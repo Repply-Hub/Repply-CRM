@@ -42,10 +42,8 @@ export function AppSidebar() {
 
   const handleMouseLeave = useCallback(() => {
     if (enterTimer.current) { clearTimeout(enterTimer.current); enterTimer.current = null; }
-    if (!collapsed) {
-      leaveTimer.current = setTimeout(() => setOpen(false), 400);
-    }
-  }, [collapsed, setOpen]);
+    leaveTimer.current = setTimeout(() => setOpen(false), 400);
+  }, [setOpen]);
 
   return (
     <Sidebar
