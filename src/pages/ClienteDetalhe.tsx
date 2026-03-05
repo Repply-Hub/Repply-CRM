@@ -225,17 +225,17 @@ const ClienteDetalhe = () => {
               </CardContent>
             </Card>
           )}
-          {cliente.email && (
-            <Card className="border-border/40">
-               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
-                 <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                 <div className="min-w-0">
-                   <p className="text-xs text-muted-foreground">Email</p>
-                   <p className="text-sm font-medium text-foreground truncate">{cliente.email}</p>
-                 </div>
-              </CardContent>
-            </Card>
-          )}
+          <Card className="border-border/40">
+             <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+               <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+               <div className="min-w-0">
+                 <p className="text-xs text-muted-foreground">Email</p>
+                 <p className={`text-sm font-medium ${cliente.email ? 'text-foreground' : 'text-muted-foreground italic'} truncate`}>
+                   {cliente.email || 'Não informado'}
+                 </p>
+               </div>
+            </CardContent>
+          </Card>
           {cliente.telefone && (
             <Card className="border-border/40">
                <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
