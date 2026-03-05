@@ -1,4 +1,4 @@
-import { LayoutDashboard, Kanban, Users, FileText, Settings } from 'lucide-react';
+import { LayoutDashboard, Kanban, Users, FileText, Settings, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { NavLink } from '@/components/NavLink';
 import logoMd from '@/assets/logo-md.webp';
@@ -24,7 +24,7 @@ const navItems = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
 
@@ -34,11 +34,17 @@ export function AppSidebar() {
         <div className="flex items-center gap-3 overflow-hidden">
           <img src={logoMd} alt="MD Representações" className="h-8 w-8 rounded-md shrink-0" />
           {!collapsed && (
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-sidebar-foreground truncate">MD Representações</p>
               <p className="text-[10px] text-sidebar-foreground/60">Gestão Comercial</p>
             </div>
           )}
+          <button
+            onClick={toggleSidebar}
+            className="shrink-0 h-7 w-7 flex items-center justify-center rounded-md hover:bg-sidebar-accent/60 text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
+          >
+            {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
         </div>
       </SidebarHeader>
 
