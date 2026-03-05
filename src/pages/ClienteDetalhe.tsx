@@ -126,7 +126,10 @@ const ClienteDetalhe = () => {
               <Icon className="h-6 w-6 text-primary" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">{cliente.empresa}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">{(cliente as any).razao_social || cliente.empresa}</h1>
+              {(cliente as any).razao_social && (cliente as any).razao_social !== cliente.empresa && (
+                <p className="text-sm text-muted-foreground truncate">{cliente.empresa}</p>
+              )}
               <Badge variant="secondary" className="mt-1">{tipoLabels[cliente.tipo] ?? cliente.tipo}</Badge>
             </div>
           </div>
