@@ -1,4 +1,4 @@
-import { LayoutDashboard, Kanban, Users, FileText, Settings, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { LayoutDashboard, Kanban, Users, FileText, Settings } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useRef, useCallback } from 'react';
 import { NavLink } from '@/components/NavLink';
@@ -28,25 +28,22 @@ export function AppSidebar() {
   const { state, setOpen } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
-  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const leaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMouseEnter = useCallback(() => {
-    if (leaveTimeout.current) {
-      clearTimeout(leaveTimeout.current);
-      leaveTimeout.current = null;
-    }
+    if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null; }
     if (collapsed) {
-      hoverTimeout.current = setTimeout(() => setOpen(true), 300);
+      enterTimer.current = setTimeout(() => setOpen(true), 300);
     }
   }, [collapsed, setOpen]);
 
   const handleMouseLeave = useCallback(() => {
-    if (hoverTimeout.current) {
-      clearTimeout(hoverTimeout.current);
-      hoverTimeout.current = null;
+    if (enterTimer.current) { clearTimeout(enterTimer.current); enterTimer.current = null; }
+    if (!collapsed) {
+      leaveTimer.current = setTimeout(() => setOpen(false), 400);
     }
-  }, []);
+  }, [collapsed, setOpen]);
 
   return (
     <Sidebar
@@ -58,18 +55,10 @@ export function AppSidebar() {
         <div className="flex items-center gap-3 overflow-hidden">
           <img src={logoMd} alt="MD Representações" className="h-8 w-8 rounded-md shrink-0" />
           {!collapsed && (
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0">
               <p className="text-sm font-bold text-sidebar-foreground truncate">MD Representações</p>
               <p className="text-[10px] text-sidebar-foreground/60">Gestão Comercial</p>
             </div>
-          )}
-          {!collapsed && (
-            <button
-              onClick={() => setOpen(false)}
-              className="shrink-0 h-7 w-7 flex items-center justify-center rounded-md hover:bg-sidebar-accent/60 text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
-            >
-              <PanelLeftClose className="h-4 w-4" />
-            </button>
           )}
         </div>
       </SidebarHeader>
