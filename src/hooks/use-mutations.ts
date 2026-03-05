@@ -24,6 +24,26 @@ export function useCreateCliente() {
   });
 }
 
+export function useUpdateCliente() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: {
+      id: string;
+      empresa?: string;
+      tipo?: string;
+      cnpj?: string;
+      email?: string;
+      telefone?: string;
+      endereco?: string;
+      nome_contato?: string;
+    }) => {
+      const { error } = await supabase.from('clientes').update(data).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['clientes'] }),
+  });
+}
+
 export function useCreatePedido() {
   const qc = useQueryClient();
   return useMutation({
