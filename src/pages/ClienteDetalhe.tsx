@@ -1,13 +1,20 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useClientes } from '@/hooks/use-clientes';
 import { usePedidos } from '@/hooks/use-pedidos';
+import { useUpdateCliente } from '@/hooks/use-mutations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2 } from 'lucide-react';
+import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil } from 'lucide-react';
 import { KANBAN_STAGES } from '@/data/mockData';
+import { toast } from 'sonner';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física' };
@@ -25,9 +32,51 @@ const ClienteDetalhe = () => {
   const navigate = useNavigate();
   const { data: clientes, isLoading: loadingClientes } = useClientes();
   const { data: pedidos, isLoading: loadingPedidos } = usePedidos();
+  const updateCliente = useUpdateCliente();
+  const [editOpen, setEditOpen] = useState(false);
 
   const cliente = clientes?.find(c => c.id === id);
   const pedidosCliente = (pedidos ?? []).filter(p => p.cliente_id === id);
+
+  // Edit form state
+  const [editData, setEditData] = useState({
+    empresa: '', tipo: '', cnpj: '', email: '', telefone: '', endereco: '', nome_contato: '',
+  });
+
+  const openEdit = () => {
+    if (!cliente) return;
+    setEditData({
+      empresa: cliente.empresa ?? '',
+      tipo: cliente.tipo ?? 'construtora',
+      cnpj: cliente.cnpj ?? '',
+      email: cliente.email ?? '',
+      telefone: cliente.telefone ?? '',
+      endereco: cliente.endereco ?? '',
+      nome_contato: cliente.nome_contato ?? '',
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    try {
+      await updateCliente.mutateAsync({
+        id,
+        empresa: editData.empresa,
+        tipo: editData.tipo,
+        cnpj: editData.cnpj || undefined,
+        email: editData.email || undefined,
+        telefone: editData.telefone || undefined,
+        endereco: editData.endereco || undefined,
+        nome_contato: editData.nome_contato || undefined,
+      });
+      toast.success('Cliente atualizado com sucesso!');
+      setEditOpen(false);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
 
   if (loadingClientes) {
     return (
@@ -59,18 +108,72 @@ const ClienteDetalhe = () => {
     <AppLayout>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/clientes')}>
-            <ArrowLeft className="h-5 w-5" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/clientes')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Icon className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">{cliente.empresa}</h1>
+              <Badge variant="secondary" className="mt-1">{tipoLabels[cliente.tipo] ?? cliente.tipo}</Badge>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={openEdit}>
+            <Pencil className="h-4 w-4 mr-1" /> Editar
           </Button>
-          <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Icon className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">{cliente.empresa}</h1>
-            <Badge variant="secondary" className="mt-1">{tipoLabels[cliente.tipo] ?? cliente.tipo}</Badge>
-          </div>
         </div>
+
+        {/* Edit Dialog */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>Editar Cliente</DialogTitle></DialogHeader>
+            <form onSubmit={handleEditSubmit} className="space-y-4 mt-2">
+              <div>
+                <Label>Tipo</Label>
+                <Select value={editData.tipo} onValueChange={v => setEditData(d => ({ ...d, tipo: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="construtora">Construtora</SelectItem>
+                    <SelectItem value="loja">Loja</SelectItem>
+                    <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>{editData.tipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ'}</Label>
+                <Input value={editData.cnpj} onChange={e => setEditData(d => ({ ...d, cnpj: e.target.value }))} placeholder={editData.tipo === 'pessoa_fisica' ? '000.000.000-00' : '00.000.000/0000-00'} />
+              </div>
+              <div>
+                <Label>Nome / Razão Social</Label>
+                <Input value={editData.empresa} onChange={e => setEditData(d => ({ ...d, empresa: e.target.value }))} required />
+              </div>
+              <div>
+                <Label>Nome do Contato</Label>
+                <Input value={editData.nome_contato} onChange={e => setEditData(d => ({ ...d, nome_contato: e.target.value }))} placeholder="Nome da pessoa de contato" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Email</Label>
+                  <Input type="email" value={editData.email} onChange={e => setEditData(d => ({ ...d, email: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Telefone</Label>
+                  <Input value={editData.telefone} onChange={e => setEditData(d => ({ ...d, telefone: e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <Label>Endereço</Label>
+                <Input value={editData.endereco} onChange={e => setEditData(d => ({ ...d, endereco: e.target.value }))} />
+              </div>
+              <Button type="submit" className="w-full" disabled={updateCliente.isPending}>
+                {updateCliente.isPending ? 'Salvando...' : 'Salvar Alterações'}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Info Cards */}
         <div className="grid gap-4 md:grid-cols-3">
