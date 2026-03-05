@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { toast } from 'sonner';
 import { EnderecoForm } from '@/components/EnderecoForm';
@@ -38,6 +38,7 @@ const ClienteDetalhe = () => {
   const updateCliente = useUpdateCliente();
   const deleteCliente = useDeleteCliente();
   const [editOpen, setEditOpen] = useState(false);
+  const [enderecoOpen, setEnderecoOpen] = useState(true);
 
   const cliente = clientes?.find(c => c.id === id);
   const pedidosCliente = (pedidos ?? []).filter(p => p.cliente_id === id);
@@ -239,18 +240,27 @@ const ClienteDetalhe = () => {
             return (
               <Card className="md:col-span-3 border-border/40">
                 <CardContent className="pt-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Endereço</p>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {fields.map(f => (
-                      <div key={f.label}>
-                        <p className="text-xs text-muted-foreground">{f.label}</p>
-                        <p className="text-sm font-medium text-foreground">{f.value}</p>
-                      </div>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    className="flex items-center justify-between w-full gap-2 mb-0 cursor-pointer"
+                    onClick={() => setEnderecoOpen(o => !o)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Endereço</p>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${enderecoOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {enderecoOpen && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
+                      {fields.map(f => (
+                        <div key={f.label}>
+                          <p className="text-xs text-muted-foreground">{f.label}</p>
+                          <p className="text-sm font-medium text-foreground">{f.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
