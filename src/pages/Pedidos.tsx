@@ -129,7 +129,7 @@ const Pedidos = () => {
             <Input className="pl-9" placeholder="Buscar pedidos..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="w-full sm:w-40 shrink-0">
               <SelectValue placeholder="Etapa" />
             </SelectTrigger>
             <SelectContent>
