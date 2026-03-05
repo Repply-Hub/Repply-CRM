@@ -48,6 +48,47 @@ export function enderecoToString(e: EnderecoFields): string {
 }
 
 export function stringToEndereco(addr: string): EnderecoFields {
-  // best-effort parse, mostly used for edit pre-fill
-  return { ...emptyEndereco, logradouro: addr };
+  if (!addr) return { ...emptyEndereco };
+  const parts = addr.split(',').map(s => s.trim());
+  const logradouro = parts[0] || '';
+  const numero = parts[1] || '';
+  // Handle variable-length: "log, num, bairro, cidade - UF, cep" or "log, num, cidade - UF, cep"
+  let complemento = '';
+  let bairro = '';
+  let cidadeUfRaw = '';
+  let cep = '';
+
+  if (parts.length >= 5) {
+    complemento = parts[2] || '';
+    bairro = parts[3] || '';
+    cidadeUfRaw = parts[4] || '';
+    cep = parts[5] || '';
+  } else if (parts.length === 4) {
+    bairro = parts[2] || '';
+    cidadeUfRaw = parts[3] || '';
+  } else if (parts.length === 3) {
+    cidadeUfRaw = parts[2] || '';
+  }
+
+  // If last part looks like a CEP (5 digits + dash + 3 digits or 8 digits), treat it as cep
+  const lastPart = parts[parts.length - 1] || '';
+  if (/^\d{5}-?\d{3}$/.test(lastPart.replace(/\s/g, ''))) {
+    cep = lastPart;
+    // Re-parse without cep
+    if (parts.length === 5) {
+      bairro = parts[2] || '';
+      cidadeUfRaw = parts[3] || '';
+      complemento = '';
+    } else if (parts.length >= 6) {
+      complemento = parts[2] || '';
+      bairro = parts[3] || '';
+      cidadeUfRaw = parts[4] || '';
+    }
+  }
+
+  const cidadeUfMatch = cidadeUfRaw.match(/^(.+?)\s*-\s*(.+)$/);
+  const cidade = cidadeUfMatch ? cidadeUfMatch[1].trim() : cidadeUfRaw;
+  const uf = cidadeUfMatch ? cidadeUfMatch[2].trim() : '';
+
+  return { cep: maskCep(cep), logradouro, numero, complemento, bairro, cidade, uf };
 }
