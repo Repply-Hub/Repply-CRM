@@ -1,4 +1,5 @@
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { KanbanColumn } from '@/components/kanban/KanbanColumn';
 import { KANBAN_STAGES } from '@/data/mockData';
@@ -7,6 +8,7 @@ import { Plus, Filter, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
+  const navigate = useNavigate();
   const { data: pedidos, isLoading } = usePedidos();
   const updateStatus = useUpdatePedidoStatus();
 
@@ -43,8 +45,12 @@ const Index = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm"><Filter className="h-4 w-4 mr-1" /> Filtrar</Button>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Pedido</Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/pedidos')}>
+              <Filter className="h-4 w-4 mr-1" /> Ver Pedidos
+            </Button>
+            <Button size="sm" onClick={() => navigate('/pedidos')}>
+              <Plus className="h-4 w-4 mr-1" /> Novo Pedido
+            </Button>
           </div>
         </div>
 
