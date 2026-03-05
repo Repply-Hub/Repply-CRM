@@ -32,13 +32,15 @@ const Pedidos = () => {
   const { data: clientes } = useClientes();
   const createPedido = useCreatePedido();
   const [search, setSearch] = useState('');
+  const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: contatos } = useHistoricoContatos(selectedOrder);
 
   const filtered = (pedidos ?? []).filter(p =>
-    (p.cliente?.empresa ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.fabricante?.nome ?? '').toLowerCase().includes(search.toLowerCase())
+    ((p.cliente?.empresa ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (p.fabricante?.nome ?? '').toLowerCase().includes(search.toLowerCase())) &&
+    (stageFilter === 'todos' || p.status === stageFilter)
   );
 
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
@@ -121,9 +123,22 @@ const Pedidos = () => {
           </div>
         </div>
 
-        <div className="relative mb-4 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar pedidos..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Buscar pedidos..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <Select value={stageFilter} onValueChange={setStageFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Etapa" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas as etapas</SelectItem>
+              {KANBAN_STAGES.map(s => (
+                <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {isLoading ? (
