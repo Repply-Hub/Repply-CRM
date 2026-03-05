@@ -24,6 +24,7 @@ const Clientes = () => {
   const { data: clients, isLoading } = useClientes();
   const createCliente = useCreateCliente();
   const [search, setSearch] = useState('');
+  const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
@@ -34,7 +35,8 @@ const Clientes = () => {
   const [telefone, setTelefone] = useState('');
 
   const filtered = (clients ?? []).filter(c =>
-    c.empresa.toLowerCase().includes(search.toLowerCase())
+    c.empresa.toLowerCase().includes(search.toLowerCase()) &&
+    (tipoFilter === 'todos' || c.tipo === tipoFilter)
   );
 
   const handleCnpjChange = (value: string) => {
@@ -161,9 +163,20 @@ const Clientes = () => {
           </Dialog>
         </div>
 
-        <div className="relative mb-4 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar clientes..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <div className="relative max-w-sm flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Buscar clientes..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <Select value={tipoFilter} onValueChange={setTipoFilter}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por tipo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              <SelectItem value="construtora">Construtora</SelectItem>
+              <SelectItem value="loja">Loja</SelectItem>
+              <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {isLoading ? (
