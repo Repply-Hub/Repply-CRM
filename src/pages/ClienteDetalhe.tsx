@@ -110,20 +110,20 @@ const ClienteDetalhe = () => {
     <AppLayout>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/clientes')}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate('/clientes')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Icon className="h-6 w-6 text-primary" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{cliente.empresa}</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">{cliente.empresa}</h1>
               <Badge variant="secondary" className="mt-1">{tipoLabels[cliente.tipo] ?? cliente.tipo}</Badge>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0 pl-14 sm:pl-0">
             <Button variant="outline" size="sm" onClick={openEdit}>
               <Pencil className="h-4 w-4 mr-1" /> Editar
             </Button>
@@ -215,45 +215,45 @@ const ClienteDetalhe = () => {
         <div className="grid gap-4 md:grid-cols-3">
           {cliente.cnpj && (
             <Card>
-              <CardContent className="pt-4 flex items-center gap-3">
-                <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">CNPJ</p>
-                  <p className="text-sm font-medium text-foreground">{cliente.cnpj}</p>
-                </div>
+               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+                 <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                 <div className="min-w-0">
+                   <p className="text-xs text-muted-foreground">CNPJ</p>
+                   <p className="text-sm font-medium text-foreground break-all">{cliente.cnpj}</p>
+                 </div>
               </CardContent>
             </Card>
           )}
           {cliente.email && (
             <Card>
-              <CardContent className="pt-4 flex items-center gap-3">
-                <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Email</p>
-                  <p className="text-sm font-medium text-foreground">{cliente.email}</p>
-                </div>
+               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+                 <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                 <div className="min-w-0">
+                   <p className="text-xs text-muted-foreground">Email</p>
+                   <p className="text-sm font-medium text-foreground truncate">{cliente.email}</p>
+                 </div>
               </CardContent>
             </Card>
           )}
           {cliente.telefone && (
             <Card>
-              <CardContent className="pt-4 flex items-center gap-3">
-                <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Telefone</p>
-                  <p className="text-sm font-medium text-foreground">{cliente.telefone}</p>
-                </div>
+               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+                 <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                 <div className="min-w-0">
+                   <p className="text-xs text-muted-foreground">Telefone</p>
+                   <p className="text-sm font-medium text-foreground break-all">{cliente.telefone}</p>
+                 </div>
               </CardContent>
             </Card>
           )}
           {cliente.endereco && (
             <Card className="md:col-span-3">
-              <CardContent className="pt-4 flex items-center gap-3">
-                <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Endereço</p>
-                  <p className="text-sm font-medium text-foreground">{cliente.endereco}</p>
-                </div>
+               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+                 <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                 <div className="min-w-0">
+                   <p className="text-xs text-muted-foreground">Endereço</p>
+                   <p className="text-sm font-medium text-foreground break-words">{cliente.endereco}</p>
+                 </div>
               </CardContent>
             </Card>
           )}
