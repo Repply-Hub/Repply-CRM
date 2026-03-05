@@ -29,6 +29,7 @@ const Clientes = () => {
   const [cnpj, setCnpj] = useState('');
   const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
   const [empresa, setEmpresa] = useState('');
+  const [razaoSocial, setRazaoSocial] = useState('');
   const [endereco, setEndereco] = useState<EnderecoFields>(emptyEndereco);
   const [telefone, setTelefone] = useState('');
 
@@ -54,6 +55,7 @@ const Clientes = () => {
       const data = await fetchCnpjData(digits);
       setCnpjStatus('valid');
       if (data.razao_social && !empresa) setEmpresa(data.razao_social);
+      if (data.razao_social && !razaoSocial) setRazaoSocial(data.razao_social);
       if (!endereco.logradouro) {
         setEndereco(prev => ({
           ...prev,
@@ -74,7 +76,7 @@ const Clientes = () => {
   };
 
   const resetForm = () => {
-    setCnpj(''); setEmpresa(''); setEndereco(emptyEndereco); setTelefone(''); setCnpjStatus('idle');
+    setCnpj(''); setEmpresa(''); setRazaoSocial(''); setEndereco(emptyEndereco); setTelefone(''); setCnpjStatus('idle');
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -88,6 +90,7 @@ const Clientes = () => {
     try {
       await createCliente.mutateAsync({
         empresa: empresa || (form.get('empresa') as string),
+        razao_social: razaoSocial || undefined,
         tipo,
         cnpj: cnpj || undefined,
         email: (form.get('email') as string) || undefined,
@@ -143,7 +146,8 @@ const Clientes = () => {
                   </div>
                   {tipo !== 'pessoa_fisica' && <p className="text-[10px] text-muted-foreground mt-1">Ao sair do campo, o CNPJ será validado e os dados preenchidos automaticamente</p>}
                 </div>
-                <div><Label>Nome / Razão Social</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} required placeholder="Nome da empresa ou pessoa" /></div>
+                <div><Label>Nome</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} required placeholder="Nome fantasia ou nome" /></div>
+                <div><Label>Razão Social</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" /></div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
                   <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
