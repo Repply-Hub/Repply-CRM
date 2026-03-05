@@ -215,7 +215,7 @@ const ClienteDetalhe = () => {
         {/* Info Cards */}
         <div className="grid gap-4 md:grid-cols-3">
           {cliente.cnpj && (
-            <Card>
+            <Card className="border-border/40">
                <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
                  <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                  <div className="min-w-0">
@@ -226,7 +226,7 @@ const ClienteDetalhe = () => {
             </Card>
           )}
           {cliente.email && (
-            <Card>
+            <Card className="border-border/40">
                <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
                  <div className="min-w-0">
@@ -237,7 +237,7 @@ const ClienteDetalhe = () => {
             </Card>
           )}
           {cliente.telefone && (
-            <Card>
+            <Card className="border-border/40">
                <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
                  <div className="min-w-0">
@@ -269,7 +269,7 @@ const ClienteDetalhe = () => {
             ].filter(f => f.value);
 
             return (
-              <Card className="md:col-span-3">
+              <Card className="md:col-span-3 border-border/40">
                 <CardContent className="pt-4">
                   <div className="flex items-center gap-2 mb-4">
                     <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -291,7 +291,7 @@ const ClienteDetalhe = () => {
 
         {/* Obras */}
         {cliente.obras && cliente.obras.length > 0 && (
-          <Card>
+          <Card className="border-border/40">
             <CardHeader>
               <CardTitle className="text-base">Obras Vinculadas</CardTitle>
             </CardHeader>
@@ -314,7 +314,7 @@ const ClienteDetalhe = () => {
         )}
 
         {/* Pedidos */}
-        <Card>
+        <Card className="border-border/40">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="text-base">Pedidos</CardTitle>
             <Button size="sm" onClick={() => navigate('/pedidos')}>
