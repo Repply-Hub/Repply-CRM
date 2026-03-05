@@ -1,0 +1,139 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+
+export function useObrasByCliente(clienteId: string | null) {
+  return useQuery({
+    queryKey: ['obras', clienteId],
+    enabled: !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('obras')
+        .select('*')
+        .eq('cliente_id', clienteId!)
+        .order('nome_obra');
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useTabelaPrecos(fabricanteId: string | null) {
+  return useQuery({
+    queryKey: ['tabela_precos', fabricanteId],
+    enabled: !!fabricanteId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tabela_precos')
+        .select('*')
+        .eq('fabricante_id', fabricanteId!)
+        .eq('vigente', true)
+        .order('descricao_material');
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useMyVendedorId() {
+  return useQuery({
+    queryKey: ['my_vendedor_id'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_my_vendedor_id');
+      if (error) throw error;
+      return data as string;
+    },
+  });
+}
+
+export function useIsGestor() {
+  return useQuery({
+    queryKey: ['is_gestor'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('is_gestor');
+      if (error) throw error;
+      return data as boolean;
+    },
+  });
+}
+
+export interface NovoPedidoPayload {
+  cliente_id: string;
+  fabricante_id: string;
+  vendedor_id: string;
+  obra_id?: string;
+  data_pedido: string;
+  prazo_resposta?: string;
+  origem_lead?: string;
+  endereco_entrega?: string;
+  observacoes?: string;
+  itens: {
+    descricao_material: string;
+    referencia_fabricante?: string;
+    quantidade: number;
+    unidade?: string;
+    preco_unitario: number;
+  }[];
+  proximo_contato?: string;
+}
+
+export function useCreatePedidoCompleto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: NovoPedidoPayload) => {
+      // 1. Create pedido
+      const { data: pedido, error: pedidoErr } = await supabase
+        .from('pedidos')
+        .insert({
+          cliente_id: payload.cliente_id,
+          fabricante_id: payload.fabricante_id,
+          vendedor_id: payload.vendedor_id,
+          obra_id: payload.obra_id || null,
+          data_pedido: payload.data_pedido,
+          status: 'novo_lead',
+          observacoes: payload.observacoes || null,
+          // new fields via .insert with any
+        } as any)
+        .select('id')
+        .single();
+      if (pedidoErr) throw pedidoErr;
+
+      // Update new columns separately since types may not be generated yet
+      if (payload.prazo_resposta || payload.origem_lead || payload.endereco_entrega) {
+        const updates: Record<string, any> = {};
+        if (payload.prazo_resposta) updates.prazo_resposta = payload.prazo_resposta;
+        if (payload.origem_lead) updates.origem_lead = payload.origem_lead;
+        if (payload.endereco_entrega) updates.endereco_entrega = payload.endereco_entrega;
+        await supabase.from('pedidos').update(updates as any).eq('id', pedido.id);
+      }
+
+      // 2. Insert items
+      const itensData = payload.itens.map(item => ({
+        pedido_id: pedido.id,
+        descricao_material: item.descricao_material,
+        referencia_fabricante: item.referencia_fabricante || null,
+        quantidade: item.quantidade,
+        unidade: item.unidade || null,
+        preco_unitario: item.preco_unitario,
+        preco_total: item.quantidade * item.preco_unitario,
+      }));
+      const { error: itensErr } = await supabase.from('itens_pedido').insert(itensData);
+      if (itensErr) throw itensErr;
+
+      // 3. Insert historico_contatos if proximo_contato set
+      if (payload.proximo_contato) {
+        await supabase.from('historico_contatos').insert({
+          pedido_id: pedido.id,
+          vendedor_id: payload.vendedor_id,
+          tipo: 'automatico',
+          descricao: 'Contato agendado na criação do pedido',
+          proximo_contato_em: payload.proximo_contato,
+        });
+      }
+
+      return pedido;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pedidos'] });
+    },
+  });
+}
