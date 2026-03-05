@@ -8,10 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
+import { useCreateVendedor, useCreateFabricante } from '@/hooks/use-mutations';
 import { Plus, Upload, Sun, Moon, Monitor, Loader2 } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -53,6 +57,44 @@ const Configuracoes = () => {
   const [alertDays, setAlertDays] = useState('5');
   const { data: vendedoresData, isLoading: loadV } = useVendedores();
   const { data: fabricantesData, isLoading: loadF } = useFabricantes();
+  const createVendedor = useCreateVendedor();
+  const createFabricante = useCreateFabricante();
+  const [vendedorDialog, setVendedorDialog] = useState(false);
+  const [fabricanteDialog, setFabricanteDialog] = useState(false);
+
+  const handleCreateVendedor = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    try {
+      await createVendedor.mutateAsync({
+        nome: form.get('nome') as string,
+        email: form.get('email') as string,
+        telefone: (form.get('telefone') as string) || undefined,
+        role: (form.get('role') as string) || 'vendedor',
+      });
+      toast.success('Vendedor cadastrado!');
+      setVendedorDialog(false);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleCreateFabricante = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    try {
+      await createFabricante.mutateAsync({
+        nome: form.get('nome') as string,
+        cnpj: (form.get('cnpj') as string) || undefined,
+        nome_contato: (form.get('nome_contato') as string) || undefined,
+        telefone: (form.get('telefone') as string) || undefined,
+      });
+      toast.success('Fabricante cadastrado!');
+      setFabricanteDialog(false);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
 
   return (
     <AppLayout>
@@ -67,7 +109,7 @@ const Configuracoes = () => {
             <TabsTrigger value="aparencia">Aparência</TabsTrigger>
             <TabsTrigger value="vendedores">Vendedores</TabsTrigger>
             <TabsTrigger value="automacao">Automação</TabsTrigger>
-            <TabsTrigger value="tabelas">Tabelas de Preço</TabsTrigger>
+            <TabsTrigger value="tabelas">Fabricantes</TabsTrigger>
           </TabsList>
 
           <TabsContent value="aparencia" className="mt-4"><ThemeSelector /></TabsContent>
@@ -79,7 +121,32 @@ const Configuracoes = () => {
                   <CardTitle className="text-base">Vendedores</CardTitle>
                   <CardDescription>Cadastro e permissões dos vendedores</CardDescription>
                 </div>
-                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Vendedor</Button>
+                <Dialog open={vendedorDialog} onOpenChange={setVendedorDialog}>
+                  <DialogTrigger asChild>
+                    <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Vendedor</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Cadastrar Vendedor</DialogTitle></DialogHeader>
+                    <form onSubmit={handleCreateVendedor} className="space-y-4 mt-2">
+                      <div><Label>Nome</Label><Input name="nome" required placeholder="Nome completo" /></div>
+                      <div><Label>Email</Label><Input name="email" type="email" required placeholder="email@exemplo.com" /></div>
+                      <div><Label>Telefone</Label><Input name="telefone" placeholder="(00) 0000-0000" /></div>
+                      <div>
+                        <Label>Perfil</Label>
+                        <Select name="role" defaultValue="vendedor">
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="vendedor">Vendedor</SelectItem>
+                            <SelectItem value="gestor">Gestor</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button type="submit" className="w-full" disabled={createVendedor.isPending}>
+                        {createVendedor.isPending ? 'Salvando...' : 'Salvar Vendedor'}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </CardHeader>
               <CardContent>
                 {loadV ? (
@@ -91,7 +158,6 @@ const Configuracoes = () => {
                         <TableHead>Nome</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
-                        <TableHead>Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -100,7 +166,6 @@ const Configuracoes = () => {
                           <TableCell className="font-medium">{v.nome}</TableCell>
                           <TableCell>{v.email}</TableCell>
                           <TableCell><Badge variant={v.role === 'gestor' ? 'default' : 'secondary'}>{v.role}</Badge></TableCell>
-                          <TableCell><Button variant="ghost" size="sm">Editar</Button></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -148,7 +213,23 @@ const Configuracoes = () => {
                   <CardTitle className="text-base">Fabricantes</CardTitle>
                   <CardDescription>Fabricantes cadastrados</CardDescription>
                 </div>
-                <Button size="sm"><Upload className="h-4 w-4 mr-1" /> Importar Tabela</Button>
+                <Dialog open={fabricanteDialog} onOpenChange={setFabricanteDialog}>
+                  <DialogTrigger asChild>
+                    <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Fabricante</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Cadastrar Fabricante</DialogTitle></DialogHeader>
+                    <form onSubmit={handleCreateFabricante} className="space-y-4 mt-2">
+                      <div><Label>Nome</Label><Input name="nome" required placeholder="Nome do fabricante" /></div>
+                      <div><Label>CNPJ</Label><Input name="cnpj" placeholder="00.000.000/0000-00" /></div>
+                      <div><Label>Contato</Label><Input name="nome_contato" placeholder="Nome do contato" /></div>
+                      <div><Label>Telefone</Label><Input name="telefone" placeholder="(00) 0000-0000" /></div>
+                      <Button type="submit" className="w-full" disabled={createFabricante.isPending}>
+                        {createFabricante.isPending ? 'Salvando...' : 'Salvar Fabricante'}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </CardHeader>
               <CardContent>
                 {loadF ? (
@@ -159,8 +240,8 @@ const Configuracoes = () => {
                       <TableRow>
                         <TableHead>Fabricante</TableHead>
                         <TableHead>CNPJ</TableHead>
+                        <TableHead>Contato</TableHead>
                         <TableHead>Última Atualização Preço</TableHead>
-                        <TableHead>Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -168,8 +249,8 @@ const Configuracoes = () => {
                         <TableRow key={f.id}>
                           <TableCell className="font-medium">{f.nome}</TableCell>
                           <TableCell>{f.cnpj ?? '-'}</TableCell>
+                          <TableCell>{f.nome_contato ?? '-'}</TableCell>
                           <TableCell>{f.ultima_atualizacao_preco ? new Date(f.ultima_atualizacao_preco).toLocaleDateString('pt-BR') : '-'}</TableCell>
-                          <TableCell><Button variant="ghost" size="sm">Atualizar</Button></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
