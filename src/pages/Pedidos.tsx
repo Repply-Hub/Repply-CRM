@@ -1,16 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { usePedidos, useHistoricoContatos } from '@/hooks/use-pedidos';
-import { useFabricantes, useClientes } from '@/hooks/use-clientes';
-import { useCreatePedido } from '@/hooks/use-mutations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -27,14 +24,11 @@ const stageColors: Record<string, string> = {
 const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone, whatsapp: MessageSquare, visita: Eye };
 
 const Pedidos = () => {
+  const navigate = useNavigate();
   const { data: pedidos, isLoading } = usePedidos();
-  const { data: fabricantes } = useFabricantes();
-  const { data: clientes } = useClientes();
-  const createPedido = useCreatePedido();
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const { data: contatos } = useHistoricoContatos(selectedOrder);
 
   const filtered = (pedidos ?? []).filter(p =>
@@ -45,32 +39,6 @@ const Pedidos = () => {
 
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const clienteId = form.get('cliente_id') as string;
-    const fabricanteId = form.get('fabricante_id') as string;
-    const valor = parseFloat(form.get('valor') as string) || 0;
-
-    if (!clienteId || !fabricanteId) {
-      toast.error('Selecione cliente e fabricante');
-      return;
-    }
-
-    try {
-      await createPedido.mutateAsync({
-        cliente_id: clienteId,
-        fabricante_id: fabricanteId,
-        valor_total: valor,
-        observacoes: (form.get('observacoes') as string) || undefined,
-      });
-      toast.success('Pedido criado com sucesso!');
-      setDialogOpen(false);
-    } catch (err: any) {
-      toast.error(err.message);
-    }
-  };
-
   return (
     <AppLayout>
       <div className="p-6">
@@ -79,47 +47,13 @@ const Pedidos = () => {
             <h1 className="text-2xl font-bold text-foreground">Pedidos & Orçamentos</h1>
             <p className="text-sm text-muted-foreground mt-1">{pedidos?.length ?? 0} pedidos</p>
           </div>
-          <div className="flex gap-2">
+           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => toast.info('Importação XLSX em breve!')}>
               <Upload className="h-4 w-4 mr-1" /> Importar XLSX
             </Button>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Pedido</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader><DialogTitle>Novo Pedido</DialogTitle></DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-                  <div>
-                    <Label>Cliente</Label>
-                    <Select name="cliente_id">
-                      <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
-                      <SelectContent>
-                        {(clientes ?? []).map(c => (
-                          <SelectItem key={c.id} value={c.id}>{c.empresa}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Fabricante</Label>
-                    <Select name="fabricante_id">
-                      <SelectTrigger><SelectValue placeholder="Selecionar fabricante" /></SelectTrigger>
-                      <SelectContent>
-                        {(fabricantes ?? []).map(f => (
-                          <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div><Label>Valor Total</Label><Input name="valor" type="number" step="0.01" placeholder="0,00" /></div>
-                  <div><Label>Observações</Label><Input name="observacoes" placeholder="Observações (opcional)" /></div>
-                  <Button type="submit" className="w-full" disabled={createPedido.isPending}>
-                    {createPedido.isPending ? 'Criando...' : 'Criar Pedido'}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
+              <Plus className="h-4 w-4 mr-1" /> Novo Pedido
+            </Button>
           </div>
         </div>
 

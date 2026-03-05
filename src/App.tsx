@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Clientes from "./pages/Clientes";
 import ClienteDetalhe from "./pages/ClienteDetalhe";
 import Pedidos from "./pages/Pedidos";
+import NovoPedido from "./pages/NovoPedido";
 import Dashboard from "./pages/Dashboard";
 import Configuracoes from "./pages/Configuracoes";
 import Login from "./pages/Login";
@@ -37,6 +38,7 @@ const AppRoutes = () => (
     <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
     <Route path="/clientes/:id" element={<ProtectedRoute><ClienteDetalhe /></ProtectedRoute>} />
     <Route path="/pedidos" element={<ProtectedRoute><Pedidos /></ProtectedRoute>} />
+    <Route path="/pedidos/novo" element={<ProtectedRoute><NovoPedido /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
