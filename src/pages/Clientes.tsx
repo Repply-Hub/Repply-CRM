@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
+import { EnderecoForm } from '@/components/EnderecoForm';
+import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física' };
@@ -27,7 +29,7 @@ const Clientes = () => {
   const [cnpj, setCnpj] = useState('');
   const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
   const [empresa, setEmpresa] = useState('');
-  const [endereco, setEndereco] = useState('');
+  const [endereco, setEndereco] = useState<EnderecoFields>(emptyEndereco);
   const [telefone, setTelefone] = useState('');
 
   const filtered = (clients ?? []).filter(c =>
@@ -52,8 +54,17 @@ const Clientes = () => {
       const data = await fetchCnpjData(digits);
       setCnpjStatus('valid');
       if (data.razao_social && !empresa) setEmpresa(data.razao_social);
-      const addr = [data.logradouro, data.numero, data.bairro, `${data.municipio} - ${data.uf}`].filter(Boolean).join(', ');
-      if (addr && !endereco) setEndereco(addr);
+      if (!endereco.logradouro) {
+        setEndereco(prev => ({
+          ...prev,
+          logradouro: data.logradouro || prev.logradouro,
+          numero: data.numero || prev.numero,
+          bairro: data.bairro || prev.bairro,
+          cidade: data.municipio || prev.cidade,
+          uf: data.uf || prev.uf,
+          cep: data.cep || prev.cep,
+        }));
+      }
       if (data.ddd_telefone_1 && !telefone) setTelefone(data.ddd_telefone_1);
       toast.success('CNPJ validado! Dados preenchidos automaticamente.');
     } catch {
@@ -63,7 +74,7 @@ const Clientes = () => {
   };
 
   const resetForm = () => {
-    setCnpj(''); setEmpresa(''); setEndereco(''); setTelefone(''); setCnpjStatus('idle');
+    setCnpj(''); setEmpresa(''); setEndereco(emptyEndereco); setTelefone(''); setCnpjStatus('idle');
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -73,6 +84,7 @@ const Clientes = () => {
       toast.error('CNPJ inválido');
       return;
     }
+    const enderecoStr = enderecoToString(endereco);
     try {
       await createCliente.mutateAsync({
         empresa: empresa || (form.get('empresa') as string),
@@ -80,7 +92,7 @@ const Clientes = () => {
         cnpj: cnpj || undefined,
         email: (form.get('email') as string) || undefined,
         telefone: telefone || undefined,
-        endereco: endereco || undefined,
+        endereco: enderecoStr || undefined,
       });
       toast.success('Cliente cadastrado com sucesso!');
       resetForm();
@@ -102,7 +114,7 @@ const Clientes = () => {
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Cliente</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Cadastrar Cliente</DialogTitle></DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-2">
                 <div>
@@ -136,7 +148,7 @@ const Clientes = () => {
                   <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
                   <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
                 </div>
-                <div><Label>Endereço</Label><Input value={endereco} onChange={e => setEndereco(e.target.value)} placeholder="Rua, número, cidade - UF" /></div>
+                <EnderecoForm value={endereco} onChange={setEndereco} />
                 <Button type="submit" className="w-full" disabled={createCliente.isPending}>
                   {createCliente.isPending ? 'Salvando...' : 'Salvar Cliente'}
                 </Button>
