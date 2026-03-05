@@ -285,10 +285,13 @@ export type Database = {
           cliente_id: string
           created_at: string
           data_pedido: string
+          endereco_entrega: string | null
           fabricante_id: string
           id: string
           obra_id: string | null
           observacoes: string | null
+          origem_lead: string | null
+          prazo_resposta: string | null
           status: string
           updated_at: string
           valor_total: number | null
@@ -298,10 +301,13 @@ export type Database = {
           cliente_id: string
           created_at?: string
           data_pedido?: string
+          endereco_entrega?: string | null
           fabricante_id: string
           id?: string
           obra_id?: string | null
           observacoes?: string | null
+          origem_lead?: string | null
+          prazo_resposta?: string | null
           status?: string
           updated_at?: string
           valor_total?: number | null
@@ -311,10 +317,13 @@ export type Database = {
           cliente_id?: string
           created_at?: string
           data_pedido?: string
+          endereco_entrega?: string | null
           fabricante_id?: string
           id?: string
           obra_id?: string | null
           observacoes?: string | null
+          origem_lead?: string | null
+          prazo_resposta?: string | null
           status?: string
           updated_at?: string
           valor_total?: number | null
