@@ -247,17 +247,46 @@ const ClienteDetalhe = () => {
               </CardContent>
             </Card>
           )}
-          {cliente.endereco && (
-            <Card className="md:col-span-3">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <p className="text-xs text-muted-foreground">Endereço</p>
-                </div>
-                <p className="text-sm font-medium text-foreground break-words">{cliente.endereco}</p>
-              </CardContent>
-            </Card>
-          )}
+          {cliente.endereco && (() => {
+            // Parse "logradouro, numero, complemento, bairro, cidade - UF, CEP" format
+            const parts = cliente.endereco.split(',').map(s => s.trim());
+            const logradouro = parts[0] || '';
+            const numero = parts[1] || '';
+            const bairro = parts.length > 3 ? parts[2] : '';
+            const cidadeUfRaw = parts.length > 3 ? parts[3] : parts[2] || '';
+            const cep = parts.length > 4 ? parts[4] : '';
+            const cidadeUfMatch = cidadeUfRaw.match(/^(.+?)\s*-\s*(.+)$/);
+            const cidade = cidadeUfMatch ? cidadeUfMatch[1].trim() : cidadeUfRaw;
+            const uf = cidadeUfMatch ? cidadeUfMatch[2].trim() : '';
+            
+            const fields = [
+              { label: 'Logradouro', value: logradouro },
+              { label: 'Número', value: numero },
+              { label: 'Bairro', value: bairro },
+              { label: 'Cidade', value: cidade },
+              { label: 'UF', value: uf },
+              { label: 'CEP', value: cep },
+            ].filter(f => f.value);
+
+            return (
+              <Card className="md:col-span-3">
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Endereço</p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {fields.map(f => (
+                      <div key={f.label}>
+                        <p className="text-xs text-muted-foreground">{f.label}</p>
+                        <p className="text-sm font-medium text-foreground">{f.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
         </div>
 
         {/* Obras */}
