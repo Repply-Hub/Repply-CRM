@@ -57,6 +57,13 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        kanban: {
+          new: "hsl(var(--kanban-new))",
+          budget: "hsl(var(--kanban-budget))",
+          sent: "hsl(var(--kanban-sent))",
+          negotiation: "hsl(var(--kanban-negotiation))",
+          closed: "hsl(var(--kanban-closed))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
