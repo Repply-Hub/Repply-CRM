@@ -123,29 +123,28 @@ const Pedidos = () => {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 mb-4 w-full">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Buscar pedidos..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="w-full sm:w-48 shrink-0">
-              <SelectValue placeholder="Etapa" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todas as etapas</SelectItem>
-              {KANBAN_STAGES.map(s => (
-                <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         {isLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : (
           <div className="flex gap-6">
             <div className="flex-1">
+              <div className="flex flex-col sm:flex-row gap-3 mb-4 w-full">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input className="pl-9" placeholder="Buscar pedidos..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                </div>
+                <Select value={stageFilter} onValueChange={setStageFilter}>
+                  <SelectTrigger className="w-full sm:w-48 shrink-0">
+                    <SelectValue placeholder="Etapa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas as etapas</SelectItem>
+                    {KANBAN_STAGES.map(s => (
+                      <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
