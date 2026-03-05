@@ -48,7 +48,7 @@ const Index = () => {
             <Button variant="outline" size="sm" onClick={() => navigate('/pedidos')}>
               <Filter className="h-4 w-4 mr-1" /> Ver Pedidos
             </Button>
-            <Button size="sm" onClick={() => navigate('/pedidos')}>
+            <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
               <Plus className="h-4 w-4 mr-1" /> Novo Pedido
             </Button>
           </div>
