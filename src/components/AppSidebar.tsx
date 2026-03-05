@@ -1,6 +1,7 @@
-import { LayoutDashboard, Kanban, Users, FileText, Settings } from 'lucide-react';
+import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useRef, useCallback } from 'react';
+import { useAuth } from '@/hooks/use-auth';
 import { NavLink } from '@/components/NavLink';
 import logoMd from '@/assets/logo-md.webp';
 import {
@@ -26,6 +27,7 @@ const navItems = [
 
 export function AppSidebar() {
   const { state, setOpen } = useSidebar();
+  const { signOut } = useAuth();
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -88,17 +90,13 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-3">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className="h-8 w-8 rounded-full bg-sidebar-primary flex items-center justify-center text-xs font-bold text-sidebar-primary-foreground shrink-0">
-            CM
-          </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">Carlos Mendes</p>
-              <p className="text-xs text-sidebar-foreground/60">Vendedor</p>
-            </div>
-          )}
-        </div>
+        <button
+          onClick={() => signOut()}
+          className="flex items-center gap-3 overflow-hidden w-full rounded-md px-2 py-1.5 hover:bg-sidebar-accent/60 transition-colors"
+        >
+          <LogOut className="h-4 w-4 shrink-0 text-sidebar-foreground/60" />
+          {!collapsed && <span className="text-sm text-sidebar-foreground">Sair</span>}
+        </button>
       </SidebarFooter>
     </Sidebar>
   );

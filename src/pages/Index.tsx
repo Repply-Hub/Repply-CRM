@@ -1,26 +1,33 @@
-import { useState } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { AppLayout } from '@/components/AppLayout';
 import { KanbanColumn } from '@/components/kanban/KanbanColumn';
-import { mockOrders, KANBAN_STAGES } from '@/data/mockData';
-import { Order, KanbanStage } from '@/types';
-import { Plus, Filter } from 'lucide-react';
+import { KANBAN_STAGES } from '@/data/mockData';
+import { usePedidos, useUpdatePedidoStatus } from '@/hooks/use-pedidos';
+import { Plus, Filter, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const { data: pedidos, isLoading } = usePedidos();
+  const updateStatus = useUpdatePedidoStatus();
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     const { draggableId, destination } = result;
-    setOrders(prev =>
-      prev.map(o =>
-        o.id === draggableId
-          ? { ...o, stage: destination.droppableId as KanbanStage, daysInStage: 0 }
-          : o
-      )
-    );
+    updateStatus.mutate({ id: draggableId, status: destination.droppableId });
   };
+
+  const orders = (pedidos ?? []).map(p => ({
+    id: p.id,
+    clientName: p.cliente?.empresa ?? 'Sem cliente',
+    obra: p.obra?.nome_obra ?? '-',
+    fabricante: p.fabricante?.nome ?? '-',
+    valor: p.valor_total ?? 0,
+    stage: p.status as any,
+    daysInStage: Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000),
+    alertDays: 7,
+    vendedor: p.vendedor?.nome ?? '-',
+    createdAt: p.data_pedido,
+  }));
 
   const totalPipeline = orders.reduce((acc, o) => acc + o.valor, 0);
 
@@ -36,28 +43,30 @@ const Index = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-1" /> Filtrar
-            </Button>
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" /> Novo Pedido
-            </Button>
+            <Button variant="outline" size="sm"><Filter className="h-4 w-4 mr-1" /> Filtrar</Button>
+            <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Pedido</Button>
           </div>
         </div>
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {KANBAN_STAGES.map(stage => (
-              <KanbanColumn
-                key={stage.key}
-                stageKey={stage.key}
-                label={stage.label}
-                colorClass={stage.color}
-                orders={orders.filter(o => o.stage === stage.key)}
-              />
-            ))}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        </DragDropContext>
+        ) : (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {KANBAN_STAGES.map(stage => (
+                <KanbanColumn
+                  key={stage.key}
+                  stageKey={stage.key}
+                  label={stage.label}
+                  colorClass={stage.color}
+                  orders={orders.filter(o => o.stage === stage.key)}
+                />
+              ))}
+            </div>
+          </DragDropContext>
+        )}
       </div>
     </AppLayout>
   );
