@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { mockVendedores, mockFabricantes } from '@/data/mockData';
-import { Plus, Upload, Sun, Moon, Monitor } from 'lucide-react';
+import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
+import { Plus, Upload, Sun, Moon, Monitor, Loader2 } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 
@@ -35,9 +35,7 @@ function ThemeSelector() {
               onClick={() => setTheme(opt.value)}
               className={cn(
                 'flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all',
-                theme === opt.value
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/40'
+                theme === opt.value ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
               )}
             >
               <opt.icon className={cn('h-6 w-6', theme === opt.value ? 'text-primary' : 'text-muted-foreground')} />
@@ -53,6 +51,8 @@ function ThemeSelector() {
 
 const Configuracoes = () => {
   const [alertDays, setAlertDays] = useState('5');
+  const { data: vendedoresData, isLoading: loadV } = useVendedores();
+  const { data: fabricantesData, isLoading: loadF } = useFabricantes();
 
   return (
     <AppLayout>
@@ -70,9 +70,7 @@ const Configuracoes = () => {
             <TabsTrigger value="tabelas">Tabelas de Preço</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="aparencia" className="mt-4">
-            <ThemeSelector />
-          </TabsContent>
+          <TabsContent value="aparencia" className="mt-4"><ThemeSelector /></TabsContent>
 
           <TabsContent value="vendedores" className="mt-4">
             <Card>
@@ -84,32 +82,30 @@ const Configuracoes = () => {
                 <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Vendedor</Button>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mockVendedores.map(v => (
-                      <TableRow key={v.id}>
-                        <TableCell className="font-medium">{v.nome}</TableCell>
-                        <TableCell>{v.email}</TableCell>
-                        <TableCell>
-                          <Badge variant={v.ativo ? 'default' : 'secondary'}>
-                            {v.ativo ? 'Ativo' : 'Inativo'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm">Editar</Button>
-                        </TableCell>
+                {loadV ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Ações</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {(vendedoresData ?? []).map(v => (
+                        <TableRow key={v.id}>
+                          <TableCell className="font-medium">{v.nome}</TableCell>
+                          <TableCell>{v.email}</TableCell>
+                          <TableCell><Badge variant={v.role === 'gestor' ? 'default' : 'secondary'}>{v.role}</Badge></TableCell>
+                          <TableCell><Button variant="ghost" size="sm">Editar</Button></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -119,7 +115,7 @@ const Configuracoes = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Alertas de Inatividade</CardTitle>
-                  <CardDescription>Configure o tempo máximo que um pedido pode ficar parado em uma etapa</CardDescription>
+                  <CardDescription>Configure o tempo máximo que um pedido pode ficar parado</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-4">
@@ -142,16 +138,6 @@ const Configuracoes = () => {
                   </div>
                 </CardContent>
               </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Templates de Mensagem</CardTitle>
-                  <CardDescription>Modelos para envio rápido de comunicações</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Template</Button>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
 
@@ -159,34 +145,36 @@ const Configuracoes = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-base">Tabelas de Preço</CardTitle>
-                  <CardDescription>Tabelas vigentes dos fabricantes</CardDescription>
+                  <CardTitle className="text-base">Fabricantes</CardTitle>
+                  <CardDescription>Fabricantes cadastrados</CardDescription>
                 </div>
                 <Button size="sm"><Upload className="h-4 w-4 mr-1" /> Importar Tabela</Button>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fabricante</TableHead>
-                      <TableHead>Tabela Vigente</TableHead>
-                      <TableHead>Última Atualização</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mockFabricantes.map(f => (
-                      <TableRow key={f.id}>
-                        <TableCell className="font-medium">{f.nome}</TableCell>
-                        <TableCell>{f.tabela}</TableCell>
-                        <TableCell>{f.ultimaAtualizacao}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm">Atualizar</Button>
-                        </TableCell>
+                {loadF ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fabricante</TableHead>
+                        <TableHead>CNPJ</TableHead>
+                        <TableHead>Última Atualização Preço</TableHead>
+                        <TableHead>Ações</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {(fabricantesData ?? []).map(f => (
+                        <TableRow key={f.id}>
+                          <TableCell className="font-medium">{f.nome}</TableCell>
+                          <TableCell>{f.cnpj ?? '-'}</TableCell>
+                          <TableCell>{f.ultima_atualizacao_preco ? new Date(f.ultima_atualizacao_preco).toLocaleDateString('pt-BR') : '-'}</TableCell>
+                          <TableCell><Button variant="ghost" size="sm">Atualizar</Button></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
