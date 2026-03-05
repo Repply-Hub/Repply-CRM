@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useClientes } from '@/hooks/use-clientes';
 import { useCreateCliente } from '@/hooks/use-mutations';
@@ -17,6 +18,7 @@ const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, lo
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física' };
 
 const Clientes = () => {
+  const navigate = useNavigate();
   const { data: clients, isLoading } = useClientes();
   const createCliente = useCreateCliente();
   const [search, setSearch] = useState('');
@@ -155,7 +157,7 @@ const Clientes = () => {
             {filtered.map(client => {
               const Icon = tipoIcons[client.tipo] ?? Building2;
               return (
-                <Card key={client.id} className="hover:shadow-md transition-shadow">
+                <Card key={client.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/clientes/${client.id}`)}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
