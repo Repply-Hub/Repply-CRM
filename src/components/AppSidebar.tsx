@@ -1,6 +1,7 @@
 import { LayoutDashboard, Kanban, Users, FileText, Settings } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import logoMd from '@/assets/logo-md.webp';
 
 const navItems = [
   { path: '/', label: 'Kanban', icon: Kanban },
@@ -15,11 +16,14 @@ export function AppSidebar() {
 
   return (
     <aside className="w-64 min-h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border">
-      <div className="p-6 border-b border-sidebar-border">
-        <h1 className="text-xl font-bold tracking-tight text-sidebar-primary-foreground">
-          MD<span className="text-sidebar-primary"> Representações</span>
-        </h1>
-        <p className="text-xs text-sidebar-foreground/60 mt-1">Gestão Comercial</p>
+      <div className="p-4 border-b border-sidebar-border flex items-center gap-3">
+        <img src={logoMd} alt="MD Representações" className="h-10 w-10 rounded-lg" />
+        <div>
+          <h1 className="text-base font-bold tracking-tight text-sidebar-foreground">
+            MD Representações
+          </h1>
+          <p className="text-[10px] text-sidebar-foreground/60">Gestão Comercial</p>
+        </div>
       </div>
       <nav className="flex-1 p-3 space-y-1">
         {navItems.map((item) => {
