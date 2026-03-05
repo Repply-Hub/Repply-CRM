@@ -1,0 +1,1 @@
+ALTER TABLE public.clientes ADD COLUMN razao_social text;

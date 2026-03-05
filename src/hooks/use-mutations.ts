@@ -6,6 +6,7 @@ export function useCreateCliente() {
   return useMutation({
     mutationFn: async (data: {
       empresa: string;
+      razao_social?: string;
       tipo: string;
       cnpj?: string;
       email?: string;
@@ -30,6 +31,7 @@ export function useUpdateCliente() {
     mutationFn: async ({ id, ...data }: {
       id: string;
       empresa?: string;
+      razao_social?: string;
       tipo?: string;
       cnpj?: string;
       email?: string;

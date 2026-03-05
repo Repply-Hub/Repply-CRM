@@ -68,6 +68,7 @@ export type Database = {
           endereco: string | null
           id: string
           nome_contato: string | null
+          razao_social: string | null
           telefone: string | null
           tipo: string
           updated_at: string
@@ -81,6 +82,7 @@ export type Database = {
           endereco?: string | null
           id?: string
           nome_contato?: string | null
+          razao_social?: string | null
           telefone?: string | null
           tipo: string
           updated_at?: string
@@ -94,6 +96,7 @@ export type Database = {
           endereco?: string | null
           id?: string
           nome_contato?: string | null
+          razao_social?: string | null
           telefone?: string | null
           tipo?: string
           updated_at?: string

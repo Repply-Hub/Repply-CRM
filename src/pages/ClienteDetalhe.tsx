@@ -45,7 +45,7 @@ const ClienteDetalhe = () => {
 
   // Edit form state
   const [editData, setEditData] = useState({
-    empresa: '', tipo: '', cnpj: '', email: '', telefone: '', nome_contato: '',
+    empresa: '', razao_social: '', tipo: '', cnpj: '', email: '', telefone: '', nome_contato: '',
   });
   const [editEndereco, setEditEndereco] = useState<EnderecoFields>(emptyEndereco);
 
@@ -53,6 +53,7 @@ const ClienteDetalhe = () => {
     if (!cliente) return;
     setEditData({
       empresa: cliente.empresa ?? '',
+      razao_social: (cliente as any).razao_social ?? '',
       tipo: cliente.tipo ?? 'construtora',
       cnpj: cliente.cnpj ?? '',
       email: cliente.email ?? '',
@@ -71,6 +72,7 @@ const ClienteDetalhe = () => {
       await updateCliente.mutateAsync({
         id,
         empresa: editData.empresa,
+        razao_social: editData.razao_social || undefined,
         tipo: editData.tipo,
         cnpj: editData.cnpj || undefined,
         email: editData.email || undefined,
@@ -156,8 +158,12 @@ const ClienteDetalhe = () => {
                 <Input value={editData.cnpj} onChange={e => setEditData(d => ({ ...d, cnpj: e.target.value }))} placeholder={editData.tipo === 'pessoa_fisica' ? '000.000.000-00' : '00.000.000/0000-00'} />
               </div>
               <div>
-                <Label>Nome / Razão Social</Label>
-                <Input value={editData.empresa} onChange={e => setEditData(d => ({ ...d, empresa: e.target.value }))} required />
+                <Label>Nome</Label>
+                <Input value={editData.empresa} onChange={e => setEditData(d => ({ ...d, empresa: e.target.value }))} required placeholder="Nome fantasia ou nome" />
+              </div>
+              <div>
+                <Label>Razão Social</Label>
+                <Input value={editData.razao_social} onChange={e => setEditData(d => ({ ...d, razao_social: e.target.value }))} placeholder="Razão social da empresa" />
               </div>
               <div>
                 <Label>Nome do Contato</Label>
