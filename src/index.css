@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
-    --foreground: 220 30% 10%;
+    --background: 30 15% 97%;
+    --foreground: 20 20% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 30% 10%;
+    --card-foreground: 20 20% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 30% 10%;
+    --popover-foreground: 20 20% 12%;
 
-    --primary: 220 70% 50%;
+    --primary: 24 95% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 93%;
-    --secondary-foreground: 220 30% 15%;
+    --secondary: 25 20% 93%;
+    --secondary-foreground: 20 20% 15%;
 
-    --muted: 220 15% 93%;
-    --muted-foreground: 220 10% 45%;
+    --muted: 25 12% 93%;
+    --muted-foreground: 20 10% 45%;
 
-    --accent: 36 95% 55%;
-    --accent-foreground: 36 95% 15%;
+    --accent: 24 90% 58%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -31,52 +31,52 @@
     --success: 152 60% 42%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 36 95% 55%;
-    --warning-foreground: 36 95% 15%;
+    --warning: 42 95% 55%;
+    --warning-foreground: 42 80% 15%;
 
-    --border: 220 15% 88%;
-    --input: 220 15% 88%;
-    --ring: 220 70% 50%;
+    --border: 25 15% 88%;
+    --input: 25 15% 88%;
+    --ring: 24 95% 50%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 220 30% 12%;
-    --sidebar-foreground: 220 15% 85%;
-    --sidebar-primary: 220 70% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 18%;
-    --sidebar-accent-foreground: 220 15% 90%;
-    --sidebar-border: 220 25% 20%;
-    --sidebar-ring: 220 70% 55%;
+    --sidebar-background: 24 85% 48%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 24 95% 50%;
+    --sidebar-accent: 24 80% 42%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 24 70% 40%;
+    --sidebar-ring: 0 0% 100%;
 
-    --kanban-new: 220 70% 50%;
-    --kanban-budget: 36 95% 55%;
+    --kanban-new: 24 95% 50%;
+    --kanban-budget: 42 95% 55%;
     --kanban-sent: 270 60% 55%;
-    --kanban-negotiation: 16 80% 55%;
+    --kanban-negotiation: 200 70% 50%;
     --kanban-closed: 152 60% 42%;
   }
 
   .dark {
-    --background: 220 25% 8%;
-    --foreground: 220 15% 90%;
+    --background: 20 15% 8%;
+    --foreground: 25 15% 90%;
 
-    --card: 220 25% 12%;
-    --card-foreground: 220 15% 90%;
+    --card: 20 15% 12%;
+    --card-foreground: 25 15% 90%;
 
-    --popover: 220 25% 12%;
-    --popover-foreground: 220 15% 90%;
+    --popover: 20 15% 12%;
+    --popover-foreground: 25 15% 90%;
 
-    --primary: 220 70% 55%;
+    --primary: 24 95% 52%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 20% 18%;
-    --secondary-foreground: 220 15% 85%;
+    --secondary: 20 15% 18%;
+    --secondary-foreground: 25 15% 85%;
 
-    --muted: 220 20% 18%;
-    --muted-foreground: 220 10% 55%;
+    --muted: 20 15% 18%;
+    --muted-foreground: 20 10% 55%;
 
-    --accent: 36 95% 55%;
-    --accent-foreground: 36 95% 15%;
+    --accent: 24 90% 58%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 30%;
     --destructive-foreground: 0 0% 100%;
@@ -84,26 +84,26 @@
     --success: 152 60% 42%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 36 95% 55%;
-    --warning-foreground: 36 95% 15%;
+    --warning: 42 95% 55%;
+    --warning-foreground: 42 80% 15%;
 
-    --border: 220 20% 20%;
-    --input: 220 20% 20%;
-    --ring: 220 70% 55%;
+    --border: 20 15% 20%;
+    --input: 20 15% 20%;
+    --ring: 24 95% 52%;
 
-    --sidebar-background: 220 30% 6%;
-    --sidebar-foreground: 220 15% 80%;
-    --sidebar-primary: 220 70% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 12%;
-    --sidebar-accent-foreground: 220 15% 85%;
-    --sidebar-border: 220 25% 12%;
-    --sidebar-ring: 220 70% 55%;
+    --sidebar-background: 24 70% 22%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 24 95% 50%;
+    --sidebar-accent: 24 60% 28%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 24 50% 25%;
+    --sidebar-ring: 0 0% 100%;
 
-    --kanban-new: 220 70% 55%;
-    --kanban-budget: 36 95% 55%;
+    --kanban-new: 24 95% 52%;
+    --kanban-budget: 42 95% 55%;
     --kanban-sent: 270 60% 55%;
-    --kanban-negotiation: 16 80% 55%;
+    --kanban-negotiation: 200 70% 50%;
     --kanban-closed: 152 60% 42%;
   }
 }
