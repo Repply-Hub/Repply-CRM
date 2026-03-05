@@ -18,10 +18,10 @@ import {
 } from '@/components/ui/sidebar';
 
 const navItems = [
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/', label: 'Kanban', icon: Kanban },
   { path: '/clientes', label: 'Clientes', icon: Users },
   { path: '/pedidos', label: 'Pedidos', icon: FileText },
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
