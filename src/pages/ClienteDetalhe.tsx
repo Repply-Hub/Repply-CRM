@@ -16,6 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { toast } from 'sonner';
+import { EnderecoForm } from '@/components/EnderecoForm';
+import { emptyEndereco, enderecoToString, stringToEndereco, type EnderecoFields } from '@/lib/cep';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física' };
@@ -42,8 +44,9 @@ const ClienteDetalhe = () => {
 
   // Edit form state
   const [editData, setEditData] = useState({
-    empresa: '', tipo: '', cnpj: '', email: '', telefone: '', endereco: '', nome_contato: '',
+    empresa: '', tipo: '', cnpj: '', email: '', telefone: '', nome_contato: '',
   });
+  const [editEndereco, setEditEndereco] = useState<EnderecoFields>(emptyEndereco);
 
   const openEdit = () => {
     if (!cliente) return;
@@ -53,15 +56,16 @@ const ClienteDetalhe = () => {
       cnpj: cliente.cnpj ?? '',
       email: cliente.email ?? '',
       telefone: cliente.telefone ?? '',
-      endereco: cliente.endereco ?? '',
       nome_contato: cliente.nome_contato ?? '',
     });
+    setEditEndereco(cliente.endereco ? stringToEndereco(cliente.endereco) : emptyEndereco);
     setEditOpen(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
+    const enderecoStr = enderecoToString(editEndereco);
     try {
       await updateCliente.mutateAsync({
         id,
@@ -70,7 +74,7 @@ const ClienteDetalhe = () => {
         cnpj: editData.cnpj || undefined,
         email: editData.email || undefined,
         telefone: editData.telefone || undefined,
-        endereco: editData.endereco || undefined,
+        endereco: enderecoStr || undefined,
         nome_contato: editData.nome_contato || undefined,
       });
       toast.success('Cliente atualizado com sucesso!');
@@ -164,7 +168,7 @@ const ClienteDetalhe = () => {
 
         {/* Edit Dialog */}
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Editar Cliente</DialogTitle></DialogHeader>
             <form onSubmit={handleEditSubmit} className="space-y-4 mt-2">
               <div>
@@ -200,10 +204,7 @@ const ClienteDetalhe = () => {
                   <Input value={editData.telefone} onChange={e => setEditData(d => ({ ...d, telefone: e.target.value }))} />
                 </div>
               </div>
-              <div>
-                <Label>Endereço</Label>
-                <Input value={editData.endereco} onChange={e => setEditData(d => ({ ...d, endereco: e.target.value }))} />
-              </div>
+              <EnderecoForm value={editEndereco} onChange={setEditEndereco} />
               <Button type="submit" className="w-full" disabled={updateCliente.isPending}>
                 {updateCliente.isPending ? 'Salvando...' : 'Salvar Alterações'}
               </Button>
@@ -248,12 +249,12 @@ const ClienteDetalhe = () => {
           )}
           {cliente.endereco && (
             <Card className="md:col-span-3">
-               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
-                 <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                 <div className="min-w-0">
-                   <p className="text-xs text-muted-foreground">Endereço</p>
-                   <p className="text-sm font-medium text-foreground break-words">{cliente.endereco}</p>
-                 </div>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <p className="text-xs text-muted-foreground">Endereço</p>
+                </div>
+                <p className="text-sm font-medium text-foreground break-words">{cliente.endereco}</p>
               </CardContent>
             </Card>
           )}
