@@ -12,10 +12,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import { useCreateVendedor, useCreateFabricante } from '@/hooks/use-mutations';
-import { Plus, Upload, Sun, Moon, Monitor, Loader2 } from 'lucide-react';
+import { Plus, Upload, Sun, Moon, Monitor, Loader2, CheckCircle2 } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -79,17 +80,53 @@ const Configuracoes = () => {
     }
   };
 
+  // Fabricante CNPJ validation state
+  const [fabCnpj, setFabCnpj] = useState('');
+  const [fabCnpjStatus, setFabCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
+  const [fabNome, setFabNome] = useState('');
+  const [fabContato, setFabContato] = useState('');
+  const [fabTelefone, setFabTelefone] = useState('');
+
+  const handleFabCnpjBlur = async () => {
+    const digits = unmaskCnpj(fabCnpj);
+    if (digits.length !== 14) return;
+    if (!isValidCnpjDigits(digits)) {
+      setFabCnpjStatus('invalid');
+      toast.error('CNPJ inválido');
+      return;
+    }
+    setFabCnpjStatus('loading');
+    try {
+      const data = await fetchCnpjData(digits);
+      setFabCnpjStatus('valid');
+      if (data.razao_social && !fabNome) setFabNome(data.razao_social);
+      if (data.ddd_telefone_1 && !fabTelefone) setFabTelefone(data.ddd_telefone_1);
+      toast.success('CNPJ validado!');
+    } catch {
+      setFabCnpjStatus('invalid');
+      toast.error('CNPJ não encontrado');
+    }
+  };
+
+  const resetFabForm = () => {
+    setFabCnpj(''); setFabCnpjStatus('idle'); setFabNome(''); setFabContato(''); setFabTelefone('');
+  };
+
   const handleCreateFabricante = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
+    if (unmaskCnpj(fabCnpj).length === 14 && !isValidCnpjDigits(unmaskCnpj(fabCnpj))) {
+      toast.error('CNPJ inválido');
+      return;
+    }
     try {
       await createFabricante.mutateAsync({
-        nome: form.get('nome') as string,
-        cnpj: (form.get('cnpj') as string) || undefined,
-        nome_contato: (form.get('nome_contato') as string) || undefined,
-        telefone: (form.get('telefone') as string) || undefined,
+        nome: fabNome,
+        cnpj: fabCnpj || undefined,
+        nome_contato: fabContato || undefined,
+        telefone: fabTelefone || undefined,
       });
       toast.success('Fabricante cadastrado!');
+      resetFabForm();
       setFabricanteDialog(false);
     } catch (err: any) {
       toast.error(err.message);
@@ -213,17 +250,31 @@ const Configuracoes = () => {
                   <CardTitle className="text-base">Fabricantes</CardTitle>
                   <CardDescription>Fabricantes cadastrados</CardDescription>
                 </div>
-                <Dialog open={fabricanteDialog} onOpenChange={setFabricanteDialog}>
+                <Dialog open={fabricanteDialog} onOpenChange={(o) => { setFabricanteDialog(o); if (!o) resetFabForm(); }}>
                   <DialogTrigger asChild>
                     <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Fabricante</Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader><DialogTitle>Cadastrar Fabricante</DialogTitle></DialogHeader>
                     <form onSubmit={handleCreateFabricante} className="space-y-4 mt-2">
-                      <div><Label>Nome</Label><Input name="nome" required placeholder="Nome do fabricante" /></div>
-                      <div><Label>CNPJ</Label><Input name="cnpj" placeholder="00.000.000/0000-00" /></div>
-                      <div><Label>Contato</Label><Input name="nome_contato" placeholder="Nome do contato" /></div>
-                      <div><Label>Telefone</Label><Input name="telefone" placeholder="(00) 0000-0000" /></div>
+                      <div>
+                        <Label>CNPJ</Label>
+                        <div className="relative">
+                          <Input
+                            value={fabCnpj}
+                            onChange={(e) => { setFabCnpj(maskCnpj(e.target.value)); setFabCnpjStatus('idle'); }}
+                            onBlur={handleFabCnpjBlur}
+                            placeholder="00.000.000/0000-00"
+                            className={fabCnpjStatus === 'invalid' ? 'border-destructive' : fabCnpjStatus === 'valid' ? 'border-green-500' : ''}
+                          />
+                          {fabCnpjStatus === 'loading' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
+                          {fabCnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">Preencha o CNPJ para buscar dados automaticamente</p>
+                      </div>
+                      <div><Label>Nome</Label><Input value={fabNome} onChange={e => setFabNome(e.target.value)} required placeholder="Nome do fabricante" /></div>
+                      <div><Label>Contato</Label><Input value={fabContato} onChange={e => setFabContato(e.target.value)} placeholder="Nome do contato" /></div>
+                      <div><Label>Telefone</Label><Input value={fabTelefone} onChange={e => setFabTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
                       <Button type="submit" className="w-full" disabled={createFabricante.isPending}>
                         {createFabricante.isPending ? 'Salvando...' : 'Salvar Fabricante'}
                       </Button>
