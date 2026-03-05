@@ -9,7 +9,47 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { mockVendedores, mockFabricantes } from '@/data/mockData';
-import { Plus, Upload } from 'lucide-react';
+import { Plus, Upload, Sun, Moon, Monitor } from 'lucide-react';
+import { useTheme } from '@/hooks/use-theme';
+import { cn } from '@/lib/utils';
+
+const themeOptions = [
+  { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
+  { value: 'dark' as const, label: 'Escuro', icon: Moon, desc: 'Reduz o brilho da tela' },
+  { value: 'system' as const, label: 'Sistema', icon: Monitor, desc: 'Segue a preferência do SO' },
+];
+
+function ThemeSelector() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <Card className="max-w-xl">
+      <CardHeader>
+        <CardTitle className="text-base">Tema</CardTitle>
+        <CardDescription>Escolha o modo de exibição da interface</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-3">
+          {themeOptions.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setTheme(opt.value)}
+              className={cn(
+                'flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all',
+                theme === opt.value
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/40'
+              )}
+            >
+              <opt.icon className={cn('h-6 w-6', theme === opt.value ? 'text-primary' : 'text-muted-foreground')} />
+              <span className="text-sm font-medium">{opt.label}</span>
+              <span className="text-[10px] text-muted-foreground text-center">{opt.desc}</span>
+            </button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 const Configuracoes = () => {
   const [alertDays, setAlertDays] = useState('5');
@@ -22,12 +62,17 @@ const Configuracoes = () => {
           <p className="text-sm text-muted-foreground mt-1">Gerencie vendedores, automações e tabelas de preço</p>
         </div>
 
-        <Tabs defaultValue="vendedores">
+        <Tabs defaultValue="aparencia">
           <TabsList>
+            <TabsTrigger value="aparencia">Aparência</TabsTrigger>
             <TabsTrigger value="vendedores">Vendedores</TabsTrigger>
             <TabsTrigger value="automacao">Automação</TabsTrigger>
             <TabsTrigger value="tabelas">Tabelas de Preço</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="aparencia" className="mt-4">
+            <ThemeSelector />
+          </TabsContent>
 
           <TabsContent value="vendedores" className="mt-4">
             <Card>
