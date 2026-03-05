@@ -107,6 +107,13 @@ export type Database = {
             referencedRelation: "vendedores"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "clientes_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
+          },
         ]
       }
       fabricantes: {
@@ -181,6 +188,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vendedores"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_contatos_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
           },
         ]
       }
@@ -319,6 +333,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pedidos_fabricante_id_fkey"
+            columns: ["fabricante_id"]
+            isOneToOne: false
+            referencedRelation: "vw_velocidade_por_fabricante"
+            referencedColumns: ["fabricante_id"]
+          },
+          {
             foreignKeyName: "pedidos_obra_id_fkey"
             columns: ["obra_id"]
             isOneToOne: false
@@ -331,6 +352,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vendedores"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
           },
         ]
       }
@@ -373,6 +401,13 @@ export type Database = {
             referencedRelation: "fabricantes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "tabela_precos_fabricante_id_fkey"
+            columns: ["fabricante_id"]
+            isOneToOne: false
+            referencedRelation: "vw_velocidade_por_fabricante"
+            referencedColumns: ["fabricante_id"]
+          },
         ]
       }
       vendedores: {
@@ -407,7 +442,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      vw_faturamento_mensal: {
+        Row: {
+          faturamento_total: number | null
+          mes: string | null
+          mes_ano: string | null
+          qtd_pedidos_fechados: number | null
+          ticket_medio: number | null
+        }
+        Relationships: []
+      }
+      vw_indicadores_vendedor: {
+        Row: {
+          qtd_elaborando: number | null
+          qtd_enviado: number | null
+          qtd_fechado: number | null
+          qtd_negociacao: number | null
+          qtd_novo_lead: number | null
+          qtd_perdido: number | null
+          taxa_fechamento: number | null
+          tempo_medio_ate_orcamento_dias: number | null
+          ticket_medio_fechado: number | null
+          total_pedidos: number | null
+          vendedor_id: string | null
+          vendedor_nome: string | null
+        }
+        Relationships: []
+      }
+      vw_velocidade_por_fabricante: {
+        Row: {
+          fabricante_id: string | null
+          fabricante_nome: string | null
+          tempo_medio_ate_orcamento_dias: number | null
+          total_pedidos: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_my_vendedor_id: { Args: never; Returns: string }
