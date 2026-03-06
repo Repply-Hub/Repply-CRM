@@ -6,7 +6,7 @@ import { KanbanColumn } from '@/components/kanban/KanbanColumn';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { usePedidos, useUpdatePedidoStatus } from '@/hooks/use-pedidos';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
-import { Plus, Filter, Loader2, X } from 'lucide-react';
+import { Plus, Filter, Loader2, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -90,7 +90,7 @@ const Index = () => {
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className={selectedVendedores.length > 0 ? 'border-primary' : ''}>
-                Vendedor
+                Vendedor <ChevronDown className="h-3.5 w-3.5 ml-1" />
                 {selectedVendedores.length > 0 && (
                   <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{selectedVendedores.length}</Badge>
                 )}
@@ -114,7 +114,7 @@ const Index = () => {
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className={selectedFabricantes.length > 0 ? 'border-primary' : ''}>
-                Fabricante
+                Fabricante <ChevronDown className="h-3.5 w-3.5 ml-1" />
                 {selectedFabricantes.length > 0 && (
                   <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{selectedFabricantes.length}</Badge>
                 )}
