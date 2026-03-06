@@ -429,7 +429,7 @@ function AuditLog() {
       {filtered.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-4">Nenhum resultado encontrado.</p>
       ) : (
-        <ScrollArea className="max-h-[400px]">
+        <ScrollArea className="h-[400px]">
           <div className="space-y-1">
             {dateKeys.map(dateKey => {
               const items = grouped[dateKey];
