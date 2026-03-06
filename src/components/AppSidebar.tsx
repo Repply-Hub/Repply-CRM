@@ -19,7 +19,7 @@ import {
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/', label: 'Kanban', icon: Kanban },
+  { path: '/', label: 'Pipeline', icon: Kanban },
   { path: '/clientes', label: 'Clientes', icon: Users },
   { path: '/obras', label: 'Obras', icon: HardHat },
   { path: '/pedidos', label: 'Pedidos', icon: FileText },
@@ -62,19 +62,19 @@ export function AppSidebar() {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <SidebarHeader className="border-b border-sidebar-border p-3">
+      <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
         <div className="flex items-center gap-3 overflow-hidden">
-          <img src={logoMd} alt="MD Representações" className="h-8 w-8 rounded-md shrink-0" />
+          <img src={logoMd} alt="MD Representações" className="h-9 w-9 rounded-lg shrink-0 ring-2 ring-white/10" />
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-bold text-sidebar-foreground truncate">MD Representações</p>
-              <p className="text-[10px] text-sidebar-foreground/60">Gestão Comercial</p>
+              <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
+              <p className="text-[10px] text-sidebar-foreground/50 font-medium">Gestão Comercial</p>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="py-2">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -84,11 +84,11 @@ export function AppSidebar() {
                     <NavLink
                       to={item.path}
                       end={item.path === '/'}
-                      className="hover:bg-sidebar-accent/60"
-                      activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-medium shadow-sm"
+                      className="hover:bg-sidebar-accent/60 rounded-lg transition-all duration-150"
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-sm"
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
-                      {!collapsed && <span>{item.label}</span>}
+                      {!collapsed && <span className="text-[13px]">{item.label}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -101,10 +101,10 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-3">
         <button
           onClick={() => signOut()}
-          className="flex items-center gap-3 overflow-hidden w-full rounded-md px-2 py-1.5 hover:bg-sidebar-accent/60 transition-colors"
+          className="flex items-center gap-3 overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150"
         >
-          <LogOut className="h-4 w-4 shrink-0 text-sidebar-foreground/60" />
-          {!collapsed && <span className="text-sm text-sidebar-foreground">Sair</span>}
+          <LogOut className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
+          {!collapsed && <span className="text-[13px] text-sidebar-foreground/70">Sair</span>}
         </button>
       </SidebarFooter>
     </Sidebar>

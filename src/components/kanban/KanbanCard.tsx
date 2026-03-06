@@ -21,46 +21,47 @@ export function KanbanCard({ order, index }: KanbanCardProps) {
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           className={cn(
-            'bg-card rounded-lg p-4 shadow-sm border border-border mb-3 transition-shadow',
-            snapshot.isDragging && 'shadow-lg ring-2 ring-primary/30',
-            isAlert && 'border-destructive/50'
+            'bg-card rounded-xl p-4 shadow-card border border-border/60 mb-3 transition-all duration-200 group',
+            snapshot.isDragging && 'shadow-card-hover ring-2 ring-primary/25 rotate-1 scale-[1.02]',
+            isAlert && 'border-destructive/40 bg-destructive/[0.02]',
+            !snapshot.isDragging && 'hover:shadow-card-hover hover:border-border'
           )}
         >
           {isAlert && (
-            <div className="flex items-center gap-1.5 text-destructive text-xs font-medium mb-2">
+            <div className="flex items-center gap-1.5 text-destructive text-[11px] font-semibold mb-2.5 bg-destructive/10 rounded-md px-2 py-1 w-fit">
               <AlertTriangle className="h-3 w-3" />
               {order.daysInStage} dias nesta etapa
             </div>
           )}
-          <h4 className="font-semibold text-sm text-card-foreground">{order.clientName}</h4>
-          <div className="mt-2 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Building2 className="h-3 w-3" />
-              {order.obra}
+          <h4 className="font-semibold text-sm text-card-foreground leading-snug">{order.clientName}</h4>
+          <div className="mt-2.5 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+              <span className="truncate">{order.obra}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Factory className="h-3 w-3" />
-              {order.fabricante}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Factory className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+              <span className="truncate">{order.fabricante}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-card-foreground">
-              <DollarSign className="h-3 w-3" />
+            <div className="flex items-center gap-2 text-sm font-semibold text-card-foreground">
+              <DollarSign className="h-3.5 w-3.5 shrink-0 text-primary/70" />
               {order.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+          <div className="mt-3 pt-2.5 border-t border-border/40 flex items-center justify-between">
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
               {order.vendedor}
             </span>
             <div className="flex items-center gap-1">
               <button
                 onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${order.id}/editar`); }}
-                className="h-6 w-6 rounded flex items-center justify-center hover:bg-accent transition-colors"
+                className="h-6 w-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-primary/10 transition-all"
                 title="Editar pedido"
               >
                 <Pencil className="h-3 w-3 text-muted-foreground" />
               </button>
               {!isAlert && (
-                <span className="text-[10px] text-muted-foreground">{order.daysInStage}d</span>
+                <span className="text-[10px] text-muted-foreground/60 tabular-nums">{order.daysInStage}d</span>
               )}
             </div>
           </div>

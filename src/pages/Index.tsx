@@ -67,11 +67,11 @@ const Index = () => {
 
   return (
     <AppLayout>
-      <div className="p-6">
+      <div className="p-6 max-w-[1600px]">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Pipeline de Vendas</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Pipeline de Vendas</h1>
+            <p className="text-sm text-muted-foreground mt-1 tabular-nums">
               {orders.length} pedidos · Total:{' '}
               {totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </p>
