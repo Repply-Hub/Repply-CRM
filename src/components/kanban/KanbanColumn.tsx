@@ -32,11 +32,20 @@ export function KanbanColumn({ stageKey, label, colorClass, orders }: KanbanColu
             <div
               ref={provided.innerRef}
               {...provided.droppableProps}
+              role="list"
+              aria-label={`Coluna ${label}`}
               className={cn(
-                'rounded-xl p-2 min-h-[200px] transition-all duration-200',
-                snapshot.isDraggingOver ? 'bg-primary/[0.06] ring-1 ring-primary/15' : 'bg-muted/40'
+                'rounded-xl p-2 min-h-[200px] transition-all duration-300 ease-out',
+                snapshot.isDraggingOver
+                  ? 'bg-primary/[0.08] ring-2 ring-primary/20 ring-dashed shadow-inner'
+                  : 'bg-muted/40',
               )}
             >
+              {snapshot.isDraggingOver && orders.length === 0 && (
+                <div className="flex items-center justify-center h-20 text-xs text-primary/60 font-medium animate-fade-in">
+                  Solte aqui para mover
+                </div>
+              )}
               {orders.map((order, idx) => (
                 <KanbanCard key={order.id} order={order} index={idx} />
               ))}
