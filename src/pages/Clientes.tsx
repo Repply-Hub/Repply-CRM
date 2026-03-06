@@ -109,10 +109,10 @@ const Clientes = () => {
 
   return (
     <AppLayout>
-      <div className="p-6">
+      <div className="p-6 max-w-[1400px]">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
+            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Clientes</h1>
             <p className="text-sm text-muted-foreground mt-1">{clients?.length ?? 0} cadastrados</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
@@ -186,15 +186,15 @@ const Clientes = () => {
             {filtered.map(client => {
               const Icon = tipoIcons[client.tipo] ?? Building2;
               return (
-                <Card key={client.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/clientes/${client.id}`)}>
+                <Card key={client.id} className="shadow-card hover:shadow-card-hover transition-all duration-200 cursor-pointer border-border/60 group" onClick={() => navigate(`/clientes/${client.id}`)}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
                         <Icon className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <CardTitle className="text-sm truncate">{client.empresa}</CardTitle>
-                        <Badge variant="secondary" className="text-[10px] mt-1">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
+                        <CardTitle className="text-sm truncate font-bold">{client.empresa}</CardTitle>
+                        <Badge variant="secondary" className="text-[10px] mt-1 font-medium">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
                       </div>
                     </div>
                   </CardHeader>
