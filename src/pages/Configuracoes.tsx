@@ -186,6 +186,7 @@ const Configuracoes = () => {
             </div>
           </TabsContent>
 
+
           <TabsContent value="tabelas" className="mt-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
