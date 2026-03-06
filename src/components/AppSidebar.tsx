@@ -62,9 +62,9 @@ export function AppSidebar() {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <img src={logoSidebar} alt="MD Representações" className="h-10 w-10 shrink-0 object-contain" />
+      <SidebarHeader className="border-b border-sidebar-border px-2 py-3">
+        <div className="flex items-center gap-3 overflow-visible">
+          <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
