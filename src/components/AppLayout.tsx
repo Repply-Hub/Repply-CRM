@@ -5,7 +5,13 @@ import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
+interface AppLayoutProps {
+  children: React.ReactNode;
+  title?: string;
+  subtitle?: string;
+}
+
+export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
   const [hasUnread] = useState(false);
 
   return (
@@ -13,10 +19,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 border-b border-border/60 flex items-center justify-end px-4 shrink-0">
+          <header className="h-14 flex items-center justify-between px-6 shrink-0">
+            <div className="min-w-0">
+              {title && <h1 className="text-2xl font-extrabold text-foreground tracking-tight truncate">{title}</h1>}
+              {subtitle && <p className="text-sm text-muted-foreground mt-0.5 truncate">{subtitle}</p>}
+            </div>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full hover:bg-accent">
+                <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full hover:bg-accent shrink-0">
                   <Bell className="h-5 w-5 text-muted-foreground" />
                   {hasUnread && (
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive" />

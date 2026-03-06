@@ -93,13 +93,9 @@ const Dashboard = () => {
   }
 
   return (
-    <AppLayout>
+    <AppLayout title="Dashboard" subtitle="Visão analítica do desempenho comercial">
       <div className="p-6 max-w-[1400px]">
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">Visão analítica do desempenho comercial</p>
-          </div>
+        <div className="mb-8 flex justify-end">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
         </div>
 

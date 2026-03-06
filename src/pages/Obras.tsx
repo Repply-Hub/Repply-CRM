@@ -60,18 +60,8 @@ export default function Obras() {
   }, [obras, search, statusFilter, sort]);
 
   return (
-    <AppLayout>
+    <AppLayout title="Obras" subtitle="Gerencie e acompanhe todas as obras cadastradas.">
       <div className="p-4 md:p-6 space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <HardHat className="h-6 w-6 text-primary" />
-            Obras
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gerencie e acompanhe todas as obras cadastradas.
-          </p>
-        </div>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">

@@ -108,13 +108,9 @@ const Clientes = () => {
   };
 
   return (
-    <AppLayout>
+    <AppLayout title="Clientes" subtitle={`${clients?.length ?? 0} cadastrados`}>
       <div className="p-6 max-w-[1400px]">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Clientes</h1>
-            <p className="text-sm text-muted-foreground mt-1">{clients?.length ?? 0} cadastrados</p>
-          </div>
+        <div className="flex items-center justify-end mb-6">
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Cliente</Button>

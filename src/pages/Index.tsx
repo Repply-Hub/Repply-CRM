@@ -66,16 +66,9 @@ const Index = () => {
   const totalPipeline = orders.reduce((acc, o) => acc + o.valor, 0);
 
   return (
-    <AppLayout>
+    <AppLayout title="Pipeline de Vendas" subtitle={`${orders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}>
       <div className="p-6 max-w-[1600px]">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Pipeline de Vendas</h1>
-            <p className="text-sm text-muted-foreground mt-1 tabular-nums">
-              {orders.length} pedidos · Total:{' '}
-              {totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </p>
-          </div>
+        <div className="flex items-center justify-end mb-4">
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={async () => {
               const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
