@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_permissoes: {
+        Row: {
+          acao: string
+          admin_id: string
+          created_at: string
+          detalhes: Json | null
+          id: string
+          vendedor_id: string
+        }
+        Insert: {
+          acao: string
+          admin_id: string
+          created_at?: string
+          detalhes?: Json | null
+          id?: string
+          vendedor_id: string
+        }
+        Update: {
+          acao?: string
+          admin_id?: string
+          created_at?: string
+          detalhes?: Json | null
+          id?: string
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_permissoes_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_permissoes_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
+          },
+        ]
+      }
       automation_logs: {
         Row: {
           cliente_id: string | null
