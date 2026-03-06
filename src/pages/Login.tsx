@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { useAuth } from '@/hooks/use-auth';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
-import logoSidebar from '@/assets/logo-sidebar.svg';
+import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import logoSidebar from "@/assets/logo-sidebar.svg";
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
@@ -15,7 +15,7 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     const form = new FormData(e.currentTarget);
-    const { error } = await signIn(form.get('email') as string, form.get('password') as string);
+    const { error } = await signIn(form.get("email") as string, form.get("password") as string);
     if (error) toast.error(error.message);
     setLoading(false);
   };
@@ -25,12 +25,12 @@ export default function Login() {
     setLoading(true);
     const form = new FormData(e.currentTarget);
     const { error } = await signUp(
-      form.get('email') as string,
-      form.get('password') as string,
-      form.get('nome') as string,
+      form.get("email") as string,
+      form.get("password") as string,
+      form.get("nome") as string,
     );
     if (error) toast.error(error.message);
-    else toast.success('Cadastro realizado! Verifique seu email para confirmar.');
+    else toast.success("Cadastro realizado! Verifique seu email para confirmar.");
     setLoading(false);
   };
 
@@ -44,22 +44,24 @@ export default function Login() {
           <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] rounded-full bg-white/[0.04]" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] rounded-full bg-white/[0.03]" />
         </div>
-        
+
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
           <div className="flex items-center gap-3">
-            <img src={logoSidebar} alt="MD Representações" className="h-16 w-16 object-contain" />
+            <img src={logoSidebar} alt="MD Representações" className="h-40 w-40 object-contain" />
             <span className="text-lg font-bold tracking-tight">MD Representações</span>
           </div>
-          
+
           <div className="space-y-6">
             <h1 className="text-4xl font-extrabold leading-tight tracking-tight">
-              Gestão comercial<br />
+              Gestão comercial
+              <br />
               <span className="text-white/80">inteligente e ágil</span>
             </h1>
             <p className="text-base text-white/70 max-w-sm leading-relaxed">
-              Pipeline de vendas, controle de orçamentos e dashboards — tudo em um só lugar para sua representação comercial.
+              Pipeline de vendas, controle de orçamentos e dashboards — tudo em um só lugar para sua representação
+              comercial.
             </p>
-            
+
             <div className="flex gap-8 pt-4">
               <div>
                 <p className="text-2xl font-bold">100%</p>
@@ -75,7 +77,7 @@ export default function Login() {
               </div>
             </div>
           </div>
-          
+
           <p className="text-xs text-white/40">© {new Date().getFullYear()} MD Representações</p>
         </div>
       </div>
@@ -89,7 +91,7 @@ export default function Login() {
             <h2 className="text-xl font-bold text-foreground">MD Representações</h2>
             <p className="text-sm text-muted-foreground">Gestão Comercial</p>
           </div>
-          
+
           <div className="hidden lg:block mb-8">
             <h2 className="text-2xl font-bold text-foreground">Bem-vindo de volta</h2>
             <p className="text-sm text-muted-foreground mt-1">Entre na sua conta para continuar</p>
@@ -97,8 +99,12 @@ export default function Login() {
 
           <Tabs defaultValue="login">
             <TabsList className="w-full mb-6">
-              <TabsTrigger value="login" className="flex-1">Entrar</TabsTrigger>
-              <TabsTrigger value="register" className="flex-1">Cadastrar</TabsTrigger>
+              <TabsTrigger value="login" className="flex-1">
+                Entrar
+              </TabsTrigger>
+              <TabsTrigger value="register" className="flex-1">
+                Cadastrar
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
@@ -112,7 +118,7 @@ export default function Login() {
                   <Input name="password" type="password" required placeholder="••••••••" className="h-11" />
                 </div>
                 <Button type="submit" className="w-full h-11 font-semibold shadow-brand" disabled={loading}>
-                  {loading ? 'Entrando...' : 'Entrar'}
+                  {loading ? "Entrando..." : "Entrar"}
                 </Button>
               </form>
             </TabsContent>
@@ -129,10 +135,17 @@ export default function Login() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Senha</Label>
-                  <Input name="password" type="password" required minLength={6} placeholder="Mínimo 6 caracteres" className="h-11" />
+                  <Input
+                    name="password"
+                    type="password"
+                    required
+                    minLength={6}
+                    placeholder="Mínimo 6 caracteres"
+                    className="h-11"
+                  />
                 </div>
                 <Button type="submit" className="w-full h-11 font-semibold shadow-brand" disabled={loading}>
-                  {loading ? 'Cadastrando...' : 'Cadastrar'}
+                  {loading ? "Cadastrando..." : "Cadastrar"}
                 </Button>
               </form>
             </TabsContent>
