@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import logoSidebar from "@/assets/logo-sidebar.svg";
+import logoLogin from "@/assets/logo-login.svg";
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
