@@ -1,4 +1,4 @@
-import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut, HardHat } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
@@ -21,6 +21,7 @@ const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/', label: 'Kanban', icon: Kanban },
   { path: '/clientes', label: 'Clientes', icon: Users },
+  { path: '/obras', label: 'Obras', icon: HardHat },
   { path: '/pedidos', label: 'Pedidos', icon: FileText },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];

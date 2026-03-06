@@ -12,6 +12,7 @@ import Pedidos from "./pages/Pedidos";
 import NovoPedido from "./pages/NovoPedido";
 import Dashboard from "./pages/Dashboard";
 import Configuracoes from "./pages/Configuracoes";
+import Obras from "./pages/Obras";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -39,6 +40,7 @@ const AppRoutes = () => (
     <Route path="/clientes/:id" element={<ProtectedRoute><ClienteDetalhe /></ProtectedRoute>} />
     <Route path="/pedidos" element={<ProtectedRoute><Pedidos /></ProtectedRoute>} />
     <Route path="/pedidos/novo" element={<ProtectedRoute><NovoPedido /></ProtectedRoute>} />
+    <Route path="/obras" element={<ProtectedRoute><Obras /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
