@@ -335,10 +335,9 @@ function AuditLog() {
   const isExpanded = (key: string) => expandedDates.size === 0 ? key === dateKeys[0] : expandedDates.has(key);
   const toggleDate = (key: string) => {
     setExpandedDates(prev => {
-      const next = new Set(prev.size === 0 ? dateKeys.filter(k => k === dateKeys[0]) : prev);
-      if (key === dateKeys[0] && prev.size === 0) {
-        next.delete(key);
-      } else if (next.has(key)) {
+      // Initialize from auto-expand state if untouched
+      const next = new Set(prev.size === 0 ? [dateKeys[0]] : prev);
+      if (next.has(key)) {
         next.delete(key);
       } else {
         next.add(key);
