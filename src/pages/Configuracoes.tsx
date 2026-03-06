@@ -141,16 +141,27 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
             const allExcluir = MODULOS.every(m => (getPermissao(m.key)?.pode_excluir ?? false));
 
             const handleToggleAll = async (campo: keyof Pick<Permissao, 'pode_ver' | 'pode_criar' | 'pode_editar' | 'pode_excluir'>, currentAll: boolean) => {
-              for (const mod of MODULOS) {
+              const newValue = !currentAll;
+              const rows = MODULOS.map(mod => {
                 const existing = getPermissao(mod.key);
-                const currentVal = campo === 'pode_ver' ? (existing?.pode_ver ?? true) :
-                  campo === 'pode_criar' ? (existing?.pode_criar ?? false) :
-                  campo === 'pode_editar' ? (existing?.pode_editar ?? false) :
-                  (existing?.pode_excluir ?? false);
-                if (currentVal === currentAll) {
-                  await handleToggle(mod.key, campo, currentVal);
-                }
-              }
+                return {
+                  vendedor_id: vendedor.id,
+                  modulo: mod.key,
+                  pode_ver: campo === 'pode_ver' ? newValue : (existing?.pode_ver ?? true),
+                  pode_criar: campo === 'pode_criar' ? newValue : (existing?.pode_criar ?? false),
+                  pode_editar: campo === 'pode_editar' ? newValue : (existing?.pode_editar ?? false),
+                  pode_excluir: campo === 'pode_excluir' ? newValue : (existing?.pode_excluir ?? false),
+                };
+              });
+              const { error } = await supabase.from('permissoes_vendedor').upsert(rows, { onConflict: 'vendedor_id,modulo' });
+              if (error) { toast.error('Erro ao atualizar permissões'); return; }
+              await supabase.from('audit_permissoes').insert({
+                admin_id: user?.id ?? '',
+                vendedor_id: vendedor.id,
+                acao: `Alterou ${campo} de TODOS os módulos para ${newValue ? 'ativo' : 'inativo'}`,
+                detalhes: { campo, para: newValue, modulos: 'todos' } as any,
+              });
+              qc.invalidateQueries({ queryKey: ['permissoes_vendedor', vendedor.id] });
             };
 
             return (
