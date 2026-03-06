@@ -1,5 +1,6 @@
 import { Draggable } from '@hello-pangea/dnd';
-import { AlertTriangle, Building2, Factory, DollarSign } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, Building2, Factory, DollarSign, Pencil } from 'lucide-react';
 import { Order } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -9,6 +10,7 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ order, index }: KanbanCardProps) {
+  const navigate = useNavigate();
   const isAlert = order.daysInStage >= order.alertDays;
 
   return (
@@ -49,9 +51,18 @@ export function KanbanCard({ order, index }: KanbanCardProps) {
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
               {order.vendedor}
             </span>
-            {!isAlert && (
-              <span className="text-[10px] text-muted-foreground">{order.daysInStage}d</span>
-            )}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${order.id}/editar`); }}
+                className="h-6 w-6 rounded flex items-center justify-center hover:bg-accent transition-colors"
+                title="Editar pedido"
+              >
+                <Pencil className="h-3 w-3 text-muted-foreground" />
+              </button>
+              {!isAlert && (
+                <span className="text-[10px] text-muted-foreground">{order.daysInStage}d</span>
+              )}
+            </div>
           </div>
         </div>
       )}
