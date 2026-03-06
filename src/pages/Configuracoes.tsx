@@ -226,7 +226,7 @@ const Configuracoes = () => {
   };
 
   return (
-    <AppLayout>
+    <AppLayout title="Configurações" subtitle="Gerencie vendedores, permissões e automações">
       <div className="p-6">
 
         <Tabs defaultValue="vendedores">
