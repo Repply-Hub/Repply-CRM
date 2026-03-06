@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { NavLink } from '@/components/NavLink';
-import logoMd from '@/assets/logo-md.webp';
+import logoSidebar from '@/assets/logo-sidebar.svg';
 import {
   Sidebar,
   SidebarContent,
