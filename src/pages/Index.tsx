@@ -6,7 +6,7 @@ import { KanbanColumn } from '@/components/kanban/KanbanColumn';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { usePedidos, useUpdatePedidoStatus } from '@/hooks/use-pedidos';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
-import { Plus, Filter, Loader2, X, ChevronDown, FileDown } from 'lucide-react';
+import { Plus, Filter, Loader2, X, ChevronDown, FileDown, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -22,6 +22,7 @@ const Index = () => {
 
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
   const [selectedFabricantes, setSelectedFabricantes] = useState<string[]>([]);
+  const [showOnlyAttention, setShowOnlyAttention] = useState(false);
 
   const toggleFilter = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
     setList(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -30,9 +31,10 @@ const Index = () => {
   const clearFilters = () => {
     setSelectedVendedores([]);
     setSelectedFabricantes([]);
+    setShowOnlyAttention(false);
   };
 
-  const hasFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0;
+  const hasFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention;
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
@@ -59,9 +61,10 @@ const Index = () => {
     return allOrders.filter(o => {
       if (selectedVendedores.length > 0 && !selectedVendedores.includes(o.vendedorId)) return false;
       if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(o.fabricanteId)) return false;
+      if (showOnlyAttention && o.daysInStage < o.alertDays) return false;
       return true;
     });
-  }, [allOrders, selectedVendedores, selectedFabricantes]);
+  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention]);
 
   const totalPipeline = orders.reduce((acc, o) => acc + o.valor, 0);
 
@@ -145,6 +148,15 @@ const Index = () => {
               </div>
             </PopoverContent>
           </Popover>
+
+          <Button
+            variant={showOnlyAttention ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowOnlyAttention(prev => !prev)}
+            className={showOnlyAttention ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}
+          >
+            <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Precisa de atenção
+          </Button>
 
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
