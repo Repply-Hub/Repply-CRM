@@ -267,7 +267,17 @@ function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nom
   );
 }
 
+function getActionMeta(acao: string) {
+  if (acao.includes('pode_ver')) return { icon: Eye, color: 'text-blue-500', bgColor: 'bg-blue-500/10', label: 'Visualização' };
+  if (acao.includes('pode_criar')) return { icon: Plus, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', label: 'Criação' };
+  if (acao.includes('pode_editar')) return { icon: PenLine, color: 'text-amber-500', bgColor: 'bg-amber-500/10', label: 'Edição' };
+  if (acao.includes('pode_excluir')) return { icon: Trash, color: 'text-red-500', bgColor: 'bg-red-500/10', label: 'Exclusão' };
+  return { icon: Shield, color: 'text-primary', bgColor: 'bg-primary/10', label: 'Permissão' };
+}
+
 function AuditLog() {
+  const [search, setSearch] = useState('');
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const { data: logs, isLoading } = useQuery({
     queryKey: ['audit_permissoes'],
     queryFn: async () => {
@@ -275,51 +285,174 @@ function AuditLog() {
         .from('audit_permissoes')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
       if (error) throw error;
       return data;
     },
   });
 
   const { data: vendedores } = useVendedores();
-
   const getVendedorNome = (id: string) => vendedores?.find(v => v.id === id)?.nome ?? id;
 
   if (isLoading) return <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
   if (!logs || logs.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-6">Nenhuma alteração registrada ainda.</p>;
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-center">
+        <History className="h-10 w-10 text-muted-foreground/20 mb-2" />
+        <p className="text-sm text-muted-foreground">Nenhuma alteração registrada ainda.</p>
+        <p className="text-xs text-muted-foreground/60 mt-1">As mudanças de permissão aparecerão aqui.</p>
+      </div>
+    );
   }
 
+  const filtered = logs.filter(log => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const nome = getVendedorNome(log.vendedor_id).toLowerCase();
+    return nome.includes(q) || log.acao.toLowerCase().includes(q);
+  });
+
+  // Group by date
+  const grouped = filtered.reduce<Record<string, typeof filtered>>((acc, log) => {
+    const dateKey = new Date(log.created_at).toLocaleDateString('pt-BR');
+    if (!acc[dateKey]) acc[dateKey] = [];
+    acc[dateKey].push(log);
+    return acc;
+  }, {});
+
+  const dateKeys = Object.keys(grouped);
+
+  // Auto-expand first group
+  const isExpanded = (key: string) => expandedDates.size === 0 ? key === dateKeys[0] : expandedDates.has(key);
+  const toggleDate = (key: string) => {
+    setExpandedDates(prev => {
+      const next = new Set(prev.size === 0 ? dateKeys.filter(k => k === dateKeys[0]) : prev);
+      if (key === dateKeys[0] && prev.size === 0) {
+        next.delete(key);
+      } else if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  // Legend data
+  const legendItems = [
+    { label: 'Visualização', color: 'bg-blue-500' },
+    { label: 'Criação', color: 'bg-emerald-500' },
+    { label: 'Edição', color: 'bg-amber-500' },
+    { label: 'Exclusão', color: 'bg-red-500' },
+  ];
+
   return (
-    <ScrollArea className="max-h-72">
-      <div className="space-y-2 p-1">
-        {logs.map(log => {
-          const d = new Date(log.created_at);
-          const detalhes = log.detalhes as { campo?: string; modulo?: string; de?: boolean; para?: boolean } | null;
-          return (
-            <div key={log.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/40 text-sm">
-              <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-foreground">
-                  <span className="font-medium">{getVendedorNome(log.vendedor_id)}</span>
-                  {' — '}
-                  <span className="text-muted-foreground">{log.acao}</span>
-                </p>
-                {detalhes && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {detalhes.de ? '✅' : '❌'} → {detalhes.para ? '✅' : '❌'}
-                  </p>
-                )}
-              </div>
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                {d.toLocaleDateString('pt-BR')} {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-              </span>
+    <div className="space-y-3">
+      {/* Search & Legend */}
+      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between">
+        <div className="relative w-full sm:w-64">
+          <Eye className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar alterações..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
+        <div className="flex items-center gap-3 flex-wrap" role="legend" aria-label="Legenda de tipos">
+          {legendItems.map(l => (
+            <div key={l.label} className="flex items-center gap-1.5">
+              <span className={cn('h-2.5 w-2.5 rounded-full', l.color)} />
+              <span className="text-[10px] text-muted-foreground">{l.label}</span>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
-    </ScrollArea>
+
+      {filtered.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-4">Nenhum resultado encontrado.</p>
+      ) : (
+        <ScrollArea className="max-h-[400px]">
+          <div className="space-y-1">
+            {dateKeys.map(dateKey => {
+              const items = grouped[dateKey];
+              const expanded = isExpanded(dateKey);
+              return (
+                <div key={dateKey}>
+                  {/* Date group header */}
+                  <button
+                    onClick={() => toggleDate(dateKey)}
+                    className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent/50 transition-colors"
+                    aria-expanded={expanded}
+                  >
+                    <ChevronRight className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform', expanded && 'rotate-90')} />
+                    <span className="text-xs font-semibold text-foreground">{dateKey}</span>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">{items.length}</Badge>
+                  </button>
+
+                  {/* Timeline items */}
+                  {expanded && (
+                    <div className="ml-4 border-l-2 border-border pl-4 space-y-0 pb-2">
+                      {items.map((log, idx) => {
+                        const d = new Date(log.created_at);
+                        const meta = getActionMeta(log.acao);
+                        const Icon = meta.icon;
+                        const detalhes = log.detalhes as { campo?: string; modulo?: string; de?: boolean; para?: boolean; modulos?: string } | null;
+                        const isBulk = detalhes?.modulos === 'todos';
+
+                        return (
+                          <div key={log.id} className="relative flex items-start gap-3 py-2 group">
+                            {/* Timeline dot */}
+                            <div className={cn('absolute -left-[1.35rem] top-3 h-2.5 w-2.5 rounded-full border-2 border-background', meta.bgColor.replace('/10', ''), meta.color === 'text-blue-500' ? 'bg-blue-500' : meta.color === 'text-emerald-500' ? 'bg-emerald-500' : meta.color === 'text-amber-500' ? 'bg-amber-500' : meta.color === 'text-red-500' ? 'bg-red-500' : 'bg-primary')} />
+
+                            {/* Icon */}
+                            <div className={cn('h-7 w-7 rounded-md flex items-center justify-center shrink-0', meta.bgColor)}>
+                              <Icon className={cn('h-3.5 w-3.5', meta.color)} />
+                            </div>
+
+                            {/* Content */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-foreground">{getVendedorNome(log.vendedor_id)}</span>
+                                {isBulk && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-primary/30 text-primary">Todos</Badge>}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">{log.acao}</p>
+                              {detalhes && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className={cn('inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full', detalhes.de ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-500')}>
+                                    {detalhes.de ? '✓ Ativo' : '✕ Inativo'}
+                                  </span>
+                                  <span className="text-muted-foreground text-[10px]">→</span>
+                                  <span className={cn('inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full', detalhes.para ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-500')}>
+                                    {detalhes.para ? '✓ Ativo' : '✕ Inativo'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Time */}
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap mt-0.5">
+                              {d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      )}
+
+      {/* Summary */}
+      <div className="flex items-center justify-between pt-1 border-t border-border">
+        <span className="text-[10px] text-muted-foreground">{filtered.length} alteração(ões) encontrada(s)</span>
+        <span className="text-[10px] text-muted-foreground">{dateKeys.length} dia(s)</span>
+      </div>
+    </div>
   );
 }
 
