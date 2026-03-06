@@ -1,19 +1,59 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppSidebar } from './AppSidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { Bell, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useNotificacoes, useUnreadCount, useMarkAsRead, useMarkAllAsRead } from '@/hooks/use-notificacoes';
+import { useNotificacoes, useUnreadCount, useMarkAsRead, useMarkAllAsRead, type Notificacao } from '@/hooks/use-notificacoes';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { buildWhatsAppUrl, getMessageTemplate } from '@/hooks/use-whatsapp';
 
 interface AppLayoutProps {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
+}
+
+async function openWhatsAppForNotification(n: Notificacao, tipo: 'cobranca' | 'relacionamento') {
+  if (!n.cliente_id) {
+    toast.error('Cliente não associado a esta notificação.');
+    return;
+  }
+
+  const { data: cliente } = await supabase
+    .from('clientes')
+    .select('empresa, telefone')
+    .eq('id', n.cliente_id)
+    .single();
+
+  if (!cliente?.telefone) {
+    toast.error('Cliente sem telefone cadastrado.');
+    return;
+  }
+
+  const msg = getMessageTemplate(tipo, cliente.empresa);
+  const url = buildWhatsAppUrl(cliente.telefone, msg);
+  window.open(url, '_blank');
+
+  // Log the message
+  const { data: vendedor } = await supabase.rpc('get_my_vendedor_id');
+  if (vendedor) {
+    await supabase.from('mensagens_whatsapp').insert({
+      vendedor_id: vendedor,
+      pedido_id: n.pedido_id,
+      cliente_id: n.cliente_id,
+      telefone_destino: cliente.telefone,
+      tipo_mensagem: tipo,
+      conteudo: msg,
+      metodo: 'wa_me_link',
+    });
+  }
+
+  toast.success('WhatsApp aberto! Mensagem registrada.');
 }
 
 function NotificationCenter() {
@@ -61,6 +101,8 @@ function NotificationCenter() {
     return `${diffD}d`;
   };
 
+  const isFollowupType = (n: Notificacao) => n.tipo === 'followup' || n.tipo === 'inatividade';
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -87,33 +129,65 @@ function NotificationCenter() {
             </Button>
           )}
         </div>
-        <ScrollArea className="max-h-80">
+        <ScrollArea className="max-h-96">
           {(!notificacoes || notificacoes.length === 0) ? (
             <p className="text-xs text-muted-foreground p-4 text-center">Nenhuma notificação no momento.</p>
           ) : (
             <div className="divide-y divide-border">
               {notificacoes.map(n => (
-                <button
+                <div
                   key={n.id}
                   className={cn(
                     "w-full text-left px-4 py-3 hover:bg-accent/50 transition-colors",
                     !n.lida && "bg-primary/5"
                   )}
-                  onClick={() => {
-                    if (!n.lida) markRead.mutate(n.id);
-                    if (n.pedido_id) navigate(`/pedidos/${n.pedido_id}/editar`);
-                  }}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className={cn("text-sm leading-tight", !n.lida && "font-medium")}>{n.titulo}</p>
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap mt-0.5">
-                      {formatTime(n.created_at)}
-                    </span>
-                  </div>
-                  {n.mensagem && (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.mensagem}</p>
+                  <button
+                    className="w-full text-left"
+                    onClick={() => {
+                      if (!n.lida) markRead.mutate(n.id);
+                      if (n.pedido_id) navigate(`/pedidos/${n.pedido_id}/editar`);
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={cn("text-sm leading-tight", !n.lida && "font-medium")}>{n.titulo}</p>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap mt-0.5">
+                        {formatTime(n.created_at)}
+                      </span>
+                    </div>
+                    {n.mensagem && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.mensagem}</p>
+                    )}
+                  </button>
+
+                  {/* WhatsApp quick actions for follow-up notifications */}
+                  {isFollowupType(n) && n.cliente_id && (
+                    <div className="flex gap-1.5 mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-[11px] gap-1 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950/30"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openWhatsAppForNotification(n, 'cobranca');
+                        }}
+                      >
+                        <MessageCircle className="h-3 w-3" /> Cobrança
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-[11px] gap-1 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950/30"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openWhatsAppForNotification(n, 'relacionamento');
+                        }}
+                      >
+                        <MessageCircle className="h-3 w-3" /> Relacionamento
+                      </Button>
+                    </div>
                   )}
-                </button>
+                </div>
               ))}
             </div>
           )}

@@ -287,6 +287,78 @@ export type Database = {
           },
         ]
       }
+      mensagens_whatsapp: {
+        Row: {
+          cliente_id: string | null
+          conteudo: string
+          created_at: string
+          id: string
+          metodo: string
+          pedido_id: string | null
+          telefone_destino: string
+          tipo_mensagem: string
+          vendedor_id: string
+        }
+        Insert: {
+          cliente_id?: string | null
+          conteudo: string
+          created_at?: string
+          id?: string
+          metodo?: string
+          pedido_id?: string | null
+          telefone_destino: string
+          tipo_mensagem?: string
+          vendedor_id: string
+        }
+        Update: {
+          cliente_id?: string | null
+          conteudo?: string
+          created_at?: string
+          id?: string
+          metodo?: string
+          pedido_id?: string | null
+          telefone_destino?: string
+          tipo_mensagem?: string
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensagens_whatsapp_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_whatsapp_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_whatsapp_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pedidos_inativos"
+            referencedColumns: ["pedido_id"]
+          },
+          {
+            foreignKeyName: "mensagens_whatsapp_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensagens_whatsapp_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
+          },
+        ]
+      }
       notificacoes: {
         Row: {
           cliente_id: string | null
