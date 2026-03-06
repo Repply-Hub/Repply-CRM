@@ -33,17 +33,26 @@ export function AppSidebar() {
   const location = useLocation();
   const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverOpened = useRef(false);
 
   const handleMouseEnter = useCallback(() => {
     if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null; }
     if (collapsed) {
-      enterTimer.current = setTimeout(() => setOpen(true), 300);
+      enterTimer.current = setTimeout(() => {
+        hoverOpened.current = true;
+        setOpen(true);
+      }, 300);
     }
   }, [collapsed, setOpen]);
 
   const handleMouseLeave = useCallback(() => {
     if (enterTimer.current) { clearTimeout(enterTimer.current); enterTimer.current = null; }
-    leaveTimer.current = setTimeout(() => setOpen(false), 400);
+    if (hoverOpened.current) {
+      leaveTimer.current = setTimeout(() => {
+        hoverOpened.current = false;
+        setOpen(false);
+      }, 400);
+    }
   }, [setOpen]);
 
   return (
