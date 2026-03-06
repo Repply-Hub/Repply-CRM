@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { format } from 'date-fns';
 import { AppLayout } from '@/components/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,7 +17,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useVendedores } from '@/hooks/use-clientes';
 import { useCreateVendedor } from '@/hooks/use-mutations';
 import { usePermissoes, useUpsertPermissao, MODULOS, type Permissao } from '@/hooks/use-permissoes';
-import { Plus, Sun, Moon, Monitor, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, Clock, ChevronRight, History } from 'lucide-react';
+import { Plus, Sun, Moon, Monitor, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, Clock, ChevronRight, History, CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
