@@ -518,6 +518,8 @@ const Configuracoes = () => {
   const [vendedorDialog, setVendedorDialog] = useState(false);
   const [editingVendedor, setEditingVendedor] = useState<null | { id: string; nome: string; email: string; telefone: string | null; role: string }>(null);
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
+  const [equipePage, setEquipePage] = useState(0);
+  const EQUIPE_PER_PAGE = 5;
   const qc = useQueryClient();
 
   const { data: isGestor } = useQuery({
