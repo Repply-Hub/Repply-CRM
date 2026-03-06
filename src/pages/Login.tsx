@@ -90,9 +90,7 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex flex-col items-center mb-8 lg:hidden">
-            <img src={logoSidebar} alt="MD Representações" className="h-20 w-20 object-contain mb-4" />
-            <h2 className="text-xl font-bold text-foreground">MD Representações</h2>
-            <p className="text-sm text-muted-foreground">Gestão Comercial</p>
+            <img src={logoSidebar} alt="MD Representações" className="h-32 w-32 object-contain mb-4" />
           </div>
 
           <div className="hidden lg:block mb-8">
