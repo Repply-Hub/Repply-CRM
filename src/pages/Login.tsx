@@ -90,7 +90,7 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex flex-col items-center mb-8 lg:hidden">
-            <img src={logoLogin} alt="MD Representações" className="h-40 w-40 object-contain mt-4 -mb-4" />
+            <img src={logoLogin} alt="MD Representações" className="h-40 w-40 object-contain mt-6 -mb-6" />
             <p className="text-sm text-muted-foreground relative z-10">Gestão comercial inteligente e ágil</p>
           </div>
 
@@ -118,8 +118,18 @@ export default function Login() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Senha</Label>
                   <div className="relative">
-                    <Input name="password" type={showLoginPw ? "text" : "password"} required placeholder="••••••••" className="h-11 pr-10" />
-                    <button type="button" onClick={() => setShowLoginPw(!showLoginPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                    <Input
+                      name="password"
+                      type={showLoginPw ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      className="h-11 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPw(!showLoginPw)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
                       {showLoginPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
@@ -151,7 +161,11 @@ export default function Login() {
                       placeholder="Mínimo 6 caracteres"
                       className="h-11 pr-10"
                     />
-                    <button type="button" onClick={() => setShowRegisterPw(!showRegisterPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => setShowRegisterPw(!showRegisterPw)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
                       {showRegisterPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
