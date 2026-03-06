@@ -45,7 +45,12 @@ export function useUpdatePedidoStatus() {
       const { error } = await supabase.from('pedidos').update({ status }).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pedidos'] });
+      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
+      qc.invalidateQueries({ queryKey: ['vw_indicadores_vendedor'] });
+      qc.invalidateQueries({ queryKey: ['vw_velocidade_por_fabricante'] });
+    },
   });
 }
 
