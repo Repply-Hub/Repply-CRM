@@ -520,6 +520,15 @@ const Configuracoes = () => {
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
   const qc = useQueryClient();
 
+  const { data: isGestor } = useQuery({
+    queryKey: ['is_gestor'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('is_gestor');
+      if (error) throw error;
+      return data as boolean;
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('vendedores').delete().eq('id', id);
@@ -689,18 +698,20 @@ const Configuracoes = () => {
                       </CardContent>
                     </Card>
 
-                    {/* Permissions */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-primary" /> Permissões por Módulo
-                        </CardTitle>
-                        <CardDescription>Controle granular de acesso para {activeVendedor.nome}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <InlinePermissaoEditor vendedor={activeVendedor} />
-                      </CardContent>
-                    </Card>
+                    {/* Permissions - only visible to gestor */}
+                    {isGestor && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Shield className="h-4 w-4 text-primary" /> Permissões por Módulo
+                          </CardTitle>
+                          <CardDescription>Controle granular de acesso para {activeVendedor.nome}</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <InlinePermissaoEditor vendedor={activeVendedor} />
+                        </CardContent>
+                      </Card>
+                    )}
 
                     {/* Audit Trail */}
                     <Card>
