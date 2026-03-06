@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import logoMd from '@/assets/logo-md.webp';
+import logoSidebar from '@/assets/logo-sidebar.svg';
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
@@ -47,7 +47,7 @@ export default function Login() {
         
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
           <div className="flex items-center gap-3">
-            <img src={logoMd} alt="MD Representações" className="h-10 w-10 rounded-xl shadow-lg" />
+            <img src={logoSidebar} alt="MD Representações" className="h-16 w-16 object-contain" />
             <span className="text-lg font-bold tracking-tight">MD Representações</span>
           </div>
           
@@ -85,7 +85,7 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex flex-col items-center mb-8 lg:hidden">
-            <img src={logoMd} alt="MD Representações" className="h-14 w-14 rounded-xl shadow-brand mb-4" />
+            <img src={logoSidebar} alt="MD Representações" className="h-20 w-20 object-contain mb-4" />
             <h2 className="text-xl font-bold text-foreground">MD Representações</h2>
             <p className="text-sm text-muted-foreground">Gestão Comercial</p>
           </div>
