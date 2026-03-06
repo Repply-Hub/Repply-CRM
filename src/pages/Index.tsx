@@ -72,7 +72,7 @@ const Index = () => {
     <AppLayout title="Pipeline de Vendas" subtitle={`${orders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}>
       <div className="p-6 max-w-[1600px]">
         {/* Filters & Actions - single line */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className={selectedVendedores.length > 0 ? 'border-primary' : ''}>
