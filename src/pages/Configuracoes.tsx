@@ -195,7 +195,7 @@ function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nom
       <form onSubmit={handleSubmit} className="space-y-4 mt-2">
         <div><Label>Nome</Label><Input name="nome" required defaultValue={vendedor.nome} /></div>
         <div><Label>Email</Label><Input name="email" type="email" required defaultValue={vendedor.email} /></div>
-        <div><Label>Telefone</Label><Input name="telefone" defaultValue={vendedor.telefone ?? ''} /></div>
+        <div><Label>Telefone</Label><Input name="telefone" defaultValue={vendedor.telefone ?? ''} placeholder="(00) 00000-0000" /></div>
         <div>
           <Label>Perfil</Label>
           <Select name="role" defaultValue={vendedor.role}>
