@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { format } from 'date-fns';
 import { AppLayout } from '@/components/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,7 +17,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useVendedores } from '@/hooks/use-clientes';
 import { useCreateVendedor } from '@/hooks/use-mutations';
 import { usePermissoes, useUpsertPermissao, MODULOS, type Permissao } from '@/hooks/use-permissoes';
-import { Plus, Sun, Moon, Monitor, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, Clock, ChevronRight, History } from 'lucide-react';
+import { Plus, Sun, Moon, Monitor, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, Clock, ChevronRight, History, CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -278,6 +281,8 @@ function getActionMeta(acao: string) {
 function AuditLog() {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const { data: logs, isLoading } = useQuery({
     queryKey: ['audit_permissoes'],
@@ -310,7 +315,10 @@ function AuditLog() {
   const filtered = logs.filter(log => {
     const matchesSearch = !search || getVendedorNome(log.vendedor_id).toLowerCase().includes(search.toLowerCase()) || log.acao.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = !activeFilter || getActionMeta(log.acao).label === activeFilter;
-    return matchesSearch && matchesFilter;
+    const logDate = new Date(log.created_at);
+    const matchesDateFrom = !dateFrom || logDate >= new Date(dateFrom.setHours(0, 0, 0, 0));
+    const matchesDateTo = !dateTo || logDate <= new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate(), 23, 59, 59);
+    return matchesSearch && matchesFilter && matchesDateFrom && matchesDateTo;
   });
 
   // Group by date
@@ -360,7 +368,7 @@ function AuditLog() {
         />
       </div>
 
-      {/* Filter buttons */}
+      {/* Filter buttons & Date range */}
       <div className="flex items-center gap-1.5 flex-wrap">
         <button
           onClick={() => setActiveFilter(null)}
@@ -384,6 +392,38 @@ function AuditLog() {
             {f.label}
           </button>
         ))}
+
+        <div className="flex-1" />
+
+        {/* Date range pickers */}
+        <div className="flex items-center gap-1.5">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn('h-7 text-[11px] gap-1', dateFrom && 'border-primary')}>
+                <CalendarIcon className="h-3 w-3" />
+                {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'De'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          <span className="text-[10px] text-muted-foreground">—</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn('h-7 text-[11px] gap-1', dateTo && 'border-primary')}>
+                <CalendarIcon className="h-3 w-3" />
+                {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'Até'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(undefined); setDateTo(undefined); }} className="text-[10px] text-muted-foreground hover:text-foreground">✕</button>
+          )}
+        </div>
       </div>
 
       {filtered.length === 0 ? (
