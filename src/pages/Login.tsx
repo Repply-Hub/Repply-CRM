@@ -52,6 +52,7 @@ export default function Login() {
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
           <div className="flex items-center gap-3">
             <img src={logoLogin} alt="MD Representações" className="h-40 w-40 object-contain" />
+          </div>
 
           <div className="space-y-6">
             <h1 className="text-4xl font-extrabold leading-tight tracking-tight">
