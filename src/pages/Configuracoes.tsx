@@ -10,13 +10,12 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
-import { useCreateVendedor, useCreateFabricante } from '@/hooks/use-mutations';
-import { Plus, Upload, Sun, Moon, Monitor, Loader2, CheckCircle2 } from 'lucide-react';
+import { useVendedores } from '@/hooks/use-clientes';
+import { useCreateVendedor } from '@/hooks/use-mutations';
+import { Plus, Sun, Moon, Monitor, Loader2 } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -57,11 +56,8 @@ function ThemeSelector() {
 const Configuracoes = () => {
   const [alertDays, setAlertDays] = useState('5');
   const { data: vendedoresData, isLoading: loadV } = useVendedores();
-  const { data: fabricantesData, isLoading: loadF } = useFabricantes();
   const createVendedor = useCreateVendedor();
-  const createFabricante = useCreateFabricante();
   const [vendedorDialog, setVendedorDialog] = useState(false);
-  const [fabricanteDialog, setFabricanteDialog] = useState(false);
 
   const handleCreateVendedor = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -80,58 +76,6 @@ const Configuracoes = () => {
     }
   };
 
-  // Fabricante CNPJ validation state
-  const [fabCnpj, setFabCnpj] = useState('');
-  const [fabCnpjStatus, setFabCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
-  const [fabNome, setFabNome] = useState('');
-  const [fabContato, setFabContato] = useState('');
-  const [fabTelefone, setFabTelefone] = useState('');
-
-  const handleFabCnpjBlur = async () => {
-    const digits = unmaskCnpj(fabCnpj);
-    if (digits.length !== 14) return;
-    if (!isValidCnpjDigits(digits)) {
-      setFabCnpjStatus('invalid');
-      toast.error('CNPJ inválido');
-      return;
-    }
-    setFabCnpjStatus('loading');
-    try {
-      const data = await fetchCnpjData(digits);
-      setFabCnpjStatus('valid');
-      if (data.razao_social && !fabNome) setFabNome(data.razao_social);
-      if (data.ddd_telefone_1 && !fabTelefone) setFabTelefone(data.ddd_telefone_1);
-      toast.success('CNPJ validado!');
-    } catch {
-      setFabCnpjStatus('invalid');
-      toast.error('CNPJ não encontrado');
-    }
-  };
-
-  const resetFabForm = () => {
-    setFabCnpj(''); setFabCnpjStatus('idle'); setFabNome(''); setFabContato(''); setFabTelefone('');
-  };
-
-  const handleCreateFabricante = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (unmaskCnpj(fabCnpj).length === 14 && !isValidCnpjDigits(unmaskCnpj(fabCnpj))) {
-      toast.error('CNPJ inválido');
-      return;
-    }
-    try {
-      await createFabricante.mutateAsync({
-        nome: fabNome,
-        cnpj: fabCnpj || undefined,
-        nome_contato: fabContato || undefined,
-        telefone: fabTelefone || undefined,
-      });
-      toast.success('Fabricante cadastrado!');
-      resetFabForm();
-      setFabricanteDialog(false);
-    } catch (err: any) {
-      toast.error(err.message);
-    }
-  };
 
   return (
     <AppLayout>
@@ -146,7 +90,6 @@ const Configuracoes = () => {
             <TabsTrigger value="aparencia">Aparência</TabsTrigger>
             <TabsTrigger value="vendedores">Vendedores</TabsTrigger>
             <TabsTrigger value="automacao">Automação</TabsTrigger>
-            <TabsTrigger value="tabelas">Fabricantes</TabsTrigger>
           </TabsList>
 
           <TabsContent value="aparencia" className="mt-4"><ThemeSelector /></TabsContent>
