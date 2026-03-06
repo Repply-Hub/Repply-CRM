@@ -149,6 +149,15 @@ const Index = () => {
             </PopoverContent>
           </Popover>
 
+          <Button
+            variant={showOnlyAttention ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowOnlyAttention(prev => !prev)}
+            className={showOnlyAttention ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}
+          >
+            <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Precisa de atenção
+          </Button>
+
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
               <X className="h-3.5 w-3.5 mr-1" /> Limpar filtros
