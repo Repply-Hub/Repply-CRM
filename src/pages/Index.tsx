@@ -6,7 +6,7 @@ import { KanbanColumn } from '@/components/kanban/KanbanColumn';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { usePedidos, useUpdatePedidoStatus } from '@/hooks/use-pedidos';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
-import { Plus, Filter, Loader2, X, ChevronDown, FileDown } from 'lucide-react';
+import { Plus, Filter, Loader2, X, ChevronDown, FileDown, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
