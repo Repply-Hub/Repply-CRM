@@ -31,9 +31,10 @@ const Index = () => {
   const clearFilters = () => {
     setSelectedVendedores([]);
     setSelectedFabricantes([]);
+    setShowOnlyAttention(false);
   };
 
-  const hasFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0;
+  const hasFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention;
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
