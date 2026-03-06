@@ -13,7 +13,6 @@ const Dashboard = () => {
 
   const isLoading = loadFat;
 
-  // Derive KPIs from real data
   const lastMonth = faturamento?.slice(-1)[0];
   const prevMonth = faturamento?.slice(-2, -1)[0];
   const faturamentoChange = lastMonth && prevMonth && prevMonth.faturamento_total
@@ -25,10 +24,10 @@ const Dashboard = () => {
   const taxaConversao = totalPedidos > 0 ? ((fechados / totalPedidos) * 100).toFixed(0) : '0';
 
   const kpis = [
-    { label: 'Faturamento Mês', value: (lastMonth?.faturamento_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: DollarSign, change: `${Number(faturamentoChange) >= 0 ? '+' : ''}${faturamentoChange}%` },
-    { label: 'Taxa Conversão', value: `${taxaConversao}%`, icon: Target, change: '' },
-    { label: 'Ticket Médio', value: (lastMonth?.ticket_medio ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: TrendingUp, change: '' },
-    { label: 'Pedidos no Mês', value: String(lastMonth?.qtd_pedidos_fechados ?? 0), icon: Clock, change: '' },
+    { label: 'Faturamento Mês', value: (lastMonth?.faturamento_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: DollarSign, change: `${Number(faturamentoChange) >= 0 ? '+' : ''}${faturamentoChange}%`, positive: Number(faturamentoChange) >= 0 },
+    { label: 'Taxa Conversão', value: `${taxaConversao}%`, icon: Target, change: '', positive: true },
+    { label: 'Ticket Médio', value: (lastMonth?.ticket_medio ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: TrendingUp, change: '', positive: true },
+    { label: 'Pedidos no Mês', value: String(lastMonth?.qtd_pedidos_fechados ?? 0), icon: Clock, change: '', positive: true },
   ];
 
   const faturamentoData = (faturamento ?? []).map(f => ({
@@ -46,11 +45,10 @@ const Dashboard = () => {
     dias: Number(v.tempo_medio_ate_orcamento_dias ?? 0),
   }));
 
-  // Segment by ticket
   const segmentacao = [
-    { name: 'Alto (>100k)', value: pedidos?.filter(p => (p.valor_total ?? 0) > 100000).length ?? 0, color: 'hsl(220, 70%, 50%)' },
-    { name: 'Médio (30-100k)', value: pedidos?.filter(p => (p.valor_total ?? 0) >= 30000 && (p.valor_total ?? 0) <= 100000).length ?? 0, color: 'hsl(36, 95%, 55%)' },
-    { name: 'Baixo (<30k)', value: pedidos?.filter(p => (p.valor_total ?? 0) < 30000).length ?? 0, color: 'hsl(152, 60%, 42%)' },
+    { name: 'Alto (>100k)', value: pedidos?.filter(p => (p.valor_total ?? 0) > 100000).length ?? 0, color: 'hsl(24, 100%, 47%)' },
+    { name: 'Médio (30-100k)', value: pedidos?.filter(p => (p.valor_total ?? 0) >= 30000 && (p.valor_total ?? 0) <= 100000).length ?? 0, color: 'hsl(42, 95%, 52%)' },
+    { name: 'Baixo (<30k)', value: pedidos?.filter(p => (p.valor_total ?? 0) < 30000).length ?? 0, color: 'hsl(152, 60%, 38%)' },
   ];
 
   if (isLoading) {
@@ -65,27 +63,28 @@ const Dashboard = () => {
 
   return (
     <AppLayout>
-      <div className="p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+      <div className="p-6 max-w-[1400px]">
+        <div className="mb-8">
+          <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">Visão analítica do desempenho comercial</p>
         </div>
 
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {kpis.map(kpi => (
-            <Card key={kpi.label}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                    <p className="text-2xl font-bold text-card-foreground mt-1">{kpi.value}</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {kpis.map((kpi, i) => (
+            <Card key={kpi.label} className="shadow-card hover:shadow-card-hover transition-all duration-200 border-border/60 overflow-hidden relative group">
+              {i === 0 && <div className="absolute inset-0 gradient-brand-subtle opacity-60" />}
+              <CardContent className="p-5 relative">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
+                    <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{kpi.value}</p>
                     {kpi.change && (
-                      <span className={`text-xs font-medium ${kpi.change.startsWith('+') ? 'text-success' : 'text-destructive'}`}>
+                      <span className={`text-xs font-semibold ${kpi.positive ? 'text-success' : 'text-destructive'}`}>
                         {kpi.change}
                       </span>
                     )}
                   </div>
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
                     <kpi.icon className="h-5 w-5 text-primary" />
                   </div>
                 </div>
@@ -94,24 +93,24 @@ const Dashboard = () => {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Faturamento Mensal</CardTitle></CardHeader>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+          <Card className="shadow-card border-border/60">
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Faturamento Mensal</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={faturamentoData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 88%)" />
-                  <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
                   <Tooltip formatter={(v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
-                  <Bar dataKey="valor" fill="hsl(220, 70%, 50%)" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="valor" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Segmentação por Ticket</CardTitle></CardHeader>
+          <Card className="shadow-card border-border/60">
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Segmentação por Ticket</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
@@ -125,32 +124,32 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Conversão por Vendedor</CardTitle></CardHeader>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <Card className="shadow-card border-border/60">
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Conversão por Vendedor</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={conversaoVendedor} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 88%)" />
-                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 12 }} tickFormatter={v => `${v}%`} />
-                  <YAxis dataKey="nome" type="category" tick={{ fontSize: 12 }} width={80} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={v => `${v}%`} />
+                  <YAxis dataKey="nome" type="category" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} width={80} />
                   <Tooltip formatter={(v: number) => `${v}%`} />
-                  <Bar dataKey="conversao" fill="hsl(152, 60%, 42%)" radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="conversao" fill="hsl(var(--success))" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Velocidade de Resposta por Fábrica</CardTitle></CardHeader>
+          <Card className="shadow-card border-border/60">
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-bold">Velocidade de Resposta por Fábrica</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={velocidadeData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 88%)" />
-                  <XAxis dataKey="fabrica" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={v => `${v}d`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="fabrica" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={v => `${v}d`} />
                   <Tooltip formatter={(v: number) => `${v} dias`} />
-                  <Line type="monotone" dataKey="dias" stroke="hsl(36, 95%, 55%)" strokeWidth={2} dot={{ fill: 'hsl(36, 95%, 55%)', r: 4 }} />
+                  <Line type="monotone" dataKey="dias" stroke="hsl(var(--warning))" strokeWidth={2.5} dot={{ fill: 'hsl(var(--warning))', r: 4, strokeWidth: 2, stroke: 'hsl(var(--card))' }} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
