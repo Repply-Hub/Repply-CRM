@@ -71,35 +71,7 @@ const Index = () => {
   return (
     <AppLayout title="Pipeline de Vendas" subtitle={`${orders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}>
       <div className="p-6 max-w-[1600px]">
-        <div className="flex items-center justify-end mb-4">
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={async () => {
-              const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
-              await generatePedidosPdf(
-                orders.map(o => ({
-                  cliente: o.clientName,
-                  obra: o.obra,
-                  fabricante: o.fabricante,
-                  vendedor: o.vendedor,
-                  valor: o.valor,
-                  etapa: stageLabel(o.stage),
-                  data: o.createdAt,
-                })),
-                hasFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
-              );
-            }}>
-              <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/pedidos')}>
-              <Filter className="h-4 w-4 mr-1" /> Ver Pedidos
-            </Button>
-            <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
-              <Plus className="h-4 w-4 mr-1" /> Novo Pedido
-            </Button>
-          </div>
-        </div>
-
-        {/* Filtros */}
+        {/* Filters & Actions - single line */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <Popover>
             <PopoverTrigger asChild>
@@ -163,6 +135,33 @@ const Index = () => {
               <X className="h-3.5 w-3.5 mr-1" /> Limpar filtros
             </Button>
           )}
+
+          {/* Spacer to push action buttons right */}
+          <div className="flex-1" />
+
+          <Button variant="outline" size="sm" onClick={async () => {
+            const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
+            await generatePedidosPdf(
+              orders.map(o => ({
+                cliente: o.clientName,
+                obra: o.obra,
+                fabricante: o.fabricante,
+                vendedor: o.vendedor,
+                valor: o.valor,
+                etapa: stageLabel(o.stage),
+                data: o.createdAt,
+              })),
+              hasFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
+            );
+          }}>
+            <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/pedidos')}>
+            <Filter className="h-4 w-4 mr-1" /> Ver Pedidos
+          </Button>
+          <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
+            <Plus className="h-4 w-4 mr-1" /> Novo Pedido
+          </Button>
         </div>
 
         {isLoading ? (
