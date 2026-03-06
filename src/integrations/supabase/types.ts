@@ -374,6 +374,57 @@ export type Database = {
           },
         ]
       }
+      permissoes_vendedor: {
+        Row: {
+          created_at: string
+          id: string
+          modulo: string
+          pode_criar: boolean
+          pode_editar: boolean
+          pode_excluir: boolean
+          pode_ver: boolean
+          updated_at: string
+          vendedor_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          modulo: string
+          pode_criar?: boolean
+          pode_editar?: boolean
+          pode_excluir?: boolean
+          pode_ver?: boolean
+          updated_at?: string
+          vendedor_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          modulo?: string
+          pode_criar?: boolean
+          pode_editar?: boolean
+          pode_excluir?: boolean
+          pode_ver?: boolean
+          updated_at?: string
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permissoes_vendedor_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permissoes_vendedor_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
+          },
+        ]
+      }
       tabela_precos: {
         Row: {
           created_at: string
@@ -493,6 +544,10 @@ export type Database = {
     }
     Functions: {
       get_my_vendedor_id: { Args: never; Returns: string }
+      has_permission: {
+        Args: { _acao: string; _modulo: string; _vendedor_id: string }
+        Returns: boolean
+      }
       is_gestor: { Args: never; Returns: boolean }
     }
     Enums: {
