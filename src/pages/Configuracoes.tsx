@@ -10,13 +10,12 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
-import { useCreateVendedor, useCreateFabricante } from '@/hooks/use-mutations';
-import { Plus, Upload, Sun, Moon, Monitor, Loader2, CheckCircle2 } from 'lucide-react';
+import { useVendedores } from '@/hooks/use-clientes';
+import { useCreateVendedor } from '@/hooks/use-mutations';
+import { Plus, Sun, Moon, Monitor, Loader2 } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -57,11 +56,8 @@ function ThemeSelector() {
 const Configuracoes = () => {
   const [alertDays, setAlertDays] = useState('5');
   const { data: vendedoresData, isLoading: loadV } = useVendedores();
-  const { data: fabricantesData, isLoading: loadF } = useFabricantes();
   const createVendedor = useCreateVendedor();
-  const createFabricante = useCreateFabricante();
   const [vendedorDialog, setVendedorDialog] = useState(false);
-  const [fabricanteDialog, setFabricanteDialog] = useState(false);
 
   const handleCreateVendedor = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -80,58 +76,6 @@ const Configuracoes = () => {
     }
   };
 
-  // Fabricante CNPJ validation state
-  const [fabCnpj, setFabCnpj] = useState('');
-  const [fabCnpjStatus, setFabCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
-  const [fabNome, setFabNome] = useState('');
-  const [fabContato, setFabContato] = useState('');
-  const [fabTelefone, setFabTelefone] = useState('');
-
-  const handleFabCnpjBlur = async () => {
-    const digits = unmaskCnpj(fabCnpj);
-    if (digits.length !== 14) return;
-    if (!isValidCnpjDigits(digits)) {
-      setFabCnpjStatus('invalid');
-      toast.error('CNPJ inválido');
-      return;
-    }
-    setFabCnpjStatus('loading');
-    try {
-      const data = await fetchCnpjData(digits);
-      setFabCnpjStatus('valid');
-      if (data.razao_social && !fabNome) setFabNome(data.razao_social);
-      if (data.ddd_telefone_1 && !fabTelefone) setFabTelefone(data.ddd_telefone_1);
-      toast.success('CNPJ validado!');
-    } catch {
-      setFabCnpjStatus('invalid');
-      toast.error('CNPJ não encontrado');
-    }
-  };
-
-  const resetFabForm = () => {
-    setFabCnpj(''); setFabCnpjStatus('idle'); setFabNome(''); setFabContato(''); setFabTelefone('');
-  };
-
-  const handleCreateFabricante = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (unmaskCnpj(fabCnpj).length === 14 && !isValidCnpjDigits(unmaskCnpj(fabCnpj))) {
-      toast.error('CNPJ inválido');
-      return;
-    }
-    try {
-      await createFabricante.mutateAsync({
-        nome: fabNome,
-        cnpj: fabCnpj || undefined,
-        nome_contato: fabContato || undefined,
-        telefone: fabTelefone || undefined,
-      });
-      toast.success('Fabricante cadastrado!');
-      resetFabForm();
-      setFabricanteDialog(false);
-    } catch (err: any) {
-      toast.error(err.message);
-    }
-  };
 
   return (
     <AppLayout>
@@ -146,7 +90,6 @@ const Configuracoes = () => {
             <TabsTrigger value="aparencia">Aparência</TabsTrigger>
             <TabsTrigger value="vendedores">Vendedores</TabsTrigger>
             <TabsTrigger value="automacao">Automação</TabsTrigger>
-            <TabsTrigger value="tabelas">Fabricantes</TabsTrigger>
           </TabsList>
 
           <TabsContent value="aparencia" className="mt-4"><ThemeSelector /></TabsContent>
@@ -241,74 +184,6 @@ const Configuracoes = () => {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="tabelas" className="mt-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Fabricantes</CardTitle>
-                  <CardDescription>Fabricantes cadastrados</CardDescription>
-                </div>
-                <Dialog open={fabricanteDialog} onOpenChange={(o) => { setFabricanteDialog(o); if (!o) resetFabForm(); }}>
-                  <DialogTrigger asChild>
-                    <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Fabricante</Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader><DialogTitle>Cadastrar Fabricante</DialogTitle></DialogHeader>
-                    <form onSubmit={handleCreateFabricante} className="space-y-4 mt-2">
-                      <div>
-                        <Label>CNPJ</Label>
-                        <div className="relative">
-                          <Input
-                            value={fabCnpj}
-                            onChange={(e) => { setFabCnpj(maskCnpj(e.target.value)); setFabCnpjStatus('idle'); }}
-                            onBlur={handleFabCnpjBlur}
-                            placeholder="00.000.000/0000-00"
-                            className={fabCnpjStatus === 'invalid' ? 'border-destructive' : fabCnpjStatus === 'valid' ? 'border-green-500' : ''}
-                          />
-                          {fabCnpjStatus === 'loading' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
-                          {fabCnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
-                        </div>
-                        <p className="text-[10px] text-muted-foreground mt-1">Preencha o CNPJ para buscar dados automaticamente</p>
-                      </div>
-                      <div><Label>Nome</Label><Input value={fabNome} onChange={e => setFabNome(e.target.value)} required placeholder="Nome do fabricante" /></div>
-                      <div><Label>Contato</Label><Input value={fabContato} onChange={e => setFabContato(e.target.value)} placeholder="Nome do contato" /></div>
-                      <div><Label>Telefone</Label><Input value={fabTelefone} onChange={e => setFabTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
-                      <Button type="submit" className="w-full" disabled={createFabricante.isPending}>
-                        {createFabricante.isPending ? 'Salvando...' : 'Salvar Fabricante'}
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </CardHeader>
-              <CardContent>
-                {loadF ? (
-                  <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fabricante</TableHead>
-                        <TableHead>CNPJ</TableHead>
-                        <TableHead>Contato</TableHead>
-                        <TableHead>Última Atualização Preço</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(fabricantesData ?? []).map(f => (
-                        <TableRow key={f.id}>
-                          <TableCell className="font-medium">{f.nome}</TableCell>
-                          <TableCell>{f.cnpj ?? '-'}</TableCell>
-                          <TableCell>{f.nome_contato ?? '-'}</TableCell>
-                          <TableCell>{f.ultima_atualizacao_preco ? new Date(f.ultima_atualizacao_preco).toLocaleDateString('pt-BR') : '-'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>
