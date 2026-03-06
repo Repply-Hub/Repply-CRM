@@ -368,7 +368,7 @@ function AuditLog() {
         />
       </div>
 
-      {/* Filter buttons */}
+      {/* Filter buttons & Date range */}
       <div className="flex items-center gap-1.5 flex-wrap">
         <button
           onClick={() => setActiveFilter(null)}
@@ -392,6 +392,38 @@ function AuditLog() {
             {f.label}
           </button>
         ))}
+
+        <div className="flex-1" />
+
+        {/* Date range pickers */}
+        <div className="flex items-center gap-1.5">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn('h-7 text-[11px] gap-1', dateFrom && 'border-primary')}>
+                <CalendarIcon className="h-3 w-3" />
+                {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'De'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          <span className="text-[10px] text-muted-foreground">—</span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn('h-7 text-[11px] gap-1', dateTo && 'border-primary')}>
+                <CalendarIcon className="h-3 w-3" />
+                {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'Até'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(undefined); setDateTo(undefined); }} className="text-[10px] text-muted-foreground hover:text-foreground">✕</button>
+          )}
+        </div>
       </div>
 
       {filtered.length === 0 ? (
