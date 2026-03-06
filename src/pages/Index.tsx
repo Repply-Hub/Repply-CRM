@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { generatePedidosPdf } from '@/lib/generate-pdf';
+import { toast } from 'sonner';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -36,11 +37,16 @@ const Index = () => {
 
   const hasFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention;
 
-  const handleDragEnd = (result: DropResult) => {
+  const handleDragEnd = useCallback((result: DropResult) => {
     if (!result.destination) return;
-    const { draggableId, destination } = result;
+    const { draggableId, source, destination } = result;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    if (source.droppableId === destination.droppableId) return;
+
+    const stageLabel = KANBAN_STAGES.find(s => s.key === destination.droppableId)?.label ?? destination.droppableId;
     updateStatus.mutate({ id: draggableId, status: destination.droppableId });
-  };
+    toast.success(`Pedido movido para "${stageLabel}"`);
+  }, [updateStatus]);
 
   const allOrders = (pedidos ?? []).map(p => ({
     id: p.id,
