@@ -57,6 +57,13 @@ export type Database = {
             referencedRelation: "pedidos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "automation_logs_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pedidos_inativos"
+            referencedColumns: ["pedido_id"]
+          },
         ]
       }
       clientes: {
@@ -118,6 +125,30 @@ export type Database = {
             referencedColumns: ["vendedor_id"]
           },
         ]
+      }
+      configuracoes_automacao: {
+        Row: {
+          chave: string
+          id: string
+          updated_at: string
+          updated_by: string | null
+          valor: Json
+        }
+        Insert: {
+          chave: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+          valor?: Json
+        }
+        Update: {
+          chave?: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+          valor?: Json
+        }
+        Relationships: []
       }
       fabricantes: {
         Row: {
@@ -186,6 +217,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "historico_contatos_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pedidos_inativos"
+            referencedColumns: ["pedido_id"]
+          },
+          {
             foreignKeyName: "historico_contatos_vendedor_id_fkey"
             columns: ["vendedor_id"]
             isOneToOne: false
@@ -239,6 +277,85 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pedidos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itens_pedido_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pedidos_inativos"
+            referencedColumns: ["pedido_id"]
+          },
+        ]
+      }
+      notificacoes: {
+        Row: {
+          cliente_id: string | null
+          created_at: string
+          id: string
+          lida: boolean
+          mensagem: string | null
+          pedido_id: string | null
+          tipo: string
+          titulo: string
+          vendedor_id: string
+        }
+        Insert: {
+          cliente_id?: string | null
+          created_at?: string
+          id?: string
+          lida?: boolean
+          mensagem?: string | null
+          pedido_id?: string | null
+          tipo?: string
+          titulo: string
+          vendedor_id: string
+        }
+        Update: {
+          cliente_id?: string | null
+          created_at?: string
+          id?: string
+          lida?: boolean
+          mensagem?: string | null
+          pedido_id?: string | null
+          tipo?: string
+          titulo?: string
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pedidos_inativos"
+            referencedColumns: ["pedido_id"]
+          },
+          {
+            foreignKeyName: "notificacoes_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
           },
         ]
       }
@@ -531,6 +648,42 @@ export type Database = {
           vendedor_nome: string | null
         }
         Relationships: []
+      }
+      vw_pedidos_inativos: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
+          dias_limite: string | null
+          dias_parado: number | null
+          pedido_id: string | null
+          status: string | null
+          ultima_atualizacao: string | null
+          vendedor_id: string | null
+          vendedor_nome: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
+          },
+        ]
       }
       vw_velocidade_por_fabricante: {
         Row: {
