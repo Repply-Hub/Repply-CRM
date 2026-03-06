@@ -518,6 +518,8 @@ const Configuracoes = () => {
   const [vendedorDialog, setVendedorDialog] = useState(false);
   const [editingVendedor, setEditingVendedor] = useState<null | { id: string; nome: string; email: string; telefone: string | null; role: string }>(null);
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
+  const [equipePage, setEquipePage] = useState(0);
+  const EQUIPE_PER_PAGE = 5;
   const qc = useQueryClient();
 
   const { data: isGestor } = useQuery({
@@ -612,30 +614,43 @@ const Configuracoes = () => {
                   {loadV ? (
                     <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
                   ) : (
-                    <div className="divide-y divide-border">
-                      {(vendedoresData ?? []).map(v => (
-                        <button
-                          key={v.id}
-                          className={cn(
-                            "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50",
-                            selectedVendedor === v.id && "bg-accent/70"
-                          )}
-                          onClick={() => setSelectedVendedor(v.id)}
-                        >
-                          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-sm font-bold text-primary">{v.nome.charAt(0).toUpperCase()}</span>
+                    <>
+                      <div className="divide-y divide-border">
+                        {(vendedoresData ?? []).slice(equipePage * EQUIPE_PER_PAGE, (equipePage + 1) * EQUIPE_PER_PAGE).map(v => (
+                          <button
+                            key={v.id}
+                            className={cn(
+                              "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50",
+                              selectedVendedor === v.id && "bg-accent/70"
+                            )}
+                            onClick={() => setSelectedVendedor(v.id)}
+                          >
+                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-sm font-bold text-primary">{v.nome.charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{v.nome}</p>
+                              <p className="text-xs text-muted-foreground truncate">{v.email}</p>
+                            </div>
+                            <Badge variant={v.role === 'gestor' ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
+                              {v.role}
+                            </Badge>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                      {(vendedoresData?.length ?? 0) > EQUIPE_PER_PAGE && (
+                        <div className="flex items-center justify-between px-4 py-2 border-t border-border">
+                          <span className="text-xs text-muted-foreground">
+                            {equipePage * EQUIPE_PER_PAGE + 1}–{Math.min((equipePage + 1) * EQUIPE_PER_PAGE, vendedoresData?.length ?? 0)} de {vendedoresData?.length}
+                          </span>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={equipePage === 0} onClick={() => setEquipePage(p => p - 1)}>Anterior</Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={(equipePage + 1) * EQUIPE_PER_PAGE >= (vendedoresData?.length ?? 0)} onClick={() => setEquipePage(p => p + 1)}>Próximo</Button>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">{v.nome}</p>
-                            <p className="text-xs text-muted-foreground truncate">{v.email}</p>
-                          </div>
-                          <Badge variant={v.role === 'gestor' ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
-                            {v.role}
-                          </Badge>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                        </button>
-                      ))}
-                    </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
