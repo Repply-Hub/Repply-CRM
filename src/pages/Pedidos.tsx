@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2 } from 'lucide-react';
+import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 
@@ -90,6 +90,7 @@ const Pedidos = () => {
                       <TableHead>Etapa</TableHead>
                       <TableHead>Vendedor</TableHead>
                       <TableHead></TableHead>
+                      <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -103,6 +104,11 @@ const Pedidos = () => {
                           <Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge>
                         </TableCell>
                         <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${p.id}/editar`); }} title="Editar pedido">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                         <TableCell>
                           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedOrder(p.id); }}>
                             <MessageSquare className="h-4 w-4" />
