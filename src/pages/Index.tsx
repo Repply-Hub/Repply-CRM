@@ -22,6 +22,7 @@ const Index = () => {
 
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
   const [selectedFabricantes, setSelectedFabricantes] = useState<string[]>([]);
+  const [showOnlyAttention, setShowOnlyAttention] = useState(false);
 
   const toggleFilter = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
     setList(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
