@@ -6,11 +6,12 @@ import { KanbanColumn } from '@/components/kanban/KanbanColumn';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { usePedidos, useUpdatePedidoStatus } from '@/hooks/use-pedidos';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
-import { Plus, Filter, Loader2, X, ChevronDown } from 'lucide-react';
+import { Plus, Filter, Loader2, X, ChevronDown, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+import { generatePedidosPdf } from '@/lib/generate-pdf';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -76,6 +77,23 @@ const Index = () => {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => {
+              const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
+              generatePedidosPdf(
+                orders.map(o => ({
+                  cliente: o.clientName,
+                  obra: o.obra,
+                  fabricante: o.fabricante,
+                  vendedor: o.vendedor,
+                  valor: o.valor,
+                  etapa: stageLabel(o.stage),
+                  data: o.createdAt,
+                })),
+                hasFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
+              );
+            }}>
+              <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/pedidos')}>
               <Filter className="h-4 w-4 mr-1" /> Ver Pedidos
             </Button>

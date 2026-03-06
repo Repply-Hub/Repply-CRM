@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil } from 'lucide-react';
+import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil, FileDown } from 'lucide-react';
+import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 
@@ -48,6 +49,23 @@ const Pedidos = () => {
             <p className="text-sm text-muted-foreground mt-1">{pedidos?.length ?? 0} pedidos</p>
           </div>
            <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => {
+              const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
+              generatePedidosPdf(
+                filtered.map(p => ({
+                  cliente: p.cliente?.empresa ?? '-',
+                  obra: p.obra?.nome_obra ?? '-',
+                  fabricante: p.fabricante?.nome ?? '-',
+                  vendedor: p.vendedor?.nome ?? '-',
+                  valor: p.valor_total ?? 0,
+                  etapa: stageLabel(p.status),
+                  data: p.data_pedido,
+                })),
+                stageFilter !== 'todos' ? `Orçamentos - ${stageLabel(stageFilter)}` : 'Orçamentos - Todos'
+              );
+            }}>
+              <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
+            </Button>
             <Button variant="outline" size="sm" onClick={() => toast.info('Importação XLSX em breve!')}>
               <Upload className="h-4 w-4 mr-1" /> Importar XLSX
             </Button>
