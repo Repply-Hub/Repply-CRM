@@ -185,7 +185,10 @@ const Configuracoes = () => {
               </Card>
             </div>
           </TabsContent>
-
-
+        </Tabs>
+      </div>
+    </AppLayout>
+  );
+};
 
 export default Configuracoes;
