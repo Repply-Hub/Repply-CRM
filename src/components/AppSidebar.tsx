@@ -64,7 +64,7 @@ export function AppSidebar() {
     >
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
         <div className="flex items-center gap-3 overflow-hidden">
-          <img src={logoSidebar} alt="MD Representações" className="h-9 w-9 rounded-lg shrink-0" />
+          <img src={logoSidebar} alt="MD Representações" className="h-10 w-10 shrink-0 object-contain" />
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
