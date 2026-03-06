@@ -339,35 +339,51 @@ function AuditLog() {
     });
   };
 
-  // Legend data
-  const legendItems = [
-    { label: 'Visualização', color: 'bg-blue-500' },
-    { label: 'Criação', color: 'bg-emerald-500' },
-    { label: 'Edição', color: 'bg-amber-500' },
-    { label: 'Exclusão', color: 'bg-red-500' },
+  // Filter buttons
+  const filterItems = [
+    { label: 'Visualização', color: 'bg-blue-500', activeColor: 'bg-blue-500 text-white' },
+    { label: 'Criação', color: 'bg-emerald-500', activeColor: 'bg-emerald-500 text-white' },
+    { label: 'Edição', color: 'bg-amber-500', activeColor: 'bg-amber-500 text-white' },
+    { label: 'Exclusão', color: 'bg-red-500', activeColor: 'bg-red-500 text-white' },
   ];
 
   return (
     <div className="space-y-3">
-      {/* Search & Legend */}
-      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between">
-        <div className="relative w-full sm:w-64">
-          <Eye className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Buscar alterações..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-8 h-9 text-sm"
-          />
-        </div>
-        <div className="flex items-center gap-3 flex-wrap" role="legend" aria-label="Legenda de tipos">
-          {legendItems.map(l => (
-            <div key={l.label} className="flex items-center gap-1.5">
-              <span className={cn('h-2.5 w-2.5 rounded-full', l.color)} />
-              <span className="text-[10px] text-muted-foreground">{l.label}</span>
-            </div>
-          ))}
-        </div>
+      {/* Search */}
+      <div className="relative w-full">
+        <Eye className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+        <Input
+          placeholder="Buscar alterações..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="pl-8 h-9 text-sm"
+        />
+      </div>
+
+      {/* Filter buttons */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <button
+          onClick={() => setActiveFilter(null)}
+          className={cn(
+            'text-[11px] px-2.5 py-1 rounded-full border transition-colors',
+            !activeFilter ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-accent'
+          )}
+        >
+          Todos
+        </button>
+        {filterItems.map(f => (
+          <button
+            key={f.label}
+            onClick={() => setActiveFilter(activeFilter === f.label ? null : f.label)}
+            className={cn(
+              'text-[11px] px-2.5 py-1 rounded-full border transition-colors flex items-center gap-1.5',
+              activeFilter === f.label ? cn(f.activeColor, 'border-transparent') : 'border-border text-muted-foreground hover:bg-accent'
+            )}
+          >
+            <span className={cn('h-2 w-2 rounded-full', activeFilter === f.label ? 'bg-white/80' : f.color)} />
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {filtered.length === 0 ? (
