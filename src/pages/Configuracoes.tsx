@@ -308,10 +308,9 @@ function AuditLog() {
   }
 
   const filtered = logs.filter(log => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    const nome = getVendedorNome(log.vendedor_id).toLowerCase();
-    return nome.includes(q) || log.acao.toLowerCase().includes(q);
+    const matchesSearch = !search || getVendedorNome(log.vendedor_id).toLowerCase().includes(search.toLowerCase()) || log.acao.toLowerCase().includes(search.toLowerCase());
+    const matchesFilter = !activeFilter || getActionMeta(log.acao).label === activeFilter;
+    return matchesSearch && matchesFilter;
   });
 
   // Group by date
