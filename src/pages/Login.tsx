@@ -51,9 +51,7 @@ export default function Login() {
 
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
           <div className="flex items-center gap-3">
-            <img src={logoSidebar} alt="MD Representações" className="h-40 w-40 object-contain" />
-            <span className="text-lg font-bold tracking-tight">MD Representações</span>
-          </div>
+            <img src={logoLogin} alt="MD Representações" className="h-40 w-40 object-contain" />
 
           <div className="space-y-6">
             <h1 className="text-4xl font-extrabold leading-tight tracking-tight">
@@ -91,7 +89,8 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex flex-col items-center mb-8 lg:hidden">
-            <img src={logoSidebar} alt="MD Representações" className="h-32 w-32 object-contain mb-4" />
+            <img src={logoLogin} alt="MD Representações" className="h-40 w-40 object-contain mb-4" />
+            <p className="text-sm text-muted-foreground">Gestão comercial inteligente e ágil</p>
           </div>
 
           <div className="hidden lg:block mb-8">
