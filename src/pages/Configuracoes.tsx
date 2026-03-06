@@ -315,7 +315,10 @@ function AuditLog() {
   const filtered = logs.filter(log => {
     const matchesSearch = !search || getVendedorNome(log.vendedor_id).toLowerCase().includes(search.toLowerCase()) || log.acao.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = !activeFilter || getActionMeta(log.acao).label === activeFilter;
-    return matchesSearch && matchesFilter;
+    const logDate = new Date(log.created_at);
+    const matchesDateFrom = !dateFrom || logDate >= new Date(dateFrom.setHours(0, 0, 0, 0));
+    const matchesDateTo = !dateTo || logDate <= new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate(), 23, 59, 59);
+    return matchesSearch && matchesFilter && matchesDateFrom && matchesDateTo;
   });
 
   // Group by date
