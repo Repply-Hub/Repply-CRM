@@ -277,6 +277,7 @@ function getActionMeta(acao: string) {
 
 function AuditLog() {
   const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const { data: logs, isLoading } = useQuery({
     queryKey: ['audit_permissoes'],
