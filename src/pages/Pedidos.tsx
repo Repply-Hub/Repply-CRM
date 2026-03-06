@@ -49,9 +49,9 @@ const Pedidos = () => {
             <p className="text-sm text-muted-foreground mt-1">{pedidos?.length ?? 0} pedidos</p>
           </div>
            <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => {
+            <Button variant="outline" size="sm" onClick={async () => {
               const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
-              generatePedidosPdf(
+              await generatePedidosPdf(
                 filtered.map(p => ({
                   cliente: p.cliente?.empresa ?? '-',
                   obra: p.obra?.nome_obra ?? '-',
