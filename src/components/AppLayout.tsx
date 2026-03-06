@@ -19,7 +19,7 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center justify-between px-6 shrink-0">
+          <header className="h-16 flex items-center justify-between px-6 shrink-0 pt-2">
             <div className="min-w-0">
               {title && <h1 className="text-2xl font-extrabold text-foreground tracking-tight truncate">{title}</h1>}
               {subtitle && <p className="text-sm text-muted-foreground mt-0.5 truncate">{subtitle}</p>}
