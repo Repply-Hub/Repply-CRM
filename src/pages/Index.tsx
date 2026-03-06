@@ -61,9 +61,10 @@ const Index = () => {
     return allOrders.filter(o => {
       if (selectedVendedores.length > 0 && !selectedVendedores.includes(o.vendedorId)) return false;
       if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(o.fabricanteId)) return false;
+      if (showOnlyAttention && o.daysInStage < o.alertDays) return false;
       return true;
     });
-  }, [allOrders, selectedVendedores, selectedFabricantes]);
+  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention]);
 
   const totalPipeline = orders.reduce((acc, o) => acc + o.valor, 0);
 
