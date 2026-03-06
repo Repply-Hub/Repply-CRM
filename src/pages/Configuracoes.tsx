@@ -8,14 +8,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useCreateVendedor } from '@/hooks/use-mutations';
-import { Plus, Sun, Moon, Monitor, Loader2 } from 'lucide-react';
+import { usePermissoes, useUpsertPermissao, MODULOS, type Permissao } from '@/hooks/use-permissoes';
+import { Plus, Sun, Moon, Monitor, Loader2, Pencil, Trash2, Shield } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -53,11 +58,155 @@ function ThemeSelector() {
   );
 }
 
+function PermissoesDialog({ vendedor }: { vendedor: { id: string; nome: string; role: string } }) {
+  const { data: permissoes, isLoading } = usePermissoes(vendedor.id);
+  const upsert = useUpsertPermissao();
+  const isGestor = vendedor.role === 'gestor';
+
+  const getPermissao = (modulo: string): Permissao | undefined =>
+    permissoes?.find(p => p.modulo === modulo);
+
+  const handleToggle = (modulo: string, campo: keyof Pick<Permissao, 'pode_ver' | 'pode_criar' | 'pode_editar' | 'pode_excluir'>, currentVal: boolean) => {
+    const existing = getPermissao(modulo);
+    upsert.mutate({
+      vendedor_id: vendedor.id,
+      modulo,
+      pode_ver: campo === 'pode_ver' ? !currentVal : (existing?.pode_ver ?? true),
+      pode_criar: campo === 'pode_criar' ? !currentVal : (existing?.pode_criar ?? false),
+      pode_editar: campo === 'pode_editar' ? !currentVal : (existing?.pode_editar ?? false),
+      pode_excluir: campo === 'pode_excluir' ? !currentVal : (existing?.pode_excluir ?? false),
+    });
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="Permissões">
+          <Shield className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Permissões — {vendedor.nome}</DialogTitle>
+        </DialogHeader>
+        {isGestor ? (
+          <p className="text-sm text-muted-foreground py-4">Gestores possuem acesso total a todos os módulos.</p>
+        ) : isLoading ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Módulo</TableHead>
+                <TableHead className="text-center w-20">Ver</TableHead>
+                <TableHead className="text-center w-20">Criar</TableHead>
+                <TableHead className="text-center w-20">Editar</TableHead>
+                <TableHead className="text-center w-20">Excluir</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {MODULOS.map(mod => {
+                const perm = getPermissao(mod.key);
+                const ver = perm?.pode_ver ?? true;
+                const criar = perm?.pode_criar ?? false;
+                const editar = perm?.pode_editar ?? false;
+                const excluir = perm?.pode_excluir ?? false;
+                return (
+                  <TableRow key={mod.key}>
+                    <TableCell className="font-medium">{mod.label}</TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox checked={ver} onCheckedChange={() => handleToggle(mod.key, 'pode_ver', ver)} />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox checked={criar} onCheckedChange={() => handleToggle(mod.key, 'pode_criar', criar)} />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox checked={editar} onCheckedChange={() => handleToggle(mod.key, 'pode_editar', editar)} />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox checked={excluir} onCheckedChange={() => handleToggle(mod.key, 'pode_excluir', excluir)} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nome: string; email: string; telefone: string | null; role: string }; onClose: () => void }) {
+  const qc = useQueryClient();
+  const updateMutation = useMutation({
+    mutationFn: async (data: { nome: string; email: string; telefone?: string; role: string }) => {
+      const { error } = await supabase.from('vendedores').update(data).eq('id', vendedor.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendedores'] });
+      toast.success('Vendedor atualizado!');
+      onClose();
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    updateMutation.mutate({
+      nome: form.get('nome') as string,
+      email: form.get('email') as string,
+      telefone: (form.get('telefone') as string) || undefined,
+      role: form.get('role') as string,
+    });
+  };
+
+  return (
+    <DialogContent>
+      <DialogHeader><DialogTitle>Editar Vendedor</DialogTitle></DialogHeader>
+      <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+        <div><Label>Nome</Label><Input name="nome" required defaultValue={vendedor.nome} /></div>
+        <div><Label>Email</Label><Input name="email" type="email" required defaultValue={vendedor.email} /></div>
+        <div><Label>Telefone</Label><Input name="telefone" defaultValue={vendedor.telefone ?? ''} /></div>
+        <div>
+          <Label>Perfil</Label>
+          <Select name="role" defaultValue={vendedor.role}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="vendedor">Vendedor</SelectItem>
+              <SelectItem value="gestor">Gestor</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button type="submit" disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? 'Salvando...' : 'Salvar'}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
+
 const Configuracoes = () => {
   const [alertDays, setAlertDays] = useState('5');
   const { data: vendedoresData, isLoading: loadV } = useVendedores();
   const createVendedor = useCreateVendedor();
   const [vendedorDialog, setVendedorDialog] = useState(false);
+  const [editingVendedor, setEditingVendedor] = useState<null | { id: string; nome: string; email: string; telefone: string | null; role: string }>(null);
+  const qc = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('vendedores').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vendedores'] });
+      toast.success('Vendedor removido!');
+    },
+  });
 
   const handleCreateVendedor = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -76,19 +225,18 @@ const Configuracoes = () => {
     }
   };
 
-
   return (
     <AppLayout>
       <div className="p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gerencie vendedores, automações e tabelas de preço</p>
+          <p className="text-sm text-muted-foreground mt-1">Gerencie vendedores, permissões e automações</p>
         </div>
 
-        <Tabs defaultValue="aparencia">
+        <Tabs defaultValue="vendedores">
           <TabsList>
-            <TabsTrigger value="aparencia">Aparência</TabsTrigger>
             <TabsTrigger value="vendedores">Vendedores</TabsTrigger>
+            <TabsTrigger value="aparencia">Aparência</TabsTrigger>
             <TabsTrigger value="automacao">Automação</TabsTrigger>
           </TabsList>
 
@@ -98,8 +246,8 @@ const Configuracoes = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-base">Vendedores</CardTitle>
-                  <CardDescription>Cadastro e permissões dos vendedores</CardDescription>
+                  <CardTitle className="text-base">Vendedores & Permissões</CardTitle>
+                  <CardDescription>Gerencie usuários e controle de acesso por módulo</CardDescription>
                 </div>
                 <Dialog open={vendedorDialog} onOpenChange={setVendedorDialog}>
                   <DialogTrigger asChild>
@@ -137,15 +285,57 @@ const Configuracoes = () => {
                       <TableRow>
                         <TableHead>Nome</TableHead>
                         <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
+                        <TableHead>Telefone</TableHead>
+                        <TableHead>Perfil</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {(vendedoresData ?? []).map(v => (
                         <TableRow key={v.id}>
                           <TableCell className="font-medium">{v.nome}</TableCell>
-                          <TableCell>{v.email}</TableCell>
-                          <TableCell><Badge variant={v.role === 'gestor' ? 'default' : 'secondary'}>{v.role}</Badge></TableCell>
+                          <TableCell className="text-muted-foreground">{v.email}</TableCell>
+                          <TableCell className="text-muted-foreground">{v.telefone || '—'}</TableCell>
+                          <TableCell>
+                            <Badge variant={v.role === 'gestor' ? 'default' : 'secondary'}>{v.role}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <PermissoesDialog vendedor={v} />
+                              <Dialog open={editingVendedor?.id === v.id} onOpenChange={(open) => !open && setEditingVendedor(null)}>
+                                <Button variant="ghost" size="icon" title="Editar" onClick={() => setEditingVendedor(v)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                {editingVendedor?.id === v.id && (
+                                  <EditVendedorDialog vendedor={editingVendedor} onClose={() => setEditingVendedor(null)} />
+                                )}
+                              </Dialog>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" title="Excluir" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Excluir vendedor?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Esta ação não pode ser desfeita. Todos os dados associados a "{v.nome}" serão removidos.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteMutation.mutate(v.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Excluir
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
