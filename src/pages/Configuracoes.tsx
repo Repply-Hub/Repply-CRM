@@ -134,30 +134,69 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
           </TableRow>
         </TableHeader>
         <TableBody>
-          {MODULOS.map(mod => {
-            const perm = getPermissao(mod.key);
-            const ver = perm?.pode_ver ?? true;
-            const criar = perm?.pode_criar ?? false;
-            const editar = perm?.pode_editar ?? false;
-            const excluir = perm?.pode_excluir ?? false;
+          {(() => {
+            const allVer = MODULOS.every(m => (getPermissao(m.key)?.pode_ver ?? true));
+            const allCriar = MODULOS.every(m => (getPermissao(m.key)?.pode_criar ?? false));
+            const allEditar = MODULOS.every(m => (getPermissao(m.key)?.pode_editar ?? false));
+            const allExcluir = MODULOS.every(m => (getPermissao(m.key)?.pode_excluir ?? false));
+
+            const handleToggleAll = async (campo: keyof Pick<Permissao, 'pode_ver' | 'pode_criar' | 'pode_editar' | 'pode_excluir'>, currentAll: boolean) => {
+              for (const mod of MODULOS) {
+                const existing = getPermissao(mod.key);
+                const currentVal = campo === 'pode_ver' ? (existing?.pode_ver ?? true) :
+                  campo === 'pode_criar' ? (existing?.pode_criar ?? false) :
+                  campo === 'pode_editar' ? (existing?.pode_editar ?? false) :
+                  (existing?.pode_excluir ?? false);
+                if (currentVal === currentAll) {
+                  await handleToggle(mod.key, campo, currentVal);
+                }
+              }
+            };
+
             return (
-              <TableRow key={mod.key}>
-                <TableCell className="font-medium text-sm">{mod.label}</TableCell>
-                <TableCell className="text-center">
-                  <Checkbox checked={ver} onCheckedChange={() => handleToggle(mod.key, 'pode_ver', ver)} />
-                </TableCell>
-                <TableCell className="text-center">
-                  <Checkbox checked={criar} onCheckedChange={() => handleToggle(mod.key, 'pode_criar', criar)} />
-                </TableCell>
-                <TableCell className="text-center">
-                  <Checkbox checked={editar} onCheckedChange={() => handleToggle(mod.key, 'pode_editar', editar)} />
-                </TableCell>
-                <TableCell className="text-center">
-                  <Checkbox checked={excluir} onCheckedChange={() => handleToggle(mod.key, 'pode_excluir', excluir)} />
-                </TableCell>
-              </TableRow>
+              <>
+                <TableRow className="bg-muted/30 border-b-2 border-border">
+                  <TableCell className="font-semibold text-sm text-primary">Todos</TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox checked={allVer} onCheckedChange={() => handleToggleAll('pode_ver', allVer)} />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox checked={allCriar} onCheckedChange={() => handleToggleAll('pode_criar', allCriar)} />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox checked={allEditar} onCheckedChange={() => handleToggleAll('pode_editar', allEditar)} />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox checked={allExcluir} onCheckedChange={() => handleToggleAll('pode_excluir', allExcluir)} />
+                  </TableCell>
+                </TableRow>
+                {MODULOS.map(mod => {
+                  const perm = getPermissao(mod.key);
+                  const ver = perm?.pode_ver ?? true;
+                  const criar = perm?.pode_criar ?? false;
+                  const editar = perm?.pode_editar ?? false;
+                  const excluir = perm?.pode_excluir ?? false;
+                  return (
+                    <TableRow key={mod.key}>
+                      <TableCell className="font-medium text-sm">{mod.label}</TableCell>
+                      <TableCell className="text-center">
+                        <Checkbox checked={ver} onCheckedChange={() => handleToggle(mod.key, 'pode_ver', ver)} />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Checkbox checked={criar} onCheckedChange={() => handleToggle(mod.key, 'pode_criar', criar)} />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Checkbox checked={editar} onCheckedChange={() => handleToggle(mod.key, 'pode_editar', editar)} />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Checkbox checked={excluir} onCheckedChange={() => handleToggle(mod.key, 'pode_excluir', excluir)} />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </>
             );
-          })}
+          })()}
         </TableBody>
       </Table>
     </div>
