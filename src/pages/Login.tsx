@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,8 @@ import logoSidebar from "@/assets/logo-sidebar.svg";
 export default function Login() {
   const { signIn, signUp } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [showLoginPw, setShowLoginPw] = useState(false);
+  const [showRegisterPw, setShowRegisterPw] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -115,7 +118,12 @@ export default function Login() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Senha</Label>
-                  <Input name="password" type="password" required placeholder="••••••••" className="h-11" />
+                  <div className="relative">
+                    <Input name="password" type={showLoginPw ? "text" : "password"} required placeholder="••••••••" className="h-11 pr-10" />
+                    <button type="button" onClick={() => setShowLoginPw(!showLoginPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showLoginPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
                 <Button type="submit" className="w-full h-11 font-semibold shadow-brand" disabled={loading}>
                   {loading ? "Entrando..." : "Entrar"}
@@ -135,14 +143,19 @@ export default function Login() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Senha</Label>
-                  <Input
-                    name="password"
-                    type="password"
-                    required
-                    minLength={6}
-                    placeholder="Mínimo 6 caracteres"
-                    className="h-11"
-                  />
+                  <div className="relative">
+                    <Input
+                      name="password"
+                      type={showRegisterPw ? "text" : "password"}
+                      required
+                      minLength={6}
+                      placeholder="Mínimo 6 caracteres"
+                      className="h-11 pr-10"
+                    />
+                    <button type="button" onClick={() => setShowRegisterPw(!showRegisterPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showRegisterPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
                 <Button type="submit" className="w-full h-11 font-semibold shadow-brand" disabled={loading}>
                   {loading ? "Cadastrando..." : "Cadastrar"}
