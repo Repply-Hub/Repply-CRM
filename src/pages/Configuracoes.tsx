@@ -519,6 +519,7 @@ const Configuracoes = () => {
   const [editingVendedor, setEditingVendedor] = useState<null | { id: string; nome: string; email: string; telefone: string | null; role: string }>(null);
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
   const [equipePage, setEquipePage] = useState(0);
+  const [empresaFilter, setEmpresaFilter] = useState<string>('todas');
   const EQUIPE_PER_PAGE = 5;
   const qc = useQueryClient();
 
@@ -530,6 +531,35 @@ const Configuracoes = () => {
       return data as boolean;
     },
   });
+
+  // Fetch clientes for empresa filter (gestor only)
+  const { data: clientesData } = useQuery({
+    queryKey: ['clientes_empresas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('empresa, vendedor_id')
+        .order('empresa');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!isGestor,
+  });
+
+  const empresasUnicas = useMemo(() => {
+    if (!clientesData) return [];
+    const set = new Set(clientesData.map(c => c.empresa));
+    return Array.from(set).sort();
+  }, [clientesData]);
+
+  const filteredVendedores = useMemo(() => {
+    if (!vendedoresData) return [];
+    if (empresaFilter === 'todas') return vendedoresData;
+    const vendedorIds = new Set(
+      clientesData?.filter(c => c.empresa === empresaFilter).map(c => c.vendedor_id).filter(Boolean)
+    );
+    return vendedoresData.filter(v => vendedorIds.has(v.id));
+  }, [vendedoresData, empresaFilter, clientesData]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
