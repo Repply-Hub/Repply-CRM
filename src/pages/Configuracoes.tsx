@@ -519,6 +519,7 @@ const Configuracoes = () => {
   const [editingVendedor, setEditingVendedor] = useState<null | { id: string; nome: string; email: string; telefone: string | null; role: string }>(null);
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
   const [equipePage, setEquipePage] = useState(0);
+  const [empresaFilter, setEmpresaFilter] = useState<string>('todas');
   const EQUIPE_PER_PAGE = 5;
   const qc = useQueryClient();
 
@@ -530,6 +531,35 @@ const Configuracoes = () => {
       return data as boolean;
     },
   });
+
+  // Fetch clientes for empresa filter (gestor only)
+  const { data: clientesData } = useQuery({
+    queryKey: ['clientes_empresas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('empresa, vendedor_id')
+        .order('empresa');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!isGestor,
+  });
+
+  const empresasUnicas = useMemo(() => {
+    if (!clientesData) return [];
+    const set = new Set(clientesData.map(c => c.empresa));
+    return Array.from(set).sort();
+  }, [clientesData]);
+
+  const filteredVendedores = useMemo(() => {
+    if (!vendedoresData) return [];
+    if (empresaFilter === 'todas') return vendedoresData;
+    const vendedorIds = new Set(
+      clientesData?.filter(c => c.empresa === empresaFilter).map(c => c.vendedor_id).filter(Boolean)
+    );
+    return vendedoresData.filter(v => vendedorIds.has(v.id));
+  }, [vendedoresData, empresaFilter, clientesData]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -563,11 +593,11 @@ const Configuracoes = () => {
   const activeVendedor = vendedoresData?.find(v => v.id === selectedVendedor);
 
   return (
-    <AppLayout title="Configurações" subtitle="Gerencie vendedores, permissões e automações">
+    <AppLayout title="Configurações" subtitle={isGestor ? "Gerencie usuários, permissões e automações" : "Gerencie vendedores, permissões e automações"}>
       <div className="p-6">
         <Tabs defaultValue="vendedores">
           <TabsList>
-            <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> Vendedores</TabsTrigger>
+           <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> {isGestor ? 'Usuários' : 'Vendedores'}</TabsTrigger>
             <TabsTrigger value="aparencia">Aparência</TabsTrigger>
             <TabsTrigger value="automacao">Automação</TabsTrigger>
           </TabsList>
@@ -580,8 +610,8 @@ const Configuracoes = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-3">
                   <div>
-                    <CardTitle className="text-base">Equipe</CardTitle>
-                    <CardDescription>{vendedoresData?.length ?? 0} vendedores cadastrados</CardDescription>
+                    <CardTitle className="text-base">{isGestor ? 'Usuários' : 'Equipe'}</CardTitle>
+                    <CardDescription>{filteredVendedores.length} {isGestor ? 'usuários' : 'vendedores'} {empresaFilter !== 'todas' ? `na empresa "${empresaFilter}"` : 'cadastrados'}</CardDescription>
                   </div>
                   <Dialog open={vendedorDialog} onOpenChange={setVendedorDialog}>
                     <DialogTrigger asChild>
@@ -611,12 +641,28 @@ const Configuracoes = () => {
                   </Dialog>
                 </CardHeader>
                 <CardContent className="p-0">
+                  {/* Empresa filter for gestor */}
+                  {isGestor && empresasUnicas.length > 0 && (
+                    <div className="px-4 pt-3 pb-2">
+                      <Select value={empresaFilter} onValueChange={(val) => { setEmpresaFilter(val); setEquipePage(0); setSelectedVendedor(null); }}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Filtrar por empresa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas as empresas</SelectItem>
+                          {empresasUnicas.map(emp => (
+                            <SelectItem key={emp} value={emp}>{emp}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   {loadV ? (
                     <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
                   ) : (
                     <>
                       <div className="divide-y divide-border">
-                        {(vendedoresData ?? []).slice(equipePage * EQUIPE_PER_PAGE, (equipePage + 1) * EQUIPE_PER_PAGE).map(v => (
+                        {filteredVendedores.slice(equipePage * EQUIPE_PER_PAGE, (equipePage + 1) * EQUIPE_PER_PAGE).map(v => (
                           <button
                             key={v.id}
                             className={cn(
@@ -639,14 +685,14 @@ const Configuracoes = () => {
                           </button>
                         ))}
                       </div>
-                      {(vendedoresData?.length ?? 0) > EQUIPE_PER_PAGE && (
+                      {filteredVendedores.length > EQUIPE_PER_PAGE && (
                         <div className="flex items-center justify-between px-4 py-2 border-t border-border">
                           <span className="text-xs text-muted-foreground">
-                            {equipePage * EQUIPE_PER_PAGE + 1}–{Math.min((equipePage + 1) * EQUIPE_PER_PAGE, vendedoresData?.length ?? 0)} de {vendedoresData?.length}
+                            {equipePage * EQUIPE_PER_PAGE + 1}–{Math.min((equipePage + 1) * EQUIPE_PER_PAGE, filteredVendedores.length)} de {filteredVendedores.length}
                           </span>
                           <div className="flex gap-1">
                             <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={equipePage === 0} onClick={() => setEquipePage(p => p - 1)}>Anterior</Button>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={(equipePage + 1) * EQUIPE_PER_PAGE >= (vendedoresData?.length ?? 0)} onClick={() => setEquipePage(p => p + 1)}>Próximo</Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={(equipePage + 1) * EQUIPE_PER_PAGE >= filteredVendedores.length} onClick={() => setEquipePage(p => p + 1)}>Próximo</Button>
                           </div>
                         </div>
                       )}
@@ -744,7 +790,7 @@ const Configuracoes = () => {
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                       <Users className="h-12 w-12 text-muted-foreground/30 mb-3" />
-                      <p className="text-sm text-muted-foreground">Selecione um vendedor na lista para gerenciar suas permissões</p>
+                      <p className="text-sm text-muted-foreground">Selecione um usuário na lista para gerenciar suas permissões</p>
                     </CardContent>
                   </Card>
                 )}
