@@ -662,7 +662,7 @@ const Configuracoes = () => {
                   ) : (
                     <>
                       <div className="divide-y divide-border">
-                        {(vendedoresData ?? []).slice(equipePage * EQUIPE_PER_PAGE, (equipePage + 1) * EQUIPE_PER_PAGE).map(v => (
+                        {filteredVendedores.slice(equipePage * EQUIPE_PER_PAGE, (equipePage + 1) * EQUIPE_PER_PAGE).map(v => (
                           <button
                             key={v.id}
                             className={cn(
@@ -685,14 +685,14 @@ const Configuracoes = () => {
                           </button>
                         ))}
                       </div>
-                      {(vendedoresData?.length ?? 0) > EQUIPE_PER_PAGE && (
+                      {filteredVendedores.length > EQUIPE_PER_PAGE && (
                         <div className="flex items-center justify-between px-4 py-2 border-t border-border">
                           <span className="text-xs text-muted-foreground">
-                            {equipePage * EQUIPE_PER_PAGE + 1}–{Math.min((equipePage + 1) * EQUIPE_PER_PAGE, vendedoresData?.length ?? 0)} de {vendedoresData?.length}
+                            {equipePage * EQUIPE_PER_PAGE + 1}–{Math.min((equipePage + 1) * EQUIPE_PER_PAGE, filteredVendedores.length)} de {filteredVendedores.length}
                           </span>
                           <div className="flex gap-1">
                             <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={equipePage === 0} onClick={() => setEquipePage(p => p - 1)}>Anterior</Button>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={(equipePage + 1) * EQUIPE_PER_PAGE >= (vendedoresData?.length ?? 0)} onClick={() => setEquipePage(p => p + 1)}>Próximo</Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={(equipePage + 1) * EQUIPE_PER_PAGE >= filteredVendedores.length} onClick={() => setEquipePage(p => p + 1)}>Próximo</Button>
                           </div>
                         </div>
                       )}
