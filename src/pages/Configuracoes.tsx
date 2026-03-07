@@ -593,7 +593,7 @@ const Configuracoes = () => {
   const activeVendedor = vendedoresData?.find(v => v.id === selectedVendedor);
 
   return (
-    <AppLayout title="Configurações" subtitle="Gerencie vendedores, permissões e automações">
+    <AppLayout title="Configurações" subtitle={isGestor ? "Gerencie usuários, permissões e automações" : "Gerencie vendedores, permissões e automações"}>
       <div className="p-6">
         <Tabs defaultValue="vendedores">
           <TabsList>
@@ -790,7 +790,7 @@ const Configuracoes = () => {
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                       <Users className="h-12 w-12 text-muted-foreground/30 mb-3" />
-                      <p className="text-sm text-muted-foreground">Selecione um vendedor na lista para gerenciar suas permissões</p>
+                      <p className="text-sm text-muted-foreground">Selecione um usuário na lista para gerenciar suas permissões</p>
                     </CardContent>
                   </Card>
                 )}
