@@ -641,6 +641,22 @@ const Configuracoes = () => {
                   </Dialog>
                 </CardHeader>
                 <CardContent className="p-0">
+                  {/* Empresa filter for gestor */}
+                  {isGestor && empresasUnicas.length > 0 && (
+                    <div className="px-4 pt-3 pb-2">
+                      <Select value={empresaFilter} onValueChange={(val) => { setEmpresaFilter(val); setEquipePage(0); setSelectedVendedor(null); }}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Filtrar por empresa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas as empresas</SelectItem>
+                          {empresasUnicas.map(emp => (
+                            <SelectItem key={emp} value={emp}>{emp}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   {loadV ? (
                     <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
                   ) : (
