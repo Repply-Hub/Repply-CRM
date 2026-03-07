@@ -597,7 +597,7 @@ const Configuracoes = () => {
       <div className="p-6">
         <Tabs defaultValue="vendedores">
           <TabsList>
-            <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> Vendedores</TabsTrigger>
+           <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> {isGestor ? 'Usuários' : 'Vendedores'}</TabsTrigger>
             <TabsTrigger value="aparencia">Aparência</TabsTrigger>
             <TabsTrigger value="automacao">Automação</TabsTrigger>
           </TabsList>
@@ -610,8 +610,8 @@ const Configuracoes = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-3">
                   <div>
-                    <CardTitle className="text-base">Equipe</CardTitle>
-                    <CardDescription>{vendedoresData?.length ?? 0} vendedores cadastrados</CardDescription>
+                    <CardTitle className="text-base">{isGestor ? 'Usuários' : 'Equipe'}</CardTitle>
+                    <CardDescription>{filteredVendedores.length} {isGestor ? 'usuários' : 'vendedores'} {empresaFilter !== 'todas' ? `na empresa "${empresaFilter}"` : 'cadastrados'}</CardDescription>
                   </div>
                   <Dialog open={vendedorDialog} onOpenChange={setVendedorDialog}>
                     <DialogTrigger asChild>
