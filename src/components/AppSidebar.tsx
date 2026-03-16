@@ -24,6 +24,7 @@ const navItems = [
   { path: '/obras', label: 'Obras', icon: HardHat },
   { path: '/pedidos', label: 'Pedidos', icon: FileText },
   { path: '/fabricantes', label: 'Fabricantes', icon: Factory },
+  { path: '/portal', label: 'Portal', icon: Globe },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
