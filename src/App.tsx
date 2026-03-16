@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import Configuracoes from "./pages/Configuracoes";
 import Obras from "./pages/Obras";
 import Fabricantes from "./pages/Fabricantes";
+import Portal from "./pages/Portal";
 import EditarPedido from "./pages/EditarPedido";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
