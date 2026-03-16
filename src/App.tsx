@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import Configuracoes from "./pages/Configuracoes";
 import Obras from "./pages/Obras";
 import Fabricantes from "./pages/Fabricantes";
+import Portal from "./pages/Portal";
 import EditarPedido from "./pages/EditarPedido";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -45,6 +46,7 @@ const AppRoutes = () => (
     <Route path="/pedidos/:id/editar" element={<ProtectedRoute><EditarPedido /></ProtectedRoute>} />
     <Route path="/obras" element={<ProtectedRoute><Obras /></ProtectedRoute>} />
     <Route path="/fabricantes" element={<ProtectedRoute><Fabricantes /></ProtectedRoute>} />
+    <Route path="/portal" element={<ProtectedRoute><Portal /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
