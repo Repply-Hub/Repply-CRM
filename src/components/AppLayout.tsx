@@ -129,7 +129,7 @@ function NotificationCenter() {
             </Button>
           )}
         </div>
-        <ScrollArea className="max-h-96">
+        <ScrollArea className="h-96">
           {(!notificacoes || notificacoes.length === 0) ? (
             <p className="text-xs text-muted-foreground p-4 text-center">Nenhuma notificação no momento.</p>
           ) : (
