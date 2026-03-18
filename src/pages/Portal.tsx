@@ -767,7 +767,7 @@ export default function Portal() {
       }));
       toast.error('Erro ao acessar site do IDEMA. O site pode estar fora do ar.', { id: toastId });
     } finally {
-      setScraping(false);
+      setScraping((prev) => ({ ...prev, idema: false }));
     }
   };
 
