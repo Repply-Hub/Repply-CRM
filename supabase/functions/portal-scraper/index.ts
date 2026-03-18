@@ -812,6 +812,33 @@ Deno.serve(async (req) => {
         filteredText = textContent.split(/[.!?]+/).filter(s => s.toLowerCase().includes(q)).join('. ').trim();
       }
 
+      const normalizedContent = `${filteredText} ${filteredLinks.map((l) => `${l.text} ${l.href}`).join(' ')}`.toLowerCase();
+      const hasRelevantIdemaContent =
+        filteredTable.length > 0 ||
+        filteredLinks.some((l) => /validar|pdf_licenca|licen/i.test(`${l.text} ${l.href}`)) ||
+        /(licen[çc]a|cnpj|empreendimento|processo|validade|emiss[aã]o|tec\/)/i.test(normalizedContent);
+
+      const looksLikeGenericServicesPage =
+        filteredTable.length === 0 &&
+        /(procedimentos normativos|ascom\/idema|servi[cç]os prestados|área específica)/i.test(normalizedContent);
+
+      if (!hasRelevantIdemaContent || looksLikeGenericServicesPage) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'O portal do IDEMA não retornou resultados válidos no momento.',
+            fallback_url: actionUrl || usedUrl || site.url,
+            site: { id: site.id, name: site.name, url: site.url },
+            meta: {
+              action_url: actionUrl || usedUrl || site.url,
+              filter_applied: true,
+            },
+            fetched_at: new Date().toISOString(),
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       return new Response(
         JSON.stringify({
           success: true,

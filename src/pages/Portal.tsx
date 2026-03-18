@@ -965,7 +965,32 @@ export default function Portal() {
                   <div className="space-y-6 min-w-0">
                     {SITES.filter(site => site.id === activeTab).map((site) => {
                       const result = results[site.id];
-                      if (!result?.success || !result.data?.table?.length) return null;
+
+                      if (!result) {
+                        return (
+                          <div key={site.id} className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+                            Nenhum dado carregado ainda. Clique em <span className="font-medium text-foreground">Atualizar Dados</span> para consultar.
+                          </div>
+                        );
+                      }
+
+                      if (!result.success) {
+                        return (
+                          <div key={site.id} className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+                            <p className="font-medium text-foreground">Não foi possível carregar dados do {site.name}.</p>
+                            <p className="mt-1">{result.error || 'Erro na consulta.'}</p>
+                          </div>
+                        );
+                      }
+
+                      if (!result.data?.table?.length) {
+                        return (
+                          <div key={site.id} className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+                            Nenhum registro encontrado para {site.name} no momento.
+                          </div>
+                        );
+                      }
+
                       const headers = Object.keys(result.data.table[0]);
                       const currentPage = pages[site.id] || 0;
                       const totalPages = Math.ceil(result.data.table.length / ROWS_PER_PAGE);
