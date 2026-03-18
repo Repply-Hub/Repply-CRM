@@ -338,6 +338,9 @@ export default function Portal() {
                       const result = results[site.id];
                       if (!result?.success || !result.data?.table?.length) return null;
                       const headers = Object.keys(result.data.table[0]);
+                      const currentPage = pages[site.id] || 0;
+                      const totalPages = Math.ceil(result.data.table.length / ROWS_PER_PAGE);
+                      const paginatedRows = result.data.table.slice(currentPage * ROWS_PER_PAGE, (currentPage + 1) * ROWS_PER_PAGE);
                       return (
                         <div key={site.id}>
                           <div className="flex items-center justify-between mb-2">
@@ -360,7 +363,7 @@ export default function Portal() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {result.data.table.map((row, i) => (
+                                  {paginatedRows.map((row, i) => (
                                     <tr key={i} className="border-t border-border/50 hover:bg-accent/30">
                                       {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
                                         <td key={h} className="px-3 py-2 max-w-[200px] truncate" title={row[h]}>
@@ -385,6 +388,33 @@ export default function Portal() {
                               </table>
                             </div>
                           </div>
+                          {totalPages > 1 && (
+                            <div className="flex items-center justify-between mt-2">
+                              <p className="text-xs text-muted-foreground">
+                                Página {currentPage + 1} de {totalPages}
+                              </p>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  disabled={currentPage === 0}
+                                  onClick={() => setPages(p => ({ ...p, [site.id]: currentPage - 1 }))}
+                                >
+                                  <ChevronLeft className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  disabled={currentPage >= totalPages - 1}
+                                  onClick={() => setPages(p => ({ ...p, [site.id]: currentPage + 1 }))}
+                                >
+                                  <ChevronRight className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
