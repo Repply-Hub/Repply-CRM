@@ -149,12 +149,24 @@ function parseCnpjs(text: string): string[] {
 
 function detectLicenseType(text: string): string {
   const lower = text.toLowerCase();
+  // Abbreviations first (common in Extremoz PDFs)
+  if (/\bLIO\s+para\b/i.test(text)) return 'Licença de Instalação e Operação';
+  if (/\bLP\s+para\b/i.test(text)) return 'Licença Prévia';
+  if (/\bLS\s+para\b/i.test(text)) return 'Licença Simplificada';
+  if (/\bLI\s+para\b/i.test(text)) return 'Licença de Instalação';
+  if (/\bLO\s+para\b/i.test(text)) return 'Licença de Operação';
+  // Full names
+  if (lower.includes('renovação de licença simplificada')) return 'Renovação de Licença Simplificada';
+  if (lower.includes('renovação de licença')) return 'Renovação de Licença';
   if (lower.includes('licença prévia') || lower.includes('(lp)')) return 'Licença Prévia';
+  if (lower.includes('licença de instalação e operação')) return 'Licença de Instalação e Operação';
   if (lower.includes('licença de instalação') || lower.includes('(li)')) return 'Licença de Instalação';
   if (lower.includes('licença de operação') || lower.includes('(lo)')) return 'Licença de Operação';
   if (lower.includes('licença simplificada') || lower.includes('(ls)')) return 'Licença Simplificada';
-  if (lower.includes('renovação de licença')) return 'Renovação de Licença';
   if (lower.includes('licença ambiental')) return 'Licença Ambiental';
+  if (lower.includes('autorização ambiental')) return 'Autorização Ambiental';
+  if (lower.includes('dispensa de licen')) return 'Dispensa de Licença';
+  if (/tomada de preços|concorrência|pregão/i.test(text)) return 'Licitação';
   return '';
 }
 
