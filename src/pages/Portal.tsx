@@ -680,7 +680,7 @@ export default function Portal() {
 
           const keys = Object.keys(row).map(k => k.toLowerCase());
           const rowLower: Record<string, string> = {};
-          Object.entries(row).forEach(([k, v]) => { rowLower[k.toLowerCase()] = v; });
+          Object.entries(row).forEach(([k, v]) => { rowLower[k.toLowerCase()] = String(v); });
 
           await supabase.from('licencas_idema').insert({
             numero_licenca: rowLower['nº'] || rowLower['numero'] || rowLower['licença'] || rowLower['n°'] || '',
