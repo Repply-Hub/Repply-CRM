@@ -473,23 +473,6 @@ export default function Portal() {
                   </div>
                 )}
 
-                {/* Success status */}
-                {results[site.id]?.success && (
-                  <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-success/10 text-xs">
-                    <p className="text-success font-medium">
-                      {results[site.id].meta ? (
-                        <>✓ {results[site.id].meta!.total_licencas} licenças · {results[site.id].meta!.processed_pdfs}/{results[site.id].meta!.total_pdfs} edições</>
-                      ) : (
-                        <>✓ {results[site.id].data?.links?.length || 0} links · {results[site.id].data?.table?.length || 0} registros</>
-                      )}
-                    </p>
-                    {results[site.id].data?.table && results[site.id].data!.table.length > 0 && (
-                      <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2 text-primary hover:text-primary" onClick={() => exportCsv(site.id)}>
-                        <Download className="h-3 w-3 mr-1" /> CSV
-                      </Button>
-                    )}
-                  </div>
-                )}
               </CardContent>
             </Card>
           ))}
