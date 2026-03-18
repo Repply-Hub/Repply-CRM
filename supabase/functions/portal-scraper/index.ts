@@ -181,32 +181,26 @@ function extractObraDescricao(text: string): string {
 /** Extract PDF links from Extremoz listing page HTML */
 function extractExtremozPdfLinks(html: string): Array<{ date: string; title: string; href: string }> {
   const results: Array<{ date: string; title: string; href: string }> = [];
+  const seen = new Set<string>();
 
-  // Match article blocks: <div class="arq-list-item-content"><a href="URL"><h1>TITLE</h1><p class="data">DATE</p>
-  const articleRegex = /<div\s+class="arq-list-item-content">\s*<a\s+href="([^"]+)"[^>]*>\s*<h1>([^<]*)<\/h1>\s*<p\s+class="data">[^<]*<\/i>\s*([^<]*)<\/p>/gi;
+  // Primary: match href to PDF files on the Extremoz domain
+  const hrefRegex = /href="(https?:\/\/extremoz\.rn\.gov\.br\/wp-content\/uploads\/[^"]+\.(?:pdf|doc\.pdf))"/gi;
   let match;
-  while ((match = articleRegex.exec(html)) !== null) {
-    const href = match[1].trim();
-    const title = match[2].trim();
-    const date = match[3].trim();
-    if (href.includes('.pdf') || href.includes('.doc')) {
-      results.push({ date, title, href });
-    }
-  }
+  while ((match = hrefRegex.exec(html)) !== null) {
+    const href = match[1];
+    if (seen.has(href)) continue;
+    seen.add(href);
 
-  // Fallback: simple href regex for PDF links
-  if (results.length === 0) {
-    const fallbackRegex = /href="(https?:\/\/extremoz\.rn\.gov\.br\/wp-content\/uploads\/[^"]+\.(?:pdf|doc\.pdf))"/gi;
-    let fbMatch;
-    const seen = new Set<string>();
-    while ((fbMatch = fallbackRegex.exec(html)) !== null) {
-      const href = fbMatch[1];
-      if (seen.has(href)) continue;
-      seen.add(href);
-      const filename = href.split('/').pop() || '';
-      const title = filename.replace(/\.doc\.pdf$|\.pdf$/i, '').replace(/-/g, ' ');
-      results.push({ date: '', title, href });
-    }
+    const filename = href.split('/').pop() || '';
+    const title = filename.replace(/\.doc\.pdf$|\.pdf$/i, '').replace(/-/g, ' ');
+
+    // Try to find date near this link (look for dd/mm/yyyy pattern nearby)
+    const pos = match.index;
+    const nearby = html.substring(pos, Math.min(html.length, pos + 500));
+    const dateMatch = nearby.match(/(\d{2}\/\d{2}\/\d{4})/);
+    const date = dateMatch ? dateMatch[1] : '';
+
+    results.push({ date, title, href });
   }
 
   return results;
