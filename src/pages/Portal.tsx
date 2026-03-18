@@ -519,16 +519,16 @@ export default function Portal() {
         </div>
 
         {/* Results area */}
-        {Object.values(results).some((r) => r.success) && (
+        {activeTab && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Resultados</CardTitle>
+              <CardTitle className="text-base">{SITES.find(s => s.id === activeTab)?.name}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="pr-1">
                 {(
                   <div className="space-y-6 min-w-0">
-                    {SITES.map((site) => {
+                    {SITES.filter(site => site.id === activeTab).map((site) => {
                       const result = results[site.id];
                       if (!result?.success || !result.data?.table?.length) return null;
                       const headers = Object.keys(result.data.table[0]);
