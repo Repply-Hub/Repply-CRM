@@ -346,40 +346,42 @@ export default function Portal() {
                               <Download className="h-3 w-3 mr-1" /> CSV
                             </Button>
                           </div>
-                          <div className="overflow-x-auto border rounded-md max-w-[calc(100vw-2rem)] sm:max-w-full">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="bg-muted/50">
-                                  {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
-                                    <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
-                                  ))}
-                                  <th className="px-3 py-2 text-left font-medium">Ações</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {result.data.table.map((row, i) => (
-                                  <tr key={i} className="border-t border-border/50 hover:bg-accent/30">
+                          <div className="w-full overflow-x-auto rounded-md border">
+                            <div className="min-w-max">
+                              <table className="w-full min-w-[1100px] text-xs">
+                                <thead>
+                                  <tr className="bg-muted/50">
                                     {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
-                                      <td key={h} className="px-3 py-2 max-w-[200px] truncate" title={row[h]}>
-                                        {row[h]}
-                                      </td>
+                                      <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
                                     ))}
-                                    <td className="px-3 py-2">
-                                      {row['Link PDF'] && (
-                                        <a
-                                          href={row['Link PDF']}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-1 text-primary hover:underline"
-                                        >
-                                          <ExternalLink className="h-3 w-3" /> PDF
-                                        </a>
-                                      )}
-                                    </td>
+                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Ações</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody>
+                                  {result.data.table.map((row, i) => (
+                                    <tr key={i} className="border-t border-border/50 hover:bg-accent/30">
+                                      {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
+                                        <td key={h} className="px-3 py-2 max-w-[200px] truncate" title={row[h]}>
+                                          {row[h]}
+                                        </td>
+                                      ))}
+                                      <td className="px-3 py-2 whitespace-nowrap">
+                                        {row['Link PDF'] && (
+                                          <a
+                                            href={row['Link PDF']}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                                          >
+                                            <ExternalLink className="h-3 w-3" /> PDF
+                                          </a>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         </div>
                       );
