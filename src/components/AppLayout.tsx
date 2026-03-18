@@ -203,10 +203,10 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-16 flex items-center justify-between px-6 shrink-0 pt-2">
-            <div className="min-w-0">
-              {title && <h1 className="text-2xl font-extrabold text-foreground tracking-tight truncate">{title}</h1>}
-              {subtitle && <p className="text-sm text-muted-foreground mt-0.5 truncate">{subtitle}</p>}
+          <header className="min-h-[3.5rem] md:min-h-[4rem] flex items-center justify-between px-3 sm:px-4 md:px-6 shrink-0 pt-2 gap-2">
+            <div className="min-w-0 flex-1">
+              {title && <h1 className="text-lg sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight truncate">{title}</h1>}
+              {subtitle && <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 truncate">{subtitle}</p>}
             </div>
             <NotificationCenter />
           </header>

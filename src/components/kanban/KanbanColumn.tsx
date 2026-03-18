@@ -15,7 +15,7 @@ export function KanbanColumn({ stageKey, label, colorClass, orders }: KanbanColu
   const total = orders.reduce((acc, o) => acc + o.valor, 0);
 
   return (
-    <div className="flex flex-col w-72 min-w-[288px] shrink-0 max-h-[calc(100vh-220px)]">
+    <div className="flex flex-col w-64 sm:w-72 min-w-[256px] sm:min-w-[288px] shrink-0 max-h-[calc(100vh-180px)] sm:max-h-[calc(100vh-220px)]">
       <div className="flex items-center gap-2.5 mb-1 px-1">
         <div className={cn('h-2 w-2 rounded-full ring-2 ring-offset-1 ring-offset-background', `bg-${colorClass}`, `ring-${colorClass}/30`)} />
         <h3 className="text-sm font-bold text-foreground tracking-tight">{label}</h3>
