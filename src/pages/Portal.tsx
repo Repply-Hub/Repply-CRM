@@ -126,7 +126,186 @@ export default function Portal() {
     }
   };
 
-  const fetchSite = async (siteId: string) => {
+  // Client-side scraping for Extremoz (bypasses server IP block)
+  const scrapeExtremoz = async () => {
+    setScraping(true);
+    const toastId = toast.loading('Buscando diários oficiais de Extremoz...');
+    try {
+      // Step 1: Fetch the listing page from user's browser
+      const years = ['2026', '2025'];
+      const pdfLinks: Array<{ href: string; title: string; date: string }> = [];
+
+      for (const year of years) {
+        const baseUrl = `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${year}/`;
+        for (let page = 1; page <= 5; page++) {
+          const url = page === 1 ? baseUrl : `${baseUrl}page/${page}/`;
+          try {
+            const resp = await fetch(url);
+            if (!resp.ok) break;
+            const html = await resp.text();
+
+            // Extract PDF links
+            const hrefRegex = /href="(https?:\/\/extremoz\.rn\.gov\.br\/wp-content\/uploads\/[^"]+\.(?:pdf|doc\.pdf))"/gi;
+            let match;
+            while ((match = hrefRegex.exec(html)) !== null) {
+              const href = match[1];
+              if (pdfLinks.some(p => p.href === href)) continue;
+              const filename = href.split('/').pop() || '';
+              const title = filename.replace(/\.doc\.pdf$|\.pdf$/i, '').replace(/-/g, ' ');
+              pdfLinks.push({ href, title, date: '' });
+            }
+
+            if (!html.includes(`/page/${page + 1}`)) break;
+          } catch {
+            break;
+          }
+        }
+        if (pdfLinks.length > 0) break; // found PDFs, stop
+      }
+
+      if (pdfLinks.length === 0) {
+        toast.error('Nenhum PDF encontrado no site de Extremoz', { id: toastId });
+        setScraping(false);
+        return;
+      }
+
+      toast.loading(`Encontrados ${pdfLinks.length} PDFs. Verificando novos...`, { id: toastId });
+
+      // Step 2: Check which PDFs are already in the database
+      const { data: existing } = await supabase
+        .from('licencas_extremoz')
+        .select('pdf_link');
+      const existingLinks = new Set((existing || []).map(r => r.pdf_link));
+      const newPdfs = pdfLinks.filter(p => !existingLinks.has(p.href));
+
+      if (newPdfs.length === 0) {
+        toast.success('Banco de dados já está atualizado! Nenhum novo diário encontrado.', { id: toastId });
+        setScraping(false);
+        return;
+      }
+
+      toast.loading(`Processando ${newPdfs.length} novos PDFs...`, { id: toastId });
+
+      // Step 3: Process new PDFs (limit to 5 at a time)
+      const toProcess = newPdfs.slice(0, 5);
+      let totalInserted = 0;
+
+      for (const pdf of toProcess) {
+        try {
+          const resp = await fetch(pdf.href);
+          if (!resp.ok) continue;
+          const buffer = new Uint8Array(await resp.arrayBuffer());
+          
+          if (buffer.length > 2 * 1024 * 1024) {
+            // Too large, just register as entry
+            await supabase.from('licencas_extremoz').insert({
+              data_edicao: pdf.title,
+              pdf_nome: pdf.href.split('/').pop() || '',
+              pdf_link: pdf.href,
+              bloco_texto: '(PDF muito grande para processamento automático)',
+            });
+            totalInserted++;
+            continue;
+          }
+
+          // Basic PDF text extraction (same logic as edge function)
+          const raw = new TextDecoder('latin1').decode(buffer);
+          const textParts: string[] = [];
+          const btEtRegex = /BT\s([\s\S]*?)ET/g;
+          let btMatch;
+          while ((btMatch = btEtRegex.exec(raw)) !== null) {
+            const block = btMatch[1];
+            const tjRegex = /\(([^)]*)\)\s*Tj/g;
+            let tjMatch;
+            while ((tjMatch = tjRegex.exec(block)) !== null) {
+              const decoded = tjMatch[1].replace(/\\n/g, '\n').replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\').trim();
+              if (decoded) textParts.push(decoded);
+            }
+            const tjArrayRegex = /\[([\s\S]*?)\]\s*TJ/g;
+            let tjArrMatch;
+            while ((tjArrMatch = tjArrayRegex.exec(block)) !== null) {
+              const strRegex = /\(([^)]*)\)/g;
+              let strMatch;
+              const parts: string[] = [];
+              while ((strMatch = strRegex.exec(tjArrMatch[1])) !== null) {
+                parts.push(strMatch[1].replace(/\\n/g, '\n').replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\'));
+              }
+              const joined = parts.join('').trim();
+              if (joined) textParts.push(joined);
+            }
+          }
+          const text = textParts.join('\n');
+
+          if (!text || text.length < 20) {
+            await supabase.from('licencas_extremoz').insert({
+              data_edicao: pdf.title,
+              pdf_nome: pdf.href.split('/').pop() || '',
+              pdf_link: pdf.href,
+              bloco_texto: '(Texto não extraível - PDF baseado em imagem)',
+            });
+            totalInserted++;
+            continue;
+          }
+
+          // Extract CNPJs
+          const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
+          const cnpjs = [...new Set((text.match(cnpjRegex) || []).map(c => c.replace(/\s/g, '')))];
+
+          if (cnpjs.length === 0) {
+            await supabase.from('licencas_extremoz').insert({
+              data_edicao: pdf.title,
+              pdf_nome: pdf.href.split('/').pop() || '',
+              pdf_link: pdf.href,
+              bloco_texto: text.substring(0, 500),
+            });
+            totalInserted++;
+            continue;
+          }
+
+          for (const cnpj of cnpjs) {
+            const idx = text.indexOf(cnpj);
+            const context = text.substring(Math.max(0, idx - 300), Math.min(text.length, idx + 400));
+            const lower = context.toLowerCase();
+
+            // Detect license type
+            let tipo = '';
+            if (lower.includes('licença prévia') || lower.includes('(lp)')) tipo = 'Licença Prévia';
+            else if (lower.includes('licença de instalação') || lower.includes('(li)')) tipo = 'Licença de Instalação';
+            else if (lower.includes('licença de operação') || lower.includes('(lo)')) tipo = 'Licença de Operação';
+            else if (lower.includes('licença simplificada') || lower.includes('(ls)')) tipo = 'Licença Simplificada';
+            else if (lower.includes('renovação de licença')) tipo = 'Renovação de Licença';
+            else if (lower.includes('licença ambiental')) tipo = 'Licença Ambiental';
+
+            const hasRelevant = tipo || lower.includes('licen') || lower.includes('construção') || lower.includes('loteamento') || lower.includes('empreendimento');
+            if (!hasRelevant) continue;
+
+            await supabase.from('licencas_extremoz').insert({
+              data_edicao: pdf.title,
+              tipo_licenca: tipo || 'Não identificada',
+              cnpj,
+              pdf_nome: pdf.href.split('/').pop() || '',
+              pdf_link: pdf.href,
+              bloco_texto: context.substring(0, 500),
+            });
+            totalInserted++;
+          }
+        } catch (err) {
+          console.error('Erro ao processar PDF:', pdf.href, err);
+        }
+      }
+
+      toast.success(`${totalInserted} novos registros importados de ${toProcess.length} PDFs!`, { id: toastId });
+      // Reload data
+      await fetchExtremozFromDb();
+    } catch (err) {
+      console.error('Scraping error:', err);
+      toast.error('Erro ao fazer scraping de Extremoz', { id: toastId });
+    } finally {
+      setScraping(false);
+    }
+  };
+
+
     if (siteId === 'extremoz') {
       return fetchExtremozFromDb();
     }
