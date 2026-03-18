@@ -637,7 +637,7 @@ export default function Portal() {
 
   // ─── IDEMA: client-side scraping ──────────────────────────────
   const scrapeIdema = async () => {
-    setScraping(true);
+    setScraping((prev) => ({ ...prev, idema: true }));
     const toastId = toast.loading('Buscando licenças do IDEMA via servidor...');
     try {
       const { data, error } = await supabase.functions.invoke('portal-scraper', {
