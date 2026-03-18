@@ -155,7 +155,7 @@ export default function Portal() {
 
   // Client-side scraping for Extremoz (bypasses server IP block)
   const scrapeExtremoz = async () => {
-    setScraping(true);
+    setScraping((prev) => ({ ...prev, extremoz: true }));
     const toastId = toast.loading('Buscando diários oficiais de Extremoz...');
     try {
       // Step 1: Fetch the listing page from user's browser
