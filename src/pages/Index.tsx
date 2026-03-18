@@ -145,7 +145,7 @@ const Index = () => {
           {/* Spacer to push action buttons right */}
           <div className="flex-1" />
 
-          <Button variant="outline" size="sm" onClick={async () => {
+          <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
             const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
             await generatePedidosPdf(
               orders.map(o => ({
@@ -162,11 +162,11 @@ const Index = () => {
           }}>
             <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/pedidos')}>
+          <Button variant="outline" size="sm" className="hidden md:inline-flex" onClick={() => navigate('/pedidos')}>
             <Filter className="h-4 w-4 mr-1" /> Ver Pedidos
           </Button>
           <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
-            <Plus className="h-4 w-4 mr-1" /> Novo Pedido
+            <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
           </Button>
         </div>
 
