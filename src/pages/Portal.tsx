@@ -207,7 +207,7 @@ export default function Portal() {
 
       if (newPdfs.length === 0) {
         toast.success('Banco de dados já está atualizado! Nenhum novo diário encontrado.', { id: toastId });
-        setScraping(false);
+        setScraping((prev) => ({ ...prev, extremoz: false }));
         return;
       }
 
