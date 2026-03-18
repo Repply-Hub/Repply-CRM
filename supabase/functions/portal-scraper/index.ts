@@ -729,7 +729,7 @@ Deno.serve(async (req) => {
       const baseAttempts: Promise<IdemaBaseResult>[] = urls.map((tryUrl) => (async () => {
         console.log(`Trying IDEMA with filters: ${tryUrl}`);
         const getController = new AbortController();
-        const getTimeout = setTimeout(() => getController.abort(), 12000);
+        const getTimeout = setTimeout(() => getController.abort(), 25000);
         const getResp = await fetch(tryUrl, { signal: getController.signal, headers: FETCH_HEADERS });
         clearTimeout(getTimeout);
         if (!getResp.ok) throw new Error(`GET ${tryUrl} status ${getResp.status}`);
