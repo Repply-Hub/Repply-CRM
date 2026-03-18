@@ -57,7 +57,6 @@ const SITES = [
   },
 ];
 
-const EXTREMOZ_YEARS = ['2026', '2025', '2024', '2023', '2022'];
 
 export default function Portal() {
   const [search, setSearch] = useState('');
