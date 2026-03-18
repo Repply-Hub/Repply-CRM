@@ -70,6 +70,11 @@ export default function Portal() {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
+  // Auto-load Extremoz data on mount
+  useEffect(() => {
+    fetchExtremozFromDb();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const fetchExtremozFromDb = async () => {
     setLoading((prev) => ({ ...prev, extremoz: true }));
     try {
