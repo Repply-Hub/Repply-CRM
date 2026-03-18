@@ -74,6 +74,7 @@ export default function Portal() {
   const [results, setResults] = useState<Record<string, SiteResult>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const ROWS_PER_PAGE = 10;
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
