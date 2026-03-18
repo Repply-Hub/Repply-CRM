@@ -705,7 +705,7 @@ export default function Portal() {
         const cnpjs = [...new Set((text.match(cnpjRegex) || []).map((c: unknown) => String(c).replace(/\s/g, '')))];
 
         for (const cnpj of cnpjs.slice(0, 50)) {
-          const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
+          const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', String(cnpj)).limit(1);
           if (existing && existing.length > 0) continue;
 
           const idx = text.indexOf(cnpj);
