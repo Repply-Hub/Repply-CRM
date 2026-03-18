@@ -501,8 +501,8 @@ export default function Portal() {
                 onClick={() => {
                   setActiveTab(site.id);
                   if (!results[site.id]?.success) {
-                    if (newTab === 'extremoz') fetchExtremozFromDb();
-                    else fetchSite(newTab);
+                    if (site.id === 'extremoz') fetchExtremozFromDb();
+                    else fetchSite(site.id);
                   }
                 }}
                 className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${
