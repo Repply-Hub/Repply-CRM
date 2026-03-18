@@ -63,7 +63,6 @@ export default function Portal() {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, SiteResult>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
-  const [pages, setPages] = useState<Record<string, number>>({});
   const ROWS_PER_PAGE = 10;
 
   const fetchExtremozFromDb = async () => {
