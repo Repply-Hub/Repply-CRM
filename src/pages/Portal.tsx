@@ -62,7 +62,7 @@ export default function Portal() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, SiteResult>>({});
-  const [activeTab, setActiveTab] = useState<'table' | 'links' | 'text'>('table');
+  const [pages, setPages] = useState<Record<string, number>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
   const ROWS_PER_PAGE = 10;
 
