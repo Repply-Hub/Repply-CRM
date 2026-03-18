@@ -573,7 +573,76 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ─── Generic (IDEMA) ────────────────────────────────────────
+    // ─── IDEMA ────────────────────────────────────────────────────
+    if (site_id === 'idema') {
+      // Try multiple URLs (the site can be flaky)
+      const urls = [
+        'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/',
+        'https://sistemas.idema.rn.gov.br/servicos/licencas_emitidas/',
+      ];
+
+      let html = '';
+      let usedUrl = '';
+      for (const tryUrl of urls) {
+        try {
+          console.log(`Trying IDEMA: ${tryUrl}`);
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 25000);
+          const resp = await fetch(tryUrl, { signal: controller.signal, headers: FETCH_HEADERS });
+          clearTimeout(timeout);
+          if (resp.ok) {
+            html = await resp.text();
+            usedUrl = tryUrl;
+            console.log(`IDEMA success from ${tryUrl}: ${html.length} chars`);
+            break;
+          }
+        } catch (err) {
+          console.log(`IDEMA ${tryUrl} failed:`, err);
+        }
+      }
+
+      if (!html) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Site do IDEMA está inacessível no momento. Tente novamente mais tarde.',
+            fallback_url: site.url,
+          }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const textContent = extractTextContent(html);
+      const links = extractLinks(html, usedUrl || site.url);
+      const tableData = extractTableData(html);
+
+      let filteredLinks = links;
+      let filteredText = textContent;
+      let filteredTable = tableData;
+
+      if (search) {
+        const q = search.toLowerCase();
+        filteredLinks = links.filter(l => l.text.toLowerCase().includes(q) || l.href.toLowerCase().includes(q));
+        filteredTable = tableData.filter(row => Object.values(row).some(v => v.toLowerCase().includes(q)));
+        filteredText = textContent.split(/[.!?]+/).filter(s => s.toLowerCase().includes(q)).join('. ').trim();
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          site: { id: site.id, name: site.name, url: site.url },
+          data: {
+            text: filteredText.substring(0, 5000),
+            links: filteredLinks.slice(0, 50),
+            table: filteredTable.slice(0, 100),
+          },
+          fetched_at: new Date().toISOString(),
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ─── Generic fallback ───────────────────────────────────────
     const url = site.url;
     console.log(`Fetching ${site.name}: ${url}`);
 

@@ -638,130 +638,101 @@ export default function Portal() {
   // ─── IDEMA: client-side scraping ──────────────────────────────
   const scrapeIdema = async () => {
     setScraping(true);
-    const toastId = toast.loading('Buscando licenças do IDEMA...');
+    const toastId = toast.loading('Buscando licenças do IDEMA via servidor...');
     try {
-      // Try to fetch the IDEMA license listing page
-      const resp = await fetch('https://siga.idema.rn.gov.br/servicos/licencas_emitidas/');
-      if (!resp.ok) {
-        toast.error(`Site do IDEMA retornou status ${resp.status}. Tente novamente mais tarde.`, { id: toastId });
-        setScraping(false);
-        return;
-      }
-      const html = await resp.text();
+      // Use edge function as proxy (avoids CORS)
+      const { data, error } = await supabase.functions.invoke('portal-scraper', {
+        body: { site_id: 'idema', search: search || undefined },
+      });
+      if (error) throw error;
 
-      // Extract table data from the HTML
-      const tableRegex = /<table[\s\S]*?<\/table>/gi;
-      const tables = html.match(tableRegex);
-
-      if (!tables || tables.length === 0) {
-        // Try extracting links to PDF licenses instead
-        const pdfLinks: Array<{ href: string; text: string }> = [];
-        const linkRegex = /<a\s+[^>]*href=["']([^"']*(?:licen|valida|pdf)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
-        let match;
-        while ((match = linkRegex.exec(html)) !== null) {
-          const href = match[1];
-          const text = match[2].replace(/<[^>]+>/g, '').trim();
-          if (text.length > 3) pdfLinks.push({ href, text });
-        }
-
-        if (pdfLinks.length === 0) {
-          // Just save the raw text content
-          const textContent = html
-            .replace(/<script[\s\S]*?<\/script>/gi, '')
-            .replace(/<style[\s\S]*?<\/style>/gi, '')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          if (textContent.length > 50) {
-            // Extract CNPJs from the page
-            const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
-            const cnpjs = [...new Set((textContent.match(cnpjRegex) || []).map(c => c.replace(/\s/g, '')))];
-
-            let inserted = 0;
-            for (const cnpj of cnpjs.slice(0, 50)) {
-              const idx = textContent.indexOf(cnpj);
-              const context = textContent.substring(Math.max(0, idx - 200), Math.min(textContent.length, idx + 300));
-              
-              const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
-              if (existing && existing.length > 0) continue;
-
-              await supabase.from('licencas_idema').insert({
-                cnpj,
-                bloco_texto: context.substring(0, 500),
-                razao_social: '',
-              });
-              inserted++;
-            }
-            toast.success(`${inserted} registros extraídos da página do IDEMA`, { id: toastId });
-          } else {
-            toast.error('Não foi possível extrair dados da página do IDEMA', { id: toastId });
-          }
-        } else {
-          toast.success(`${pdfLinks.length} links encontrados no IDEMA`, { id: toastId });
-        }
-
-        await fetchIdemaFromDb();
+      if (!data?.success) {
+        toast.error(data?.error || 'Erro ao consultar IDEMA', { id: toastId });
         setScraping(false);
         return;
       }
 
-      // Parse HTML tables
+      const tableData = data.data?.table || [];
+      const links = data.data?.links || [];
+      const text = data.data?.text || '';
+
+      if (tableData.length === 0 && links.length === 0 && text.length < 50) {
+        toast.error('Nenhum dado extraído do IDEMA', { id: toastId });
+        setScraping(false);
+        return;
+      }
+
+      // Save extracted data to DB
       let totalInserted = 0;
-      for (const table of tables) {
-        const headerRegex = /<th[^>]*>([\s\S]*?)<\/th>/gi;
-        const headers: string[] = [];
-        let hMatch;
-        while ((hMatch = headerRegex.exec(table)) !== null) {
-          headers.push(hMatch[1].replace(/<[^>]+>/g, '').trim());
-        }
 
-        const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-        let trMatch;
-        let isFirst = true;
-        while ((trMatch = trRegex.exec(table)) !== null) {
-          if (isFirst && headers.length > 0) { isFirst = false; continue; }
-          isFirst = false;
+      // If we got table data, parse and save
+      if (tableData.length > 0) {
+        for (const row of tableData) {
+          const values = Object.values(row).join(' ');
+          const cnpjMatch = values.match(/\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/);
+          const cnpj = cnpjMatch ? cnpjMatch[0].replace(/\s/g, '') : '';
 
-          const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-          let tdMatch;
-          const cells: string[] = [];
-          const cellLinks: string[] = [];
-          while ((tdMatch = tdRegex.exec(trMatch[1])) !== null) {
-            const cellHtml = tdMatch[1];
-            cells.push(cellHtml.replace(/<[^>]+>/g, '').trim());
-            const linkMatch = cellHtml.match(/href=["']([^"']+)["']/);
-            if (linkMatch) cellLinks.push(linkMatch[1]);
+          // Skip if already exists
+          if (cnpj) {
+            const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
+            if (existing && existing.length > 0) continue;
           }
 
-          if (cells.length < 2) continue;
-
-          // Try to map cells to known columns
-          const row: Record<string, string> = {};
-          headers.forEach((h, i) => { if (cells[i]) row[h.toLowerCase()] = cells[i]; });
-
-          const cnpj = cells.find(c => /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/.test(c)) || '';
-          const pdfLink = cellLinks.find(l => l.includes('.pdf') || l.includes('validar')) || '';
+          const keys = Object.keys(row).map(k => k.toLowerCase());
+          const rowLower: Record<string, string> = {};
+          Object.entries(row).forEach(([k, v]) => { rowLower[k.toLowerCase()] = String(v); });
 
           await supabase.from('licencas_idema').insert({
-            numero_licenca: row['nº'] || row['numero'] || row['licença'] || cells[0] || '',
-            tipo_licenca: row['tipo'] || row['tipo de licença'] || '',
-            data_emissao: row['emissão'] || row['data'] || row['data de emissão'] || '',
-            data_validade: row['validade'] || row['data de validade'] || '',
-            cnpj: cnpj.replace(/\s/g, ''),
-            razao_social: row['razão social'] || row['empresa'] || row['empreendedor'] || '',
-            empreendimento: row['empreendimento'] || row['atividade'] || '',
-            municipio: row['município'] || row['municipio'] || row['local'] || '',
-            atividade: row['atividade'] || '',
-            porte: row['porte'] || '',
-            pdf_link: pdfLink,
-            bloco_texto: cells.join(' | ').substring(0, 500),
+            numero_licenca: rowLower['nº'] || rowLower['numero'] || rowLower['licença'] || rowLower['n°'] || '',
+            tipo_licenca: rowLower['tipo'] || rowLower['tipo de licença'] || rowLower['tipo licença'] || '',
+            data_emissao: rowLower['emissão'] || rowLower['data'] || rowLower['data de emissão'] || rowLower['data emissão'] || '',
+            data_validade: rowLower['validade'] || rowLower['data de validade'] || '',
+            cnpj,
+            razao_social: rowLower['razão social'] || rowLower['empresa'] || rowLower['empreendedor'] || rowLower['interessado'] || '',
+            empreendimento: rowLower['empreendimento'] || rowLower['atividade'] || '',
+            municipio: rowLower['município'] || rowLower['municipio'] || rowLower['local'] || '',
+            atividade: rowLower['atividade'] || '',
+            porte: rowLower['porte'] || '',
+            bloco_texto: Object.values(row).map(v => String(v)).join(' | ').substring(0, 500),
           });
           totalInserted++;
         }
       }
 
-      toast.success(`${totalInserted} licenças importadas do IDEMA!`, { id: toastId });
+      // If no table data but we have text with CNPJs
+      if (totalInserted === 0 && text.length > 50) {
+        const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
+        const cnpjs = [...new Set((text.match(cnpjRegex) || []).map((c: unknown) => String(c).replace(/\s/g, '')))];
+
+        for (const cnpj of cnpjs.slice(0, 50)) {
+          const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', String(cnpj)).limit(1);
+          if (existing && existing.length > 0) continue;
+
+          const idx = text.indexOf(cnpj);
+          const context = text.substring(Math.max(0, idx - 200), Math.min(text.length, idx + 300));
+
+          await supabase.from('licencas_idema').insert([{
+            cnpj: String(cnpj),
+            bloco_texto: context.substring(0, 500),
+          }]);
+          totalInserted++;
+        }
+      }
+
+      // Also store links as reference
+      if (totalInserted === 0 && links.length > 0) {
+        for (const link of links.slice(0, 30)) {
+          if (link.text?.length > 5) {
+            await supabase.from('licencas_idema').insert({
+              bloco_texto: link.text.substring(0, 500),
+              pdf_link: link.href || '',
+            });
+            totalInserted++;
+          }
+        }
+      }
+
+      toast.success(`${totalInserted} registros importados do IDEMA!`, { id: toastId });
       await fetchIdemaFromDb();
     } catch (err) {
       console.error('Scraping IDEMA error:', err);
