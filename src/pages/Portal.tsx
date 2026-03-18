@@ -380,7 +380,7 @@ export default function Portal() {
 
   // ─── Natal: client-side scraping ──────────────────────────────
   const scrapeNatal = async () => {
-    setScraping(true);
+    setScraping((prev) => ({ ...prev, natal: true }));
     const toastId = toast.loading('Buscando diários oficiais de Natal...');
     try {
       // Fetch listing page for current month
