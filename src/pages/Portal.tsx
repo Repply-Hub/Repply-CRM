@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, ExternalLink, Globe, FileText, Table2, AlertTriangle, RefreshCw, Download } from 'lucide-react';
+import { Loader2, Search, ExternalLink, Globe, FileText, Table2, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
