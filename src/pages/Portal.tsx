@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Search, ExternalLink, Globe, FileText, Table2, AlertTriangle, RefreshCw, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -58,24 +57,70 @@ const SITES = [
   },
 ];
 
-const EXTREMOZ_YEARS = ['2026', '2025', '2024', '2023', '2022'];
 
 export default function Portal() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, SiteResult>>({});
   const [activeTab, setActiveTab] = useState<'table' | 'links' | 'text'>('table');
-  const [extremozYear, setExtremozYear] = useState('2026');
-  const [extremozMaxPdfs, setExtremozMaxPdfs] = useState('5');
+
+  const fetchExtremozFromDb = async () => {
+    setLoading((prev) => ({ ...prev, extremoz: true }));
+    try {
+      let query = supabase.from('licencas_extremoz').select('*').order('created_at', { ascending: false });
+      
+      if (search) {
+        const q = `%${search}%`;
+        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},nome_fantasia.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q}`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const tableData = (data || []).map(row => ({
+        'Data da Edição': row.data_edicao || '',
+        'Tipo de Licença': row.tipo_licenca || '',
+        'Prioridade': row.prioridade || '',
+        'CNPJ': row.cnpj || '',
+        'Razão Social': row.razao_social || '',
+        'Nome Fantasia': row.nome_fantasia || '',
+        'Telefone': row.telefone || '',
+        'Email': row.email || '',
+        'Endereço': row.endereco_empresa || '',
+        'Quadro Societário': row.quadro_societario || '',
+        'Obra / Descrição': row.obra_descricao || '',
+        'PDF': row.pdf_nome || '',
+        'Link PDF': row.pdf_link || '',
+        'Texto Encontrado': row.bloco_texto || '',
+      }));
+
+      setResults((prev) => ({
+        ...prev,
+        extremoz: {
+          success: true,
+          site: { id: 'extremoz', name: 'Diário Oficial - Extremoz', url: 'https://extremoz.rn.gov.br/diario-oficial/' },
+          data: { text: `${tableData.length} registros encontrados no banco de dados.`, links: [], table: tableData },
+          meta: { total_licencas: tableData.length, total_pdfs: tableData.length, processed_pdfs: tableData.length },
+          fetched_at: new Date().toISOString(),
+        },
+      }));
+      toast.success(`Extremoz: ${tableData.length} licenças carregadas do banco de dados`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro de conexão';
+      setResults((prev) => ({ ...prev, extremoz: { success: false, error: message } }));
+      toast.error('Erro ao carregar dados de Extremoz');
+    } finally {
+      setLoading((prev) => ({ ...prev, extremoz: false }));
+    }
+  };
 
   const fetchSite = async (siteId: string) => {
+    if (siteId === 'extremoz') {
+      return fetchExtremozFromDb();
+    }
     setLoading((prev) => ({ ...prev, [siteId]: true }));
     try {
       const body: Record<string, unknown> = { site_id: siteId, search: search || undefined };
-      if (siteId === 'extremoz') {
-        body.year = extremozYear;
-        body.max_pdfs = parseInt(extremozMaxPdfs);
-      }
 
       const { data, error } = await supabase.functions.invoke('portal-scraper', { body });
       if (error) throw error;
@@ -85,11 +130,7 @@ export default function Portal() {
       if (data.success) {
         const tableCount = data.data?.table?.length || 0;
         const linkCount = data.data?.links?.length || 0;
-        if (siteId === 'extremoz' && data.meta) {
-          toast.success(`Extremoz: ${data.meta.total_licencas} licenças extraídas de ${data.meta.processed_pdfs}/${data.meta.total_pdfs} edições`);
-        } else {
-          toast.success(`${SITES.find((s) => s.id === siteId)?.name}: ${linkCount} links, ${tableCount} registros`);
-        }
+        toast.success(`${SITES.find((s) => s.id === siteId)?.name}: ${linkCount} links, ${tableCount} registros`);
       } else {
         toast.error(data.error || 'Erro ao consultar site');
       }
@@ -175,31 +216,11 @@ export default function Portal() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                {/* Extremoz year/quantity controls */}
+                {/* Extremoz info */}
                 {site.id === 'extremoz' && (
-                  <div className="flex gap-2 mb-2">
-                    <Select value={extremozYear} onValueChange={setExtremozYear}>
-                      <SelectTrigger className="h-8 text-xs flex-1">
-                        <SelectValue placeholder="Ano" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {EXTREMOZ_YEARS.map(y => (
-                          <SelectItem key={y} value={y}>{y}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={extremozMaxPdfs} onValueChange={setExtremozMaxPdfs}>
-                      <SelectTrigger className="h-8 text-xs w-24">
-                        <SelectValue placeholder="PDFs" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3">3 PDFs</SelectItem>
-                        <SelectItem value="5">5 PDFs</SelectItem>
-                        <SelectItem value="10">10 PDFs</SelectItem>
-                        <SelectItem value="15">15 PDFs</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <p className="text-[10px] text-muted-foreground mb-2">
+                    📊 Dados carregados do banco de dados (115 registros da planilha)
+                  </p>
                 )}
 
                 <div className="flex gap-2">
@@ -223,7 +244,7 @@ export default function Portal() {
                     className="text-xs"
                     onClick={() => window.open(
                       site.id === 'extremoz'
-                        ? `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${extremozYear}/`
+                        ? 'https://extremoz.rn.gov.br/diario-oficial/'
                         : site.url,
                       '_blank'
                     )}
