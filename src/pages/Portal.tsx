@@ -305,7 +305,7 @@ export default function Portal() {
     }
   };
 
-
+  const fetchSite = async (siteId: string) => {
     if (siteId === 'extremoz') {
       return fetchExtremozFromDb();
     }
