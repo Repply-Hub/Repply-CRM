@@ -444,7 +444,7 @@ export default function Portal() {
 
       if (newPdfs.length === 0) {
         toast.success('Banco de dados já está atualizado!', { id: toastId });
-        setScraping(false);
+        setScraping((prev) => ({ ...prev, natal: false }));
         return;
       }
 
