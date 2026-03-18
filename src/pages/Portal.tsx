@@ -693,7 +693,7 @@ export default function Portal() {
             municipio: rowLower['município'] || rowLower['municipio'] || rowLower['local'] || '',
             atividade: rowLower['atividade'] || '',
             porte: rowLower['porte'] || '',
-            bloco_texto: Object.values(row).join(' | ').substring(0, 500),
+            bloco_texto: Object.values(row).map(v => String(v)).join(' | ').substring(0, 500),
           });
           totalInserted++;
         }
