@@ -715,32 +715,69 @@ Deno.serve(async (req) => {
 
     // ─── IDEMA ────────────────────────────────────────────────────
     if (site_id === 'idema') {
-      // Try multiple URLs (the site can be flaky)
       const urls = [
         'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/',
         'https://sistemas.idema.rn.gov.br/servicos/licencas_emitidas/',
       ];
 
-      let html = '';
+      let baseHtml = '';
+      let resultHtml = '';
       let usedUrl = '';
+      let actionUrl = '';
+
       for (const tryUrl of urls) {
         try {
-          console.log(`Trying IDEMA: ${tryUrl}`);
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 25000);
-          const resp = await fetch(tryUrl, { signal: controller.signal, headers: FETCH_HEADERS });
-          clearTimeout(timeout);
-          if (resp.ok) {
-            html = await resp.text();
-            usedUrl = tryUrl;
-            console.log(`IDEMA success from ${tryUrl}: ${html.length} chars`);
+          console.log(`Trying IDEMA with filters: ${tryUrl}`);
+
+          const getController = new AbortController();
+          const getTimeout = setTimeout(() => getController.abort(), 16000);
+          const getResp = await fetch(tryUrl, { signal: getController.signal, headers: FETCH_HEADERS });
+          clearTimeout(getTimeout);
+          if (!getResp.ok) continue;
+
+          baseHtml = await getResp.text();
+          usedUrl = tryUrl;
+          actionUrl = getIdemaFormAction(baseHtml, tryUrl);
+
+          const cookieHeader = parseSetCookieToCookieHeader(getResp.headers.get('set-cookie'));
+          const payload = buildIdemaFilterPayload(baseHtml, search);
+
+          const postController = new AbortController();
+          const postTimeout = setTimeout(() => postController.abort(), 18000);
+          const postResp = await fetch(actionUrl, {
+            method: 'POST',
+            signal: postController.signal,
+            headers: {
+              ...FETCH_HEADERS,
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Origin': new URL(tryUrl).origin,
+              'Referer': tryUrl,
+              ...(cookieHeader ? { 'Cookie': cookieHeader } : {}),
+            },
+            body: payload.toString(),
+          });
+          clearTimeout(postTimeout);
+
+          if (!postResp.ok) {
+            resultHtml = baseHtml;
+            console.log(`IDEMA POST failed (${postResp.status}) for ${actionUrl}, using GET HTML fallback`);
+          } else {
+            resultHtml = await postResp.text();
+            console.log(`IDEMA POST success from ${actionUrl}: ${resultHtml.length} chars`);
+          }
+
+          const hasUsefulRows = selectMostRelevantIdemaTable(extractTableData(resultHtml)).length > 0;
+          const hasSearchEcho = search ? resultHtml.toLowerCase().includes(search.toLowerCase()) : true;
+
+          if (hasUsefulRows || hasSearchEcho) {
             break;
           }
         } catch (err) {
-          console.log(`IDEMA ${tryUrl} failed:`, err);
+          console.log(`IDEMA filtered attempt failed (${tryUrl}):`, err);
         }
       }
 
+      const html = resultHtml || baseHtml;
       if (!html) {
         return new Response(
           JSON.stringify({
@@ -754,7 +791,7 @@ Deno.serve(async (req) => {
 
       const textContent = extractTextContent(html);
       const links = extractLinks(html, usedUrl || site.url);
-      const tableData = extractTableData(html);
+      const tableData = selectMostRelevantIdemaTable(extractTableData(html));
 
       let filteredLinks = links;
       let filteredText = textContent;
@@ -774,7 +811,11 @@ Deno.serve(async (req) => {
           data: {
             text: filteredText.substring(0, 5000),
             links: filteredLinks.slice(0, 50),
-            table: filteredTable.slice(0, 100),
+            table: filteredTable.slice(0, 200),
+          },
+          meta: {
+            action_url: actionUrl || usedUrl || site.url,
+            filter_applied: true,
           },
           fetched_at: new Date().toISOString(),
         }),
