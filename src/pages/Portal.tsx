@@ -390,55 +390,6 @@ export default function Portal() {
                     })}
                   </div>
                 )}
-
-                {activeTab === 'links' && (
-                  <div className="space-y-4">
-                    {SITES.map((site) => {
-                      const result = results[site.id];
-                      if (!result?.success || !result.data?.links?.length) return null;
-                      return (
-                        <div key={site.id}>
-                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-                            {site.name}
-                          </p>
-                          <div className="space-y-1">
-                            {result.data.links.map((link, i) => (
-                              <a
-                                key={i}
-                                href={link.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 p-2 rounded-md hover:bg-accent/50 transition-colors text-sm group"
-                              >
-                                <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 group-hover:text-primary" />
-                                <span className="truncate">{link.text}</span>
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {activeTab === 'text' && (
-                  <div className="space-y-4">
-                    {SITES.map((site) => {
-                      const result = results[site.id];
-                      if (!result?.success || !result.data?.text) return null;
-                      return (
-                        <div key={site.id}>
-                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-                            {site.name}
-                          </p>
-                          <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
-                            {result.data.text}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
