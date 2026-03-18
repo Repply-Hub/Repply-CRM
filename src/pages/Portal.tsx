@@ -882,19 +882,15 @@ export default function Portal() {
                     variant="outline"
                     size="sm"
                     className="flex-1 text-xs rounded-lg"
-                    onClick={() => (site.id === 'extremoz' ? scrapeExtremoz() : site.id === 'natal' ? scrapeNatal() : fetchSite(site.id))}
+                    onClick={() => (site.id === 'extremoz' ? scrapeExtremoz() : site.id === 'natal' ? scrapeNatal() : site.id === 'idema' ? scrapeIdema() : fetchSite(site.id))}
                     disabled={loading[site.id] || scraping}
                   >
-                    {(loading[site.id] || ((site.id === 'extremoz' || site.id === 'natal') && scraping)) ? (
+                    {(loading[site.id] || scraping) ? (
                       <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
-                    ) : (site.id === 'extremoz' || site.id === 'natal') ? (
-                      <CloudDownload className="h-3 w-3 mr-1.5" />
                     ) : (
-                      <RefreshCw className="h-3 w-3 mr-1.5" />
+                      <CloudDownload className="h-3 w-3 mr-1.5" />
                     )}
-                    {(site.id === 'extremoz' || site.id === 'natal')
-                      ? (scraping ? 'Atualizando...' : 'Atualizar Diários')
-                      : (loading[site.id] ? 'Consultando...' : 'Consultar')}
+                    {scraping ? 'Atualizando...' : 'Atualizar Dados'}
                   </Button>
                   <Button
                     variant="ghost"
