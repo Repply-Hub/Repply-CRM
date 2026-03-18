@@ -468,23 +468,7 @@ export default function Portal() {
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </Button>
-        </div>
-
-        {/* Tab buttons to view lists */}
-        <div className="flex flex-wrap gap-2">
-          {SITES.map((site) => (
-            <Button
-              key={site.id}
-              variant="outline"
-              size="sm"
-              className="text-xs rounded-lg"
-              onClick={() => scrollToResults(site.id)}
-            >
-              <List className="h-3 w-3 mr-1.5" />
-              {site.name}
-            </Button>
-          ))}
-        </div>
+                </div>
 
                 {/* Error status */}
                 {results[site.id] && !results[site.id].success && (
@@ -504,6 +488,26 @@ export default function Portal() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Tab-style buttons like reference image */}
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          {SITES.map((site) => {
+            const hasData = results[site.id]?.success;
+            return (
+              <button
+                key={site.id}
+                onClick={() => scrollToResults(site.id)}
+                className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${
+                  hasData
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                {site.name}
+              </button>
+            );
+          })}
         </div>
 
         {/* Results area */}
