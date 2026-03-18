@@ -712,7 +712,7 @@ export default function Portal() {
           const context = text.substring(Math.max(0, idx - 200), Math.min(text.length, idx + 300));
 
           await supabase.from('licencas_idema').insert([{
-            cnpj,
+            cnpj: String(cnpj),
             bloco_texto: context.substring(0, 500),
           }]);
           totalInserted++;
