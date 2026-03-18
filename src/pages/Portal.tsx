@@ -678,22 +678,30 @@ export default function Portal() {
             if (existing && existing.length > 0) continue;
           }
 
-          const keys = Object.keys(row).map(k => k.toLowerCase());
           const rowLower: Record<string, string> = {};
           Object.entries(row).forEach(([k, v]) => { rowLower[k.toLowerCase()] = String(v); });
 
+          const numeroLicenca = rowLower['nº licença'] || rowLower['nº'] || rowLower['numero'] || rowLower['licença'] || rowLower['n°'] || '';
+          const tipoLicenca = rowLower['tipo'] || rowLower['tipo de licença'] || rowLower['tipo licença'] || '';
+          const razaoSocial = rowLower['razão social'] || rowLower['empresa'] || rowLower['empreendedor'] || rowLower['interessado'] || '';
+          const empreendimento = rowLower['empreendimento'] || rowLower['atividade'] || '';
+          const textoConsolidado = Object.values(row).map(v => String(v)).join(' | ').substring(0, 500);
+
+          const hasRelevantData = Boolean(cnpj || numeroLicenca || tipoLicenca || razaoSocial || empreendimento);
+          if (!hasRelevantData) continue;
+
           await supabase.from('licencas_idema').insert({
-            numero_licenca: rowLower['nº'] || rowLower['numero'] || rowLower['licença'] || rowLower['n°'] || '',
-            tipo_licenca: rowLower['tipo'] || rowLower['tipo de licença'] || rowLower['tipo licença'] || '',
+            numero_licenca: numeroLicenca,
+            tipo_licenca: tipoLicenca,
             data_emissao: rowLower['emissão'] || rowLower['data'] || rowLower['data de emissão'] || rowLower['data emissão'] || '',
             data_validade: rowLower['validade'] || rowLower['data de validade'] || '',
             cnpj,
-            razao_social: rowLower['razão social'] || rowLower['empresa'] || rowLower['empreendedor'] || rowLower['interessado'] || '',
-            empreendimento: rowLower['empreendimento'] || rowLower['atividade'] || '',
+            razao_social: razaoSocial,
+            empreendimento,
             municipio: rowLower['município'] || rowLower['municipio'] || rowLower['local'] || '',
             atividade: rowLower['atividade'] || '',
             porte: rowLower['porte'] || '',
-            bloco_texto: Object.values(row).map(v => String(v)).join(' | ').substring(0, 500),
+            bloco_texto: textoConsolidado,
           });
           totalInserted++;
         }
@@ -719,17 +727,8 @@ export default function Portal() {
         }
       }
 
-      // Also store links as reference
-      if (totalInserted === 0 && links.length > 0) {
-        for (const link of links.slice(0, 30)) {
-          if (link.text?.length > 5) {
-            await supabase.from('licencas_idema').insert({
-              bloco_texto: link.text.substring(0, 500),
-              pdf_link: link.href || '',
-            });
-            totalInserted++;
-          }
-        }
+      if (totalInserted === 0) {
+        toast.warning('IDEMA retornou página sem resultados válidos para importação.', { id: toastId });
       }
 
       toast.success(`${totalInserted} registros importados do IDEMA!`, { id: toastId });

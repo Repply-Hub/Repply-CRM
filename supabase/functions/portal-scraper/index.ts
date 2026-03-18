@@ -70,7 +70,10 @@ function extractTableData(html: string): Array<Record<string, string>> {
     let trMatch;
     let isFirst = true;
     while ((trMatch = trRegex.exec(table)) !== null) {
-      if (isFirst && headers.length > 0) { isFirst = false; continue; }
+      if (isFirst && headers.length > 0) {
+        isFirst = false;
+        continue;
+      }
       isFirst = false;
       const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
       let tdMatch;
@@ -78,13 +81,150 @@ function extractTableData(html: string): Array<Record<string, string>> {
       let colIdx = 0;
       while ((tdMatch = tdRegex.exec(trMatch[1])) !== null) {
         const key = headers[colIdx] || `col_${colIdx}`;
-        row[key] = tdMatch[1].replace(/<[^>]+>/g, '').trim();
+        row[key] = tdMatch[1]
+          .replace(/<br\s*\/?\s*>/gi, ' | ')
+          .replace(/<[^>]+>/g, '')
+          .replace(/&nbsp;/gi, ' ')
+          .trim();
         colIdx++;
       }
       if (Object.keys(row).length > 0) rows.push(row);
     }
   }
   return rows;
+}
+
+function formatDateBR(date: Date): string {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function parseSetCookieToCookieHeader(setCookie: string | null): string {
+  if (!setCookie) return '';
+  return setCookie
+    .split(/,(?=\s*[^;]+=)/)
+    .map(part => part.split(';')[0].trim())
+    .filter(Boolean)
+    .join('; ');
+}
+
+function getIdemaFormAction(html: string, baseUrl: string): string {
+  const formRegex = /<form[^>]*>([\s\S]*?)<\/form>/gi;
+  let bestAction = baseUrl;
+  let bestScore = -1;
+  let match: RegExpExecArray | null;
+
+  while ((match = formRegex.exec(html)) !== null) {
+    const fullForm = match[0];
+    const body = match[1];
+    const actionMatch = fullForm.match(/action=["']([^"']*)["']/i);
+    const actionRaw = (actionMatch?.[1] || '').trim();
+
+    const score =
+      Number(/cnpj/i.test(body)) +
+      Number(/cpf/i.test(body)) +
+      Number(/processo/i.test(body)) +
+      Number(/data|per[ií]odo/i.test(body));
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestAction = actionRaw ? new URL(actionRaw, baseUrl).toString() : baseUrl;
+    }
+  }
+
+  return bestAction;
+}
+
+function extractFormHiddenFields(html: string): Record<string, string> {
+  const hidden: Record<string, string> = {};
+  const inputRegex = /<input[^>]*>/gi;
+  let inputMatch: RegExpExecArray | null;
+
+  while ((inputMatch = inputRegex.exec(html)) !== null) {
+    const input = inputMatch[0];
+    const type = (input.match(/type=["']([^"']+)["']/i)?.[1] || '').toLowerCase();
+    const name = (input.match(/name=["']([^"']+)["']/i)?.[1] || '').trim();
+    const value = (input.match(/value=["']([^"']*)["']/i)?.[1] || '').trim();
+
+    if (type === 'hidden' && name) hidden[name] = value;
+  }
+
+  return hidden;
+}
+
+function extractFormFieldNames(html: string): string[] {
+  const names = new Set<string>();
+  const fieldRegex = /<(input|select|textarea)[^>]*name=["']([^"']+)["'][^>]*>/gi;
+  let fieldMatch: RegExpExecArray | null;
+
+  while ((fieldMatch = fieldRegex.exec(html)) !== null) {
+    names.add(fieldMatch[2].trim());
+  }
+
+  return [...names];
+}
+
+function pickFieldName(fieldNames: string[], patterns: string[]): string | null {
+  const lower = fieldNames.map(name => ({ original: name, lower: name.toLowerCase() }));
+  for (const pattern of patterns) {
+    const found = lower.find(field => field.lower.includes(pattern.toLowerCase()));
+    if (found) return found.original;
+  }
+  return null;
+}
+
+function buildIdemaFilterPayload(baseHtml: string, search?: string): URLSearchParams {
+  const payload = new URLSearchParams();
+  const hidden = extractFormHiddenFields(baseHtml);
+  Object.entries(hidden).forEach(([name, value]) => payload.set(name, value));
+
+  const fieldNames = extractFormFieldNames(baseHtml);
+  const setIfFound = (patterns: string[], value: string) => {
+    const field = pickFieldName(fieldNames, patterns);
+    if (field) payload.set(field, value);
+    return field;
+  };
+
+  const now = new Date();
+  const from = new Date(now);
+  from.setDate(now.getDate() - 90);
+
+  const startDate = formatDateBR(from);
+  const endDate = formatDateBR(now);
+
+  setIfFound(['data_inicial', 'dt_inicial', 'inicio', 'de', 'periodo_ini'], startDate);
+  setIfFound(['data_final', 'dt_final', 'fim', 'ate', 'periodo_fim'], endDate);
+
+  const q = (search || '').trim();
+  const digits = q.replace(/\D/g, '');
+
+  if (digits.length === 14) {
+    setIfFound(['cnpj'], digits);
+  } else if (digits.length === 11) {
+    setIfFound(['cpf'], digits);
+  } else if (q) {
+    const processField = setIfFound(['processo', 'protocolo', 'numero_processo'], q);
+    if (!processField) {
+      setIfFound(['empreendimento', 'razao', 'interessado', 'termo', 'busca', 'search'], q);
+    }
+  }
+
+  setIfFound(['acao', 'action', 'op', 'submit', 'buscar', 'pesquisar', 'consultar'], 'Buscar');
+  return payload;
+}
+
+function selectMostRelevantIdemaTable(tables: Array<Record<string, string>>): Array<Record<string, string>> {
+  if (tables.length === 0) return [];
+
+  const relevant = tables.filter((row) => {
+    const joinedKeys = Object.keys(row).join(' ').toLowerCase();
+    const joinedValues = Object.values(row).join(' ').toLowerCase();
+    return /(licen|cnpj|cpf|processo|empreendimento|validade|emiss)/.test(joinedKeys + ' ' + joinedValues);
+  });
+
+  return relevant.length > 0 ? relevant : tables;
 }
 
 // ─── PDF text extraction (basic) ────────────────────────────────────
@@ -575,32 +715,77 @@ Deno.serve(async (req) => {
 
     // ─── IDEMA ────────────────────────────────────────────────────
     if (site_id === 'idema') {
-      // Try multiple URLs (the site can be flaky)
       const urls = [
         'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/',
         'https://sistemas.idema.rn.gov.br/servicos/licencas_emitidas/',
       ];
 
-      let html = '';
+      let baseHtml = '';
+      let resultHtml = '';
       let usedUrl = '';
-      for (const tryUrl of urls) {
+      let actionUrl = '';
+
+      type IdemaBaseResult = { html: string; url: string; cookieHeader: string };
+      const baseAttempts: Promise<IdemaBaseResult>[] = urls.map((tryUrl) => (async () => {
+        console.log(`Trying IDEMA with filters: ${tryUrl}`);
+        const getController = new AbortController();
+        const getTimeout = setTimeout(() => getController.abort(), 12000);
+        const getResp = await fetch(tryUrl, { signal: getController.signal, headers: FETCH_HEADERS });
+        clearTimeout(getTimeout);
+        if (!getResp.ok) throw new Error(`GET ${tryUrl} status ${getResp.status}`);
+
+        const html = await getResp.text();
+        return {
+          html,
+          url: tryUrl,
+          cookieHeader: parseSetCookieToCookieHeader(getResp.headers.get('set-cookie')),
+        };
+      })());
+
+      let baseResult: IdemaBaseResult | null = null;
+      try {
+        baseResult = await Promise.any(baseAttempts);
+      } catch (err) {
+        console.log('All IDEMA base attempts failed:', err);
+      }
+
+      if (baseResult) {
+        baseHtml = baseResult.html;
+        usedUrl = baseResult.url;
+        actionUrl = getIdemaFormAction(baseHtml, usedUrl);
+
         try {
-          console.log(`Trying IDEMA: ${tryUrl}`);
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 25000);
-          const resp = await fetch(tryUrl, { signal: controller.signal, headers: FETCH_HEADERS });
-          clearTimeout(timeout);
-          if (resp.ok) {
-            html = await resp.text();
-            usedUrl = tryUrl;
-            console.log(`IDEMA success from ${tryUrl}: ${html.length} chars`);
-            break;
+          const payload = buildIdemaFilterPayload(baseHtml, search);
+          const postController = new AbortController();
+          const postTimeout = setTimeout(() => postController.abort(), 12000);
+          const postResp = await fetch(actionUrl, {
+            method: 'POST',
+            signal: postController.signal,
+            headers: {
+              ...FETCH_HEADERS,
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Origin': new URL(usedUrl).origin,
+              'Referer': usedUrl,
+              ...(baseResult.cookieHeader ? { 'Cookie': baseResult.cookieHeader } : {}),
+            },
+            body: payload.toString(),
+          });
+          clearTimeout(postTimeout);
+
+          if (!postResp.ok) {
+            resultHtml = baseHtml;
+            console.log(`IDEMA POST failed (${postResp.status}) for ${actionUrl}, using GET HTML fallback`);
+          } else {
+            resultHtml = await postResp.text();
+            console.log(`IDEMA POST success from ${actionUrl}: ${resultHtml.length} chars`);
           }
         } catch (err) {
-          console.log(`IDEMA ${tryUrl} failed:`, err);
+          console.log('IDEMA POST failed, using GET HTML fallback:', err);
+          resultHtml = baseHtml;
         }
       }
 
+      const html = resultHtml || baseHtml;
       if (!html) {
         return new Response(
           JSON.stringify({
@@ -614,7 +799,7 @@ Deno.serve(async (req) => {
 
       const textContent = extractTextContent(html);
       const links = extractLinks(html, usedUrl || site.url);
-      const tableData = extractTableData(html);
+      const tableData = selectMostRelevantIdemaTable(extractTableData(html));
 
       let filteredLinks = links;
       let filteredText = textContent;
@@ -634,7 +819,11 @@ Deno.serve(async (req) => {
           data: {
             text: filteredText.substring(0, 5000),
             links: filteredLinks.slice(0, 50),
-            table: filteredTable.slice(0, 100),
+            table: filteredTable.slice(0, 200),
+          },
+          meta: {
+            action_url: actionUrl || usedUrl || site.url,
+            filter_applied: true,
           },
           fetched_at: new Date().toISOString(),
         }),
