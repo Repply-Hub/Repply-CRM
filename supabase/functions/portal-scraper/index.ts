@@ -11,7 +11,7 @@ interface SiteConfig {
 
 const SITES: Record<string, SiteConfig> = {
   idema: { id: 'idema', name: 'IDEMA - Licenças Emitidas', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
-  natal: { id: 'natal', name: 'Diário Oficial de Natal', url: 'https://www.natal.rn.gov.br/dom' },
+  natal: { id: 'natal', name: 'Diário Oficial de Natal', url: 'https://www2.natal.rn.gov.br/dom/' },
   extremoz: { id: 'extremoz', name: 'Diário Oficial de Extremoz', url: 'https://extremoz.rn.gov.br/diario-oficial/diario-oficial-2026/' },
 };
 
@@ -455,7 +455,125 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ─── Generic (IDEMA, Natal) ─────────────────────────────────
+    // ─── Natal ────────────────────────────────────────────────────
+    if (site_id === 'natal') {
+      const targetYear = year || new Date().getFullYear().toString();
+      const targetMonth = body.month || String(new Date().getMonth() + 1).padStart(2, '0');
+      const pdfLimit = Math.min(max_pdfs || 5, 10);
+
+      console.log(`Natal: year=${targetYear}, month=${targetMonth}, limit=${pdfLimit}`);
+
+      // Fetch listing page via POST
+      const formData = new URLSearchParams();
+      formData.append('mes', targetMonth);
+      formData.append('ano', targetYear);
+      formData.append('list', 'Listar');
+
+      let listingHtml = '';
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        const resp = await fetch('https://www2.natal.rn.gov.br/dom/', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: { ...FETCH_HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData.toString(),
+        });
+        clearTimeout(timeout);
+        if (!resp.ok) throw new Error(`Status ${resp.status}`);
+        listingHtml = await resp.text();
+      } catch (err) {
+        console.error('Natal listing error:', err);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Não foi possível acessar o DOM de Natal', fallback_url: site.url }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Extract PDF links
+      const pdfLinks: Array<{ href: string; title: string; date: string; numero: string }> = [];
+      const linkRegex = /<a\s+href="(https?:\/\/www2\.natal\.rn\.gov\.br\/_anexos\/publicacao\/dom\/[^"]+\.pdf)"[^>]*>([^<]+)<\/a>/gi;
+      let linkMatch;
+      while ((linkMatch = linkRegex.exec(listingHtml)) !== null) {
+        const href = linkMatch[1];
+        const title = linkMatch[2].trim();
+        if (pdfLinks.some(p => p.href === href)) continue;
+        // Extract date and number from title like "Ano XXVI - Num. 6029 - 18/03/2026"
+        const dateMatch = title.match(/(\d{2}\/\d{2}\/\d{4})/);
+        const numMatch = title.match(/Num\.\s*(\d+)/i);
+        pdfLinks.push({
+          href,
+          title,
+          date: dateMatch ? dateMatch[1] : '',
+          numero: numMatch ? numMatch[1] : '',
+        });
+      }
+
+      console.log(`Found ${pdfLinks.length} PDFs for ${targetMonth}/${targetYear}`);
+
+      if (pdfLinks.length === 0) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Nenhum diário oficial encontrado para ${targetMonth}/${targetYear}`,
+            fallback_url: site.url,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Process PDFs (reuse same logic as Extremoz)
+      const toProcess = pdfLinks.slice(0, pdfLimit);
+      const allEntries: ExtremozEntry[] = [];
+
+      for (const pdf of toProcess) {
+        const entries = await processOnePdf(pdf.href, pdf.date, pdf.title);
+        // Add numero_dom info
+        for (const e of entries) {
+          (e as any).numero_dom = pdf.numero;
+        }
+        allEntries.push(...entries);
+      }
+
+      console.log(`Extracted ${allEntries.length} entries from ${toProcess.length} PDFs`);
+
+      // Filter
+      let filtered = allEntries;
+      if (search) {
+        const q = search.toLowerCase();
+        filtered = allEntries.filter(e =>
+          e.cnpj.includes(q) || e.razao_social.toLowerCase().includes(q) ||
+          e.obra_descricao.toLowerCase().includes(q) || e.bloco_texto.toLowerCase().includes(q)
+        );
+      }
+
+      const tableData = filtered.map(e => ({
+        'Data da Edição': e.data_edicao,
+        'Nº DOM': (e as any).numero_dom || '',
+        'Tipo de Licença': e.tipo_licenca,
+        'CNPJ': e.cnpj,
+        'Razão Social': e.razao_social,
+        'Obra / Descrição': e.obra_descricao,
+        'PDF': e.pdf_nome,
+        'Link PDF': e.pdf_link,
+        'Texto Encontrado': e.bloco_texto.substring(0, 200),
+      }));
+
+      const linksList = pdfLinks.map(p => ({ text: p.title, href: p.href }));
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          site: { id: 'natal', name: site.name, url: site.url },
+          data: { text: `${allEntries.length} menções encontradas em ${toProcess.length} de ${pdfLinks.length} edições (${targetMonth}/${targetYear}).`, links: linksList, table: tableData },
+          meta: { year: targetYear, month: targetMonth, total_pdfs: pdfLinks.length, processed_pdfs: toProcess.length, total_entries: allEntries.length, filtered_entries: filtered.length },
+          fetched_at: new Date().toISOString(),
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ─── Generic (IDEMA) ────────────────────────────────────────
     const url = site.url;
     console.log(`Fetching ${site.name}: ${url}`);
 

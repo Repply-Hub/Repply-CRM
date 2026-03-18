@@ -46,7 +46,7 @@ const SITES = [
     id: 'natal',
     name: 'Diário Oficial - Natal',
     description: 'Publicações oficiais da Prefeitura de Natal/RN',
-    url: 'https://www.natal.rn.gov.br/dom',
+    url: 'https://www2.natal.rn.gov.br/dom/',
     icon: '🏛️',
     gradient: 'from-blue-500/10 to-blue-600/5',
     badgeClass: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/20',
@@ -79,10 +79,13 @@ export default function Portal() {
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const scrollToResults = (siteId: string) => {
-    // If no results yet, fetch first
     if (!results[siteId]?.success) {
       if (siteId === 'extremoz') {
         fetchExtremozFromDb().then(() => {
+          setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        });
+      } else if (siteId === 'natal') {
+        fetchNatalFromDb().then(() => {
           setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
         });
       } else {
@@ -99,9 +102,10 @@ export default function Portal() {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
-  // Auto-load Extremoz data on mount
+  // Auto-load data on mount
   useEffect(() => {
     fetchExtremozFromDb();
+    fetchNatalFromDb();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchExtremozFromDb = async () => {
@@ -333,10 +337,263 @@ export default function Portal() {
     }
   };
 
-  const fetchSite = async (siteId: string) => {
-    if (siteId === 'extremoz') {
-      return fetchExtremozFromDb();
+  // ─── Natal: load from DB ────────────────────────────────────
+  const fetchNatalFromDb = async () => {
+    setLoading((prev) => ({ ...prev, natal: true }));
+    try {
+      let query = supabase.from('licencas_natal').select('*').order('created_at', { ascending: false });
+      
+      if (search) {
+        const q = `%${search}%`;
+        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q}`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const tableData = (data || []).map(row => ({
+        'Data da Edição': row.data_edicao || '',
+        'Nº DOM': row.numero_dom || '',
+        'Tipo de Licença': row.tipo_licenca || '',
+        'CNPJ': row.cnpj || '',
+        'Razão Social': row.razao_social || '',
+        'Obra / Descrição': row.obra_descricao || '',
+        'PDF': row.pdf_nome || '',
+        'Link PDF': row.pdf_link || '',
+        'Texto Encontrado': row.bloco_texto || '',
+      }));
+
+      setResults((prev) => ({
+        ...prev,
+        natal: {
+          success: true,
+          site: { id: 'natal', name: 'Diário Oficial - Natal', url: 'https://www2.natal.rn.gov.br/dom/' },
+          data: { text: `${tableData.length} registros encontrados no banco de dados.`, links: [], table: tableData },
+          meta: { total_licencas: tableData.length },
+          fetched_at: new Date().toISOString(),
+        },
+      }));
+      if (tableData.length > 0) toast.success(`Natal: ${tableData.length} registros carregados`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro de conexão';
+      setResults((prev) => ({ ...prev, natal: { success: false, error: message } }));
+      toast.error('Erro ao carregar dados de Natal');
+    } finally {
+      setLoading((prev) => ({ ...prev, natal: false }));
     }
+  };
+
+  // ─── Natal: client-side scraping ──────────────────────────────
+  const scrapeNatal = async () => {
+    setScraping(true);
+    const toastId = toast.loading('Buscando diários oficiais de Natal...');
+    try {
+      // Fetch listing page for current month
+      const now = new Date();
+      const months = [
+        { mes: String(now.getMonth() + 1).padStart(2, '0'), ano: String(now.getFullYear()) },
+      ];
+      // Also check previous month
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      months.push({ mes: String(prev.getMonth() + 1).padStart(2, '0'), ano: String(prev.getFullYear()) });
+
+      const pdfLinks: Array<{ href: string; title: string; date: string; numero: string }> = [];
+
+      for (const { mes, ano } of months) {
+        try {
+          const formData = new URLSearchParams();
+          formData.append('mes', mes);
+          formData.append('ano', ano);
+          formData.append('list', 'Listar');
+
+          const resp = await fetch('https://www2.natal.rn.gov.br/dom/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
+          });
+          if (!resp.ok) continue;
+          const html = await resp.text();
+
+          const linkRegex = /<a\s+href="(https?:\/\/www2\.natal\.rn\.gov\.br\/_anexos\/publicacao\/dom\/[^"]+\.pdf)"[^>]*>([^<]+)<\/a>/gi;
+          let match;
+          while ((match = linkRegex.exec(html)) !== null) {
+            const href = match[1];
+            const title = match[2].trim();
+            if (pdfLinks.some(p => p.href === href)) continue;
+            const dateMatch = title.match(/(\d{2}\/\d{2}\/\d{4})/);
+            const numMatch = title.match(/Num\.\s*(\d+)/i);
+            pdfLinks.push({
+              href,
+              title,
+              date: dateMatch ? dateMatch[1] : '',
+              numero: numMatch ? numMatch[1] : '',
+            });
+          }
+        } catch {
+          // continue
+        }
+      }
+
+      if (pdfLinks.length === 0) {
+        toast.error('Nenhum PDF encontrado no DOM de Natal', { id: toastId });
+        setScraping(false);
+        return;
+      }
+
+      toast.loading(`Encontrados ${pdfLinks.length} PDFs. Verificando novos...`, { id: toastId });
+
+      // Check existing
+      const { data: existing } = await supabase.from('licencas_natal').select('pdf_link');
+      const existingLinks = new Set((existing || []).map(r => r.pdf_link));
+      const newPdfs = pdfLinks.filter(p => !existingLinks.has(p.href));
+
+      if (newPdfs.length === 0) {
+        toast.success('Banco de dados já está atualizado!', { id: toastId });
+        setScraping(false);
+        return;
+      }
+
+      toast.loading(`Processando ${newPdfs.length} novos PDFs...`, { id: toastId });
+
+      const toProcess = newPdfs.slice(0, 5);
+      let totalInserted = 0;
+
+      for (const pdf of toProcess) {
+        try {
+          const resp = await fetch(pdf.href);
+          if (!resp.ok) continue;
+          const buffer = new Uint8Array(await resp.arrayBuffer());
+
+          if (buffer.length > 3 * 1024 * 1024) {
+            await supabase.from('licencas_natal').insert({
+              data_edicao: pdf.date || pdf.title,
+              numero_dom: pdf.numero,
+              pdf_nome: pdf.href.split('/').pop() || '',
+              pdf_link: pdf.href,
+              bloco_texto: '(PDF muito grande para processamento automático)',
+            });
+            totalInserted++;
+            continue;
+          }
+
+          // Basic PDF text extraction
+          const raw = new TextDecoder('latin1').decode(buffer);
+          const textParts: string[] = [];
+          const btEtRegex = /BT\s([\s\S]*?)ET/g;
+          let btMatch;
+          while ((btMatch = btEtRegex.exec(raw)) !== null) {
+            const block = btMatch[1];
+            const tjRegex = /\(([^)]*)\)\s*Tj/g;
+            let tjMatch;
+            while ((tjMatch = tjRegex.exec(block)) !== null) {
+              const decoded = tjMatch[1].replace(/\\n/g, '\n').replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\').trim();
+              if (decoded) textParts.push(decoded);
+            }
+            const tjArrayRegex = /\[([\s\S]*?)\]\s*TJ/g;
+            let tjArrMatch;
+            while ((tjArrMatch = tjArrayRegex.exec(block)) !== null) {
+              const strRegex = /\(([^)]*)\)/g;
+              let strMatch;
+              const parts: string[] = [];
+              while ((strMatch = strRegex.exec(tjArrMatch[1])) !== null) {
+                parts.push(strMatch[1].replace(/\\n/g, '\n').replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\'));
+              }
+              const joined = parts.join('').trim();
+              if (joined) textParts.push(joined);
+            }
+          }
+          const text = textParts.join('\n');
+
+          if (!text || text.length < 20) {
+            await supabase.from('licencas_natal').insert({
+              data_edicao: pdf.date || pdf.title,
+              numero_dom: pdf.numero,
+              pdf_nome: pdf.href.split('/').pop() || '',
+              pdf_link: pdf.href,
+              bloco_texto: '(Texto não extraível - PDF baseado em imagem)',
+            });
+            totalInserted++;
+            continue;
+          }
+
+          // Extract CNPJs
+          const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
+          const cnpjs = [...new Set((text.match(cnpjRegex) || []).map(c => c.replace(/\s/g, '')))];
+
+          if (cnpjs.length === 0) {
+            await supabase.from('licencas_natal').insert({
+              data_edicao: pdf.date || pdf.title,
+              numero_dom: pdf.numero,
+              pdf_nome: pdf.href.split('/').pop() || '',
+              pdf_link: pdf.href,
+              bloco_texto: text.substring(0, 500),
+            });
+            totalInserted++;
+            continue;
+          }
+
+          for (const cnpj of cnpjs) {
+            const idx = text.indexOf(cnpj);
+            const context = text.substring(Math.max(0, idx - 300), Math.min(text.length, idx + 400));
+            const lower = context.toLowerCase();
+
+            let tipo = '';
+            if (lower.includes('licença prévia') || lower.includes('(lp)')) tipo = 'Licença Prévia';
+            else if (lower.includes('licença de instalação e operação')) tipo = 'Licença de Instalação e Operação';
+            else if (lower.includes('licença de instalação') || lower.includes('(li)')) tipo = 'Licença de Instalação';
+            else if (lower.includes('licença de operação') || lower.includes('(lo)')) tipo = 'Licença de Operação';
+            else if (lower.includes('licença simplificada') || lower.includes('(ls)')) tipo = 'Licença Simplificada';
+            else if (lower.includes('renovação de licença')) tipo = 'Renovação de Licença';
+            else if (lower.includes('licença ambiental')) tipo = 'Licença Ambiental';
+            else if (lower.includes('alvará')) tipo = 'Alvará';
+            else if (lower.includes('autorização ambiental')) tipo = 'Autorização Ambiental';
+
+            // Extract obra description
+            let obra = '';
+            const obraPatterns = [
+              /(?:para\s+(?:a\s+|o\s+)?)((?:CONSTRUÇÃO|REFORMA|AMPLIAÇÃO|IMPLANTAÇÃO|PAVIMENTAÇÃO|LOTEAMENTO)[\s\S]{3,120}?)(?:[,.]|\s+localiz)/i,
+              /empreendimento\s+(?:imobiliário\s+)?denominado\s+([\s\S]{5,100}?)(?:[,.]|\s+localiz)/i,
+            ];
+            for (const p of obraPatterns) {
+              const m = context.match(p);
+              if (m) { obra = m[1].replace(/\s+/g, ' ').trim(); break; }
+            }
+
+            const hasRelevant = tipo || lower.includes('licen') || lower.includes('construção') || 
+              lower.includes('loteamento') || lower.includes('empreendimento') || lower.includes('alvará');
+            if (!hasRelevant) continue;
+
+            await supabase.from('licencas_natal').insert({
+              data_edicao: pdf.date || pdf.title,
+              numero_dom: pdf.numero,
+              tipo_licenca: tipo || 'Não identificada',
+              cnpj,
+              razao_social: '',
+              obra_descricao: obra,
+              pdf_nome: pdf.href.split('/').pop() || '',
+              pdf_link: pdf.href,
+              bloco_texto: context.substring(0, 500),
+            });
+            totalInserted++;
+          }
+        } catch (err) {
+          console.error('Erro ao processar PDF Natal:', pdf.href, err);
+        }
+      }
+
+      toast.success(`${totalInserted} novos registros importados de ${toProcess.length} PDFs!`, { id: toastId });
+      await fetchNatalFromDb();
+    } catch (err) {
+      console.error('Scraping Natal error:', err);
+      toast.error('Erro ao fazer scraping de Natal', { id: toastId });
+    } finally {
+      setScraping(false);
+    }
+  };
+
+  const fetchSite = async (siteId: string) => {
+    if (siteId === 'extremoz') return fetchExtremozFromDb();
+    if (siteId === 'natal') return fetchNatalFromDb();
     setLoading((prev) => ({ ...prev, [siteId]: true }));
     try {
       const body: Record<string, unknown> = { site_id: siteId, search: search || undefined };
@@ -444,17 +701,17 @@ export default function Portal() {
                     variant="outline"
                     size="sm"
                     className="flex-1 text-xs rounded-lg"
-                    onClick={() => site.id === 'extremoz' ? scrapeExtremoz() : fetchSite(site.id)}
+                    onClick={() => (site.id === 'extremoz' ? scrapeExtremoz() : site.id === 'natal' ? scrapeNatal() : fetchSite(site.id))}
                     disabled={loading[site.id] || scraping}
                   >
-                    {(loading[site.id] || (site.id === 'extremoz' && scraping)) ? (
+                    {(loading[site.id] || ((site.id === 'extremoz' || site.id === 'natal') && scraping)) ? (
                       <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
-                    ) : site.id === 'extremoz' ? (
+                    ) : (site.id === 'extremoz' || site.id === 'natal') ? (
                       <CloudDownload className="h-3 w-3 mr-1.5" />
                     ) : (
                       <RefreshCw className="h-3 w-3 mr-1.5" />
                     )}
-                    {site.id === 'extremoz'
+                    {(site.id === 'extremoz' || site.id === 'natal')
                       ? (scraping ? 'Atualizando...' : 'Atualizar Diários')
                       : (loading[site.id] ? 'Consultando...' : 'Consultar')}
                   </Button>
@@ -502,6 +759,7 @@ export default function Portal() {
                   setActiveTab(site.id);
                   if (!results[site.id]?.success) {
                     if (site.id === 'extremoz') fetchExtremozFromDb();
+                    else if (site.id === 'natal') fetchNatalFromDb();
                     else fetchSite(site.id);
                   }
                 }}
