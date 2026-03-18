@@ -582,7 +582,7 @@ export default function Portal() {
       console.error('Scraping Natal error:', err);
       toast.error('Erro ao fazer scraping de Natal', { id: toastId });
     } finally {
-      setScraping(false);
+      setScraping((prev) => ({ ...prev, natal: false }));
     }
   };
 
