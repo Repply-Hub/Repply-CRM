@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.portal-scraper]
 verify_jwt = false
+
+[functions.import-licencas]
+verify_jwt = false
