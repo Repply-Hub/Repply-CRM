@@ -470,6 +470,17 @@ export default function Portal() {
                   </Button>
                 </div>
 
+                {/* Ver Lista */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-xs rounded-lg text-muted-foreground hover:text-foreground"
+                  onClick={() => scrollToResults(site.id)}
+                >
+                  <List className="h-3 w-3 mr-1.5" />
+                  Ver Lista
+                </Button>
+
                 {/* Error status */}
                 {results[site.id] && !results[site.id].success && (
                   <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 text-destructive text-xs">
