@@ -246,7 +246,7 @@ export default function Portal() {
                     className="text-xs"
                     onClick={() => window.open(
                       site.id === 'extremoz'
-                        ? `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${extremozYear}/`
+                        ? 'https://extremoz.rn.gov.br/diario-oficial/'
                         : site.url,
                       '_blank'
                     )}
