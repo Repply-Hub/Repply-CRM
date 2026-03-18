@@ -519,7 +519,7 @@ export default function Portal() {
                       const totalPages = Math.ceil(result.data.table.length / ROWS_PER_PAGE);
                       const paginatedRows = result.data.table.slice(currentPage * ROWS_PER_PAGE, (currentPage + 1) * ROWS_PER_PAGE);
                       return (
-                        <div key={site.id} className="min-w-0">
+                        <div key={site.id} className="min-w-0" ref={(el) => { sectionRefs.current[site.id] = el; }}>
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                               {site.name} ({result.data.table.length} registros)
