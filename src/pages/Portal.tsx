@@ -218,31 +218,11 @@ export default function Portal() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                {/* Extremoz year/quantity controls */}
+                {/* Extremoz info */}
                 {site.id === 'extremoz' && (
-                  <div className="flex gap-2 mb-2">
-                    <Select value={extremozYear} onValueChange={setExtremozYear}>
-                      <SelectTrigger className="h-8 text-xs flex-1">
-                        <SelectValue placeholder="Ano" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {EXTREMOZ_YEARS.map(y => (
-                          <SelectItem key={y} value={y}>{y}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={extremozMaxPdfs} onValueChange={setExtremozMaxPdfs}>
-                      <SelectTrigger className="h-8 text-xs w-24">
-                        <SelectValue placeholder="PDFs" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3">3 PDFs</SelectItem>
-                        <SelectItem value="5">5 PDFs</SelectItem>
-                        <SelectItem value="10">10 PDFs</SelectItem>
-                        <SelectItem value="15">15 PDFs</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <p className="text-[10px] text-muted-foreground mb-2">
+                    📊 Dados carregados do banco de dados (115 registros da planilha)
+                  </p>
                 )}
 
                 <div className="flex gap-2">
