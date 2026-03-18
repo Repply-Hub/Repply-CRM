@@ -702,7 +702,7 @@ export default function Portal() {
       // If no table data but we have text with CNPJs
       if (totalInserted === 0 && text.length > 50) {
         const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
-        const cnpjs = [...new Set((text.match(cnpjRegex) || []).map((c: string) => c.replace(/\s/g, '')))];
+        const cnpjs = [...new Set((text.match(cnpjRegex) || []).map((c: unknown) => String(c).replace(/\s/g, '')))];
 
         for (const cnpj of cnpjs.slice(0, 50)) {
           const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
