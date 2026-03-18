@@ -65,8 +65,6 @@ export default function Portal() {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, SiteResult>>({});
   const [activeTab, setActiveTab] = useState<'table' | 'links' | 'text'>('table');
-  const [extremozYear, setExtremozYear] = useState('2026');
-  const [extremozMaxPdfs, setExtremozMaxPdfs] = useState('5');
 
   const fetchExtremozFromDb = async () => {
     setLoading((prev) => ({ ...prev, extremoz: true }));
