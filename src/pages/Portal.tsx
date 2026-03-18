@@ -79,10 +79,13 @@ export default function Portal() {
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const scrollToResults = (siteId: string) => {
-    // If no results yet, fetch first
     if (!results[siteId]?.success) {
       if (siteId === 'extremoz') {
         fetchExtremozFromDb().then(() => {
+          setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        });
+      } else if (siteId === 'natal') {
+        fetchNatalFromDb().then(() => {
           setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
         });
       } else {
