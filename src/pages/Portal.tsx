@@ -400,41 +400,45 @@ export default function Portal() {
         </div>
 
         {/* Site cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {SITES.map((site) => (
-            <Card key={site.id} className={`border ${site.borderColor}`}>
-              <CardHeader className="pb-3">
+            <Card key={site.id} className={`rounded-xl border ${site.borderColor} bg-gradient-to-br ${site.gradient} transition-all duration-300 ${site.glowColor} hover:shadow-lg group`}>
+              <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-sm font-semibold">{site.name}</CardTitle>
-                    <CardDescription className="text-xs mt-1">{site.description}</CardDescription>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">{site.icon}</span>
+                    <div>
+                      <CardTitle className="text-sm font-bold tracking-tight">{site.name}</CardTitle>
+                      <CardDescription className="text-[11px] mt-0.5 leading-snug">{site.description}</CardDescription>
+                    </div>
                   </div>
-                  <Badge variant="outline" className={`${site.color} shrink-0 text-[10px]`}>
+                  <Badge variant="outline" className={`${site.badgeClass} shrink-0 text-[10px] font-medium`}>
                     <Globe className="h-3 w-3 mr-1" />
                     Gov
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {/* Extremoz info */}
+              <CardContent className="space-y-3 pt-1">
+                {/* Extremoz scraping */}
                 {site.id === 'extremoz' && (
-                  <div className="space-y-1 mb-2">
-                    <p className="text-[10px] text-muted-foreground">
-                      📊 Dados carregados do banco de dados
-                    </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+                      Dados sincronizados do banco
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full text-xs border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                      className="w-full text-xs rounded-lg border-dashed border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/10 transition-colors"
                       onClick={scrapeExtremoz}
                       disabled={scraping}
                     >
                       {scraping ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
                       ) : (
-                        <CloudDownload className="h-3 w-3 mr-1" />
+                        <CloudDownload className="h-3 w-3 mr-1.5" />
                       )}
-                      {scraping ? 'Buscando novos diários...' : 'Atualizar Diários (Scraping)'}
+                      {scraping ? 'Buscando novos diários...' : 'Atualizar Diários'}
                     </Button>
                   </div>
                 )}
@@ -443,21 +447,21 @@ export default function Portal() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1 text-xs"
+                    className="flex-1 text-xs rounded-lg"
                     onClick={() => fetchSite(site.id)}
                     disabled={loading[site.id]}
                   >
                     {loading[site.id] ? (
-                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
                     ) : (
-                      <RefreshCw className="h-3 w-3 mr-1" />
+                      <RefreshCw className="h-3 w-3 mr-1.5" />
                     )}
                     Consultar
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-xs"
+                    className="text-xs rounded-lg opacity-70 group-hover:opacity-100 transition-opacity"
                     onClick={() => window.open(
                       site.id === 'extremoz'
                         ? 'https://extremoz.rn.gov.br/diario-oficial/'
@@ -472,12 +476,12 @@ export default function Portal() {
 
                 {/* Error status */}
                 {results[site.id] && !results[site.id].success && (
-                  <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-xs">
+                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 text-destructive text-xs">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                     <div>
-                      <p>{results[site.id].error}</p>
+                      <p className="font-medium">{results[site.id].error}</p>
                       {results[site.id].fallback_url && (
-                        <a href={results[site.id].fallback_url} target="_blank" rel="noopener noreferrer" className="underline mt-1 inline-block">
+                        <a href={results[site.id].fallback_url} target="_blank" rel="noopener noreferrer" className="underline mt-1 inline-block opacity-80 hover:opacity-100">
                           Acessar site diretamente →
                         </a>
                       )}
@@ -487,21 +491,18 @@ export default function Portal() {
 
                 {/* Success status */}
                 {results[site.id]?.success && (
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    {results[site.id].meta ? (
-                      <>
-                        <p>✓ {results[site.id].meta!.total_licencas} licenças · {results[site.id].meta!.processed_pdfs}/{results[site.id].meta!.total_pdfs} edições</p>
-                        {results[site.id].data!.table.length > 0 && (
-                          <Button variant="ghost" size="sm" className="h-6 text-[11px] p-0 text-primary" onClick={() => exportCsv(site.id)}>
-                            <Download className="h-3 w-3 mr-1" /> Exportar CSV
-                          </Button>
-                        )}
-                      </>
-                    ) : (
-                      <p>
-                        ✓ {results[site.id].data?.links?.length || 0} links ·{' '}
-                        {results[site.id].data?.table?.length || 0} registros
-                      </p>
+                  <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-success/10 text-xs">
+                    <p className="text-success font-medium">
+                      {results[site.id].meta ? (
+                        <>✓ {results[site.id].meta!.total_licencas} licenças · {results[site.id].meta!.processed_pdfs}/{results[site.id].meta!.total_pdfs} edições</>
+                      ) : (
+                        <>✓ {results[site.id].data?.links?.length || 0} links · {results[site.id].data?.table?.length || 0} registros</>
+                      )}
+                    </p>
+                    {results[site.id].data?.table && results[site.id].data!.table.length > 0 && (
+                      <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2 text-primary hover:text-primary" onClick={() => exportCsv(site.id)}>
+                        <Download className="h-3 w-3 mr-1" /> CSV
+                      </Button>
                     )}
                   </div>
                 )}
