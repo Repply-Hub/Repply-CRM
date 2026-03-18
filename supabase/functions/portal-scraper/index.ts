@@ -729,7 +729,7 @@ Deno.serve(async (req) => {
       const baseAttempts: Promise<IdemaBaseResult>[] = urls.map((tryUrl) => (async () => {
         console.log(`Trying IDEMA with filters: ${tryUrl}`);
         const getController = new AbortController();
-        const getTimeout = setTimeout(() => getController.abort(), 12000);
+        const getTimeout = setTimeout(() => getController.abort(), 25000);
         const getResp = await fetch(tryUrl, { signal: getController.signal, headers: FETCH_HEADERS });
         clearTimeout(getTimeout);
         if (!getResp.ok) throw new Error(`GET ${tryUrl} status ${getResp.status}`);
@@ -752,12 +752,45 @@ Deno.serve(async (req) => {
       if (baseResult) {
         baseHtml = baseResult.html;
         usedUrl = baseResult.url;
+        
+        // DEBUG: Log all form fields found
+        const allFieldNames = extractFormFieldNames(baseHtml);
+        console.log('IDEMA form field names:', JSON.stringify(allFieldNames));
+        const hiddenFields = extractFormHiddenFields(baseHtml);
+        console.log('IDEMA hidden fields:', JSON.stringify(hiddenFields));
+        
+        // DEBUG: Log all forms found
+        const formRegex2 = /<form[^>]*>/gi;
+        const forms = baseHtml.match(formRegex2) || [];
+        console.log('IDEMA forms found:', JSON.stringify(forms));
+        
+        // DEBUG: Log select elements
+        const selectRegex = /<select[^>]*name=["']([^"']+)["'][^>]*>/gi;
+        const selects: string[] = [];
+        let selMatch;
+        while ((selMatch = selectRegex.exec(baseHtml)) !== null) {
+          selects.push(selMatch[1]);
+        }
+        console.log('IDEMA select fields:', JSON.stringify(selects));
+        
+        // DEBUG: Log button/submit elements
+        const buttonRegex = /<(button|input)[^>]*(?:type=["']submit["']|type=["']button["'])[^>]*>/gi;
+        const buttons: string[] = [];
+        let btnMatch;
+        while ((btnMatch = buttonRegex.exec(baseHtml)) !== null) {
+          buttons.push(btnMatch[0].substring(0, 200));
+        }
+        console.log('IDEMA buttons:', JSON.stringify(buttons));
+
         actionUrl = getIdemaFormAction(baseHtml, usedUrl);
+        console.log('IDEMA action URL resolved:', actionUrl);
 
         try {
           const payload = buildIdemaFilterPayload(baseHtml, search);
+          console.log('IDEMA POST payload:', payload.toString());
+          
           const postController = new AbortController();
-          const postTimeout = setTimeout(() => postController.abort(), 12000);
+          const postTimeout = setTimeout(() => postController.abort(), 25000);
           const postResp = await fetch(actionUrl, {
             method: 'POST',
             signal: postController.signal,
@@ -778,6 +811,23 @@ Deno.serve(async (req) => {
           } else {
             resultHtml = await postResp.text();
             console.log(`IDEMA POST success from ${actionUrl}: ${resultHtml.length} chars`);
+            
+            // DEBUG: Log table extraction results
+            const postTables = extractTableData(resultHtml);
+            console.log(`IDEMA POST tables extracted: ${postTables.length} rows`);
+            if (postTables.length > 0) {
+              console.log('IDEMA first row keys:', JSON.stringify(Object.keys(postTables[0])));
+              console.log('IDEMA first row values:', JSON.stringify(postTables[0]));
+            } else {
+              // Check if there's a table tag at all
+              const tableCount = (resultHtml.match(/<table/gi) || []).length;
+              console.log(`IDEMA POST HTML has ${tableCount} table tags`);
+              // Log a snippet of the HTML around any table
+              const tableIdx = resultHtml.indexOf('<table');
+              if (tableIdx >= 0) {
+                console.log('IDEMA table snippet:', resultHtml.substring(tableIdx, tableIdx + 500));
+              }
+            }
           }
         } catch (err) {
           console.log('IDEMA POST failed, using GET HTML fallback:', err);

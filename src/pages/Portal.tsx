@@ -635,105 +635,141 @@ export default function Portal() {
     }
   };
 
-  // ─── IDEMA: client-side scraping ──────────────────────────────
+  // ─── IDEMA: client-side scraping with proxy fallback ────────────
   const scrapeIdema = async () => {
     setScraping((prev) => ({ ...prev, idema: true }));
-    const toastId = toast.loading('Buscando licenças do IDEMA via servidor...');
-    try {
-      const { data, error } = await supabase.functions.invoke('portal-scraper', {
-        body: { site_id: 'idema', search: search || undefined },
-      });
-      if (error) throw error;
+    const toastId = toast.loading('Buscando licenças do IDEMA...');
+    const idemaUrl = 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/';
 
-      if (!data?.success) {
-        setResults((prev) => ({
-          ...prev,
-          idema: {
-            success: false,
-            error: data?.error || 'Erro ao consultar IDEMA',
-            fallback_url: data?.fallback_url || SITES.find((site) => site.id === 'idema')?.url,
-            site: { id: 'idema', name: 'IDEMA', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
-          },
-        }));
-        toast.error(data?.error || 'Erro ao consultar IDEMA', { id: toastId });
-        return;
-      }
-
-      const tableData = data.data?.table || [];
-      const links = data.data?.links || [];
-      const text = data.data?.text || '';
-
-      if (tableData.length === 0 && links.length === 0 && text.length < 50) {
-        setResults((prev) => ({
-          ...prev,
-          idema: {
-            success: false,
-            error: 'Nenhum dado válido foi retornado pelo IDEMA.',
-            fallback_url: data?.fallback_url || data?.meta?.action_url || SITES.find((site) => site.id === 'idema')?.url,
-            site: { id: 'idema', name: 'IDEMA', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
-          },
-        }));
-        toast.error('Nenhum dado extraído do IDEMA', { id: toastId });
-        return;
-      }
-
-      let totalInserted = 0;
-
-      if (tableData.length > 0) {
-        for (const row of tableData) {
-          const values = Object.values(row).join(' ');
-          const cnpjMatch = values.match(/\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/);
-          const cnpj = cnpjMatch ? cnpjMatch[0].replace(/\s/g, '') : '';
-
-          if (cnpj) {
-            const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
-            if (existing && existing.length > 0) continue;
+    const extractTableFromHtml = (rawHtml: string): Array<Record<string, string>> => {
+      const rows: Array<Record<string, string>> = [];
+      const tableRegex = /<table[\s\S]*?<\/table>/gi;
+      const tables = rawHtml.match(tableRegex);
+      if (!tables) return rows;
+      for (const table of tables) {
+        const headerRegex = /<th[^>]*>([\s\S]*?)<\/th>/gi;
+        const headers: string[] = [];
+        let hMatch;
+        while ((hMatch = headerRegex.exec(table)) !== null) {
+          headers.push(hMatch[1].replace(/<[^>]+>/g, '').trim());
+        }
+        if (headers.length < 2) continue;
+        const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+        let trMatch;
+        let isFirst = true;
+        while ((trMatch = trRegex.exec(table)) !== null) {
+          if (isFirst && headers.length > 0) { isFirst = false; continue; }
+          isFirst = false;
+          const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+          let tdMatch;
+          const row: Record<string, string> = {};
+          let colIdx = 0;
+          while ((tdMatch = tdRegex.exec(trMatch[1])) !== null) {
+            const key = headers[colIdx] || `col_${colIdx}`;
+            row[key] = tdMatch[1].replace(/<br\s*\/?\s*>/gi, ' | ').replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').trim();
+            colIdx++;
           }
+          if (Object.keys(row).length > 0) rows.push(row);
+        }
+      }
+      return rows;
+    };
 
-          const rowLower: Record<string, string> = {};
-          Object.entries(row).forEach(([k, v]) => { rowLower[k.toLowerCase()] = String(v); });
+    const processTableRows = async (tableData: Array<Record<string, string>>): Promise<number> => {
+      let totalInserted = 0;
+      for (const row of tableData) {
+        const values = Object.values(row).join(' ');
+        const cnpjMatch = values.match(/\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/);
+        const cnpj = cnpjMatch ? cnpjMatch[0].replace(/\s/g, '') : '';
+        if (cnpj) {
+          const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
+          if (existing && existing.length > 0) continue;
+        }
+        const rowLower: Record<string, string> = {};
+        Object.entries(row).forEach(([k, v]) => { rowLower[k.toLowerCase()] = String(v); });
+        const numeroLicenca = rowLower['nº licença'] || rowLower['nº'] || rowLower['numero'] || rowLower['licença'] || rowLower['n°'] || '';
+        const tipoLicenca = rowLower['tipo'] || rowLower['tipo de licença'] || rowLower['tipo licença'] || '';
+        const razaoSocial = rowLower['razão social'] || rowLower['empresa'] || rowLower['empreendedor'] || rowLower['interessado'] || '';
+        const empreendimento = rowLower['empreendimento'] || rowLower['atividade'] || '';
+        const hasRelevantData = Boolean(cnpj || numeroLicenca || tipoLicenca || razaoSocial || empreendimento);
+        if (!hasRelevantData) continue;
+        await supabase.from('licencas_idema').insert({
+          numero_licenca: numeroLicenca, tipo_licenca: tipoLicenca,
+          data_emissao: rowLower['emissão'] || rowLower['data'] || rowLower['data de emissão'] || rowLower['data emissão'] || '',
+          data_validade: rowLower['validade'] || rowLower['data de validade'] || '',
+          cnpj, razao_social: razaoSocial, empreendimento,
+          municipio: rowLower['município'] || rowLower['municipio'] || rowLower['local'] || '',
+          atividade: rowLower['atividade'] || '', porte: rowLower['porte'] || '',
+          bloco_texto: Object.values(row).map(v => String(v)).join(' | ').substring(0, 500),
+        });
+        totalInserted++;
+      }
+      return totalInserted;
+    };
 
-          const numeroLicenca = rowLower['nº licença'] || rowLower['nº'] || rowLower['numero'] || rowLower['licença'] || rowLower['n°'] || '';
-          const tipoLicenca = rowLower['tipo'] || rowLower['tipo de licença'] || rowLower['tipo licença'] || '';
-          const razaoSocial = rowLower['razão social'] || rowLower['empresa'] || rowLower['empreendedor'] || rowLower['interessado'] || '';
-          const empreendimento = rowLower['empreendimento'] || rowLower['atividade'] || '';
-          const textoConsolidado = Object.values(row).map(v => String(v)).join(' | ').substring(0, 500);
+    try {
+      // Strategy 1: Direct browser fetch
+      let html = '';
+      try {
+        const resp = await fetch(idemaUrl, { signal: AbortSignal.timeout(20000) });
+        if (resp.ok) html = await resp.text();
+      } catch (e) {
+        console.log('IDEMA direct fetch failed (likely CORS):', e);
+      }
 
-          const hasRelevantData = Boolean(cnpj || numeroLicenca || tipoLicenca || razaoSocial || empreendimento);
-          if (!hasRelevantData) continue;
-
-          await supabase.from('licencas_idema').insert({
-            numero_licenca: numeroLicenca,
-            tipo_licenca: tipoLicenca,
-            data_emissao: rowLower['emissão'] || rowLower['data'] || rowLower['data de emissão'] || rowLower['data emissão'] || '',
-            data_validade: rowLower['validade'] || rowLower['data de validade'] || '',
-            cnpj,
-            razao_social: razaoSocial,
-            empreendimento,
-            municipio: rowLower['município'] || rowLower['municipio'] || rowLower['local'] || '',
-            atividade: rowLower['atividade'] || '',
-            porte: rowLower['porte'] || '',
-            bloco_texto: textoConsolidado,
+      // Strategy 2: Edge Function proxy fallback
+      if (!html) {
+        toast.loading('CORS bloqueado. Tentando via servidor...', { id: toastId });
+        try {
+          const { data, error } = await supabase.functions.invoke('portal-scraper', {
+            body: { site_id: 'idema', search: search || undefined },
           });
-          totalInserted++;
+          if (!error && data?.success && data?.data?.table?.length > 0) {
+            const inserted = await processTableRows(data.data.table);
+            if (inserted > 0) {
+              toast.success(`${inserted} registros importados do IDEMA!`, { id: toastId });
+              await fetchIdemaFromDb();
+              return;
+            }
+          }
+          if (!error && data?.data?.text) {
+            html = data.data.text; // Use extracted text as fallback
+          }
+        } catch (proxyErr) {
+          console.log('IDEMA proxy also failed:', proxyErr);
         }
       }
 
-      if (totalInserted === 0 && text.length > 50) {
+      if (!html) {
+        setResults((prev) => ({
+          ...prev,
+          idema: {
+            success: false,
+            error: 'O site do IDEMA está instável ou fora do ar. Tente novamente em alguns minutos ou acesse diretamente.',
+            fallback_url: idemaUrl,
+            site: { id: 'idema', name: 'IDEMA', url: idemaUrl },
+          },
+        }));
+        toast.error('IDEMA inacessível no momento. Tente novamente mais tarde.', { id: toastId });
+        return;
+      }
+
+      // Parse and import
+      toast.loading('Processando dados do IDEMA...', { id: toastId });
+      const tableData = extractTableFromHtml(html);
+      let totalInserted = await processTableRows(tableData);
+
+      // Fallback: extract CNPJs from text
+      if (totalInserted === 0) {
+        const textContent = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
         const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
-        const cnpjs = [...new Set((text.match(cnpjRegex) || []).map((c: unknown) => String(c).replace(/\s/g, '')))];
-
+        const cnpjs = [...new Set((textContent.match(cnpjRegex) || []).map(c => c.replace(/\s/g, '')))];
         for (const cnpj of cnpjs.slice(0, 50)) {
-          const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', String(cnpj)).limit(1);
+          const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
           if (existing && existing.length > 0) continue;
-
-          const idx = text.indexOf(cnpj);
-          const context = text.substring(Math.max(0, idx - 200), Math.min(text.length, idx + 300));
-
-          await supabase.from('licencas_idema').insert([{
-            cnpj: String(cnpj),
-            bloco_texto: context.substring(0, 500),
-          }]);
+          const idx = textContent.indexOf(cnpj);
+          const context = textContent.substring(Math.max(0, idx - 200), Math.min(textContent.length, idx + 300));
+          await supabase.from('licencas_idema').insert({ cnpj, bloco_texto: context.substring(0, 500) });
           totalInserted++;
         }
       }
@@ -743,12 +779,12 @@ export default function Portal() {
           ...prev,
           idema: {
             success: false,
-            error: 'O IDEMA respondeu, mas sem resultados importáveis.',
-            fallback_url: data?.meta?.action_url || SITES.find((site) => site.id === 'idema')?.url,
-            site: { id: 'idema', name: 'IDEMA', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
+            error: 'O IDEMA respondeu, mas sem resultados importáveis. Tente buscar com um CNPJ ou termo específico.',
+            fallback_url: idemaUrl,
+            site: { id: 'idema', name: 'IDEMA', url: idemaUrl },
           },
         }));
-        toast.warning('IDEMA retornou página sem resultados válidos para importação.', { id: toastId });
+        toast.warning('IDEMA retornou página sem resultados válidos.', { id: toastId });
         return;
       }
 
@@ -760,12 +796,12 @@ export default function Portal() {
         ...prev,
         idema: {
           success: false,
-          error: 'Erro ao acessar o portal do IDEMA. O site pode estar fora do ar ou expirando na consulta.',
-          fallback_url: SITES.find((site) => site.id === 'idema')?.url,
-          site: { id: 'idema', name: 'IDEMA', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
+          error: 'Erro ao acessar o portal do IDEMA. O site pode estar fora do ar.',
+          fallback_url: idemaUrl,
+          site: { id: 'idema', name: 'IDEMA', url: idemaUrl },
         },
       }));
-      toast.error('Erro ao acessar site do IDEMA. O site pode estar fora do ar.', { id: toastId });
+      toast.error('Erro ao acessar site do IDEMA.', { id: toastId });
     } finally {
       setScraping((prev) => ({ ...prev, idema: false }));
     }
