@@ -431,7 +431,7 @@ export default function Portal() {
 
       if (pdfLinks.length === 0) {
         toast.error('Nenhum PDF encontrado no DOM de Natal', { id: toastId });
-        setScraping(false);
+        setScraping((prev) => ({ ...prev, natal: false }));
         return;
       }
 
