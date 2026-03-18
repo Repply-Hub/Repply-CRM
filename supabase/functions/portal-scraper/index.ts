@@ -725,34 +725,48 @@ Deno.serve(async (req) => {
       let usedUrl = '';
       let actionUrl = '';
 
-      for (const tryUrl of urls) {
+      type IdemaBaseResult = { html: string; url: string; cookieHeader: string };
+      const baseAttempts: Promise<IdemaBaseResult>[] = urls.map((tryUrl) => (async () => {
+        console.log(`Trying IDEMA with filters: ${tryUrl}`);
+        const getController = new AbortController();
+        const getTimeout = setTimeout(() => getController.abort(), 12000);
+        const getResp = await fetch(tryUrl, { signal: getController.signal, headers: FETCH_HEADERS });
+        clearTimeout(getTimeout);
+        if (!getResp.ok) throw new Error(`GET ${tryUrl} status ${getResp.status}`);
+
+        const html = await getResp.text();
+        return {
+          html,
+          url: tryUrl,
+          cookieHeader: parseSetCookieToCookieHeader(getResp.headers.get('set-cookie')),
+        };
+      })());
+
+      let baseResult: IdemaBaseResult | null = null;
+      try {
+        baseResult = await Promise.any(baseAttempts);
+      } catch (err) {
+        console.log('All IDEMA base attempts failed:', err);
+      }
+
+      if (baseResult) {
+        baseHtml = baseResult.html;
+        usedUrl = baseResult.url;
+        actionUrl = getIdemaFormAction(baseHtml, usedUrl);
+
         try {
-          console.log(`Trying IDEMA with filters: ${tryUrl}`);
-
-          const getController = new AbortController();
-          const getTimeout = setTimeout(() => getController.abort(), 16000);
-          const getResp = await fetch(tryUrl, { signal: getController.signal, headers: FETCH_HEADERS });
-          clearTimeout(getTimeout);
-          if (!getResp.ok) continue;
-
-          baseHtml = await getResp.text();
-          usedUrl = tryUrl;
-          actionUrl = getIdemaFormAction(baseHtml, tryUrl);
-
-          const cookieHeader = parseSetCookieToCookieHeader(getResp.headers.get('set-cookie'));
           const payload = buildIdemaFilterPayload(baseHtml, search);
-
           const postController = new AbortController();
-          const postTimeout = setTimeout(() => postController.abort(), 18000);
+          const postTimeout = setTimeout(() => postController.abort(), 12000);
           const postResp = await fetch(actionUrl, {
             method: 'POST',
             signal: postController.signal,
             headers: {
               ...FETCH_HEADERS,
               'Content-Type': 'application/x-www-form-urlencoded',
-              'Origin': new URL(tryUrl).origin,
-              'Referer': tryUrl,
-              ...(cookieHeader ? { 'Cookie': cookieHeader } : {}),
+              'Origin': new URL(usedUrl).origin,
+              'Referer': usedUrl,
+              ...(baseResult.cookieHeader ? { 'Cookie': baseResult.cookieHeader } : {}),
             },
             body: payload.toString(),
           });
@@ -765,15 +779,9 @@ Deno.serve(async (req) => {
             resultHtml = await postResp.text();
             console.log(`IDEMA POST success from ${actionUrl}: ${resultHtml.length} chars`);
           }
-
-          const hasUsefulRows = selectMostRelevantIdemaTable(extractTableData(resultHtml)).length > 0;
-          const hasSearchEcho = search ? resultHtml.toLowerCase().includes(search.toLowerCase()) : true;
-
-          if (hasUsefulRows || hasSearchEcho) {
-            break;
-          }
         } catch (err) {
-          console.log(`IDEMA filtered attempt failed (${tryUrl}):`, err);
+          console.log('IDEMA POST failed, using GET HTML fallback:', err);
+          resultHtml = baseHtml;
         }
       }
 
