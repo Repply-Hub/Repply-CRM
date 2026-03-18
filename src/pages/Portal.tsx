@@ -499,9 +499,8 @@ export default function Portal() {
               <button
                 key={site.id}
                 onClick={() => {
-                  const newTab = activeTab === site.id ? null : site.id;
-                  setActiveTab(newTab);
-                  if (newTab && !results[newTab]?.success) {
+                  setActiveTab(site.id);
+                  if (!results[site.id]?.success) {
                     if (newTab === 'extremoz') fetchExtremozFromDb();
                     else fetchSite(newTab);
                   }
