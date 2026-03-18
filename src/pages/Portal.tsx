@@ -68,14 +68,63 @@ export default function Portal() {
   const [extremozYear, setExtremozYear] = useState('2026');
   const [extremozMaxPdfs, setExtremozMaxPdfs] = useState('5');
 
+  const fetchExtremozFromDb = async () => {
+    setLoading((prev) => ({ ...prev, extremoz: true }));
+    try {
+      let query = supabase.from('licencas_extremoz').select('*').order('created_at', { ascending: false });
+      
+      if (search) {
+        const q = `%${search}%`;
+        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},nome_fantasia.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q}`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const tableData = (data || []).map(row => ({
+        'Data da Edição': row.data_edicao || '',
+        'Tipo de Licença': row.tipo_licenca || '',
+        'Prioridade': row.prioridade || '',
+        'CNPJ': row.cnpj || '',
+        'Razão Social': row.razao_social || '',
+        'Nome Fantasia': row.nome_fantasia || '',
+        'Telefone': row.telefone || '',
+        'Email': row.email || '',
+        'Endereço': row.endereco_empresa || '',
+        'Quadro Societário': row.quadro_societario || '',
+        'Obra / Descrição': row.obra_descricao || '',
+        'PDF': row.pdf_nome || '',
+        'Link PDF': row.pdf_link || '',
+        'Texto Encontrado': row.bloco_texto || '',
+      }));
+
+      setResults((prev) => ({
+        ...prev,
+        extremoz: {
+          success: true,
+          site: { id: 'extremoz', name: 'Diário Oficial - Extremoz', url: 'https://extremoz.rn.gov.br/diario-oficial/' },
+          data: { text: `${tableData.length} registros encontrados no banco de dados.`, links: [], table: tableData },
+          meta: { total_licencas: tableData.length, total_pdfs: tableData.length, processed_pdfs: tableData.length },
+          fetched_at: new Date().toISOString(),
+        },
+      }));
+      toast.success(`Extremoz: ${tableData.length} licenças carregadas do banco de dados`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro de conexão';
+      setResults((prev) => ({ ...prev, extremoz: { success: false, error: message } }));
+      toast.error('Erro ao carregar dados de Extremoz');
+    } finally {
+      setLoading((prev) => ({ ...prev, extremoz: false }));
+    }
+  };
+
   const fetchSite = async (siteId: string) => {
+    if (siteId === 'extremoz') {
+      return fetchExtremozFromDb();
+    }
     setLoading((prev) => ({ ...prev, [siteId]: true }));
     try {
       const body: Record<string, unknown> = { site_id: siteId, search: search || undefined };
-      if (siteId === 'extremoz') {
-        body.year = extremozYear;
-        body.max_pdfs = parseInt(extremozMaxPdfs);
-      }
 
       const { data, error } = await supabase.functions.invoke('portal-scraper', { body });
       if (error) throw error;
@@ -85,11 +134,7 @@ export default function Portal() {
       if (data.success) {
         const tableCount = data.data?.table?.length || 0;
         const linkCount = data.data?.links?.length || 0;
-        if (siteId === 'extremoz' && data.meta) {
-          toast.success(`Extremoz: ${data.meta.total_licencas} licenças extraídas de ${data.meta.processed_pdfs}/${data.meta.total_pdfs} edições`);
-        } else {
-          toast.success(`${SITES.find((s) => s.id === siteId)?.name}: ${linkCount} links, ${tableCount} registros`);
-        }
+        toast.success(`${SITES.find((s) => s.id === siteId)?.name}: ${linkCount} links, ${tableCount} registros`);
       } else {
         toast.error(data.error || 'Erro ao consultar site');
       }
