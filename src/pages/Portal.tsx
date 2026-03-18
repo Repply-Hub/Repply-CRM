@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 
-import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CloudDownload } from 'lucide-react';
+import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CloudDownload, List } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -75,6 +75,24 @@ export default function Portal() {
   const [pages, setPages] = useState<Record<string, number>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const ROWS_PER_PAGE = 10;
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const scrollToResults = (siteId: string) => {
+    // If no results yet, fetch first
+    if (!results[siteId]?.success) {
+      if (siteId === 'extremoz') {
+        fetchExtremozFromDb().then(() => {
+          setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        });
+      } else {
+        fetchSite(siteId).then(() => {
+          setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        });
+      }
+      return;
+    }
+    sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const toggleRow = useCallback((key: string) => {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -452,6 +470,17 @@ export default function Portal() {
                   </Button>
                 </div>
 
+                {/* Ver Lista */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-xs rounded-lg text-muted-foreground hover:text-foreground"
+                  onClick={() => scrollToResults(site.id)}
+                >
+                  <List className="h-3 w-3 mr-1.5" />
+                  Ver Lista
+                </Button>
+
                 {/* Error status */}
                 {results[site.id] && !results[site.id].success && (
                   <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 text-destructive text-xs">
@@ -490,7 +519,7 @@ export default function Portal() {
                       const totalPages = Math.ceil(result.data.table.length / ROWS_PER_PAGE);
                       const paginatedRows = result.data.table.slice(currentPage * ROWS_PER_PAGE, (currentPage + 1) * ROWS_PER_PAGE);
                       return (
-                        <div key={site.id} className="min-w-0">
+                        <div key={site.id} className="min-w-0" ref={(el) => { sectionRefs.current[site.id] = el; }}>
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                               {site.name} ({result.data.table.length} registros)
