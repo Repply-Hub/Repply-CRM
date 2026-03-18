@@ -937,6 +937,7 @@ export default function Portal() {
                   if (!results[site.id]?.success) {
                     if (site.id === 'extremoz') fetchExtremozFromDb();
                     else if (site.id === 'natal') fetchNatalFromDb();
+                    else if (site.id === 'idema') fetchIdemaFromDb();
                     else fetchSite(site.id);
                   }
                 }}
