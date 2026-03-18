@@ -467,7 +467,7 @@ export default function Portal() {
                     })}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         )}
