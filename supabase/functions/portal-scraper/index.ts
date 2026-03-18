@@ -180,8 +180,13 @@ function extractCompanyName(text: string, cnpj: string): string {
 
 function extractObraDescricao(text: string): string {
   const patterns = [
-    /(?:para\s+(?:a|o)\s+)((?:CONSTRUÇÃO|REFORMA|AMPLIAÇÃO|IMPLANTAÇÃO|PAVIMENTAÇÃO|LOTEAMENTO)[\s\S]{5,120}?)(?:[,.]|\s+localizada)/i,
+    /(?:para\s+(?:a\s+|o\s+)?)((?:CONSTRUÇÃO|REFORMA|AMPLIAÇÃO|IMPLANTAÇÃO|PAVIMENTAÇÃO|LOTEAMENTO)[\s\S]{3,120}?)(?:[,.]|\s+localiz)/i,
+    /(?:para\s+)((?:Loteamento|LOTEAMENTO)\s+[^,\.]{3,80})/i,
     /empreendimento\s+(?:imobiliário\s+)?denominado\s+([\s\S]{5,100}?)(?:[,.]|\s+localiz)/i,
+    /((?:Loteamento|LOTEAMENTO)\s+[A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s\-]+(?:\d+)?)/i,
+    /(?:para\s+)((?:centro\s+comercial|centro\s+de\s+velório|condomínio|residencial)[^,\.]{0,100})/i,
+    /(construção\s+residencial\s+[^,\.]{0,80})/i,
+    /(pavimentação[^,\.]{3,100})/i,
   ];
   for (const p of patterns) {
     const m = text.match(p);
