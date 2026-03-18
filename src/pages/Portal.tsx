@@ -711,10 +711,10 @@ export default function Portal() {
           const idx = text.indexOf(cnpj);
           const context = text.substring(Math.max(0, idx - 200), Math.min(text.length, idx + 300));
 
-          await supabase.from('licencas_idema').insert({
+          await supabase.from('licencas_idema').insert([{
             cnpj,
             bloco_texto: context.substring(0, 500),
-          });
+          }]);
           totalInserted++;
         }
       }
