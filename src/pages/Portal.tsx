@@ -883,14 +883,14 @@ export default function Portal() {
                     size="sm"
                     className="flex-1 text-xs rounded-lg"
                     onClick={() => (site.id === 'extremoz' ? scrapeExtremoz() : site.id === 'natal' ? scrapeNatal() : site.id === 'idema' ? scrapeIdema() : fetchSite(site.id))}
-                    disabled={loading[site.id] || scraping}
+                    disabled={loading[site.id] || scraping[site.id]}
                   >
-                    {(loading[site.id] || scraping) ? (
+                    {(loading[site.id] || scraping[site.id]) ? (
                       <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
                     ) : (
                       <CloudDownload className="h-3 w-3 mr-1.5" />
                     )}
-                    {scraping ? 'Atualizando...' : 'Atualizar Dados'}
+                    {scraping[site.id] ? 'Atualizando...' : 'Atualizar Dados'}
                   </Button>
                   <Button
                     variant="ghost"
