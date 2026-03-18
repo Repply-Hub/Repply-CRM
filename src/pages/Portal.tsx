@@ -61,6 +61,7 @@ const SITES = [
 export default function Portal() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [scraping, setScraping] = useState(false);
   const [results, setResults] = useState<Record<string, SiteResult>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
