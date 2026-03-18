@@ -63,7 +63,12 @@ export default function Portal() {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, SiteResult>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const ROWS_PER_PAGE = 10;
+
+  const toggleRow = useCallback((key: string) => {
+    setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
 
   const fetchExtremozFromDb = async () => {
     setLoading((prev) => ({ ...prev, extremoz: true }));
