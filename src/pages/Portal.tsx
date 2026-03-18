@@ -1,11 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 
-import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CloudDownload } from 'lucide-react';
+import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CloudDownload, List } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
