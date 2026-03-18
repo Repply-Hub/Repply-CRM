@@ -331,7 +331,7 @@ export default function Portal() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[500px] overflow-y-auto pr-1">
+              <div className="max-h-[400px] overflow-y-auto pr-1">
                 {activeTab === 'table' && (
                   <div className="space-y-6 min-w-0">
                     {SITES.map((site) => {
