@@ -586,9 +586,195 @@ export default function Portal() {
     }
   };
 
+  // ─── IDEMA: load from DB ──────────────────────────────────────
+  const fetchIdemaFromDb = async () => {
+    setLoading((prev) => ({ ...prev, idema: true }));
+    try {
+      let query = supabase.from('licencas_idema').select('*').order('created_at', { ascending: false });
+      
+      if (search) {
+        const q = `%${search}%`;
+        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},empreendimento.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q},municipio.ilike.${q}`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const tableData = (data || []).map(row => ({
+        'Nº Licença': row.numero_licenca || '',
+        'Tipo de Licença': row.tipo_licenca || '',
+        'Data Emissão': row.data_emissao || '',
+        'Validade': row.data_validade || '',
+        'CNPJ': row.cnpj || '',
+        'Razão Social': row.razao_social || '',
+        'Empreendimento': row.empreendimento || '',
+        'Município': row.municipio || '',
+        'Atividade': row.atividade || '',
+        'Porte': row.porte || '',
+        'Link PDF': row.pdf_link || '',
+        'Texto Encontrado': row.bloco_texto || '',
+      }));
+
+      setResults((prev) => ({
+        ...prev,
+        idema: {
+          success: true,
+          site: { id: 'idema', name: 'IDEMA', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
+          data: { text: `${tableData.length} registros encontrados no banco de dados.`, links: [], table: tableData },
+          meta: { total_licencas: tableData.length },
+          fetched_at: new Date().toISOString(),
+        },
+      }));
+      if (tableData.length > 0) toast.success(`IDEMA: ${tableData.length} licenças carregadas`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro de conexão';
+      setResults((prev) => ({ ...prev, idema: { success: false, error: message } }));
+      toast.error('Erro ao carregar dados do IDEMA');
+    } finally {
+      setLoading((prev) => ({ ...prev, idema: false }));
+    }
+  };
+
+  // ─── IDEMA: client-side scraping ──────────────────────────────
+  const scrapeIdema = async () => {
+    setScraping(true);
+    const toastId = toast.loading('Buscando licenças do IDEMA...');
+    try {
+      // Try to fetch the IDEMA license listing page
+      const resp = await fetch('https://siga.idema.rn.gov.br/servicos/licencas_emitidas/');
+      if (!resp.ok) {
+        toast.error(`Site do IDEMA retornou status ${resp.status}. Tente novamente mais tarde.`, { id: toastId });
+        setScraping(false);
+        return;
+      }
+      const html = await resp.text();
+
+      // Extract table data from the HTML
+      const tableRegex = /<table[\s\S]*?<\/table>/gi;
+      const tables = html.match(tableRegex);
+
+      if (!tables || tables.length === 0) {
+        // Try extracting links to PDF licenses instead
+        const pdfLinks: Array<{ href: string; text: string }> = [];
+        const linkRegex = /<a\s+[^>]*href=["']([^"']*(?:licen|valida|pdf)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+        let match;
+        while ((match = linkRegex.exec(html)) !== null) {
+          const href = match[1];
+          const text = match[2].replace(/<[^>]+>/g, '').trim();
+          if (text.length > 3) pdfLinks.push({ href, text });
+        }
+
+        if (pdfLinks.length === 0) {
+          // Just save the raw text content
+          const textContent = html
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          if (textContent.length > 50) {
+            // Extract CNPJs from the page
+            const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
+            const cnpjs = [...new Set((textContent.match(cnpjRegex) || []).map(c => c.replace(/\s/g, '')))];
+
+            let inserted = 0;
+            for (const cnpj of cnpjs.slice(0, 50)) {
+              const idx = textContent.indexOf(cnpj);
+              const context = textContent.substring(Math.max(0, idx - 200), Math.min(textContent.length, idx + 300));
+              
+              const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
+              if (existing && existing.length > 0) continue;
+
+              await supabase.from('licencas_idema').insert({
+                cnpj,
+                bloco_texto: context.substring(0, 500),
+                razao_social: '',
+              });
+              inserted++;
+            }
+            toast.success(`${inserted} registros extraídos da página do IDEMA`, { id: toastId });
+          } else {
+            toast.error('Não foi possível extrair dados da página do IDEMA', { id: toastId });
+          }
+        } else {
+          toast.success(`${pdfLinks.length} links encontrados no IDEMA`, { id: toastId });
+        }
+
+        await fetchIdemaFromDb();
+        setScraping(false);
+        return;
+      }
+
+      // Parse HTML tables
+      let totalInserted = 0;
+      for (const table of tables) {
+        const headerRegex = /<th[^>]*>([\s\S]*?)<\/th>/gi;
+        const headers: string[] = [];
+        let hMatch;
+        while ((hMatch = headerRegex.exec(table)) !== null) {
+          headers.push(hMatch[1].replace(/<[^>]+>/g, '').trim());
+        }
+
+        const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+        let trMatch;
+        let isFirst = true;
+        while ((trMatch = trRegex.exec(table)) !== null) {
+          if (isFirst && headers.length > 0) { isFirst = false; continue; }
+          isFirst = false;
+
+          const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+          let tdMatch;
+          const cells: string[] = [];
+          const cellLinks: string[] = [];
+          while ((tdMatch = tdRegex.exec(trMatch[1])) !== null) {
+            const cellHtml = tdMatch[1];
+            cells.push(cellHtml.replace(/<[^>]+>/g, '').trim());
+            const linkMatch = cellHtml.match(/href=["']([^"']+)["']/);
+            if (linkMatch) cellLinks.push(linkMatch[1]);
+          }
+
+          if (cells.length < 2) continue;
+
+          // Try to map cells to known columns
+          const row: Record<string, string> = {};
+          headers.forEach((h, i) => { if (cells[i]) row[h.toLowerCase()] = cells[i]; });
+
+          const cnpj = cells.find(c => /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/.test(c)) || '';
+          const pdfLink = cellLinks.find(l => l.includes('.pdf') || l.includes('validar')) || '';
+
+          await supabase.from('licencas_idema').insert({
+            numero_licenca: row['nº'] || row['numero'] || row['licença'] || cells[0] || '',
+            tipo_licenca: row['tipo'] || row['tipo de licença'] || '',
+            data_emissao: row['emissão'] || row['data'] || row['data de emissão'] || '',
+            data_validade: row['validade'] || row['data de validade'] || '',
+            cnpj: cnpj.replace(/\s/g, ''),
+            razao_social: row['razão social'] || row['empresa'] || row['empreendedor'] || '',
+            empreendimento: row['empreendimento'] || row['atividade'] || '',
+            municipio: row['município'] || row['municipio'] || row['local'] || '',
+            atividade: row['atividade'] || '',
+            porte: row['porte'] || '',
+            pdf_link: pdfLink,
+            bloco_texto: cells.join(' | ').substring(0, 500),
+          });
+          totalInserted++;
+        }
+      }
+
+      toast.success(`${totalInserted} licenças importadas do IDEMA!`, { id: toastId });
+      await fetchIdemaFromDb();
+    } catch (err) {
+      console.error('Scraping IDEMA error:', err);
+      toast.error('Erro ao acessar site do IDEMA. O site pode estar fora do ar.', { id: toastId });
+    } finally {
+      setScraping(false);
+    }
+  };
+
   const fetchSite = async (siteId: string) => {
     if (siteId === 'extremoz') return fetchExtremozFromDb();
     if (siteId === 'natal') return fetchNatalFromDb();
+    if (siteId === 'idema') return fetchIdemaFromDb();
     setLoading((prev) => ({ ...prev, [siteId]: true }));
     try {
       const body: Record<string, unknown> = { site_id: siteId, search: search || undefined };
