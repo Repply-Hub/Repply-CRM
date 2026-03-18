@@ -419,12 +419,6 @@ export default function Portal() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-1">
-                {site.id === 'extremoz' && (
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                    <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                    Dados sincronizados do banco
-                  </div>
-                )}
 
                 <div className="flex items-center gap-2">
                   <Button
