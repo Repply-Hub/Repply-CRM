@@ -402,47 +402,17 @@ export default function Portal() {
         {/* Site cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {SITES.map((site) => (
-            <Card key={site.id} className={`rounded-xl border ${site.borderColor} bg-gradient-to-br ${site.gradient} transition-all duration-300 ${site.glowColor} hover:shadow-lg group`}>
+            <Card key={site.id} className={`rounded-xl border ${site.borderColor} transition-all duration-300 ${site.glowColor} hover:shadow-lg group`}>
               <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-2xl">{site.icon}</span>
-                    <div>
-                      <CardTitle className="text-sm font-bold tracking-tight">{site.name}</CardTitle>
-                      <CardDescription className="text-[11px] mt-0.5 leading-snug">{site.description}</CardDescription>
-                    </div>
-                  </div>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-sm font-bold tracking-tight">{site.name}</CardTitle>
                   <Badge variant="outline" className={`${site.badgeClass} shrink-0 text-[10px] font-medium`}>
                     <Globe className="h-3 w-3 mr-1" />
                     Gov
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3 pt-1">
-                {/* Extremoz scraping */}
-                {site.id === 'extremoz' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                      Dados sincronizados do banco
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-xs rounded-lg border-dashed border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/10 transition-colors"
-                      onClick={scrapeExtremoz}
-                      disabled={scraping}
-                    >
-                      {scraping ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
-                      ) : (
-                        <CloudDownload className="h-3 w-3 mr-1.5" />
-                      )}
-                      {scraping ? 'Buscando novos diários...' : 'Atualizar Diários'}
-                    </Button>
-                  </div>
-                )}
-
+              <CardContent className="space-y-3 pt-0">
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -458,10 +428,26 @@ export default function Portal() {
                     )}
                     Consultar
                   </Button>
+                  {site.id === 'extremoz' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-xs rounded-lg border-dashed"
+                      onClick={scrapeExtremoz}
+                      disabled={scraping}
+                    >
+                      {scraping ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                      ) : (
+                        <CloudDownload className="h-3 w-3 mr-1.5" />
+                      )}
+                      Atualizar
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="text-xs rounded-lg opacity-70 group-hover:opacity-100 transition-opacity"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 rounded-lg opacity-60 group-hover:opacity-100 transition-opacity"
                     onClick={() => window.open(
                       site.id === 'extremoz'
                         ? 'https://extremoz.rn.gov.br/diario-oficial/'
@@ -469,40 +455,28 @@ export default function Portal() {
                       '_blank'
                     )}
                   >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    Abrir
+                    <ExternalLink className="h-3.5 w-3.5" />
                   </Button>
                 </div>
 
-                {/* Error status */}
+                {/* Error */}
                 {results[site.id] && !results[site.id].success && (
-                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 text-destructive text-xs">
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium">{results[site.id].error}</p>
-                      {results[site.id].fallback_url && (
-                        <a href={results[site.id].fallback_url} target="_blank" rel="noopener noreferrer" className="underline mt-1 inline-block opacity-80 hover:opacity-100">
-                          Acessar site diretamente →
-                        </a>
-                      )}
-                    </div>
-                  </div>
+                  <p className="text-[11px] text-destructive flex items-center gap-1.5">
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    {results[site.id].error}
+                  </p>
                 )}
 
-                {/* Success status */}
+                {/* Success */}
                 {results[site.id]?.success && (
-                  <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-success/10 text-xs">
-                    <p className="text-success font-medium">
-                      {results[site.id].meta ? (
-                        <>✓ {results[site.id].meta!.total_licencas} licenças · {results[site.id].meta!.processed_pdfs}/{results[site.id].meta!.total_pdfs} edições</>
-                      ) : (
-                        <>✓ {results[site.id].data?.links?.length || 0} links · {results[site.id].data?.table?.length || 0} registros</>
-                      )}
-                    </p>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-success font-medium">
+                      ✓ {results[site.id].data?.table?.length || 0} registros
+                    </span>
                     {results[site.id].data?.table && results[site.id].data!.table.length > 0 && (
-                      <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2 text-primary hover:text-primary" onClick={() => exportCsv(site.id)}>
-                        <Download className="h-3 w-3 mr-1" /> CSV
-                      </Button>
+                      <button className="text-primary hover:underline flex items-center gap-1" onClick={() => exportCsv(site.id)}>
+                        <Download className="h-3 w-3" /> CSV
+                      </button>
                     )}
                   </div>
                 )}
