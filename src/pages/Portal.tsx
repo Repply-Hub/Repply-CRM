@@ -514,6 +514,8 @@ export default function Portal() {
               >
                 {site.name}
               </button>
+            );
+          })}
         </div>
 
         {/* Results area */}
