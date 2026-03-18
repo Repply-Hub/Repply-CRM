@@ -328,7 +328,7 @@ export default function Portal() {
       console.error('Scraping error:', err);
       toast.error('Erro ao fazer scraping de Extremoz', { id: toastId });
     } finally {
-      setScraping(false);
+      setScraping((prev) => ({ ...prev, extremoz: false }));
     }
   };
 
