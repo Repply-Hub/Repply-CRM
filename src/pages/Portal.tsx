@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Loader2, Search, ExternalLink, Globe, FileText, Table2, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -331,9 +331,9 @@ export default function Portal() {
               </div>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[500px]">
+              <div className="h-[500px] overflow-y-auto pr-1">
                 {activeTab === 'table' && (
-                  <div className="space-y-6">
+                  <div className="space-y-6 min-w-0">
                     {SITES.map((site) => {
                       const result = results[site.id];
                       if (!result?.success || !result.data?.table?.length) return null;
@@ -342,64 +342,62 @@ export default function Portal() {
                       const totalPages = Math.ceil(result.data.table.length / ROWS_PER_PAGE);
                       const paginatedRows = result.data.table.slice(currentPage * ROWS_PER_PAGE, (currentPage + 1) * ROWS_PER_PAGE);
                       return (
-                        <div key={site.id}>
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        <div key={site.id} className="min-w-0">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                               {site.name} ({result.data.table.length} registros)
                             </p>
                             <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={() => exportCsv(site.id)}>
-                              <Download className="h-3 w-3 mr-1" /> CSV
+                              <Download className="mr-1 h-3 w-3" /> CSV
                             </Button>
                           </div>
-                          <div className="w-full overflow-x-auto rounded-md border">
-                            <div className="min-w-max">
-                              <table className="w-full min-w-[1100px] text-xs">
-                                <thead>
-                                  <tr className="bg-muted/50">
-                                    {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
-                                      <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
-                                    ))}
-                                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Ações</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {paginatedRows.map((row, i) => (
-                                    <tr key={i} className="border-t border-border/50 hover:bg-accent/30">
-                                      {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
-                                        <td key={h} className="px-3 py-2 max-w-[200px] truncate" title={row[h]}>
-                                          {row[h]}
-                                        </td>
-                                      ))}
-                                      <td className="px-3 py-2 whitespace-nowrap">
-                                        {row['Link PDF'] && (
-                                          <a
-                                            href={row['Link PDF']}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-primary hover:underline"
-                                          >
-                                            <ExternalLink className="h-3 w-3" /> PDF
-                                          </a>
-                                        )}
-                                      </td>
-                                    </tr>
+                          <div className="w-full max-w-full overflow-x-auto rounded-md border overscroll-x-contain">
+                            <table className="min-w-[1100px] text-xs">
+                              <thead>
+                                <tr className="bg-muted/50">
+                                  {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
+                                    <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
                                   ))}
-                                </tbody>
-                              </table>
-                            </div>
+                                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Ações</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {paginatedRows.map((row, i) => (
+                                  <tr key={i} className="border-t border-border/50 hover:bg-accent/30">
+                                    {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
+                                      <td key={h} className="max-w-[200px] truncate px-3 py-2" title={row[h]}>
+                                        {row[h]}
+                                      </td>
+                                    ))}
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                      {row['Link PDF'] && (
+                                        <a
+                                          href={row['Link PDF']}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                                        >
+                                          <ExternalLink className="h-3 w-3" /> PDF
+                                        </a>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
                           {totalPages > 1 && (
-                            <div className="flex items-center justify-between mt-2">
+                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                               <p className="text-xs text-muted-foreground">
                                 Página {currentPage + 1} de {totalPages}
                               </p>
-                              <div className="flex gap-1">
+                              <div className="flex items-center gap-1">
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   className="h-7 w-7 p-0"
                                   disabled={currentPage === 0}
-                                  onClick={() => setPages(p => ({ ...p, [site.id]: currentPage - 1 }))}
+                                  onClick={() => setPages((p) => ({ ...p, [site.id]: currentPage - 1 }))}
                                 >
                                   <ChevronLeft className="h-3.5 w-3.5" />
                                 </Button>
@@ -408,7 +406,7 @@ export default function Portal() {
                                   size="sm"
                                   className="h-7 w-7 p-0"
                                   disabled={currentPage >= totalPages - 1}
-                                  onClick={() => setPages(p => ({ ...p, [site.id]: currentPage + 1 }))}
+                                  onClick={() => setPages((p) => ({ ...p, [site.id]: currentPage + 1 }))}
                                 >
                                   <ChevronRight className="h-3.5 w-3.5" />
                                 </Button>
@@ -469,7 +467,7 @@ export default function Portal() {
                     })}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         )}
