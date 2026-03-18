@@ -7,28 +7,13 @@ interface SiteConfig {
   id: string;
   name: string;
   url: string;
-  searchUrl?: (query: string) => string;
 }
 
 const SITES: Record<string, SiteConfig> = {
-  idema: {
-    id: 'idema',
-    name: 'IDEMA - Licenças Emitidas',
-    url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/',
-  },
-  natal: {
-    id: 'natal',
-    name: 'Diário Oficial de Natal',
-    url: 'https://www.natal.rn.gov.br/dom',
-  },
-  extremoz: {
-    id: 'extremoz',
-    name: 'Diário Oficial de Extremoz',
-    url: 'https://extremoz.rn.gov.br/diario-oficial/diario-oficial-2026/',
-  },
+  idema: { id: 'idema', name: 'IDEMA - Licenças Emitidas', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
+  natal: { id: 'natal', name: 'Diário Oficial de Natal', url: 'https://www.natal.rn.gov.br/dom' },
+  extremoz: { id: 'extremoz', name: 'Diário Oficial de Extremoz', url: 'https://extremoz.rn.gov.br/diario-oficial/diario-oficial-2026/' },
 };
-
-const EXTREMOZ_YEARS = ['2026', '2025', '2024', '2023', '2022'];
 
 const FETCH_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -42,8 +27,6 @@ function extractTextContent(html: string): string {
   let clean = html.replace(/<script[\s\S]*?<\/script>/gi, '');
   clean = clean.replace(/<style[\s\S]*?<\/style>/gi, '');
   clean = clean.replace(/<nav[\s\S]*?<\/nav>/gi, '');
-  clean = clean.replace(/<header[\s\S]*?<\/header>/gi, '');
-  clean = clean.replace(/<footer[\s\S]*?<\/footer>/gi, '');
   clean = clean.replace(/<[^>]+>/g, ' ');
   clean = clean.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
   clean = clean.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
@@ -104,27 +87,29 @@ function extractTableData(html: string): Array<Record<string, string>> {
   return rows;
 }
 
-// ─── PDF Text extraction (basic - works for text-based PDFs) ────────
+// ─── PDF text extraction (basic) ────────────────────────────────────
+
+function decodePdfString(s: string): string {
+  return s
+    .replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t')
+    .replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\');
+}
 
 function extractPdfText(buffer: Uint8Array): string {
-  // Convert to string to search for text streams
   const decoder = new TextDecoder('latin1');
   const raw = decoder.decode(buffer);
   const textParts: string[] = [];
 
-  // Method 1: Extract text between BT and ET (text objects)
   const btEtRegex = /BT\s([\s\S]*?)ET/g;
   let btMatch;
   while ((btMatch = btEtRegex.exec(raw)) !== null) {
     const block = btMatch[1];
-    // Extract text from Tj and TJ operators
     const tjRegex = /\(([^)]*)\)\s*Tj/g;
     let tjMatch;
     while ((tjMatch = tjRegex.exec(block)) !== null) {
       const decoded = decodePdfString(tjMatch[1]);
       if (decoded.trim()) textParts.push(decoded.trim());
     }
-    // TJ array operator
     const tjArrayRegex = /\[([\s\S]*?)\]\s*TJ/g;
     let tjArrMatch;
     while ((tjArrMatch = tjArrayRegex.exec(block)) !== null) {
@@ -140,102 +125,51 @@ function extractPdfText(buffer: Uint8Array): string {
     }
   }
 
-  // Method 2: Try to find stream content between stream/endstream
-  if (textParts.length < 5) {
-    const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
-    let streamMatch;
-    while ((streamMatch = streamRegex.exec(raw)) !== null) {
-      const content = streamMatch[1];
-      // Look for readable text patterns
-      const readable = content.replace(/[^\x20-\x7E\xC0-\xFF\n]/g, ' ');
-      const words = readable.match(/[A-Za-zÀ-ÿ]{3,}/g);
-      if (words && words.length > 5) {
-        textParts.push(readable.replace(/\s+/g, ' ').trim());
-      }
-    }
-  }
-
   return textParts.join('\n');
 }
 
-function decodePdfString(s: string): string {
-  // Handle PDF escape sequences
-  return s
-    .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '\r')
-    .replace(/\\t/g, '\t')
-    .replace(/\\\(/g, '(')
-    .replace(/\\\)/g, ')')
-    .replace(/\\\\/g, '\\');
-}
+// ─── Extremoz parsing ───────────────────────────────────────────────
 
-// ─── Extremoz-specific: structured data extraction ──────────────────
-
-interface ExtremozLicenca {
+interface ExtremozEntry {
   data_edicao: string;
   tipo_licenca: string;
   cnpj: string;
   razao_social: string;
   obra_descricao: string;
-  pdf_link: string;
   pdf_nome: string;
+  pdf_link: string;
   bloco_texto: string;
 }
 
 function parseCnpjs(text: string): string[] {
   const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
   const matches = text.match(cnpjRegex) || [];
-  return [...new Set(matches.map(c => c.replace(/[\s]/g, '')))];
+  return [...new Set(matches.map(c => c.replace(/\s/g, '')))];
 }
 
 function detectLicenseType(text: string): string {
   const lower = text.toLowerCase();
-  if (lower.includes('licença prévia') || lower.includes('licenca previa') || lower.includes('pedido de licença prévia') || lower.includes('(lp)')) return 'Licença Prévia';
-  if (lower.includes('licença de instalação') || lower.includes('licenca de instalacao') || lower.includes('(li)')) return 'Licença de Instalação';
-  if (lower.includes('licença de operação') || lower.includes('licenca de operacao') || lower.includes('(lo)')) return 'Licença de Operação';
-  if (lower.includes('licença simplificada') || lower.includes('licenca simplificada') || lower.includes('(ls)')) return 'Licença Simplificada';
-  if (lower.includes('renovação de licença') || lower.includes('renovacao de licenca')) return 'Renovação de Licença';
-  if (lower.includes('licença ambiental') || lower.includes('licenca ambiental')) return 'Licença Ambiental';
-  if (lower.includes('autorização ambiental') || lower.includes('autorizacao ambiental')) return 'Autorização Ambiental';
+  if (lower.includes('licença prévia') || lower.includes('(lp)')) return 'Licença Prévia';
+  if (lower.includes('licença de instalação') || lower.includes('(li)')) return 'Licença de Instalação';
+  if (lower.includes('licença de operação') || lower.includes('(lo)')) return 'Licença de Operação';
+  if (lower.includes('licença simplificada') || lower.includes('(ls)')) return 'Licença Simplificada';
+  if (lower.includes('renovação de licença')) return 'Renovação de Licença';
+  if (lower.includes('licença ambiental')) return 'Licença Ambiental';
   return '';
 }
 
 function extractCompanyName(text: string, cnpj: string): string {
-  // Try to find company name near the CNPJ
   const escaped = cnpj.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
-  // Pattern: "COMPANY NAME, CNPJ: XX.XXX.XXX/XXXX-XX" or "COMPANY NAME, CNPJ XX.XXX.XXX/XXXX-XX"
-  const beforeCnpj = new RegExp(`([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\\s\\-\\.]+?)\\s*,?\\s*(?:CNPJ|C\\.N\\.P\\.J)[:\\s/nº]*${escaped}`, 'i');
-  const match = text.match(beforeCnpj);
-  if (match) {
-    let name = match[1].trim();
-    // Clean up common prefixes
-    name = name.replace(/^(PREFEITURA\s+MUNICIPAL\s+DE\s+EXTREMOZ\s*,?\s*)/i, '');
-    if (name.length > 3) return name.toUpperCase();
-  }
-
-  // Pattern: After CNPJ number
-  const afterCnpj = new RegExp(`${escaped}[,\\s]*(?:torna público|torna publico)`, 'i');
-  const match2 = text.match(afterCnpj);
-  if (match2) {
-    // Look back from the CNPJ position
-    const idx = text.indexOf(cnpj);
-    if (idx > 0) {
-      const before = text.substring(Math.max(0, idx - 200), idx);
-      const lines = before.split(/[\n,]/);
-      const lastLine = lines[lines.length - 1]?.trim();
-      if (lastLine && lastLine.length > 3) return lastLine.toUpperCase();
-    }
-  }
-
+  const pattern = new RegExp(`([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\\s\\-\\.]{3,80}?)\\s*,?\\s*(?:CNPJ|C\\.N\\.P\\.J)[:\\s/nº]*${escaped}`, 'i');
+  const match = text.match(pattern);
+  if (match) return match[1].trim().toUpperCase();
   return '';
 }
 
 function extractObraDescricao(text: string): string {
   const patterns = [
-    /(?:para\s+(?:a|o)\s+)((?:CONSTRUÇÃO|REFORMA|AMPLIAÇÃO|IMPLANTAÇÃO|PAVIMENTAÇÃO|URBANIZAÇÃO|LOTEAMENTO)[\s\S]{5,120}?)(?:[,.]|\s+localizada|\s+situada)/i,
+    /(?:para\s+(?:a|o)\s+)((?:CONSTRUÇÃO|REFORMA|AMPLIAÇÃO|IMPLANTAÇÃO|PAVIMENTAÇÃO|LOTEAMENTO)[\s\S]{5,120}?)(?:[,.]|\s+localizada)/i,
     /empreendimento\s+(?:imobiliário\s+)?denominado\s+([\s\S]{5,100}?)(?:[,.]|\s+localiz)/i,
-    /(?:obra|serviço)\s+de\s+([\s\S]{5,100}?)(?:[,.]|\s+localiz)/i,
   ];
   for (const p of patterns) {
     const m = text.match(p);
@@ -244,33 +178,41 @@ function extractObraDescricao(text: string): string {
   return '';
 }
 
-function splitTextIntoBlocks(text: string): string[] {
-  // Split into paragraphs/sections at key boundaries
-  const blocks: string[] = [];
-  // Split by CNPJ mentions - each CNPJ is likely a different notice
-  const cnpjPositions: number[] = [];
-  const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
-  let m;
-  while ((m = cnpjRegex.exec(text)) !== null) {
-    cnpjPositions.push(m.index);
+/** Extract PDF links from Extremoz listing page HTML */
+function extractExtremozPdfLinks(html: string): Array<{ date: string; title: string; href: string }> {
+  const results: Array<{ date: string; title: string; href: string }> = [];
+
+  // Match article blocks: <div class="arq-list-item-content"><a href="URL"><h1>TITLE</h1><p class="data">DATE</p>
+  const articleRegex = /<div\s+class="arq-list-item-content">\s*<a\s+href="([^"]+)"[^>]*>\s*<h1>([^<]*)<\/h1>\s*<p\s+class="data">[^<]*<\/i>\s*([^<]*)<\/p>/gi;
+  let match;
+  while ((match = articleRegex.exec(html)) !== null) {
+    const href = match[1].trim();
+    const title = match[2].trim();
+    const date = match[3].trim();
+    if (href.includes('.pdf') || href.includes('.doc')) {
+      results.push({ date, title, href });
+    }
   }
 
-  if (cnpjPositions.length === 0) {
-    if (text.trim()) blocks.push(text.trim());
-    return blocks;
+  // Fallback: simple href regex for PDF links
+  if (results.length === 0) {
+    const fallbackRegex = /href="(https?:\/\/extremoz\.rn\.gov\.br\/wp-content\/uploads\/[^"]+\.(?:pdf|doc\.pdf))"/gi;
+    let fbMatch;
+    const seen = new Set<string>();
+    while ((fbMatch = fallbackRegex.exec(html)) !== null) {
+      const href = fbMatch[1];
+      if (seen.has(href)) continue;
+      seen.add(href);
+      const filename = href.split('/').pop() || '';
+      const title = filename.replace(/\.doc\.pdf$|\.pdf$/i, '').replace(/-/g, ' ');
+      results.push({ date: '', title, href });
+    }
   }
 
-  // For each CNPJ, take surrounding context (200 chars before, 500 after)
-  for (const pos of cnpjPositions) {
-    const start = Math.max(0, pos - 200);
-    const end = Math.min(text.length, pos + 500);
-    blocks.push(text.substring(start, end).trim());
-  }
-
-  return blocks;
+  return results;
 }
 
-async function fetchExtremozPdfLinks(year: string, maxPages = 3): Promise<Array<{ date: string; title: string; href: string }>> {
+async function fetchExtremozPdfLinks(year: string, maxPages: number): Promise<Array<{ date: string; title: string; href: string }>> {
   const results: Array<{ date: string; title: string; href: string }> = [];
   const baseUrl = `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${year}/`;
 
@@ -284,27 +226,15 @@ async function fetchExtremozPdfLinks(year: string, maxPages = 3): Promise<Array<
       if (!resp.ok) break;
       const html = await resp.text();
 
-      // Extract PDF links - pattern from the site: links to wp-content/uploads/YYYY/MM/filename.pdf
-      const linkRegex = /<a\s+[^>]*href=["'](https?:\/\/extremoz\.rn\.gov\.br\/wp-content\/uploads\/\d{4}\/\d{2}\/[^"']+\.(?:pdf|doc\.pdf))["'][^>]*>([\s\S]*?)<\/a>/gi;
-      let linkMatch;
-      while ((linkMatch = linkRegex.exec(html)) !== null) {
-        const href = linkMatch[1];
-        const rawText = linkMatch[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        
-        // Extract date from the link text or filename
-        const filename = href.split('/').pop() || '';
-        const title = rawText || filename.replace(/\.pdf$/i, '').replace(/-/g, ' ');
-        
-        // Parse date from filename like "13-de-Julho-de-2022.pdf"
-        const dateStr = filename.replace(/\.doc\.pdf$|\.pdf$/i, '').replace(/-/g, ' ');
-        
-        if (!results.some(r => r.href === href)) {
-          results.push({ date: dateStr, title, href });
+      const links = extractExtremozPdfLinks(html);
+      for (const link of links) {
+        if (!results.some(r => r.href === link.href)) {
+          results.push(link);
         }
       }
 
-      // Check if there's a next page
-      if (!html.includes(`page/${page + 1}`)) break;
+      // Check for next page
+      if (!html.includes(`/page/${page + 1}`)) break;
     } catch {
       break;
     }
@@ -313,97 +243,102 @@ async function fetchExtremozPdfLinks(year: string, maxPages = 3): Promise<Array<
   return results;
 }
 
-async function processExtremozPdf(pdfUrl: string, dateStr: string): Promise<ExtremozLicenca[]> {
-  const licencas: ExtremozLicenca[] = [];
-  const pdfFilename = pdfUrl.split('/').pop() || '';
+async function processOnePdf(href: string, date: string, title: string): Promise<ExtremozEntry[]> {
+  const entries: ExtremozEntry[] = [];
+  const pdfFilename = href.split('/').pop() || '';
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    const resp = await fetch(pdfUrl, { signal: controller.signal, headers: FETCH_HEADERS });
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    const resp = await fetch(href, { signal: controller.signal, headers: FETCH_HEADERS });
     clearTimeout(timeout);
-    if (!resp.ok) return licencas;
+    if (!resp.ok) return entries;
 
     const buffer = new Uint8Array(await resp.arrayBuffer());
-    const text = extractPdfText(buffer);
-
-    if (!text || text.length < 20) {
-      // PDF might be image-based, return minimal entry
+    
+    // Limit buffer size to avoid CPU issues (skip PDFs > 2MB)
+    if (buffer.length > 2 * 1024 * 1024) {
       return [{
-        data_edicao: dateStr,
+        data_edicao: date || title,
         tipo_licenca: '',
         cnpj: '',
         razao_social: '',
         obra_descricao: '',
-        pdf_link: pdfUrl,
         pdf_nome: pdfFilename,
-        bloco_texto: '(PDF baseado em imagem - texto não extraível)',
+        pdf_link: href,
+        bloco_texto: '(PDF muito grande para processamento automático)',
       }];
     }
 
-    // Split text into blocks and process each
-    const blocks = splitTextIntoBlocks(text);
-    const processedCnpjs = new Set<string>();
+    const text = extractPdfText(buffer);
 
-    for (const block of blocks) {
-      const cnpjs = parseCnpjs(block);
-      if (cnpjs.length === 0) continue;
-
-      for (const cnpj of cnpjs) {
-        if (processedCnpjs.has(cnpj)) continue;
-        processedCnpjs.add(cnpj);
-
-        const tipo = detectLicenseType(block);
-        const razaoSocial = extractCompanyName(block, cnpj);
-        const obra = extractObraDescricao(block);
-
-        // Only include entries that have license-related content
-        const hasLicenseContent = tipo || 
-          block.toLowerCase().includes('licen') || 
-          block.toLowerCase().includes('alvará') || 
-          block.toLowerCase().includes('empreendimento') ||
-          block.toLowerCase().includes('construção') ||
-          block.toLowerCase().includes('loteamento');
-
-        if (hasLicenseContent || razaoSocial) {
-          licencas.push({
-            data_edicao: dateStr,
-            tipo_licenca: tipo || 'Não identificada',
-            cnpj,
-            razao_social: razaoSocial || '',
-            obra_descricao: obra || '',
-            pdf_link: pdfUrl,
-            pdf_nome: pdfFilename,
-            bloco_texto: block.substring(0, 500),
-          });
-        }
-      }
+    if (!text || text.length < 20) {
+      return [{
+        data_edicao: date || title,
+        tipo_licenca: '',
+        cnpj: '',
+        razao_social: '',
+        obra_descricao: '',
+        pdf_nome: pdfFilename,
+        pdf_link: href,
+        bloco_texto: '(Texto não extraível - PDF baseado em imagem)',
+      }];
     }
 
-    // If no license entries found but text exists, return one general entry
-    if (licencas.length === 0 && text.length > 50) {
-      const cnpjs = parseCnpjs(text);
-      if (cnpjs.length > 0) {
-        licencas.push({
-          data_edicao: dateStr,
-          tipo_licenca: detectLicenseType(text) || 'Não identificada',
-          cnpj: cnpjs[0],
-          razao_social: extractCompanyName(text, cnpjs[0]),
-          obra_descricao: extractObraDescricao(text),
-          pdf_link: pdfUrl,
+    // Find CNPJs and extract entries
+    const cnpjs = parseCnpjs(text);
+    const processedCnpjs = new Set<string>();
+
+    for (const cnpj of cnpjs) {
+      if (processedCnpjs.has(cnpj)) continue;
+      processedCnpjs.add(cnpj);
+
+      // Get context around CNPJ
+      const idx = text.indexOf(cnpj);
+      const context = text.substring(Math.max(0, idx - 300), Math.min(text.length, idx + 400));
+
+      const tipo = detectLicenseType(context);
+      const razao = extractCompanyName(context, cnpj);
+      const obra = extractObraDescricao(context);
+
+      const hasRelevant = tipo || context.toLowerCase().includes('licen') ||
+        context.toLowerCase().includes('construção') || context.toLowerCase().includes('loteamento') ||
+        context.toLowerCase().includes('empreendimento');
+
+      if (hasRelevant || razao) {
+        entries.push({
+          data_edicao: date || title,
+          tipo_licenca: tipo || 'Não identificada',
+          cnpj,
+          razao_social: razao,
+          obra_descricao: obra,
           pdf_nome: pdfFilename,
-          bloco_texto: text.substring(0, 500),
+          pdf_link: href,
+          bloco_texto: context.substring(0, 300),
         });
       }
     }
+
+    if (entries.length === 0 && cnpjs.length > 0) {
+      entries.push({
+        data_edicao: date || title,
+        tipo_licenca: detectLicenseType(text) || 'Não identificada',
+        cnpj: cnpjs[0],
+        razao_social: extractCompanyName(text, cnpjs[0]),
+        obra_descricao: extractObraDescricao(text),
+        pdf_nome: pdfFilename,
+        pdf_link: href,
+        bloco_texto: text.substring(0, 300),
+      });
+    }
   } catch (err) {
-    console.error(`Error processing PDF ${pdfUrl}:`, err);
+    console.error(`PDF error ${pdfFilename}:`, err);
   }
 
-  return licencas;
+  return entries;
 }
 
-// ─── Main handler ───────────────────────────────────────────────────
+// ─── Main ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -411,7 +346,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { site_id, search, year, max_pdfs } = await req.json();
+    const body = await req.json();
+    const { site_id, search, year, max_pdfs } = body;
 
     if (!site_id || !SITES[site_id]) {
       return new Response(
@@ -422,16 +358,16 @@ Deno.serve(async (req) => {
 
     const site = SITES[site_id];
 
-    // ─── Extremoz special handling ──────────────────────────────
+    // ─── Extremoz ───────────────────────────────────────────────
     if (site_id === 'extremoz') {
       const targetYear = year || '2026';
-      const pdfLimit = Math.min(max_pdfs || 5, 15); // Cap at 15 to avoid timeouts
+      const pdfLimit = Math.min(max_pdfs || 3, 8);
 
-      console.log(`Fetching Extremoz year=${targetYear}, max_pdfs=${pdfLimit}`);
+      console.log(`Extremoz: year=${targetYear}, limit=${pdfLimit}`);
 
-      // Step 1: Get PDF links from listing pages
+      // Step 1: Get PDF links
       const pdfLinks = await fetchExtremozPdfLinks(targetYear, 7);
-      console.log(`Found ${pdfLinks.length} PDF links for ${targetYear}`);
+      console.log(`Found ${pdfLinks.length} PDFs for ${targetYear}`);
 
       if (pdfLinks.length === 0) {
         return new Response(
@@ -440,65 +376,60 @@ Deno.serve(async (req) => {
             error: `Nenhum diário oficial encontrado para ${targetYear}`,
             fallback_url: `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${targetYear}/`,
           }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Step 2: Process PDFs (limited to avoid timeout)
-      const pdfsToProcess = pdfLinks.slice(0, pdfLimit);
-      const allLicencas: ExtremozLicenca[] = [];
-      
-      for (const pdf of pdfsToProcess) {
-        const licencas = await processExtremozPdf(pdf.href, pdf.date);
-        allLicencas.push(...licencas);
+      // Step 2: Process PDFs sequentially (limited)
+      const toProcess = pdfLinks.slice(0, pdfLimit);
+      const allEntries: ExtremozEntry[] = [];
+
+      for (const pdf of toProcess) {
+        const entries = await processOnePdf(pdf.href, pdf.date, pdf.title);
+        allEntries.push(...entries);
       }
 
-      console.log(`Extracted ${allLicencas.length} license entries from ${pdfsToProcess.length} PDFs`);
+      console.log(`Extracted ${allEntries.length} entries from ${toProcess.length} PDFs`);
 
-      // Step 3: Filter by search term if provided
-      let filtered = allLicencas;
+      // Step 3: Filter
+      let filtered = allEntries;
       if (search) {
         const q = search.toLowerCase();
-        filtered = allLicencas.filter(l =>
-          l.cnpj.includes(q) ||
-          l.razao_social.toLowerCase().includes(q) ||
-          l.obra_descricao.toLowerCase().includes(q) ||
-          l.bloco_texto.toLowerCase().includes(q) ||
-          l.tipo_licenca.toLowerCase().includes(q)
+        filtered = allEntries.filter(e =>
+          e.cnpj.includes(q) || e.razao_social.toLowerCase().includes(q) ||
+          e.obra_descricao.toLowerCase().includes(q) || e.bloco_texto.toLowerCase().includes(q)
         );
       }
 
-      // Convert to table format
-      const tableData = filtered.map(l => ({
-        'Data da Edição': l.data_edicao,
-        'Tipo de Licença': l.tipo_licenca,
-        'CNPJ': l.cnpj,
-        'Razão Social': l.razao_social,
-        'Obra / Descrição': l.obra_descricao,
-        'PDF': l.pdf_nome,
-        'Link PDF': l.pdf_link,
-        'Texto Encontrado': l.bloco_texto.substring(0, 300),
+      const tableData = filtered.map(e => ({
+        'Data da Edição': e.data_edicao,
+        'Tipo de Licença': e.tipo_licenca,
+        'CNPJ': e.cnpj,
+        'Razão Social': e.razao_social,
+        'Obra / Descrição': e.obra_descricao,
+        'PDF': e.pdf_nome,
+        'Link PDF': e.pdf_link,
+        'Texto Encontrado': e.bloco_texto.substring(0, 200),
       }));
 
-      // Also return PDF links list
       const linksList = pdfLinks.map(p => ({ text: p.title || p.date, href: p.href }));
 
       return new Response(
         JSON.stringify({
           success: true,
-          site: { id: site.id, name: site.name, url: `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${targetYear}/` },
+          site: { id: 'extremoz', name: site.name, url: `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${targetYear}/` },
           data: {
-            text: `${allLicencas.length} licenças/menções encontradas em ${pdfsToProcess.length} edições do Diário Oficial de Extremoz (${targetYear}). ${pdfLinks.length} edições disponíveis no total.`,
+            text: `${allEntries.length} menções encontradas em ${toProcess.length} de ${pdfLinks.length} edições (${targetYear}).`,
             links: linksList,
             table: tableData,
           },
           meta: {
             year: targetYear,
             total_pdfs: pdfLinks.length,
-            processed_pdfs: pdfsToProcess.length,
-            total_licencas: allLicencas.length,
-            filtered_licencas: filtered.length,
-            available_years: EXTREMOZ_YEARS,
+            processed_pdfs: toProcess.length,
+            total_entries: allEntries.length,
+            filtered_entries: filtered.length,
+            available_years: ['2026', '2025', '2024', '2023', '2022'],
           },
           fetched_at: new Date().toISOString(),
         }),
@@ -506,8 +437,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ─── Generic site handling (IDEMA, Natal) ───────────────────
-    const url = site.searchUrl && search ? site.searchUrl(search) : site.url;
+    // ─── Generic (IDEMA, Natal) ─────────────────────────────────
+    const url = site.url;
     console.log(`Fetching ${site.name}: ${url}`);
 
     const controller = new AbortController();
@@ -516,13 +447,12 @@ Deno.serve(async (req) => {
     let response: Response;
     try {
       response = await fetch(url, { signal: controller.signal, headers: FETCH_HEADERS });
-    } catch (fetchErr) {
+    } catch {
       clearTimeout(timeout);
-      console.error(`Fetch failed for ${site.name}:`, fetchErr);
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Não foi possível acessar ${site.name}. O site pode estar fora do ar ou bloqueando acesso externo.`,
+          error: `Não foi possível acessar ${site.name}.`,
           fallback_url: site.url,
         }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -532,11 +462,7 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: `${site.name} retornou status ${response.status}`,
-          fallback_url: site.url,
-        }),
+        JSON.stringify({ success: false, error: `${site.name} retornou status ${response.status}`, fallback_url: site.url }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -554,8 +480,7 @@ Deno.serve(async (req) => {
       const q = search.toLowerCase();
       filteredLinks = links.filter(l => l.text.toLowerCase().includes(q) || l.href.toLowerCase().includes(q));
       filteredTable = tableData.filter(row => Object.values(row).some(v => v.toLowerCase().includes(q)));
-      const sentences = textContent.split(/[.!?]+/);
-      filteredText = sentences.filter(s => s.toLowerCase().includes(q)).join('. ').trim();
+      filteredText = textContent.split(/[.!?]+/).filter(s => s.toLowerCase().includes(q)).join('. ').trim();
     }
 
     return new Response(
@@ -572,7 +497,7 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error in portal-scraper:', error);
+    console.error('portal-scraper error:', error);
     return new Response(
       JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Erro desconhecido' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
