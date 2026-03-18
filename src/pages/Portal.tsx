@@ -70,7 +70,7 @@ const SITES = [
 export default function Portal() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState<Record<string, boolean>>({});
-  const [scraping, setScraping] = useState(false);
+  const [scraping, setScraping] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, SiteResult>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -155,7 +155,7 @@ export default function Portal() {
 
   // Client-side scraping for Extremoz (bypasses server IP block)
   const scrapeExtremoz = async () => {
-    setScraping(true);
+    setScraping((prev) => ({ ...prev, extremoz: true }));
     const toastId = toast.loading('Buscando diários oficiais de Extremoz...');
     try {
       // Step 1: Fetch the listing page from user's browser
@@ -192,7 +192,7 @@ export default function Portal() {
 
       if (pdfLinks.length === 0) {
         toast.error('Nenhum PDF encontrado no site de Extremoz', { id: toastId });
-        setScraping(false);
+        setScraping((prev) => ({ ...prev, extremoz: false }));
         return;
       }
 
@@ -207,7 +207,7 @@ export default function Portal() {
 
       if (newPdfs.length === 0) {
         toast.success('Banco de dados já está atualizado! Nenhum novo diário encontrado.', { id: toastId });
-        setScraping(false);
+        setScraping((prev) => ({ ...prev, extremoz: false }));
         return;
       }
 
@@ -328,7 +328,7 @@ export default function Portal() {
       console.error('Scraping error:', err);
       toast.error('Erro ao fazer scraping de Extremoz', { id: toastId });
     } finally {
-      setScraping(false);
+      setScraping((prev) => ({ ...prev, extremoz: false }));
     }
   };
 
@@ -380,7 +380,7 @@ export default function Portal() {
 
   // ─── Natal: client-side scraping ──────────────────────────────
   const scrapeNatal = async () => {
-    setScraping(true);
+    setScraping((prev) => ({ ...prev, natal: true }));
     const toastId = toast.loading('Buscando diários oficiais de Natal...');
     try {
       // Fetch listing page for current month
@@ -431,7 +431,7 @@ export default function Portal() {
 
       if (pdfLinks.length === 0) {
         toast.error('Nenhum PDF encontrado no DOM de Natal', { id: toastId });
-        setScraping(false);
+        setScraping((prev) => ({ ...prev, natal: false }));
         return;
       }
 
@@ -444,7 +444,7 @@ export default function Portal() {
 
       if (newPdfs.length === 0) {
         toast.success('Banco de dados já está atualizado!', { id: toastId });
-        setScraping(false);
+        setScraping((prev) => ({ ...prev, natal: false }));
         return;
       }
 
@@ -582,7 +582,7 @@ export default function Portal() {
       console.error('Scraping Natal error:', err);
       toast.error('Erro ao fazer scraping de Natal', { id: toastId });
     } finally {
-      setScraping(false);
+      setScraping((prev) => ({ ...prev, natal: false }));
     }
   };
 
@@ -637,7 +637,7 @@ export default function Portal() {
 
   // ─── IDEMA: client-side scraping ──────────────────────────────
   const scrapeIdema = async () => {
-    setScraping(true);
+    setScraping((prev) => ({ ...prev, idema: true }));
     const toastId = toast.loading('Buscando licenças do IDEMA via servidor...');
     try {
       const { data, error } = await supabase.functions.invoke('portal-scraper', {
@@ -767,7 +767,7 @@ export default function Portal() {
       }));
       toast.error('Erro ao acessar site do IDEMA. O site pode estar fora do ar.', { id: toastId });
     } finally {
-      setScraping(false);
+      setScraping((prev) => ({ ...prev, idema: false }));
     }
   };
 
@@ -883,14 +883,14 @@ export default function Portal() {
                     size="sm"
                     className="flex-1 text-xs rounded-lg"
                     onClick={() => (site.id === 'extremoz' ? scrapeExtremoz() : site.id === 'natal' ? scrapeNatal() : site.id === 'idema' ? scrapeIdema() : fetchSite(site.id))}
-                    disabled={loading[site.id] || scraping}
+                    disabled={loading[site.id] || scraping[site.id]}
                   >
-                    {(loading[site.id] || scraping) ? (
+                    {(loading[site.id] || scraping[site.id]) ? (
                       <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
                     ) : (
                       <CloudDownload className="h-3 w-3 mr-1.5" />
                     )}
-                    {scraping ? 'Atualizando...' : 'Atualizar Dados'}
+                    {scraping[site.id] ? 'Atualizando...' : 'Atualizar Dados'}
                   </Button>
                   <Button
                     variant="ghost"
