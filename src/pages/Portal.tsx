@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, ExternalLink, Globe, FileText, Table2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Search, ExternalLink, Globe, FileText, Table2, AlertTriangle, RefreshCw, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -18,6 +19,14 @@ interface SiteResult {
     text: string;
     links: Array<{ text: string; href: string }>;
     table: Array<Record<string, string>>;
+  };
+  meta?: {
+    year?: string;
+    total_pdfs?: number;
+    processed_pdfs?: number;
+    total_licencas?: number;
+    filtered_licencas?: number;
+    available_years?: string[];
   };
   fetched_at?: string;
 }
@@ -42,42 +51,54 @@ const SITES = [
   {
     id: 'extremoz',
     name: 'Diário Oficial - Extremoz',
-    description: 'Publicações oficiais da Prefeitura de Extremoz/RN',
-    url: 'https://extremoz.rn.gov.br/diario-oficial/diario-oficial-2026/',
+    description: 'Licenças e publicações oficiais extraídas dos PDFs do Diário Oficial de Extremoz/RN',
+    url: 'https://extremoz.rn.gov.br/diario-oficial/',
     color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
     borderColor: 'border-amber-500/20',
   },
 ];
 
+const EXTREMOZ_YEARS = ['2026', '2025', '2024', '2023', '2022'];
+
 export default function Portal() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, SiteResult>>({});
-  const [activeTab, setActiveTab] = useState<'links' | 'text' | 'table'>('links');
+  const [activeTab, setActiveTab] = useState<'table' | 'links' | 'text'>('table');
+  const [extremozYear, setExtremozYear] = useState('2026');
+  const [extremozMaxPdfs, setExtremozMaxPdfs] = useState('5');
 
   const fetchSite = async (siteId: string) => {
     setLoading((prev) => ({ ...prev, [siteId]: true }));
     try {
-      const { data, error } = await supabase.functions.invoke('portal-scraper', {
-        body: { site_id: siteId, search: search || undefined },
-      });
+      const body: Record<string, unknown> = { site_id: siteId, search: search || undefined };
+      if (siteId === 'extremoz') {
+        body.year = extremozYear;
+        body.max_pdfs = parseInt(extremozMaxPdfs);
+      }
 
+      const { data, error } = await supabase.functions.invoke('portal-scraper', { body });
       if (error) throw error;
 
       setResults((prev) => ({ ...prev, [siteId]: data }));
 
       if (data.success) {
-        const linkCount = data.data?.links?.length || 0;
         const tableCount = data.data?.table?.length || 0;
-        toast.success(`${SITES.find((s) => s.id === siteId)?.name}: ${linkCount} links, ${tableCount} registros encontrados`);
+        const linkCount = data.data?.links?.length || 0;
+        if (siteId === 'extremoz' && data.meta) {
+          toast.success(`Extremoz: ${data.meta.total_licencas} licenças extraídas de ${data.meta.processed_pdfs}/${data.meta.total_pdfs} edições`);
+        } else {
+          toast.success(`${SITES.find((s) => s.id === siteId)?.name}: ${linkCount} links, ${tableCount} registros`);
+        }
       } else {
         toast.error(data.error || 'Erro ao consultar site');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro de conexão';
       console.error('Portal fetch error:', err);
       setResults((prev) => ({
         ...prev,
-        [siteId]: { success: false, error: err.message || 'Erro de conexão' },
+        [siteId]: { success: false, error: message },
       }));
       toast.error('Erro ao consultar o site');
     } finally {
@@ -91,6 +112,27 @@ export default function Portal() {
     }
   };
 
+  const exportCsv = (siteId: string) => {
+    const result = results[siteId];
+    if (!result?.success || !result.data?.table?.length) return;
+
+    const headers = Object.keys(result.data.table[0]);
+    const csvRows = [
+      headers.join(';'),
+      ...result.data.table.map(row =>
+        headers.map(h => `"${(row[h] || '').replace(/"/g, '""')}"`).join(';')
+      ),
+    ];
+    const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${siteId}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('CSV exportado com sucesso');
+  };
+
   return (
     <AppLayout title="Portal de Consultas" subtitle="Consulte licenças e publicações oficiais de órgãos públicos.">
       <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
@@ -99,7 +141,7 @@ export default function Portal() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por obra, empresa, licença..."
+              placeholder="Buscar por CNPJ, empresa, licença, obra..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -133,6 +175,33 @@ export default function Portal() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
+                {/* Extremoz year/quantity controls */}
+                {site.id === 'extremoz' && (
+                  <div className="flex gap-2 mb-2">
+                    <Select value={extremozYear} onValueChange={setExtremozYear}>
+                      <SelectTrigger className="h-8 text-xs flex-1">
+                        <SelectValue placeholder="Ano" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXTREMOZ_YEARS.map(y => (
+                          <SelectItem key={y} value={y}>{y}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={extremozMaxPdfs} onValueChange={setExtremozMaxPdfs}>
+                      <SelectTrigger className="h-8 text-xs w-24">
+                        <SelectValue placeholder="PDFs" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="3">3 PDFs</SelectItem>
+                        <SelectItem value="5">5 PDFs</SelectItem>
+                        <SelectItem value="10">10 PDFs</SelectItem>
+                        <SelectItem value="15">15 PDFs</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -152,26 +221,26 @@ export default function Portal() {
                     variant="ghost"
                     size="sm"
                     className="text-xs"
-                    onClick={() => window.open(site.url, '_blank')}
+                    onClick={() => window.open(
+                      site.id === 'extremoz'
+                        ? `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${extremozYear}/`
+                        : site.url,
+                      '_blank'
+                    )}
                   >
                     <ExternalLink className="h-3 w-3 mr-1" />
                     Abrir
                   </Button>
                 </div>
 
-                {/* Status */}
+                {/* Error status */}
                 {results[site.id] && !results[site.id].success && (
                   <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-xs">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                     <div>
                       <p>{results[site.id].error}</p>
                       {results[site.id].fallback_url && (
-                        <a
-                          href={results[site.id].fallback_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline mt-1 inline-block"
-                        >
+                        <a href={results[site.id].fallback_url} target="_blank" rel="noopener noreferrer" className="underline mt-1 inline-block">
                           Acessar site diretamente →
                         </a>
                       )}
@@ -179,10 +248,24 @@ export default function Portal() {
                   </div>
                 )}
 
+                {/* Success status */}
                 {results[site.id]?.success && (
-                  <div className="text-xs text-muted-foreground">
-                    ✓ {results[site.id].data?.links?.length || 0} links ·{' '}
-                    {results[site.id].data?.table?.length || 0} registros
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    {results[site.id].meta ? (
+                      <>
+                        <p>✓ {results[site.id].meta!.total_licencas} licenças · {results[site.id].meta!.processed_pdfs}/{results[site.id].meta!.total_pdfs} edições</p>
+                        {results[site.id].data!.table.length > 0 && (
+                          <Button variant="ghost" size="sm" className="h-6 text-[11px] p-0 text-primary" onClick={() => exportCsv(site.id)}>
+                            <Download className="h-3 w-3 mr-1" /> Exportar CSV
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <p>
+                        ✓ {results[site.id].data?.links?.length || 0} links ·{' '}
+                        {results[site.id].data?.table?.length || 0} registros
+                      </p>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -194,17 +277,9 @@ export default function Portal() {
         {Object.values(results).some((r) => r.success) && (
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <CardTitle className="text-base">Resultados</CardTitle>
                 <div className="flex gap-1 ml-auto">
-                  <Button
-                    variant={activeTab === 'links' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setActiveTab('links')}
-                  >
-                    <FileText className="h-3 w-3 mr-1" /> Links
-                  </Button>
                   <Button
                     variant={activeTab === 'table' ? 'default' : 'ghost'}
                     size="sm"
@@ -212,6 +287,14 @@ export default function Portal() {
                     onClick={() => setActiveTab('table')}
                   >
                     <Table2 className="h-3 w-3 mr-1" /> Tabelas
+                  </Button>
+                  <Button
+                    variant={activeTab === 'links' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setActiveTab('links')}
+                  >
+                    <FileText className="h-3 w-3 mr-1" /> Links
                   </Button>
                   <Button
                     variant={activeTab === 'text' ? 'default' : 'ghost'}
@@ -225,7 +308,64 @@ export default function Portal() {
               </div>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[400px]">
+              <ScrollArea className="h-[500px]">
+                {activeTab === 'table' && (
+                  <div className="space-y-6">
+                    {SITES.map((site) => {
+                      const result = results[site.id];
+                      if (!result?.success || !result.data?.table?.length) return null;
+                      const headers = Object.keys(result.data.table[0]);
+                      return (
+                        <div key={site.id}>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                              {site.name} ({result.data.table.length} registros)
+                            </p>
+                            <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={() => exportCsv(site.id)}>
+                              <Download className="h-3 w-3 mr-1" /> CSV
+                            </Button>
+                          </div>
+                          <div className="overflow-x-auto border rounded-md">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-muted/50">
+                                  {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
+                                    <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
+                                  ))}
+                                  <th className="px-3 py-2 text-left font-medium">Ações</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {result.data.table.map((row, i) => (
+                                  <tr key={i} className="border-t border-border/50 hover:bg-accent/30">
+                                    {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
+                                      <td key={h} className="px-3 py-2 max-w-[200px] truncate" title={row[h]}>
+                                        {row[h]}
+                                      </td>
+                                    ))}
+                                    <td className="px-3 py-2">
+                                      {row['Link PDF'] && (
+                                        <a
+                                          href={row['Link PDF']}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                                        >
+                                          <ExternalLink className="h-3 w-3" /> PDF
+                                        </a>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {activeTab === 'links' && (
                   <div className="space-y-4">
                     {SITES.map((site) => {
@@ -249,47 +389,6 @@ export default function Portal() {
                                 <span className="truncate">{link.text}</span>
                               </a>
                             ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {activeTab === 'table' && (
-                  <div className="space-y-4">
-                    {SITES.map((site) => {
-                      const result = results[site.id];
-                      if (!result?.success || !result.data?.table?.length) return null;
-                      const headers = Object.keys(result.data.table[0]);
-                      return (
-                        <div key={site.id}>
-                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-                            {site.name}
-                          </p>
-                          <div className="overflow-x-auto border rounded-md">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="bg-muted/50">
-                                  {headers.map((h) => (
-                                    <th key={h} className="px-3 py-2 text-left font-medium">
-                                      {h}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {result.data.table.map((row, i) => (
-                                  <tr key={i} className="border-t border-border/50 hover:bg-accent/30">
-                                    {headers.map((h) => (
-                                      <td key={h} className="px-3 py-2">
-                                        {row[h]}
-                                      </td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
                           </div>
                         </div>
                       );
