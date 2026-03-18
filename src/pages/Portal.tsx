@@ -409,9 +409,25 @@ export default function Portal() {
               <CardContent className="space-y-2">
                 {/* Extremoz info */}
                 {site.id === 'extremoz' && (
-                  <p className="text-[10px] text-muted-foreground mb-2">
-                    📊 Dados carregados do banco de dados (115 registros da planilha)
-                  </p>
+                  <div className="space-y-1 mb-2">
+                    <p className="text-[10px] text-muted-foreground">
+                      📊 Dados carregados do banco de dados
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                      onClick={scrapeExtremoz}
+                      disabled={scraping}
+                    >
+                      {scraping ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        <CloudDownload className="h-3 w-3 mr-1" />
+                      )}
+                      {scraping ? 'Buscando novos diários...' : 'Atualizar Diários (Scraping)'}
+                    </Button>
+                  </div>
                 )}
 
                 <div className="flex gap-2">
