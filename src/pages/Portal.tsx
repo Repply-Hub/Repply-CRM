@@ -468,18 +468,23 @@ export default function Portal() {
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </Button>
-                </div>
+        </div>
 
-                {/* Ver Lista */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-xs rounded-lg text-muted-foreground hover:text-foreground"
-                  onClick={() => scrollToResults(site.id)}
-                >
-                  <List className="h-3 w-3 mr-1.5" />
-                  Ver Lista
-                </Button>
+        {/* Tab buttons to view lists */}
+        <div className="flex flex-wrap gap-2">
+          {SITES.map((site) => (
+            <Button
+              key={site.id}
+              variant="outline"
+              size="sm"
+              className="text-xs rounded-lg"
+              onClick={() => scrollToResults(site.id)}
+            >
+              <List className="h-3 w-3 mr-1.5" />
+              {site.name}
+            </Button>
+          ))}
+        </div>
 
                 {/* Error status */}
                 {results[site.id] && !results[site.id].success && (
