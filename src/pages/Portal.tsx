@@ -74,7 +74,7 @@ export default function Portal() {
   const [results, setResults] = useState<Record<string, SiteResult>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('extremoz');
   const ROWS_PER_PAGE = 10;
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -499,11 +499,10 @@ export default function Portal() {
               <button
                 key={site.id}
                 onClick={() => {
-                  const newTab = activeTab === site.id ? null : site.id;
-                  setActiveTab(newTab);
-                  if (newTab && !results[newTab]?.success) {
-                    if (newTab === 'extremoz') fetchExtremozFromDb();
-                    else fetchSite(newTab);
+                  setActiveTab(site.id);
+                  if (!results[site.id]?.success) {
+                    if (site.id === 'extremoz') fetchExtremozFromDb();
+                    else fetchSite(site.id);
                   }
                 }}
                 className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${
