@@ -386,6 +386,48 @@ export type Database = {
         }
         Relationships: []
       }
+      licencas_natal: {
+        Row: {
+          bloco_texto: string | null
+          cnpj: string | null
+          created_at: string
+          data_edicao: string | null
+          id: string
+          numero_dom: string | null
+          obra_descricao: string | null
+          pdf_link: string | null
+          pdf_nome: string | null
+          razao_social: string | null
+          tipo_licenca: string | null
+        }
+        Insert: {
+          bloco_texto?: string | null
+          cnpj?: string | null
+          created_at?: string
+          data_edicao?: string | null
+          id?: string
+          numero_dom?: string | null
+          obra_descricao?: string | null
+          pdf_link?: string | null
+          pdf_nome?: string | null
+          razao_social?: string | null
+          tipo_licenca?: string | null
+        }
+        Update: {
+          bloco_texto?: string | null
+          cnpj?: string | null
+          created_at?: string
+          data_edicao?: string | null
+          id?: string
+          numero_dom?: string | null
+          obra_descricao?: string | null
+          pdf_link?: string | null
+          pdf_nome?: string | null
+          razao_social?: string | null
+          tipo_licenca?: string | null
+        }
+        Relationships: []
+      }
       mensagens_whatsapp: {
         Row: {
           cliente_id: string | null
