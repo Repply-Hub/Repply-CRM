@@ -102,9 +102,10 @@ export default function Portal() {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
-  // Auto-load Extremoz data on mount
+  // Auto-load data on mount
   useEffect(() => {
     fetchExtremozFromDb();
+    fetchNatalFromDb();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchExtremozFromDb = async () => {
