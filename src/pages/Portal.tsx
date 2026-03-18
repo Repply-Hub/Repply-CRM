@@ -80,19 +80,13 @@ export default function Portal() {
 
   const scrollToResults = (siteId: string) => {
     if (!results[siteId]?.success) {
-      if (siteId === 'extremoz') {
-        fetchExtremozFromDb().then(() => {
-          setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-        });
-      } else if (siteId === 'natal') {
-        fetchNatalFromDb().then(() => {
-          setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-        });
-      } else {
-        fetchSite(siteId).then(() => {
-          setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-        });
-      }
+      const fetchFn = siteId === 'extremoz' ? fetchExtremozFromDb 
+        : siteId === 'natal' ? fetchNatalFromDb 
+        : siteId === 'idema' ? fetchIdemaFromDb 
+        : () => fetchSite(siteId);
+      fetchFn().then(() => {
+        setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+      });
       return;
     }
     sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
