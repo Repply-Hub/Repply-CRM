@@ -75,6 +75,24 @@ export default function Portal() {
   const [pages, setPages] = useState<Record<string, number>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const ROWS_PER_PAGE = 10;
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const scrollToResults = (siteId: string) => {
+    // If no results yet, fetch first
+    if (!results[siteId]?.success) {
+      if (siteId === 'extremoz') {
+        fetchExtremozFromDb().then(() => {
+          setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        });
+      } else {
+        fetchSite(siteId).then(() => {
+          setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        });
+      }
+      return;
+    }
+    sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const toggleRow = useCallback((key: string) => {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
