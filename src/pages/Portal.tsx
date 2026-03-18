@@ -419,58 +419,42 @@ export default function Portal() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-1">
-                {/* Extremoz scraping */}
                 {site.id === 'extremoz' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                      Dados sincronizados do banco
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-xs rounded-lg border-dashed border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/10 transition-colors"
-                      onClick={scrapeExtremoz}
-                      disabled={scraping}
-                    >
-                      {scraping ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
-                      ) : (
-                        <CloudDownload className="h-3 w-3 mr-1.5" />
-                      )}
-                      {scraping ? 'Buscando novos diários...' : 'Atualizar Diários'}
-                    </Button>
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+                    Dados sincronizados do banco
                   </div>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     className="flex-1 text-xs rounded-lg"
-                    onClick={() => fetchSite(site.id)}
-                    disabled={loading[site.id]}
+                    onClick={() => site.id === 'extremoz' ? scrapeExtremoz() : fetchSite(site.id)}
+                    disabled={loading[site.id] || scraping}
                   >
-                    {loading[site.id] ? (
+                    {(loading[site.id] || (site.id === 'extremoz' && scraping)) ? (
                       <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                    ) : site.id === 'extremoz' ? (
+                      <CloudDownload className="h-3 w-3 mr-1.5" />
                     ) : (
                       <RefreshCw className="h-3 w-3 mr-1.5" />
                     )}
-                    Consultar
+                    {site.id === 'extremoz'
+                      ? (scraping ? 'Atualizando...' : 'Atualizar Diários')
+                      : (loading[site.id] ? 'Consultando...' : 'Consultar')}
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="text-xs rounded-lg opacity-70 group-hover:opacity-100 transition-opacity"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 rounded-lg opacity-60 hover:opacity-100"
                     onClick={() => window.open(
-                      site.id === 'extremoz'
-                        ? 'https://extremoz.rn.gov.br/diario-oficial/'
-                        : site.url,
+                      site.id === 'extremoz' ? 'https://extremoz.rn.gov.br/diario-oficial/' : site.url,
                       '_blank'
                     )}
                   >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    Abrir
+                    <ExternalLink className="h-3.5 w-3.5" />
                   </Button>
                 </div>
 
