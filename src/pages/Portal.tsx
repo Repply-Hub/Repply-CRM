@@ -74,6 +74,7 @@ export default function Portal() {
   const [results, setResults] = useState<Record<string, SiteResult>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const ROWS_PER_PAGE = 10;
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -497,9 +498,16 @@ export default function Portal() {
             return (
               <button
                 key={site.id}
-                onClick={() => scrollToResults(site.id)}
+                onClick={() => {
+                  const newTab = activeTab === site.id ? null : site.id;
+                  setActiveTab(newTab);
+                  if (newTab && !results[newTab]?.success) {
+                    if (newTab === 'extremoz') fetchExtremozFromDb();
+                    else fetchSite(newTab);
+                  }
+                }}
                 className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${
-                  hasData
+                  activeTab === site.id
                     ? 'bg-primary text-primary-foreground shadow-md'
                     : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
@@ -511,16 +519,16 @@ export default function Portal() {
         </div>
 
         {/* Results area */}
-        {Object.values(results).some((r) => r.success) && (
+        {activeTab && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Resultados</CardTitle>
+              <CardTitle className="text-base">{SITES.find(s => s.id === activeTab)?.name}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="pr-1">
                 {(
                   <div className="space-y-6 min-w-0">
-                    {SITES.map((site) => {
+                    {SITES.filter(site => site.id === activeTab).map((site) => {
                       const result = results[site.id];
                       if (!result?.success || !result.data?.table?.length) return null;
                       const headers = Object.keys(result.data.table[0]);
