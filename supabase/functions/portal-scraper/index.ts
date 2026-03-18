@@ -790,7 +790,7 @@ Deno.serve(async (req) => {
           console.log('IDEMA POST payload:', payload.toString());
           
           const postController = new AbortController();
-          const postTimeout = setTimeout(() => postController.abort(), 12000);
+          const postTimeout = setTimeout(() => postController.abort(), 25000);
           const postResp = await fetch(actionUrl, {
             method: 'POST',
             signal: postController.signal,
