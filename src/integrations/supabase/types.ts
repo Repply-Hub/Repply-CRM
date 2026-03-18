@@ -329,6 +329,63 @@ export type Database = {
           },
         ]
       }
+      licencas_extremoz: {
+        Row: {
+          bloco_texto: string | null
+          cnpj: string | null
+          created_at: string
+          data_edicao: string | null
+          email: string | null
+          endereco_empresa: string | null
+          id: string
+          nome_fantasia: string | null
+          obra_descricao: string | null
+          pdf_link: string | null
+          pdf_nome: string | null
+          prioridade: string | null
+          quadro_societario: string | null
+          razao_social: string | null
+          telefone: string | null
+          tipo_licenca: string | null
+        }
+        Insert: {
+          bloco_texto?: string | null
+          cnpj?: string | null
+          created_at?: string
+          data_edicao?: string | null
+          email?: string | null
+          endereco_empresa?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          obra_descricao?: string | null
+          pdf_link?: string | null
+          pdf_nome?: string | null
+          prioridade?: string | null
+          quadro_societario?: string | null
+          razao_social?: string | null
+          telefone?: string | null
+          tipo_licenca?: string | null
+        }
+        Update: {
+          bloco_texto?: string | null
+          cnpj?: string | null
+          created_at?: string
+          data_edicao?: string | null
+          email?: string | null
+          endereco_empresa?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          obra_descricao?: string | null
+          pdf_link?: string | null
+          pdf_nome?: string | null
+          prioridade?: string | null
+          quadro_societario?: string | null
+          razao_social?: string | null
+          telefone?: string | null
+          tipo_licenca?: string | null
+        }
+        Relationships: []
+      }
       mensagens_whatsapp: {
         Row: {
           cliente_id: string | null
