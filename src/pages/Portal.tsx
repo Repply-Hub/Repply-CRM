@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 
-import { Loader2, Search, ExternalLink, Globe, FileText, Table2, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Search, ExternalLink, Globe, Table2, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -62,7 +62,6 @@ export default function Portal() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, SiteResult>>({});
-  const [activeTab, setActiveTab] = useState<'table' | 'links' | 'text'>('table');
   const [pages, setPages] = useState<Record<string, number>>({});
   const ROWS_PER_PAGE = 10;
 
@@ -300,39 +299,11 @@ export default function Portal() {
         {Object.values(results).some((r) => r.success) && (
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <CardTitle className="text-base">Resultados</CardTitle>
-                <div className="flex gap-1 ml-auto">
-                  <Button
-                    variant={activeTab === 'table' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setActiveTab('table')}
-                  >
-                    <Table2 className="h-3 w-3 mr-1" /> Tabelas
-                  </Button>
-                  <Button
-                    variant={activeTab === 'links' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setActiveTab('links')}
-                  >
-                    <FileText className="h-3 w-3 mr-1" /> Links
-                  </Button>
-                  <Button
-                    variant={activeTab === 'text' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setActiveTab('text')}
-                  >
-                    <FileText className="h-3 w-3 mr-1" /> Texto
-                  </Button>
-                </div>
-              </div>
+              <CardTitle className="text-base">Resultados</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="pr-1">
-                {activeTab === 'table' && (
+                {(
                   <div className="space-y-6 min-w-0">
                     {SITES.map((site) => {
                       const result = results[site.id];
@@ -413,55 +384,6 @@ export default function Portal() {
                               </div>
                             </div>
                           )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {activeTab === 'links' && (
-                  <div className="space-y-4">
-                    {SITES.map((site) => {
-                      const result = results[site.id];
-                      if (!result?.success || !result.data?.links?.length) return null;
-                      return (
-                        <div key={site.id}>
-                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-                            {site.name}
-                          </p>
-                          <div className="space-y-1">
-                            {result.data.links.map((link, i) => (
-                              <a
-                                key={i}
-                                href={link.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 p-2 rounded-md hover:bg-accent/50 transition-colors text-sm group"
-                              >
-                                <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 group-hover:text-primary" />
-                                <span className="truncate">{link.text}</span>
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {activeTab === 'text' && (
-                  <div className="space-y-4">
-                    {SITES.map((site) => {
-                      const result = results[site.id];
-                      if (!result?.success || !result.data?.text) return null;
-                      return (
-                        <div key={site.id}>
-                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-                            {site.name}
-                          </p>
-                          <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
-                            {result.data.text}
-                          </p>
                         </div>
                       );
                     })}
