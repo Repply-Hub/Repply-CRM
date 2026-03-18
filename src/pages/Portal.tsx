@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -69,6 +69,11 @@ export default function Portal() {
   const toggleRow = useCallback((key: string) => {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
+
+  // Auto-load Extremoz data on mount
+  useEffect(() => {
+    fetchExtremozFromDb();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchExtremozFromDb = async () => {
     setLoading((prev) => ({ ...prev, extremoz: true }));
