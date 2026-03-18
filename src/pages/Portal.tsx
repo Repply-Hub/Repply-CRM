@@ -498,17 +498,22 @@ export default function Portal() {
             return (
               <button
                 key={site.id}
-                onClick={() => scrollToResults(site.id)}
+                onClick={() => {
+                  const newTab = activeTab === site.id ? null : site.id;
+                  setActiveTab(newTab);
+                  if (newTab && !results[newTab]?.success) {
+                    if (newTab === 'extremoz') fetchExtremozFromDb();
+                    else fetchSite(newTab);
+                  }
+                }}
                 className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${
-                  hasData
+                  activeTab === site.id
                     ? 'bg-primary text-primary-foreground shadow-md'
                     : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 {site.name}
               </button>
-            );
-          })}
         </div>
 
         {/* Results area */}
