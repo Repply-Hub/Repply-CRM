@@ -346,7 +346,7 @@ export default function Portal() {
                               <Download className="h-3 w-3 mr-1" /> CSV
                             </Button>
                           </div>
-                          <div className="overflow-x-auto border rounded-md">
+                          <div className="overflow-x-auto border rounded-md max-w-[calc(100vw-2rem)] sm:max-w-full">
                             <table className="w-full text-xs">
                               <thead>
                                 <tr className="bg-muted/50">
