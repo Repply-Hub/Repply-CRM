@@ -219,6 +219,7 @@ async function fetchExtremozPdfLinks(year: string, maxPages: number): Promise<Ar
       clearTimeout(timeout);
       if (!resp.ok) break;
       const html = await resp.text();
+      console.log(`Page ${page}: ${html.length} chars, first 200: ${html.substring(0, 200).replace(/\n/g, ' ')}`);
 
       const links = extractExtremozPdfLinks(html);
       for (const link of links) {
