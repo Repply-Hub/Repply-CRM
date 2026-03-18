@@ -192,7 +192,7 @@ export default function Portal() {
 
       if (pdfLinks.length === 0) {
         toast.error('Nenhum PDF encontrado no site de Extremoz', { id: toastId });
-        setScraping(false);
+        setScraping((prev) => ({ ...prev, extremoz: false }));
         return;
       }
 
