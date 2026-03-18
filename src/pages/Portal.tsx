@@ -304,7 +304,7 @@ export default function Portal() {
             </CardHeader>
             <CardContent>
               <div className="pr-1">
-                {activeTab === 'table' && (
+                {(
                   <div className="space-y-6 min-w-0">
                     {SITES.map((site) => {
                       const result = results[site.id];
