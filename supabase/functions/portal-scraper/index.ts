@@ -217,11 +217,16 @@ async function fetchExtremozPdfLinks(year: string, maxPages: number): Promise<Ar
       const timeout = setTimeout(() => controller.abort(), 10000);
       const resp = await fetch(url, { signal: controller.signal, headers: FETCH_HEADERS });
       clearTimeout(timeout);
-      if (!resp.ok) break;
+      console.log(`Page ${page}: status=${resp.status}`);
+      if (!resp.ok) {
+        console.log(`Page ${page} failed with status ${resp.status}`);
+        break;
+      }
       const html = await resp.text();
-      console.log(`Page ${page}: ${html.length} chars, first 200: ${html.substring(0, 200).replace(/\n/g, ' ')}`);
+      console.log(`Page ${page}: ${html.length} chars, has wp-content: ${html.includes('wp-content/uploads')}`)
 
       const links = extractExtremozPdfLinks(html);
+      console.log(`Page ${page}: found ${links.length} links`);
       for (const link of links) {
         if (!results.some(r => r.href === link.href)) {
           results.push(link);
@@ -230,7 +235,8 @@ async function fetchExtremozPdfLinks(year: string, maxPages: number): Promise<Ar
 
       // Check for next page
       if (!html.includes(`/page/${page + 1}`)) break;
-    } catch {
+    } catch (err) {
+      console.error(`Page ${page} error:`, err);
       break;
     }
   }
