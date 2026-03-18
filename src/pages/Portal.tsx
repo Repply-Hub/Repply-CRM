@@ -93,7 +93,7 @@ export default function Portal() {
 
   return (
     <AppLayout title="Portal de Consultas" subtitle="Consulte licenças e publicações oficiais de órgãos públicos.">
-      <div className="p-4 md:p-6 space-y-6">
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         {/* Search bar */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
