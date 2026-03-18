@@ -331,6 +331,7 @@ export default function Portal() {
                             <table className="min-w-[1100px] text-xs">
                               <thead>
                                 <tr className="bg-muted/50">
+                                  <th className="px-2 py-2 w-8"></th>
                                   {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
                                     <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
                                   ))}
@@ -338,27 +339,54 @@ export default function Portal() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {paginatedRows.map((row, i) => (
-                                  <tr key={i} className="border-t border-border/50 hover:bg-accent/30">
-                                    {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
-                                      <td key={h} className="max-w-[200px] truncate px-3 py-2" title={row[h]}>
-                                        {row[h]}
-                                      </td>
-                                    ))}
-                                    <td className="px-3 py-2 whitespace-nowrap">
-                                      {row['Link PDF'] && (
-                                        <a
-                                          href={row['Link PDF']}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-1 text-primary hover:underline"
-                                        >
-                                          <ExternalLink className="h-3 w-3" /> PDF
-                                        </a>
+                                {paginatedRows.map((row, i) => {
+                                  const rowKey = `${site.id}-${currentPage}-${i}`;
+                                  const isExpanded = expandedRows[rowKey];
+                                  const colCount = headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').length + 2;
+                                  return (
+                                    <>
+                                      <tr key={rowKey} className="border-t border-border/50 hover:bg-accent/30">
+                                        <td className="px-2 py-2">
+                                          {row['Texto Encontrado'] && (
+                                            <button
+                                              onClick={() => toggleRow(rowKey)}
+                                              className="p-0.5 rounded hover:bg-accent"
+                                            >
+                                              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                            </button>
+                                          )}
+                                        </td>
+                                        {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
+                                          <td key={h} className="max-w-[200px] truncate px-3 py-2" title={row[h]}>
+                                            {row[h]}
+                                          </td>
+                                        ))}
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                          {row['Link PDF'] && (
+                                            <a
+                                              href={row['Link PDF']}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                                            >
+                                              <ExternalLink className="h-3 w-3" /> PDF
+                                            </a>
+                                          )}
+                                        </td>
+                                      </tr>
+                                      {isExpanded && row['Texto Encontrado'] && (
+                                        <tr key={`${rowKey}-text`} className="bg-muted/30">
+                                          <td colSpan={colCount} className="px-4 py-3">
+                                            <p className="text-xs font-semibold text-muted-foreground mb-1">Texto Encontrado:</p>
+                                            <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground/80 max-h-[200px] overflow-y-auto">
+                                              {row['Texto Encontrado']}
+                                            </p>
+                                          </td>
+                                        </tr>
                                       )}
-                                    </td>
-                                  </tr>
-                                ))}
+                                    </>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
