@@ -759,6 +759,7 @@ export default function Portal() {
                   setActiveTab(site.id);
                   if (!results[site.id]?.success) {
                     if (site.id === 'extremoz') fetchExtremozFromDb();
+                    else if (site.id === 'natal') fetchNatalFromDb();
                     else fetchSite(site.id);
                   }
                 }}
