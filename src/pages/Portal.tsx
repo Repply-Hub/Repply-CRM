@@ -640,15 +640,22 @@ export default function Portal() {
     setScraping(true);
     const toastId = toast.loading('Buscando licenças do IDEMA via servidor...');
     try {
-      // Use edge function as proxy (avoids CORS)
       const { data, error } = await supabase.functions.invoke('portal-scraper', {
         body: { site_id: 'idema', search: search || undefined },
       });
       if (error) throw error;
 
       if (!data?.success) {
+        setResults((prev) => ({
+          ...prev,
+          idema: {
+            success: false,
+            error: data?.error || 'Erro ao consultar IDEMA',
+            fallback_url: data?.fallback_url || SITES.find((site) => site.id === 'idema')?.url,
+            site: { id: 'idema', name: 'IDEMA', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
+          },
+        }));
         toast.error(data?.error || 'Erro ao consultar IDEMA', { id: toastId });
-        setScraping(false);
         return;
       }
 
@@ -657,22 +664,27 @@ export default function Portal() {
       const text = data.data?.text || '';
 
       if (tableData.length === 0 && links.length === 0 && text.length < 50) {
+        setResults((prev) => ({
+          ...prev,
+          idema: {
+            success: false,
+            error: 'Nenhum dado válido foi retornado pelo IDEMA.',
+            fallback_url: data?.fallback_url || data?.meta?.action_url || SITES.find((site) => site.id === 'idema')?.url,
+            site: { id: 'idema', name: 'IDEMA', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
+          },
+        }));
         toast.error('Nenhum dado extraído do IDEMA', { id: toastId });
-        setScraping(false);
         return;
       }
 
-      // Save extracted data to DB
       let totalInserted = 0;
 
-      // If we got table data, parse and save
       if (tableData.length > 0) {
         for (const row of tableData) {
           const values = Object.values(row).join(' ');
           const cnpjMatch = values.match(/\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/);
           const cnpj = cnpjMatch ? cnpjMatch[0].replace(/\s/g, '') : '';
 
-          // Skip if already exists
           if (cnpj) {
             const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
             if (existing && existing.length > 0) continue;
@@ -707,7 +719,6 @@ export default function Portal() {
         }
       }
 
-      // If no table data but we have text with CNPJs
       if (totalInserted === 0 && text.length > 50) {
         const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
         const cnpjs = [...new Set((text.match(cnpjRegex) || []).map((c: unknown) => String(c).replace(/\s/g, '')))];
@@ -728,13 +739,32 @@ export default function Portal() {
       }
 
       if (totalInserted === 0) {
+        setResults((prev) => ({
+          ...prev,
+          idema: {
+            success: false,
+            error: 'O IDEMA respondeu, mas sem resultados importáveis.',
+            fallback_url: data?.meta?.action_url || SITES.find((site) => site.id === 'idema')?.url,
+            site: { id: 'idema', name: 'IDEMA', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
+          },
+        }));
         toast.warning('IDEMA retornou página sem resultados válidos para importação.', { id: toastId });
+        return;
       }
 
       toast.success(`${totalInserted} registros importados do IDEMA!`, { id: toastId });
       await fetchIdemaFromDb();
     } catch (err) {
       console.error('Scraping IDEMA error:', err);
+      setResults((prev) => ({
+        ...prev,
+        idema: {
+          success: false,
+          error: 'Erro ao acessar o portal do IDEMA. O site pode estar fora do ar ou expirando na consulta.',
+          fallback_url: SITES.find((site) => site.id === 'idema')?.url,
+          site: { id: 'idema', name: 'IDEMA', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
+        },
+      }));
       toast.error('Erro ao acessar site do IDEMA. O site pode estar fora do ar.', { id: toastId });
     } finally {
       setScraping(false);
