@@ -40,14 +40,14 @@
 
     --radius: 0.75rem;
 
-    /* Sidebar — amarelo */
-    --sidebar-background: 45 75% 22%;
-    --sidebar-foreground: 45 20% 95%;
+    /* Sidebar — vermelho */
+    --sidebar-background: 0 65% 22%;
+    --sidebar-foreground: 0 20% 95%;
     --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 45 90% 50%;
-    --sidebar-accent: 45 60% 30%;
-    --sidebar-accent-foreground: 45 20% 95%;
-    --sidebar-border: 45 50% 26%;
+    --sidebar-primary-foreground: 0 80% 55%;
+    --sidebar-accent: 0 55% 30%;
+    --sidebar-accent-foreground: 0 20% 95%;
+    --sidebar-border: 0 45% 26%;
     --sidebar-ring: 0 0% 100%;
 
     /* Kanban stages */
@@ -100,13 +100,13 @@
     --input: 20 14% 18%;
     --ring: 24 100% 52%;
 
-    --sidebar-background: 45 60% 14%;
-    --sidebar-foreground: 45 15% 92%;
+    --sidebar-background: 0 55% 14%;
+    --sidebar-foreground: 0 15% 92%;
     --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 45 90% 50%;
-    --sidebar-accent: 45 45% 20%;
-    --sidebar-accent-foreground: 45 15% 92%;
-    --sidebar-border: 45 40% 18%;
+    --sidebar-primary-foreground: 0 80% 55%;
+    --sidebar-accent: 0 45% 20%;
+    --sidebar-accent-foreground: 0 15% 92%;
+    --sidebar-border: 0 40% 18%;
     --sidebar-ring: 0 0% 100%;
 
     --kanban-new: 24 100% 52%;
