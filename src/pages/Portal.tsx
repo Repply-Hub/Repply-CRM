@@ -100,6 +100,7 @@ export default function Portal() {
   useEffect(() => {
     fetchExtremozFromDb();
     fetchNatalFromDb();
+    fetchIdemaFromDb();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchExtremozFromDb = async () => {
