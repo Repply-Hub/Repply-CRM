@@ -386,6 +386,60 @@ export type Database = {
         }
         Relationships: []
       }
+      licencas_idema: {
+        Row: {
+          atividade: string | null
+          bloco_texto: string | null
+          cnpj: string | null
+          created_at: string
+          data_emissao: string | null
+          data_validade: string | null
+          empreendimento: string | null
+          id: string
+          municipio: string | null
+          numero_licenca: string | null
+          pdf_link: string | null
+          porte: string | null
+          potencial_poluidor: string | null
+          razao_social: string | null
+          tipo_licenca: string | null
+        }
+        Insert: {
+          atividade?: string | null
+          bloco_texto?: string | null
+          cnpj?: string | null
+          created_at?: string
+          data_emissao?: string | null
+          data_validade?: string | null
+          empreendimento?: string | null
+          id?: string
+          municipio?: string | null
+          numero_licenca?: string | null
+          pdf_link?: string | null
+          porte?: string | null
+          potencial_poluidor?: string | null
+          razao_social?: string | null
+          tipo_licenca?: string | null
+        }
+        Update: {
+          atividade?: string | null
+          bloco_texto?: string | null
+          cnpj?: string | null
+          created_at?: string
+          data_emissao?: string | null
+          data_validade?: string | null
+          empreendimento?: string | null
+          id?: string
+          municipio?: string | null
+          numero_licenca?: string | null
+          pdf_link?: string | null
+          porte?: string | null
+          potencial_poluidor?: string | null
+          razao_social?: string | null
+          tipo_licenca?: string | null
+        }
+        Relationships: []
+      }
       licencas_natal: {
         Row: {
           bloco_texto: string | null
