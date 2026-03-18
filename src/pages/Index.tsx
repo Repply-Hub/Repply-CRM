@@ -76,9 +76,9 @@ const Index = () => {
 
   return (
     <AppLayout title="Pipeline de Vendas" subtitle={`${orders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}>
-      <div className="p-6 max-w-[1600px]">
-        {/* Filters & Actions - single line */}
-        <div className="flex items-center gap-2 mb-6 flex-wrap">
+      <div className="p-3 sm:p-4 md:p-6 max-w-[1600px]">
+        {/* Filters & Actions */}
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-4 md:mb-6 flex-wrap">
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className={selectedVendedores.length > 0 ? 'border-primary' : ''}>
@@ -145,7 +145,7 @@ const Index = () => {
           {/* Spacer to push action buttons right */}
           <div className="flex-1" />
 
-          <Button variant="outline" size="sm" onClick={async () => {
+          <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
             const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
             await generatePedidosPdf(
               orders.map(o => ({
@@ -162,11 +162,11 @@ const Index = () => {
           }}>
             <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/pedidos')}>
+          <Button variant="outline" size="sm" className="hidden md:inline-flex" onClick={() => navigate('/pedidos')}>
             <Filter className="h-4 w-4 mr-1" /> Ver Pedidos
           </Button>
           <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
-            <Plus className="h-4 w-4 mr-1" /> Novo Pedido
+            <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
           </Button>
         </div>
 
@@ -176,7 +176,7 @@ const Index = () => {
           </div>
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="flex gap-4 overflow-x-auto pb-4">
+            <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-3 px-3 sm:mx-0 sm:px-0">
               {KANBAN_STAGES.map(stage => (
                 <KanbanColumn
                   key={stage.key}
