@@ -300,35 +300,7 @@ export default function Portal() {
         {Object.values(results).some((r) => r.success) && (
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <CardTitle className="text-base">Resultados</CardTitle>
-                <div className="flex gap-1 ml-auto">
-                  <Button
-                    variant={activeTab === 'table' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setActiveTab('table')}
-                  >
-                    <Table2 className="h-3 w-3 mr-1" /> Tabelas
-                  </Button>
-                  <Button
-                    variant={activeTab === 'links' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setActiveTab('links')}
-                  >
-                    <FileText className="h-3 w-3 mr-1" /> Links
-                  </Button>
-                  <Button
-                    variant={activeTab === 'text' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setActiveTab('text')}
-                  >
-                    <FileText className="h-3 w-3 mr-1" /> Texto
-                  </Button>
-                </div>
-              </div>
+              <CardTitle className="text-base">Resultados</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="pr-1">
