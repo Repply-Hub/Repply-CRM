@@ -16,6 +16,7 @@ import Obras from "./pages/Obras";
 import Fabricantes from "./pages/Fabricantes";
 import Portal from "./pages/Portal";
 import EditarPedido from "./pages/EditarPedido";
+import Calendario from "./pages/Calendario";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
