@@ -49,6 +49,7 @@ const AppRoutes = () => (
     <Route path="/fabricantes" element={<ProtectedRoute><Fabricantes /></ProtectedRoute>} />
     <Route path="/portal" element={<ProtectedRoute><Portal /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+    <Route path="/calendario" element={<ProtectedRoute><Calendario /></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
