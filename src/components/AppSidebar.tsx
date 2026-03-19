@@ -1,4 +1,4 @@
-import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut, HardHat, Factory, Globe } from 'lucide-react';
+import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut, HardHat, Factory, Globe, CalendarDays } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
@@ -25,6 +25,7 @@ const navItems = [
   { path: '/pedidos', label: 'Pedidos', icon: FileText },
   { path: '/fabricantes', label: 'Fabricantes', icon: Factory },
   { path: '/portal', label: 'Portal', icon: Globe },
+  { path: '/calendario', label: 'Calendário', icon: CalendarDays },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
