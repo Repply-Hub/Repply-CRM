@@ -100,13 +100,13 @@
     --input: 20 14% 18%;
     --ring: 24 100% 52%;
 
-    --sidebar-background: 0 55% 14%;
-    --sidebar-foreground: 0 15% 92%;
+    --sidebar-background: 24 80% 14%;
+    --sidebar-foreground: 24 15% 92%;
     --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 0 80% 55%;
-    --sidebar-accent: 0 45% 20%;
-    --sidebar-accent-foreground: 0 15% 92%;
-    --sidebar-border: 0 40% 18%;
+    --sidebar-primary-foreground: 24 100% 50%;
+    --sidebar-accent: 24 65% 20%;
+    --sidebar-accent-foreground: 24 15% 92%;
+    --sidebar-border: 24 55% 18%;
     --sidebar-ring: 0 0% 100%;
 
     --kanban-new: 24 100% 52%;
