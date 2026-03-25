@@ -1,5 +1,5 @@
 import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut, HardHat, Factory, Globe, CalendarDays } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { NavLink } from '@/components/NavLink';
@@ -65,7 +65,10 @@ export function AppSidebar() {
       onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader className="border-b border-sidebar-border px-2 py-3">
-        <div className={`flex items-center overflow-visible ${collapsed ? 'justify-center' : 'gap-3'}`}>
+        <Link
+          to="/dashboard"
+          className={`flex items-center overflow-visible hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : 'gap-3'}`}
+        >
           <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
           {!collapsed && (
             <div className="min-w-0">
@@ -73,7 +76,7 @@ export function AppSidebar() {
               <p className="text-[10px] text-sidebar-foreground/50 font-medium">Gestão Comercial</p>
             </div>
           )}
-        </div>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent className="py-2">
