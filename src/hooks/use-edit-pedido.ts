@@ -67,27 +67,53 @@ export function useUpdatePedidoCompleto() {
         .eq('id', payload.pedido_id);
       if (pedidoErr) throw pedidoErr;
 
-      // 2. Delete existing items and re-insert (simplest approach for full edit)
-      const { error: delErr } = await supabase
+      // 2. Upsert items: update existing (with id) and insert new ones (without id)
+      const itensExistentes = payload.itens.filter(i => i.id);
+      const itensNovos = payload.itens.filter(i => !i.id);
+
+      if (itensExistentes.length > 0) {
+        const { error: upsertErr } = await supabase.from('itens_pedido').upsert(
+          itensExistentes.map(item => ({
+            id: item.id!,
+            pedido_id: payload.pedido_id,
+            descricao_material: item.descricao_material,
+            referencia_fabricante: item.referencia_fabricante || null,
+            quantidade: item.quantidade,
+            unidade: item.unidade || null,
+            preco_unitario: item.preco_unitario,
+            preco_total: item.quantidade * item.preco_unitario,
+          }))
+        );
+        if (upsertErr) throw upsertErr;
+      }
+
+      if (itensNovos.length > 0) {
+        const { error: insertErr } = await supabase.from('itens_pedido').insert(
+          itensNovos.map(item => ({
+            pedido_id: payload.pedido_id,
+            descricao_material: item.descricao_material,
+            referencia_fabricante: item.referencia_fabricante || null,
+            quantidade: item.quantidade,
+            unidade: item.unidade || null,
+            preco_unitario: item.preco_unitario,
+            preco_total: item.quantidade * item.preco_unitario,
+          }))
+        );
+        if (insertErr) throw insertErr;
+      }
+
+      // 3. Delete only items that were removed (not present in payload)
+      // Inserts/upserts above must succeed first — only then we remove old items
+      const idsManutidos = payload.itens.filter(i => i.id).map(i => i.id!);
+      const deleteQuery = supabase
         .from('itens_pedido')
         .delete()
         .eq('pedido_id', payload.pedido_id);
-      if (delErr) throw delErr;
 
-      // 3. Insert updated items
-      if (payload.itens.length > 0) {
-        const itensData = payload.itens.map(item => ({
-          pedido_id: payload.pedido_id,
-          descricao_material: item.descricao_material,
-          referencia_fabricante: item.referencia_fabricante || null,
-          quantidade: item.quantidade,
-          unidade: item.unidade || null,
-          preco_unitario: item.preco_unitario,
-          preco_total: item.quantidade * item.preco_unitario,
-        }));
-        const { error: itensErr } = await supabase.from('itens_pedido').insert(itensData);
-        if (itensErr) throw itensErr;
-      }
+      const { error: delErr } = idsManutidos.length > 0
+        ? await deleteQuery.not('id', 'in', `(${idsManutidos.join(',')})`)
+        : await deleteQuery;
+      if (delErr) throw delErr;
 
       return { id: payload.pedido_id };
     },

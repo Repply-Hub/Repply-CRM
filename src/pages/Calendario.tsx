@@ -13,6 +13,7 @@ import { EventDialog } from '@/components/calendar/EventDialog';
 import { getWeekDays } from '@/components/calendar/calendarUtils';
 import type { ViewMode, CalendarType, EventoForm, CalendarEvent } from '@/components/calendar/types';
 import { CALENDAR_COLORS } from '@/components/calendar/types';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
   useCalendarEvents,
   useCreateEvento,
@@ -136,6 +137,7 @@ export default function Calendario() {
 
   return (
     <AppLayout headerContent={headerContent} mainClassName="flex-1 overflow-hidden flex flex-col">
+      <ErrorBoundary>
       <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Sidebar esquerda — oculta em mobile */}
           <aside className="hidden lg:flex w-56 border-r flex-col gap-5 p-3 shrink-0 overflow-y-auto min-h-0">
@@ -241,6 +243,7 @@ export default function Calendario() {
         onSave={handleSave}
         onDelete={handleDelete}
       />
+      </ErrorBoundary>
     </AppLayout>
   );
 }

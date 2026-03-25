@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -62,11 +62,6 @@ const NovoPedido = () => {
   const [proximoContato, setProximoContato] = useState<Date | undefined>();
   const [proximoContatoHora, setProximoContatoHora] = useState('09:00');
 
-  // Set default vendedor
-  useState(() => {
-    if (myVendedorId && !vendedorId) setVendedorId(myVendedorId);
-  });
-
   // Derived
   const selectedCliente = useMemo(() => clientes?.find(c => c.id === clienteId), [clientes, clienteId]);
   const isConstrutora = selectedCliente?.tipo === 'construtora';
@@ -76,10 +71,10 @@ const NovoPedido = () => {
 
   const valorTotal = useMemo(() => itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0), [itens]);
 
-  // Auto-set vendedor when data loads
-  if (myVendedorId && !vendedorId) {
-    setVendedorId(myVendedorId);
-  }
+  // Set default vendedor when data loads
+  useEffect(() => {
+    if (myVendedorId && !vendedorId) setVendedorId(myVendedorId);
+  }, [myVendedorId]);
 
   // Handle obra selection
   const handleObraChange = (id: string) => {

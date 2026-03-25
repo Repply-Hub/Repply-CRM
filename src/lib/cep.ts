@@ -15,11 +15,27 @@ export interface CepData {
   street: string;
 }
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 export async function fetchCepData(cep: string): Promise<CepData> {
   const digits = cep.replace(/\D/g, '');
-  const res = await fetch(`https://brasilapi.com.br/api/cep/v1/${digits}`);
-  if (!res.ok) throw new Error('CEP não encontrado');
-  return res.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(`https://brasilapi.com.br/api/cep/v1/${digits}`, {
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error('CEP não encontrado');
+    return res.json();
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Consulta de CEP expirou. Verifique sua conexão e tente novamente.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export interface EnderecoFields {

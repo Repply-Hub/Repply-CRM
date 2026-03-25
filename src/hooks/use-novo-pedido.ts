@@ -91,20 +91,13 @@ export function useCreatePedidoCompleto() {
           data_pedido: payload.data_pedido,
           status: 'novo_lead',
           observacoes: payload.observacoes || null,
-          // new fields via .insert with any
-        } as any)
+          prazo_resposta: payload.prazo_resposta || null,
+          origem_lead: payload.origem_lead || null,
+          endereco_entrega: payload.endereco_entrega || null,
+        })
         .select('id')
         .single();
       if (pedidoErr) throw pedidoErr;
-
-      // Update new columns separately since types may not be generated yet
-      if (payload.prazo_resposta || payload.origem_lead || payload.endereco_entrega) {
-        const updates: Record<string, any> = {};
-        if (payload.prazo_resposta) updates.prazo_resposta = payload.prazo_resposta;
-        if (payload.origem_lead) updates.origem_lead = payload.origem_lead;
-        if (payload.endereco_entrega) updates.endereco_entrega = payload.endereco_entrega;
-        await supabase.from('pedidos').update(updates as any).eq('id', pedido.id);
-      }
 
       // 2. Insert items
       const itensData = payload.itens.map(item => ({

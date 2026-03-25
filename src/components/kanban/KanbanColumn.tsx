@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Droppable } from '@hello-pangea/dnd';
 import { KanbanCard } from './KanbanCard';
 import { Order, KanbanStage } from '@/types';
@@ -11,7 +12,7 @@ interface KanbanColumnProps {
   orders: Order[];
 }
 
-export function KanbanColumn({ stageKey, label, colorClass, orders }: KanbanColumnProps) {
+export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders }: KanbanColumnProps) {
   const total = orders.reduce((acc, o) => acc + o.valor, 0);
 
   return (
@@ -56,4 +57,4 @@ export function KanbanColumn({ stageKey, label, colorClass, orders }: KanbanColu
       </Droppable>
     </div>
   );
-}
+});

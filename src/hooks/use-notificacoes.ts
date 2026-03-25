@@ -41,7 +41,11 @@ export function useNotificacoes() {
           qc.invalidateQueries({ queryKey: ['notificacoes'] });
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) {
+          console.error('[notificacoes] falha na subscription realtime:', err);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);

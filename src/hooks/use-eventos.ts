@@ -4,6 +4,38 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
 import type { CalendarEvent, CalendarType, EventoForm } from '@/components/calendar/types';
 
+// Tabela 'eventos' não está nos tipos gerados — definimos a estrutura localmente
+interface EventoRow {
+  id: string;
+  user_id: string;
+  titulo: string;
+  descricao: string | null;
+  inicio: string;
+  fim: string;
+  dia_inteiro: boolean;
+  tipo_calendario: string;
+  cor: string;
+  updated_at?: string;
+}
+
+// Tipagem local para as queries de calendário
+interface PedidoCalendario {
+  id: string;
+  status: string;
+  prazo_resposta: string | null;
+  valor_total: number | null;
+  clientes: { empresa: string } | null;
+  fabricantes: { nome: string } | null;
+}
+
+interface ContatoCalendario {
+  id: string;
+  tipo: string;
+  descricao: string | null;
+  proximo_contato_em: string | null;
+  pedidos: { clientes: { empresa: string } | null } | null;
+}
+
 // --- Queries ---
 
 export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
@@ -14,11 +46,11 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
     enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('eventos' as any)
+        .from('eventos' as unknown as 'pedidos')
         .select('*')
         .order('inicio');
       if (error) throw error;
-      return data as any[];
+      return data as unknown as EventoRow[];
     },
   });
 
@@ -68,7 +100,7 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
 
     // Prazos de pedidos (somente se "pessoal" visível)
     if (visibleCalendars.has('pessoal')) {
-      pedidos?.forEach((p: any) => {
+      (pedidos as unknown as PedidoCalendario[])?.forEach((p) => {
         if (!p.prazo_resposta) return;
         const date = new Date(p.prazo_resposta);
         result.push({
@@ -85,13 +117,13 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
       });
 
       // Próximos contatos
-      contatos?.forEach((c: any) => {
+      (contatos as unknown as ContatoCalendario[])?.forEach((c) => {
         if (!c.proximo_contato_em) return;
         const start = new Date(c.proximo_contato_em);
         const end = new Date(start.getTime() + 30 * 60 * 1000);
         result.push({
           id: `contato-${c.id}`,
-          titulo: `Contato: ${(c as any).pedidos?.clientes?.empresa || 'Cliente'}`,
+          titulo: `Contato: ${c.pedidos?.clientes?.empresa || 'Cliente'}`,
           descricao: c.descricao || c.tipo,
           inicio: start,
           fim: end,
@@ -124,7 +156,7 @@ export function useCreateEvento() {
         ? new Date(form.fim + 'T23:59:59').toISOString()
         : new Date(form.fim).toISOString();
 
-      const { error } = await supabase.from('eventos' as any).insert({
+      const { error } = await supabase.from('eventos' as unknown as 'pedidos').insert({
         user_id: user!.id,
         titulo: form.titulo,
         descricao: form.descricao || null,
@@ -153,7 +185,7 @@ export function useUpdateEvento() {
         : new Date(form.fim).toISOString();
 
       const { error } = await supabase
-        .from('eventos' as any)
+        .from('eventos' as unknown as 'pedidos')
         .update({
           titulo: form.titulo,
           descricao: form.descricao || null,
@@ -176,7 +208,7 @@ export function useDeleteEvento() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('eventos' as any).delete().eq('id', id);
+      const { error } = await supabase.from('eventos' as unknown as 'pedidos').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['eventos'] }),

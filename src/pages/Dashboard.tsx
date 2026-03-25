@@ -12,6 +12,7 @@ import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante }
 import { usePedidos } from '@/hooks/use-pedidos';
 import { DateRangePicker, type DateRange } from '@/components/DateRangePicker';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/ChartTooltip';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const formatCurrency = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -61,8 +62,8 @@ const Dashboard = () => {
 
   const lastMonth = filteredFaturamento.slice(-1)[0];
   const prevMonth = filteredFaturamento.slice(-2, -1)[0];
-  const faturamentoChange = lastMonth && prevMonth && prevMonth.faturamento_total
-    ? (((lastMonth.faturamento_total ?? 0) - (prevMonth.faturamento_total ?? 0)) / (prevMonth.faturamento_total ?? 1) * 100).toFixed(0)
+  const faturamentoChange = lastMonth && prevMonth && prevMonth.faturamento_total && prevMonth.faturamento_total !== 0
+    ? (((lastMonth.faturamento_total ?? 0) - prevMonth.faturamento_total) / prevMonth.faturamento_total * 100).toFixed(0)
     : '0';
 
   const totalPedidos = filteredPedidos.length;
@@ -113,6 +114,7 @@ const Dashboard = () => {
 
   return (
     <AppLayout title="Dashboard" subtitle="Visão analítica do desempenho comercial">
+      <ErrorBoundary>
       <div className="p-6 max-w-[1400px] mx-auto">
         <div className="mb-8 flex justify-end">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
@@ -288,6 +290,7 @@ const Dashboard = () => {
           </Card>
         </div>
       </div>
+      </ErrorBoundary>
     </AppLayout>
   );
 };

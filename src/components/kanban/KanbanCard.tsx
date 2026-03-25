@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Building2, Factory, DollarSign, Pencil, GripVertical } from 'lucide-react';
@@ -10,7 +11,7 @@ interface KanbanCardProps {
   index: number;
 }
 
-export function KanbanCard({ order, index }: KanbanCardProps) {
+export const KanbanCard = memo(function KanbanCard({ order, index }: KanbanCardProps) {
   const navigate = useNavigate();
   const isAlert = order.daysInStage >= order.alertDays;
 
@@ -99,4 +100,4 @@ export function KanbanCard({ order, index }: KanbanCardProps) {
       )}
     </Draggable>
   );
-}
+});
