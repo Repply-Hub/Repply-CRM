@@ -65,7 +65,7 @@ export function AppSidebar() {
       onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader className="border-b border-sidebar-border px-2 py-3">
-        <div className="flex items-center gap-3 overflow-visible">
+        <div className={`flex items-center overflow-visible ${collapsed ? 'justify-center' : 'gap-3'}`}>
           <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
           {!collapsed && (
             <div className="min-w-0">
