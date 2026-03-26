@@ -192,6 +192,33 @@ export type Database = {
         }
         Relationships: []
       }
+      empresas: {
+        Row: {
+          cnpj: string | null
+          codigo_acesso: string
+          created_at: string
+          id: string
+          nome: string
+          owner_id: string
+        }
+        Insert: {
+          cnpj?: string | null
+          codigo_acesso?: string
+          created_at?: string
+          id?: string
+          nome: string
+          owner_id: string
+        }
+        Update: {
+          cnpj?: string | null
+          codigo_acesso?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          owner_id?: string
+        }
+        Relationships: []
+      }
       eventos: {
         Row: {
           cor: string
@@ -903,6 +930,7 @@ export type Database = {
         Row: {
           created_at: string
           email: string
+          empresa_id: string | null
           id: string
           nome: string
           role: string
@@ -912,6 +940,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email: string
+          empresa_id?: string | null
           id?: string
           nome: string
           role?: string
@@ -921,13 +950,22 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string
+          empresa_id?: string | null
           id?: string
           nome?: string
           role?: string
           telefone?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendedores_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

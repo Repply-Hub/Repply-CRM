@@ -515,6 +515,96 @@ function AuditLog() {
   );
 }
 
+function CodigoAcessoCard() {
+  const { user } = useAuth();
+  const [copied, setCopied] = useState(false);
+  const qc = useQueryClient();
+  const { data: empresa, isLoading } = useQuery({
+    queryKey: ['minha_empresa', user?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('empresas')
+        .select('id, nome, codigo_acesso, cnpj')
+        .eq('owner_id', user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; nome: string; codigo_acesso: string; cnpj: string | null } | null;
+    },
+    enabled: !!user,
+  });
+
+  const regenerate = useMutation({
+    mutationFn: async () => {
+      const newCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+      const { error } = await (supabase as any)
+        .from('empresas')
+        .update({ codigo_acesso: newCode })
+        .eq('owner_id', user!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['minha_empresa', user?.id] });
+      toast.success('Código regenerado!');
+    },
+  });
+
+  if (isLoading || !empresa) return null;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(empresa.codigo_acesso);
+    setCopied(true);
+    toast.success('Código copiado!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-primary" /> Código de Acesso
+        </CardTitle>
+        <CardDescription>Compartilhe este código com seus funcionários para que eles possam se cadastrar na sua empresa</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 bg-muted/50 border border-border rounded-lg px-4 py-3 text-center">
+            <span className="text-2xl font-mono font-bold tracking-[0.3em] text-foreground">{empresa.codigo_acesso}</span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="flex-1" onClick={handleCopy}>
+            {copied ? '✓ Copiado' : 'Copiar código'}
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="text-muted-foreground">
+                Gerar novo
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Gerar novo código?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  O código atual será invalidado. Funcionários que ainda não se cadastraram precisarão do novo código.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => regenerate.mutate()}>
+                  Gerar novo código
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Empresa: <span className="font-medium text-foreground">{empresa.nome}</span>
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ProfileTab() {
   const { user, signOut } = useAuth();
   const qc = useQueryClient();
@@ -686,6 +776,9 @@ function ProfileTab() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Código de acesso da empresa */}
+        {(perfil.role === 'empresa' || perfil.role === 'admin') && <CodigoAcessoCard />}
       </div>
 
       {/* Coluna Direita: Aparência, Segurança e Perigo */}
