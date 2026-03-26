@@ -18,6 +18,8 @@ import Portal from "./pages/Portal";
 import EditarPedido from "./pages/EditarPedido";
 import Calendario from "./pages/Calendario";
 import Login from "./pages/Login";
+import EsqueciSenha from "./pages/EsqueciSenha";
+import RedefinirSenha from "./pages/RedefinirSenha";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
