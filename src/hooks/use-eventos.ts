@@ -230,7 +230,7 @@ export function useUpdateEvento() {
         ? new Date(form.fim + 'T23:59:59').toISOString()
         : new Date(form.fim).toISOString();
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('eventos')
         .update({
           titulo: form.titulo,
