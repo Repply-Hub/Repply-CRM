@@ -45,8 +45,8 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
     queryKey: ['eventos'],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('eventos' as unknown as 'pedidos')
+      const { data, error } = await (supabase as any)
+        .from('eventos')
         .select('*')
         .order('inicio');
       if (error) throw error;
