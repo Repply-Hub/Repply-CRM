@@ -214,7 +214,7 @@ export function useBulkCreateEventos() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['eventos'] });
-      qc.refetchQueries({ queryKey: ['eventos'] });
+      qc.refetchQueries({ queryKey: ['eventos'], type: 'active' });
     },
   });
 }
