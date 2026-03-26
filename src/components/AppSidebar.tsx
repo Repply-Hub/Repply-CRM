@@ -118,7 +118,19 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-3">
+      <SidebarFooter className="border-t border-sidebar-border p-3 space-y-1">
+        {/* Perfil do usuário */}
+        <div className={`flex items-center overflow-hidden rounded-lg px-2 py-2 ${collapsed ? 'justify-center' : 'gap-3'}`}>
+          <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
+            <UserCircle className="h-5 w-5 text-primary" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium text-sidebar-foreground truncate">{vendedor?.nome ?? user?.email?.split('@')[0] ?? '—'}</p>
+              <p className="text-[10px] text-sidebar-foreground/50 capitalize">{vendedor?.role ?? 'vendedor'}</p>
+            </div>
+          )}
+        </div>
         <button
           onClick={() => signOut()}
           className={`flex items-center overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 ${collapsed ? 'justify-center' : 'gap-3'}`}
