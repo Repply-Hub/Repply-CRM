@@ -1,4 +1,4 @@
-import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut, HardHat, Factory, Globe, CalendarDays, UserCircle } from 'lucide-react';
+import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut, HardHat, Factory, Globe, CalendarDays, UserCircle, ClipboardList } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
