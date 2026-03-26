@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
 import type { CalendarEvent, CalendarType, EventoForm } from '@/components/calendar/types';
 
-// Tabela 'eventos' não está nos tipos gerados — definimos a estrutura localmente
+// Estrutura local para mapear a row do banco
 interface EventoRow {
   id: string;
   user_id: string;
