@@ -382,7 +382,56 @@ export default function Calendario() {
         onSave={handleSave}
         onDelete={handleDelete}
       />
+
+      {/* Dialog de importação */}
+      <Dialog open={importDialogOpen} onOpenChange={(open) => { setImportDialogOpen(open); if (!open) setPendingFile(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importar agenda (.ics)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Tipo de calendário</Label>
+              <Select value={importCalendarType} onValueChange={(v) => setImportCalendarType(v as CalendarType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pessoal">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: CALENDAR_COLORS.pessoal }} />
+                      Meu calendário
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="empresa">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: CALENDAR_COLORS.empresa }} />
+                      Calendário da empresa
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Arquivo</Label>
+              <Button variant="outline" className="w-full justify-start" onClick={handleSelectFile}>
+                {pendingFile ? pendingFile.name : 'Selecionar arquivo .ics'}
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setImportDialogOpen(false); setPendingFile(null); }}>
+              Cancelar
+            </Button>
+            <Button disabled={!pendingFile || isImporting} onClick={handleConfirmImport}>
+              Importar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </ErrorBoundary>
     </AppLayout>
+  );
+}
   );
 }
