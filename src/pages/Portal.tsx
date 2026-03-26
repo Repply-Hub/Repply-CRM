@@ -413,7 +413,7 @@ export default function Portal() {
         ...prev,
         natal: {
           success: true,
-          site: { id: 'natal', name: 'Diário Oficial - Natal', url: 'https://www2.natal.rn.gov.br/dom/' },
+          site: { id: 'natal', name: 'Diário Oficial - Natal', url: 'https://www.natal.rn.gov.br/dom/' },
           data: { text: `${tableData.length} registros relevantes encontrados no banco de dados.`, links: [], table: tableData },
           meta: { total_licencas: tableData.length },
           fetched_at: new Date().toISOString(),
