@@ -11,7 +11,7 @@ interface SiteConfig {
 
 const SITES: Record<string, SiteConfig> = {
   idema: { id: 'idema', name: 'IDEMA - Licenças Emitidas', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
-  natal: { id: 'natal', name: 'Diário Oficial de Natal', url: 'https://www2.natal.rn.gov.br/dom/' },
+  natal: { id: 'natal', name: 'Diário Oficial de Natal', url: 'https://www.natal.rn.gov.br/dom/' },
   extremoz: { id: 'extremoz', name: 'Diário Oficial de Extremoz', url: 'https://extremoz.rn.gov.br/diario-oficial/diario-oficial-2026/' },
 };
 
@@ -613,7 +613,7 @@ Deno.serve(async (req) => {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
-        const resp = await fetch('https://www2.natal.rn.gov.br/dom/', {
+        const resp = await fetch('https://www.natal.rn.gov.br/dom/', {
           method: 'POST',
           signal: controller.signal,
           headers: { ...FETCH_HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' },

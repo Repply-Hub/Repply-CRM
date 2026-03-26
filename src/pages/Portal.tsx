@@ -81,7 +81,7 @@ const SITES = [
     id: 'natal',
     name: 'Diário Oficial - Natal',
     description: 'Publicações oficiais da Prefeitura de Natal/RN',
-    url: 'https://www2.natal.rn.gov.br/dom/',
+    url: 'https://www.natal.rn.gov.br/dom/',
     icon: '🏛️',
     gradient: 'from-blue-500/10 to-blue-600/5',
     badgeClass: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/20',
@@ -413,7 +413,7 @@ export default function Portal() {
         ...prev,
         natal: {
           success: true,
-          site: { id: 'natal', name: 'Diário Oficial - Natal', url: 'https://www2.natal.rn.gov.br/dom/' },
+          site: { id: 'natal', name: 'Diário Oficial - Natal', url: 'https://www.natal.rn.gov.br/dom/' },
           data: { text: `${tableData.length} registros relevantes encontrados no banco de dados.`, links: [], table: tableData },
           meta: { total_licencas: tableData.length },
           fetched_at: new Date().toISOString(),
@@ -463,7 +463,7 @@ export default function Portal() {
           formData.append('ano', ano);
           formData.append('list', 'Listar');
 
-          const resp = await fetch('https://www2.natal.rn.gov.br/dom/', {
+          const resp = await fetch('https://www.natal.rn.gov.br/dom/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString(),
@@ -471,7 +471,7 @@ export default function Portal() {
           if (!resp.ok) continue;
           const html = await resp.text();
 
-          const linkRegex = /<a\s+href="(https?:\/\/www2\.natal\.rn\.gov\.br\/_anexos\/publicacao\/dom\/[^"]+\.pdf)"[^>]*>([^<]+)<\/a>/gi;
+          const linkRegex = /<a\s+href="(https?:\/\/www2?\.natal\.rn\.gov\.br\/_anexos\/publicacao\/dom\/[^"]+\.pdf)"[^>]*>([^<]+)<\/a>/gi;
           let match;
           while ((match = linkRegex.exec(html)) !== null) {
             const href = match[1];
