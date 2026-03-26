@@ -28,6 +28,7 @@ const navItems = [
   { path: '/fabricantes', label: 'Fabricantes', icon: Factory },
   { path: '/portal', label: 'Portal', icon: Globe },
   { path: '/calendario', label: 'Calendário', icon: CalendarDays },
+  { path: '/tarefas', label: 'Tarefas', icon: ClipboardList },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
