@@ -71,7 +71,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
   const upsert = useUpsertPermissao();
   const { user } = useAuth();
   const qc = useQueryClient();
-  const isGestor = vendedor.role === 'gestor';
+  const isGestor = vendedor.role === 'gestor' || vendedor.role === 'admin';
 
   const getPermissao = (modulo: string): Permissao | undefined =>
     permissoes?.find(p => p.modulo === modulo);
