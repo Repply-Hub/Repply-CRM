@@ -3,6 +3,85 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const normalizeLicenseType = (value: string) => {
+  const text = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  if (text.includes('licenca previa') || text === 'lp') return 'Licença Prévia';
+  if (text.includes('licenca de instalacao') || text === 'li') return 'Licença de Instalação';
+  if (text.includes('licenca de operacao') || text === 'lo') return 'Licença de Operação';
+
+  return '';
+};
+
+const isRelevantEntry = (entry: Record<string, unknown>) => {
+  const tipo = normalizeLicenseType(String(entry.tipo_licenca || ''));
+  const hasCoreData = Boolean(
+    String(entry.fase_obra || '').trim() ||
+    String(entry.nome_contato || '').trim() ||
+    String(entry.email || '').trim() ||
+    String(entry.construtora || '').trim() ||
+    String(entry.razao_social || '').trim() ||
+    String(entry.obra_descricao || '').trim() ||
+    String(entry.endereco_obra || '').trim()
+  );
+
+  return Boolean(tipo && hasCoreData);
+};
+
+const sanitizeEntry = (entry: Record<string, unknown>) => ({
+  tipo_licenca: normalizeLicenseType(String(entry.tipo_licenca || '')),
+  fase_obra: String(entry.fase_obra || '').trim(),
+  construtora: String(entry.construtora || '').trim(),
+  cnpj: String(entry.cnpj || '').trim(),
+  razao_social: String(entry.razao_social || '').trim(),
+  nome_contato: String(entry.nome_contato || '').trim(),
+  email: String(entry.email || '').trim(),
+  telefone: '',
+  endereco_obra: String(entry.endereco_obra || '').trim(),
+  obra_descricao: String(entry.obra_descricao || '').trim(),
+  bloco_texto: String(entry.bloco_texto || '').trim().slice(0, 300),
+});
+
+const extractJsonObject = (content: string) => {
+  const fencedMatch = content.match(/```json\s*([\s\S]*?)\s*```/i);
+  if (fencedMatch?.[1]) return fencedMatch[1].trim();
+
+  const start = content.indexOf('{');
+  if (start === -1) return '';
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < content.length; i++) {
+    const char = content[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === '{') depth++;
+    if (char === '}') {
+      depth--;
+      if (depth === 0) return content.slice(start, i + 1);
+    }
+  }
+
+  return content.slice(start).trim();
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -75,27 +154,37 @@ Deno.serve(async (req) => {
     }
 
     // Call Gemini with the PDF for structured extraction
-    const prompt = `Analise este PDF do Diário Oficial de Natal/RN e extraia TODAS as licenças, alvarás, autorizações e publicações relacionadas a obras/construções/empreendimentos.
+    const prompt = `Analise este PDF do Diário Oficial de Natal/RN e extraia APENAS publicações de obras relacionadas aos seguintes tipos de licença:
 
-Para CADA licença/publicação encontrada, extraia as seguintes informações:
+- Licença Prévia
+- Licença de Instalação
+- Licença de Operação
 
-- tipo_licenca: O tipo (ex: "Licença Prévia", "Licença de Instalação", "Licença de Operação", "Licença Simplificada", "Alvará de Construção", "Alvará de Funcionamento", "Autorização Ambiental", etc.)
-- fase_obra: A fase/momento da obra (ex: "Planejamento", "Instalação", "Construção", "Operação", "Reforma", "Ampliação", "Demolição")
-- construtora: Nome da construtora/incorporadora/empresa responsável
-- cnpj: CNPJ da empresa (formato XX.XXX.XXX/XXXX-XX)
-- razao_social: Razão social da empresa
-- nome_contato: Nome do responsável/requerente/proprietário
-- email: Email de contato encontrado
-- telefone: Telefone de contato encontrado
-- endereco_obra: Endereço/localização da obra
-- obra_descricao: Descrição da obra/empreendimento
-- bloco_texto: Trecho resumido do texto relevante (max 300 caracteres)
+IGNORE completamente qualquer outro conteúdo, como extratos de contrato, aditivos, avisos, nomeações, licitações, funcionamento, serviços, compras, decretos ou publicações sem uma dessas três licenças.
 
-Responda APENAS com um JSON válido no formato:
-{"entries": [{"tipo_licenca": "...", "fase_obra": "...", "construtora": "...", "cnpj": "...", "razao_social": "...", "nome_contato": "...", "email": "...", "telefone": "...", "endereco_obra": "...", "obra_descricao": "...", "bloco_texto": "..."}]}
+Para cada item válido, extraia SOMENTE estes campos:
+- tipo_licenca: deve ser exatamente "Licença Prévia", "Licença de Instalação" ou "Licença de Operação"
+- fase_obra: momento da obra
+- construtora: de quem é a construtora / de quem é a obra
+- razao_social: razão social da empresa, se houver
+- cnpj: CNPJ se houver
+- nome_contato: nome do contato/responsável
+- email: email do contato
+- endereco_obra: endereço da obra, se houver
+- obra_descricao: descrição objetiva da obra
+- bloco_texto: trecho resumido do texto fonte com no máximo 300 caracteres
 
-Se não encontrar nenhuma licença/obra relevante, retorne: {"entries": []}
-Extraia o máximo de informações possível. Deixe campos vazios ("") quando não disponível.`;
+Regras obrigatórias:
+1. Não invente dados.
+2. Não retorne itens sem um dos 3 tipos de licença permitidos.
+3. Se o texto citar construção/obra mas sem LP/LI/LO explícita, ignore.
+4. Se não houver email, retorne string vazia.
+5. Responda APENAS JSON válido, sem markdown.
+
+Formato exato de resposta:
+{"entries": [{"tipo_licenca": "Licença Prévia", "fase_obra": "", "construtora": "", "cnpj": "", "razao_social": "", "nome_contato": "", "email": "", "endereco_obra": "", "obra_descricao": "", "bloco_texto": ""}]}
+
+Se não encontrar nenhuma publicação válida, retorne exatamente: {"entries": []}`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -119,7 +208,8 @@ Extraia o máximo de informações possível. Deixe campos vazios ("") quando n�
             ],
           },
         ],
-        temperature: 0.1,
+         response_format: { type: 'json_object' },
+         temperature: 0,
         max_tokens: 4096,
       }),
     });
@@ -141,18 +231,22 @@ Extraia o máximo de informações possível. Deixe campos vazios ("") quando n�
     let entries: any[] = [];
     try {
       // Extract JSON from response (may be wrapped in ```json blocks)
-      const jsonMatch = content.match(/\{[\s\S]*"entries"[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        entries = parsed.entries || [];
+      const parsedContent = extractJsonObject(content);
+      if (parsedContent) {
+        const parsed = JSON.parse(parsedContent);
+        entries = Array.isArray(parsed.entries) ? parsed.entries : [];
       }
     } catch (parseErr) {
       console.error('Failed to parse AI response:', parseErr);
       console.log('Raw content:', content.substring(0, 500));
     }
 
+    const filteredEntries = entries
+      .map((entry: any) => sanitizeEntry(entry))
+      .filter((entry) => isRelevantEntry(entry));
+
     // Add metadata to each entry
-    const enrichedEntries = entries.map((entry: any) => ({
+    const enrichedEntries = filteredEntries.map((entry: any) => ({
       ...entry,
       data_edicao: pdf_date || '',
       numero_dom: pdf_numero || '',
@@ -170,10 +264,9 @@ Extraia o máximo de informações possível. Deixe campos vazios ("") quando n�
         razao_social: '',
         nome_contato: '',
         email: '',
-        telefone: '',
         endereco_obra: '',
         obra_descricao: '',
-        bloco_texto: '(Nenhuma licença/obra identificada neste diário)',
+        bloco_texto: '(Nenhuma Licença Prévia, Licença de Instalação ou Licença de Operação identificada neste diário)',
       });
     }
 

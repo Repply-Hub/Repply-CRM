@@ -31,6 +31,34 @@ interface SiteResult {
   fetched_at?: string;
 }
 
+const normalizeNatalLicenseType = (value?: string | null) => {
+  const text = (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  if (text.includes('licenca previa') || text === 'lp') return 'Licença Prévia';
+  if (text.includes('licenca de instalacao') || text === 'li') return 'Licença de Instalação';
+  if (text.includes('licenca de operacao') || text === 'lo') return 'Licença de Operação';
+
+  return '';
+};
+
+const isNatalRelevantRecord = (row: Record<string, unknown>) => {
+  const tipo = normalizeNatalLicenseType(String(row.tipo_licenca || ''));
+  const hasCoreData = Boolean(
+    String(row.fase_obra || '').trim() ||
+    String(row.nome_contato || '').trim() ||
+    String(row.email || '').trim() ||
+    String(row.construtora || '').trim() ||
+    String(row.razao_social || '').trim() ||
+    String(row.obra_descricao || '').trim() ||
+    String(row.endereco_obra || '').trim()
+  );
+
+  return Boolean(tipo && hasCoreData);
+};
+
+const isNatalPlaceholderRecord = (row: Record<string, unknown>) =>
+  String(row.bloco_texto || '').includes('Nenhuma Licença Prévia, Licença de Instalação ou Licença de Operação identificada');
+
 const SITES = [
   {
     id: 'idema',
@@ -356,17 +384,16 @@ export default function Portal() {
       const { data, error } = await query;
       if (error) throw error;
 
-      const tableData = (data || []).map(row => ({
+      const relevantData = (data || []).filter((row) => isNatalRelevantRecord(row as unknown as Record<string, unknown>));
+
+      const tableData = relevantData.map(row => ({
         'Data da Edição': row.data_edicao || '',
         'Nº DOM': row.numero_dom || '',
-        'Tipo de Licença': row.tipo_licenca || '',
+        'Tipo de Licença': normalizeNatalLicenseType(row.tipo_licenca) || '',
         'Fase da Obra': (row as any).fase_obra || '',
         'Construtora': (row as any).construtora || '',
-        'CNPJ': row.cnpj || '',
-        'Razão Social': row.razao_social || '',
         'Contato': (row as any).nome_contato || '',
         'Email': (row as any).email || '',
-        'Telefone': (row as any).telefone || '',
         'Endereço da Obra': (row as any).endereco_obra || '',
         'Obra / Descrição': row.obra_descricao || '',
         'PDF': row.pdf_nome || '',
@@ -379,7 +406,7 @@ export default function Portal() {
         natal: {
           success: true,
           site: { id: 'natal', name: 'Diário Oficial - Natal', url: 'https://www2.natal.rn.gov.br/dom/' },
-          data: { text: `${tableData.length} registros encontrados no banco de dados.`, links: [], table: tableData },
+          data: { text: `${tableData.length} registros relevantes encontrados no banco de dados.`, links: [], table: tableData },
           meta: { total_licencas: tableData.length },
           fetched_at: new Date().toISOString(),
         },
@@ -453,9 +480,18 @@ export default function Portal() {
       toast.loading(`Encontrados ${pdfLinks.length} PDFs. Verificando novos...`, { id: toastId });
 
       // Check existing
-      const { data: existing } = await supabase.from('licencas_natal').select('pdf_link');
-      const existingLinks = new Set((existing || []).map(r => r.pdf_link));
-      const newPdfs = pdfLinks.filter(p => !existingLinks.has(p.href));
+      const { data: existing } = await supabase
+        .from('licencas_natal')
+        .select('pdf_link,tipo_licenca,fase_obra,construtora,razao_social,nome_contato,email,endereco_obra,obra_descricao,bloco_texto');
+
+      const relevantLinks = new Set(
+        (existing || [])
+          .filter((row) => isNatalRelevantRecord(row as unknown as Record<string, unknown>) || isNatalPlaceholderRecord(row as unknown as Record<string, unknown>))
+          .map((row) => row.pdf_link)
+          .filter(Boolean)
+      );
+
+      const newPdfs = pdfLinks.filter(p => !relevantLinks.has(p.href));
 
       if (newPdfs.length === 0) {
         toast.success('Banco de dados já está atualizado!', { id: toastId });
@@ -499,14 +535,13 @@ export default function Portal() {
               await supabase.from('licencas_natal').insert({
                 data_edicao: entry.data_edicao || pdf.date || pdf.title,
                 numero_dom: entry.numero_dom || pdf.numero,
-                tipo_licenca: entry.tipo_licenca || '',
+                tipo_licenca: normalizeNatalLicenseType(entry.tipo_licenca) || '',
                 fase_obra: entry.fase_obra || '',
                 construtora: entry.construtora || '',
                 cnpj: entry.cnpj || '',
                 razao_social: entry.razao_social || '',
                 nome_contato: entry.nome_contato || '',
                 email: entry.email || '',
-                telefone: entry.telefone || '',
                 endereco_obra: entry.endereco_obra || '',
                 obra_descricao: entry.obra_descricao || '',
                 pdf_nome: pdf.href.split('/').pop() || '',
