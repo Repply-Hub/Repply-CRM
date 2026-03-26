@@ -1050,6 +1050,7 @@ export type Database = {
         Returns: boolean
       }
       is_gestor: { Args: never; Returns: boolean }
+      validar_codigo_empresa: { Args: { p_codigo: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
