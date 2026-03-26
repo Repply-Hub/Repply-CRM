@@ -8,6 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Building2, MapPin, Search, Loader2, HardHat, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+
+const OBRA_FIELDS: ColumnDefinition[] = [
+  { id: 'nome_obra', label: 'Nome da Obra', locked: true },
+  { id: 'status', label: 'Status', locked: true },
+  { id: 'cliente', label: 'Cliente' },
+  { id: 'endereco', label: 'Endereço' },
+  { id: 'spe_cnpj', label: 'CNPJ/SPE' },
+  { id: 'created_at', label: 'Data de Criação' },
+];
 
 const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   em_andamento: { label: 'Em andamento', variant: 'default' },
@@ -23,6 +33,17 @@ export default function Obras() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
+
+  // Field visibility state
+  const [visibleFields, setVisibleFields] = useState<string[]>(() => {
+    const saved = localStorage.getItem('obras_fields');
+    return saved ? JSON.parse(saved) : OBRA_FIELDS.map(c => c.id);
+  });
+
+  const handleFieldChange = (newFields: string[]) => {
+    setVisibleFields(newFields);
+    localStorage.setItem('obras_fields', JSON.stringify(newFields));
+  };
 
   const filtered = useMemo(() => {
     if (!obras) return [];
@@ -97,6 +118,11 @@ export default function Obras() {
               <SelectItem value="name_desc">Nome Z-A</SelectItem>
             </SelectContent>
           </Select>
+          <ColumnSettings
+            columns={OBRA_FIELDS}
+            visibleColumns={visibleFields}
+            onChange={handleFieldChange}
+          />
         </div>
 
         {/* Content */}
@@ -130,30 +156,32 @@ export default function Obras() {
                       </div>
                     </CardHeader>
                     <CardContent className="flex-1 space-y-2 text-sm text-muted-foreground">
-                      {cliente?.empresa && (
+                      {visibleFields.includes('cliente') && cliente?.empresa && (
                         <div className="flex items-center gap-2">
                           <Building2 className="h-3.5 w-3.5 shrink-0" />
                           <span className="truncate">{cliente.empresa}</span>
                         </div>
                       )}
-                      {obra.endereco_entrega && (
+                      {visibleFields.includes('endereco') && obra.endereco_entrega && (
                         <div className="flex items-center gap-2">
                           <MapPin className="h-3.5 w-3.5 shrink-0" />
                           <span className="truncate">{obra.endereco_entrega}</span>
                         </div>
                       )}
-                      {obra.spe_cnpj && (
+                      {visibleFields.includes('spe_cnpj') && obra.spe_cnpj && (
                         <div className="flex items-center gap-2">
                           <Building2 className="h-3.5 w-3.5 shrink-0" />
                           <span className="text-xs">SPE: {obra.spe_cnpj}</span>
                         </div>
                       )}
-                      <div className="flex items-center gap-2 pt-1 border-t border-border/50">
-                        <Calendar className="h-3.5 w-3.5 shrink-0" />
-                        <span className="text-xs">
-                          Criada em {format(new Date(obra.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
-                        </span>
-                      </div>
+                      {visibleFields.includes('created_at') && (
+                        <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+                          <Calendar className="h-3.5 w-3.5 shrink-0" />
+                          <span className="text-xs">
+                            Criada em {format(new Date(obra.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
+                          </span>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );

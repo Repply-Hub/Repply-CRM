@@ -12,6 +12,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+
+const CLIENTE_FIELDS: ColumnDefinition[] = [
+  { id: 'empresa', label: 'Nome/Empresa', locked: true },
+  { id: 'tipo', label: 'Tipo' },
+  { id: 'cnpj', label: 'CPF/CNPJ' },
+  { id: 'email', label: 'E-mail' },
+  { id: 'endereco', label: 'Endereço' },
+  { id: 'obras_count', label: 'Qtd. Obras' },
+];
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 import { EnderecoForm } from '@/components/EnderecoForm';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
@@ -33,6 +43,17 @@ const Clientes = () => {
   const [razaoSocial, setRazaoSocial] = useState('');
   const [endereco, setEndereco] = useState<EnderecoFields>(emptyEndereco);
   const [telefone, setTelefone] = useState('');
+
+  // Field visibility state
+  const [visibleFields, setVisibleFields] = useState<string[]>(() => {
+    const saved = localStorage.getItem('clientes_fields');
+    return saved ? JSON.parse(saved) : CLIENTE_FIELDS.map(c => c.id);
+  });
+
+  const handleFieldChange = (newFields: string[]) => {
+    setVisibleFields(newFields);
+    localStorage.setItem('clientes_fields', JSON.stringify(newFields));
+  };
 
   const filtered = (clients ?? []).filter(c =>
     c.empresa.toLowerCase().includes(search.toLowerCase()) &&
@@ -124,6 +145,11 @@ const Clientes = () => {
               <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
             </SelectContent>
           </Select>
+          <ColumnSettings
+            columns={CLIENTE_FIELDS}
+            visibleColumns={visibleFields}
+            onChange={handleFieldChange}
+          />
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Cliente</Button>
@@ -188,15 +214,17 @@ const Clientes = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-sm truncate font-bold">{client.empresa}</CardTitle>
-                        <Badge variant="secondary" className="text-[10px] mt-1 font-medium">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
+                        {visibleFields.includes('tipo') && (
+                          <Badge variant="secondary" className="text-[10px] mt-1 font-medium">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="text-xs space-y-1 text-muted-foreground">
-                    {client.cnpj && <p>{client.cnpj}</p>}
-                    {client.email && <p>{client.email}</p>}
-                    {client.endereco && <p className="flex items-center gap-1"><MapPin className="h-3 w-3" />{client.endereco}</p>}
-                    {client.obras && client.obras.length > 0 && (
+                    {visibleFields.includes('cnpj') && client.cnpj && <p>{client.cnpj}</p>}
+                    {visibleFields.includes('email') && client.email && <p>{client.email}</p>}
+                    {visibleFields.includes('endereco') && client.endereco && <p className="flex items-center gap-1"><MapPin className="h-3 w-3" />{client.endereco}</p>}
+                    {visibleFields.includes('obras_count') && client.obras && client.obras.length > 0 && (
                       <p className="text-primary font-medium">{client.obras.length} obra(s) vinculada(s)</p>
                     )}
                   </CardContent>

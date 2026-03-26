@@ -14,6 +14,16 @@ import { useCreateFabricante } from '@/hooks/use-mutations';
 import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante } from '@/hooks/use-fabricantes';
 import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package } from 'lucide-react';
 import { toast } from 'sonner';
+import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+
+const PRECOS_COLUMNS: ColumnDefinition[] = [
+  { id: 'descricao', label: 'Descrição', locked: true },
+  { id: 'referencia', label: 'Referência' },
+  { id: 'preco', label: 'Preço Unit.' },
+  { id: 'unidade', label: 'Unidade' },
+  { id: 'status', label: 'Status' },
+  { id: 'acoes', label: 'Ações' },
+];
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -167,6 +177,17 @@ const Fabricantes = () => {
   const [editPreco, setEditPreco] = useState<any>(null);
   const [deleteAlert, setDeleteAlert] = useState<{ type: 'fab' | 'preco'; id: string } | null>(null);
 
+  // Column visibility state for Price Table
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('precos_columns');
+    return saved ? JSON.parse(saved) : PRECOS_COLUMNS.map(c => c.id);
+  });
+
+  const handleColumnChange = (newColumns: string[]) => {
+    setVisibleColumns(newColumns);
+    localStorage.setItem('precos_columns', JSON.stringify(newColumns));
+  };
+
   const deleteFabricante = useDeleteFabricante();
   const deletePreco = useDeletePreco();
   const { data: precos, isLoading: loadingPrecos } = useTabelaPrecos(selectedFabId);
@@ -216,9 +237,8 @@ const Fabricantes = () => {
                     <button
                       key={f.id}
                       onClick={() => setSelectedFabId(f.id)}
-                      className={`w-full text-left p-3 rounded-lg border transition-all ${
-                        selectedFabId === f.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-transparent hover:bg-muted/50'
-                      }`}
+                      className={`w-full text-left p-3 rounded-lg border transition-all ${selectedFabId === f.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-transparent hover:bg-muted/50'
+                        }`}
                     >
                       <p className="font-medium text-sm text-foreground">{f.nome}</p>
                       <p className="text-xs text-muted-foreground">{f.cnpj || 'Sem CNPJ'} · {f.nome_contato || 'Sem contato'}</p>
@@ -261,9 +281,16 @@ const Fabricantes = () => {
                       <CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4" /> Tabela de Preços</CardTitle>
                       <CardDescription>{precos?.length ?? 0} itens</CardDescription>
                     </div>
-                    <Button size="sm" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
-                      <Plus className="h-4 w-4 mr-1" /> Novo Item
-                    </Button>
+                    <div className="flex gap-2">
+                      <ColumnSettings
+                        columns={PRECOS_COLUMNS}
+                        visibleColumns={visibleColumns}
+                        onChange={handleColumnChange}
+                      />
+                      <Button size="sm" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
+                        <Plus className="h-4 w-4 mr-1" /> Novo Item
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {loadingPrecos ? (
@@ -272,32 +299,34 @@ const Fabricantes = () => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Descrição</TableHead>
-                            <TableHead>Referência</TableHead>
-                            <TableHead>Preço Unit.</TableHead>
-                            <TableHead>Unidade</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="w-20">Ações</TableHead>
+                            {visibleColumns.includes('descricao') && <TableHead>Descrição</TableHead>}
+                            {visibleColumns.includes('referencia') && <TableHead>Referência</TableHead>}
+                            {visibleColumns.includes('preco') && <TableHead>Preço Unit.</TableHead>}
+                            {visibleColumns.includes('unidade') && <TableHead>Unidade</TableHead>}
+                            {visibleColumns.includes('status') && <TableHead>Status</TableHead>}
+                            {visibleColumns.includes('acoes') && <TableHead className="w-20">Ações</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {precos.map(p => (
                             <TableRow key={p.id}>
-                              <TableCell className="font-medium">{p.descricao_material}</TableCell>
-                              <TableCell>{p.referencia ?? '-'}</TableCell>
-                              <TableCell>{p.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                              <TableCell>{p.unidade ?? '-'}</TableCell>
-                              <TableCell><Badge variant={p.vigente ? 'default' : 'secondary'}>{p.vigente ? 'Vigente' : 'Inativo'}</Badge></TableCell>
-                              <TableCell>
-                                <div className="flex gap-1">
-                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditPreco(p); setPrecoDialog(true); }}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteAlert({ type: 'preco', id: p.id })}>
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              </TableCell>
+                              {visibleColumns.includes('descricao') && <TableCell className="font-medium">{p.descricao_material}</TableCell>}
+                              {visibleColumns.includes('referencia') && <TableCell>{p.referencia ?? '-'}</TableCell>}
+                              {visibleColumns.includes('preco') && <TableCell>{p.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>}
+                              {visibleColumns.includes('unidade') && <TableCell>{p.unidade ?? '-'}</TableCell>}
+                              {visibleColumns.includes('status') && <TableCell><Badge variant={p.vigente ? 'default' : 'secondary'}>{p.vigente ? 'Vigente' : 'Inativo'}</Badge></TableCell>}
+                              {visibleColumns.includes('acoes') && (
+                                <TableCell>
+                                  <div className="flex gap-1">
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditPreco(p); setPrecoDialog(true); }}>
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteAlert({ type: 'preco', id: p.id })}>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              )}
                             </TableRow>
                           ))}
                         </TableBody>

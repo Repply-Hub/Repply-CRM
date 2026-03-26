@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { ColumnSettings } from '@/components/ColumnSettings';
 
-import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CloudDownload, List } from 'lucide-react';
+import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CloudDownload, List, Settings2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -75,15 +76,24 @@ export default function Portal() {
   const [pages, setPages] = useState<Record<string, number>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<string>('extremoz');
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, string[]>>(() => {
+    const saved = localStorage.getItem('portal-visible-columns');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('portal-visible-columns', JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
   const ROWS_PER_PAGE = 10;
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const scrollToResults = (siteId: string) => {
     if (!results[siteId]?.success) {
-      const fetchFn = siteId === 'extremoz' ? fetchExtremozFromDb 
-        : siteId === 'natal' ? fetchNatalFromDb 
-        : siteId === 'idema' ? fetchIdemaFromDb 
-        : () => fetchSite(siteId);
+      const fetchFn = siteId === 'extremoz' ? fetchExtremozFromDb
+        : siteId === 'natal' ? fetchNatalFromDb
+          : siteId === 'idema' ? fetchIdemaFromDb
+            : () => fetchSite(siteId);
       fetchFn().then(() => {
         setTimeout(() => sectionRefs.current[siteId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
       });
@@ -107,7 +117,7 @@ export default function Portal() {
     setLoading((prev) => ({ ...prev, extremoz: true }));
     try {
       let query = supabase.from('licencas_extremoz').select('*').order('created_at', { ascending: false });
-      
+
       if (search) {
         const q = `%${search}%`;
         query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},nome_fantasia.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q}`);
@@ -222,7 +232,7 @@ export default function Portal() {
           const resp = await fetch(pdf.href);
           if (!resp.ok) continue;
           const buffer = new Uint8Array(await resp.arrayBuffer());
-          
+
           if (buffer.length > 2 * 1024 * 1024) {
             // Too large, just register as entry
             await supabase.from('licencas_extremoz').insert({
@@ -337,7 +347,7 @@ export default function Portal() {
     setLoading((prev) => ({ ...prev, natal: true }));
     try {
       let query = supabase.from('licencas_natal').select('*').order('created_at', { ascending: false });
-      
+
       if (search) {
         const q = `%${search}%`;
         query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q}`);
@@ -554,7 +564,7 @@ export default function Portal() {
               if (m) { obra = m[1].replace(/\s+/g, ' ').trim(); break; }
             }
 
-            const hasRelevant = tipo || lower.includes('licen') || lower.includes('construção') || 
+            const hasRelevant = tipo || lower.includes('licen') || lower.includes('construção') ||
               lower.includes('loteamento') || lower.includes('empreendimento') || lower.includes('alvará');
             if (!hasRelevant) continue;
 
@@ -591,7 +601,7 @@ export default function Portal() {
     setLoading((prev) => ({ ...prev, idema: true }));
     try {
       let query = supabase.from('licencas_idema').select('*').order('created_at', { ascending: false });
-      
+
       if (search) {
         const q = `%${search}%`;
         query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},empreendimento.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q},municipio.ilike.${q}`);
@@ -977,11 +987,10 @@ export default function Portal() {
                     else fetchSite(site.id);
                   }
                 }}
-                className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${
-                  activeTab === site.id
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
+                className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${activeTab === site.id
+                  ? 'bg-primary text-primary-foreground shadow-md'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
               >
                 {site.name}
               </button>
@@ -1027,7 +1036,16 @@ export default function Portal() {
                         );
                       }
 
-                      const headers = Object.keys(result.data.table[0]);
+                      const allHeaders = Object.keys(result.data.table[0]).filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF');
+
+                      const currentVisible = visibleColumns[site.id] || allHeaders;
+                      const headers = allHeaders.filter(h => currentVisible.includes(h));
+
+                      const colDefinitions = allHeaders.map(h => ({
+                        id: h,
+                        label: h
+                      }));
+
                       const currentPage = pages[site.id] || 0;
                       const totalPages = Math.ceil(result.data.table.length / ROWS_PER_PAGE);
                       const paginatedRows = result.data.table.slice(currentPage * ROWS_PER_PAGE, (currentPage + 1) * ROWS_PER_PAGE);
@@ -1037,16 +1055,23 @@ export default function Portal() {
                             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                               {site.name} ({result.data.table.length} registros)
                             </p>
-                            <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={() => exportCsv(site.id)}>
-                              <Download className="mr-1 h-3 w-3" /> CSV
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <ColumnSettings
+                                columns={colDefinitions}
+                                visibleColumns={currentVisible}
+                                onChange={(cols) => setVisibleColumns(prev => ({ ...prev, [site.id]: cols }))}
+                              />
+                              <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={() => exportCsv(site.id)}>
+                                <Download className="mr-1 h-3 w-3" /> CSV
+                              </Button>
+                            </div>
                           </div>
                           <div className="w-full max-w-full overflow-x-auto rounded-md border overscroll-x-contain">
                             <table className="min-w-[1100px] text-xs">
                               <thead>
                                 <tr className="bg-muted/50">
                                   <th className="px-2 py-2 w-8"></th>
-                                  {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
+                                  {headers.map((h) => (
                                     <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
                                   ))}
                                   <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Ações</th>
@@ -1056,7 +1081,7 @@ export default function Portal() {
                                 {paginatedRows.map((row, i) => {
                                   const rowKey = `${site.id}-${currentPage}-${i}`;
                                   const isExpanded = expandedRows[rowKey];
-                                  const colCount = headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').length + 2;
+                                  const colCount = headers.length + 2;
                                   return (
                                     <>
                                       <tr key={rowKey} className="border-t border-border/50 hover:bg-accent/30">
@@ -1070,7 +1095,7 @@ export default function Portal() {
                                             </button>
                                           )}
                                         </td>
-                                        {headers.filter(h => h !== 'Texto Encontrado' && h !== 'Link PDF').map((h) => (
+                                        {headers.map((h) => (
                                           <td key={h} className="max-w-[200px] truncate px-3 py-2" title={row[h]}>
                                             {row[h]}
                                           </td>

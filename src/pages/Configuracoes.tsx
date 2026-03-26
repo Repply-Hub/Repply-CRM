@@ -37,24 +37,26 @@ function ThemeSelector() {
   const { theme, setTheme } = useTheme();
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Tema</CardTitle>
-        <CardDescription>Escolha o modo de exibição da interface</CardDescription>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <Sun className="h-4 w-4 text-primary" /> Aparência
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="flex bg-muted/30 p-1 rounded-md border border-border">
           {themeOptions.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setTheme(opt.value)}
               className={cn(
-                'flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all',
-                theme === opt.value ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                'flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-sm text-xs font-medium transition-all',
+                theme === opt.value
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
               )}
             >
-              <opt.icon className={cn('h-6 w-6', theme === opt.value ? 'text-primary' : 'text-muted-foreground')} />
-              <span className="text-sm font-medium">{opt.label}</span>
-              <span className="text-[10px] text-muted-foreground text-center">{opt.desc}</span>
+              <opt.icon className={cn('h-3.5 w-3.5', theme === opt.value ? 'text-primary' : 'text-muted-foreground')} />
+              <span>{opt.label}</span>
             </button>
           ))}
         </div>
@@ -684,8 +686,11 @@ function ProfileTab() {
         </Card>
       </div>
 
-      {/* Coluna Direita: Segurança e Perigo */}
+      {/* Coluna Direita: Aparência, Segurança e Perigo */}
       <div className="space-y-4">
+        {/* Aparência */}
+        <ThemeSelector />
+
         {/* Segurança / Senha */}
         <Card>
           <CardHeader>
@@ -848,13 +853,10 @@ const Configuracoes = () => {
           <TabsList>
             <TabsTrigger value="perfil" className="gap-1.5"><UserCircle className="h-4 w-4" /> Perfil</TabsTrigger>
             <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> {isGestor ? 'Usuários' : 'Vendedores'}</TabsTrigger>
-            <TabsTrigger value="aparencia">Aparência</TabsTrigger>
             <TabsTrigger value="automacao">Automação</TabsTrigger>
           </TabsList>
 
           <TabsContent value="perfil" className="mt-4"><ProfileTab /></TabsContent>
-
-          <TabsContent value="aparencia" className="mt-4"><ThemeSelector /></TabsContent>
 
           <TabsContent value="vendedores" className="mt-4">
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-4">

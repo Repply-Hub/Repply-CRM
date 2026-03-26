@@ -13,6 +13,17 @@ import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil,
 import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+
+const PEDIDOS_COLUMNS: ColumnDefinition[] = [
+  { id: 'cliente', label: 'Cliente', locked: true },
+  { id: 'obra', label: 'Obra' },
+  { id: 'fabricante', label: 'Fabricante' },
+  { id: 'valor', label: 'Valor' },
+  { id: 'etapa', label: 'Etapa' },
+  { id: 'vendedor', label: 'Vendedor' },
+  { id: 'acoes', label: 'Ações' },
+];
 
 const stageColors: Record<string, string> = {
   novo_lead: 'bg-kanban-new text-white',
@@ -32,9 +43,20 @@ const Pedidos = () => {
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder);
 
+  // Column visibility state
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('pedidos_columns');
+    return saved ? JSON.parse(saved) : PEDIDOS_COLUMNS.map(c => c.id);
+  });
+
+  const handleColumnChange = (newColumns: string[]) => {
+    setVisibleColumns(newColumns);
+    localStorage.setItem('pedidos_columns', JSON.stringify(newColumns));
+  };
+
   const filtered = (pedidos ?? []).filter(p =>
     ((p.cliente?.empresa ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.fabricante?.nome ?? '').toLowerCase().includes(search.toLowerCase())) &&
+      (p.fabricante?.nome ?? '').toLowerCase().includes(search.toLowerCase())) &&
     (stageFilter === 'todos' || p.status === stageFilter)
   );
 
@@ -44,7 +66,7 @@ const Pedidos = () => {
     <AppLayout title="Pedidos & Orçamentos" subtitle={`${pedidos?.length ?? 0} pedidos`}>
       <div className="p-6">
         <div className="flex items-center justify-end mb-6">
-           <div className="flex gap-2">
+          <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={async () => {
               const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
               await generatePedidosPdf(
@@ -68,6 +90,11 @@ const Pedidos = () => {
             <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
               <Plus className="h-4 w-4 mr-1" /> Novo Pedido
             </Button>
+            <ColumnSettings
+              columns={PEDIDOS_COLUMNS}
+              visibleColumns={visibleColumns}
+              onChange={handleColumnChange}
+            />
           </div>
         </div>
 
@@ -97,37 +124,47 @@ const Pedidos = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Obra</TableHead>
-                      <TableHead>Fabricante</TableHead>
-                      <TableHead>Valor</TableHead>
-                      <TableHead>Etapa</TableHead>
-                      <TableHead>Vendedor</TableHead>
-                      <TableHead></TableHead>
-                      <TableHead></TableHead>
+                      {visibleColumns.includes('cliente') && <TableHead>Cliente</TableHead>}
+                      {visibleColumns.includes('obra') && <TableHead>Obra</TableHead>}
+                      {visibleColumns.includes('fabricante') && <TableHead>Fabricante</TableHead>}
+                      {visibleColumns.includes('valor') && <TableHead>Valor</TableHead>}
+                      {visibleColumns.includes('etapa') && <TableHead>Etapa</TableHead>}
+                      {visibleColumns.includes('vendedor') && <TableHead>Vendedor</TableHead>}
+                      {visibleColumns.includes('acoes') && (
+                        <>
+                          <TableHead></TableHead>
+                          <TableHead></TableHead>
+                        </>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filtered.map(p => (
                       <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setSelectedOrder(p.id)}>
-                        <TableCell className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>
-                        <TableCell>{p.obra?.nome_obra ?? '-'}</TableCell>
-                        <TableCell>{p.fabricante?.nome ?? '-'}</TableCell>
-                        <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                        <TableCell>
-                          <Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge>
-                        </TableCell>
-                        <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${p.id}/editar`); }} title="Editar pedido">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedOrder(p.id); }}>
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+                        {visibleColumns.includes('cliente') && <TableCell className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>}
+                        {visibleColumns.includes('obra') && <TableCell>{p.obra?.nome_obra ?? '-'}</TableCell>}
+                        {visibleColumns.includes('fabricante') && <TableCell>{p.fabricante?.nome ?? '-'}</TableCell>}
+                        {visibleColumns.includes('valor') && <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>}
+                        {visibleColumns.includes('etapa') && (
+                          <TableCell>
+                            <Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge>
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('vendedor') && <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>}
+                        {visibleColumns.includes('acoes') && (
+                          <>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${p.id}/editar`); }} title="Editar pedido">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedOrder(p.id); }}>
+                                <MessageSquare className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
