@@ -1,4 +1,5 @@
-import { getDocument } from 'https://esm.sh/pdfjs-serverless@0.5.0';
+import { Buffer } from "node:buffer";
+import pdfParse from "npm:pdf-parse@1.1.1/lib/pdf-parse.js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,22 +73,11 @@ const extractJsonObject = (content: string) => {
 
 async function extractTextFromPdf(pdfBuffer: ArrayBuffer): Promise<string> {
   try {
-    const data = new Uint8Array(pdfBuffer);
-    const doc = await getDocument({ data, useSystemFonts: true });
-    const pages: string[] = [];
-
-    for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: { str?: string }) => item.str || '')
-        .join(' ');
-      pages.push(pageText);
-    }
-
-    return pages.join('\n\n');
+    const buffer = Buffer.from(pdfBuffer);
+    const data = await pdfParse(buffer);
+    return data.text || '';
   } catch (err) {
-    console.error('PDF text extraction error:', err);
+    console.error('pdf-parse extraction error:', err);
     return '';
   }
 }
@@ -131,28 +121,21 @@ Deno.serve(async (req) => {
     const pdfBuffer = await pdfResp.arrayBuffer();
     console.log(`PDF fetched, size: ${pdfBuffer.byteLength} bytes`);
 
-    // Extract text from PDF
+    // Extract text using pdf-parse
     const pdfText = await extractTextFromPdf(pdfBuffer);
     console.log(`PDF text extracted, length: ${pdfText.length} chars`);
 
     if (!pdfText || pdfText.length < 50) {
-      console.log('PDF text too short or empty, returning placeholder');
+      console.log('PDF text too short or empty');
       return new Response(
         JSON.stringify({
           success: true,
           entries: [{
             data_edicao: pdf_date || '',
             numero_dom: pdf_numero || '',
-            tipo_licenca: '',
-            fase_obra: '',
-            construtora: '',
-            cnpj: '',
-            razao_social: '',
-            nome_contato: '',
-            email: '',
-            telefone: '',
-            endereco_obra: '',
-            obra_descricao: '',
+            tipo_licenca: '', fase_obra: '', construtora: '', cnpj: '',
+            razao_social: '', nome_contato: '', email: '', telefone: '',
+            endereco_obra: '', obra_descricao: '',
             bloco_texto: '(Não foi possível extrair texto do PDF)',
           }],
         }),
@@ -160,8 +143,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Truncate text if too long (keep first 15000 chars for AI context)
-    const truncatedText = pdfText.length > 15000 ? pdfText.slice(0, 15000) + '\n\n[... texto truncado ...]' : pdfText;
+    // Truncate for AI context window
+    const truncatedText = pdfText.length > 15000
+      ? pdfText.slice(0, 15000) + '\n\n[... texto truncado ...]'
+      : pdfText;
 
     const prompt = `Analise o texto abaixo extraído de um Diário Oficial de Natal/RN e extraia APENAS publicações relacionadas aos seguintes tipos de licença ambiental:
 
@@ -232,7 +217,6 @@ ${truncatedText}`;
       }
     } catch (parseErr) {
       console.error('Failed to parse AI response:', parseErr);
-      console.log('Raw content:', content.substring(0, 500));
     }
 
     const filteredEntries = entries
@@ -249,16 +233,9 @@ ${truncatedText}`;
       enrichedEntries.push({
         data_edicao: pdf_date || '',
         numero_dom: pdf_numero || '',
-        tipo_licenca: '',
-        fase_obra: '',
-        construtora: '',
-        cnpj: '',
-        razao_social: '',
-        nome_contato: '',
-        email: '',
-        telefone: '',
-        endereco_obra: '',
-        obra_descricao: '',
+        tipo_licenca: '', fase_obra: '', construtora: '', cnpj: '',
+        razao_social: '', nome_contato: '', email: '', telefone: '',
+        endereco_obra: '', obra_descricao: '',
         bloco_texto: '(Nenhuma Licença Prévia, Licença de Instalação ou Licença de Operação identificada neste diário)',
       });
     }
