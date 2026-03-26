@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
       options: {
-        data: { nome, role: 'gestor', nome_empresa: nomeEmpresa, cnpj_empresa: cnpjEmpresa ?? '' },
+        data: { nome, role: 'empresa', nome_empresa: nomeEmpresa, cnpj_empresa: cnpjEmpresa ?? '' },
       },
     });
     return { error: error as Error | null };
