@@ -9,21 +9,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Trash2, Pencil, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, ChevronLeft, ChevronRight, Eye, Loader2, Calendar, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 const PER_PAGE = 10;
 
-const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  pendente: { label: 'Pendente', variant: 'secondary' },
-  em_andamento: { label: 'Em andamento', variant: 'default' },
-  concluida: { label: 'Concluída', variant: 'outline' },
+const statusConfig: Record<string, { label: string; className: string }> = {
+  pendente: { label: 'Pendente', className: 'bg-warning/15 text-warning-foreground border-warning/30' },
+  em_andamento: { label: 'Em andamento', className: 'bg-primary/15 text-primary border-primary/30' },
+  concluida: { label: 'Concluída', className: 'bg-success/15 text-success border-success/30' },
 };
 
 function getStatusInfo(s: string) {
-  return statusConfig[s] ?? { label: s, variant: 'secondary' as const };
+  return statusConfig[s] ?? { label: s, className: 'bg-muted text-muted-foreground' };
 }
 
 export default function Tarefas() {
@@ -41,15 +41,8 @@ export default function Tarefas() {
   const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
 
   const [form, setForm] = useState({
-    titulo: '',
-    descricao: '',
-    status: 'pendente',
-    prazo_final: '',
-    responsavel: '',
-    participantes: '',
-    observadores: '',
-    projeto: '',
-    marcadores: '',
+    titulo: '', descricao: '', status: 'pendente', prazo_final: '',
+    responsavel: '', participantes: '', observadores: '', projeto: '', marcadores: '',
   });
 
   const filtered = useMemo(() => {
@@ -60,6 +53,7 @@ export default function Tarefas() {
       list = list.filter(t =>
         t.titulo.toLowerCase().includes(q) ||
         t.responsavel?.toLowerCase().includes(q) ||
+        t.projeto?.toLowerCase().includes(q) ||
         t.marcadores?.toLowerCase().includes(q)
       );
     }
@@ -78,15 +72,10 @@ export default function Tarefas() {
   function openEdit(t: Tarefa) {
     setEditingTarefa(t);
     setForm({
-      titulo: t.titulo,
-      descricao: t.descricao || '',
-      status: t.status,
+      titulo: t.titulo, descricao: t.descricao || '', status: t.status,
       prazo_final: t.prazo_final ? t.prazo_final.slice(0, 16) : '',
-      responsavel: t.responsavel || '',
-      participantes: t.participantes || '',
-      observadores: t.observadores || '',
-      projeto: t.projeto || '',
-      marcadores: t.marcadores || '',
+      responsavel: t.responsavel || '', participantes: t.participantes || '',
+      observadores: t.observadores || '', projeto: t.projeto || '', marcadores: t.marcadores || '',
     });
     setDialogOpen(true);
   }
@@ -94,10 +83,7 @@ export default function Tarefas() {
   async function handleSave() {
     if (!form.titulo.trim()) { toast.error('Título é obrigatório'); return; }
     try {
-      const payload = {
-        ...form,
-        prazo_final: form.prazo_final ? new Date(form.prazo_final).toISOString() : null,
-      };
+      const payload = { ...form, prazo_final: form.prazo_final ? new Date(form.prazo_final).toISOString() : null };
       if (editingTarefa) {
         await updateTarefa.mutateAsync({ id: editingTarefa.id, ...payload });
         toast.success('Tarefa atualizada');
@@ -117,23 +103,16 @@ export default function Tarefas() {
   }
 
   return (
-    <AppLayout>
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Tarefas</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">{filtered.length} tarefa(s)</p>
-          </div>
-          <Button onClick={openNew} size="sm" className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-1" />Nova Tarefa</Button>
-        </div>
-
+    <AppLayout title="Tarefas" subtitle={`${filtered.length} tarefa(s)`}>
+      <div className="p-3 sm:p-4 md:p-6 max-w-[1400px] mx-auto space-y-4 md:space-y-6">
+        {/* Filters & Actions */}
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar tarefas..." className="pl-9" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
           </div>
           <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[180px] shrink-0"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
               <SelectItem value="pendente">Pendente</SelectItem>
@@ -141,109 +120,144 @@ export default function Tarefas() {
               <SelectItem value="concluida">Concluída</SelectItem>
             </SelectContent>
           </Select>
+          <Button onClick={openNew} size="sm" className="shrink-0">
+            <Plus className="h-4 w-4 mr-1" />Nova Tarefa
+          </Button>
         </div>
 
-        {/* Mobile: cards layout */}
-        <div className="block md:hidden space-y-3">
-          {isLoading ? (
-            <p className="text-center py-8 text-muted-foreground text-sm">Carregando...</p>
-          ) : paginated.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma tarefa encontrada</p>
-          ) : paginated.map(t => {
-            const si = getStatusInfo(t.status);
-            const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
-            return (
-              <div key={t.id} className="rounded-lg border bg-card p-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm line-clamp-2">{t.titulo}</p>
-                    {t.projeto && <p className="text-xs text-muted-foreground mt-0.5">{t.projeto}</p>}
-                  </div>
-                  <Badge variant={si.variant} className="shrink-0 text-[10px]">{si.label}</Badge>
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{t.responsavel || '—'}</span>
-                  <span className={isOverdue ? 'text-destructive font-medium' : ''}>
-                    {t.prazo_final ? format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR }) : '—'}
-                  </span>
-                </div>
-                {t.marcadores && <p className="text-xs text-muted-foreground">{t.marcadores}</p>}
-                <div className="flex gap-1 pt-1 border-t">
-                  <Button variant="ghost" size="sm" className="h-7 text-xs flex-1" onClick={() => { setViewTarefa(t); setViewOpen(true); }}><Eye className="h-3 w-3 mr-1" />Ver</Button>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs flex-1" onClick={() => openEdit(t)}><Pencil className="h-3 w-3 mr-1" />Editar</Button>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs flex-1 text-destructive" onClick={() => handleDelete(t.id)}><Trash2 className="h-3 w-3 mr-1" />Excluir</Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Desktop: table layout */}
-        <div className="hidden md:block rounded-lg border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tarefa</TableHead>
-                <TableHead>Responsável</TableHead>
-                <TableHead className="hidden lg:table-cell">Prazo</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="hidden xl:table-cell">Marcadores</TableHead>
-                <TableHead className="w-[100px]">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
-              ) : paginated.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma tarefa encontrada</TableCell></TableRow>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            {/* Mobile: card layout */}
+            <div className="block md:hidden space-y-3">
+              {paginated.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground text-sm">Nenhuma tarefa encontrada</div>
               ) : paginated.map(t => {
                 const si = getStatusInfo(t.status);
                 const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                 return (
-                  <TableRow key={t.id}>
-                    <TableCell className="max-w-[250px] xl:max-w-none">
-                      <p className="font-medium text-sm line-clamp-2">{t.titulo}</p>
-                      {t.projeto && <p className="text-xs text-muted-foreground mt-0.5">{t.projeto}</p>}
-                    </TableCell>
-                    <TableCell className="text-sm whitespace-nowrap">{t.responsavel || '—'}</TableCell>
-                    <TableCell className={`hidden lg:table-cell text-sm whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : ''}`}>
-                      {t.prazo_final ? format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR }) : '—'}
-                    </TableCell>
-                    <TableCell><Badge variant={si.variant} className="whitespace-nowrap">{si.label}</Badge></TableCell>
-                    <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">{t.marcadores || '—'}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setViewTarefa(t); setViewOpen(true); }}><Eye className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(t)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(t.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  <div key={t.id} className="rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm text-card-foreground line-clamp-2">{t.titulo}</p>
+                        {t.projeto && <p className="text-xs text-muted-foreground mt-1">{t.projeto}</p>}
                       </div>
-                    </TableCell>
-                  </TableRow>
+                      <Badge className={`shrink-0 text-[10px] border ${si.className}`}>{si.label}</Badge>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      {t.responsavel && (
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />{t.responsavel}
+                        </span>
+                      )}
+                      {t.prazo_final && (
+                        <span className={`flex items-center gap-1 ${isOverdue ? 'text-destructive font-medium' : ''}`}>
+                          <Calendar className="h-3 w-3" />
+                          {format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR })}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-1 pt-2 border-t border-border/40">
+                      <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 hover:bg-primary/5" onClick={() => { setViewTarefa(t); setViewOpen(true); }}>
+                        <Eye className="h-3.5 w-3.5 mr-1" />Ver
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 hover:bg-primary/5" onClick={() => openEdit(t)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1" />Editar
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 text-destructive hover:bg-destructive/5" onClick={() => handleDelete(t.id)}>
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />Excluir
+                      </Button>
+                    </div>
+                  </div>
                 );
               })}
-            </TableBody>
-          </Table>
-        </div>
-
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-2 sm:px-4 py-3 border rounded-lg bg-card">
-            <span className="text-xs text-muted-foreground">Página {page} de {totalPages}</span>
-            <div className="flex gap-1">
-              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
-              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
             </div>
-          </div>
+
+            {/* Desktop: table layout */}
+            <div className="hidden md:block rounded-xl border border-border/60 overflow-hidden shadow-[var(--shadow-card)]">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Tarefa</TableHead>
+                    <TableHead className="hidden lg:table-cell">Responsável</TableHead>
+                    <TableHead className="hidden lg:table-cell">Prazo</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="hidden xl:table-cell">Projeto</TableHead>
+                    <TableHead className="w-[110px]">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginated.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">Nenhuma tarefa encontrada</TableCell></TableRow>
+                  ) : paginated.map(t => {
+                    const si = getStatusInfo(t.status);
+                    const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
+                    return (
+                      <TableRow key={t.id} className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="max-w-[300px]">
+                          <p className="font-medium text-sm text-card-foreground line-clamp-1">{t.titulo}</p>
+                          {t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
+                          {t.responsavel && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.responsavel}</p>}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm whitespace-nowrap">{t.responsavel || '—'}</TableCell>
+                        <TableCell className={`hidden lg:table-cell text-sm whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : ''}`}>
+                          {t.prazo_final ? format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR }) : '—'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`whitespace-nowrap text-[11px] border ${si.className}`}>{si.label}</Badge>
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell text-sm text-muted-foreground truncate max-w-[180px]">{t.projeto || '—'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-0.5">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5" onClick={() => { setViewTarefa(t); setViewOpen(true); }}>
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5" onClick={() => openEdit(t)}>
+                              <Pencil className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/5" onClick={() => handleDelete(t.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive/70" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-3 sm:px-4 py-3 rounded-xl border border-border/60 bg-card shadow-[var(--shadow-card)]">
+                <span className="text-xs text-muted-foreground">
+                  Página {page} de {totalPages} · {filtered.length} tarefa(s)
+                </span>
+                <div className="flex gap-1">
+                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Dialog criar/editar */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingTarefa ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 mt-2">
             <div><Label>Título *</Label><Input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} /></div>
             <div><Label>Descrição</Label><Textarea value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} rows={3} /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Status</Label>
                 <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
@@ -257,7 +271,7 @@ export default function Tarefas() {
               </div>
               <div><Label>Prazo</Label><Input type="datetime-local" value={form.prazo_final} onChange={e => setForm(f => ({ ...f, prazo_final: e.target.value }))} /></div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Responsável</Label><Input value={form.responsavel} onChange={e => setForm(f => ({ ...f, responsavel: e.target.value }))} /></div>
               <div><Label>Projeto</Label><Input value={form.projeto} onChange={e => setForm(f => ({ ...f, projeto: e.target.value }))} /></div>
             </div>
@@ -265,7 +279,7 @@ export default function Tarefas() {
             <div><Label>Observadores</Label><Input value={form.observadores} onChange={e => setForm(f => ({ ...f, observadores: e.target.value }))} placeholder="Separados por vírgula" /></div>
             <div><Label>Marcadores</Label><Input value={form.marcadores} onChange={e => setForm(f => ({ ...f, marcadores: e.target.value }))} /></div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={createTarefa.isPending || updateTarefa.isPending}>Salvar</Button>
           </DialogFooter>
@@ -274,24 +288,64 @@ export default function Tarefas() {
 
       {/* Dialog visualizar */}
       <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalhes da Tarefa</DialogTitle></DialogHeader>
           {viewTarefa && (
-            <div className="space-y-3 text-sm">
-              <div><span className="font-medium text-muted-foreground">Título:</span> <span>{viewTarefa.titulo}</span></div>
-              {viewTarefa.descricao && <div><span className="font-medium text-muted-foreground">Descrição:</span> <p className="mt-1 whitespace-pre-wrap">{viewTarefa.descricao}</p></div>}
-              <div className="grid grid-cols-2 gap-3">
-                <div><span className="font-medium text-muted-foreground">Status:</span> <Badge variant={getStatusInfo(viewTarefa.status).variant} className="ml-1">{getStatusInfo(viewTarefa.status).label}</Badge></div>
-                <div><span className="font-medium text-muted-foreground">Prazo:</span> {viewTarefa.prazo_final ? format(new Date(viewTarefa.prazo_final), "dd/MM/yyyy HH:mm", { locale: ptBR }) : '—'}</div>
+            <div className="space-y-4 text-sm mt-2">
+              <div>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Título</span>
+                <p className="mt-1 font-medium text-card-foreground">{viewTarefa.titulo}</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><span className="font-medium text-muted-foreground">Responsável:</span> {viewTarefa.responsavel || '—'}</div>
-                <div><span className="font-medium text-muted-foreground">Criado por:</span> {viewTarefa.criado_por || '—'}</div>
+              {viewTarefa.descricao && (
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Descrição</span>
+                  <p className="mt-1 whitespace-pre-wrap text-card-foreground">{viewTarefa.descricao}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</span>
+                  <div className="mt-1"><Badge className={`border ${getStatusInfo(viewTarefa.status).className}`}>{getStatusInfo(viewTarefa.status).label}</Badge></div>
+                </div>
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Prazo</span>
+                  <p className="mt-1">{viewTarefa.prazo_final ? format(new Date(viewTarefa.prazo_final), "dd/MM/yyyy HH:mm", { locale: ptBR }) : '—'}</p>
+                </div>
               </div>
-              {viewTarefa.participantes && <div><span className="font-medium text-muted-foreground">Participantes:</span> {viewTarefa.participantes}</div>}
-              {viewTarefa.observadores && <div><span className="font-medium text-muted-foreground">Observadores:</span> {viewTarefa.observadores}</div>}
-              {viewTarefa.projeto && <div><span className="font-medium text-muted-foreground">Projeto:</span> {viewTarefa.projeto}</div>}
-              {viewTarefa.marcadores && <div><span className="font-medium text-muted-foreground">Marcadores:</span> {viewTarefa.marcadores}</div>}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Responsável</span>
+                  <p className="mt-1">{viewTarefa.responsavel || '—'}</p>
+                </div>
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Criado por</span>
+                  <p className="mt-1">{viewTarefa.criado_por || '—'}</p>
+                </div>
+              </div>
+              {viewTarefa.participantes && (
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Participantes</span>
+                  <p className="mt-1">{viewTarefa.participantes}</p>
+                </div>
+              )}
+              {viewTarefa.observadores && (
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Observadores</span>
+                  <p className="mt-1">{viewTarefa.observadores}</p>
+                </div>
+              )}
+              {viewTarefa.projeto && (
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Projeto</span>
+                  <p className="mt-1">{viewTarefa.projeto}</p>
+                </div>
+              )}
+              {viewTarefa.marcadores && (
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Marcadores</span>
+                  <p className="mt-1">{viewTarefa.marcadores}</p>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
