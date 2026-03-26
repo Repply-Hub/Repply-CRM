@@ -194,7 +194,7 @@ const Fabricantes = () => {
   const { data: precos, isLoading: loadingPrecos } = useTabelaPrecos(selectedFabId);
 
   const [fabPage, setFabPage] = useState(1);
-  const FAB_PER_PAGE = 10;
+  const FAB_PER_PAGE = 5;
 
   const selectedFab = fabricantes?.find(f => f.id === selectedFabId);
   const filtered = fabricantes?.filter(f => f.nome.toLowerCase().includes(search.toLowerCase())) ?? [];
