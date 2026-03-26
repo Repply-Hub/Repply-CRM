@@ -46,17 +46,31 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
     enabled: !!user?.id,
     staleTime: 0,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('eventos')
-        .select('*')
-        .eq('user_id', user!.id)
-        .order('inicio')
-        .range(0, 10000);
-      if (error) {
-        console.error('[useCalendarEvents] erro ao buscar eventos:', error);
-        throw error;
+      const pageSize = 1000;
+      let from = 0;
+      let hasMore = true;
+      const allEvents: EventoRow[] = [];
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('eventos')
+          .select('*')
+          .eq('user_id', user!.id)
+          .order('inicio')
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          console.error('[useCalendarEvents] erro ao buscar eventos:', error);
+          throw error;
+        }
+
+        const batch = (data as EventoRow[] | null) ?? [];
+        allEvents.push(...batch);
+        hasMore = batch.length === pageSize;
+        from += pageSize;
       }
-      return data as EventoRow[];
+
+      return allEvents;
     },
   });
 
