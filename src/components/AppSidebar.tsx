@@ -33,8 +33,21 @@ const navItems = [
 
 export function AppSidebar() {
   const { state, setOpen } = useSidebar();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const collapsed = state === 'collapsed';
+
+  const { data: vendedor } = useQuery({
+    queryKey: ['meu-perfil', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('vendedores')
+        .select('nome, role')
+        .eq('user_id', user!.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id,
+  });
   const location = useLocation();
   const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
