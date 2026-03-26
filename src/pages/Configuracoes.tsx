@@ -917,10 +917,13 @@ const Configuracoes = () => {
                     <>
                       {/* Grouped by role */}
                       {(() => {
+                        const roleLabels: Record<string, string> = { admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' };
+                        const admins = filteredVendedores.filter(v => v.role === 'admin');
+                        const empresas = filteredVendedores.filter(v => v.role === 'empresa');
                         const gestores = filteredVendedores.filter(v => v.role === 'gestor');
                         const vendedores = filteredVendedores.filter(v => v.role === 'vendedor');
 
-                        const renderSection = (title: string, icon: React.ReactNode, items: typeof filteredVendedores, badgeVariant: 'default' | 'secondary') => {
+                        const renderSection = (title: string, icon: React.ReactNode, items: typeof filteredVendedores, badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline') => {
                           if (items.length === 0) return null;
                           return (
                             <div key={title}>
@@ -947,7 +950,7 @@ const Configuracoes = () => {
                                       <p className="text-xs text-muted-foreground truncate">{v.email}</p>
                                     </div>
                                     <Badge variant={badgeVariant} className="shrink-0 text-[10px]">
-                                      {v.role === 'gestor' ? 'Gestor' : 'Vendedor'}
+                                      {roleLabels[v.role] || v.role}
                                     </Badge>
                                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                                   </button>
@@ -959,7 +962,9 @@ const Configuracoes = () => {
 
                         return (
                           <>
-                            {renderSection('Gestores', <Shield className="h-3.5 w-3.5 text-primary" />, gestores, 'default')}
+                            {renderSection('Admin', <Crown className="h-3.5 w-3.5 text-primary" />, admins, 'destructive')}
+                            {renderSection('Empresas', <Building2 className="h-3.5 w-3.5 text-primary" />, empresas, 'default')}
+                            {renderSection('Gestores', <Shield className="h-3.5 w-3.5 text-primary" />, gestores, 'outline')}
                             {renderSection('Vendedores', <Users className="h-3.5 w-3.5 text-muted-foreground" />, vendedores, 'secondary')}
                           </>
                         );
