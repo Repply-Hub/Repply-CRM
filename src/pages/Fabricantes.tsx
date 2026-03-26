@@ -199,6 +199,13 @@ const Fabricantes = () => {
     if (!deleteAlert) return;
     try {
       if (deleteAlert.type === 'fab') {
+        // Delete related precos first
+        const { error: precosError } = await supabase
+          .from('tabela_precos')
+          .delete()
+          .eq('fabricante_id', deleteAlert.id);
+        if (precosError) throw precosError;
+
         await deleteFabricante.mutateAsync(deleteAlert.id);
         if (selectedFabId === deleteAlert.id) setSelectedFabId(null);
         toast.success('Fabricante excluído!');
@@ -206,7 +213,14 @@ const Fabricantes = () => {
         await deletePreco.mutateAsync(deleteAlert.id);
         toast.success('Item excluído!');
       }
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err: any) {
+      const msg = err.message || '';
+      if (msg.includes('violates foreign key') || msg.includes('referenced')) {
+        toast.error('Este fabricante possui pedidos vinculados e não pode ser excluído.');
+      } else {
+        toast.error(msg);
+      }
+    }
     setDeleteAlert(null);
   };
 
