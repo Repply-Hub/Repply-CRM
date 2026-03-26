@@ -11,7 +11,7 @@ interface SiteConfig {
 
 const SITES: Record<string, SiteConfig> = {
   idema: { id: 'idema', name: 'IDEMA - Licenças Emitidas', url: 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/' },
-  natal: { id: 'natal', name: 'Diário Oficial de Natal', url: 'https://www2.natal.rn.gov.br/dom/' },
+  natal: { id: 'natal', name: 'Diário Oficial de Natal', url: 'https://www.natal.rn.gov.br/dom/' },
   extremoz: { id: 'extremoz', name: 'Diário Oficial de Extremoz', url: 'https://extremoz.rn.gov.br/diario-oficial/diario-oficial-2026/' },
 };
 
