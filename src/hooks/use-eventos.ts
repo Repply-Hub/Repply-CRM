@@ -42,20 +42,21 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
   const { user } = useAuth();
 
   const { data: eventos } = useQuery({
-    queryKey: ['eventos'],
-    enabled: !!user,
+    queryKey: ['eventos', user?.id],
+    enabled: !!user?.id,
+    staleTime: 0,
     queryFn: async () => {
-      // Busca todos os eventos sem o limite padrão de 1000 linhas
       const { data, error } = await supabase
         .from('eventos')
         .select('*')
+        .eq('user_id', user!.id)
         .order('inicio')
         .range(0, 10000);
       if (error) {
         console.error('[useCalendarEvents] erro ao buscar eventos:', error);
         throw error;
       }
-      return data as unknown as EventoRow[];
+      return data as EventoRow[];
     },
   });
 
@@ -213,7 +214,7 @@ export function useBulkCreateEventos() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['eventos'] });
-      qc.refetchQueries({ queryKey: ['eventos'] });
+      qc.refetchQueries({ queryKey: ['eventos'], type: 'active' });
     },
   });
 }

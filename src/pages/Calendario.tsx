@@ -220,14 +220,11 @@ export default function Calendario() {
       }
       toast.success(`${count} evento${count !== 1 ? 's' : ''} importado${count !== 1 ? 's' : ''} com sucesso`);
 
-      // Navega para o mês do evento mais próximo da data atual
-      const now = new Date();
-      const closest = parsed.reduce((best, ev) => {
-        const d = new Date(ev.inicio);
-        return Math.abs(d.getTime() - now.getTime()) < Math.abs(new Date(best.inicio).getTime() - now.getTime()) ? ev : best;
-      });
-      setCurrentDate(new Date(closest.inicio));
-      setViewMode('mes');
+      const firstImportedDate = new Date(parsed[0].inicio);
+      setCurrentDate(firstImportedDate);
+      
+      // Mantém a visão atual para não parecer que os eventos sumiram após importar
+      // Se estiver no mês, continua no mês; se estiver em semana/dia, permanece também.
     } catch {
       toast.dismiss(toastId);
       toast.error('Erro ao ler o arquivo. Verifique se é um arquivo .ics válido.');
