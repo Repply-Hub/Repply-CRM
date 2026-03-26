@@ -93,8 +93,8 @@ function parseICS(content: string, calendarType: CalendarType = 'empresa'): Even
       inicio: format(inicioDate, fmt),
       fim: format(fimDate, fmt),
       diaInteiro: allDay,
-      tipoCalendario: 'empresa',
-      cor: CALENDAR_COLORS.empresa,
+      tipoCalendario: calendarType,
+      cor: CALENDAR_COLORS[calendarType],
     });
   }
   return events;
