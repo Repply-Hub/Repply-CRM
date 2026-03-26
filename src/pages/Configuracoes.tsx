@@ -644,8 +644,8 @@ function ProfileTab() {
               <div>
                 <p className="font-semibold">{perfil.nome}</p>
                 <p className="text-sm text-muted-foreground">{perfil.email}</p>
-                <Badge variant={perfil.role === 'gestor' ? 'default' : 'secondary'} className="text-[10px] mt-1">
-                  {perfil.role === 'gestor' ? 'Gestor' : 'Vendedor'}
+                <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="text-[10px] mt-1">
+                  {{ admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' }[perfil.role] || perfil.role}
                 </Badge>
               </div>
             </div>
