@@ -885,7 +885,9 @@ const Configuracoes = () => {
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="vendedor">Vendedor</SelectItem>
+                              <SelectItem value="empresa">Empresa</SelectItem>
                               <SelectItem value="gestor">Gestor</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
