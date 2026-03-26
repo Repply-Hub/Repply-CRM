@@ -50,12 +50,8 @@ export default function Login() {
     const form = new FormData(e.currentTarget);
     const codigoEmpresa = (form.get("codigo_empresa") as string).toUpperCase();
 
-    // Valida o código da empresa antes de criar o usuário
-    const { data: empresa } = await supabase
-      .from("empresas" as any)
-      .select("id, nome")
-      .eq("codigo_acesso", codigoEmpresa)
-      .maybeSingle();
+    // Valida o código da empresa antes de criar o usuário (via RPC para funcionar sem auth)
+    const { data: empresa } = await supabase.rpc("validar_codigo_empresa" as any, { p_codigo: codigoEmpresa });
 
     if (!empresa) {
       toast.error("Código de empresa inválido. Solicite o código ao seu gestor.");
