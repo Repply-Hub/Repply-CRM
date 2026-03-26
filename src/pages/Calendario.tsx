@@ -6,6 +6,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarHeader } from '@/components/calendar/CalendarHeader';
 import { TimeGridView } from '@/components/calendar/TimeGridView';
 import { CalendarMonthView } from '@/components/calendar/CalendarMonthView';
@@ -57,7 +60,7 @@ function parseICSDate(value: string): { date: Date; allDay: boolean } {
   return { date: new Date(y, mo, d, h, mi, s), allDay: false };
 }
 
-function parseICS(content: string): EventoForm[] {
+function parseICS(content: string, calendarType: CalendarType = 'empresa'): EventoForm[] {
   const events: EventoForm[] = [];
   const veventRegex = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/g;
   let match;
@@ -90,8 +93,8 @@ function parseICS(content: string): EventoForm[] {
       inicio: format(inicioDate, fmt),
       fim: format(fimDate, fmt),
       diaInteiro: allDay,
-      tipoCalendario: 'empresa',
-      cor: CALENDAR_COLORS.empresa,
+      tipoCalendario: calendarType,
+      cor: CALENDAR_COLORS[calendarType],
     });
   }
   return events;
@@ -108,6 +111,9 @@ export default function Calendario() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
   const [isImporting, setIsImporting] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importCalendarType, setImportCalendarType] = useState<CalendarType>('empresa');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const isMobile = useIsMobile();
@@ -192,22 +198,33 @@ export default function Calendario() {
 
   // --- Importar ICS ---
   const handleImportClick = () => {
+    setImportDialogOpen(true);
+  };
+
+  const handleSelectFile = () => {
     importInputRef.current?.click();
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    setPendingFile(file);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingFile) return;
+    setImportDialogOpen(false);
     setIsImporting(true);
     const toastId = toast.loading('Importando agenda...');
     try {
-      const content = await file.text();
-      const parsed = parseICS(content);
+      const content = await pendingFile.text();
+      const parsed = parseICS(content, importCalendarType);
       if (parsed.length === 0) {
         toast.dismiss(toastId);
         toast.warning('Nenhum evento encontrado no arquivo.');
         setIsImporting(false);
+        setPendingFile(null);
         return;
       }
       const inserted = await bulkCreateEventos(parsed);
@@ -216,15 +233,16 @@ export default function Calendario() {
       if (count === 0) {
         toast.warning('Nenhum evento foi gravado. Verifique as permissões do calendário.');
         setIsImporting(false);
+        setPendingFile(null);
         return;
       }
       toast.success(`${count} evento${count !== 1 ? 's' : ''} importado${count !== 1 ? 's' : ''} com sucesso`);
-
     } catch {
       toast.dismiss(toastId);
       toast.error('Erro ao ler o arquivo. Verifique se é um arquivo .ics válido.');
     } finally {
       setIsImporting(false);
+      setPendingFile(null);
     }
   };
 
@@ -255,7 +273,7 @@ export default function Calendario() {
         type="file"
         accept=".ics,text/calendar"
         className="hidden"
-        onChange={handleFileChange}
+        onChange={handleFileSelected}
         disabled={isImporting}
       />
       <ErrorBoundary>
@@ -364,6 +382,53 @@ export default function Calendario() {
         onSave={handleSave}
         onDelete={handleDelete}
       />
+
+      {/* Dialog de importação */}
+      <Dialog open={importDialogOpen} onOpenChange={(open) => { setImportDialogOpen(open); if (!open) setPendingFile(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importar agenda (.ics)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Tipo de calendário</Label>
+              <Select value={importCalendarType} onValueChange={(v) => setImportCalendarType(v as CalendarType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pessoal">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: CALENDAR_COLORS.pessoal }} />
+                      Meu calendário
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="empresa">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: CALENDAR_COLORS.empresa }} />
+                      Calendário da empresa
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Arquivo</Label>
+              <Button variant="outline" className="w-full justify-start" onClick={handleSelectFile}>
+                {pendingFile ? pendingFile.name : 'Selecionar arquivo .ics'}
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setImportDialogOpen(false); setPendingFile(null); }}>
+              Cancelar
+            </Button>
+            <Button disabled={!pendingFile || isImporting} onClick={handleConfirmImport}>
+              Importar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </ErrorBoundary>
     </AppLayout>
   );
