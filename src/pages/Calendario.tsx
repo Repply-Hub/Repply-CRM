@@ -198,22 +198,33 @@ export default function Calendario() {
 
   // --- Importar ICS ---
   const handleImportClick = () => {
+    setImportDialogOpen(true);
+  };
+
+  const handleSelectFile = () => {
     importInputRef.current?.click();
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    setPendingFile(file);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingFile) return;
+    setImportDialogOpen(false);
     setIsImporting(true);
     const toastId = toast.loading('Importando agenda...');
     try {
-      const content = await file.text();
-      const parsed = parseICS(content);
+      const content = await pendingFile.text();
+      const parsed = parseICS(content, importCalendarType);
       if (parsed.length === 0) {
         toast.dismiss(toastId);
         toast.warning('Nenhum evento encontrado no arquivo.');
         setIsImporting(false);
+        setPendingFile(null);
         return;
       }
       const inserted = await bulkCreateEventos(parsed);
@@ -222,15 +233,16 @@ export default function Calendario() {
       if (count === 0) {
         toast.warning('Nenhum evento foi gravado. Verifique as permissões do calendário.');
         setIsImporting(false);
+        setPendingFile(null);
         return;
       }
       toast.success(`${count} evento${count !== 1 ? 's' : ''} importado${count !== 1 ? 's' : ''} com sucesso`);
-
     } catch {
       toast.dismiss(toastId);
       toast.error('Erro ao ler o arquivo. Verifique se é um arquivo .ics válido.');
     } finally {
       setIsImporting(false);
+      setPendingFile(null);
     }
   };
 
