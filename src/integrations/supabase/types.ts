@@ -1005,6 +1005,7 @@ export type Database = {
       }
     }
     Functions: {
+      delete_current_user: { Args: never; Returns: undefined }
       get_my_vendedor_id: { Args: never; Returns: string }
       has_permission: {
         Args: { _acao: string; _modulo: string; _vendedor_id: string }

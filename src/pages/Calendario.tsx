@@ -220,14 +220,6 @@ export default function Calendario() {
       }
       toast.success(`${count} evento${count !== 1 ? 's' : ''} importado${count !== 1 ? 's' : ''} com sucesso`);
 
-      // Diagnóstico: verificar se a query de leitura funciona
-      const { data: check, error: checkErr } = await (supabase as any)
-        .from('eventos')
-        .select('id', { count: 'exact', head: true });
-      if (checkErr) {
-        toast.error(`Erro ao ler eventos: ${checkErr.message}`);
-      } else {
-        console.log('[import] total de eventos na query de leitura:', check);
       // Navega para o mês do evento mais próximo da data atual
       const now = new Date();
       const closest = parsed.reduce((best, ev) => {
