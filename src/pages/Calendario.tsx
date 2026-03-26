@@ -90,8 +90,8 @@ function parseICS(content: string): EventoForm[] {
       inicio: format(inicioDate, fmt),
       fim: format(fimDate, fmt),
       diaInteiro: allDay,
-      tipoCalendario: 'pessoal',
-      cor: CALENDAR_COLORS.pessoal,
+      tipoCalendario: 'empresa',
+      cor: CALENDAR_COLORS.empresa,
     });
   }
   return events;
