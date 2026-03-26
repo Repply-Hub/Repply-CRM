@@ -8,6 +8,8 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, nome: string) => Promise<{ error: Error | null }>;
+  signUpEmpresa: (email: string, password: string, nome: string, nomeEmpresa: string, cnpjEmpresa?: string) => Promise<{ error: Error | null }>;
+  signUpFuncionario: (email: string, password: string, nome: string, codigoEmpresa: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -44,12 +46,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
+  const signUpEmpresa = async (email: string, password: string, nome: string, nomeEmpresa: string, cnpjEmpresa?: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { nome, role: 'gestor', nome_empresa: nomeEmpresa, cnpj_empresa: cnpjEmpresa ?? '' },
+      },
+    });
+    return { error: error as Error | null };
+  };
+
+  const signUpFuncionario = async (email: string, password: string, nome: string, codigoEmpresa: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { nome, role: 'vendedor', codigo_empresa: codigoEmpresa.toUpperCase() },
+      },
+    });
+    return { error: error as Error | null };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signIn, signUp, signUpEmpresa, signUpFuncionario, signOut }}>
       {children}
     </AuthContext.Provider>
   );
