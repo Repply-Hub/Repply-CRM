@@ -518,7 +518,7 @@ function AuditLog() {
 function CodigoAcessoCard() {
   const { user } = useAuth();
   const [copied, setCopied] = useState(false);
-
+  const qc = useQueryClient();
   const { data: empresa, isLoading } = useQuery({
     queryKey: ['minha_empresa', user?.id],
     queryFn: async () => {
