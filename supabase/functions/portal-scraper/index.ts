@@ -613,7 +613,7 @@ Deno.serve(async (req) => {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
-        const resp = await fetch('https://www2.natal.rn.gov.br/dom/', {
+        const resp = await fetch('https://www.natal.rn.gov.br/dom/', {
           method: 'POST',
           signal: controller.signal,
           headers: { ...FETCH_HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' },
