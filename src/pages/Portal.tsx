@@ -1,12 +1,18 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { format, subMonths, startOfMonth, endOfMonth, getMonth, getYear } from 'date-fns';
+import { ptBR } from 'date-fns/locale/pt-BR';
+import { CalendarIcon } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ColumnSettings } from '@/components/ColumnSettings';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
-import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CloudDownload, List, Settings2 } from 'lucide-react';
+import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CloudDownload, List, Settings2, Calendar as CalendarLucide } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -108,6 +114,8 @@ export default function Portal() {
     const saved = localStorage.getItem('portal-visible-columns');
     return saved ? JSON.parse(saved) : {};
   });
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(subMonths(new Date(), 1)));
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
     localStorage.setItem('portal-visible-columns', JSON.stringify(visibleColumns));
@@ -428,11 +436,23 @@ export default function Portal() {
     try {
       // Fetch listing page for current and previous month
       const now = new Date();
-      const months = [
-        { mes: String(now.getMonth() + 1).padStart(2, '0'), ano: String(now.getFullYear()) },
-      ];
-      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      months.push({ mes: String(prev.getMonth() + 1).padStart(2, '0'), ano: String(prev.getFullYear()) });
+      const from = dateFrom || startOfMonth(subMonths(now, 1));
+      const to = dateTo || now;
+
+      // Generate list of months between from and to
+      const months: Array<{ mes: string; ano: string }> = [];
+      const cursor = new Date(getYear(from), getMonth(from), 1);
+      const end = new Date(getYear(to), getMonth(to), 1);
+      while (cursor <= end) {
+        months.push({
+          mes: String(cursor.getMonth() + 1).padStart(2, '0'),
+          ano: String(cursor.getFullYear()),
+        });
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+      if (months.length === 0) {
+        months.push({ mes: String(now.getMonth() + 1).padStart(2, '0'), ano: String(now.getFullYear()) });
+      }
 
       const pdfLinks: Array<{ href: string; title: string; date: string; numero: string }> = [];
 
@@ -869,7 +889,7 @@ export default function Portal() {
     <AppLayout title="Portal de Consultas" subtitle="Consulte licenças e publicações oficiais de órgãos públicos.">
       <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         {/* Search bar */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -879,6 +899,31 @@ export default function Portal() {
               className="pl-9"
               onKeyDown={(e) => e.key === 'Enter' && fetchAll()}
             />
+          </div>
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal text-xs h-9 min-w-[130px]", !dateFrom && "text-muted-foreground")}>
+                  <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+                  {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Data início"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} />
+              </PopoverContent>
+            </Popover>
+            <span className="text-xs text-muted-foreground">até</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal text-xs h-9 min-w-[130px]", !dateTo && "text-muted-foreground")}>
+                  <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+                  {dateTo ? format(dateTo, "dd/MM/yyyy") : "Data fim"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} />
+              </PopoverContent>
+            </Popover>
           </div>
           <Button onClick={fetchAll} disabled={Object.values(loading).some(Boolean)}>
             {Object.values(loading).some(Boolean) ? (
