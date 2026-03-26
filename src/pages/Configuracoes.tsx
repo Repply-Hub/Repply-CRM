@@ -915,41 +915,55 @@ const Configuracoes = () => {
                     <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
                   ) : (
                     <>
-                      <div className="divide-y divide-border">
-                        {filteredVendedores.slice(equipePage * EQUIPE_PER_PAGE, (equipePage + 1) * EQUIPE_PER_PAGE).map(v => (
-                          <button
-                            key={v.id}
-                            className={cn(
-                              "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50",
-                              selectedVendedor === v.id && "bg-accent/70"
-                            )}
-                            onClick={() => setSelectedVendedor(v.id)}
-                          >
-                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="text-sm font-bold text-primary">{v.nome.charAt(0).toUpperCase()}</span>
+                      {/* Grouped by role */}
+                      {(() => {
+                        const gestores = filteredVendedores.filter(v => v.role === 'gestor');
+                        const vendedores = filteredVendedores.filter(v => v.role === 'vendedor');
+
+                        const renderSection = (title: string, icon: React.ReactNode, items: typeof filteredVendedores, badgeVariant: 'default' | 'secondary') => {
+                          if (items.length === 0) return null;
+                          return (
+                            <div key={title}>
+                              <div className="flex items-center gap-2 px-4 py-2 bg-muted/40 border-b border-border">
+                                {icon}
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{title}</span>
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 ml-auto">{items.length}</Badge>
+                              </div>
+                              <div className="divide-y divide-border">
+                                {items.map(v => (
+                                  <button
+                                    key={v.id}
+                                    className={cn(
+                                      "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50",
+                                      selectedVendedor === v.id && "bg-accent/70"
+                                    )}
+                                    onClick={() => setSelectedVendedor(v.id)}
+                                  >
+                                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                      <span className="text-sm font-bold text-primary">{v.nome.charAt(0).toUpperCase()}</span>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-medium truncate">{v.nome}</p>
+                                      <p className="text-xs text-muted-foreground truncate">{v.email}</p>
+                                    </div>
+                                    <Badge variant={badgeVariant} className="shrink-0 text-[10px]">
+                                      {v.role === 'gestor' ? 'Gestor' : 'Vendedor'}
+                                    </Badge>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  </button>
+                                ))}
+                              </div>
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium truncate">{v.nome}</p>
-                              <p className="text-xs text-muted-foreground truncate">{v.email}</p>
-                            </div>
-                            <Badge variant={v.role === 'gestor' ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
-                              {v.role}
-                            </Badge>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                          </button>
-                        ))}
-                      </div>
-                      {filteredVendedores.length > EQUIPE_PER_PAGE && (
-                        <div className="flex items-center justify-between px-4 py-2 border-t border-border">
-                          <span className="text-xs text-muted-foreground">
-                            {equipePage * EQUIPE_PER_PAGE + 1}–{Math.min((equipePage + 1) * EQUIPE_PER_PAGE, filteredVendedores.length)} de {filteredVendedores.length}
-                          </span>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={equipePage === 0} onClick={() => setEquipePage(p => p - 1)}>Anterior</Button>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={(equipePage + 1) * EQUIPE_PER_PAGE >= filteredVendedores.length} onClick={() => setEquipePage(p => p + 1)}>Próximo</Button>
-                          </div>
-                        </div>
-                      )}
+                          );
+                        };
+
+                        return (
+                          <>
+                            {renderSection('Gestores', <Shield className="h-3.5 w-3.5 text-primary" />, gestores, 'default')}
+                            {renderSection('Vendedores', <Users className="h-3.5 w-3.5 text-muted-foreground" />, vendedores, 'secondary')}
+                          </>
+                        );
+                      })()}
                     </>
                   )}
                 </CardContent>
