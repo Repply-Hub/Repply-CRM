@@ -193,8 +193,16 @@ const Fabricantes = () => {
   const deletePreco = useDeletePreco();
   const { data: precos, isLoading: loadingPrecos } = useTabelaPrecos(selectedFabId);
 
+  const [fabPage, setFabPage] = useState(1);
+  const FAB_PER_PAGE = 10;
+
   const selectedFab = fabricantes?.find(f => f.id === selectedFabId);
   const filtered = fabricantes?.filter(f => f.nome.toLowerCase().includes(search.toLowerCase())) ?? [];
+  const totalFabPages = Math.max(1, Math.ceil(filtered.length / FAB_PER_PAGE));
+  const paginatedFabs = filtered.slice((fabPage - 1) * FAB_PER_PAGE, fabPage * FAB_PER_PAGE);
+
+  // Reset page when search changes
+  const handleSearchChange = (val: string) => { setSearch(val); setFabPage(1); };
 
   const handleDelete = async () => {
     if (!deleteAlert) return;
