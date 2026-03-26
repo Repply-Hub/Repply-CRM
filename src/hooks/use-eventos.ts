@@ -156,7 +156,7 @@ export function useCreateEvento() {
         ? new Date(form.fim + 'T23:59:59').toISOString()
         : new Date(form.fim).toISOString();
 
-      const { error } = await supabase.from('eventos' as unknown as 'pedidos').insert({
+      const { error } = await (supabase as any).from('eventos').insert({
         user_id: user!.id,
         titulo: form.titulo,
         descricao: form.descricao || null,
