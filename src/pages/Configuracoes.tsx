@@ -776,6 +776,9 @@ function ProfileTab() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Código de acesso da empresa */}
+        {(perfil.role === 'empresa' || perfil.role === 'admin') && <CodigoAcessoCard />}
       </div>
 
       {/* Coluna Direita: Aparência, Segurança e Perigo */}
