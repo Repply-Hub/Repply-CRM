@@ -192,6 +192,48 @@ export type Database = {
         }
         Relationships: []
       }
+      eventos: {
+        Row: {
+          cor: string
+          created_at: string
+          descricao: string | null
+          dia_inteiro: boolean
+          fim: string
+          id: string
+          inicio: string
+          tipo_calendario: string
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cor?: string
+          created_at?: string
+          descricao?: string | null
+          dia_inteiro?: boolean
+          fim: string
+          id?: string
+          inicio: string
+          tipo_calendario?: string
+          titulo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cor?: string
+          created_at?: string
+          descricao?: string | null
+          dia_inteiro?: boolean
+          fim?: string
+          id?: string
+          inicio?: string
+          tipo_calendario?: string
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       fabricantes: {
         Row: {
           cnpj: string | null

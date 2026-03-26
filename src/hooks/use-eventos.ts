@@ -45,8 +45,8 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
     queryKey: ['eventos'],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('eventos' as unknown as 'pedidos')
+      const { data, error } = await (supabase as any)
+        .from('eventos')
         .select('*')
         .order('inicio');
       if (error) throw error;
@@ -156,7 +156,7 @@ export function useCreateEvento() {
         ? new Date(form.fim + 'T23:59:59').toISOString()
         : new Date(form.fim).toISOString();
 
-      const { error } = await supabase.from('eventos' as unknown as 'pedidos').insert({
+      const { error } = await (supabase as any).from('eventos').insert({
         user_id: user!.id,
         titulo: form.titulo,
         descricao: form.descricao || null,
@@ -184,8 +184,8 @@ export function useUpdateEvento() {
         ? new Date(form.fim + 'T23:59:59').toISOString()
         : new Date(form.fim).toISOString();
 
-      const { error } = await supabase
-        .from('eventos' as unknown as 'pedidos')
+      const { error } = await (supabase as any)
+        .from('eventos')
         .update({
           titulo: form.titulo,
           descricao: form.descricao || null,
@@ -208,7 +208,7 @@ export function useDeleteEvento() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('eventos' as unknown as 'pedidos').delete().eq('id', id);
+      const { error } = await (supabase as any).from('eventos').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['eventos'] }),
