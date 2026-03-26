@@ -1,7 +1,9 @@
-import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut, HardHat, Factory, Globe, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut, HardHat, Factory, Globe, CalendarDays, UserCircle } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { NavLink } from '@/components/NavLink';
 import logoSidebar from '@/assets/logo-sidebar.svg';
 import {
