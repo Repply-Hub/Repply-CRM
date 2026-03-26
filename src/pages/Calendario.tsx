@@ -273,7 +273,7 @@ export default function Calendario() {
         type="file"
         accept=".ics,text/calendar"
         className="hidden"
-        onChange={handleFileChange}
+        onChange={handleFileSelected}
         disabled={isImporting}
       />
       <ErrorBoundary>
