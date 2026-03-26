@@ -1,3 +1,5 @@
+import { getDocument } from 'https://esm.sh/pdfjs-serverless@0.5.0';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -5,11 +7,9 @@ const corsHeaders = {
 
 const normalizeLicenseType = (value: string) => {
   const text = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-
   if (text.includes('licenca previa') || text === 'lp') return 'Licença Prévia';
   if (text.includes('licenca de instalacao') || text === 'li') return 'Licença de Instalação';
   if (text.includes('licenca de operacao') || text === 'lo') return 'Licença de Operação';
-
   return '';
 };
 
@@ -24,7 +24,6 @@ const isRelevantEntry = (entry: Record<string, unknown>) => {
     String(entry.obra_descricao || '').trim() ||
     String(entry.endereco_obra || '').trim()
   );
-
   return Boolean(tipo && hasCoreData);
 };
 
@@ -55,32 +54,43 @@ const extractJsonObject = (content: string) => {
 
   for (let i = start; i < content.length; i++) {
     const char = content[i];
-
     if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === '\\') {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
+      if (escaped) { escaped = false; }
+      else if (char === '\\') { escaped = true; }
+      else if (char === '"') { inString = false; }
       continue;
     }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
+    if (char === '"') { inString = true; continue; }
     if (char === '{') depth++;
     if (char === '}') {
       depth--;
       if (depth === 0) return content.slice(start, i + 1);
     }
   }
-
   return content.slice(start).trim();
 };
+
+async function extractTextFromPdf(pdfBuffer: ArrayBuffer): Promise<string> {
+  try {
+    const data = new Uint8Array(pdfBuffer);
+    const doc = await getDocument({ data, useSystemFonts: true });
+    const pages: string[] = [];
+
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: { str?: string }) => item.str || '')
+        .join(' ');
+      pages.push(pageText);
+    }
+
+    return pages.join('\n\n');
+  } catch (err) {
+    console.error('PDF text extraction error:', err);
+    return '';
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -107,11 +117,8 @@ Deno.serve(async (req) => {
 
     console.log('Fetching PDF:', pdf_url);
 
-    // Fetch the PDF
     const pdfResp = await fetch(pdf_url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
     });
 
     if (!pdfResp.ok) {
@@ -122,14 +129,14 @@ Deno.serve(async (req) => {
     }
 
     const pdfBuffer = await pdfResp.arrayBuffer();
-    const base64Pdf = btoa(
-      new Uint8Array(pdfBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-    );
-
     console.log(`PDF fetched, size: ${pdfBuffer.byteLength} bytes`);
 
-    // If PDF is too large (>5MB), skip AI processing
-    if (pdfBuffer.byteLength > 5 * 1024 * 1024) {
+    // Extract text from PDF
+    const pdfText = await extractTextFromPdf(pdfBuffer);
+    console.log(`PDF text extracted, length: ${pdfText.length} chars`);
+
+    if (!pdfText || pdfText.length < 50) {
+      console.log('PDF text too short or empty, returning placeholder');
       return new Response(
         JSON.stringify({
           success: true,
@@ -146,45 +153,46 @@ Deno.serve(async (req) => {
             telefone: '',
             endereco_obra: '',
             obra_descricao: '',
-            bloco_texto: '(PDF muito grande para processamento)',
+            bloco_texto: '(Não foi possível extrair texto do PDF)',
           }],
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Call Gemini with the PDF for structured extraction
-    const prompt = `Analise este PDF do Diário Oficial de Natal/RN e extraia APENAS publicações de obras relacionadas aos seguintes tipos de licença:
+    // Truncate text if too long (keep first 15000 chars for AI context)
+    const truncatedText = pdfText.length > 15000 ? pdfText.slice(0, 15000) + '\n\n[... texto truncado ...]' : pdfText;
 
-- Licença Prévia
-- Licença de Instalação
-- Licença de Operação
+    const prompt = `Analise o texto abaixo extraído de um Diário Oficial de Natal/RN e extraia APENAS publicações relacionadas aos seguintes tipos de licença ambiental:
 
-IGNORE completamente qualquer outro conteúdo, como extratos de contrato, aditivos, avisos, nomeações, licitações, funcionamento, serviços, compras, decretos ou publicações sem uma dessas três licenças.
+- Licença Prévia (LP)
+- Licença de Instalação (LI)
+- Licença de Operação (LO)
 
-Para cada item válido, extraia SOMENTE estes campos:
-- tipo_licenca: deve ser exatamente "Licença Prévia", "Licença de Instalação" ou "Licença de Operação"
-- fase_obra: momento da obra
-- construtora: de quem é a construtora / de quem é a obra
-- razao_social: razão social da empresa, se houver
+IGNORE completamente qualquer outro conteúdo (extratos de contrato, aditivos, avisos, nomeações, licitações, funcionamento, serviços, compras, decretos, alvarás de funcionamento, licenças de funcionamento, etc.).
+
+Para cada item válido com LP, LI ou LO, extraia:
+- tipo_licenca: "Licença Prévia", "Licença de Instalação" ou "Licença de Operação"
+- fase_obra: momento/fase da obra
+- construtora: construtora ou responsável pela obra
+- razao_social: razão social da empresa
 - cnpj: CNPJ se houver
 - nome_contato: nome do contato/responsável
-- email: email do contato
-- endereco_obra: endereço da obra, se houver
-- obra_descricao: descrição objetiva da obra
-- bloco_texto: trecho resumido do texto fonte com no máximo 300 caracteres
+- email: email se houver
+- endereco_obra: endereço da obra
+- obra_descricao: descrição da obra
+- bloco_texto: trecho resumido do texto fonte (máx 300 chars)
 
-Regras obrigatórias:
-1. Não invente dados.
-2. Não retorne itens sem um dos 3 tipos de licença permitidos.
-3. Se o texto citar construção/obra mas sem LP/LI/LO explícita, ignore.
-4. Se não houver email, retorne string vazia.
-5. Responda APENAS JSON válido, sem markdown.
+Regras:
+1. Não invente dados. Se não encontrar, retorne string vazia.
+2. Não retorne itens sem LP, LI ou LO.
+3. Se não encontrar nenhuma licença válida, retorne: {"entries": []}
+4. Responda APENAS JSON válido, sem markdown.
 
-Formato exato de resposta:
-{"entries": [{"tipo_licenca": "Licença Prévia", "fase_obra": "", "construtora": "", "cnpj": "", "razao_social": "", "nome_contato": "", "email": "", "endereco_obra": "", "obra_descricao": "", "bloco_texto": ""}]}
+Formato: {"entries": [...]}
 
-Se não encontrar nenhuma publicação válida, retorne exatamente: {"entries": []}`;
+TEXTO DO DIÁRIO OFICIAL:
+${truncatedText}`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -194,22 +202,9 @@ Se não encontrar nenhuma publicação válida, retorne exatamente: {"entries": 
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:application/pdf;base64,${base64Pdf}`,
-                },
-              },
-            ],
-          },
-        ],
-         response_format: { type: 'json_object' },
-         temperature: 0,
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0,
         max_tokens: 4096,
       }),
     });
@@ -226,11 +221,10 @@ Se não encontrar nenhuma publicação válida, retorne exatamente: {"entries": 
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content || '';
     console.log('AI response length:', content.length);
+    console.log('AI response preview:', content.substring(0, 500));
 
-    // Parse JSON from AI response
     let entries: any[] = [];
     try {
-      // Extract JSON from response (may be wrapped in ```json blocks)
       const parsedContent = extractJsonObject(content);
       if (parsedContent) {
         const parsed = JSON.parse(parsedContent);
@@ -245,14 +239,12 @@ Se não encontrar nenhuma publicação válida, retorne exatamente: {"entries": 
       .map((entry: any) => sanitizeEntry(entry))
       .filter((entry) => isRelevantEntry(entry));
 
-    // Add metadata to each entry
     const enrichedEntries = filteredEntries.map((entry: any) => ({
       ...entry,
       data_edicao: pdf_date || '',
       numero_dom: pdf_numero || '',
     }));
 
-    // If no entries found, still return one entry so we don't reprocess
     if (enrichedEntries.length === 0) {
       enrichedEntries.push({
         data_edicao: pdf_date || '',
@@ -264,6 +256,7 @@ Se não encontrar nenhuma publicação válida, retorne exatamente: {"entries": 
         razao_social: '',
         nome_contato: '',
         email: '',
+        telefone: '',
         endereco_obra: '',
         obra_descricao: '',
         bloco_texto: '(Nenhuma Licença Prévia, Licença de Instalação ou Licença de Operação identificada neste diário)',
