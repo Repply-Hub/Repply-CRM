@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
 import type { CalendarEvent, CalendarType, EventoForm } from '@/components/calendar/types';
 
-// Tabela 'eventos' não está nos tipos gerados — definimos a estrutura localmente
+// Estrutura local para mapear a row do banco
 interface EventoRow {
   id: string;
   user_id: string;
@@ -45,10 +45,12 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
     queryKey: ['eventos'],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      // Busca todos os eventos sem o limite padrão de 1000 linhas
+      const { data, error } = await supabase
         .from('eventos')
         .select('*')
-        .order('inicio');
+        .order('inicio')
+        .range(0, 10000);
       if (error) {
         console.error('[useCalendarEvents] erro ao buscar eventos:', error);
         throw error;
@@ -159,7 +161,7 @@ export function useCreateEvento() {
         ? new Date(form.fim + 'T23:59:59').toISOString()
         : new Date(form.fim).toISOString();
 
-      const { error } = await (supabase as any).from('eventos').insert({
+      const { error } = await supabase.from('eventos').insert({
         user_id: user!.id,
         titulo: form.titulo,
         descricao: form.descricao || null,
@@ -200,7 +202,7 @@ export function useBulkCreateEventos() {
       const CHUNK = 500;
       let totalInserted = 0;
       for (let i = 0; i < rows.length; i += CHUNK) {
-        const { data: inserted, error } = await (supabase as any)
+        const { data: inserted, error } = await supabase
           .from('eventos')
           .insert(rows.slice(i, i + CHUNK))
           .select('id');
@@ -228,7 +230,7 @@ export function useUpdateEvento() {
         ? new Date(form.fim + 'T23:59:59').toISOString()
         : new Date(form.fim).toISOString();
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('eventos')
         .update({
           titulo: form.titulo,
@@ -252,7 +254,7 @@ export function useDeleteEvento() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from('eventos').delete().eq('id', id);
+      const { error } = await supabase.from('eventos').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['eventos'] }),
