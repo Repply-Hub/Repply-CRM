@@ -926,6 +926,57 @@ export type Database = {
           },
         ]
       }
+      tarefas: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          descricao: string | null
+          id: string
+          marcadores: string | null
+          observadores: string | null
+          participantes: string | null
+          prazo_final: string | null
+          projeto: string | null
+          responsavel: string | null
+          status: string
+          titulo: string
+          updated_at: string
+          vendedor_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          marcadores?: string | null
+          observadores?: string | null
+          participantes?: string | null
+          prazo_final?: string | null
+          projeto?: string | null
+          responsavel?: string | null
+          status?: string
+          titulo: string
+          updated_at?: string
+          vendedor_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          id?: string
+          marcadores?: string | null
+          observadores?: string | null
+          participantes?: string | null
+          prazo_final?: string | null
+          projeto?: string | null
+          responsavel?: string | null
+          status?: string
+          titulo?: string
+          updated_at?: string
+          vendedor_id?: string | null
+        }
+        Relationships: []
+      }
       vendedores: {
         Row: {
           created_at: string
