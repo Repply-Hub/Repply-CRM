@@ -433,5 +433,3 @@ export default function Calendario() {
     </AppLayout>
   );
 }
-  );
-}
