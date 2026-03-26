@@ -543,7 +543,7 @@ function CodigoAcessoCard() {
       if (error) throw error;
     },
     onSuccess: () => {
-      useQueryClient().invalidateQueries({ queryKey: ['minha_empresa', user?.id] });
+      qc.invalidateQueries({ queryKey: ['minha_empresa', user?.id] });
       toast.success('Código regenerado!');
     },
   });
