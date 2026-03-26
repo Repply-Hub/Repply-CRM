@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AppLayout } from '@/components/AppLayout';
@@ -17,6 +17,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
   useCalendarEvents,
   useCreateEvento,
+  useBulkCreateEventos,
   useUpdateEvento,
   useDeleteEvento,
 } from '@/hooks/use-eventos';
@@ -26,6 +27,75 @@ const CALENDAR_LABELS: Record<CalendarType, string> = {
   pessoal: 'Meu calendário',
   empresa: 'Calendário da empresa',
 };
+
+// --- ICS parser ---
+function parseICSDate(value: string): { date: Date; allDay: boolean } {
+  // All-day: 8 digits only (VALUE=DATE)
+  if (/^\d{8}$/.test(value)) {
+    const y = parseInt(value.slice(0, 4));
+    const m = parseInt(value.slice(4, 6)) - 1;
+    const d = parseInt(value.slice(6, 8));
+    return { date: new Date(y, m, d), allDay: true };
+  }
+  // UTC datetime (ends with Z)
+  if (value.endsWith('Z')) {
+    const y = parseInt(value.slice(0, 4));
+    const mo = parseInt(value.slice(4, 6)) - 1;
+    const d = parseInt(value.slice(6, 8));
+    const h = parseInt(value.slice(9, 11));
+    const mi = parseInt(value.slice(11, 13));
+    const s = parseInt(value.slice(13, 15)) || 0;
+    return { date: new Date(Date.UTC(y, mo, d, h, mi, s)), allDay: false };
+  }
+  // Local datetime
+  const y = parseInt(value.slice(0, 4));
+  const mo = parseInt(value.slice(4, 6)) - 1;
+  const d = parseInt(value.slice(6, 8));
+  const h = parseInt(value.slice(9, 11));
+  const mi = parseInt(value.slice(11, 13));
+  const s = parseInt(value.slice(13, 15)) || 0;
+  return { date: new Date(y, mo, d, h, mi, s), allDay: false };
+}
+
+function parseICS(content: string): EventoForm[] {
+  const events: EventoForm[] = [];
+  const veventRegex = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/g;
+  let match;
+  while ((match = veventRegex.exec(content)) !== null) {
+    const block = match[1];
+    // Unfold folded lines (RFC 5545: CRLF + whitespace)
+    const unfolded = block.replace(/\r?\n[ \t]/g, '');
+    const lines = unfolded.split(/\r?\n/);
+    const props: Record<string, string> = {};
+    for (const line of lines) {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx === -1) continue;
+      const keyFull = line.slice(0, colonIdx).trim().toUpperCase();
+      const value = line.slice(colonIdx + 1).trim();
+      // Strip parameters (e.g. DTSTART;TZID=America/Sao_Paulo → DTSTART)
+      const baseKey = keyFull.split(';')[0];
+      if (!(baseKey in props)) props[baseKey] = value;
+    }
+    if (!props['DTSTART']) continue;
+    const titulo = (props['SUMMARY'] || 'Sem título')
+      .replace(/\\n/g, '\n').replace(/\\,/g, ',').replace(/\\\\/g, '\\');
+    const descricao = (props['DESCRIPTION'] || '')
+      .replace(/\\n/g, '\n').replace(/\\,/g, ',').replace(/\\\\/g, '\\');
+    const { date: inicioDate, allDay } = parseICSDate(props['DTSTART']);
+    const { date: fimDate } = parseICSDate(props['DTEND'] || props['DTSTART']);
+    const fmt = allDay ? 'yyyy-MM-dd' : "yyyy-MM-dd'T'HH:mm";
+    events.push({
+      titulo,
+      descricao,
+      inicio: format(inicioDate, fmt),
+      fim: format(fimDate, fmt),
+      diaInteiro: allDay,
+      tipoCalendario: 'pessoal',
+      cor: CALENDAR_COLORS.pessoal,
+    });
+  }
+  return events;
+}
 
 export default function Calendario() {
   const [viewMode, setViewMode] = useState<ViewMode>('semana');
@@ -37,9 +107,13 @@ export default function Calendario() {
   const [initialSlot, setInitialSlot] = useState<Partial<EventoForm>>({});
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
+  const [isImporting, setIsImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
   const isMobile = useIsMobile();
   const events = useCalendarEvents(visibleCalendars);
   const { mutate: createEvento } = useCreateEvento();
+  const { mutateAsync: bulkCreateEventos } = useBulkCreateEventos();
   const { mutate: updateEvento } = useUpdateEvento();
   const { mutate: deleteEvento } = useDeleteEvento();
 
@@ -116,6 +190,60 @@ export default function Calendario() {
     });
   };
 
+  // --- Importar ICS ---
+  const handleImportClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setIsImporting(true);
+    const toastId = toast.loading('Importando agenda...');
+    try {
+      const content = await file.text();
+      const parsed = parseICS(content);
+      if (parsed.length === 0) {
+        toast.dismiss(toastId);
+        toast.warning('Nenhum evento encontrado no arquivo.');
+        setIsImporting(false);
+        return;
+      }
+      const inserted = await bulkCreateEventos(parsed);
+      toast.dismiss(toastId);
+      const count = inserted ?? parsed.length;
+      if (count === 0) {
+        toast.warning('Nenhum evento foi gravado. Verifique as permissões do calendário.');
+        setIsImporting(false);
+        return;
+      }
+      toast.success(`${count} evento${count !== 1 ? 's' : ''} importado${count !== 1 ? 's' : ''} com sucesso`);
+
+      // Diagnóstico: verificar se a query de leitura funciona
+      const { data: check, error: checkErr } = await (supabase as any)
+        .from('eventos')
+        .select('id', { count: 'exact', head: true });
+      if (checkErr) {
+        toast.error(`Erro ao ler eventos: ${checkErr.message}`);
+      } else {
+        console.log('[import] total de eventos na query de leitura:', check);
+      // Navega para o mês do evento mais próximo da data atual
+      const now = new Date();
+      const closest = parsed.reduce((best, ev) => {
+        const d = new Date(ev.inicio);
+        return Math.abs(d.getTime() - now.getTime()) < Math.abs(new Date(best.inicio).getTime() - now.getTime()) ? ev : best;
+      });
+      setCurrentDate(new Date(closest.inicio));
+      setViewMode('mes');
+    } catch {
+      toast.dismiss(toastId);
+      toast.error('Erro ao ler o arquivo. Verifique se é um arquivo .ics válido.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   // --- Dias para a TimeGridView ---
   // Mobile: semana exibe 3 dias centrados no dia atual
   const gridDays =
@@ -132,11 +260,20 @@ export default function Calendario() {
       onViewModeChange={setViewMode}
       onNavigate={navigate}
       onNewEvent={() => openNewEvent()}
+      onImport={handleImportClick}
     />
   );
 
   return (
     <AppLayout headerContent={headerContent} mainClassName="flex-1 overflow-hidden flex flex-col">
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".ics,text/calendar"
+        className="hidden"
+        onChange={handleFileChange}
+        disabled={isImporting}
+      />
       <ErrorBoundary>
       <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Sidebar esquerda — oculta em mobile */}

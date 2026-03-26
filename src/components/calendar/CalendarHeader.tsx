@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Upload } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ interface CalendarHeaderProps {
   onViewModeChange: (mode: ViewMode) => void;
   onNavigate: (direction: 'prev' | 'next' | 'today') => void;
   onNewEvent: () => void;
+  onImport?: () => void;
 }
 
 const VIEW_LABELS: Record<ViewMode, { full: string; short: string }> = {
@@ -43,6 +44,7 @@ export function CalendarHeader({
   onViewModeChange,
   onNavigate,
   onNewEvent,
+  onImport,
 }: CalendarHeaderProps) {
   const isMobile = useIsMobile();
   return (
@@ -99,6 +101,18 @@ export function CalendarHeader({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+
+        {onImport && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1.5 px-3 shadow-sm transition-all font-bold"
+            onClick={onImport}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            {!isMobile && "Importar"}
+          </Button>
+        )}
 
         <Button
           size="sm"

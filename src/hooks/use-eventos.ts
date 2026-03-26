@@ -49,7 +49,10 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
         .from('eventos')
         .select('*')
         .order('inicio');
-      if (error) throw error;
+      if (error) {
+        console.error('[useCalendarEvents] erro ao buscar eventos:', error);
+        throw error;
+      }
       return data as unknown as EventoRow[];
     },
   });
@@ -169,6 +172,47 @@ export function useCreateEvento() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['eventos'] }),
+  });
+}
+
+export function useBulkCreateEventos() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (forms: EventoForm[]) => {
+      const rows = forms.map((form) => ({
+        user_id: user!.id,
+        titulo: form.titulo,
+        descricao: form.descricao || null,
+        inicio: form.diaInteiro
+          ? new Date(form.inicio + 'T00:00:00').toISOString()
+          : new Date(form.inicio).toISOString(),
+        fim: form.diaInteiro
+          ? new Date(form.fim + 'T23:59:59').toISOString()
+          : new Date(form.fim).toISOString(),
+        dia_inteiro: form.diaInteiro,
+        tipo_calendario: form.tipoCalendario,
+        cor: form.cor,
+      }));
+
+      // Insere em lotes de 500 para evitar limites do PostgREST
+      const CHUNK = 500;
+      let totalInserted = 0;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const { data: inserted, error } = await (supabase as any)
+          .from('eventos')
+          .insert(rows.slice(i, i + CHUNK))
+          .select('id');
+        if (error) throw error;
+        totalInserted += (inserted as { id: string }[] | null)?.length ?? 0;
+      }
+      return totalInserted;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['eventos'] });
+      qc.refetchQueries({ queryKey: ['eventos'] });
+    },
   });
 }
 
