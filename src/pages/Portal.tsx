@@ -545,7 +545,7 @@ export default function Portal() {
 
           for (const cnpj of cnpjs) {
             const idx = text.indexOf(cnpj);
-            const context = text.substring(Math.max(0, idx - 300), Math.min(text.length, idx + 400));
+            const context = text.substring(Math.max(0, idx - 400), Math.min(text.length, idx + 500));
             const lower = context.toLowerCase();
 
             let tipo = '';
@@ -570,6 +570,57 @@ export default function Portal() {
               if (m) { obra = m[1].replace(/\s+/g, ' ').trim(); break; }
             }
 
+            // Extract construtora / empresa responsável
+            let construtora = '';
+            const constPatterns = [
+              /(?:construtora|incorporadora|empresa)\s*[:\-]?\s*([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s\-\.]{3,80}?)(?:\s*[,.]|\s+CNPJ|\s+inscrit)/i,
+              /([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s\-\.]{3,80}?)(?:\s*,?\s*(?:CNPJ|C\.N\.P\.J)[:\s/nº]*\d{2})/i,
+            ];
+            for (const p of constPatterns) {
+              const m = context.match(p);
+              if (m) { construtora = m[1].replace(/\s+/g, ' ').trim(); break; }
+            }
+
+            // Detect fase/momento da obra
+            let fase = '';
+            if (lower.includes('licença prévia') || lower.includes('(lp)')) fase = 'Planejamento';
+            else if (lower.includes('licença de instalação') || lower.includes('(li)')) fase = 'Instalação';
+            else if (lower.includes('licença de operação') || lower.includes('(lo)')) fase = 'Operação';
+            else if (lower.includes('construção')) fase = 'Construção';
+            else if (lower.includes('reforma')) fase = 'Reforma';
+            else if (lower.includes('ampliação')) fase = 'Ampliação';
+            else if (lower.includes('demolição')) fase = 'Demolição';
+
+            // Extract contact info: email
+            const emailMatch = context.match(/[\w.\-+]+@[\w.\-]+\.\w{2,}/i);
+            const emailFound = emailMatch ? emailMatch[0] : '';
+
+            // Extract contact: telefone
+            const telMatch = context.match(/(?:\(?\d{2}\)?\s*\d{4,5}[-.\s]?\d{4})/);
+            const telefoneFound = telMatch ? telMatch[0].trim() : '';
+
+            // Extract contact name
+            let nomeContato = '';
+            const nomePatterns = [
+              /(?:responsável|requerente|interessado|proprietário|titular)\s*[:\-]?\s*([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][a-záàâãéèêíïóôõöúçñA-Z\s\-\.]{3,60}?)(?:\s*[,.]|\s+CPF|\s+CNPJ|\s+inscrit|\s+residente)/i,
+              /(?:Sr\.|Sra\.|Sr|Sra)\s+([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][a-záàâãéèêíïóôõöúçñA-Z\s\-\.]{3,50})/i,
+            ];
+            for (const p of nomePatterns) {
+              const m = context.match(p);
+              if (m) { nomeContato = m[1].replace(/\s+/g, ' ').trim(); break; }
+            }
+
+            // Extract endereço da obra
+            let enderecoObra = '';
+            const endPatterns = [
+              /(?:localizado|situada?|endereço|localização)\s*(?:na?|em|no)?\s*[:\-]?\s*([^,\.]{5,120}?)(?:[,.]|\s+(?:bairro|município|cidade|natal|CEP))/i,
+              /(?:Rua|Av\.|Avenida|Travessa|Alameda|Estrada)\s+[^,\.]{5,100}/i,
+            ];
+            for (const p of endPatterns) {
+              const m = context.match(p);
+              if (m) { enderecoObra = (m[1] || m[0]).replace(/\s+/g, ' ').trim(); break; }
+            }
+
             const hasRelevant = tipo || lower.includes('licen') || lower.includes('construção') ||
               lower.includes('loteamento') || lower.includes('empreendimento') || lower.includes('alvará');
             if (!hasRelevant) continue;
@@ -578,13 +629,19 @@ export default function Portal() {
               data_edicao: pdf.date || pdf.title,
               numero_dom: pdf.numero,
               tipo_licenca: tipo || 'Não identificada',
+              fase_obra: fase,
+              construtora,
               cnpj,
-              razao_social: '',
+              razao_social: construtora,
+              nome_contato: nomeContato,
+              email: emailFound,
+              telefone: telefoneFound,
+              endereco_obra: enderecoObra,
               obra_descricao: obra,
               pdf_nome: pdf.href.split('/').pop() || '',
               pdf_link: pdf.href,
               bloco_texto: context.substring(0, 500),
-            });
+            } as any);
             totalInserted++;
           }
         } catch (err) {
