@@ -513,40 +513,58 @@ export type Database = {
         Row: {
           bloco_texto: string | null
           cnpj: string | null
+          construtora: string | null
           created_at: string
           data_edicao: string | null
+          email: string | null
+          endereco_obra: string | null
+          fase_obra: string | null
           id: string
+          nome_contato: string | null
           numero_dom: string | null
           obra_descricao: string | null
           pdf_link: string | null
           pdf_nome: string | null
           razao_social: string | null
+          telefone: string | null
           tipo_licenca: string | null
         }
         Insert: {
           bloco_texto?: string | null
           cnpj?: string | null
+          construtora?: string | null
           created_at?: string
           data_edicao?: string | null
+          email?: string | null
+          endereco_obra?: string | null
+          fase_obra?: string | null
           id?: string
+          nome_contato?: string | null
           numero_dom?: string | null
           obra_descricao?: string | null
           pdf_link?: string | null
           pdf_nome?: string | null
           razao_social?: string | null
+          telefone?: string | null
           tipo_licenca?: string | null
         }
         Update: {
           bloco_texto?: string | null
           cnpj?: string | null
+          construtora?: string | null
           created_at?: string
           data_edicao?: string | null
+          email?: string | null
+          endereco_obra?: string | null
+          fase_obra?: string | null
           id?: string
+          nome_contato?: string | null
           numero_dom?: string | null
           obra_descricao?: string | null
           pdf_link?: string | null
           pdf_nome?: string | null
           razao_social?: string | null
+          telefone?: string | null
           tipo_licenca?: string | null
         }
         Relationships: []
