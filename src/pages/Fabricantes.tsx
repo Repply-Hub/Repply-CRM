@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFabricantes } from '@/hooks/use-clientes';
 import { useCreateFabricante } from '@/hooks/use-mutations';
 import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante } from '@/hooks/use-fabricantes';
-import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package } from 'lucide-react';
+import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 
