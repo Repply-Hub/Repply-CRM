@@ -202,7 +202,7 @@ export function useBulkCreateEventos() {
       const CHUNK = 500;
       let totalInserted = 0;
       for (let i = 0; i < rows.length; i += CHUNK) {
-        const { data: inserted, error } = await (supabase as any)
+        const { data: inserted, error } = await supabase
           .from('eventos')
           .insert(rows.slice(i, i + CHUNK))
           .select('id');
