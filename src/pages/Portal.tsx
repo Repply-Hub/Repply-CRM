@@ -394,17 +394,16 @@ export default function Portal() {
     }
   };
 
-  // ─── Natal: client-side scraping ──────────────────────────────
+  // ─── Natal: client-side scraping with AI extraction ──────────────────────────────
   const scrapeNatal = async () => {
     setScraping((prev) => ({ ...prev, natal: true }));
     const toastId = toast.loading('Buscando diários oficiais de Natal...');
     try {
-      // Fetch listing page for current month
+      // Fetch listing page for current and previous month
       const now = new Date();
       const months = [
         { mes: String(now.getMonth() + 1).padStart(2, '0'), ano: String(now.getFullYear()) },
       ];
-      // Also check previous month
       const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       months.push({ mes: String(prev.getMonth() + 1).padStart(2, '0'), ano: String(prev.getFullYear()) });
 
@@ -464,192 +463,83 @@ export default function Portal() {
         return;
       }
 
-      toast.loading(`Processando ${newPdfs.length} novos PDFs...`, { id: toastId });
-
-      const toProcess = newPdfs.slice(0, 5);
+      // Process up to 3 PDFs at a time (AI processing is heavier)
+      const toProcess = newPdfs.slice(0, 3);
       let totalInserted = 0;
 
-      for (const pdf of toProcess) {
+      for (let i = 0; i < toProcess.length; i++) {
+        const pdf = toProcess[i];
+        toast.loading(`Processando PDF ${i + 1}/${toProcess.length} com IA... (${pdf.numero || pdf.title})`, { id: toastId });
+
         try {
-          const resp = await fetch(pdf.href);
-          if (!resp.ok) continue;
-          const buffer = new Uint8Array(await resp.arrayBuffer());
+          const { data: aiResult, error: aiError } = await supabase.functions.invoke('extract-natal-pdf', {
+            body: {
+              pdf_url: pdf.href,
+              pdf_date: pdf.date || pdf.title,
+              pdf_numero: pdf.numero,
+            },
+          });
 
-          if (buffer.length > 3 * 1024 * 1024) {
+          if (aiError) {
+            console.error('AI extraction error:', aiError);
+            // Fallback: insert basic entry
             await supabase.from('licencas_natal').insert({
               data_edicao: pdf.date || pdf.title,
               numero_dom: pdf.numero,
               pdf_nome: pdf.href.split('/').pop() || '',
               pdf_link: pdf.href,
-              bloco_texto: '(PDF muito grande para processamento automático)',
+              bloco_texto: '(Erro na extração via IA)',
             });
             totalInserted++;
             continue;
           }
 
-          // Basic PDF text extraction
-          const raw = new TextDecoder('latin1').decode(buffer);
-          const textParts: string[] = [];
-          const btEtRegex = /BT\s([\s\S]*?)ET/g;
-          let btMatch;
-          while ((btMatch = btEtRegex.exec(raw)) !== null) {
-            const block = btMatch[1];
-            const tjRegex = /\(([^)]*)\)\s*Tj/g;
-            let tjMatch;
-            while ((tjMatch = tjRegex.exec(block)) !== null) {
-              const decoded = tjMatch[1].replace(/\\n/g, '\n').replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\').trim();
-              if (decoded) textParts.push(decoded);
+          if (aiResult?.success && aiResult.entries?.length > 0) {
+            for (const entry of aiResult.entries) {
+              await supabase.from('licencas_natal').insert({
+                data_edicao: entry.data_edicao || pdf.date || pdf.title,
+                numero_dom: entry.numero_dom || pdf.numero,
+                tipo_licenca: entry.tipo_licenca || '',
+                fase_obra: entry.fase_obra || '',
+                construtora: entry.construtora || '',
+                cnpj: entry.cnpj || '',
+                razao_social: entry.razao_social || '',
+                nome_contato: entry.nome_contato || '',
+                email: entry.email || '',
+                telefone: entry.telefone || '',
+                endereco_obra: entry.endereco_obra || '',
+                obra_descricao: entry.obra_descricao || '',
+                pdf_nome: pdf.href.split('/').pop() || '',
+                pdf_link: pdf.href,
+                bloco_texto: entry.bloco_texto || '',
+              } as any);
+              totalInserted++;
             }
-            const tjArrayRegex = /\[([\s\S]*?)\]\s*TJ/g;
-            let tjArrMatch;
-            while ((tjArrMatch = tjArrayRegex.exec(block)) !== null) {
-              const strRegex = /\(([^)]*)\)/g;
-              let strMatch;
-              const parts: string[] = [];
-              while ((strMatch = strRegex.exec(tjArrMatch[1])) !== null) {
-                parts.push(strMatch[1].replace(/\\n/g, '\n').replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\'));
-              }
-              const joined = parts.join('').trim();
-              if (joined) textParts.push(joined);
-            }
-          }
-          const text = textParts.join('\n');
-
-          if (!text || text.length < 20) {
+          } else {
+            // No entries found by AI
             await supabase.from('licencas_natal').insert({
               data_edicao: pdf.date || pdf.title,
               numero_dom: pdf.numero,
               pdf_nome: pdf.href.split('/').pop() || '',
               pdf_link: pdf.href,
-              bloco_texto: '(Texto não extraível - PDF baseado em imagem)',
+              bloco_texto: '(Nenhuma licença/obra identificada neste diário)',
             });
-            totalInserted++;
-            continue;
-          }
-
-          // Extract CNPJs
-          const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
-          const cnpjs = [...new Set((text.match(cnpjRegex) || []).map(c => c.replace(/\s/g, '')))];
-
-          if (cnpjs.length === 0) {
-            await supabase.from('licencas_natal').insert({
-              data_edicao: pdf.date || pdf.title,
-              numero_dom: pdf.numero,
-              pdf_nome: pdf.href.split('/').pop() || '',
-              pdf_link: pdf.href,
-              bloco_texto: text.substring(0, 500),
-            });
-            totalInserted++;
-            continue;
-          }
-
-          for (const cnpj of cnpjs) {
-            const idx = text.indexOf(cnpj);
-            const context = text.substring(Math.max(0, idx - 400), Math.min(text.length, idx + 500));
-            const lower = context.toLowerCase();
-
-            let tipo = '';
-            if (lower.includes('licença prévia') || lower.includes('(lp)')) tipo = 'Licença Prévia';
-            else if (lower.includes('licença de instalação e operação')) tipo = 'Licença de Instalação e Operação';
-            else if (lower.includes('licença de instalação') || lower.includes('(li)')) tipo = 'Licença de Instalação';
-            else if (lower.includes('licença de operação') || lower.includes('(lo)')) tipo = 'Licença de Operação';
-            else if (lower.includes('licença simplificada') || lower.includes('(ls)')) tipo = 'Licença Simplificada';
-            else if (lower.includes('renovação de licença')) tipo = 'Renovação de Licença';
-            else if (lower.includes('licença ambiental')) tipo = 'Licença Ambiental';
-            else if (lower.includes('alvará')) tipo = 'Alvará';
-            else if (lower.includes('autorização ambiental')) tipo = 'Autorização Ambiental';
-
-            // Extract obra description
-            let obra = '';
-            const obraPatterns = [
-              /(?:para\s+(?:a\s+|o\s+)?)((?:CONSTRUÇÃO|REFORMA|AMPLIAÇÃO|IMPLANTAÇÃO|PAVIMENTAÇÃO|LOTEAMENTO)[\s\S]{3,120}?)(?:[,.]|\s+localiz)/i,
-              /empreendimento\s+(?:imobiliário\s+)?denominado\s+([\s\S]{5,100}?)(?:[,.]|\s+localiz)/i,
-            ];
-            for (const p of obraPatterns) {
-              const m = context.match(p);
-              if (m) { obra = m[1].replace(/\s+/g, ' ').trim(); break; }
-            }
-
-            // Extract construtora / empresa responsável
-            let construtora = '';
-            const constPatterns = [
-              /(?:construtora|incorporadora|empresa)\s*[:\-]?\s*([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s\-\.]{3,80}?)(?:\s*[,.]|\s+CNPJ|\s+inscrit)/i,
-              /([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s\-\.]{3,80}?)(?:\s*,?\s*(?:CNPJ|C\.N\.P\.J)[:\s/nº]*\d{2})/i,
-            ];
-            for (const p of constPatterns) {
-              const m = context.match(p);
-              if (m) { construtora = m[1].replace(/\s+/g, ' ').trim(); break; }
-            }
-
-            // Detect fase/momento da obra
-            let fase = '';
-            if (lower.includes('licença prévia') || lower.includes('(lp)')) fase = 'Planejamento';
-            else if (lower.includes('licença de instalação') || lower.includes('(li)')) fase = 'Instalação';
-            else if (lower.includes('licença de operação') || lower.includes('(lo)')) fase = 'Operação';
-            else if (lower.includes('construção')) fase = 'Construção';
-            else if (lower.includes('reforma')) fase = 'Reforma';
-            else if (lower.includes('ampliação')) fase = 'Ampliação';
-            else if (lower.includes('demolição')) fase = 'Demolição';
-
-            // Extract contact info: email
-            const emailMatch = context.match(/[\w.\-+]+@[\w.\-]+\.\w{2,}/i);
-            const emailFound = emailMatch ? emailMatch[0] : '';
-
-            // Extract contact: telefone
-            const telMatch = context.match(/(?:\(?\d{2}\)?\s*\d{4,5}[-.\s]?\d{4})/);
-            const telefoneFound = telMatch ? telMatch[0].trim() : '';
-
-            // Extract contact name
-            let nomeContato = '';
-            const nomePatterns = [
-              /(?:responsável|requerente|interessado|proprietário|titular)\s*[:\-]?\s*([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][a-záàâãéèêíïóôõöúçñA-Z\s\-\.]{3,60}?)(?:\s*[,.]|\s+CPF|\s+CNPJ|\s+inscrit|\s+residente)/i,
-              /(?:Sr\.|Sra\.|Sr|Sra)\s+([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][a-záàâãéèêíïóôõöúçñA-Z\s\-\.]{3,50})/i,
-            ];
-            for (const p of nomePatterns) {
-              const m = context.match(p);
-              if (m) { nomeContato = m[1].replace(/\s+/g, ' ').trim(); break; }
-            }
-
-            // Extract endereço da obra
-            let enderecoObra = '';
-            const endPatterns = [
-              /(?:localizado|situada?|endereço|localização)\s*(?:na?|em|no)?\s*[:\-]?\s*([^,\.]{5,120}?)(?:[,.]|\s+(?:bairro|município|cidade|natal|CEP))/i,
-              /(?:Rua|Av\.|Avenida|Travessa|Alameda|Estrada)\s+[^,\.]{5,100}/i,
-            ];
-            for (const p of endPatterns) {
-              const m = context.match(p);
-              if (m) { enderecoObra = (m[1] || m[0]).replace(/\s+/g, ' ').trim(); break; }
-            }
-
-            const hasRelevant = tipo || lower.includes('licen') || lower.includes('construção') ||
-              lower.includes('loteamento') || lower.includes('empreendimento') || lower.includes('alvará');
-            if (!hasRelevant) continue;
-
-            await supabase.from('licencas_natal').insert({
-              data_edicao: pdf.date || pdf.title,
-              numero_dom: pdf.numero,
-              tipo_licenca: tipo || 'Não identificada',
-              fase_obra: fase,
-              construtora,
-              cnpj,
-              razao_social: construtora,
-              nome_contato: nomeContato,
-              email: emailFound,
-              telefone: telefoneFound,
-              endereco_obra: enderecoObra,
-              obra_descricao: obra,
-              pdf_nome: pdf.href.split('/').pop() || '',
-              pdf_link: pdf.href,
-              bloco_texto: context.substring(0, 500),
-            } as any);
             totalInserted++;
           }
         } catch (err) {
           console.error('Erro ao processar PDF Natal:', pdf.href, err);
+          await supabase.from('licencas_natal').insert({
+            data_edicao: pdf.date || pdf.title,
+            numero_dom: pdf.numero,
+            pdf_nome: pdf.href.split('/').pop() || '',
+            pdf_link: pdf.href,
+            bloco_texto: '(Erro no processamento)',
+          });
+          totalInserted++;
         }
       }
 
-      toast.success(`${totalInserted} novos registros importados de ${toProcess.length} PDFs!`, { id: toastId });
+      toast.success(`${totalInserted} novos registros importados de ${toProcess.length} PDFs via IA!`, { id: toastId });
       await fetchNatalFromDb();
     } catch (err) {
       console.error('Scraping Natal error:', err);
