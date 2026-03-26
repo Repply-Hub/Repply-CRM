@@ -350,7 +350,7 @@ export default function Portal() {
 
       if (search) {
         const q = `%${search}%`;
-        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q}`);
+        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q},construtora.ilike.${q},nome_contato.ilike.${q},email.ilike.${q}`);
       }
 
       const { data, error } = await query;
