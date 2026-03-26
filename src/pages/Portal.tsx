@@ -463,7 +463,7 @@ export default function Portal() {
           formData.append('ano', ano);
           formData.append('list', 'Listar');
 
-          const resp = await fetch('https://www2.natal.rn.gov.br/dom/', {
+          const resp = await fetch('https://www.natal.rn.gov.br/dom/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString(),
@@ -471,7 +471,7 @@ export default function Portal() {
           if (!resp.ok) continue;
           const html = await resp.text();
 
-          const linkRegex = /<a\s+href="(https?:\/\/www2\.natal\.rn\.gov\.br\/_anexos\/publicacao\/dom\/[^"]+\.pdf)"[^>]*>([^<]+)<\/a>/gi;
+          const linkRegex = /<a\s+href="(https?:\/\/www2?\.natal\.rn\.gov\.br\/_anexos\/publicacao\/dom\/[^"]+\.pdf)"[^>]*>([^<]+)<\/a>/gi;
           let match;
           while ((match = linkRegex.exec(html)) !== null) {
             const href = match[1];
