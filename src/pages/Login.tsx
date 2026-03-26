@@ -170,6 +170,11 @@ export default function Login() {
                     </button>
                   </div>
                 </div>
+                <div className="flex justify-end">
+                  <a href="/esqueci-senha" className="text-xs text-primary hover:underline">
+                    Esqueceu sua senha?
+                  </a>
+                </div>
                 <Button type="submit" className="w-full h-11 font-semibold shadow-brand" disabled={loading}>
                   {loading ? "Entrando..." : "Entrar"}
                 </Button>
