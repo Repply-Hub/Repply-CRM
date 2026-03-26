@@ -45,10 +45,12 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
     queryKey: ['eventos'],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      // Busca todos os eventos sem o limite padrão de 1000 linhas
+      const { data, error } = await supabase
         .from('eventos')
         .select('*')
-        .order('inicio');
+        .order('inicio')
+        .range(0, 10000);
       if (error) {
         console.error('[useCalendarEvents] erro ao buscar eventos:', error);
         throw error;
