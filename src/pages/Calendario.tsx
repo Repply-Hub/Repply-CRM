@@ -60,7 +60,7 @@ function parseICSDate(value: string): { date: Date; allDay: boolean } {
   return { date: new Date(y, mo, d, h, mi, s), allDay: false };
 }
 
-function parseICS(content: string): EventoForm[] {
+function parseICS(content: string, calendarType: CalendarType = 'empresa'): EventoForm[] {
   const events: EventoForm[] = [];
   const veventRegex = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/g;
   let match;
