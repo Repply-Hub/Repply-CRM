@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFabricantes } from '@/hooks/use-clientes';
 import { useCreateFabricante } from '@/hooks/use-mutations';
 import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante } from '@/hooks/use-fabricantes';
-import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package } from 'lucide-react';
+import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 
@@ -193,8 +193,16 @@ const Fabricantes = () => {
   const deletePreco = useDeletePreco();
   const { data: precos, isLoading: loadingPrecos } = useTabelaPrecos(selectedFabId);
 
+  const [fabPage, setFabPage] = useState(1);
+  const FAB_PER_PAGE = 10;
+
   const selectedFab = fabricantes?.find(f => f.id === selectedFabId);
   const filtered = fabricantes?.filter(f => f.nome.toLowerCase().includes(search.toLowerCase())) ?? [];
+  const totalFabPages = Math.max(1, Math.ceil(filtered.length / FAB_PER_PAGE));
+  const paginatedFabs = filtered.slice((fabPage - 1) * FAB_PER_PAGE, fabPage * FAB_PER_PAGE);
+
+  // Reset page when search changes
+  const handleSearchChange = (val: string) => { setSearch(val); setFabPage(1); };
 
   const handleDelete = async () => {
     if (!deleteAlert) return;
@@ -242,25 +250,39 @@ const Fabricantes = () => {
             <CardContent className="space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar fabricante..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+                <Input placeholder="Buscar fabricante..." value={search} onChange={e => handleSearchChange(e.target.value)} className="pl-9" />
               </div>
               {isLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
               ) : (
-                <div className="space-y-1 max-h-[60vh] overflow-y-auto">
-                  {filtered.map(f => (
-                    <button
-                      key={f.id}
-                      onClick={() => setSelectedFabId(f.id)}
-                      className={`w-full text-left p-3 rounded-lg border transition-all ${selectedFabId === f.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-transparent hover:bg-muted/50'
-                        }`}
-                    >
-                      <p className="font-medium text-sm text-foreground">{f.nome}</p>
-                      <p className="text-xs text-muted-foreground">{f.cnpj || 'Sem CNPJ'} · {f.nome_contato || 'Sem contato'}</p>
-                    </button>
-                  ))}
-                  {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum fabricante encontrado</p>}
-                </div>
+                <>
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+                    {paginatedFabs.map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setSelectedFabId(f.id)}
+                        className={`w-full text-left p-3 rounded-lg border transition-all ${selectedFabId === f.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-transparent hover:bg-muted/50'}`}
+                      >
+                        <p className="font-medium text-sm text-foreground">{f.nome}</p>
+                        <p className="text-xs text-muted-foreground">{f.cnpj || 'Sem CNPJ'} · {f.nome_contato || 'Sem contato'}</p>
+                      </button>
+                    ))}
+                    {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum fabricante encontrado</p>}
+                  </div>
+                  {totalFabPages > 1 && (
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <span className="text-xs text-muted-foreground">Página {fabPage} de {totalFabPages}</span>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage <= 1} onClick={() => setFabPage(p => p - 1)}>
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage >= totalFabPages} onClick={() => setFabPage(p => p + 1)}>
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
