@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useVendedores } from '@/hooks/use-clientes';
 import { useCreateVendedor } from '@/hooks/use-mutations';
 import { usePermissoes, useUpsertPermissao, MODULOS, type Permissao } from '@/hooks/use-permissoes';
-import { Plus, Sun, Moon, Monitor, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, Clock, ChevronRight, History, CalendarIcon, UserCircle, Lock, AlertTriangle } from 'lucide-react';
+import { Plus, Sun, Moon, Monitor, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, Clock, ChevronRight, History, CalendarIcon, UserCircle, Lock, AlertTriangle, Building2, Crown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useTheme } from '@/hooks/use-theme';
@@ -71,7 +71,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
   const upsert = useUpsertPermissao();
   const { user } = useAuth();
   const qc = useQueryClient();
-  const isGestor = vendedor.role === 'gestor';
+  const isGestor = vendedor.role === 'gestor' || vendedor.role === 'admin';
 
   const getPermissao = (modulo: string): Permissao | undefined =>
     permissoes?.find(p => p.modulo === modulo);
@@ -254,11 +254,13 @@ function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nom
         <div><Label>Telefone</Label><Input name="telefone" defaultValue={vendedor.telefone ?? ''} placeholder="(00) 00000-0000" /></div>
         <div>
           <Label>Perfil</Label>
-          <Select name="role" defaultValue={vendedor.role}>
+           <Select name="role" defaultValue={vendedor.role}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="vendedor">Vendedor</SelectItem>
+              <SelectItem value="empresa">Empresa</SelectItem>
               <SelectItem value="gestor">Gestor</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -642,8 +644,8 @@ function ProfileTab() {
               <div>
                 <p className="font-semibold">{perfil.nome}</p>
                 <p className="text-sm text-muted-foreground">{perfil.email}</p>
-                <Badge variant={perfil.role === 'gestor' ? 'default' : 'secondary'} className="text-[10px] mt-1">
-                  {perfil.role === 'gestor' ? 'Gestor' : 'Vendedor'}
+                <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="text-[10px] mt-1">
+                  {{ admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' }[perfil.role] || perfil.role}
                 </Badge>
               </div>
             </div>
@@ -883,7 +885,9 @@ const Configuracoes = () => {
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="vendedor">Vendedor</SelectItem>
+                              <SelectItem value="empresa">Empresa</SelectItem>
                               <SelectItem value="gestor">Gestor</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -917,10 +921,13 @@ const Configuracoes = () => {
                     <>
                       {/* Grouped by role */}
                       {(() => {
+                        const roleLabels: Record<string, string> = { admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' };
+                        const admins = filteredVendedores.filter(v => v.role === 'admin');
+                        const empresas = filteredVendedores.filter(v => v.role === 'empresa');
                         const gestores = filteredVendedores.filter(v => v.role === 'gestor');
                         const vendedores = filteredVendedores.filter(v => v.role === 'vendedor');
 
-                        const renderSection = (title: string, icon: React.ReactNode, items: typeof filteredVendedores, badgeVariant: 'default' | 'secondary') => {
+                        const renderSection = (title: string, icon: React.ReactNode, items: typeof filteredVendedores, badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline') => {
                           if (items.length === 0) return null;
                           return (
                             <div key={title}>
@@ -947,7 +954,7 @@ const Configuracoes = () => {
                                       <p className="text-xs text-muted-foreground truncate">{v.email}</p>
                                     </div>
                                     <Badge variant={badgeVariant} className="shrink-0 text-[10px]">
-                                      {v.role === 'gestor' ? 'Gestor' : 'Vendedor'}
+                                      {roleLabels[v.role] || v.role}
                                     </Badge>
                                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                                   </button>
@@ -959,7 +966,9 @@ const Configuracoes = () => {
 
                         return (
                           <>
-                            {renderSection('Gestores', <Shield className="h-3.5 w-3.5 text-primary" />, gestores, 'default')}
+                            {renderSection('Admin', <Crown className="h-3.5 w-3.5 text-primary" />, admins, 'destructive')}
+                            {renderSection('Empresas', <Building2 className="h-3.5 w-3.5 text-primary" />, empresas, 'default')}
+                            {renderSection('Gestores', <Shield className="h-3.5 w-3.5 text-primary" />, gestores, 'outline')}
                             {renderSection('Vendedores', <Users className="h-3.5 w-3.5 text-muted-foreground" />, vendedores, 'secondary')}
                           </>
                         );
