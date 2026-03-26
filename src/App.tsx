@@ -17,6 +17,7 @@ import Fabricantes from "./pages/Fabricantes";
 import Portal from "./pages/Portal";
 import EditarPedido from "./pages/EditarPedido";
 import Calendario from "./pages/Calendario";
+import Tarefas from "./pages/Tarefas";
 import Login from "./pages/Login";
 import EsqueciSenha from "./pages/EsqueciSenha";
 import RedefinirSenha from "./pages/RedefinirSenha";
