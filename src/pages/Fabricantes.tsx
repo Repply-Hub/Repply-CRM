@@ -255,32 +255,34 @@ const Fabricantes = () => {
               {isLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
               ) : (
-                <div className="space-y-1 max-h-[50vh] overflow-y-auto">
-                  {paginatedFabs.map(f => (
-                    <button
-                      key={f.id}
-                      onClick={() => setSelectedFabId(f.id)}
-                      className={`w-full text-left p-3 rounded-lg border transition-all ${selectedFabId === f.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-transparent hover:bg-muted/50'}`}
-                    >
-                      <p className="font-medium text-sm text-foreground">{f.nome}</p>
-                      <p className="text-xs text-muted-foreground">{f.cnpj || 'Sem CNPJ'} · {f.nome_contato || 'Sem contato'}</p>
-                    </button>
-                  ))}
-                  {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum fabricante encontrado</p>}
-                </div>
-                {totalFabPages > 1 && (
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <span className="text-xs text-muted-foreground">Página {fabPage} de {totalFabPages}</span>
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage <= 1} onClick={() => setFabPage(p => p - 1)}>
-                        <ChevronLeft className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage >= totalFabPages} onClick={() => setFabPage(p => p + 1)}>
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                <>
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+                    {paginatedFabs.map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setSelectedFabId(f.id)}
+                        className={`w-full text-left p-3 rounded-lg border transition-all ${selectedFabId === f.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-transparent hover:bg-muted/50'}`}
+                      >
+                        <p className="font-medium text-sm text-foreground">{f.nome}</p>
+                        <p className="text-xs text-muted-foreground">{f.cnpj || 'Sem CNPJ'} · {f.nome_contato || 'Sem contato'}</p>
+                      </button>
+                    ))}
+                    {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum fabricante encontrado</p>}
                   </div>
-                )}
+                  {totalFabPages > 1 && (
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <span className="text-xs text-muted-foreground">Página {fabPage} de {totalFabPages}</span>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage <= 1} onClick={() => setFabPage(p => p - 1)}>
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage >= totalFabPages} onClick={() => setFabPage(p => p + 1)}>
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
