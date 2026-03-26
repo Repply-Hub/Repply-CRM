@@ -111,6 +111,9 @@ export default function Calendario() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
   const [isImporting, setIsImporting] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importCalendarType, setImportCalendarType] = useState<CalendarType>('empresa');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const isMobile = useIsMobile();
