@@ -81,7 +81,7 @@ const SITES = [
     id: 'natal',
     name: 'Diário Oficial - Natal',
     description: 'Publicações oficiais da Prefeitura de Natal/RN',
-    url: 'https://www2.natal.rn.gov.br/dom/',
+    url: 'https://www.natal.rn.gov.br/dom/',
     icon: '🏛️',
     gradient: 'from-blue-500/10 to-blue-600/5',
     badgeClass: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/20',
