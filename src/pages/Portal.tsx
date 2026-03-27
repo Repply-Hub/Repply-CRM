@@ -633,8 +633,8 @@ export default function Portal() {
       const tableData = (data || []).map(row => ({
         'Nº Licença': row.numero_licenca || '',
         'Tipo de Licença': row.tipo_licenca || '',
-        'Data Emissão': row.data_emissao || '',
-        'Validade': row.data_validade || '',
+        'Data Emissão': formatDataEdicao(row.data_emissao || ''),
+        'Validade': formatDataEdicao(row.data_validade || ''),
         'CNPJ': row.cnpj || '',
         'Razão Social': row.razao_social || '',
         'Empreendimento': row.empreendimento || '',
