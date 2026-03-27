@@ -156,23 +156,29 @@ export default function Portal() {
 
       if (search) {
         const q = `%${search}%`;
-        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},nome_fantasia.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q}`);
+        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q},email.ilike.${q}`);
       }
 
       const { data, error } = await query;
       if (error) throw error;
 
-      const tableData = (data || []).map(row => ({
+      const relevantData = (data || []).filter((row) => {
+        const tipo = String(row.tipo_licenca || '').trim();
+        const isAllowed = ['Licença Prévia', 'Licença de Instalação', 'Licença de Operação'].includes(tipo);
+        const hasCoreData = Boolean(
+          row.obra_descricao || row.razao_social || row.nome_fantasia || row.email || row.bloco_texto
+        );
+        return isAllowed && hasCoreData;
+      });
+
+      const tableData = relevantData.map(row => ({
         'Data da Edição': row.data_edicao || '',
         'Tipo de Licença': row.tipo_licenca || '',
-        'Prioridade': row.prioridade || '',
-        'CNPJ': row.cnpj || '',
-        'Razão Social': row.razao_social || '',
-        'Nome Fantasia': row.nome_fantasia || '',
-        'Telefone': row.telefone || '',
+        'Fase da Obra': row.prioridade || '',
+        'Construtora / Obra': row.razao_social || row.nome_fantasia || '',
+        'Contato': row.nome_fantasia || '',
         'Email': row.email || '',
-        'Endereço': row.endereco_empresa || '',
-        'Quadro Societário': row.quadro_societario || '',
+        'CNPJ': row.cnpj || '',
         'Obra / Descrição': row.obra_descricao || '',
         'PDF': row.pdf_nome || '',
         'Link PDF': row.pdf_link || '',

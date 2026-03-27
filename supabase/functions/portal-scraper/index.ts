@@ -275,6 +275,10 @@ interface ExtremozEntry {
   tipo_licenca: string;
   cnpj: string;
   razao_social: string;
+  nome_contato: string;
+  email: string;
+  fase_obra: string;
+  construtora: string;
   obra_descricao: string;
   pdf_nome: string;
   pdf_link: string;
@@ -287,26 +291,11 @@ function parseCnpjs(text: string): string[] {
   return [...new Set(matches.map(c => c.replace(/\s/g, '')))];
 }
 
-function detectLicenseType(text: string): string {
+function normalizeExtremozLicenseType(text: string): string {
   const lower = text.toLowerCase();
-  // Abbreviations first (common in Extremoz PDFs)
-  if (/\bLIO\s+para\b/i.test(text)) return 'Licença de Instalação e Operação';
-  if (/\bLP\s+para\b/i.test(text)) return 'Licença Prévia';
-  if (/\bLS\s+para\b/i.test(text)) return 'Licença Simplificada';
-  if (/\bLI\s+para\b/i.test(text)) return 'Licença de Instalação';
-  if (/\bLO\s+para\b/i.test(text)) return 'Licença de Operação';
-  // Full names
-  if (lower.includes('renovação de licença simplificada')) return 'Renovação de Licença Simplificada';
-  if (lower.includes('renovação de licença')) return 'Renovação de Licença';
-  if (lower.includes('licença prévia') || lower.includes('(lp)')) return 'Licença Prévia';
-  if (lower.includes('licença de instalação e operação')) return 'Licença de Instalação e Operação';
-  if (lower.includes('licença de instalação') || lower.includes('(li)')) return 'Licença de Instalação';
-  if (lower.includes('licença de operação') || lower.includes('(lo)')) return 'Licença de Operação';
-  if (lower.includes('licença simplificada') || lower.includes('(ls)')) return 'Licença Simplificada';
-  if (lower.includes('licença ambiental')) return 'Licença Ambiental';
-  if (lower.includes('autorização ambiental')) return 'Autorização Ambiental';
-  if (lower.includes('dispensa de licen')) return 'Dispensa de Licença';
-  if (/tomada de preços|concorrência|pregão/i.test(text)) return 'Licitação';
+  if (/\bLP\b/i.test(text) || lower.includes('licença prévia')) return 'Licença Prévia';
+  if (/\bLI\b/i.test(text) || lower.includes('licença de instalação')) return 'Licença de Instalação';
+  if (/\bLO\b/i.test(text) || lower.includes('licença de operação')) return 'Licença de Operação';
   return '';
 }
 
@@ -314,17 +303,47 @@ function extractCompanyName(text: string, cnpj: string): string {
   const escaped = cnpj.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(`([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\\s\\-\\.]{3,80}?)\\s*,?\\s*(?:CNPJ|C\\.N\\.P\\.J)[:\\s/nº]*${escaped}`, 'i');
   const match = text.match(pattern);
-  if (match) return match[1].trim().toUpperCase();
+  if (match) return match[1].replace(/\s+/g, ' ').trim().toUpperCase();
+  return '';
+}
+
+function extractEmail(text: string): string {
+  const match = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match?.[0] || '';
+}
+
+function extractContato(text: string): string {
+  const patterns = [
+    /(?:contato|responsável|requerente|interessado)[:\s]+([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]{4,80})/i,
+    /([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ][A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s]{4,80})\s*,\s*e-?mail/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) return match[1].replace(/\s+/g, ' ').trim();
+  }
+  return '';
+}
+
+function extractFaseObra(text: string): string {
+  const patterns = [
+    /(implantação[^,\.]{0,80})/i,
+    /(instalação[^,\.]{0,80})/i,
+    /(operação[^,\.]{0,80})/i,
+    /(construção[^,\.]{0,80})/i,
+    /(ampliação[^,\.]{0,80})/i,
+    /(reforma[^,\.]{0,80})/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) return match[1].replace(/\s+/g, ' ').trim();
+  }
   return '';
 }
 
 function extractObraDescricao(text: string): string {
   const patterns = [
     /(?:para\s+(?:a\s+|o\s+)?)((?:CONSTRUÇÃO|REFORMA|AMPLIAÇÃO|IMPLANTAÇÃO|PAVIMENTAÇÃO|LOTEAMENTO)[\s\S]{3,120}?)(?:[,.]|\s+localiz)/i,
-    /(?:para\s+)((?:Loteamento|LOTEAMENTO)\s+[^,\.]{3,80})/i,
     /empreendimento\s+(?:imobiliário\s+)?denominado\s+([\s\S]{5,100}?)(?:[,.]|\s+localiz)/i,
-    /((?:Loteamento|LOTEAMENTO)\s+[A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ\s\-]+(?:\d+)?)/i,
-    /(?:para\s+)((?:centro\s+comercial|centro\s+de\s+velório|condomínio|residencial)[^,\.]{0,100})/i,
     /(construção\s+residencial\s+[^,\.]{0,80})/i,
     /(pavimentação[^,\.]{3,100})/i,
   ];
@@ -335,70 +354,17 @@ function extractObraDescricao(text: string): string {
   return '';
 }
 
-/** Extract PDF links from Extremoz listing page HTML */
-function extractExtremozPdfLinks(html: string): Array<{ date: string; title: string; href: string }> {
-  const results: Array<{ date: string; title: string; href: string }> = [];
-  const seen = new Set<string>();
-
-  // Primary: match href to PDF files on the Extremoz domain
-  const hrefRegex = /href="(https?:\/\/extremoz\.rn\.gov\.br\/wp-content\/uploads\/[^"]+\.(?:pdf|doc\.pdf))"/gi;
-  let match;
-  while ((match = hrefRegex.exec(html)) !== null) {
-    const href = match[1];
-    if (seen.has(href)) continue;
-    seen.add(href);
-
-    const filename = href.split('/').pop() || '';
-    const title = filename.replace(/\.doc\.pdf$|\.pdf$/i, '').replace(/-/g, ' ');
-
-    // Try to find date near this link (look for dd/mm/yyyy pattern nearby)
-    const pos = match.index;
-    const nearby = html.substring(pos, Math.min(html.length, pos + 500));
-    const dateMatch = nearby.match(/(\d{2}\/\d{2}\/\d{4})/);
-    const date = dateMatch ? dateMatch[1] : '';
-
-    results.push({ date, title, href });
-  }
-
-  return results;
-}
-
-async function fetchExtremozPdfLinks(year: string, maxPages: number): Promise<Array<{ date: string; title: string; href: string }>> {
-  const results: Array<{ date: string; title: string; href: string }> = [];
-  const baseUrl = `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${year}/`;
-
-  for (let page = 1; page <= maxPages; page++) {
-    const url = page === 1 ? baseUrl : `${baseUrl}page/${page}/`;
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      const resp = await fetch(url, { signal: controller.signal, headers: FETCH_HEADERS });
-      clearTimeout(timeout);
-      console.log(`Page ${page}: status=${resp.status}`);
-      if (!resp.ok) {
-        console.log(`Page ${page} failed with status ${resp.status}`);
-        break;
-      }
-      const html = await resp.text();
-      console.log(`Page ${page}: ${html.length} chars, has wp-content: ${html.includes('wp-content/uploads')}`)
-
-      const links = extractExtremozPdfLinks(html);
-      console.log(`Page ${page}: found ${links.length} links`);
-      for (const link of links) {
-        if (!results.some(r => r.href === link.href)) {
-          results.push(link);
-        }
-      }
-
-      // Check for next page
-      if (!html.includes(`/page/${page + 1}`)) break;
-    } catch (err) {
-      console.error(`Page ${page} error:`, err);
-      break;
-    }
-  }
-
-  return results;
+function isRelevantExtremozEntry(entry: ExtremozEntry): boolean {
+  return Boolean(
+    entry.tipo_licenca && (
+      entry.fase_obra ||
+      entry.nome_contato ||
+      entry.email ||
+      entry.construtora ||
+      entry.razao_social ||
+      entry.obra_descricao
+    )
+  );
 }
 
 async function processOnePdf(href: string, date: string, title: string): Promise<ExtremozEntry[]> {
@@ -413,81 +379,54 @@ async function processOnePdf(href: string, date: string, title: string): Promise
     if (!resp.ok) return entries;
 
     const buffer = new Uint8Array(await resp.arrayBuffer());
-    
-    // Limit buffer size to avoid CPU issues (skip PDFs > 2MB)
-    if (buffer.length > 2 * 1024 * 1024) {
-      return [{
-        data_edicao: date || title,
-        tipo_licenca: '',
-        cnpj: '',
-        razao_social: '',
-        obra_descricao: '',
-        pdf_nome: pdfFilename,
-        pdf_link: href,
-        bloco_texto: '(PDF muito grande para processamento automático)',
-      }];
-    }
+    if (buffer.length > 2 * 1024 * 1024) return entries;
 
     const text = extractPdfText(buffer);
+    if (!text || text.length < 20) return entries;
 
-    if (!text || text.length < 20) {
-      return [{
-        data_edicao: date || title,
-        tipo_licenca: '',
-        cnpj: '',
-        razao_social: '',
-        obra_descricao: '',
-        pdf_nome: pdfFilename,
-        pdf_link: href,
-        bloco_texto: '(Texto não extraível - PDF baseado em imagem)',
-      }];
-    }
-
-    // Find CNPJs and extract entries
     const cnpjs = parseCnpjs(text);
-    const processedCnpjs = new Set<string>();
+    const contexts: string[] = [];
 
-    for (const cnpj of cnpjs) {
-      if (processedCnpjs.has(cnpj)) continue;
-      processedCnpjs.add(cnpj);
-
-      // Get context around CNPJ
-      const idx = text.indexOf(cnpj);
-      const context = text.substring(Math.max(0, idx - 300), Math.min(text.length, idx + 400));
-
-      const tipo = detectLicenseType(context);
-      const razao = extractCompanyName(context, cnpj);
-      const obra = extractObraDescricao(context);
-
-      const hasRelevant = tipo || context.toLowerCase().includes('licen') ||
-        context.toLowerCase().includes('construção') || context.toLowerCase().includes('loteamento') ||
-        context.toLowerCase().includes('empreendimento');
-
-      if (hasRelevant || razao) {
-        entries.push({
-          data_edicao: date || title,
-          tipo_licenca: tipo || 'Não identificada',
-          cnpj,
-          razao_social: razao,
-          obra_descricao: obra,
-          pdf_nome: pdfFilename,
-          pdf_link: href,
-          bloco_texto: context.substring(0, 300),
-        });
+    if (cnpjs.length > 0) {
+      for (const cnpj of cnpjs) {
+        const idx = text.indexOf(cnpj);
+        if (idx !== -1) contexts.push(text.substring(Math.max(0, idx - 350), Math.min(text.length, idx + 500)));
       }
+    } else {
+      contexts.push(text.substring(0, 1200));
     }
 
-    if (entries.length === 0 && cnpjs.length > 0) {
-      entries.push({
+    for (const context of contexts) {
+      const tipo = normalizeExtremozLicenseType(context);
+      if (!tipo) continue;
+
+      const cnpjMatch = context.match(/\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/);
+      const cnpj = cnpjMatch ? cnpjMatch[0].replace(/\s/g, '') : '';
+      const razao = cnpj ? extractCompanyName(context, cnpj) : '';
+      const email = extractEmail(context);
+      const nomeContato = extractContato(context);
+      const faseObra = extractFaseObra(context);
+      const obra = extractObraDescricao(context);
+      const construtora = razao || obra;
+
+      const entry: ExtremozEntry = {
         data_edicao: date || title,
-        tipo_licenca: detectLicenseType(text) || 'Não identificada',
-        cnpj: cnpjs[0],
-        razao_social: extractCompanyName(text, cnpjs[0]),
-        obra_descricao: extractObraDescricao(text),
+        tipo_licenca: tipo,
+        cnpj,
+        razao_social: razao,
+        nome_contato: nomeContato,
+        email,
+        fase_obra: faseObra,
+        construtora,
+        obra_descricao: obra,
         pdf_nome: pdfFilename,
         pdf_link: href,
-        bloco_texto: text.substring(0, 300),
-      });
+        bloco_texto: context.substring(0, 300),
+      };
+
+      if (isRelevantExtremozEntry(entry)) {
+        entries.push(entry);
+      }
     }
   } catch (err) {
     console.error(`PDF error ${pdfFilename}:`, err);
