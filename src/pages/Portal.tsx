@@ -407,7 +407,7 @@ export default function Portal() {
       const relevantData = (data || []).filter((row) => isNatalRelevantRecord(row as unknown as Record<string, unknown>));
 
       const tableData = relevantData.map(row => ({
-        'Data da Edição': row.data_edicao || '',
+        'Data da Edição': formatDataEdicao(row.data_edicao || ''),
         'Nº DOM': row.numero_dom || '',
         'Tipo de Licença': normalizeNatalLicenseType(row.tipo_licenca) || '',
         'Fase da Obra': (row as any).fase_obra || '',
