@@ -192,7 +192,7 @@ export default function Portal() {
       });
 
       const tableData = relevantData.map(row => ({
-        'Data da Edição': row.data_edicao || '',
+        'Data da Edição': formatDataEdicao(row.data_edicao || ''),
         'Tipo de Licença': row.tipo_licenca || '',
         'Fase da Obra': row.prioridade || '',
         'Construtora / Obra': row.razao_social || row.nome_fantasia || '',
