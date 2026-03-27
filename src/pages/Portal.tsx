@@ -1,6 +1,26 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { format, subMonths, startOfMonth, endOfMonth, getMonth, getYear } from 'date-fns';
+import { format, parse, subMonths, startOfMonth, endOfMonth, getMonth, getYear, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
+
+const formatDataEdicao = (raw: string): string => {
+  if (!raw) return '';
+  // Try dd/mm/yyyy
+  const slashMatch = raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (slashMatch) {
+    const d = new Date(+slashMatch[3], +slashMatch[2] - 1, +slashMatch[1]);
+    if (isValid(d)) return format(d, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
+  }
+  // Try yyyy-mm-dd
+  const isoMatch = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const d = new Date(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]);
+    if (isValid(d)) return format(d, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
+  }
+  // Try parsing as date directly
+  const d = new Date(raw);
+  if (isValid(d) && !isNaN(d.getTime())) return format(d, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
+  return raw;
+};
 import { CalendarIcon } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
