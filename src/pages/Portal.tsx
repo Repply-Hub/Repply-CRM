@@ -156,23 +156,29 @@ export default function Portal() {
 
       if (search) {
         const q = `%${search}%`;
-        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},nome_fantasia.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q}`);
+        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},obra_descricao.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q},email.ilike.${q}`);
       }
 
       const { data, error } = await query;
       if (error) throw error;
 
-      const tableData = (data || []).map(row => ({
+      const relevantData = (data || []).filter((row) => {
+        const tipo = String(row.tipo_licenca || '').trim();
+        const isAllowed = ['Licença Prévia', 'Licença de Instalação', 'Licença de Operação'].includes(tipo);
+        const hasCoreData = Boolean(
+          row.obra_descricao || row.razao_social || row.nome_fantasia || row.email || row.bloco_texto
+        );
+        return isAllowed && hasCoreData;
+      });
+
+      const tableData = relevantData.map(row => ({
         'Data da Edição': row.data_edicao || '',
         'Tipo de Licença': row.tipo_licenca || '',
-        'Prioridade': row.prioridade || '',
-        'CNPJ': row.cnpj || '',
-        'Razão Social': row.razao_social || '',
-        'Nome Fantasia': row.nome_fantasia || '',
-        'Telefone': row.telefone || '',
+        'Fase da Obra': row.prioridade || '',
+        'Construtora / Obra': row.razao_social || row.nome_fantasia || '',
+        'Contato': row.nome_fantasia || '',
         'Email': row.email || '',
-        'Endereço': row.endereco_empresa || '',
-        'Quadro Societário': row.quadro_societario || '',
+        'CNPJ': row.cnpj || '',
         'Obra / Descrição': row.obra_descricao || '',
         'PDF': row.pdf_nome || '',
         'Link PDF': row.pdf_link || '',
@@ -270,18 +276,9 @@ export default function Portal() {
           const buffer = new Uint8Array(await resp.arrayBuffer());
 
           if (buffer.length > 2 * 1024 * 1024) {
-            // Too large, just register as entry
-            await supabase.from('licencas_extremoz').insert({
-              data_edicao: pdf.title,
-              pdf_nome: pdf.href.split('/').pop() || '',
-              pdf_link: pdf.href,
-              bloco_texto: '(PDF muito grande para processamento automático)',
-            });
-            totalInserted++;
             continue;
           }
 
-          // Basic PDF text extraction (same logic as edge function)
           const raw = new TextDecoder('latin1').decode(buffer);
           const textParts: string[] = [];
           const btEtRegex = /BT\s([\s\S]*?)ET/g;
@@ -310,55 +307,50 @@ export default function Portal() {
           const text = textParts.join('\n');
 
           if (!text || text.length < 20) {
-            await supabase.from('licencas_extremoz').insert({
-              data_edicao: pdf.title,
-              pdf_nome: pdf.href.split('/').pop() || '',
-              pdf_link: pdf.href,
-              bloco_texto: '(Texto não extraível - PDF baseado em imagem)',
-            });
-            totalInserted++;
             continue;
           }
 
-          // Extract CNPJs
+          const contexts: string[] = [];
           const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
           const cnpjs = [...new Set((text.match(cnpjRegex) || []).map(c => c.replace(/\s/g, '')))];
 
-          if (cnpjs.length === 0) {
-            await supabase.from('licencas_extremoz').insert({
-              data_edicao: pdf.title,
-              pdf_nome: pdf.href.split('/').pop() || '',
-              pdf_link: pdf.href,
-              bloco_texto: text.substring(0, 500),
-            });
-            totalInserted++;
-            continue;
+          if (cnpjs.length > 0) {
+            for (const cnpj of cnpjs) {
+              const idx = text.indexOf(cnpj);
+              if (idx !== -1) contexts.push(text.substring(Math.max(0, idx - 350), Math.min(text.length, idx + 500)));
+            }
+          } else {
+            contexts.push(text.substring(0, 1200));
           }
 
-          for (const cnpj of cnpjs) {
-            const idx = text.indexOf(cnpj);
-            const context = text.substring(Math.max(0, idx - 300), Math.min(text.length, idx + 400));
+          for (const context of contexts) {
             const lower = context.toLowerCase();
-
-            // Detect license type
             let tipo = '';
-            if (lower.includes('licença prévia') || lower.includes('(lp)')) tipo = 'Licença Prévia';
-            else if (lower.includes('licença de instalação') || lower.includes('(li)')) tipo = 'Licença de Instalação';
-            else if (lower.includes('licença de operação') || lower.includes('(lo)')) tipo = 'Licença de Operação';
-            else if (lower.includes('licença simplificada') || lower.includes('(ls)')) tipo = 'Licença Simplificada';
-            else if (lower.includes('renovação de licença')) tipo = 'Renovação de Licença';
-            else if (lower.includes('licença ambiental')) tipo = 'Licença Ambiental';
+            if (/\bLP\b/i.test(context) || lower.includes('licença prévia')) tipo = 'Licença Prévia';
+            else if (/\bLI\b/i.test(context) || lower.includes('licença de instalação')) tipo = 'Licença de Instalação';
+            else if (/\bLO\b/i.test(context) || lower.includes('licença de operação')) tipo = 'Licença de Operação';
 
-            const hasRelevant = tipo || lower.includes('licen') || lower.includes('construção') || lower.includes('loteamento') || lower.includes('empreendimento');
-            if (!hasRelevant) continue;
+            if (!tipo) continue;
+
+            const cnpjMatch = context.match(cnpjRegex);
+            const cnpj = cnpjMatch?.[0]?.replace(/\s/g, '') || '';
+            const emailMatch = context.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+            const email = emailMatch?.[0] || '';
+            const faseMatch = context.match(/(implantação[^,\.]{0,80}|instalação[^,\.]{0,80}|operação[^,\.]{0,80}|construção[^,\.]{0,80}|ampliação[^,\.]{0,80}|reforma[^,\.]{0,80})/i);
+            const obraMatch = context.match(/((?:CONSTRUÇÃO|REFORMA|AMPLIAÇÃO|IMPLANTAÇÃO|PAVIMENTAÇÃO|LOTEAMENTO)[\s\S]{3,120}?)(?:[,.]|\s+localiz)/i);
 
             await supabase.from('licencas_extremoz').insert({
               data_edicao: pdf.title,
-              tipo_licenca: tipo || 'Não identificada',
+              tipo_licenca: tipo,
               cnpj,
+              razao_social: '',
+              nome_fantasia: '',
+              email,
+              prioridade: faseMatch?.[1]?.trim() || '',
+              obra_descricao: obraMatch?.[1]?.replace(/\s+/g, ' ').trim() || '',
               pdf_nome: pdf.href.split('/').pop() || '',
               pdf_link: pdf.href,
-              bloco_texto: context.substring(0, 500),
+              bloco_texto: context.substring(0, 300),
             });
             totalInserted++;
           }
