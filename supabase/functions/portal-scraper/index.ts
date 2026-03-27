@@ -501,6 +501,10 @@ Deno.serve(async (req) => {
       const tableData = filtered.map(e => ({
         'Data da Edição': e.data_edicao,
         'Tipo de Licença': e.tipo_licenca,
+        'Fase da Obra': e.fase_obra,
+        'Construtora / Obra': e.construtora,
+        'Contato': e.nome_contato,
+        'Email': e.email,
         'CNPJ': e.cnpj,
         'Razão Social': e.razao_social,
         'Obra / Descrição': e.obra_descricao,
