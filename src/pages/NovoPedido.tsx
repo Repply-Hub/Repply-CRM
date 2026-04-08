@@ -476,18 +476,17 @@ function ItemDescricaoField({
   }, [value, tabelaPrecos]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Input
-          className="h-8 text-xs"
-          value={value}
-          onChange={e => { onChange(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          placeholder="Descrição..."
-        />
-      </PopoverTrigger>
-      {filtered.length > 0 && (
-        <PopoverContent className="w-72 p-0" align="start" onOpenAutoFocus={e => e.preventDefault()}>
+    <div className="relative">
+      <Input
+        className="h-8 text-xs"
+        value={value}
+        onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        placeholder="Descrição..."
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute top-full left-0 z-50 mt-1 w-72 rounded-md border bg-popover text-popover-foreground shadow-md">
           <Command>
             <CommandList>
               <CommandGroup>
@@ -513,9 +512,9 @@ function ItemDescricaoField({
               </CommandGroup>
             </CommandList>
           </Command>
-        </PopoverContent>
+        </div>
       )}
-    </Popover>
+    </div>
   );
 }
 
