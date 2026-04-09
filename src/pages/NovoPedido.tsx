@@ -186,9 +186,12 @@ const NovoPedido = () => {
   return (
     <AppLayout>
       <div className="p-6 max-w-4xl mx-auto">
-        <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate('/pedidos')}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Voltar para Pedidos
-        </Button>
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/pedidos')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-2xl font-bold text-foreground">Novo Pedido</h1>
+        </div>
 
         {/* Progress */}
         <div className="flex items-center gap-3 mb-6">
