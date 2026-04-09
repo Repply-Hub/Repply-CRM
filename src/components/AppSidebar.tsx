@@ -1,10 +1,13 @@
-import { LayoutDashboard, Kanban, Users, FileText, Settings, LogOut, HardHat, Factory, Globe, CalendarDays, UserCircle, ClipboardList } from 'lucide-react';
+import { LogOut, UserCircle, Pencil } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { NavLink } from '@/components/NavLink';
+import { useSidebarPreferences } from '@/hooks/use-sidebar-preferences';
+import { getIconComponent } from '@/lib/sidebar-icons';
+import { SidebarCustomizeDialog } from '@/components/SidebarCustomizeDialog';
 import logoSidebar from '@/assets/logo-sidebar.svg';
 import {
   Sidebar,
@@ -19,23 +22,14 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 
-const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/', label: 'Pipeline', icon: Kanban },
-  { path: '/clientes', label: 'Clientes', icon: Users },
-  { path: '/obras', label: 'Obras', icon: HardHat },
-  { path: '/pedidos', label: 'Pedidos', icon: FileText },
-  { path: '/fabricantes', label: 'Fabricantes', icon: Factory },
-  { path: '/portal', label: 'Portal', icon: Globe },
-  { path: '/calendario', label: 'Calendário', icon: CalendarDays },
-  { path: '/tarefas', label: 'Tarefas', icon: ClipboardList },
-  { path: '/configuracoes', label: 'Configurações', icon: Settings },
-];
-
 export function AppSidebar() {
   const { state, setOpen, isMobile } = useSidebar();
   const { signOut, user } = useAuth();
   const collapsed = !isMobile && state === 'collapsed';
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+
+  const { items, save, isSaving } = useSidebarPreferences();
+  const visibleItems = items.filter(i => i.visible);
 
   const { data: vendedor } = useQuery({
     queryKey: ['meu-perfil', user?.id],
@@ -75,71 +69,93 @@ export function AppSidebar() {
   }, [setOpen]);
 
   return (
-    <Sidebar
-      collapsible="icon"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      <SidebarHeader className="px-2 py-3 border-b border-primary/10 mb-2">
-        <Link
-          to="/dashboard"
-          className={`flex items-center overflow-visible hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : 'gap-3'}`}
-        >
-          <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
-              <p className="text-[10px] text-sidebar-foreground/50 font-medium">Gestão Comercial</p>
+    <>
+      <Sidebar
+        collapsible="icon"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <SidebarHeader className="px-2 py-3 border-b border-primary/10 mb-2">
+          <Link
+            to="/dashboard"
+            className={`flex items-center overflow-visible hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : 'gap-3'}`}
+          >
+            <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
+                <p className="text-[10px] text-sidebar-foreground/50 font-medium">Gestão Comercial</p>
+              </div>
+            )}
+          </Link>
+        </SidebarHeader>
+
+        <SidebarContent className="py-2">
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleItems.map((item) => {
+                  const Icon = getIconComponent(item.icon);
+                  return (
+                    <SidebarMenuItem key={item.id}>
+                      <SidebarMenuButton asChild tooltip={item.label}>
+                        <NavLink
+                          to={item.path}
+                          end={item.path === '/'}
+                          className="hover:bg-sidebar-accent/60 rounded-lg transition-all duration-150"
+                          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-sm"
+                        >
+                          {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                          {!collapsed && <span className="text-[13px]">{item.label}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+
+        <SidebarFooter className="border-t border-sidebar-border p-3 space-y-1">
+          {/* Personalizar */}
+          <button
+            onClick={() => setCustomizeOpen(true)}
+            className={`flex items-center overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 ${collapsed ? 'justify-center' : 'gap-3'}`}
+          >
+            <Pencil className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
+            {!collapsed && <span className="text-[13px] text-sidebar-foreground/70">Personalizar</span>}
+          </button>
+
+          {/* Perfil do usuário */}
+          <div className={`flex items-center overflow-hidden rounded-lg px-2 py-2 ${collapsed ? 'justify-center' : 'gap-3'}`}>
+            <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
+              <UserCircle className="h-5 w-5 text-primary" />
             </div>
-          )}
-        </Link>
-      </SidebarHeader>
-
-      <SidebarContent className="py-2">
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton asChild tooltip={item.label}>
-                    <NavLink
-                      to={item.path}
-                      end={item.path === '/'}
-                      className="hover:bg-sidebar-accent/60 rounded-lg transition-all duration-150"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-sm"
-                    >
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      {!collapsed && <span className="text-[13px]">{item.label}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-
-      <SidebarFooter className="border-t border-sidebar-border p-3 space-y-1">
-        {/* Perfil do usuário */}
-        <div className={`flex items-center overflow-hidden rounded-lg px-2 py-2 ${collapsed ? 'justify-center' : 'gap-3'}`}>
-          <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
-            <UserCircle className="h-5 w-5 text-primary" />
+            {!collapsed && (
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium text-sidebar-foreground truncate">{vendedor?.nome ?? user?.email?.split('@')[0] ?? '—'}</p>
+                <p className="text-[10px] text-sidebar-foreground/50 capitalize">{vendedor?.role ?? 'vendedor'}</p>
+              </div>
+            )}
           </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-sidebar-foreground truncate">{vendedor?.nome ?? user?.email?.split('@')[0] ?? '—'}</p>
-              <p className="text-[10px] text-sidebar-foreground/50 capitalize">{vendedor?.role ?? 'vendedor'}</p>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={() => signOut()}
-          className={`flex items-center overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 ${collapsed ? 'justify-center' : 'gap-3'}`}
-        >
-          <LogOut className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
-          {!collapsed && <span className="text-[13px] text-sidebar-foreground/70">Sair</span>}
-        </button>
-      </SidebarFooter>
-    </Sidebar>
+          <button
+            onClick={() => signOut()}
+            className={`flex items-center overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 ${collapsed ? 'justify-center' : 'gap-3'}`}
+          >
+            <LogOut className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
+            {!collapsed && <span className="text-[13px] text-sidebar-foreground/70">Sair</span>}
+          </button>
+        </SidebarFooter>
+      </Sidebar>
+
+      <SidebarCustomizeDialog
+        open={customizeOpen}
+        onOpenChange={setCustomizeOpen}
+        items={items}
+        onSave={save}
+        isSaving={isSaving}
+      />
+    </>
   );
 }
