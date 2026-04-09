@@ -78,96 +78,99 @@ const Index = () => {
     <AppLayout title="Pipeline de Vendas" subtitle={`${orders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}>
       <div className="p-3 sm:p-4 md:p-6 max-w-[1600px]">
         {/* Filters & Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2 mb-4 md:mb-6 flex-wrap">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={selectedVendedores.length > 0 ? 'border-primary' : ''}>
-                Vendedor <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                {selectedVendedores.length > 0 && (
-                  <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{selectedVendedores.length}</Badge>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-2" align="start">
-              <div className="space-y-1">
-                {(vendedores ?? []).map(v => (
-                  <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                    <Checkbox
-                      checked={selectedVendedores.includes(v.id)}
-                      onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)}
-                    />
-                    {v.nome}
-                  </label>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-4 md:mb-6">
+          {/* Filters - left side */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap flex-1 min-w-0">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={selectedVendedores.length > 0 ? 'border-primary' : ''}>
+                  Vendedor <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                  {selectedVendedores.length > 0 && (
+                    <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{selectedVendedores.length}</Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2" align="start">
+                <div className="space-y-1">
+                  {(vendedores ?? []).map(v => (
+                    <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                      <Checkbox
+                        checked={selectedVendedores.includes(v.id)}
+                        onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)}
+                      />
+                      {v.nome}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={selectedFabricantes.length > 0 ? 'border-primary' : ''}>
-                Fabricante <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                {selectedFabricantes.length > 0 && (
-                  <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{selectedFabricantes.length}</Badge>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-2" align="start">
-              <div className="space-y-1">
-                {(fabricantes ?? []).map(f => (
-                  <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                    <Checkbox
-                      checked={selectedFabricantes.includes(f.id)}
-                      onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)}
-                    />
-                    {f.nome}
-                  </label>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={selectedFabricantes.length > 0 ? 'border-primary' : ''}>
+                  Fabricante <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                  {selectedFabricantes.length > 0 && (
+                    <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{selectedFabricantes.length}</Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2" align="start">
+                <div className="space-y-1">
+                  {(fabricantes ?? []).map(f => (
+                    <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                      <Checkbox
+                        checked={selectedFabricantes.includes(f.id)}
+                        onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)}
+                      />
+                      {f.nome}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
 
-          <Button
-            variant={showOnlyAttention ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowOnlyAttention(prev => !prev)}
-            className={showOnlyAttention ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}
-          >
-            <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Precisa de atenção
-          </Button>
-
-          {hasFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-              <X className="h-3.5 w-3.5 mr-1" /> Limpar filtros
+            <Button
+              variant={showOnlyAttention ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowOnlyAttention(prev => !prev)}
+              className={showOnlyAttention ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}
+            >
+              <AlertTriangle className="h-3.5 w-3.5 mr-1" /> <span className="hidden sm:inline">Precisa de atenção</span><span className="sm:hidden">Atenção</span>
             </Button>
-          )}
 
-          {/* Spacer to push action buttons right */}
-          <div className="flex-1" />
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                <X className="h-3.5 w-3.5 mr-1" /> Limpar
+              </Button>
+            )}
+          </div>
 
-          <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
-            const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
-            await generatePedidosPdf(
-              orders.map(o => ({
-                cliente: o.clientName,
-                obra: o.obra,
-                fabricante: o.fabricante,
-                vendedor: o.vendedor,
-                valor: o.valor,
-                etapa: stageLabel(o.stage),
-                data: o.createdAt,
-              })),
-              hasFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
-            );
-          }}>
-            <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
-          </Button>
-          <Button variant="outline" size="sm" className="hidden md:inline-flex" onClick={() => navigate('/pedidos')}>
-            <Filter className="h-4 w-4 mr-1" /> Ver Pedidos
-          </Button>
-          <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
-            <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
-          </Button>
+          {/* Actions - right side, never wrap */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
+              const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
+              await generatePedidosPdf(
+                orders.map(o => ({
+                  cliente: o.clientName,
+                  obra: o.obra,
+                  fabricante: o.fabricante,
+                  vendedor: o.vendedor,
+                  valor: o.valor,
+                  etapa: stageLabel(o.stage),
+                  data: o.createdAt,
+                })),
+                hasFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
+              );
+            }}>
+              <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
+            </Button>
+            <Button variant="outline" size="sm" className="hidden md:inline-flex" onClick={() => navigate('/pedidos')}>
+              <Filter className="h-4 w-4 mr-1" /> Ver Pedidos
+            </Button>
+            <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
+              <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
