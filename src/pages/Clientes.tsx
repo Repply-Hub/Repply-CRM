@@ -206,6 +206,7 @@ const Clientes = () => {
     setActiveTab(tab as ViewTab);
     setTipoFilter('todos');
     setSearch('');
+    setPage(1);
   };
 
   return (
