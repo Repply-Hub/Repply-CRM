@@ -967,7 +967,7 @@ const Configuracoes = () => {
                       <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo</Button>
                     </DialogTrigger>
                     <DialogContent>
-                      <DialogHeader><DialogTitle>Cadastrar Vendedor</DialogTitle></DialogHeader>
+                      <DialogHeader><DialogTitle>Cadastrar Usuário</DialogTitle></DialogHeader>
                       <form onSubmit={handleCreateVendedor} className="space-y-4 mt-2">
                         <div><Label>Nome</Label><Input name="nome" required placeholder="Nome completo" /></div>
                         <div><Label>Email</Label><Input name="email" type="email" required placeholder="email@exemplo.com" /></div>
