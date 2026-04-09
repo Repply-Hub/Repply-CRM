@@ -33,9 +33,9 @@ const navItems = [
 ];
 
 export function AppSidebar() {
-  const { state, setOpen } = useSidebar();
+  const { state, setOpen, isMobile } = useSidebar();
   const { signOut, user } = useAuth();
-  const collapsed = state === 'collapsed';
+  const collapsed = !isMobile && state === 'collapsed';
 
   const { data: vendedor } = useQuery({
     queryKey: ['meu-perfil', user?.id],
