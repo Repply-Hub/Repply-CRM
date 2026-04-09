@@ -25,6 +25,27 @@ export function useCreateCliente() {
   });
 }
 
+export function useCreateContato() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      empresa: string;
+      nome_contato?: string;
+      email?: string;
+      telefone?: string;
+      cargo?: string;
+    }) => {
+      const { data: vid } = await supabase.rpc('get_my_vendedor_id');
+      const { error } = await supabase.from('contatos').insert({
+        ...data,
+        vendedor_id: vid,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contatos'] }),
+  });
+}
+
 export function useUpdateCliente() {
   const qc = useQueryClient();
   return useMutation({
