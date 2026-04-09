@@ -43,7 +43,7 @@ export function ColumnSettings({ columns, visibleColumns, onChange, className }:
                     <span className="hidden sm:inline">Colunas</span>
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-56 p-3" align="end">
+            <PopoverContent className="w-56 p-3" align="start">
                 <div className="space-y-3">
                     <div className="flex items-center justify-between border-b pb-2">
                         <h4 className="font-medium text-sm leading-none">Exibir Colunas</h4>
