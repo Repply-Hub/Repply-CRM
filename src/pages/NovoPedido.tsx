@@ -184,14 +184,17 @@ const NovoPedido = () => {
   };
 
   return (
-    <AppLayout>
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/pedidos')}>
+    <AppLayout
+      headerContent={
+        <div className="flex items-center gap-2 min-w-0">
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/pedidos')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-2xl font-bold text-foreground">Novo Pedido</h1>
+          <h1 className="text-base sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight truncate">Novo Pedido</h1>
         </div>
+      }
+    >
+      <div className="p-6 max-w-4xl mx-auto">
 
         {/* Progress */}
         <div className="flex items-center gap-3 mb-6">
