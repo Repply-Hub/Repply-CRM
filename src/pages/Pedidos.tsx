@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil, FileDown } from 'lucide-react';
+import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil, FileDown, Settings2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
@@ -67,34 +68,43 @@ const Pedidos = () => {
       <div className="p-6">
         <div className="flex items-center justify-end mb-6">
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={async () => {
-              const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
-              await generatePedidosPdf(
-                filtered.map(p => ({
-                  cliente: p.cliente?.empresa ?? '-',
-                  obra: p.obra?.nome_obra ?? '-',
-                  fabricante: p.fabricante?.nome ?? '-',
-                  vendedor: p.vendedor?.nome ?? '-',
-                  valor: p.valor_total ?? 0,
-                  etapa: stageLabel(p.status),
-                  data: p.data_pedido,
-                })),
-                stageFilter !== 'todos' ? `Orçamentos - ${stageLabel(stageFilter)}` : 'Orçamentos - Todos'
-              );
-            }}>
-              <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => toast.info('Importação XLSX em breve!')}>
-              <Upload className="h-4 w-4 mr-1" /> Importar XLSX
-            </Button>
-            <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
-              <Plus className="h-4 w-4 mr-1" /> Novo Pedido
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings2 className="h-4 w-4 mr-1" /> Opções
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={async () => {
+                  const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
+                  await generatePedidosPdf(
+                    filtered.map(p => ({
+                      cliente: p.cliente?.empresa ?? '-',
+                      obra: p.obra?.nome_obra ?? '-',
+                      fabricante: p.fabricante?.nome ?? '-',
+                      vendedor: p.vendedor?.nome ?? '-',
+                      valor: p.valor_total ?? 0,
+                      etapa: stageLabel(p.status),
+                      data: p.data_pedido,
+                    })),
+                    stageFilter !== 'todos' ? `Orçamentos - ${stageLabel(stageFilter)}` : 'Orçamentos - Todos'
+                  );
+                }}>
+                  <FileDown className="h-4 w-4 mr-2" /> Exportar PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toast.info('Importação XLSX em breve!')}>
+                  <Upload className="h-4 w-4 mr-2" /> Importar XLSX
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <ColumnSettings
               columns={PEDIDOS_COLUMNS}
               visibleColumns={visibleColumns}
               onChange={handleColumnChange}
             />
+            <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
+              <Plus className="h-4 w-4 mr-1" /> Novo Pedido
+            </Button>
           </div>
         </div>
 
