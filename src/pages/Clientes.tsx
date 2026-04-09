@@ -103,6 +103,9 @@ const Clientes = () => {
   });
 
   const filtered = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedEmpresas = filteredEmpresas.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedContatos = filteredContatos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const tipoFilterOptions = [
     { value: 'todos', label: 'Todos os tipos' },
