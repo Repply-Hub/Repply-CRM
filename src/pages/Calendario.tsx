@@ -278,6 +278,17 @@ export default function Calendario() {
         disabled={isImporting}
       />
       <ErrorBoundary>
+        {/* Toolbar com botões do calendário */}
+        <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 md:px-6 py-2 border-b shrink-0">
+          <CalendarHeader
+            currentDate={currentDate}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onNavigate={navigate}
+            onNewEvent={() => openNewEvent()}
+            onImport={handleImportClick}
+          />
+        </div>
         <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Sidebar esquerda — oculta em mobile */}
           <aside className="hidden lg:flex w-56 border-r flex-col gap-5 p-3 shrink-0 overflow-y-auto min-h-0">
