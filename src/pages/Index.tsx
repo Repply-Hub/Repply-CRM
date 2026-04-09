@@ -6,13 +6,17 @@ import { KanbanColumn } from '@/components/kanban/KanbanColumn';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { usePedidos, useUpdatePedidoStatus } from '@/hooks/use-pedidos';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
-import { Plus, Filter, Loader2, X, ChevronDown, FileDown, AlertTriangle } from 'lucide-react';
+import { Plus, Filter, Loader2, X, ChevronDown, FileDown, AlertTriangle, CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -24,6 +28,8 @@ const Index = () => {
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
   const [selectedFabricantes, setSelectedFabricantes] = useState<string[]>([]);
   const [showOnlyAttention, setShowOnlyAttention] = useState(false);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   const toggleFilter = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
     setList(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
