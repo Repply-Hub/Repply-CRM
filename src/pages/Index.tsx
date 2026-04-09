@@ -39,9 +39,12 @@ const Index = () => {
     setSelectedVendedores([]);
     setSelectedFabricantes([]);
     setShowOnlyAttention(false);
+    setDateFrom(undefined);
+    setDateTo(undefined);
   };
 
-  const hasFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention;
+  const hasFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo;
+  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0);
 
   const handleDragEnd = useCallback((result: DropResult) => {
     if (!result.destination) return;
