@@ -10,9 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
+import { EnderecoForm } from '@/components/EnderecoForm';
+import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'empresa', label: 'Nome/Empresa', locked: true },
@@ -22,12 +26,11 @@ const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'endereco', label: 'Endereço' },
   { id: 'obras_count', label: 'Qtd. Obras' },
 ];
-import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
-import { EnderecoForm } from '@/components/EnderecoForm';
-import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física' };
+
+type ViewTab = 'empresas' | 'contatos';
 
 const Clientes = () => {
   const navigate = useNavigate();
@@ -35,6 +38,7 @@ const Clientes = () => {
   const createCliente = useCreateCliente();
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
+  const [activeTab, setActiveTab] = useState<ViewTab>('empresas');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
@@ -44,7 +48,6 @@ const Clientes = () => {
   const [endereco, setEndereco] = useState<EnderecoFields>(emptyEndereco);
   const [telefone, setTelefone] = useState('');
 
-  // Field visibility state
   const [visibleFields, setVisibleFields] = useState<string[]>(() => {
     const saved = localStorage.getItem('clientes_fields');
     return saved ? JSON.parse(saved) : CLIENTE_FIELDS.map(c => c.id);
@@ -55,10 +58,29 @@ const Clientes = () => {
     localStorage.setItem('clientes_fields', JSON.stringify(newFields));
   };
 
-  const filtered = (clients ?? []).filter(c =>
-    c.empresa.toLowerCase().includes(search.toLowerCase()) &&
-    (tipoFilter === 'todos' || c.tipo === tipoFilter)
-  );
+  // Split clients by tab
+  const empresas = (clients ?? []).filter(c => c.tipo !== 'pessoa_fisica');
+  const contatos = (clients ?? []).filter(c => c.tipo === 'pessoa_fisica');
+  const activeList = activeTab === 'empresas' ? empresas : contatos;
+
+  const filtered = activeList.filter(c => {
+    const matchSearch = c.empresa.toLowerCase().includes(search.toLowerCase()) ||
+      (c.nome_contato && c.nome_contato.toLowerCase().includes(search.toLowerCase())) ||
+      (c.email && c.email.toLowerCase().includes(search.toLowerCase()));
+    const matchTipo = tipoFilter === 'todos' || c.tipo === tipoFilter;
+    return matchSearch && matchTipo;
+  });
+
+  const tipoFilterOptions = activeTab === 'empresas'
+    ? [
+        { value: 'todos', label: 'Todos os tipos' },
+        { value: 'construtora', label: 'Construtora' },
+        { value: 'loja', label: 'Loja' },
+      ]
+    : [
+        { value: 'todos', label: 'Todos' },
+        { value: 'pessoa_fisica', label: 'Pessoa Física' },
+      ];
 
   const handleCnpjChange = (value: string) => {
     setCnpj(maskCnpj(value));
@@ -128,23 +150,52 @@ const Clientes = () => {
     }
   };
 
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab as ViewTab);
+    setTipoFilter('todos');
+    setSearch('');
+  };
+
   return (
     <AppLayout title="Clientes" subtitle={`${clients?.length ?? 0} cadastrados`}>
       <div className="p-6 max-w-[1400px] mx-auto">
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-4">
+          <TabsList>
+            <TabsTrigger value="empresas" className="gap-2">
+              <Building2 className="h-4 w-4" />
+              Empresas
+              <Badge variant="secondary" className="ml-1 text-[10px] h-5 px-1.5">{empresas.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="contatos" className="gap-2">
+              <Users className="h-4 w-4" />
+              Contatos
+              <Badge variant="secondary" className="ml-1 text-[10px] h-5 px-1.5">{contatos.length}</Badge>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Buscar clientes..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input
+              className="pl-9"
+              placeholder={activeTab === 'empresas' ? 'Buscar empresas...' : 'Buscar contatos...'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-          <Select value={tipoFilter} onValueChange={setTipoFilter}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por tipo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os tipos</SelectItem>
-              <SelectItem value="construtora">Construtora</SelectItem>
-              <SelectItem value="loja">Loja</SelectItem>
-              <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
-            </SelectContent>
-          </Select>
+          {activeTab === 'empresas' && (
+            <Select value={tipoFilter} onValueChange={setTipoFilter}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por tipo" /></SelectTrigger>
+              <SelectContent>
+                {tipoFilterOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <ColumnSettings
             columns={CLIENTE_FIELDS}
             visibleColumns={visibleFields}
@@ -152,55 +203,66 @@ const Clientes = () => {
           />
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Cliente</Button>
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" /> {activeTab === 'empresas' ? 'Nova Empresa' : 'Novo Contato'}</Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>Cadastrar Cliente</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{activeTab === 'empresas' ? 'Cadastrar Empresa' : 'Cadastrar Contato'}</DialogTitle></DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+                {activeTab === 'empresas' ? (
+                  <div>
+                    <Label>Tipo</Label>
+                    <Select value={tipo} onValueChange={setTipo}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="construtora">Construtora</SelectItem>
+                        <SelectItem value="loja">Loja</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <input type="hidden" value="pessoa_fisica" onChange={() => setTipo('pessoa_fisica')} />
+                )}
                 <div>
-                  <Label>Tipo</Label>
-                  <Select value={tipo} onValueChange={setTipo}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="construtora">Construtora</SelectItem>
-                      <SelectItem value="loja">Loja</SelectItem>
-                      <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>{tipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ'}</Label>
+                  <Label>{activeTab === 'contatos' ? 'CPF' : 'CNPJ'}</Label>
                   <div className="relative">
                     <Input
                       value={cnpj}
                       onChange={(e) => handleCnpjChange(e.target.value)}
-                      onBlur={tipo !== 'pessoa_fisica' ? handleCnpjBlur : undefined}
-                      placeholder={tipo === 'pessoa_fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
+                      onBlur={activeTab === 'empresas' ? handleCnpjBlur : undefined}
+                      placeholder={activeTab === 'contatos' ? '000.000.000-00' : '00.000.000/0000-00'}
                       className={cnpjStatus === 'invalid' ? 'border-destructive' : cnpjStatus === 'valid' ? 'border-green-500' : ''}
                     />
                     {cnpjStatus === 'loading' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
                     {cnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
                   </div>
-                  {tipo !== 'pessoa_fisica' && <p className="text-[10px] text-muted-foreground mt-1">Ao sair do campo, o CNPJ será validado e os dados preenchidos automaticamente</p>}
+                  {activeTab === 'empresas' && <p className="text-[10px] text-muted-foreground mt-1">Ao sair do campo, o CNPJ será validado e os dados preenchidos automaticamente</p>}
                 </div>
-                <div><Label>Nome</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} required placeholder="Nome fantasia ou nome" /></div>
-                <div><Label>Razão Social</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" /></div>
+                <div><Label>{activeTab === 'contatos' ? 'Nome completo' : 'Nome'}</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} required placeholder={activeTab === 'contatos' ? 'Nome completo' : 'Nome fantasia ou nome'} /></div>
+                {activeTab === 'empresas' && (
+                  <div><Label>Razão Social</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" /></div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
                   <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
                 </div>
                 <EnderecoForm value={endereco} onChange={setEndereco} />
                 <Button type="submit" className="w-full" disabled={createCliente.isPending}>
-                  {createCliente.isPending ? 'Salvando...' : 'Salvar Cliente'}
+                  {createCliente.isPending ? 'Salvando...' : 'Salvar'}
                 </Button>
               </form>
             </DialogContent>
           </Dialog>
         </div>
 
-
+        {/* List */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            {activeTab === 'empresas' ? <Building2 className="h-12 w-12 mb-3 opacity-30" /> : <Users className="h-12 w-12 mb-3 opacity-30" />}
+            <p className="text-sm font-medium">Nenhum {activeTab === 'empresas' ? 'empresa' : 'contato'} encontrado</p>
+            <p className="text-xs mt-1">Tente ajustar os filtros ou cadastre um novo</p>
+          </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map(client => {
@@ -221,6 +283,9 @@ const Clientes = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="text-xs space-y-1 text-muted-foreground">
+                    {activeTab === 'contatos' && client.nome_contato && (
+                      <p className="font-medium text-foreground">{client.nome_contato}</p>
+                    )}
                     {visibleFields.includes('cnpj') && client.cnpj && <p>{client.cnpj}</p>}
                     {visibleFields.includes('email') && client.email && <p>{client.email}</p>}
                     {visibleFields.includes('endereco') && client.endereco && <p className="flex items-center gap-1"><MapPin className="h-3 w-3" />{client.endereco}</p>}
