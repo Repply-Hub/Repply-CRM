@@ -412,11 +412,7 @@ const NovoPedido = () => {
                   )}
                 </div>
 
-                {/* Observações */}
-                <div className="space-y-2">
-                  <Label>Observações</Label>
-                  <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações internas sobre o pedido" rows={3} />
-                </div>
+
 
                 {/* Próximo contato */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
