@@ -220,9 +220,6 @@ const Index = () => {
           }}>
             <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
           </Button>
-          <Button variant="outline" size="sm" className="hidden md:inline-flex" onClick={() => navigate('/pedidos')}>
-            <Filter className="h-4 w-4 mr-1" /> Ver Pedidos
-          </Button>
           <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
             <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
           </Button>
