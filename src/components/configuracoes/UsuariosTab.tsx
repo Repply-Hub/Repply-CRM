@@ -695,15 +695,15 @@ export function UsuariosTab() {
             className="pl-9"
           />
         </div>
-        {isGestor && empresasUnicas.length > 0 && (
+        {isGestor && empresasData && empresasData.length > 0 && (
           <Select value={empresaFilter} onValueChange={(val) => { setEmpresaFilter(val); setSelectedVendedor(null); }}>
             <SelectTrigger className="w-full sm:w-52">
               <SelectValue placeholder="Filtrar por empresa" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todas as empresas</SelectItem>
-              {empresasUnicas.map(emp => (
-                <SelectItem key={emp} value={emp}>{emp}</SelectItem>
+              {empresasData.map(emp => (
+                <SelectItem key={emp.id} value={emp.id}>{emp.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
