@@ -73,16 +73,12 @@ const Clientes = () => {
     return matchSearch && matchTipo;
   });
 
-  const tipoFilterOptions = activeTab === 'empresas'
-    ? [
-        { value: 'todos', label: 'Todos os tipos' },
-        { value: 'construtora', label: 'Construtora' },
-        { value: 'loja', label: 'Loja' },
-      ]
-    : [
-        { value: 'todos', label: 'Todos' },
-        { value: 'pessoa_fisica', label: 'Pessoa Física' },
-      ];
+  const tipoFilterOptions = [
+    { value: 'todos', label: 'Todos os tipos' },
+    { value: 'construtora', label: 'Construtora' },
+    { value: 'loja', label: 'Loja' },
+    { value: 'pessoa_fisica', label: 'Pessoa Física' },
+  ];
 
   const handleCnpjChange = (value: string) => {
     setCnpj(maskCnpj(value));
