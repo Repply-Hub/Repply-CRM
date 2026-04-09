@@ -216,24 +216,22 @@ export default function Tarefas() {
                   })}
                 </TableBody>
               </Table>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-3 sm:px-4 py-3 rounded-xl border border-border/60 bg-card shadow-[var(--shadow-card)]">
-                <span className="text-xs text-muted-foreground">
-                  Página {page} de {totalPages} · {filtered.length} tarefa(s)
-                </span>
-                <div className="flex gap-1">
-                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-t border-border/60 bg-card">
+                  <span className="text-xs text-muted-foreground">
+                    Página {page} de {totalPages} · {filtered.length} tarefa(s)
+                  </span>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </>
         )}
       </div>
