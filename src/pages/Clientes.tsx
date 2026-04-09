@@ -317,68 +317,79 @@ const Clientes = () => {
             <p className="text-xs mt-1">Tente ajustar os filtros ou cadastre um novo</p>
           </div>
         ) : activeTab === 'empresas' ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredEmpresas.map(client => {
-              const Icon = tipoIcons[client.tipo] ?? Building2;
-              return (
-                <Card key={client.id} className="shadow-card hover:shadow-card-hover transition-all duration-200 cursor-pointer border-border/60 group" onClick={() => navigate(`/clientes/${client.id}`)}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-sm truncate font-bold">{client.empresa}</CardTitle>
-                        {visibleFields.includes('tipo') && (
-                          <Badge variant="secondary" className="text-[10px] mt-1 font-medium">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="text-xs space-y-1 text-muted-foreground">
-                    {visibleFields.includes('cnpj') && client.cnpj && <p>{client.cnpj}</p>}
-                    {visibleFields.includes('email') && client.email && <p>{client.email}</p>}
-                    {visibleFields.includes('endereco') && client.endereco && <p className="flex items-center gap-1"><MapPin className="h-3 w-3" />{client.endereco}</p>}
-                    {visibleFields.includes('obras_count') && client.obras && client.obras.length > 0 && (
-                      <p className="text-primary font-medium">{client.obras.length} obra(s) vinculada(s)</p>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="rounded-lg border border-border/60 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome/Empresa</th>
+                  {visibleFields.includes('tipo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Tipo</th>}
+                  {visibleFields.includes('cnpj') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">CPF/CNPJ</th>}
+                  {visibleFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">E-mail</th>}
+                  {visibleFields.includes('endereco') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden xl:table-cell">Endereço</th>}
+                  {visibleFields.includes('obras_count') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Obras</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredEmpresas.map(client => {
+                  const Icon = tipoIcons[client.tipo] ?? Building2;
+                  return (
+                    <tr key={client.id} className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/clientes/${client.id}`)}>
+                      <td className="py-2.5 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <Icon className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="font-medium truncate max-w-[200px]">{client.empresa}</span>
+                        </div>
+                      </td>
+                      {visibleFields.includes('tipo') && (
+                        <td className="py-2.5 px-4">
+                          <Badge variant="secondary" className="text-[10px] font-medium">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
+                        </td>
+                      )}
+                      {visibleFields.includes('cnpj') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{client.cnpj || '—'}</td>}
+                      {visibleFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]">{client.email || '—'}</td>}
+                      {visibleFields.includes('endereco') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden xl:table-cell truncate max-w-[250px]">{client.endereco || '—'}</td>}
+                      {visibleFields.includes('obras_count') && <td className="py-2.5 px-4 text-xs hidden md:table-cell">{client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}</td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredContatos.map(contato => (
-              <Card key={contato.id} className="shadow-card hover:shadow-card-hover transition-all duration-200 border-border/60 group">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                      <User className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {visibleContatoFields.includes('nome_contato') && (
-                        <CardTitle className="text-sm truncate font-bold">{contato.nome_contato || 'Sem nome'}</CardTitle>
-                      )}
-                      {visibleContatoFields.includes('cargo') && contato.cargo && (
-                        <Badge variant="secondary" className="text-[10px] mt-1 font-medium">{contato.cargo}</Badge>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="text-xs space-y-1 text-muted-foreground">
-                  {visibleContatoFields.includes('empresa') && contato.empresa && (
-                    <p className="flex items-center gap-1"><Building2 className="h-3 w-3" />{contato.empresa}</p>
-                  )}
-                  {visibleContatoFields.includes('email') && contato.email && (
-                    <p className="flex items-center gap-1"><Mail className="h-3 w-3" />{contato.email}</p>
-                  )}
-                  {visibleContatoFields.includes('telefone') && contato.telefone && (
-                    <p className="flex items-center gap-1"><Phone className="h-3 w-3" />{contato.telefone}</p>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+          <div className="rounded-lg border border-border/60 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome</th>}
+                  {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Empresa</th>}
+                  {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Cargo</th>}
+                  {visibleContatoFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">E-mail</th>}
+                  {visibleContatoFields.includes('telefone') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Telefone</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredContatos.map(contato => (
+                  <tr key={contato.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                    {visibleContatoFields.includes('nome_contato') && (
+                      <td className="py-2.5 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <User className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="font-medium truncate max-w-[200px]">{contato.nome_contato || 'Sem nome'}</span>
+                        </div>
+                      </td>
+                    )}
+                    {visibleContatoFields.includes('empresa') && <td className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]">{contato.empresa || '—'}</td>}
+                    {visibleContatoFields.includes('cargo') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{contato.cargo || '—'}</td>}
+                    {visibleContatoFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]">{contato.email || '—'}</td>}
+                    {visibleContatoFields.includes('telefone') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{contato.telefone || '—'}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
