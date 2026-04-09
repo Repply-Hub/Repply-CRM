@@ -215,7 +215,9 @@ export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGr
                   className="absolute left-0 right-0 flex items-center z-20 pointer-events-none"
                   style={{ top: currentTimePx }}
                 >
-                  <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 -ml-1 ${isToday(day) ? 'bg-red-500' : 'bg-red-300/50'}`} />
+                  {isToday(day) && (
+                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 -ml-1 bg-red-500" />
+                  )}
                   <div className={`flex-1 border-t ${isToday(day) ? 'border-red-500' : 'border-red-300/30'}`} />
                 </div>
               </div>
