@@ -398,6 +398,38 @@ const Clientes = () => {
             </table>
           </div>
         )}
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+            <span>
+              Mostrando {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 7) {
+                  pageNum = i + 1;
+                } else if (page <= 4) {
+                  pageNum = i + 1;
+                } else if (page >= totalPages - 3) {
+                  pageNum = totalPages - 6 + i;
+                } else {
+                  pageNum = page - 3 + i;
+                }
+                return (
+                  <Button key={pageNum} variant={page === pageNum ? 'default' : 'outline'} size="icon" className="h-8 w-8 text-xs" onClick={() => setPage(pageNum)}>
+                    {pageNum}
+                  </Button>
+                );
+              })}
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
