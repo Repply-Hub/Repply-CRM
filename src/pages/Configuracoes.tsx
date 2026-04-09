@@ -220,6 +220,82 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
   );
 }
 
+const DEFAULT_PERFIS = [
+  { value: 'vendedor', label: 'Vendedor' },
+  { value: 'empresa', label: 'Empresa' },
+  { value: 'gestor', label: 'Gestor' },
+  { value: 'admin', label: 'Admin' },
+];
+
+function PerfilSelect({ name, defaultValue }: { name: string; defaultValue: string }) {
+  const [perfis, setPerfis] = useState(() => {
+    const saved = localStorage.getItem('custom_perfis');
+    const custom: { value: string; label: string }[] = saved ? JSON.parse(saved) : [];
+    return [...DEFAULT_PERFIS, ...custom];
+  });
+  const [value, setValue] = useState(defaultValue);
+  const [adding, setAdding] = useState(false);
+  const [newPerfil, setNewPerfil] = useState('');
+
+  const handleAddPerfil = () => {
+    const trimmed = newPerfil.trim();
+    if (!trimmed) return;
+    const val = trimmed.toLowerCase().replace(/\s+/g, '_');
+    if (perfis.some(p => p.value === val)) {
+      toast.error('Esse perfil já existe');
+      return;
+    }
+    const novo = { value: val, label: trimmed };
+    const updated = [...perfis, novo];
+    setPerfis(updated);
+    setValue(val);
+    setNewPerfil('');
+    setAdding(false);
+    // Save custom perfis
+    const custom = updated.filter(p => !DEFAULT_PERFIS.some(d => d.value === p.value));
+    localStorage.setItem('custom_perfis', JSON.stringify(custom));
+  };
+
+  return (
+    <div className="space-y-2">
+      <input type="hidden" name={name} value={value} />
+      <Select value={value} onValueChange={(v) => {
+        if (v === '__add_new__') {
+          setAdding(true);
+        } else {
+          setValue(v);
+          setAdding(false);
+        }
+      }}>
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {perfis.map(p => (
+            <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+          ))}
+          <SelectItem value="__add_new__">
+            <span className="flex items-center gap-1 text-primary">
+              <Plus className="h-3.5 w-3.5" /> Novo perfil...
+            </span>
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      {adding && (
+        <div className="flex gap-2">
+          <Input
+            placeholder="Nome do perfil"
+            value={newPerfil}
+            onChange={e => setNewPerfil(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddPerfil())}
+            className="h-8 text-sm"
+            autoFocus
+          />
+          <Button type="button" size="sm" className="h-8" onClick={handleAddPerfil}>Adicionar</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nome: string; email: string; telefone: string | null; role: string }; onClose: () => void }) {
   const qc = useQueryClient();
   const updateMutation = useMutation({
