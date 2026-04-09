@@ -845,6 +845,27 @@ export type Database = {
           },
         ]
       }
+      perfis_customizados: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       permissoes_vendedor: {
         Row: {
           created_at: string
