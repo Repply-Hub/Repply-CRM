@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
@@ -49,6 +49,8 @@ const Clientes = () => {
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [activeTab, setActiveTab] = useState<ViewTab>('empresas');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
@@ -101,6 +103,9 @@ const Clientes = () => {
   });
 
   const filtered = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedEmpresas = filteredEmpresas.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedContatos = filteredContatos.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const tipoFilterOptions = [
     { value: 'todos', label: 'Todos os tipos' },
@@ -201,6 +206,7 @@ const Clientes = () => {
     setActiveTab(tab as ViewTab);
     setTipoFilter('todos');
     setSearch('');
+    setPage(1);
   };
 
   return (
@@ -228,11 +234,11 @@ const Clientes = () => {
               className="pl-9"
               placeholder={activeTab === 'empresas' ? 'Buscar empresas...' : 'Buscar contatos...'}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
           {activeTab === 'empresas' && (
-            <Select value={tipoFilter} onValueChange={setTipoFilter}>
+            <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1); }}>
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por tipo" /></SelectTrigger>
               <SelectContent>
                 {tipoFilterOptions.map(opt => (
@@ -330,7 +336,7 @@ const Clientes = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredEmpresas.map(client => {
+                {paginatedEmpresas.map(client => {
                   const Icon = tipoIcons[client.tipo] ?? Building2;
                   return (
                     <tr key={client.id} className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/clientes/${client.id}`)}>
@@ -370,7 +376,7 @@ const Clientes = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredContatos.map(contato => (
+                {paginatedContatos.map(contato => (
                   <tr key={contato.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                     {visibleContatoFields.includes('nome_contato') && (
                       <td className="py-2.5 px-4">
@@ -390,6 +396,38 @@ const Clientes = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+            <span>
+              Mostrando {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 7) {
+                  pageNum = i + 1;
+                } else if (page <= 4) {
+                  pageNum = i + 1;
+                } else if (page >= totalPages - 3) {
+                  pageNum = totalPages - 6 + i;
+                } else {
+                  pageNum = page - 3 + i;
+                }
+                return (
+                  <Button key={pageNum} variant={page === pageNum ? 'default' : 'outline'} size="icon" className="h-8 w-8 text-xs" onClick={() => setPage(pageNum)}>
+                    {pageNum}
+                  </Button>
+                );
+              })}
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
