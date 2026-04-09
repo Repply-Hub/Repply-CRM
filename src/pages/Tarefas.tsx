@@ -164,12 +164,6 @@ export default function Tarefas() {
                       <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 hover:bg-primary/5" onClick={() => { setViewTarefa(t); setViewOpen(true); }}>
                         <Eye className="h-3.5 w-3.5 mr-1" />Ver
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 hover:bg-primary/5" onClick={() => openEdit(t)}>
-                        <Pencil className="h-3.5 w-3.5 mr-1" />Editar
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 text-destructive hover:bg-destructive/5" onClick={() => handleDelete(t.id)}>
-                        <Trash2 className="h-3.5 w-3.5 mr-1" />Excluir
-                      </Button>
                     </div>
                   </div>
                 );
@@ -186,7 +180,7 @@ export default function Tarefas() {
                     <TableHead className="hidden lg:table-cell">Prazo</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="hidden xl:table-cell">Projeto</TableHead>
-                    <TableHead className="w-[110px]">Ações</TableHead>
+                    <TableHead className="w-[60px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -214,12 +208,6 @@ export default function Tarefas() {
                           <div className="flex gap-0.5">
                             <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5" onClick={() => { setViewTarefa(t); setViewOpen(true); }}>
                               <Eye className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5" onClick={() => openEdit(t)}>
-                              <Pencil className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/5" onClick={() => handleDelete(t.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive/70" />
                             </Button>
                           </div>
                         </TableCell>
@@ -346,6 +334,14 @@ export default function Tarefas() {
                   <p className="mt-1">{viewTarefa.marcadores}</p>
                 </div>
               )}
+              <div className="flex gap-2 pt-4 border-t border-border/40">
+                <Button variant="outline" className="flex-1" onClick={() => { setViewOpen(false); openEdit(viewTarefa); }}>
+                  <Pencil className="h-4 w-4 mr-1" />Editar
+                </Button>
+                <Button variant="destructive" className="flex-1" onClick={() => { handleDelete(viewTarefa.id); setViewOpen(false); }}>
+                  <Trash2 className="h-4 w-4 mr-1" />Excluir
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
