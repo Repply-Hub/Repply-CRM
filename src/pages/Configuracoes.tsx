@@ -974,15 +974,7 @@ const Configuracoes = () => {
                         <div><Label>Telefone</Label><Input name="telefone" placeholder="(00) 0000-0000" /></div>
                         <div>
                           <Label>Perfil</Label>
-                          <Select name="role" defaultValue="vendedor">
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="vendedor">Vendedor</SelectItem>
-                              <SelectItem value="empresa">Empresa</SelectItem>
-                              <SelectItem value="gestor">Gestor</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <PerfilSelect name="role" defaultValue="vendedor" />
                         </div>
                         <Button type="submit" className="w-full" disabled={createVendedor.isPending}>
                           {createVendedor.isPending ? 'Salvando...' : 'Salvar Vendedor'}
