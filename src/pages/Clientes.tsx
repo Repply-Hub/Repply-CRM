@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
-import { useClientes } from '@/hooks/use-clientes';
-import { useCreateCliente } from '@/hooks/use-mutations';
+import { useClientes, useContatos } from '@/hooks/use-clientes';
+import { useCreateCliente, useCreateContato } from '@/hooks/use-mutations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
@@ -27,6 +27,14 @@ const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'obras_count', label: 'Qtd. Obras' },
 ];
 
+const CONTATO_FIELDS: ColumnDefinition[] = [
+  { id: 'nome_contato', label: 'Nome', locked: true },
+  { id: 'empresa', label: 'Empresa' },
+  { id: 'email', label: 'E-mail' },
+  { id: 'telefone', label: 'Telefone' },
+  { id: 'cargo', label: 'Cargo' },
+];
+
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física' };
 
@@ -34,8 +42,10 @@ type ViewTab = 'empresas' | 'contatos';
 
 const Clientes = () => {
   const navigate = useNavigate();
-  const { data: clients, isLoading } = useClientes();
+  const { data: clients, isLoading: loadingClientes } = useClientes();
+  const { data: contatosList, isLoading: loadingContatos } = useContatos();
   const createCliente = useCreateCliente();
+  const createContato = useCreateContato();
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [activeTab, setActiveTab] = useState<ViewTab>('empresas');
@@ -47,10 +57,17 @@ const Clientes = () => {
   const [razaoSocial, setRazaoSocial] = useState('');
   const [endereco, setEndereco] = useState<EnderecoFields>(emptyEndereco);
   const [telefone, setTelefone] = useState('');
+  const [nomeContato, setNomeContato] = useState('');
+  const [cargo, setCargo] = useState('');
 
   const [visibleFields, setVisibleFields] = useState<string[]>(() => {
     const saved = localStorage.getItem('clientes_fields');
     return saved ? JSON.parse(saved) : CLIENTE_FIELDS.map(c => c.id);
+  });
+
+  const [visibleContatoFields, setVisibleContatoFields] = useState<string[]>(() => {
+    const saved = localStorage.getItem('contatos_fields');
+    return saved ? JSON.parse(saved) : CONTATO_FIELDS.map(c => c.id);
   });
 
   const handleFieldChange = (newFields: string[]) => {
@@ -58,20 +75,32 @@ const Clientes = () => {
     localStorage.setItem('clientes_fields', JSON.stringify(newFields));
   };
 
-  // Split clients by tab
-  // All clients show in Empresas; Contatos is for future contact-specific records
-  const allClients = clients ?? [];
-  const empresas = allClients;
-  const contatos: typeof allClients = [];
-  const activeList = activeTab === 'empresas' ? empresas : contatos;
+  const handleContatoFieldChange = (newFields: string[]) => {
+    setVisibleContatoFields(newFields);
+    localStorage.setItem('contatos_fields', JSON.stringify(newFields));
+  };
 
-  const filtered = activeList.filter(c => {
+  const empresas = clients ?? [];
+  const contatos = contatosList ?? [];
+  const isLoading = activeTab === 'empresas' ? loadingClientes : loadingContatos;
+  const totalCount = (clients?.length ?? 0) + (contatosList?.length ?? 0);
+
+  const filteredEmpresas = empresas.filter(c => {
     const matchSearch = c.empresa.toLowerCase().includes(search.toLowerCase()) ||
       (c.nome_contato && c.nome_contato.toLowerCase().includes(search.toLowerCase())) ||
       (c.email && c.email.toLowerCase().includes(search.toLowerCase()));
     const matchTipo = tipoFilter === 'todos' || c.tipo === tipoFilter;
     return matchSearch && matchTipo;
   });
+
+  const filteredContatos = contatos.filter(c => {
+    const s = search.toLowerCase();
+    return (c.nome_contato && c.nome_contato.toLowerCase().includes(s)) ||
+      (c.empresa && c.empresa.toLowerCase().includes(s)) ||
+      (c.email && c.email.toLowerCase().includes(s));
+  });
+
+  const filtered = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
 
   const tipoFilterOptions = [
     { value: 'todos', label: 'Todos os tipos' },
@@ -119,13 +148,33 @@ const Clientes = () => {
   };
 
   const resetForm = () => {
-    setCnpj(''); setEmpresa(''); setRazaoSocial(''); setEndereco(emptyEndereco); setTelefone(''); setCnpjStatus('idle');
+    setCnpj(''); setEmpresa(''); setRazaoSocial(''); setEndereco(emptyEndereco);
+    setTelefone(''); setCnpjStatus('idle'); setNomeContato(''); setCargo('');
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    if (tipo !== 'pessoa_fisica' && unmaskCnpj(cnpj).length === 14 && !isValidCnpjDigits(unmaskCnpj(cnpj))) {
+
+    if (activeTab === 'contatos') {
+      try {
+        await createContato.mutateAsync({
+          empresa: empresa || 'Sem empresa',
+          nome_contato: nomeContato || undefined,
+          email: (form.get('email') as string) || undefined,
+          telefone: telefone || undefined,
+          cargo: cargo || undefined,
+        });
+        toast.success('Contato cadastrado com sucesso!');
+        resetForm();
+        setDialogOpen(false);
+      } catch (err: any) {
+        toast.error(err.message);
+      }
+      return;
+    }
+
+    if (unmaskCnpj(cnpj).length === 14 && !isValidCnpjDigits(unmaskCnpj(cnpj))) {
       toast.error('CNPJ inválido');
       return;
     }
@@ -140,7 +189,7 @@ const Clientes = () => {
         telefone: telefone || undefined,
         endereco: enderecoStr || undefined,
       });
-      toast.success('Cliente cadastrado com sucesso!');
+      toast.success('Empresa cadastrada com sucesso!');
       resetForm();
       setDialogOpen(false);
     } catch (err: any) {
@@ -148,19 +197,15 @@ const Clientes = () => {
     }
   };
 
-  // Sync tipo when switching tabs
   const handleTabChange = (tab: string) => {
-    if (tab === 'contatos') setTipo('pessoa_fisica');
-    else if (tipo === 'pessoa_fisica') setTipo('construtora');
     setActiveTab(tab as ViewTab);
     setTipoFilter('todos');
     setSearch('');
   };
 
   return (
-    <AppLayout title="Clientes" subtitle={`${clients?.length ?? 0} cadastrados`}>
+    <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`}>
       <div className="p-6 max-w-[1400px] mx-auto">
-        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-4">
           <TabsList>
             <TabsTrigger value="empresas" className="gap-2">
@@ -176,7 +221,6 @@ const Clientes = () => {
           </TabsList>
         </Tabs>
 
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -198,9 +242,9 @@ const Clientes = () => {
             </Select>
           )}
           <ColumnSettings
-            columns={CLIENTE_FIELDS}
-            visibleColumns={visibleFields}
-            onChange={handleFieldChange}
+            columns={activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS}
+            visibleColumns={activeTab === 'empresas' ? visibleFields : visibleContatoFields}
+            onChange={activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange}
           />
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
@@ -210,50 +254,60 @@ const Clientes = () => {
               <DialogHeader><DialogTitle>{activeTab === 'empresas' ? 'Cadastrar Empresa' : 'Cadastrar Contato'}</DialogTitle></DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-2">
                 {activeTab === 'empresas' ? (
-                  <div>
-                    <Label>Tipo</Label>
-                    <Select value={tipo} onValueChange={setTipo}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="construtora">Construtora</SelectItem>
-                        <SelectItem value="loja">Loja</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : null}
-                <div>
-                  <Label>{activeTab === 'contatos' ? 'CPF' : 'CNPJ'}</Label>
-                  <div className="relative">
-                    <Input
-                      value={cnpj}
-                      onChange={(e) => handleCnpjChange(e.target.value)}
-                      onBlur={activeTab === 'empresas' ? handleCnpjBlur : undefined}
-                      placeholder={activeTab === 'contatos' ? '000.000.000-00' : '00.000.000/0000-00'}
-                      className={cnpjStatus === 'invalid' ? 'border-destructive' : cnpjStatus === 'valid' ? 'border-green-500' : ''}
-                    />
-                    {cnpjStatus === 'loading' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
-                    {cnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
-                  </div>
-                  {activeTab === 'empresas' && <p className="text-[10px] text-muted-foreground mt-1">Ao sair do campo, o CNPJ será validado e os dados preenchidos automaticamente</p>}
-                </div>
-                <div><Label>{activeTab === 'contatos' ? 'Nome completo' : 'Nome'}</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} required placeholder={activeTab === 'contatos' ? 'Nome completo' : 'Nome fantasia ou nome'} /></div>
-                {activeTab === 'empresas' && (
-                  <div><Label>Razão Social</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" /></div>
+                  <>
+                    <div>
+                      <Label>Tipo</Label>
+                      <Select value={tipo} onValueChange={setTipo}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="construtora">Construtora</SelectItem>
+                          <SelectItem value="loja">Loja</SelectItem>
+                          <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>CNPJ</Label>
+                      <div className="relative">
+                        <Input
+                          value={cnpj}
+                          onChange={(e) => handleCnpjChange(e.target.value)}
+                          onBlur={handleCnpjBlur}
+                          placeholder="00.000.000/0000-00"
+                          className={cnpjStatus === 'invalid' ? 'border-destructive' : cnpjStatus === 'valid' ? 'border-green-500' : ''}
+                        />
+                        {cnpjStatus === 'loading' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
+                        {cnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">Ao sair do campo, o CNPJ será validado e os dados preenchidos automaticamente</p>
+                    </div>
+                    <div><Label>Nome</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} required placeholder="Nome fantasia ou nome" /></div>
+                    <div><Label>Razão Social</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" /></div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
+                      <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
+                    </div>
+                    <EnderecoForm value={endereco} onChange={setEndereco} />
+                  </>
+                ) : (
+                  <>
+                    <div><Label>Nome do contato</Label><Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} required placeholder="Nome completo" /></div>
+                    <div><Label>Empresa</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Empresa vinculada" /></div>
+                    <div><Label>Cargo</Label><Input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Cargo ou função" /></div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
+                      <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
+                    </div>
+                  </>
                 )}
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
-                  <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
-                </div>
-                <EnderecoForm value={endereco} onChange={setEndereco} />
-                <Button type="submit" className="w-full" disabled={createCliente.isPending}>
-                  {createCliente.isPending ? 'Salvando...' : 'Salvar'}
+                <Button type="submit" className="w-full" disabled={createCliente.isPending || createContato.isPending}>
+                  {(createCliente.isPending || createContato.isPending) ? 'Salvando...' : 'Salvar'}
                 </Button>
               </form>
             </DialogContent>
           </Dialog>
         </div>
 
-        {/* List */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : filtered.length === 0 ? (
@@ -262,9 +316,9 @@ const Clientes = () => {
             <p className="text-sm font-medium">Nenhum {activeTab === 'empresas' ? 'empresa' : 'contato'} encontrado</p>
             <p className="text-xs mt-1">Tente ajustar os filtros ou cadastre um novo</p>
           </div>
-        ) : (
+        ) : activeTab === 'empresas' ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filtered.map(client => {
+            {filteredEmpresas.map(client => {
               const Icon = tipoIcons[client.tipo] ?? Building2;
               return (
                 <Card key={client.id} className="shadow-card hover:shadow-card-hover transition-all duration-200 cursor-pointer border-border/60 group" onClick={() => navigate(`/clientes/${client.id}`)}>
@@ -282,9 +336,6 @@ const Clientes = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="text-xs space-y-1 text-muted-foreground">
-                    {activeTab === 'contatos' && client.nome_contato && (
-                      <p className="font-medium text-foreground">{client.nome_contato}</p>
-                    )}
                     {visibleFields.includes('cnpj') && client.cnpj && <p>{client.cnpj}</p>}
                     {visibleFields.includes('email') && client.email && <p>{client.email}</p>}
                     {visibleFields.includes('endereco') && client.endereco && <p className="flex items-center gap-1"><MapPin className="h-3 w-3" />{client.endereco}</p>}
@@ -295,6 +346,39 @@ const Clientes = () => {
                 </Card>
               );
             })}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredContatos.map(contato => (
+              <Card key={contato.id} className="shadow-card hover:shadow-card-hover transition-all duration-200 border-border/60 group">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {visibleContatoFields.includes('nome_contato') && (
+                        <CardTitle className="text-sm truncate font-bold">{contato.nome_contato || 'Sem nome'}</CardTitle>
+                      )}
+                      {visibleContatoFields.includes('cargo') && contato.cargo && (
+                        <Badge variant="secondary" className="text-[10px] mt-1 font-medium">{contato.cargo}</Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="text-xs space-y-1 text-muted-foreground">
+                  {visibleContatoFields.includes('empresa') && contato.empresa && (
+                    <p className="flex items-center gap-1"><Building2 className="h-3 w-3" />{contato.empresa}</p>
+                  )}
+                  {visibleContatoFields.includes('email') && contato.email && (
+                    <p className="flex items-center gap-1"><Mail className="h-3 w-3" />{contato.email}</p>
+                  )}
+                  {visibleContatoFields.includes('telefone') && contato.telefone && (
+                    <p className="flex items-center gap-1"><Phone className="h-3 w-3" />{contato.telefone}</p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </div>
