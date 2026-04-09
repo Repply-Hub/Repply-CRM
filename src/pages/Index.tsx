@@ -108,7 +108,7 @@ const Index = () => {
                 <ChevronDown className="h-3.5 w-3.5 ml-1" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto min-w-[560px] max-w-[720px] p-3" align="start">
+            <PopoverContent className="w-auto min-w-[680px] max-w-[860px] p-4" align="start">
               <div className="flex gap-4">
                 {/* Vendedor section */}
                 <div className="flex-1 min-w-[130px]">
