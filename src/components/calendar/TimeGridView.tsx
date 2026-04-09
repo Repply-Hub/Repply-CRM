@@ -212,13 +212,13 @@ export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGr
                 ))}
                 {/* Indicador de hora atual — em todas as colunas visíveis */}
                 <div
-                  className="absolute left-0 right-0 flex items-center z-20 pointer-events-none"
+                  className="absolute left-0 right-0 z-20 pointer-events-none"
                   style={{ top: currentTimePx }}
                 >
+                  <div className={`absolute inset-x-0 top-1/2 border-t ${isToday(day) ? 'border-red-500' : 'border-red-300/30'}`} />
                   {isToday(day) && (
-                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 -ml-1 bg-red-500" />
+                    <div className="absolute w-2.5 h-2.5 rounded-full bg-red-500 -left-1 -top-[5px]" />
                   )}
-                  <div className={`flex-1 border-t ${isToday(day) ? 'border-red-500' : 'border-red-300/30'}`} />
                 </div>
               </div>
             ))}
