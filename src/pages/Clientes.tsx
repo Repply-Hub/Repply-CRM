@@ -336,7 +336,7 @@ const Clientes = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredEmpresas.map(client => {
+                {paginatedEmpresas.map(client => {
                   const Icon = tipoIcons[client.tipo] ?? Building2;
                   return (
                     <tr key={client.id} className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/clientes/${client.id}`)}>
