@@ -222,9 +222,7 @@ const Clientes = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                ) : (
-                  <input type="hidden" value="pessoa_fisica" onChange={() => setTipo('pessoa_fisica')} />
-                )}
+                ) : null}
                 <div>
                   <Label>{activeTab === 'contatos' ? 'CPF' : 'CNPJ'}</Label>
                   <div className="relative">
