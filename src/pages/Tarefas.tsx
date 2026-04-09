@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useTarefas, useCreateTarefa, useUpdateTarefa, useDeleteTarefa, Tarefa } from '@/hooks/use-tarefas';
+import { UserProfilePopover } from '@/components/UserProfilePopover';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -150,7 +151,7 @@ export default function Tarefas() {
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       {t.responsavel && (
                         <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" />{t.responsavel}
+                          <User className="h-3 w-3" /><UserProfilePopover name={t.responsavel} className="text-xs" />
                         </span>
                       )}
                       {t.prazo_final && (
@@ -196,7 +197,7 @@ export default function Tarefas() {
                           {t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
                           {t.responsavel && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.responsavel}</p>}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-sm whitespace-nowrap">{t.responsavel || '—'}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm whitespace-nowrap">{t.responsavel ? <UserProfilePopover name={t.responsavel} /> : '—'}</TableCell>
                         <TableCell className={`hidden lg:table-cell text-sm whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : ''}`}>
                           {t.prazo_final ? format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR }) : '—'}
                         </TableCell>
@@ -301,11 +302,11 @@ export default function Tarefas() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Responsável</span>
-                  <p className="mt-1">{viewTarefa.responsavel || '—'}</p>
+                  <div className="mt-1">{viewTarefa.responsavel ? <UserProfilePopover name={viewTarefa.responsavel} /> : '—'}</div>
                 </div>
                 <div>
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Criado por</span>
-                  <p className="mt-1">{viewTarefa.criado_por || '—'}</p>
+                  <div className="mt-1">{viewTarefa.criado_por ? <UserProfilePopover name={viewTarefa.criado_por} /> : '—'}</div>
                 </div>
               </div>
               {viewTarefa.participantes && (
