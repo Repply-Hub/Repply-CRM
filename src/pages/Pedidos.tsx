@@ -74,7 +74,7 @@ const Pedidos = () => {
                   <MoreVertical className="h-4 w-4 mr-1" /> Opções
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="start" className="w-48">
                 <DropdownMenuItem onClick={async () => {
                   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
                   await generatePedidosPdf(
