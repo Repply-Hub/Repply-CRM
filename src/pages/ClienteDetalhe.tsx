@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useClientes } from '@/hooks/use-clientes';
 import { usePedidos } from '@/hooks/use-pedidos';
 import { useUpdateCliente, useDeleteCliente } from '@/hooks/use-mutations';
