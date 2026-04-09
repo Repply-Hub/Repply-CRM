@@ -93,12 +93,12 @@ const Index = () => {
                 <ChevronDown className="h-3.5 w-3.5 ml-1" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-72 p-3" align="start">
-              <div className="space-y-4">
+            <PopoverContent className="w-auto min-w-[480px] max-w-[640px] p-3" align="start">
+              <div className="flex gap-4">
                 {/* Vendedor section */}
-                <div>
+                <div className="flex-1 min-w-[140px]">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
                     {(vendedores ?? []).map(v => (
                       <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
                         <Checkbox
@@ -112,9 +112,9 @@ const Index = () => {
                 </div>
 
                 {/* Fabricante section */}
-                <div>
+                <div className="flex-1 min-w-[140px]">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fabricante</p>
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
                     {(fabricantes ?? []).map(f => (
                       <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
                         <Checkbox
@@ -127,24 +127,25 @@ const Index = () => {
                   </div>
                 </div>
 
-                {/* Attention filter */}
-                <div>
-                  <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                    <Checkbox
-                      checked={showOnlyAttention}
-                      onCheckedChange={() => setShowOnlyAttention(prev => !prev)}
-                    />
-                    <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                    Precisa de atenção
-                  </label>
+                {/* Atenção + Limpar */}
+                <div className="flex flex-col justify-between min-w-[140px]">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
+                    <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                      <Checkbox
+                        checked={showOnlyAttention}
+                        onCheckedChange={() => setShowOnlyAttention(prev => !prev)}
+                      />
+                      <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                      Atenção
+                    </label>
+                  </div>
+                  {hasFilters && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="w-full text-muted-foreground mt-2">
+                      <X className="h-3.5 w-3.5 mr-1" /> Limpar
+                    </Button>
+                  )}
                 </div>
-
-                {/* Clear */}
-                {hasFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="w-full text-muted-foreground">
-                    <X className="h-3.5 w-3.5 mr-1" /> Limpar filtros
-                  </Button>
-                )}
               </div>
             </PopoverContent>
           </Popover>
