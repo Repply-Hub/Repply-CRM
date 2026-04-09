@@ -42,7 +42,7 @@ export function useSidebarPreferences() {
       }
 
       // Merge saved preferences with defaults to handle new items added after save
-      const saved = data.items as SidebarItem[];
+      const saved = data.items as unknown as SidebarItem[];
       const savedIds = new Set(saved.map(i => i.id));
       const newDefaults = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedIds.has(d.id));
       return [...saved, ...newDefaults];
