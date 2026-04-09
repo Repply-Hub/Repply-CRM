@@ -234,7 +234,7 @@ const Clientes = () => {
               className="pl-9"
               placeholder={activeTab === 'empresas' ? 'Buscar empresas...' : 'Buscar contatos...'}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
           {activeTab === 'empresas' && (
