@@ -129,7 +129,7 @@ const Index = () => {
                 {/* Fabricante section */}
                 <div className="flex-1 min-w-[130px]">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fabricante</p>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                  <div className="space-y-1 max-h-60 overflow-y-auto">
                     {(fabricantes ?? []).map(f => (
                       <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
                         <Checkbox
