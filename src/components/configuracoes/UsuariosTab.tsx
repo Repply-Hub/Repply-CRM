@@ -553,17 +553,11 @@ export function UsuariosTab() {
     },
   });
 
-  const empresasUnicas = useMemo(() => {
-    if (!clientesData) return [];
-    return Array.from(new Set(clientesData.map(c => c.empresa))).sort();
-  }, [clientesData]);
-
   const filteredVendedores = useMemo(() => {
     if (!vendedoresData) return [];
     let result = vendedoresData;
     if (empresaFilter !== 'todas') {
-      const vendedorIds = new Set(clientesData?.filter(c => c.empresa === empresaFilter).map(c => c.vendedor_id).filter(Boolean));
-      result = result.filter(v => vendedorIds.has(v.id));
+      result = result.filter(v => v.empresa_id === empresaFilter);
     }
     if (roleFilter !== 'todos') {
       result = result.filter(v => v.role === roleFilter);
@@ -573,7 +567,7 @@ export function UsuariosTab() {
       result = result.filter(v => v.nome.toLowerCase().includes(q) || v.email.toLowerCase().includes(q));
     }
     return result;
-  }, [vendedoresData, empresaFilter, roleFilter, searchQuery, clientesData]);
+  }, [vendedoresData, empresaFilter, roleFilter, searchQuery]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
