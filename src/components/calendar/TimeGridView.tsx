@@ -170,14 +170,12 @@ export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGr
               </div>
             ))}
             {/* Label da hora atual */}
-            {isCurrentPeriod && (
-              <div
-                className="absolute right-1 text-[9px] sm:text-[10px] font-medium text-red-500 z-20"
-                style={{ top: currentTimePx - 7 }}
-              >
-                {format(new Date(), 'HH:mm')}
-              </div>
-            )}
+            <div
+              className="absolute right-1 text-[9px] sm:text-[10px] font-medium text-red-500 z-20"
+              style={{ top: currentTimePx - 7 }}
+            >
+              {format(new Date(), 'HH:mm')}
+            </div>
           </div>
 
           {/* Colunas dos dias */}
