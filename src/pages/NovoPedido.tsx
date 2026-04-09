@@ -321,6 +321,12 @@ const NovoPedido = () => {
                   <Input value={enderecoEntrega} onChange={e => setEnderecoEntrega(e.target.value)} placeholder="Endereço de entrega" />
                 </div>
 
+                {/* Descrição do Pedido */}
+                <div className="space-y-2">
+                  <Label>Descrição do Pedido</Label>
+                  <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações ou descrição geral do pedido" rows={3} />
+                </div>
+
                 <div className="flex justify-end pt-4">
                   <Button onClick={handleNext}>
                     Próximo <ArrowRight className="h-4 w-4 ml-1" />
@@ -406,11 +412,7 @@ const NovoPedido = () => {
                   )}
                 </div>
 
-                {/* Observações */}
-                <div className="space-y-2">
-                  <Label>Observações</Label>
-                  <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações internas sobre o pedido" rows={3} />
-                </div>
+
 
                 {/* Próximo contato */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
