@@ -254,19 +254,21 @@ export default function Calendario() {
         : getWeekDays(currentDate)
       : [currentDate];
 
-  const headerContent = (
-    <CalendarHeader
-      currentDate={currentDate}
-      viewMode={viewMode}
-      onViewModeChange={setViewMode}
-      onNavigate={navigate}
-      onNewEvent={() => openNewEvent()}
-      onImport={handleImportClick}
-    />
-  );
+  const calendarTitle = viewMode === 'mes'
+    ? format(currentDate, 'MMMM yyyy', { locale: ptBR })
+    : viewMode === 'semana'
+      ? (() => {
+          const monday = new Date(currentDate);
+          const day = monday.getDay();
+          monday.setDate(monday.getDate() + (day === 0 ? -6 : 1 - day));
+          const sunday = addDays(monday, 6);
+          if (monday.getMonth() === sunday.getMonth()) return format(monday, 'MMMM yyyy', { locale: ptBR });
+          return `${format(monday, 'MMM', { locale: ptBR })} – ${format(sunday, 'MMM yyyy', { locale: ptBR })}`;
+        })()
+      : format(currentDate, "d 'de' MMMM, yyyy", { locale: ptBR });
 
   return (
-    <AppLayout headerContent={headerContent} mainClassName="flex-1 overflow-hidden flex flex-col">
+    <AppLayout title="Calendário" subtitle={calendarTitle} mainClassName="flex-1 overflow-hidden flex flex-col">
       <input
         ref={importInputRef}
         type="file"
@@ -276,6 +278,17 @@ export default function Calendario() {
         disabled={isImporting}
       />
       <ErrorBoundary>
+        {/* Toolbar com botões do calendário */}
+        <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 md:px-6 py-2 border-b shrink-0">
+          <CalendarHeader
+            currentDate={currentDate}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onNavigate={navigate}
+            onNewEvent={() => openNewEvent()}
+            onImport={handleImportClick}
+          />
+        </div>
         <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Sidebar esquerda — oculta em mobile */}
           <aside className="hidden lg:flex w-56 border-r flex-col gap-5 p-3 shrink-0 overflow-y-auto min-h-0">
