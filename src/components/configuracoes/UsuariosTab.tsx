@@ -534,12 +534,12 @@ export function UsuariosTab() {
     },
   });
 
-  const { data: clientesData } = useQuery({
-    queryKey: ['clientes_empresas'],
+  const { data: empresasData } = useQuery({
+    queryKey: ['empresas_list'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('clientes').select('empresa, vendedor_id').order('empresa');
+      const { data, error } = await supabase.from('empresas').select('id, nome').order('nome');
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
     enabled: !!isGestor,
   });
