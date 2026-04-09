@@ -102,10 +102,10 @@ const Pedidos = () => {
               visibleColumns={visibleColumns}
               onChange={handleColumnChange}
             />
-            <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
-              <Plus className="h-4 w-4 mr-1" /> Novo Pedido
-            </Button>
           </div>
+          <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
+            <Plus className="h-4 w-4 mr-1" /> Novo Pedido
+          </Button>
         </div>
 
         {isLoading ? (
