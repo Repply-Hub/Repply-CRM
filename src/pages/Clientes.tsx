@@ -376,7 +376,7 @@ const Clientes = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredContatos.map(contato => (
+                {paginatedContatos.map(contato => (
                   <tr key={contato.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                     {visibleContatoFields.includes('nome_contato') && (
                       <td className="py-2.5 px-4">
