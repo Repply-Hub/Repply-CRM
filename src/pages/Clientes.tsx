@@ -59,8 +59,10 @@ const Clientes = () => {
   };
 
   // Split clients by tab
-  const empresas = (clients ?? []).filter(c => c.tipo !== 'pessoa_fisica');
-  const contatos = (clients ?? []).filter(c => c.tipo === 'pessoa_fisica');
+  // All clients show in Empresas; Contatos is for future contact-specific records
+  const allClients = clients ?? [];
+  const empresas = allClients;
+  const contatos: typeof allClients = [];
   const activeList = activeTab === 'empresas' ? empresas : contatos;
 
   const filtered = activeList.filter(c => {
@@ -71,16 +73,12 @@ const Clientes = () => {
     return matchSearch && matchTipo;
   });
 
-  const tipoFilterOptions = activeTab === 'empresas'
-    ? [
-        { value: 'todos', label: 'Todos os tipos' },
-        { value: 'construtora', label: 'Construtora' },
-        { value: 'loja', label: 'Loja' },
-      ]
-    : [
-        { value: 'todos', label: 'Todos' },
-        { value: 'pessoa_fisica', label: 'Pessoa Física' },
-      ];
+  const tipoFilterOptions = [
+    { value: 'todos', label: 'Todos os tipos' },
+    { value: 'construtora', label: 'Construtora' },
+    { value: 'loja', label: 'Loja' },
+    { value: 'pessoa_fisica', label: 'Pessoa Física' },
+  ];
 
   const handleCnpjChange = (value: string) => {
     setCnpj(maskCnpj(value));
