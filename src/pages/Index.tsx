@@ -77,9 +77,15 @@ const Index = () => {
       if (selectedVendedores.length > 0 && !selectedVendedores.includes(o.vendedorId)) return false;
       if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(o.fabricanteId)) return false;
       if (showOnlyAttention && o.daysInStage < o.alertDays) return false;
+      if (dateFrom && new Date(o.createdAt) < dateFrom) return false;
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        if (new Date(o.createdAt) > end) return false;
+      }
       return true;
     });
-  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention]);
+  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
 
   const totalPipeline = orders.reduce((acc, o) => acc + o.valor, 0);
 
@@ -96,16 +102,16 @@ const Index = () => {
                 Filtros
                 {hasFilters && (
                   <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">
-                    {(selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0)}
+                    {activeFilterCount}
                   </Badge>
                 )}
                 <ChevronDown className="h-3.5 w-3.5 ml-1" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto min-w-[480px] max-w-[640px] p-3" align="start">
+            <PopoverContent className="w-auto min-w-[560px] max-w-[720px] p-3" align="start">
               <div className="flex gap-4">
                 {/* Vendedor section */}
-                <div className="flex-1 min-w-[140px]">
+                <div className="flex-1 min-w-[130px]">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {(vendedores ?? []).map(v => (
@@ -121,7 +127,7 @@ const Index = () => {
                 </div>
 
                 {/* Fabricante section */}
-                <div className="flex-1 min-w-[140px]">
+                <div className="flex-1 min-w-[130px]">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fabricante</p>
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {(fabricantes ?? []).map(f => (
@@ -136,8 +142,37 @@ const Index = () => {
                   </div>
                 </div>
 
+                {/* Data section */}
+                <div className="min-w-[140px]">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Período</p>
+                  <div className="space-y-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className={cn("w-full justify-start text-left text-xs h-8", !dateFrom && "text-muted-foreground")}>
+                          <CalendarIcon className="h-3 w-3 mr-1.5" />
+                          {dateFrom ? format(dateFrom, 'dd/MM/yy', { locale: ptBR }) : 'De'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                      </PopoverContent>
+                    </Popover>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className={cn("w-full justify-start text-left text-xs h-8", !dateTo && "text-muted-foreground")}>
+                          <CalendarIcon className="h-3 w-3 mr-1.5" />
+                          {dateTo ? format(dateTo, 'dd/MM/yy', { locale: ptBR }) : 'Até'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
                 {/* Atenção + Limpar */}
-                <div className="flex flex-col justify-between min-w-[140px]">
+                <div className="flex flex-col justify-between min-w-[120px]">
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
                     <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
