@@ -254,15 +254,7 @@ function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nom
         <div><Label>Telefone</Label><Input name="telefone" defaultValue={vendedor.telefone ?? ''} placeholder="(00) 00000-0000" /></div>
         <div>
           <Label>Perfil</Label>
-           <Select name="role" defaultValue={vendedor.role}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="vendedor">Vendedor</SelectItem>
-              <SelectItem value="empresa">Empresa</SelectItem>
-              <SelectItem value="gestor">Gestor</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
-          </Select>
+          <PerfilSelect name="role" defaultValue={vendedor.role} />
         </div>
         <DialogFooter>
           <Button type="submit" disabled={updateMutation.isPending}>
