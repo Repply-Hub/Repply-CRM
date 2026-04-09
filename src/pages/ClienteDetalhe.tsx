@@ -114,30 +114,32 @@ const ClienteDetalhe = () => {
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
 
   return (
-    <AppLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate('/clientes')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Icon className="h-6 w-6 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">{(cliente as any).razao_social || cliente.empresa}</h1>
+    <AppLayout
+      headerContent={
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <SidebarTrigger className="shrink-0 h-8 w-8 md:hidden" />
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => navigate('/clientes')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Icon className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight truncate">{(cliente as any).razao_social || cliente.empresa}</h1>
+            <div className="flex items-center gap-2">
               {(cliente as any).razao_social && (cliente as any).razao_social !== cliente.empresa && (
-                <p className="text-sm text-muted-foreground truncate">{cliente.empresa}</p>
+                <span className="text-xs sm:text-sm text-muted-foreground truncate">{cliente.empresa}</span>
               )}
-              <Badge variant="secondary" className="mt-1">{tipoLabels[cliente.tipo] ?? cliente.tipo}</Badge>
+              <Badge variant="secondary" className="text-[10px]">{tipoLabels[cliente.tipo] ?? cliente.tipo}</Badge>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 pl-14 sm:pl-0">
-            <Button variant="outline" size="sm" onClick={openEdit}>
-              <Pencil className="h-4 w-4 mr-1" /> Editar
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" className="shrink-0 ml-auto" onClick={openEdit}>
+            <Pencil className="h-4 w-4 mr-1" /> Editar
+          </Button>
+        </div>
+      }
+    >
+      <div className="p-6 space-y-6">
         </div>
 
         {/* Edit Dialog */}
