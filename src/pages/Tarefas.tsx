@@ -192,7 +192,7 @@ export default function Tarefas() {
                     return (
                       <TableRow key={t.id} className="hover:bg-muted/30 transition-colors">
                         <TableCell className="max-w-[300px]">
-                          <p className="font-medium text-sm text-card-foreground line-clamp-1">{t.titulo}</p>
+                          <p className="font-medium text-sm text-card-foreground">{t.titulo}</p>
                           {t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
                           {t.responsavel && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.responsavel}</p>}
                         </TableCell>
