@@ -71,7 +71,7 @@ const Pedidos = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
-                  <Settings2 className="h-4 w-4 mr-1" /> Opções
+                  <MoreVertical className="h-4 w-4 mr-1" /> Opções
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
