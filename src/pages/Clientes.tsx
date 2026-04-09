@@ -150,7 +150,10 @@ const Clientes = () => {
     }
   };
 
+  // Sync tipo when switching tabs
   const handleTabChange = (tab: string) => {
+    if (tab === 'contatos') setTipo('pessoa_fisica');
+    else if (tipo === 'pessoa_fisica') setTipo('construtora');
     setActiveTab(tab as ViewTab);
     setTipoFilter('todos');
     setSearch('');
