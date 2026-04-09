@@ -1045,7 +1045,7 @@ const Configuracoes = () => {
                           <PerfilSelect name="role" defaultValue="vendedor" />
                         </div>
                         <Button type="submit" className="w-full" disabled={createVendedor.isPending}>
-                          {createVendedor.isPending ? 'Salvando...' : 'Salvar Vendedor'}
+                          {createVendedor.isPending ? 'Salvando...' : 'Salvar Usuário'}
                         </Button>
                       </form>
                     </DialogContent>
