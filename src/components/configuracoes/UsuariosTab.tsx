@@ -534,12 +534,12 @@ export function UsuariosTab() {
     },
   });
 
-  const { data: clientesData } = useQuery({
-    queryKey: ['clientes_empresas'],
+  const { data: empresasData } = useQuery({
+    queryKey: ['empresas_list'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('clientes').select('empresa, vendedor_id').order('empresa');
+      const { data, error } = await supabase.from('empresas').select('id, nome').order('nome');
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
     enabled: !!isGestor,
   });
@@ -553,17 +553,11 @@ export function UsuariosTab() {
     },
   });
 
-  const empresasUnicas = useMemo(() => {
-    if (!clientesData) return [];
-    return Array.from(new Set(clientesData.map(c => c.empresa))).sort();
-  }, [clientesData]);
-
   const filteredVendedores = useMemo(() => {
     if (!vendedoresData) return [];
     let result = vendedoresData;
     if (empresaFilter !== 'todas') {
-      const vendedorIds = new Set(clientesData?.filter(c => c.empresa === empresaFilter).map(c => c.vendedor_id).filter(Boolean));
-      result = result.filter(v => vendedorIds.has(v.id));
+      result = result.filter(v => v.empresa_id === empresaFilter);
     }
     if (roleFilter !== 'todos') {
       result = result.filter(v => v.role === roleFilter);
@@ -573,7 +567,7 @@ export function UsuariosTab() {
       result = result.filter(v => v.nome.toLowerCase().includes(q) || v.email.toLowerCase().includes(q));
     }
     return result;
-  }, [vendedoresData, empresaFilter, roleFilter, searchQuery, clientesData]);
+  }, [vendedoresData, empresaFilter, roleFilter, searchQuery]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -701,15 +695,15 @@ export function UsuariosTab() {
             className="pl-9"
           />
         </div>
-        {isGestor && empresasUnicas.length > 0 && (
+        {isGestor && empresasData && empresasData.length > 0 && (
           <Select value={empresaFilter} onValueChange={(val) => { setEmpresaFilter(val); setSelectedVendedor(null); }}>
             <SelectTrigger className="w-full sm:w-52">
               <SelectValue placeholder="Filtrar por empresa" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todas as empresas</SelectItem>
-              {empresasUnicas.map(emp => (
-                <SelectItem key={emp} value={emp}>{emp}</SelectItem>
+              {empresasData.map(emp => (
+                <SelectItem key={emp.id} value={emp.id}>{emp.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
