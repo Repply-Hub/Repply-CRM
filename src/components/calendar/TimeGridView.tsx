@@ -170,14 +170,12 @@ export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGr
               </div>
             ))}
             {/* Label da hora atual */}
-            {isCurrentPeriod && (
-              <div
-                className="absolute right-1 text-[9px] sm:text-[10px] font-medium text-red-500 z-20"
-                style={{ top: currentTimePx - 7 }}
-              >
-                {format(new Date(), 'HH:mm')}
-              </div>
-            )}
+            <div
+              className="absolute right-1 text-[9px] sm:text-[10px] font-medium text-red-500 z-20"
+              style={{ top: currentTimePx - 7 }}
+            >
+              {format(new Date(), 'HH:mm')}
+            </div>
           </div>
 
           {/* Colunas dos dias */}
@@ -212,16 +210,14 @@ export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGr
                 {timedEvents(eventsForDay(events, day)).map((ev) => (
                   <EventBlock key={ev.id} event={ev} onClick={onClickEvent} />
                 ))}
-                {/* Indicador de hora atual — apenas no dia de hoje */}
-                {isToday(day) && (
-                  <div
-                    className="absolute left-0 right-0 flex items-center z-20 pointer-events-none"
-                    style={{ top: currentTimePx }}
-                  >
-                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-500 shrink-0 -ml-1" />
-                    <div className="flex-1 border-t border-red-500" />
-                  </div>
-                )}
+                {/* Indicador de hora atual — em todas as colunas visíveis */}
+                <div
+                  className="absolute left-0 right-0 flex items-center z-20 pointer-events-none"
+                  style={{ top: currentTimePx }}
+                >
+                  <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 -ml-1 ${isToday(day) ? 'bg-red-500' : 'bg-red-300/50'}`} />
+                  <div className={`flex-1 border-t ${isToday(day) ? 'border-red-500' : 'border-red-300/30'}`} />
+                </div>
               </div>
             ))}
           </div>
