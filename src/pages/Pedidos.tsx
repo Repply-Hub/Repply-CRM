@@ -66,7 +66,7 @@ const Pedidos = () => {
   return (
     <AppLayout title="Pedidos & Orçamentos" subtitle={`${pedidos?.length ?? 0} pedidos`}>
       <div className="p-6">
-        <div className="flex items-center justify-end mb-6">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
