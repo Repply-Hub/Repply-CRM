@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './use-auth';
 
 export interface ChatMessage {
   id: string;
@@ -9,28 +8,46 @@ export interface ChatMessage {
   vendedor_id: string;
   empresa_id: string;
   created_at: string;
+  grupo_id?: string | null;
   arquivo_url?: string | null;
   arquivo_nome?: string | null;
   arquivo_tipo?: string | null;
   vendedor?: { id: string; nome: string; email: string };
 }
 
-async function fetchMessages(): Promise<ChatMessage[]> {
-  const { data, error } = await supabase
+export interface ChatGrupo {
+  id: string;
+  nome: string;
+  descricao?: string | null;
+  empresa_id: string;
+  criado_por: string;
+  created_at: string;
+}
+
+async function fetchMessages(grupoId: string | null): Promise<ChatMessage[]> {
+  let query = supabase
     .from('chat_mensagens')
     .select('*, vendedor:vendedores!chat_mensagens_vendedor_id_fkey(id, nome, email)')
     .order('created_at', { ascending: true })
     .limit(200);
+
+  if (grupoId) {
+    query = query.eq('grupo_id', grupoId);
+  } else {
+    query = query.is('grupo_id', null);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data as any) ?? [];
 }
 
-export function useChatMessages() {
+export function useChatMessages(grupoId: string | null = null) {
   const qc = useQueryClient();
 
-  const query = useQuery({
-    queryKey: ['chat_mensagens'],
-    queryFn: fetchMessages,
+  const query = useQuery<ChatMessage[]>({
+    queryKey: ['chat_mensagens', grupoId],
+    queryFn: () => fetchMessages(grupoId),
     refetchInterval: false,
   });
 
@@ -48,10 +65,38 @@ export function useChatMessages() {
   return query;
 }
 
+export function useChatGrupos() {
+  const qc = useQueryClient();
+
+  const query = useQuery<ChatGrupo[]>({
+    queryKey: ['chat-grupos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('chat_grupos')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data as any) ?? [];
+    },
+  });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('chat_grupos_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_grupos' }, () => {
+        qc.invalidateQueries({ queryKey: ['chat-grupos'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc]);
+
+  return query;
+}
+
 export function useSendMessage() {
   const [sending, setSending] = useState(false);
 
-  const send = useCallback(async (conteudo: string, file?: File) => {
+  const send = useCallback(async (conteudo: string, file?: File, grupoId?: string | null) => {
     setSending(true);
     try {
       const { data: vendedor, error: vErr } = await supabase
@@ -88,6 +133,7 @@ export function useSendMessage() {
         arquivo_url,
         arquivo_nome,
         arquivo_tipo,
+        grupo_id: grupoId || null,
       } as any);
       if (error) throw error;
     } finally {
