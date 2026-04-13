@@ -15,12 +15,30 @@ export interface ChatMessage {
   vendedor?: { id: string; nome: string; email: string };
 }
 
-async function fetchMessages(): Promise<ChatMessage[]> {
-  const { data, error } = await supabase
+export interface ChatGrupo {
+  id: string;
+  nome: string;
+  descricao?: string | null;
+  empresa_id: string;
+  criado_por: string;
+  created_at: string;
+  membros?: { vendedor_id: string }[];
+}
+
+async function fetchMessages(grupoId?: string | null): Promise<ChatMessage[]> {
+  let query = supabase
     .from('chat_mensagens')
     .select('*, vendedor:vendedores!chat_mensagens_vendedor_id_fkey(id, nome, email)')
     .order('created_at', { ascending: true })
     .limit(200);
+
+  if (grupoId) {
+    query = query.eq('grupo_id', grupoId);
+  } else {
+    query = query.is('grupo_id', null);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data as any) ?? [];
 }
