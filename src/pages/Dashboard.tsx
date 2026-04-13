@@ -7,12 +7,13 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
   LineChart, Line, Tooltip, Area, AreaChart,
 } from 'recharts';
-import { TrendingUp, DollarSign, Target, Clock, Loader2 } from 'lucide-react';
+import { TrendingUp, DollarSign, Target, Clock, Loader2, Factory } from 'lucide-react';
 import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante } from '@/hooks/use-dashboard';
 import { usePedidos } from '@/hooks/use-pedidos';
 import { DateRangePicker, type DateRange } from '@/components/DateRangePicker';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/ChartTooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const formatCurrency = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -35,6 +36,7 @@ const Dashboard = () => {
     from: subMonths(new Date(), 6),
     to: new Date(),
   });
+  const [fabricaSort, setFabricaSort] = useState<'maior' | 'menor'>('maior');
 
   const { data: faturamento, isLoading: loadFat } = useFaturamentoMensal();
   const { data: vendedores } = useIndicadoresVendedor();
@@ -95,6 +97,18 @@ const Dashboard = () => {
     fabrica: v.fabricante_nome ?? '',
     dias: Number(v.tempo_medio_ate_orcamento_dias ?? 0),
   }));
+
+  const rendimentoFabrica = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredPedidos.forEach(p => {
+      if (p.fabricante?.nome && p.status === 'fechamento') {
+        map.set(p.fabricante.nome, (map.get(p.fabricante.nome) ?? 0) + (p.valor_total ?? 0));
+      }
+    });
+    const arr = Array.from(map.entries()).map(([fabrica, valor]) => ({ fabrica, valor }));
+    arr.sort((a, b) => fabricaSort === 'maior' ? b.valor - a.valor : a.valor - b.valor);
+    return arr;
+  }, [filteredPedidos, fabricaSort]);
 
   const segmentacao = [
     { name: 'Alto (>100k)', value: filteredPedidos.filter(p => (p.valor_total ?? 0) > 100000).length, color: 'hsl(24, 100%, 47%)' },
@@ -289,6 +303,56 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Rendimento por Fábrica */}
+        {rendimentoFabrica.length > 0 && (
+          <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300 mt-5">
+            <CardHeader className="pb-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <Factory className="h-4 w-4 text-primary" /> Rendimento por Fábrica
+                  </CardTitle>
+                  <CardDescription className="text-xs">Faturamento fechado por fabricante no período</CardDescription>
+                </div>
+                <Select value={fabricaSort} onValueChange={(v) => setFabricaSort(v as 'maior' | 'menor')}>
+                  <SelectTrigger className="w-[160px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="maior">Maior rendimento</SelectItem>
+                    <SelectItem value="menor">Menor rendimento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <ResponsiveContainer width="100%" height={Math.max(220, rendimentoFabrica.length * 40)}>
+                <BarChart data={rendimentoFabrica} layout="vertical" barCategoryGap="20%">
+                  <defs>
+                    <linearGradient id="gradientRendimento" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={chartColors.primary} stopOpacity={0.7} />
+                      <stop offset="100%" stopColor={chartColors.primary} stopOpacity={1} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid {...commonGridProps} vertical horizontal={false} />
+                  <XAxis type="number" {...commonAxisProps} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                  <YAxis dataKey="fabrica" type="category" {...commonAxisProps} width={120} />
+                  <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
+                  <Bar
+                    dataKey="valor"
+                    name="Rendimento"
+                    fill="url(#gradientRendimento)"
+                    radius={[0, 8, 8, 0]}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
+                    background={{ fill: chartColors.primaryLight, radius: 8 }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
       </div>
       </ErrorBoundary>
     </AppLayout>
