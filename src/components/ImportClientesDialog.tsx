@@ -21,30 +21,18 @@ interface ParsedRow {
   nome_contato?: string;
 }
 
-const COLUMN_MAP: Record<string, keyof ParsedRow> = {
-  empresa: 'empresa',
-  nome: 'empresa',
-  'nome fantasia': 'empresa',
-  'nome_fantasia': 'empresa',
-  'razao social': 'razao_social',
-  'razão social': 'razao_social',
-  'razao_social': 'razao_social',
-  tipo: 'tipo',
-  cnpj: 'cnpj',
-  cpf: 'cnpj',
-  'cpf/cnpj': 'cnpj',
-  email: 'email',
-  'e-mail': 'email',
-  telefone: 'telefone',
-  phone: 'telefone',
-  fone: 'telefone',
-  endereco: 'endereco',
-  'endereço': 'endereco',
-  address: 'endereco',
-  contato: 'nome_contato',
-  'nome contato': 'nome_contato',
-  'nome_contato': 'nome_contato',
-};
+const COLUMN_MAP: [RegExp, keyof ParsedRow][] = [
+  // Order matters: more specific patterns first
+  [/^(razao\s*social|razao_social)$/, 'razao_social'],
+  [/^(nome\s*fantasia|nome_fantasia)$/, 'empresa'],
+  [/^(empresa|nome)$/, 'empresa'],
+  [/^(tipo|segmento|categoria)$/, 'tipo'],
+  [/^(cnpj|cpf|cpf\s*\/?\s*cnpj)$/, 'cnpj'],
+  [/^(e-?mail)$/, 'email'],
+  [/^(telefone|phone|fone|celular|tel)$/, 'telefone'],
+  [/^(endereco|endere[cç]o|address)$/, 'endereco'],
+  [/^(contato|nome\s*contato|nome_contato|responsavel|responsável)$/, 'nome_contato'],
+];
 
 const TIPO_MAP: Record<string, string> = {
   construtora: 'construtora',
@@ -64,9 +52,8 @@ const TIPO_MAP: Record<string, string> = {
 
 function normalizeHeader(h: string): keyof ParsedRow | null {
   const key = h.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  for (const [pattern, field] of Object.entries(COLUMN_MAP)) {
-    const norm = pattern.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (key === norm || key.includes(norm)) return field;
+  for (const [pattern, field] of COLUMN_MAP) {
+    if (pattern.test(key)) return field;
   }
   return null;
 }
@@ -111,13 +98,44 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
       const headers = Object.keys(json[0]);
       const mappedHeaders: Record<string, keyof ParsedRow> = {};
+      const usedFields = new Set<keyof ParsedRow>();
+      
+      // First pass: exact regex match
       headers.forEach(h => {
         const mapped = normalizeHeader(h);
-        if (mapped) mappedHeaders[h] = mapped;
+        if (mapped && !usedFields.has(mapped)) {
+          mappedHeaders[h] = mapped;
+          usedFields.add(mapped);
+        }
       });
 
+      // Second pass: partial/fuzzy match for unmapped headers
+      const partialMap: [string, keyof ParsedRow][] = [
+        ['empresa', 'empresa'], ['nome', 'empresa'], ['razao', 'razao_social'],
+        ['cnpj', 'cnpj'], ['cpf', 'cnpj'], ['mail', 'email'],
+        ['tel', 'telefone'], ['fone', 'telefone'], ['ender', 'endereco'],
+        ['contato', 'nome_contato'], ['responsavel', 'nome_contato'],
+      ];
+      headers.forEach(h => {
+        if (mappedHeaders[h]) return;
+        const norm = h.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        for (const [partial, field] of partialMap) {
+          if (!usedFields.has(field) && norm.includes(partial)) {
+            mappedHeaders[h] = field;
+            usedFields.add(field);
+            break;
+          }
+        }
+      });
+
+      const unmapped = headers.filter(h => !mappedHeaders[h]);
+      if (unmapped.length > 0) {
+        console.log('Colunas não mapeadas:', unmapped);
+      }
+      console.log('Mapeamento de colunas:', mappedHeaders);
+
       if (!Object.values(mappedHeaders).includes('empresa')) {
-        toast.error('Coluna "Empresa" ou "Nome" não encontrada no arquivo');
+        toast.error(`Coluna "Empresa" ou "Nome" não encontrada. Colunas do arquivo: ${headers.join(', ')}`);
         return;
       }
 
