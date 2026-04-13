@@ -42,7 +42,12 @@ export function useUpdatePedidoStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase.from('pedidos').update({ status }).eq('id', id);
+      const updateData: Record<string, unknown> = { status };
+      // Preenche prazo_resposta (data de fechamento) automaticamente ao mover para "fechamento"
+      if (status === 'fechamento') {
+        updateData.prazo_resposta = new Date().toISOString().split('T')[0];
+      }
+      const { error } = await supabase.from('pedidos').update(updateData).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
