@@ -160,6 +160,7 @@ const Chat = () => {
   const { send, sending } = useSendMessage();
   const [text, setText] = useState('');
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  const [teamCollapsed, setTeamCollapsed] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: myVendedor } = useQuery({
