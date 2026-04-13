@@ -111,9 +111,6 @@ function MembersList({
           Equipe
           <span className="text-[10px] text-muted-foreground font-normal">{members.length}</span>
         </h2>
-        <button onClick={onToggle} className="p-1 rounded hover:bg-muted/50 transition-colors" title="Recolher equipe">
-          <PanelLeftClose className="h-4 w-4 text-muted-foreground" />
-        </button>
       </div>
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-0.5">
@@ -203,6 +200,12 @@ function MembersList({
           })}
         </div>
       </ScrollArea>
+      <div className="border-t border-border px-3 py-2">
+        <button onClick={onToggle} className="flex items-center gap-2 w-full p-1.5 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground" title="Recolher equipe">
+          <PanelLeftClose className="h-4 w-4" />
+          <span className="text-[10px]">Recolher</span>
+        </button>
+      </div>
     </div>
   );
 }
