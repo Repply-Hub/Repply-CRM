@@ -263,7 +263,7 @@ export function AppSidebar() {
           {!editMode && (
             <>
               <Link
-                to="/perfil"
+                to="/configuracoes?tab=perfil"
                 className={`flex items-center overflow-hidden rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 ${collapsed ? 'justify-center' : 'gap-3'}`}
               >
                 <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
