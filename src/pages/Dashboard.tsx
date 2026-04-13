@@ -10,7 +10,6 @@ import {
 import { TrendingUp, DollarSign, Target, Clock, Loader2, Factory } from 'lucide-react';
 import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante } from '@/hooks/use-dashboard';
 import { usePedidos } from '@/hooks/use-pedidos';
-import { useFabricantes } from '@/hooks/use-fabricantes';
 import { DateRangePicker, type DateRange } from '@/components/DateRangePicker';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/ChartTooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
