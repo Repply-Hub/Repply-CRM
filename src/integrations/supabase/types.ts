@@ -1351,13 +1351,19 @@ export type Database = {
     }
     Functions: {
       delete_current_user: { Args: never; Returns: undefined }
+      get_my_empresa_id: { Args: never; Returns: string }
       get_my_vendedor_id: { Args: never; Returns: string }
       has_permission: {
         Args: { _acao: string; _modulo: string; _vendedor_id: string }
         Returns: boolean
       }
+      is_admin: { Args: never; Returns: boolean }
       is_gestor: { Args: never; Returns: boolean }
       validar_codigo_empresa: { Args: { p_codigo: string }; Returns: Json }
+      vendedor_in_my_empresa: {
+        Args: { _vendedor_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
