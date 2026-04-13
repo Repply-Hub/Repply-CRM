@@ -42,7 +42,7 @@ export default function Login() {
     setLoading(true);
     const form = new FormData(e.currentTarget);
     const { error } = await signIn(form.get("email") as string, form.get("password") as string);
-    if (error) toast.error(error.message);
+    if (error) toast.error(traduzirErro(error.message));
     setLoading(false);
   };
 
@@ -57,7 +57,7 @@ export default function Login() {
       form.get("nome_empresa") as string,
       form.get("cnpj") as string,
     );
-    if (error) toast.error(error.message);
+    if (error) toast.error(traduzirErro(error.message));
     else toast.success("Empresa cadastrada! Verifique seu email para confirmar.");
     setLoading(false);
   };
@@ -83,7 +83,7 @@ export default function Login() {
       form.get("nome") as string,
       codigoEmpresa,
     );
-    if (error) toast.error(error.message);
+    if (error) toast.error(traduzirErro(error.message));
     else toast.success(`Cadastro realizado na empresa "${(empresa as any).nome}"! Verifique seu email para confirmar.`);
     setLoading(false);
   };
