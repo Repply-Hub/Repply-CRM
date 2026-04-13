@@ -46,6 +46,7 @@ type ViewTab = 'empresas' | 'contatos';
 
 const Clientes = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: clients, isLoading: loadingClientes } = useClientes();
   const { data: contatosList, isLoading: loadingContatos } = useContatos();
   const createCliente = useCreateCliente();
