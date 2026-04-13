@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
-import { useCreateCliente, useCreateContato } from '@/hooks/use-mutations';
+import { useCreateCliente, useCreateContato, useDeleteCliente, useDeleteContato } from '@/hooks/use-mutations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
@@ -46,11 +48,16 @@ const Clientes = () => {
   const { data: contatosList, isLoading: loadingContatos } = useContatos();
   const createCliente = useCreateCliente();
   const createContato = useCreateContato();
+  const deleteCliente = useDeleteCliente();
+  const deleteContato = useDeleteContato();
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [activeTab, setActiveTab] = useState<ViewTab>('empresas');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
@@ -207,6 +214,59 @@ const Clientes = () => {
     setTipoFilter('todos');
     setSearch('');
     setPage(1);
+    setSelected(new Set());
+  };
+
+  const currentPageIds = activeTab === 'empresas'
+    ? paginatedEmpresas.map(c => c.id)
+    : paginatedContatos.map(c => c.id);
+
+  const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selected.has(id));
+  const someSelected = selected.size > 0;
+
+  const toggleOne = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allPageSelected) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const ids = Array.from(selected);
+      for (const id of ids) {
+        if (activeTab === 'empresas') {
+          await deleteCliente.mutateAsync(id);
+        } else {
+          await deleteContato.mutateAsync(id);
+        }
+      }
+      toast.success(`${ids.length} ${activeTab === 'empresas' ? 'empresa(s)' : 'contato(s)'} removido(s)!`);
+      setSelected(new Set());
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao remover');
+    } finally {
+      setIsDeleting(false);
+      setConfirmDeleteOpen(false);
+    }
   };
 
   return (
@@ -314,6 +374,32 @@ const Clientes = () => {
           </Dialog>
         </div>
 
+        {someSelected && (
+          <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+            <span className="text-sm font-medium text-foreground">{selected.size} selecionado(s)</span>
+            <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setConfirmDeleteOpen(true)}>
+              <Trash2 className="h-4 w-4" /> Remover selecionados
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Limpar seleção</Button>
+          </div>
+        )}
+
+        <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remover {selected.size} {activeTab === 'empresas' ? 'empresa(s)' : 'contato(s)'}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação é irreversível. Todos os registros selecionados serão permanentemente excluídos.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleBulkDelete} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Sim, remover'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         {isLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : filtered.length === 0 ? (
@@ -327,6 +413,9 @@ const Clientes = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
+                  <th className="py-2.5 px-4 w-10">
+                    <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                  </th>
                   <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome/Empresa</th>
                   {visibleFields.includes('tipo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Tipo</th>}
                   {visibleFields.includes('cnpj') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">CPF/CNPJ</th>}
@@ -339,8 +428,11 @@ const Clientes = () => {
                 {paginatedEmpresas.map(client => {
                   const Icon = tipoIcons[client.tipo] ?? Building2;
                   return (
-                    <tr key={client.id} className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/clientes/${client.id}`)}>
-                      <td className="py-2.5 px-4">
+                    <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`}>
+                      <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
+                        <Checkbox checked={selected.has(client.id)} onCheckedChange={() => toggleOne(client.id)} aria-label={`Selecionar ${client.empresa}`} />
+                      </td>
+                      <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
                         <div className="flex items-center gap-2.5">
                           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                             <Icon className="h-4 w-4 text-primary" />
@@ -349,14 +441,14 @@ const Clientes = () => {
                         </div>
                       </td>
                       {visibleFields.includes('tipo') && (
-                        <td className="py-2.5 px-4">
+                        <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
                           <Badge variant="secondary" className="text-[10px] font-medium">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
                         </td>
                       )}
-                      {visibleFields.includes('cnpj') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{client.cnpj || '—'}</td>}
-                      {visibleFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]">{client.email || '—'}</td>}
-                      {visibleFields.includes('endereco') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden xl:table-cell truncate max-w-[250px]">{client.endereco || '—'}</td>}
-                      {visibleFields.includes('obras_count') && <td className="py-2.5 px-4 text-xs hidden md:table-cell">{client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}</td>}
+                      {visibleFields.includes('cnpj') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.cnpj || '—'}</td>}
+                      {visibleFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]" onClick={() => navigate(`/clientes/${client.id}`)}>{client.email || '—'}</td>}
+                      {visibleFields.includes('endereco') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden xl:table-cell truncate max-w-[250px]" onClick={() => navigate(`/clientes/${client.id}`)}>{client.endereco || '—'}</td>}
+                      {visibleFields.includes('obras_count') && <td className="py-2.5 px-4 text-xs hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}</td>}
                     </tr>
                   );
                 })}
@@ -368,6 +460,9 @@ const Clientes = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
+                  <th className="py-2.5 px-4 w-10">
+                    <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                  </th>
                   {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome</th>}
                   {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Empresa</th>}
                   {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Cargo</th>}
@@ -377,7 +472,10 @@ const Clientes = () => {
               </thead>
               <tbody>
                 {paginatedContatos.map(contato => (
-                  <tr key={contato.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                  <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`}>
+                    <td className="py-2.5 px-4 w-10">
+                      <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
+                    </td>
                     {visibleContatoFields.includes('nome_contato') && (
                       <td className="py-2.5 px-4">
                         <div className="flex items-center gap-2.5">

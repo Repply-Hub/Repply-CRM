@@ -77,6 +77,16 @@ export function useDeleteCliente() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['clientes'] }),
   });
 }
+export function useDeleteContato() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('contatos').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contatos'] }),
+  });
+}
 export function useCreatePedido() {
   const qc = useQueryClient();
   return useMutation({
