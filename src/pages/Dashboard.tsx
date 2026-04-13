@@ -36,6 +36,7 @@ const Dashboard = () => {
     from: subMonths(new Date(), 6),
     to: new Date(),
   });
+  const [fabricaSort, setFabricaSort] = useState<'maior' | 'menor'>('maior');
 
   const { data: faturamento, isLoading: loadFat } = useFaturamentoMensal();
   const { data: vendedores } = useIndicadoresVendedor();
