@@ -386,15 +386,57 @@ const Clientes = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Column settings popover (controlled) */}
-          <ColumnSettings
-            columns={activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS}
-            visibleColumns={activeTab === 'empresas' ? visibleFields : visibleContatoFields}
-            onChange={activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange}
-            open={columnsOpen}
-            onOpenChange={setColumnsOpen}
-            hideTrigger
-          />
+          {/* Column settings dialog */}
+          <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
+            <DialogContent className="max-w-xs">
+              <DialogHeader>
+                <DialogTitle className="text-sm">Exibir Colunas</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-2 pt-2">
+                {(activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS).map((column) => {
+                  const currentVisible = activeTab === 'empresas' ? visibleFields : visibleContatoFields;
+                  const currentOnChange = activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange;
+                  const allCols = activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS;
+                  return (
+                    <div
+                      key={column.id}
+                      className={`flex items-center space-x-2 rounded-md p-1 transition-colors hover:bg-muted/50 ${column.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <Checkbox
+                        id={`col-dialog-${column.id}`}
+                        checked={currentVisible.includes(column.id)}
+                        onCheckedChange={() => {
+                          if (column.locked) return;
+                          if (currentVisible.includes(column.id)) {
+                            if (currentVisible.length > 1) currentOnChange(currentVisible.filter(id => id !== column.id));
+                          } else {
+                            const newVisible = allCols.filter(c => currentVisible.includes(c.id) || c.id === column.id).map(c => c.id);
+                            currentOnChange(newVisible);
+                          }
+                        }}
+                        disabled={column.locked}
+                      />
+                      <Label htmlFor={`col-dialog-${column.id}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
+                        {column.label}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-primary mt-1"
+                onClick={() => {
+                  const allCols = activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS;
+                  const currentOnChange = activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange;
+                  currentOnChange(allCols.map(c => c.id));
+                }}
+              >
+                Resetar todas
+              </Button>
+            </DialogContent>
+          </Dialog>
           {/* Import dialog (controlled) */}
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
