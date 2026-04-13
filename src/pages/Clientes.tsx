@@ -132,9 +132,6 @@ const Clientes = () => {
     { value: 'escola', label: 'Escola' },
     { value: 'instalador', label: 'Instalador' },
   ];
-    { value: 'loja', label: 'Loja' },
-    { value: 'pessoa_fisica', label: 'Pessoa Física' },
-  ];
 
   const handleCnpjChange = (value: string) => {
     setCnpj(maskCnpj(value));
