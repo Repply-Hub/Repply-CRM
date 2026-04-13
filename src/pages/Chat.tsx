@@ -38,20 +38,66 @@ function MembersList({
   myId,
   selectedId,
   onSelect,
+  collapsed,
+  onToggle,
 }: {
   members: Vendedor[];
   myId: string | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  collapsed: boolean;
+  onToggle: () => void;
 }) {
+  if (collapsed) {
+    return (
+      <div className="w-12 border-r border-border flex flex-col h-full shrink-0 items-center py-2 gap-1">
+        <button
+          onClick={onToggle}
+          className="p-2 rounded-lg hover:bg-muted/50 transition-colors mb-1"
+          title="Expandir equipe"
+        >
+          <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <button
+          onClick={() => onSelect(null)}
+          className={cn('p-1 rounded-lg transition-colors', selectedId === null ? 'bg-primary/10' : 'hover:bg-muted/50')}
+          title="Chat Geral"
+        >
+          <Avatar className="h-7 w-7">
+            <AvatarFallback className="bg-primary text-primary-foreground text-[8px]">
+              <Users className="h-3.5 w-3.5" />
+            </AvatarFallback>
+          </Avatar>
+        </button>
+        {members.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => onSelect(m.id)}
+            className={cn('p-1 rounded-lg transition-colors', selectedId === m.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
+            title={m.nome}
+          >
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
+                {getInitials(m.nome)}
+              </AvatarFallback>
+            </Avatar>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="w-64 border-r border-border flex flex-col h-full shrink-0">
-      <div className="px-4 py-3 border-b border-border">
-        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+      <div className="px-4 py-3 border-b border-border flex items-center">
+        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 flex-1">
           <Users className="h-4 w-4 text-primary" />
           Equipe
-          <span className="text-[10px] text-muted-foreground font-normal ml-auto">{members.length}</span>
+          <span className="text-[10px] text-muted-foreground font-normal">{members.length}</span>
         </h2>
+        <button onClick={onToggle} className="p-1 rounded hover:bg-muted/50 transition-colors" title="Recolher equipe">
+          <PanelLeftClose className="h-4 w-4 text-muted-foreground" />
+        </button>
       </div>
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-0.5">
