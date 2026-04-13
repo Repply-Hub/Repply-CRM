@@ -108,6 +108,98 @@ export type Database = {
           },
         ]
       }
+      chat_grupo_membros: {
+        Row: {
+          created_at: string
+          grupo_id: string
+          id: string
+          vendedor_id: string
+        }
+        Insert: {
+          created_at?: string
+          grupo_id: string
+          id?: string
+          vendedor_id: string
+        }
+        Update: {
+          created_at?: string
+          grupo_id?: string
+          id?: string
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_grupo_membros_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "chat_grupos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_grupo_membros_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_grupo_membros_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
+          },
+        ]
+      }
+      chat_grupos: {
+        Row: {
+          created_at: string
+          criado_por: string
+          descricao: string | null
+          empresa_id: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por: string
+          descricao?: string | null
+          empresa_id: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string
+          descricao?: string | null
+          empresa_id?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_grupos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_grupos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "chat_grupos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_mensagens: {
         Row: {
           arquivo_nome: string | null
@@ -116,6 +208,7 @@ export type Database = {
           conteudo: string
           created_at: string
           empresa_id: string
+          grupo_id: string | null
           id: string
           vendedor_id: string
         }
@@ -126,6 +219,7 @@ export type Database = {
           conteudo: string
           created_at?: string
           empresa_id: string
+          grupo_id?: string | null
           id?: string
           vendedor_id: string
         }
@@ -136,6 +230,7 @@ export type Database = {
           conteudo?: string
           created_at?: string
           empresa_id?: string
+          grupo_id?: string | null
           id?: string
           vendedor_id?: string
         }
@@ -145,6 +240,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "chat_grupos"
             referencedColumns: ["id"]
           },
           {
