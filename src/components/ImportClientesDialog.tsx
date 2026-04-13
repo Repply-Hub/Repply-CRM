@@ -71,8 +71,16 @@ function normalizeHeader(h: string): keyof ParsedRow | null {
   return null;
 }
 
-export function ImportClientesDialog() {
-  const [open, setOpen] = useState(false);
+interface ImportClientesDialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+}
+
+export function ImportClientesDialog({ open: controlledOpen, onOpenChange: controlledOnOpenChange, hideTrigger }: ImportClientesDialogProps = {}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = controlledOnOpenChange || setInternalOpen;
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
