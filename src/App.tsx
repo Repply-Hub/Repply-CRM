@@ -18,6 +18,7 @@ import Portal from "./pages/Portal";
 import EditarPedido from "./pages/EditarPedido";
 import Calendario from "./pages/Calendario";
 import Tarefas from "./pages/Tarefas";
+import Perfil from "./pages/Perfil";
 import Login from "./pages/Login";
 import EsqueciSenha from "./pages/EsqueciSenha";
 import RedefinirSenha from "./pages/RedefinirSenha";
@@ -57,6 +58,7 @@ const AppRoutes = () => (
     <Route path="/calendario" element={<ProtectedRoute><Calendario /></ProtectedRoute>} />
     <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
+    <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
