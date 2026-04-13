@@ -110,6 +110,9 @@ export type Database = {
       }
       chat_mensagens: {
         Row: {
+          arquivo_nome: string | null
+          arquivo_tipo: string | null
+          arquivo_url: string | null
           conteudo: string
           created_at: string
           empresa_id: string
@@ -117,6 +120,9 @@ export type Database = {
           vendedor_id: string
         }
         Insert: {
+          arquivo_nome?: string | null
+          arquivo_tipo?: string | null
+          arquivo_url?: string | null
           conteudo: string
           created_at?: string
           empresa_id: string
@@ -124,6 +130,9 @@ export type Database = {
           vendedor_id: string
         }
         Update: {
+          arquivo_nome?: string | null
+          arquivo_tipo?: string | null
+          arquivo_url?: string | null
           conteudo?: string
           created_at?: string
           empresa_id?: string
