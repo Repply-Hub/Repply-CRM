@@ -108,6 +108,30 @@ export type Database = {
           },
         ]
       }
+      chat_mensagens: {
+        Row: {
+          conteudo: string
+          created_at: string
+          empresa_id: string
+          id: string
+          vendedor_id: string
+        }
+        Insert: {
+          conteudo: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          vendedor_id: string
+        }
+        Update: {
+          conteudo?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          vendedor_id?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           cnpj: string | null
