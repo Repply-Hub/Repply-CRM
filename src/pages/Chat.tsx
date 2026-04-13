@@ -1,16 +1,17 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { useChatMessages, useSendMessage } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, ChatGrupo } from '@/hooks/use-chat';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen, Paperclip, FileText, Image, X, Download } from 'lucide-react';
+import { Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen, Paperclip, FileText, Image, X, Download, Users2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
 
 function getInitials(name: string) {
   return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -33,34 +34,34 @@ interface Vendedor {
   role: string;
 }
 
+type ChatTarget = { type: 'geral' } | { type: 'dm'; memberId: string } | { type: 'grupo'; grupoId: string };
+
 function MembersList({
   members,
   myId,
-  selectedId,
+  target,
   onSelect,
   collapsed,
   onToggle,
+  grupos,
 }: {
   members: Vendedor[];
   myId: string | null;
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
+  target: ChatTarget;
+  onSelect: (t: ChatTarget) => void;
   collapsed: boolean;
   onToggle: () => void;
+  grupos: ChatGrupo[];
 }) {
   if (collapsed) {
     return (
       <div className="w-12 border-r border-border flex flex-col h-full shrink-0 items-center py-2 gap-1">
-        <button
-          onClick={onToggle}
-          className="p-2 rounded-lg hover:bg-muted/50 transition-colors mb-1"
-          title="Expandir equipe"
-        >
+        <button onClick={onToggle} className="p-2 rounded-lg hover:bg-muted/50 transition-colors mb-1" title="Expandir equipe">
           <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
         </button>
         <button
-          onClick={() => onSelect(null)}
-          className={cn('p-1 rounded-lg transition-colors', selectedId === null ? 'bg-primary/10' : 'hover:bg-muted/50')}
+          onClick={() => onSelect({ type: 'geral' })}
+          className={cn('p-1 rounded-lg transition-colors', target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50')}
           title="Chat Geral"
         >
           <Avatar className="h-7 w-7">
@@ -69,11 +70,25 @@ function MembersList({
             </AvatarFallback>
           </Avatar>
         </button>
+        {grupos.map(g => (
+          <button
+            key={g.id}
+            onClick={() => onSelect({ type: 'grupo', grupoId: g.id })}
+            className={cn('p-1 rounded-lg transition-colors', target.type === 'grupo' && target.grupoId === g.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
+            title={g.nome}
+          >
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className="bg-chart-2 text-white text-[8px] font-semibold">
+                <Users2 className="h-3.5 w-3.5" />
+              </AvatarFallback>
+            </Avatar>
+          </button>
+        ))}
         {members.map((m) => (
           <button
             key={m.id}
-            onClick={() => onSelect(m.id)}
-            className={cn('p-1 rounded-lg transition-colors', selectedId === m.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
+            onClick={() => onSelect({ type: 'dm', memberId: m.id })}
+            className={cn('p-1 rounded-lg transition-colors', target.type === 'dm' && target.memberId === m.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
             title={m.nome}
           >
             <Avatar className="h-7 w-7">
@@ -103,10 +118,10 @@ function MembersList({
         <div className="p-2 space-y-0.5">
           {/* Chat geral */}
           <button
-            onClick={() => onSelect(null)}
+            onClick={() => onSelect({ type: 'geral' })}
             className={cn(
               'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
-              selectedId === null ? 'bg-primary/10' : 'hover:bg-muted/50'
+              target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50'
             )}
           >
             <Avatar className="h-8 w-8">
@@ -120,13 +135,49 @@ function MembersList({
             </div>
           </button>
 
+          {/* Grupos */}
+          {grupos.length > 0 && (
+            <div className="pt-2 pb-1 px-3">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Grupos</p>
+            </div>
+          )}
+          {grupos.map(g => (
+            <button
+              key={g.id}
+              onClick={() => onSelect({ type: 'grupo', grupoId: g.id })}
+              className={cn(
+                'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
+                target.type === 'grupo' && target.grupoId === g.id ? 'bg-primary/10' : 'hover:bg-muted/50'
+              )}
+            >
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-chart-2 text-white text-[10px] font-semibold">
+                  <Users2 className="h-4 w-4" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-foreground truncate">{g.nome}</p>
+                <p className="text-[10px] text-muted-foreground">Grupo</p>
+              </div>
+            </button>
+          ))}
+
+          {/* Criar grupo */}
+          <div className="pt-1">
+            <CreateGroupDialog members={members} myId={myId} />
+          </div>
+
+          {/* Membros */}
+          <div className="pt-2 pb-1 px-3">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Membros</p>
+          </div>
           {members.map((m) => {
             const isMe = m.id === myId;
-            const isSelected = selectedId === m.id;
+            const isSelected = target.type === 'dm' && target.memberId === m.id;
             return (
               <button
                 key={m.id}
-                onClick={() => onSelect(m.id)}
+                onClick={() => onSelect({ type: 'dm', memberId: m.id })}
                 className={cn(
                   'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
                   isSelected ? 'bg-primary/10' : 'hover:bg-muted/50'
@@ -156,14 +207,17 @@ function MembersList({
 }
 
 const Chat = () => {
-  const { data: messages, isLoading } = useChatMessages();
-  const { send, sending } = useSendMessage();
-  const [text, setText] = useState('');
-  const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
   const [teamCollapsed, setTeamCollapsed] = useState(false);
+  const [text, setText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const activeGrupoId = target.type === 'grupo' ? target.grupoId : null;
+  const { data: messages, isLoading } = useChatMessages(activeGrupoId);
+  const { send, sending } = useSendMessage();
+  const { data: grupos = [] } = useChatGrupos();
 
   const { data: myVendedor } = useQuery({
     queryKey: ['my-vendedor'],
@@ -202,7 +256,7 @@ const Chat = () => {
     setText('');
     const file = selectedFile;
     setSelectedFile(null);
-    await send(trimmed, file ?? undefined);
+    await send(trimmed, file ?? undefined, activeGrupoId);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,12 +287,19 @@ const Chat = () => {
     return groups;
   }, [messages]);
 
-  // Resolve selected member name for chat header
-  const selectedMemberData = members.find(m => m.id === selectedMember);
-  const chatHeaderName = selectedMember ? selectedMemberData?.nome ?? 'Funcionário' : 'Chat Geral';
-  const chatHeaderSub = selectedMember
-    ? (selectedMemberData?.role ?? '')
-    : `${members.length} membros`;
+  // Resolve header info
+  const activeGrupo = grupos.find(g => g.id === activeGrupoId);
+  const selectedMemberData = target.type === 'dm' ? members.find(m => m.id === target.memberId) : null;
+  
+  let chatHeaderName = 'Chat Geral';
+  let chatHeaderSub = `${members.length} membros`;
+  if (target.type === 'grupo' && activeGrupo) {
+    chatHeaderName = activeGrupo.nome;
+    chatHeaderSub = 'Grupo';
+  } else if (target.type === 'dm' && selectedMemberData) {
+    chatHeaderName = selectedMemberData.nome;
+    chatHeaderSub = selectedMemberData.role;
+  }
 
   const headerContent = (
     <div className="flex items-center gap-3">
@@ -253,24 +314,35 @@ const Chat = () => {
   return (
     <AppLayout headerContent={headerContent} mainClassName="flex-1 overflow-hidden">
       <div className="flex h-full">
-        {/* Members sidebar */}
         <MembersList
           members={members}
           myId={myVendedor ?? null}
-          selectedId={selectedMember}
-          onSelect={setSelectedMember}
+          target={target}
+          onSelect={setTarget}
           collapsed={teamCollapsed}
           onToggle={() => setTeamCollapsed(prev => !prev)}
+          grupos={grupos}
         />
 
-        {/* Chat area */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Chat header — shows selected member name */}
+          {/* Chat header */}
           <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-muted/30">
-            {selectedMember ? (
+            {target.type === 'grupo' ? (
               <>
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className={`${colorForId(selectedMember)} text-white text-xs`}>
+                  <AvatarFallback className="bg-chart-2 text-white text-xs">
+                    <Users2 className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{chatHeaderName}</p>
+                  <p className="text-[10px] text-muted-foreground capitalize">{chatHeaderSub}</p>
+                </div>
+              </>
+            ) : target.type === 'dm' ? (
+              <>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className={`${colorForId(target.memberId)} text-white text-xs`}>
                     {getInitials(chatHeaderName)}
                   </AvatarFallback>
                 </Avatar>
