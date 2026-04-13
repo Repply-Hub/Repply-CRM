@@ -286,7 +286,7 @@ function ProfileTab() {
           </CardContent>
         </Card>
 
-        {(perfil.role === 'empresa' || perfil.role === 'admin') && <CodigoAcessoCard />}
+        
       </div>
 
       <div className="space-y-4">
@@ -373,7 +373,8 @@ const Configuracoes = () => {
 
           <TabsContent value="perfil" className="mt-4"><ProfileTab /></TabsContent>
 
-          <TabsContent value="vendedores" className="mt-4">
+          <TabsContent value="vendedores" className="mt-4 space-y-4">
+            <CodigoAcessoCard />
             <UsuariosTab />
           </TabsContent>
 
