@@ -204,6 +204,26 @@ function ProfileTab() {
         <ThemeSelector />
 
         <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Pencil className="h-4 w-4 text-primary" /> Personalizar Sidebar
+            </CardTitle>
+            <CardDescription className="text-xs">Reorganize, oculte ou adicione itens ao menu lateral</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.dispatchEvent(new Event('sidebar-enter-edit'))}
+              className="gap-2"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Personalizar
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2"><Lock className="h-4 w-4 text-primary" /> Segurança</CardTitle>
             <CardDescription>Altere sua senha de acesso</CardDescription>
