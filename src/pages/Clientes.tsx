@@ -271,13 +271,14 @@ const Clientes = () => {
     setIsDeleting(true);
     try {
       const ids = Array.from(selected);
-      for (const id of ids) {
-        if (activeTab === 'empresas') {
-          await deleteCliente.mutateAsync(id);
-        } else {
-          await deleteContato.mutateAsync(id);
-        }
+      const table = activeTab === 'empresas' ? 'clientes' : 'contatos';
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const batch = ids.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase.from(table).delete().in('id', batch);
+        if (error) throw error;
       }
+      queryClient.invalidateQueries({ queryKey: [activeTab === 'empresas' ? 'clientes' : 'contatos'] });
       toast.success(`${ids.length} ${activeTab === 'empresas' ? 'empresa(s)' : 'contato(s)'} removido(s)!`);
       setSelected(new Set());
     } catch (err: any) {
