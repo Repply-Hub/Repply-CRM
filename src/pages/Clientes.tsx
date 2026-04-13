@@ -214,6 +214,59 @@ const Clientes = () => {
     setTipoFilter('todos');
     setSearch('');
     setPage(1);
+    setSelected(new Set());
+  };
+
+  const currentPageIds = activeTab === 'empresas'
+    ? paginatedEmpresas.map(c => c.id)
+    : paginatedContatos.map(c => c.id);
+
+  const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selected.has(id));
+  const someSelected = selected.size > 0;
+
+  const toggleOne = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allPageSelected) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const ids = Array.from(selected);
+      for (const id of ids) {
+        if (activeTab === 'empresas') {
+          await deleteCliente.mutateAsync(id);
+        } else {
+          await deleteContato.mutateAsync(id);
+        }
+      }
+      toast.success(`${ids.length} ${activeTab === 'empresas' ? 'empresa(s)' : 'contato(s)'} removido(s)!`);
+      setSelected(new Set());
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao remover');
+    } finally {
+      setIsDeleting(false);
+      setConfirmDeleteOpen(false);
+    }
   };
 
   return (
