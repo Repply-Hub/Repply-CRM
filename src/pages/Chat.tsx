@@ -102,6 +102,7 @@ function MembersList({
         </div>
       </div>
     );
+  }
 
   return (
     <div className="w-64 border-r border-border flex flex-col h-full shrink-0">
