@@ -58,6 +58,9 @@ const Clientes = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
+  const [typedConfirmOpen, setTypedConfirmOpen] = useState(false);
+  const [typedConfirmText, setTypedConfirmText] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
@@ -240,12 +243,28 @@ const Clientes = () => {
         return next;
       });
     } else {
-      setSelected(prev => {
-        const next = new Set(prev);
-        currentPageIds.forEach(id => next.add(id));
-        return next;
-      });
+      setSelectAllDialogOpen(true);
     }
+  };
+
+  const selectPageOnly = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      currentPageIds.forEach(id => next.add(id));
+      return next;
+    });
+    setSelectAllDialogOpen(false);
+  };
+
+  const selectAllFiltered = () => {
+    const allIds = filtered.map((item: any) => item.id);
+    setSelected(new Set(allIds));
+    setSelectAllDialogOpen(false);
+  };
+
+  const openTypedConfirm = () => {
+    setTypedConfirmText('');
+    setTypedConfirmOpen(true);
   };
 
   const handleBulkDelete = async () => {
