@@ -460,6 +460,9 @@ const Clientes = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
+                  <th className="py-2.5 px-4 w-10">
+                    <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                  </th>
                   {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome</th>}
                   {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Empresa</th>}
                   {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Cargo</th>}
@@ -469,7 +472,10 @@ const Clientes = () => {
               </thead>
               <tbody>
                 {paginatedContatos.map(contato => (
-                  <tr key={contato.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                  <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`}>
+                    <td className="py-2.5 px-4 w-10">
+                      <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
+                    </td>
                     {visibleContatoFields.includes('nome_contato') && (
                       <td className="py-2.5 px-4">
                         <div className="flex items-center gap-2.5">
