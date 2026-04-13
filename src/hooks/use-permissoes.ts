@@ -15,9 +15,13 @@ const MODULOS = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'pipeline', label: 'Pipeline' },
   { key: 'clientes', label: 'Clientes' },
-  { key: 'obras', label: 'Obras' },
+  { key: 'contatos', label: 'Contatos' },
   { key: 'pedidos', label: 'Pedidos' },
+  { key: 'obras', label: 'Obras' },
   { key: 'fabricantes', label: 'Fabricantes' },
+  { key: 'portal', label: 'Portal' },
+  { key: 'calendario', label: 'Calendário' },
+  { key: 'tarefas', label: 'Tarefas' },
   { key: 'configuracoes', label: 'Configurações' },
 ];
 
