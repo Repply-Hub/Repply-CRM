@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen, Paperclip, FileText, Image, X, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -161,6 +161,8 @@ const Chat = () => {
   const [text, setText] = useState('');
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [teamCollapsed, setTeamCollapsed] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: myVendedor } = useQuery({
@@ -196,9 +198,17 @@ const Chat = () => {
 
   const handleSend = async () => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed && !selectedFile) return;
     setText('');
-    await send(trimmed);
+    const file = selectedFile;
+    setSelectedFile(null);
+    await send(trimmed, file ?? undefined);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setSelectedFile(file);
+    e.target.value = '';
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
