@@ -343,6 +343,7 @@ const Clientes = () => {
             visibleColumns={activeTab === 'empresas' ? visibleFields : visibleContatoFields}
             onChange={activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange}
           />
+          <ExportClientesButton data={activeTab === 'empresas' ? filteredEmpresas : filteredContatos} type={activeTab} />
           {activeTab === 'empresas' && <ImportClientesDialog />}
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
