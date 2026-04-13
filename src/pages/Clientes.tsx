@@ -316,6 +316,7 @@ const Clientes = () => {
     toast.success('Arquivo exportado com sucesso!');
   };
 
+  return (
     <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`}>
       <div className="p-6 max-w-[1400px] mx-auto">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-4">
