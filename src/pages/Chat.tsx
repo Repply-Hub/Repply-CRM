@@ -56,9 +56,6 @@ function MembersList({
   if (collapsed) {
     return (
       <div className="w-12 border-r border-border flex flex-col h-full shrink-0 items-center py-2 gap-1">
-        <button onClick={onToggle} className="p-2 rounded-lg hover:bg-muted/50 transition-colors mb-1" title="Expandir equipe">
-          <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
-        </button>
         <button
           onClick={() => onSelect({ type: 'geral' })}
           className={cn('p-1 rounded-lg transition-colors', target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50')}
@@ -98,9 +95,13 @@ function MembersList({
             </Avatar>
           </button>
         ))}
+        <div className="mt-auto pt-2">
+          <button onClick={onToggle} className="p-2 rounded-lg hover:bg-muted/50 transition-colors" title="Expandir equipe">
+            <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
       </div>
     );
-  }
 
   return (
     <div className="w-64 border-r border-border flex flex-col h-full shrink-0">
