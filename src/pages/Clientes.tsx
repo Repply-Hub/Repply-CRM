@@ -58,6 +58,9 @@ const Clientes = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
+  const [typedConfirmOpen, setTypedConfirmOpen] = useState(false);
+  const [typedConfirmText, setTypedConfirmText] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
@@ -240,12 +243,28 @@ const Clientes = () => {
         return next;
       });
     } else {
-      setSelected(prev => {
-        const next = new Set(prev);
-        currentPageIds.forEach(id => next.add(id));
-        return next;
-      });
+      setSelectAllDialogOpen(true);
     }
+  };
+
+  const selectPageOnly = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      currentPageIds.forEach(id => next.add(id));
+      return next;
+    });
+    setSelectAllDialogOpen(false);
+  };
+
+  const selectAllFiltered = () => {
+    const allIds = filtered.map((item: any) => item.id);
+    setSelected(new Set(allIds));
+    setSelectAllDialogOpen(false);
+  };
+
+  const openTypedConfirm = () => {
+    setTypedConfirmText('');
+    setTypedConfirmOpen(true);
   };
 
   const handleBulkDelete = async () => {
@@ -377,29 +396,66 @@ const Clientes = () => {
         {someSelected && (
           <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
             <span className="text-sm font-medium text-foreground">{selected.size} selecionado(s)</span>
-            <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setConfirmDeleteOpen(true)}>
+            <Button variant="destructive" size="sm" className="gap-1.5" onClick={openTypedConfirm}>
               <Trash2 className="h-4 w-4" /> Remover selecionados
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Limpar seleção</Button>
           </div>
         )}
 
-        <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        {/* Dialog: selecionar página ou todos */}
+        <AlertDialog open={selectAllDialogOpen} onOpenChange={setSelectAllDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Remover {selected.size} {activeTab === 'empresas' ? 'empresa(s)' : 'contato(s)'}?</AlertDialogTitle>
+              <AlertDialogTitle>Selecionar {activeTab === 'empresas' ? 'empresas' : 'contatos'}</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta ação é irreversível. Todos os registros selecionados serão permanentemente excluídos.
+                Deseja selecionar apenas os {currentPageIds.length} desta página ou todos os {filtered.length} {activeTab === 'empresas' ? 'empresas' : 'contatos'} filtrados?
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleBulkDelete} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Sim, remover'}
-              </AlertDialogAction>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <Button variant="outline" onClick={selectPageOnly}>Apenas esta página ({currentPageIds.length})</Button>
+              <Button variant="destructive" onClick={selectAllFiltered}>Todos ({filtered.length})</Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Dialog: confirmação por escrito */}
+        <Dialog open={typedConfirmOpen} onOpenChange={(o) => { setTypedConfirmOpen(o); if (!o) setTypedConfirmText(''); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-destructive">Confirmar exclusão</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                Você está prestes a excluir <strong className="text-foreground">{selected.size}</strong> {activeTab === 'empresas' ? 'empresa(s)' : 'contato(s)'} permanentemente.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Digite <strong className="text-foreground">CONFIRMAR</strong> para prosseguir:
+              </p>
+              <Input
+                value={typedConfirmText}
+                onChange={e => setTypedConfirmText(e.target.value)}
+                placeholder="Digite CONFIRMAR"
+                className="uppercase"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setTypedConfirmOpen(false)} disabled={isDeleting}>Cancelar</Button>
+              <Button
+                variant="destructive"
+                disabled={typedConfirmText.toUpperCase() !== 'CONFIRMAR' || isDeleting}
+                onClick={async () => {
+                  await handleBulkDelete();
+                  setTypedConfirmOpen(false);
+                  setTypedConfirmText('');
+                }}
+              >
+                {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir permanentemente'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         {isLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : filtered.length === 0 ? (
