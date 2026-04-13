@@ -379,14 +379,10 @@ const Clientes = () => {
               }}>
                 <FileText className="h-4 w-4 mr-2" /> Exportar CSV
               </DropdownMenuItem>
-              {activeTab === 'empresas' && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setImportOpen(true)}>
-                    <Upload className="h-4 w-4 mr-2" /> Importar
-                  </DropdownMenuItem>
-                </>
-              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" /> Importar
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
