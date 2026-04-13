@@ -303,7 +303,19 @@ const Clientes = () => {
     }
   };
 
-  return (
+  const exportToFile = (data: any[], type: 'empresas' | 'contatos', format: 'xlsx' | 'csv') => {
+    if (data.length === 0) { toast.error('Nenhum dado para exportar'); return; }
+    const XLSX_LIB = require('xlsx');
+    const rows = type === 'empresas'
+      ? data.map((c: any) => ({ Nome: c.empresa || '', Tipo: c.tipo || '', 'CPF/CNPJ': c.cnpj || '', Email: c.email || '', Telefone: c.telefone || '', Endereço: c.endereco || '' }))
+      : data.map((c: any) => ({ Nome: c.nome_contato || '', Empresa: c.empresa || '', Email: c.email || '', Telefone: c.telefone || '', Cargo: c.cargo || '' }));
+    const ws = XLSX_LIB.utils.json_to_sheet(rows);
+    const wb = XLSX_LIB.utils.book_new();
+    XLSX_LIB.utils.book_append_sheet(wb, ws, type === 'empresas' ? 'Empresas' : 'Contatos');
+    XLSX_LIB.writeFile(wb, `${type}_${new Date().toISOString().slice(0, 10)}.${format}`, format === 'csv' ? { bookType: 'csv' } : undefined);
+    toast.success('Arquivo exportado com sucesso!');
+  };
+
     <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`}>
       <div className="p-6 max-w-[1400px] mx-auto">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-4">
