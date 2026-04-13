@@ -9,6 +9,9 @@ export interface ChatMessage {
   vendedor_id: string;
   empresa_id: string;
   created_at: string;
+  arquivo_url?: string | null;
+  arquivo_nome?: string | null;
+  arquivo_tipo?: string | null;
   vendedor?: { id: string; nome: string; email: string };
 }
 
@@ -48,10 +51,9 @@ export function useChatMessages() {
 export function useSendMessage() {
   const [sending, setSending] = useState(false);
 
-  const send = useCallback(async (conteudo: string) => {
+  const send = useCallback(async (conteudo: string, file?: File) => {
     setSending(true);
     try {
-      // Get vendedor info (id + empresa_id)
       const { data: vendedor, error: vErr } = await supabase
         .from('vendedores')
         .select('id, empresa_id')
@@ -59,11 +61,34 @@ export function useSendMessage() {
         .single();
       if (vErr || !vendedor) throw new Error('Vendedor não encontrado');
 
+      let arquivo_url: string | null = null;
+      let arquivo_nome: string | null = null;
+      let arquivo_tipo: string | null = null;
+
+      if (file) {
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        const ext = file.name.split('.').pop();
+        const path = `${userId}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('chat-files')
+          .upload(path, file);
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage
+          .from('chat-files')
+          .getPublicUrl(path);
+        arquivo_url = urlData.publicUrl;
+        arquivo_nome = file.name;
+        arquivo_tipo = file.type;
+      }
+
       const { error } = await supabase.from('chat_mensagens').insert({
-        conteudo,
+        conteudo: conteudo || (file ? file.name : ''),
         vendedor_id: vendedor.id,
         empresa_id: vendedor.empresa_id!,
-      });
+        arquivo_url,
+        arquivo_nome,
+        arquivo_tipo,
+      } as any);
       if (error) throw error;
     } finally {
       setSending(false);

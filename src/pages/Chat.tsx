@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen, Paperclip, FileText, Image, X, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -161,6 +161,8 @@ const Chat = () => {
   const [text, setText] = useState('');
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [teamCollapsed, setTeamCollapsed] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: myVendedor } = useQuery({
@@ -196,9 +198,17 @@ const Chat = () => {
 
   const handleSend = async () => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed && !selectedFile) return;
     setText('');
-    await send(trimmed);
+    const file = selectedFile;
+    setSelectedFile(null);
+    await send(trimmed, file ?? undefined);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setSelectedFile(file);
+    e.target.value = '';
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -333,7 +343,33 @@ const Chat = () => {
                                   : 'bg-muted text-foreground rounded-tl-sm'
                               }`}
                             >
-                              {msg.conteudo}
+                              {msg.arquivo_url && (
+                                <div className="mb-1">
+                                  {msg.arquivo_tipo?.startsWith('image/') ? (
+                                    <a href={msg.arquivo_url} target="_blank" rel="noopener noreferrer">
+                                      <img
+                                        src={msg.arquivo_url}
+                                        alt={msg.arquivo_nome || 'imagem'}
+                                        className="max-w-[240px] max-h-[200px] rounded-lg object-cover"
+                                      />
+                                    </a>
+                                  ) : (
+                                    <a
+                                      href={msg.arquivo_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`flex items-center gap-2 p-2 rounded-lg ${
+                                        isMe ? 'bg-primary-foreground/10' : 'bg-background/50'
+                                      }`}
+                                    >
+                                      <FileText className="h-5 w-5 shrink-0" />
+                                      <span className="text-xs truncate max-w-[180px]">{msg.arquivo_nome || 'Arquivo'}</span>
+                                      <Download className="h-4 w-4 shrink-0 ml-auto" />
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                              {msg.conteudo && !(msg.arquivo_url && msg.conteudo === msg.arquivo_nome) && msg.conteudo}
                             </div>
                             <p className={`text-[9px] text-muted-foreground mt-0.5 ${isMe ? 'text-right mr-1' : 'ml-1'}`}>
                               {format(new Date(msg.created_at), 'HH:mm', { locale: ptBR })}
@@ -351,7 +387,37 @@ const Chat = () => {
 
           {/* Input */}
           <div className="border-t border-border px-4 py-3">
+            {selectedFile && (
+              <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-muted rounded-lg text-sm">
+                {selectedFile.type.startsWith('image/') ? (
+                  <Image className="h-4 w-4 text-primary shrink-0" />
+                ) : (
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                )}
+                <span className="truncate flex-1 text-xs text-foreground">{selectedFile.name}</span>
+                <button onClick={() => setSelectedFile(null)} className="p-0.5 hover:bg-background rounded">
+                  <X className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </div>
+            )}
             <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileSelect}
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={sending}
+                className="shrink-0"
+                title="Anexar arquivo"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
               <Input
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -360,7 +426,7 @@ const Chat = () => {
                 className="flex-1"
                 disabled={sending}
               />
-              <Button onClick={handleSend} disabled={sending || !text.trim()} size="icon">
+              <Button onClick={handleSend} disabled={sending || (!text.trim() && !selectedFile)} size="icon">
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
