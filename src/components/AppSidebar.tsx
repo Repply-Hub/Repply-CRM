@@ -74,15 +74,21 @@ export function AppSidebar() {
     }
   }, [setOpen, editMode]);
 
-  const enterEditMode = () => {
+  const enterEditMode = useCallback(() => {
     setEditItems(JSON.parse(JSON.stringify(items)));
     setEditMode(true);
-    // Ensure sidebar is expanded
     if (collapsed) {
       hoverOpened.current = false;
       setOpen(true);
     }
-  };
+  }, [items, collapsed, setOpen]);
+
+  // Listen for external trigger (from profile page)
+  useEffect(() => {
+    const handler = () => enterEditMode();
+    window.addEventListener('sidebar-enter-edit', handler);
+    return () => window.removeEventListener('sidebar-enter-edit', handler);
+  }, [enterEditMode]);
 
   const cancelEdit = () => {
     setEditMode(false);
