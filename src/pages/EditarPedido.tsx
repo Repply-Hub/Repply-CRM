@@ -329,32 +329,19 @@ const EditarPedido = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Data do Pedido *</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {format(dataPedido, "dd/MM/yyyy")}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={dataPedido} onSelect={(d) => d && setDataPedido(d)} locale={ptBR} className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
+                    <Label>Data de Criação *</Label>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal cursor-default" disabled>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(dataPedido, "dd/MM/yyyy")}
+                    </Button>
                   </div>
                   <div className="space-y-2">
-                    <Label>Cliente precisa do orçamento até</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !prazoResposta && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {prazoResposta ? format(prazoResposta, "dd/MM/yyyy") : "Selecionar data"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={prazoResposta} onSelect={setPrazoResposta} locale={ptBR} className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
+                    <Label>Data de Fechamento</Label>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal cursor-default" disabled>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {prazoResposta ? format(prazoResposta, "dd/MM/yyyy") : <span className="text-muted-foreground">Preenchida ao dar ganho</span>}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">Preenchida automaticamente ao mover para Fechamento</p>
                   </div>
                 </div>
 
