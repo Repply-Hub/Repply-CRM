@@ -18,6 +18,7 @@ import Portal from "./pages/Portal";
 import EditarPedido from "./pages/EditarPedido";
 import Calendario from "./pages/Calendario";
 import Tarefas from "./pages/Tarefas";
+import Chat from "./pages/Chat";
 
 import Login from "./pages/Login";
 import EsqueciSenha from "./pages/EsqueciSenha";
@@ -58,6 +59,7 @@ const AppRoutes = () => (
     <Route path="/calendario" element={<ProtectedRoute><Calendario /></ProtectedRoute>} />
     <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
+    <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
     
     <Route path="*" element={<NotFound />} />
   </Routes>
