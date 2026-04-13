@@ -161,24 +161,37 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       let imported = 0;
 
       for (let i = 0; i < rows.length; i += BATCH) {
-        const batch = rows.slice(i, i + BATCH).map(r => ({
-          empresa: r.empresa,
-          tipo: r.tipo || 'construtora',
-          cnpj: r.cnpj || null,
-          razao_social: r.razao_social || null,
-          email: r.email || null,
-          telefone: r.telefone || null,
-          endereco: r.endereco || null,
-          nome_contato: r.nome_contato || null,
-          vendedor_id: vid,
-        }));
-        const { error } = await supabase.from('clientes').insert(batch);
-        if (error) throw error;
-        imported += batch.length;
+        if (target === 'contatos') {
+          const batch = rows.slice(i, i + BATCH).map(r => ({
+            empresa: r.empresa || 'Sem empresa',
+            nome_contato: r.nome_contato || null,
+            email: r.email || null,
+            telefone: r.telefone || null,
+            cargo: null as string | null,
+            vendedor_id: vid,
+          }));
+          const { error } = await supabase.from('contatos').insert(batch);
+          if (error) throw error;
+        } else {
+          const batch = rows.slice(i, i + BATCH).map(r => ({
+            empresa: r.empresa,
+            tipo: r.tipo || 'construtora',
+            cnpj: r.cnpj || null,
+            razao_social: r.razao_social || null,
+            email: r.email || null,
+            telefone: r.telefone || null,
+            endereco: r.endereco || null,
+            nome_contato: r.nome_contato || null,
+            vendedor_id: vid,
+          }));
+          const { error } = await supabase.from('clientes').insert(batch);
+          if (error) throw error;
+        }
+        imported += rows.slice(i, i + BATCH).length;
       }
 
-      qc.invalidateQueries({ queryKey: ['clientes'] });
-      toast.success(`${imported} clientes importados com sucesso!`);
+      qc.invalidateQueries({ queryKey: [target === 'contatos' ? 'contatos' : 'clientes'] });
+      toast.success(`${imported} ${target === 'contatos' ? 'contatos' : 'clientes'} importados com sucesso!`);
       reset();
       setOpen(false);
     } catch (err: any) {
