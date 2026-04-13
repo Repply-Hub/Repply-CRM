@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/AppLayout';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { useCreateCliente, useCreateContato, useDeleteCliente, useDeleteContato } from '@/hooks/use-mutations';
@@ -44,6 +46,7 @@ type ViewTab = 'empresas' | 'contatos';
 
 const Clientes = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: clients, isLoading: loadingClientes } = useClientes();
   const { data: contatosList, isLoading: loadingContatos } = useContatos();
   const createCliente = useCreateCliente();
@@ -271,13 +274,14 @@ const Clientes = () => {
     setIsDeleting(true);
     try {
       const ids = Array.from(selected);
-      for (const id of ids) {
-        if (activeTab === 'empresas') {
-          await deleteCliente.mutateAsync(id);
-        } else {
-          await deleteContato.mutateAsync(id);
-        }
+      const table = activeTab === 'empresas' ? 'clientes' : 'contatos';
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const batch = ids.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase.from(table).delete().in('id', batch);
+        if (error) throw error;
       }
+      queryClient.invalidateQueries({ queryKey: [activeTab === 'empresas' ? 'clientes' : 'contatos'] });
       toast.success(`${ids.length} ${activeTab === 'empresas' ? 'empresa(s)' : 'contato(s)'} removido(s)!`);
       setSelected(new Set());
     } catch (err: any) {
