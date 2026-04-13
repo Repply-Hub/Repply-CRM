@@ -382,10 +382,7 @@ const Configuracoes = () => {
 
           <TabsContent value="perfil" className="mt-4"><ProfileTab /></TabsContent>
 
-          <TabsContent value="vendedores" className="mt-4 space-y-4">
-            <div className="flex justify-end">
-              <CodigoAcessoButton />
-            </div>
+          <TabsContent value="vendedores" className="mt-4">
             <UsuariosTab />
           </TabsContent>
 

@@ -660,12 +660,14 @@ export function UsuariosTab() {
           </div>
         </div>
 
-        <Dialog open={vendedorDialog} onOpenChange={setVendedorDialog}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5 shadow-sm">
-              <UserPlus className="h-4 w-4" /> Novo Usuário
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <CodigoAcessoButton />
+          <Dialog open={vendedorDialog} onOpenChange={setVendedorDialog}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1.5 shadow-sm">
+                <UserPlus className="h-4 w-4" /> Novo Usuário
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Cadastrar Usuário</DialogTitle></DialogHeader>
             <form onSubmit={handleCreateVendedor} className="space-y-4 mt-2">
