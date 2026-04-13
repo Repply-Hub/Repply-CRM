@@ -56,9 +56,6 @@ function MembersList({
   if (collapsed) {
     return (
       <div className="w-12 border-r border-border flex flex-col h-full shrink-0 items-center py-2 gap-1">
-        <button onClick={onToggle} className="p-2 rounded-lg hover:bg-muted/50 transition-colors mb-1" title="Expandir equipe">
-          <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
-        </button>
         <button
           onClick={() => onSelect({ type: 'geral' })}
           className={cn('p-1 rounded-lg transition-colors', target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50')}
@@ -98,6 +95,11 @@ function MembersList({
             </Avatar>
           </button>
         ))}
+        <div className="mt-auto pt-2">
+          <button onClick={onToggle} className="p-2 rounded-lg hover:bg-muted/50 transition-colors" title="Expandir equipe">
+            <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
       </div>
     );
   }
@@ -110,9 +112,6 @@ function MembersList({
           Equipe
           <span className="text-[10px] text-muted-foreground font-normal">{members.length}</span>
         </h2>
-        <button onClick={onToggle} className="p-1 rounded hover:bg-muted/50 transition-colors" title="Recolher equipe">
-          <PanelLeftClose className="h-4 w-4 text-muted-foreground" />
-        </button>
       </div>
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-0.5">
@@ -202,6 +201,12 @@ function MembersList({
           })}
         </div>
       </ScrollArea>
+      <div className="border-t border-border px-3 py-2">
+        <button onClick={onToggle} className="flex items-center gap-2 w-full p-1.5 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground" title="Recolher equipe">
+          <PanelLeftClose className="h-4 w-4" />
+          <span className="text-[10px]">Recolher</span>
+        </button>
+      </div>
     </div>
   );
 }
