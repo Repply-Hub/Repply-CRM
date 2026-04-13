@@ -230,18 +230,19 @@ const Chat = () => {
     ? (selectedMemberData?.role ?? '')
     : `${members.length} membros`;
 
-  return (
-    <AppLayout>
-      {/* Page header */}
-      <div className="flex items-center gap-3 px-6 py-3 border-b border-border">
-        <MessageCircle className="h-5 w-5 text-primary" />
-        <div>
-          <h1 className="text-lg font-bold text-foreground">Chat Interno</h1>
-          <p className="text-xs text-muted-foreground">Converse com sua equipe em tempo real</p>
-        </div>
+  const headerContent = (
+    <div className="flex items-center gap-3">
+      <MessageCircle className="h-5 w-5 text-primary" />
+      <div>
+        <h1 className="text-base sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight">Chat Interno</h1>
+        <p className="text-[10px] sm:text-sm text-muted-foreground">Converse com sua equipe em tempo real</p>
       </div>
+    </div>
+  );
 
-      <div className="flex h-[calc(100vh-8rem)]">
+  return (
+    <AppLayout headerContent={headerContent} mainClassName="flex-1 overflow-hidden">
+      <div className="flex h-full">
         {/* Members sidebar */}
         <MembersList
           members={members}
