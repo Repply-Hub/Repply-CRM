@@ -12,6 +12,24 @@ import logoLogin from "@/assets/logo-login.svg";
 
 type RegisterType = "empresa" | "funcionario" | null;
 
+const errorMessages: Record<string, string> = {
+  "User already registered": "Este email já está cadastrado.",
+  "Invalid login credentials": "Email ou senha incorretos.",
+  "Email not confirmed": "Email não confirmado. Verifique sua caixa de entrada.",
+  "Password should be at least 6 characters": "A senha deve ter pelo menos 6 caracteres.",
+  "Signup requires a valid password": "Informe uma senha válida.",
+  "Unable to validate email address: invalid format": "Formato de email inválido.",
+  "Email rate limit exceeded": "Muitas tentativas. Aguarde alguns minutos.",
+  "For security purposes, you can only request this after": "Por segurança, aguarde antes de tentar novamente.",
+};
+
+function traduzirErro(msg: string): string {
+  for (const [en, pt] of Object.entries(errorMessages)) {
+    if (msg.toLowerCase().includes(en.toLowerCase())) return pt;
+  }
+  return msg;
+}
+
 export default function Login() {
   const { signIn, signUpEmpresa, signUpFuncionario } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -24,7 +42,7 @@ export default function Login() {
     setLoading(true);
     const form = new FormData(e.currentTarget);
     const { error } = await signIn(form.get("email") as string, form.get("password") as string);
-    if (error) toast.error(error.message);
+    if (error) toast.error(traduzirErro(error.message));
     setLoading(false);
   };
 
@@ -39,7 +57,7 @@ export default function Login() {
       form.get("nome_empresa") as string,
       form.get("cnpj") as string,
     );
-    if (error) toast.error(error.message);
+    if (error) toast.error(traduzirErro(error.message));
     else toast.success("Empresa cadastrada! Verifique seu email para confirmar.");
     setLoading(false);
   };
@@ -65,7 +83,7 @@ export default function Login() {
       form.get("nome") as string,
       codigoEmpresa,
     );
-    if (error) toast.error(error.message);
+    if (error) toast.error(traduzirErro(error.message));
     else toast.success(`Cadastro realizado na empresa "${(empresa as any).nome}"! Verifique seu email para confirmar.`);
     setLoading(false);
   };
