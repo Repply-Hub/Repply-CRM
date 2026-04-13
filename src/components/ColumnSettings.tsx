@@ -38,14 +38,16 @@ export function ColumnSettings({ columns, visibleColumns, onChange, className, o
 
     return (
         <Popover open={open} onOpenChange={onOpenChange}>
-            {!hideTrigger && (
-                <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className={cn("h-9 gap-2", className)}>
-                        <Settings2 className="h-4 w-4" />
-                        <span className="hidden sm:inline">Colunas</span>
-                    </Button>
-                </PopoverTrigger>
-            )}
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn("h-9 gap-2", hideTrigger && "hidden", className)}
+                >
+                    <Settings2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Colunas</span>
+                </Button>
+            </PopoverTrigger>
             <PopoverContent className="w-56 p-3" align="end">
                 <div className="space-y-3">
                     <div className="flex items-center justify-between border-b pb-2">
