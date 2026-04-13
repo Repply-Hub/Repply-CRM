@@ -413,6 +413,9 @@ const Clientes = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
+                  <th className="py-2.5 px-4 w-10">
+                    <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                  </th>
                   <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome/Empresa</th>
                   {visibleFields.includes('tipo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Tipo</th>}
                   {visibleFields.includes('cnpj') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">CPF/CNPJ</th>}
@@ -425,8 +428,11 @@ const Clientes = () => {
                 {paginatedEmpresas.map(client => {
                   const Icon = tipoIcons[client.tipo] ?? Building2;
                   return (
-                    <tr key={client.id} className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/clientes/${client.id}`)}>
-                      <td className="py-2.5 px-4">
+                    <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`}>
+                      <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
+                        <Checkbox checked={selected.has(client.id)} onCheckedChange={() => toggleOne(client.id)} aria-label={`Selecionar ${client.empresa}`} />
+                      </td>
+                      <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
                         <div className="flex items-center gap-2.5">
                           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                             <Icon className="h-4 w-4 text-primary" />
