@@ -2,6 +2,9 @@ import { useState, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useTarefas, useCreateTarefa, useUpdateTarefa, useDeleteTarefa, Tarefa } from '@/hooks/use-tarefas';
 import { UserProfilePopover } from '@/components/UserProfilePopover';
+import { useVendedores } from '@/hooks/use-clientes';
+import { useObras } from '@/hooks/use-obras';
+import { useQuery } from '@tanstack/react-query';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +32,8 @@ function getStatusInfo(s: string) {
 
 export default function Tarefas() {
   const { data: tarefas = [], isLoading } = useTarefas();
+  const { data: vendedores = [] } = useVendedores();
+  const { data: obras = [] } = useObras();
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
   const deleteTarefa = useDeleteTarefa();
@@ -259,12 +264,32 @@ export default function Tarefas() {
               <div><Label>Prazo</Label><Input type="datetime-local" value={form.prazo_final} onChange={e => setForm(f => ({ ...f, prazo_final: e.target.value }))} /></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div><Label>Responsável</Label><Input value={form.responsavel} onChange={e => setForm(f => ({ ...f, responsavel: e.target.value }))} /></div>
-              <div><Label>Projeto</Label><Input value={form.projeto} onChange={e => setForm(f => ({ ...f, projeto: e.target.value }))} /></div>
+              <div>
+                <Label>Responsável</Label>
+                <Select value={form.responsavel} onValueChange={v => setForm(f => ({ ...f, responsavel: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um responsável" /></SelectTrigger>
+                  <SelectContent>
+                    {vendedores.map((v: any) => (
+                      <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Projeto</Label>
+                <Select value={form.projeto} onValueChange={v => setForm(f => ({ ...f, projeto: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um projeto" /></SelectTrigger>
+                  <SelectContent>
+                    {obras.map((o: any) => (
+                      <SelectItem key={o.id} value={o.nome_obra}>{o.nome_obra}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div><Label>Participantes</Label><Input value={form.participantes} onChange={e => setForm(f => ({ ...f, participantes: e.target.value }))} placeholder="Separados por vírgula" /></div>
             <div><Label>Observadores</Label><Input value={form.observadores} onChange={e => setForm(f => ({ ...f, observadores: e.target.value }))} placeholder="Separados por vírgula" /></div>
-            <div><Label>Marcadores</Label><Input value={form.marcadores} onChange={e => setForm(f => ({ ...f, marcadores: e.target.value }))} /></div>
+            <div><Label>Marcadores</Label><Input value={form.marcadores} onChange={e => setForm(f => ({ ...f, marcadores: e.target.value }))} placeholder="Ex: urgente, financeiro, revisão" /></div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
