@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -347,6 +348,8 @@ function ProfileTab() {
 }
 
 const Configuracoes = () => {
+  const [searchParams] = useSearchParams();
+  const defaultTab = searchParams.get('tab') || 'perfil';
   const [alertDays, setAlertDays] = useState('5');
 
   const { data: isGestor } = useQuery({
@@ -361,7 +364,7 @@ const Configuracoes = () => {
   return (
     <AppLayout title="Configurações" subtitle={isGestor ? "Gerencie usuários, permissões e automações" : "Gerencie vendedores, permissões e automações"}>
       <div className="p-6">
-        <Tabs defaultValue="perfil">
+        <Tabs defaultValue={defaultTab}>
           <TabsList>
             <TabsTrigger value="perfil" className="gap-1.5"><UserCircle className="h-4 w-4" /> Perfil</TabsTrigger>
             <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> {isGestor ? 'Usuários' : 'Vendedores'}</TabsTrigger>
