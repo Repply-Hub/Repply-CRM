@@ -261,29 +261,29 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               Verifique os dados antes de importar. Colunas reconhecidas automaticamente.
             </div>
 
-            <ScrollArea className="flex-1 max-h-[400px] border rounded-lg">
-              <Table>
+            <div className="flex-1 max-h-[400px] border rounded-lg overflow-auto">
+              <Table className="min-w-[700px]">
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs">#</TableHead>
-                    <TableHead className="text-xs">Empresa</TableHead>
-                    <TableHead className="text-xs">Tipo</TableHead>
-                    <TableHead className="text-xs">CNPJ</TableHead>
-                    <TableHead className="text-xs">Email</TableHead>
-                    <TableHead className="text-xs">Telefone</TableHead>
-                    <TableHead className="text-xs">Endereço</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">#</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Empresa</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Tipo</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">CNPJ</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Email</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Telefone</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Endereço</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.slice(0, 50).map((r, i) => (
                     <TableRow key={i}>
                       <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="text-xs font-medium">{r.empresa}</TableCell>
-                      <TableCell className="text-xs">{r.tipo}</TableCell>
-                      <TableCell className="text-xs">{r.cnpj || '-'}</TableCell>
-                      <TableCell className="text-xs">{r.email || '-'}</TableCell>
-                      <TableCell className="text-xs">{r.telefone || '-'}</TableCell>
-                      <TableCell className="text-xs truncate max-w-[150px]">{r.endereco || '-'}</TableCell>
+                      <TableCell className="text-xs font-medium whitespace-nowrap">{r.empresa}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{r.tipo}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{r.cnpj || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{r.email || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{r.telefone || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap max-w-[200px] truncate">{r.endereco || '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -293,7 +293,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                   Mostrando 50 de {rows.length} registros
                 </p>
               )}
-            </ScrollArea>
+            </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={reset}>Cancelar</Button>
