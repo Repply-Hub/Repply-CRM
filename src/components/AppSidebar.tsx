@@ -1,6 +1,6 @@
 import { LogOut, UserCircle, Pencil, Check, X, Plus, GripVertical, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useAuth } from '@/hooks/use-auth';
 import { useQuery } from '@tanstack/react-query';
@@ -74,15 +74,21 @@ export function AppSidebar() {
     }
   }, [setOpen, editMode]);
 
-  const enterEditMode = () => {
+  const enterEditMode = useCallback(() => {
     setEditItems(JSON.parse(JSON.stringify(items)));
     setEditMode(true);
-    // Ensure sidebar is expanded
     if (collapsed) {
       hoverOpened.current = false;
       setOpen(true);
     }
-  };
+  }, [items, collapsed, setOpen]);
+
+  // Listen for external trigger (from profile page)
+  useEffect(() => {
+    const handler = () => enterEditMode();
+    window.addEventListener('sidebar-enter-edit', handler);
+    return () => window.removeEventListener('sidebar-enter-edit', handler);
+  }, [enterEditMode]);
 
   const cancelEdit = () => {
     setEditMode(false);
@@ -249,15 +255,7 @@ export function AppSidebar() {
                 <Check className="h-4 w-4" /> Salvar
               </button>
             </div>
-          ) : (
-            <button
-              onClick={enterEditMode}
-              className={`flex items-center overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 ${collapsed ? 'justify-center' : 'gap-3'}`}
-            >
-              <Pencil className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
-              {!collapsed && <span className="text-[13px] text-sidebar-foreground/70">Personalizar</span>}
-            </button>
-          )}
+          ) : null}
 
           {/* Perfil do usuário */}
           {!editMode && (
