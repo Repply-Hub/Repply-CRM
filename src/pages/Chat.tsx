@@ -33,7 +33,17 @@ interface Vendedor {
   role: string;
 }
 
-function MembersList({ members, myId }: { members: Vendedor[]; myId: string | null }) {
+function MembersList({
+  members,
+  myId,
+  selectedId,
+  onSelect,
+}: {
+  members: Vendedor[];
+  myId: string | null;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+}) {
   return (
     <div className="w-64 border-r border-border flex flex-col h-full shrink-0">
       <div className="px-4 py-3 border-b border-border">
@@ -45,14 +55,35 @@ function MembersList({ members, myId }: { members: Vendedor[]; myId: string | nu
       </div>
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-0.5">
+          {/* Chat geral */}
+          <button
+            onClick={() => onSelect(null)}
+            className={cn(
+              'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
+              selectedId === null ? 'bg-primary/10' : 'hover:bg-muted/50'
+            )}
+          >
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
+                <Users className="h-4 w-4" />
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-foreground truncate">Chat Geral</p>
+              <p className="text-[10px] text-muted-foreground">Toda a equipe</p>
+            </div>
+          </button>
+
           {members.map((m) => {
             const isMe = m.id === myId;
+            const isSelected = selectedId === m.id;
             return (
-              <div
+              <button
                 key={m.id}
+                onClick={() => onSelect(m.id)}
                 className={cn(
-                  'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors',
-                  isMe ? 'bg-primary/5' : 'hover:bg-muted/50'
+                  'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
+                  isSelected ? 'bg-primary/10' : 'hover:bg-muted/50'
                 )}
               >
                 <div className="relative">
@@ -69,7 +100,7 @@ function MembersList({ members, myId }: { members: Vendedor[]; myId: string | nu
                   </p>
                   <p className="text-[10px] text-muted-foreground capitalize truncate">{m.role}</p>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -82,6 +113,7 @@ const Chat = () => {
   const { data: messages, isLoading } = useChatMessages();
   const { send, sending } = useSendMessage();
   const [text, setText] = useState('');
+  const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: myVendedor } = useQuery({
@@ -92,11 +124,9 @@ const Chat = () => {
     },
   });
 
-  // Fetch all vendedores from the same empresa
   const { data: members = [] } = useQuery({
     queryKey: ['chat-members'],
     queryFn: async () => {
-      // First get my empresa_id
       const { data: me } = await supabase
         .from('vendedores')
         .select('empresa_id')
@@ -146,21 +176,62 @@ const Chat = () => {
     return groups;
   }, [messages]);
 
+  // Resolve selected member name for chat header
+  const selectedMemberData = members.find(m => m.id === selectedMember);
+  const chatHeaderName = selectedMember ? selectedMemberData?.nome ?? 'Funcionário' : 'Chat Geral';
+  const chatHeaderSub = selectedMember
+    ? (selectedMemberData?.role ?? '')
+    : `${members.length} membros`;
+
   return (
     <AppLayout>
-      <div className="flex h-[calc(100vh-4rem)]">
+      {/* Page header */}
+      <div className="flex items-center gap-3 px-6 py-3 border-b border-border">
+        <MessageCircle className="h-5 w-5 text-primary" />
+        <div>
+          <h1 className="text-lg font-bold text-foreground">Chat Interno</h1>
+          <p className="text-xs text-muted-foreground">Converse com sua equipe em tempo real</p>
+        </div>
+      </div>
+
+      <div className="flex h-[calc(100vh-8rem)]">
         {/* Members sidebar */}
-        <MembersList members={members} myId={myVendedor ?? null} />
+        <MembersList
+          members={members}
+          myId={myVendedor ?? null}
+          selectedId={selectedMember}
+          onSelect={setSelectedMember}
+        />
 
         {/* Chat area */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-            <MessageCircle className="h-5 w-5 text-primary" />
-            <div>
-              <h1 className="text-lg font-bold text-foreground">Chat Interno</h1>
-              <p className="text-xs text-muted-foreground">Converse com sua equipe em tempo real</p>
-            </div>
+          {/* Chat header — shows selected member name */}
+          <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-muted/30">
+            {selectedMember ? (
+              <>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className={`${colorForId(selectedMember)} text-white text-xs`}>
+                    {getInitials(chatHeaderName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{chatHeaderName}</p>
+                  <p className="text-[10px] text-muted-foreground capitalize">{chatHeaderSub}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    <Users className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Chat Geral</p>
+                  <p className="text-[10px] text-muted-foreground">{chatHeaderSub}</p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Messages */}
