@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,13 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, ChevronLeft, ChevronRight, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3 } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/ImportClientesDialog';
-import { ExportClientesButton } from '@/components/ExportClientesButton';
+
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
@@ -67,6 +68,8 @@ const Clientes = () => {
   const [typedConfirmOpen, setTypedConfirmOpen] = useState(false);
   const [typedConfirmText, setTypedConfirmText] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [columnsOpen, setColumnsOpen] = useState(false);
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
   const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
@@ -300,6 +303,20 @@ const Clientes = () => {
     }
   };
 
+  const exportToFile = (data: any[], type: 'empresas' | 'contatos', format: 'xlsx' | 'csv') => {
+    if (data.length === 0) { toast.error('Nenhum dado para exportar'); return; }
+    import('xlsx').then(XLSX => {
+      const rows = type === 'empresas'
+        ? data.map((c: any) => ({ Nome: c.empresa || '', Tipo: c.tipo || '', 'CPF/CNPJ': c.cnpj || '', Email: c.email || '', Telefone: c.telefone || '', Endereço: c.endereco || '' }))
+        : data.map((c: any) => ({ Nome: c.nome_contato || '', Empresa: c.empresa || '', Email: c.email || '', Telefone: c.telefone || '', Cargo: c.cargo || '' }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, type === 'empresas' ? 'Empresas' : 'Contatos');
+      XLSX.writeFile(wb, `${type}_${new Date().toISOString().slice(0, 10)}.${format}`, format === 'csv' ? { bookType: 'csv' } : undefined);
+      toast.success('Arquivo exportado com sucesso!');
+    });
+  };
+
   return (
     <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`}>
       <div className="p-6 max-w-[1400px] mx-auto">
@@ -338,13 +355,52 @@ const Clientes = () => {
               </SelectContent>
             </Select>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Configurações</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => setColumnsOpen(true)}>
+                <Columns3 className="h-4 w-4 mr-2" /> Colunas
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => {
+                const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                exportToFile(data, activeTab, 'xlsx');
+              }}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                exportToFile(data, activeTab, 'csv');
+              }}>
+                <FileText className="h-4 w-4 mr-2" /> Exportar CSV
+              </DropdownMenuItem>
+              {activeTab === 'empresas' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                    <Upload className="h-4 w-4 mr-2" /> Importar
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Column settings popover (controlled) */}
           <ColumnSettings
             columns={activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS}
             visibleColumns={activeTab === 'empresas' ? visibleFields : visibleContatoFields}
             onChange={activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange}
+            open={columnsOpen}
+            onOpenChange={setColumnsOpen}
+            hideTrigger
           />
-          <ExportClientesButton data={activeTab === 'empresas' ? filteredEmpresas : filteredContatos} type={activeTab} />
-          {activeTab === 'empresas' && <ImportClientesDialog />}
+          {/* Import dialog (controlled) */}
+          <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger />
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> {activeTab === 'empresas' ? 'Nova Empresa' : 'Novo Contato'}</Button>
