@@ -341,13 +341,52 @@ const Clientes = () => {
               </SelectContent>
             </Select>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Configurações</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => setColumnsOpen(true)}>
+                <Columns3 className="h-4 w-4 mr-2" /> Colunas
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => {
+                const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                exportToFile(data, activeTab, 'xlsx');
+              }}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                exportToFile(data, activeTab, 'csv');
+              }}>
+                <FileText className="h-4 w-4 mr-2" /> Exportar CSV
+              </DropdownMenuItem>
+              {activeTab === 'empresas' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                    <Upload className="h-4 w-4 mr-2" /> Importar
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Column settings popover (controlled) */}
           <ColumnSettings
             columns={activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS}
             visibleColumns={activeTab === 'empresas' ? visibleFields : visibleContatoFields}
             onChange={activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange}
+            open={columnsOpen}
+            onOpenChange={setColumnsOpen}
+            hideTrigger
           />
-          <ExportClientesButton data={activeTab === 'empresas' ? filteredEmpresas : filteredContatos} type={activeTab} />
-          {activeTab === 'empresas' && <ImportClientesDialog />}
+          {/* Import dialog (controlled) */}
+          <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger />
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> {activeTab === 'empresas' ? 'Nova Empresa' : 'Novo Contato'}</Button>
