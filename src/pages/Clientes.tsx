@@ -48,11 +48,16 @@ const Clientes = () => {
   const { data: contatosList, isLoading: loadingContatos } = useContatos();
   const createCliente = useCreateCliente();
   const createContato = useCreateContato();
+  const deleteCliente = useDeleteCliente();
+  const deleteContato = useDeleteContato();
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [activeTab, setActiveTab] = useState<ViewTab>('empresas');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
