@@ -248,6 +248,8 @@ const Chat = () => {
           myId={myVendedor ?? null}
           selectedId={selectedMember}
           onSelect={setSelectedMember}
+          collapsed={teamCollapsed}
+          onToggle={() => setTeamCollapsed(prev => !prev)}
         />
 
         {/* Chat area */}
