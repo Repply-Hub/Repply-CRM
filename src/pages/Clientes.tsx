@@ -379,14 +379,10 @@ const Clientes = () => {
               }}>
                 <FileText className="h-4 w-4 mr-2" /> Exportar CSV
               </DropdownMenuItem>
-              {activeTab === 'empresas' && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setImportOpen(true)}>
-                    <Upload className="h-4 w-4 mr-2" /> Importar
-                  </DropdownMenuItem>
-                </>
-              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" /> Importar
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -400,7 +396,7 @@ const Clientes = () => {
             hideTrigger
           />
           {/* Import dialog (controlled) */}
-          <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger />
+          <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> {activeTab === 'empresas' ? 'Nova Empresa' : 'Novo Contato'}</Button>
