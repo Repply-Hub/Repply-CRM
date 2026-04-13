@@ -5,7 +5,6 @@ import { UserProfilePopover } from '@/components/UserProfilePopover';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useObras } from '@/hooks/use-obras';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
