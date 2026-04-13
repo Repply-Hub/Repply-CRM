@@ -367,7 +367,7 @@ const Configuracoes = () => {
         <Tabs defaultValue={defaultTab}>
           <TabsList>
             <TabsTrigger value="perfil" className="gap-1.5"><UserCircle className="h-4 w-4" /> Perfil</TabsTrigger>
-            <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> {isGestor ? 'Usuários' : 'Vendedores'}</TabsTrigger>
+            <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> {isGestor ? 'Usuários' : 'Funcionários'}</TabsTrigger>
             <TabsTrigger value="automacao">Automação</TabsTrigger>
           </TabsList>
 
