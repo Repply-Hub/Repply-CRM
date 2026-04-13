@@ -75,9 +75,10 @@ interface ImportClientesDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   hideTrigger?: boolean;
+  target?: 'empresas' | 'contatos';
 }
 
-export function ImportClientesDialog({ open: controlledOpen, onOpenChange: controlledOnOpenChange, hideTrigger }: ImportClientesDialogProps = {}) {
+export function ImportClientesDialog({ open: controlledOpen, onOpenChange: controlledOnOpenChange, hideTrigger, target = 'empresas' }: ImportClientesDialogProps = {}) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = controlledOnOpenChange || setInternalOpen;
