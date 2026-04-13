@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings2, Check } from 'lucide-react';
+import { Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 export interface ColumnDefinition {
     id: string;
     label: string;
-    locked?: boolean; // Se verdadeiro, não pode ser ocultada
+    locked?: boolean;
 }
 
 interface ColumnSettingsProps {
@@ -17,17 +17,18 @@ interface ColumnSettingsProps {
     visibleColumns: string[];
     onChange: (visibleColumns: string[]) => void;
     className?: string;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    hideTrigger?: boolean;
 }
 
-export function ColumnSettings({ columns, visibleColumns, onChange, className }: ColumnSettingsProps) {
+export function ColumnSettings({ columns, visibleColumns, onChange, className, open, onOpenChange, hideTrigger }: ColumnSettingsProps) {
     const toggleColumn = (columnId: string) => {
         if (visibleColumns.includes(columnId)) {
-            // Evitar que todas as colunas sejam removidas (opcional, mas bom)
             if (visibleColumns.length > 1) {
                 onChange(visibleColumns.filter(id => id !== columnId));
             }
         } else {
-            // Manter a ordem original conforme definido em 'columns'
             const newVisible = columns
                 .filter(c => visibleColumns.includes(c.id) || c.id === columnId)
                 .map(c => c.id);
@@ -36,14 +37,16 @@ export function ColumnSettings({ columns, visibleColumns, onChange, className }:
     };
 
     return (
-        <Popover>
-            <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("h-9 gap-2", className)}>
-                    <Settings2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Colunas</span>
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-3" align="start">
+        <Popover open={open} onOpenChange={onOpenChange}>
+            {!hideTrigger && (
+                <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("h-9 gap-2", className)}>
+                        <Settings2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Colunas</span>
+                    </Button>
+                </PopoverTrigger>
+            )}
+            <PopoverContent className="w-56 p-3" align="end">
                 <div className="space-y-3">
                     <div className="flex items-center justify-between border-b pb-2">
                         <h4 className="font-medium text-sm leading-none">Exibir Colunas</h4>
