@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { PerfilSelect } from './PerfilSelect';
+import { CodigoAcessoButton } from './CodigoAcessoButton';
 
 // ─── Role utils ───
 const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof Users; badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
