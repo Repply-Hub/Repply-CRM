@@ -98,6 +98,18 @@ const Dashboard = () => {
     dias: Number(v.tempo_medio_ate_orcamento_dias ?? 0),
   }));
 
+  const rendimentoFabrica = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredPedidos.forEach(p => {
+      if (p.fabricante?.nome && p.status === 'fechamento') {
+        map.set(p.fabricante.nome, (map.get(p.fabricante.nome) ?? 0) + (p.valor_total ?? 0));
+      }
+    });
+    const arr = Array.from(map.entries()).map(([fabrica, valor]) => ({ fabrica, valor }));
+    arr.sort((a, b) => fabricaSort === 'maior' ? b.valor - a.valor : a.valor - b.valor);
+    return arr;
+  }, [filteredPedidos, fabricaSort]);
+
   const segmentacao = [
     { name: 'Alto (>100k)', value: filteredPedidos.filter(p => (p.valor_total ?? 0) > 100000).length, color: 'hsl(24, 100%, 47%)' },
     { name: 'Médio (30-100k)', value: filteredPedidos.filter(p => (p.valor_total ?? 0) >= 30000 && (p.valor_total ?? 0) <= 100000).length, color: 'hsl(42, 95%, 52%)' },
