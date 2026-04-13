@@ -98,13 +98,44 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
       const headers = Object.keys(json[0]);
       const mappedHeaders: Record<string, keyof ParsedRow> = {};
+      const usedFields = new Set<keyof ParsedRow>();
+      
+      // First pass: exact regex match
       headers.forEach(h => {
         const mapped = normalizeHeader(h);
-        if (mapped) mappedHeaders[h] = mapped;
+        if (mapped && !usedFields.has(mapped)) {
+          mappedHeaders[h] = mapped;
+          usedFields.add(mapped);
+        }
       });
 
+      // Second pass: partial/fuzzy match for unmapped headers
+      const partialMap: [string, keyof ParsedRow][] = [
+        ['empresa', 'empresa'], ['nome', 'empresa'], ['razao', 'razao_social'],
+        ['cnpj', 'cnpj'], ['cpf', 'cnpj'], ['mail', 'email'],
+        ['tel', 'telefone'], ['fone', 'telefone'], ['ender', 'endereco'],
+        ['contato', 'nome_contato'], ['responsavel', 'nome_contato'],
+      ];
+      headers.forEach(h => {
+        if (mappedHeaders[h]) return;
+        const norm = h.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        for (const [partial, field] of partialMap) {
+          if (!usedFields.has(field) && norm.includes(partial)) {
+            mappedHeaders[h] = field;
+            usedFields.add(field);
+            break;
+          }
+        }
+      });
+
+      const unmapped = headers.filter(h => !mappedHeaders[h]);
+      if (unmapped.length > 0) {
+        console.log('Colunas não mapeadas:', unmapped);
+      }
+      console.log('Mapeamento de colunas:', mappedHeaders);
+
       if (!Object.values(mappedHeaders).includes('empresa')) {
-        toast.error('Coluna "Empresa" ou "Nome" não encontrada no arquivo');
+        toast.error(`Coluna "Empresa" ou "Nome" não encontrada. Colunas do arquivo: ${headers.join(', ')}`);
         return;
       }
 
