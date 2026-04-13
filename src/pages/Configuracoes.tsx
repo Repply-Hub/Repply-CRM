@@ -56,8 +56,9 @@ function ThemeSelector() {
   );
 }
 
-function CodigoAcessoCard() {
+function CodigoAcessoButton() {
   const { user } = useAuth();
+  const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const qc = useQueryClient();
   const { data: empresa, isLoading } = useQuery({
@@ -99,50 +100,57 @@ function CodigoAcessoCard() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-primary" /> Código de Acesso
-        </CardTitle>
-        <CardDescription>Compartilhe este código com seus funcionários para que eles possam se cadastrar na sua empresa</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 bg-muted/50 border border-border rounded-lg px-4 py-3 text-center">
-            <span className="text-2xl font-mono font-bold tracking-[0.3em] text-foreground">{empresa.codigo_acesso}</span>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={handleCopy}>
-            {copied ? '✓ Copiado' : 'Copiar código'}
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="text-muted-foreground">
-                Gerar novo
+    <>
+      <Button variant="outline" size="sm" className="gap-2" onClick={() => setOpen(true)}>
+        <Building2 className="h-4 w-4" /> Código de Acesso
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" /> Código de Acesso
+            </DialogTitle>
+            <DialogDescription>
+              Compartilhe este código com seus funcionários para que eles possam se cadastrar na sua empresa.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="bg-muted/50 border border-border rounded-lg px-4 py-4 text-center">
+              <span className="text-2xl font-mono font-bold tracking-[0.3em] text-foreground">{empresa.codigo_acesso}</span>
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Empresa: <span className="font-medium text-foreground">{empresa.nome}</span>
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1" onClick={handleCopy}>
+                {copied ? '✓ Copiado' : 'Copiar código'}
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Gerar novo código?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  O código atual será invalidado. Funcionários que ainda não se cadastraram precisarão do novo código.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={() => regenerate.mutate()}>
-                  Gerar novo código
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Empresa: <span className="font-medium text-foreground">{empresa.nome}</span>
-        </p>
-      </CardContent>
-    </Card>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-muted-foreground">
+                    Gerar novo
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Gerar novo código?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      O código atual será invalidado. Funcionários que ainda não se cadastraram precisarão do novo código.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => regenerate.mutate()}>
+                      Gerar novo código
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -374,7 +382,9 @@ const Configuracoes = () => {
           <TabsContent value="perfil" className="mt-4"><ProfileTab /></TabsContent>
 
           <TabsContent value="vendedores" className="mt-4 space-y-4">
-            <CodigoAcessoCard />
+            <div className="flex justify-end">
+              <CodigoAcessoButton />
+            </div>
             <UsuariosTab />
           </TabsContent>
 
