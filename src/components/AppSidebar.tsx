@@ -262,7 +262,10 @@ export function AppSidebar() {
           {/* Perfil do usuário */}
           {!editMode && (
             <>
-              <div className={`flex items-center overflow-hidden rounded-lg px-2 py-2 ${collapsed ? 'justify-center' : 'gap-3'}`}>
+              <Link
+                to="/perfil"
+                className={`flex items-center overflow-hidden rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 ${collapsed ? 'justify-center' : 'gap-3'}`}
+              >
                 <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
                   <UserCircle className="h-5 w-5 text-primary" />
                 </div>
@@ -272,7 +275,7 @@ export function AppSidebar() {
                     <p className="text-[10px] text-sidebar-foreground/50 capitalize">{vendedor?.role ?? 'vendedor'}</p>
                   </div>
                 )}
-              </div>
+              </Link>
               <button
                 onClick={() => signOut()}
                 className={`flex items-center overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 ${collapsed ? 'justify-center' : 'gap-3'}`}
