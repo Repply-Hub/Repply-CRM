@@ -21,30 +21,18 @@ interface ParsedRow {
   nome_contato?: string;
 }
 
-const COLUMN_MAP: Record<string, keyof ParsedRow> = {
-  empresa: 'empresa',
-  nome: 'empresa',
-  'nome fantasia': 'empresa',
-  'nome_fantasia': 'empresa',
-  'razao social': 'razao_social',
-  'razão social': 'razao_social',
-  'razao_social': 'razao_social',
-  tipo: 'tipo',
-  cnpj: 'cnpj',
-  cpf: 'cnpj',
-  'cpf/cnpj': 'cnpj',
-  email: 'email',
-  'e-mail': 'email',
-  telefone: 'telefone',
-  phone: 'telefone',
-  fone: 'telefone',
-  endereco: 'endereco',
-  'endereço': 'endereco',
-  address: 'endereco',
-  contato: 'nome_contato',
-  'nome contato': 'nome_contato',
-  'nome_contato': 'nome_contato',
-};
+const COLUMN_MAP: [RegExp, keyof ParsedRow][] = [
+  // Order matters: more specific patterns first
+  [/^(razao\s*social|razao_social)$/, 'razao_social'],
+  [/^(nome\s*fantasia|nome_fantasia)$/, 'empresa'],
+  [/^(empresa|nome)$/, 'empresa'],
+  [/^(tipo|segmento|categoria)$/, 'tipo'],
+  [/^(cnpj|cpf|cpf\s*\/?\s*cnpj)$/, 'cnpj'],
+  [/^(e-?mail)$/, 'email'],
+  [/^(telefone|phone|fone|celular|tel)$/, 'telefone'],
+  [/^(endereco|endere[cç]o|address)$/, 'endereco'],
+  [/^(contato|nome\s*contato|nome_contato|responsavel|responsável)$/, 'nome_contato'],
+];
 
 const TIPO_MAP: Record<string, string> = {
   construtora: 'construtora',
@@ -64,9 +52,8 @@ const TIPO_MAP: Record<string, string> = {
 
 function normalizeHeader(h: string): keyof ParsedRow | null {
   const key = h.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  for (const [pattern, field] of Object.entries(COLUMN_MAP)) {
-    const norm = pattern.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (key === norm || key.includes(norm)) return field;
+  for (const [pattern, field] of COLUMN_MAP) {
+    if (pattern.test(key)) return field;
   }
   return null;
 }
