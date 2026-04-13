@@ -39,8 +39,8 @@ const CONTATO_FIELDS: ColumnDefinition[] = [
   { id: 'cargo', label: 'Cargo' },
 ];
 
-const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User };
-const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física' };
+const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
+const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física', condominio: 'Condomínio', hospital: 'Hospital', distribuidor: 'Distribuidor', hotel: 'Hotel', escola: 'Escola', instalador: 'Instalador' };
 
 type ViewTab = 'empresas' | 'contatos';
 
@@ -125,6 +125,12 @@ const Clientes = () => {
     { value: 'construtora', label: 'Construtora' },
     { value: 'loja', label: 'Loja' },
     { value: 'pessoa_fisica', label: 'Pessoa Física' },
+    { value: 'condominio', label: 'Condomínio' },
+    { value: 'hospital', label: 'Hospital' },
+    { value: 'distribuidor', label: 'Distribuidor' },
+    { value: 'hotel', label: 'Hotel' },
+    { value: 'escola', label: 'Escola' },
+    { value: 'instalador', label: 'Instalador' },
   ];
 
   const handleCnpjChange = (value: string) => {
@@ -352,6 +358,12 @@ const Clientes = () => {
                           <SelectItem value="construtora">Construtora</SelectItem>
                           <SelectItem value="loja">Loja</SelectItem>
                           <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
+                          <SelectItem value="condominio">Condomínio</SelectItem>
+                          <SelectItem value="hospital">Hospital</SelectItem>
+                          <SelectItem value="distribuidor">Distribuidor</SelectItem>
+                          <SelectItem value="hotel">Hotel</SelectItem>
+                          <SelectItem value="escola">Escola</SelectItem>
+                          <SelectItem value="instalador">Instalador</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
