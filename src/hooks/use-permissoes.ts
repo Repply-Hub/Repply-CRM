@@ -22,6 +22,7 @@ const MODULOS = [
   { key: 'portal', label: 'Portal' },
   { key: 'calendario', label: 'Calendário' },
   { key: 'tarefas', label: 'Tarefas' },
+  { key: 'chat', label: 'Chat' },
   { key: 'configuracoes', label: 'Configurações' },
 ];
 
