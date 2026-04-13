@@ -301,7 +301,7 @@ const Chat = () => {
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : !messages?.length ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 pt-16">
                 <MessageCircle className="h-12 w-12 opacity-30" />
                 <p className="text-sm">Nenhuma mensagem ainda. Comece a conversa!</p>
               </div>
