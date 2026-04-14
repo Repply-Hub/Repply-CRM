@@ -24,15 +24,14 @@ export const KanbanCard = memo(function KanbanCard({ order, index }: KanbanCardP
               <div
                 ref={provided.innerRef}
                 {...provided.draggableProps}
-                {...provided.dragHandleProps}
                 role="listitem"
                 aria-roledescription="item arrastável"
                 aria-label={`Pedido de ${order.clientName}, ${order.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
                 className={cn(
                   'bg-card rounded-xl p-4 shadow-card border border-border/60 mb-3 group relative',
                   'transition-all duration-200 ease-out',
-                  'cursor-grab active:cursor-grabbing',
-                  snapshot.isDragging && 'shadow-brand ring-2 ring-primary/30 rotate-[1.5deg] scale-[1.03] z-50 opacity-95',
+                  'cursor-pointer',
+                  snapshot.isDragging && 'shadow-brand ring-2 ring-primary/30 rotate-[1.5deg] scale-[1.03] z-50 opacity-95 cursor-grabbing',
                   isAlert && 'border-destructive/40 bg-destructive/[0.02]',
                   !snapshot.isDragging && 'hover:shadow-card-hover hover:border-border hover:-translate-y-0.5'
                 )}
@@ -42,13 +41,18 @@ export const KanbanCard = memo(function KanbanCard({ order, index }: KanbanCardP
                     ? provided.draggableProps.style?.transition
                     : 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                 }}
+                onClick={() => navigate(`/pedidos/${order.id}/editar`)}
               >
-                {/* Drag grip indicator */}
-                <div className={cn(
-                  'absolute top-3 right-2 text-muted-foreground/30 transition-opacity duration-150',
-                  'group-hover:text-muted-foreground/60',
-                  snapshot.isDragging && 'text-primary/50'
-                )}>
+                {/* Drag grip indicator - this is the drag handle */}
+                <div
+                  {...provided.dragHandleProps}
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    'absolute top-3 right-2 text-muted-foreground/30 transition-opacity duration-150 cursor-grab active:cursor-grabbing p-1 rounded-md hover:bg-muted/60',
+                    'group-hover:text-muted-foreground/60',
+                    snapshot.isDragging && 'text-primary/50'
+                  )}
+                >
                   <GripVertical className="h-4 w-4" />
                 </div>
 
@@ -78,13 +82,6 @@ export const KanbanCard = memo(function KanbanCard({ order, index }: KanbanCardP
                     {order.vendedor}
                   </span>
                   <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${order.id}/editar`); }}
-                      className="h-6 w-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-primary/10 transition-all"
-                      title="Editar pedido"
-                    >
-                      <Pencil className="h-3 w-3 text-muted-foreground" />
-                    </button>
                     {!isAlert && (
                       <span className="text-[10px] text-muted-foreground/60 tabular-nums">{order.daysInStage}d</span>
                     )}
