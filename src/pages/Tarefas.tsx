@@ -38,6 +38,7 @@ export default function Tarefas() {
   const { data: tarefas = [], isLoading } = useTarefas();
   const { data: vendedores = [] } = useVendedores();
   const { data: obras = [] } = useObras();
+  const queryClient = useQueryClient();
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
   const deleteTarefa = useDeleteTarefa();
@@ -50,6 +51,11 @@ export default function Tarefas() {
   const [viewOpen, setViewOpen] = useState(false);
   const [viewTarefa, setViewTarefa] = useState<Tarefa | null>(null);
   const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
+
+  // Bulk selection
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [form, setForm] = useState({
     titulo: '', descricao: '', status: 'pendente', prazo_final: '',
