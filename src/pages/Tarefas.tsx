@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useTarefas, useCreateTarefa, useUpdateTarefa, useDeleteTarefa, Tarefa } from '@/hooks/use-tarefas';
 import { UserProfilePopover } from '@/components/UserProfilePopover';
@@ -13,12 +13,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Trash2, Pencil, ChevronLeft, ChevronRight, Eye, Loader2, Calendar, User } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, Eye, Loader2, Calendar, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { ListPagination } from '@/components/ListPagination';
 
-const PER_PAGE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: 'Pendente', className: 'bg-warning/15 text-warning-foreground border-warning/30' },
@@ -41,6 +42,7 @@ export default function Tarefas() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewTarefa, setViewTarefa] = useState<Tarefa | null>(null);
@@ -66,8 +68,12 @@ export default function Tarefas() {
     return list;
   }, [tarefas, statusFilter, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   function openNew() {
     setEditingTarefa(null);
@@ -222,22 +228,22 @@ export default function Tarefas() {
                   })}
                 </TableBody>
               </Table>
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-t border-border/60 bg-card">
-                  <span className="text-xs text-muted-foreground">
-                    Página {page} de {totalPages} · {filtered.length} tarefa(s)
-                  </span>
-                  <div className="flex gap-1">
-                    <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
+
+            <ListPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={filtered.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(nextPageSize) => {
+                setPageSize(nextPageSize);
+                setPage(1);
+              }}
+              itemLabel="tarefa"
+              itemLabelPlural="tarefas"
+              className="rounded-xl border border-border/60 bg-card px-3 py-3 shadow-[var(--shadow-card)] md:rounded-t-none md:border-t-0 md:shadow-none"
+            />
           </>
         )}
       </div>
