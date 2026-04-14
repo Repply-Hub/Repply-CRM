@@ -584,107 +584,123 @@ const Clientes = () => {
             <p className="text-xs mt-1">Tente ajustar os filtros ou cadastre um novo</p>
           </div>
         ) : activeTab === 'empresas' ? (
-          <div className="rounded-lg border border-border/60 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="py-2.5 px-4 w-10">
-                    <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
-                  </th>
-                  <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome/Empresa</th>
-                  {visibleFields.includes('tipo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Tipo</th>}
-                  {visibleFields.includes('cnpj') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">CPF/CNPJ</th>}
-                  {visibleFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">E-mail</th>}
-                  {visibleFields.includes('endereco') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden xl:table-cell">Endereço</th>}
-                  {visibleFields.includes('obras_count') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Obras</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedEmpresas.map(client => {
-                  const Icon = tipoIcons[client.tipo] ?? Building2;
-                  return (
-                    <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`}>
-                      <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
-                        <Checkbox checked={selected.has(client.id)} onCheckedChange={() => toggleOne(client.id)} aria-label={`Selecionar ${client.empresa}`} />
-                      </td>
-                      <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                            <Icon className="h-4 w-4 text-primary" />
-                          </div>
-                          <span className="font-medium truncate max-w-[200px]">{client.empresa}</span>
-                        </div>
-                      </td>
-                      {visibleFields.includes('tipo') && (
+          <>
+            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="py-2.5 px-4 w-10">
+                      <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                    </th>
+                    <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome/Empresa</th>
+                    {visibleFields.includes('tipo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Tipo</th>}
+                    {visibleFields.includes('cnpj') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">CPF/CNPJ</th>}
+                    {visibleFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">E-mail</th>}
+                    {visibleFields.includes('endereco') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden xl:table-cell">Endereço</th>}
+                    {visibleFields.includes('obras_count') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Obras</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedEmpresas.map(client => {
+                    const Icon = tipoIcons[client.tipo] ?? Building2;
+                    return (
+                      <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`}>
+                        <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
+                          <Checkbox checked={selected.has(client.id)} onCheckedChange={() => toggleOne(client.id)} aria-label={`Selecionar ${client.empresa}`} />
+                        </td>
                         <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
-                          <Badge variant="secondary" className="text-[10px] font-medium">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                              <Icon className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="font-medium truncate max-w-[200px]">{client.empresa}</span>
+                          </div>
+                        </td>
+                        {visibleFields.includes('tipo') && (
+                          <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
+                            <Badge variant="secondary" className="text-[10px] font-medium">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
+                          </td>
+                        )}
+                        {visibleFields.includes('cnpj') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.cnpj || '—'}</td>}
+                        {visibleFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]" onClick={() => navigate(`/clientes/${client.id}`)}>{client.email || '—'}</td>}
+                        {visibleFields.includes('endereco') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden xl:table-cell truncate max-w-[250px]" onClick={() => navigate(`/clientes/${client.id}`)}>{client.endereco || '—'}</td>}
+                        {visibleFields.includes('obras_count') && <td className="py-2.5 px-4 text-xs hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}</td>}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <ListPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={filtered.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(nextPageSize) => {
+                setPageSize(nextPageSize);
+                setPage(1);
+              }}
+              itemLabel="empresa"
+              className="rounded-lg rounded-t-none border border-border/60 border-t bg-card px-3 py-3"
+            />
+          </>
+        ) : (
+          <>
+            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="py-2.5 px-4 w-10">
+                      <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                    </th>
+                    {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome</th>}
+                    {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Empresa</th>}
+                    {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Cargo</th>}
+                    {visibleContatoFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">E-mail</th>}
+                    {visibleContatoFields.includes('telefone') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Telefone</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedContatos.map(contato => (
+                    <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`}>
+                      <td className="py-2.5 px-4 w-10">
+                        <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
+                      </td>
+                      {visibleContatoFields.includes('nome_contato') && (
+                        <td className="py-2.5 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                              <User className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="font-medium truncate max-w-[200px]">{contato.nome_contato || 'Sem nome'}</span>
+                          </div>
                         </td>
                       )}
-                      {visibleFields.includes('cnpj') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.cnpj || '—'}</td>}
-                      {visibleFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]" onClick={() => navigate(`/clientes/${client.id}`)}>{client.email || '—'}</td>}
-                      {visibleFields.includes('endereco') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden xl:table-cell truncate max-w-[250px]" onClick={() => navigate(`/clientes/${client.id}`)}>{client.endereco || '—'}</td>}
-                      {visibleFields.includes('obras_count') && <td className="py-2.5 px-4 text-xs hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}</td>}
+                      {visibleContatoFields.includes('empresa') && <td className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]">{contato.empresa || '—'}</td>}
+                      {visibleContatoFields.includes('cargo') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{contato.cargo || '—'}</td>}
+                      {visibleContatoFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]">{contato.email || '—'}</td>}
+                      {visibleContatoFields.includes('telefone') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{contato.telefone || '—'}</td>}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="rounded-lg border border-border/60 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="py-2.5 px-4 w-10">
-                    <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
-                  </th>
-                  {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome</th>}
-                  {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Empresa</th>}
-                  {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Cargo</th>}
-                  {visibleContatoFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">E-mail</th>}
-                  {visibleContatoFields.includes('telefone') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Telefone</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedContatos.map(contato => (
-                  <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`}>
-                    <td className="py-2.5 px-4 w-10">
-                      <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
-                    </td>
-                    {visibleContatoFields.includes('nome_contato') && (
-                      <td className="py-2.5 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                            <User className="h-4 w-4 text-primary" />
-                          </div>
-                          <span className="font-medium truncate max-w-[200px]">{contato.nome_contato || 'Sem nome'}</span>
-                        </div>
-                      </td>
-                    )}
-                    {visibleContatoFields.includes('empresa') && <td className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]">{contato.empresa || '—'}</td>}
-                    {visibleContatoFields.includes('cargo') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{contato.cargo || '—'}</td>}
-                    {visibleContatoFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]">{contato.email || '—'}</td>}
-                    {visibleContatoFields.includes('telefone') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{contato.telefone || '—'}</td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <ListPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={filtered.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(nextPageSize) => {
+                setPageSize(nextPageSize);
+                setPage(1);
+              }}
+              itemLabel="contato"
+              className="rounded-lg rounded-t-none border border-border/60 border-t bg-card px-3 py-3"
+            />
+          </>
         )}
-        <ListPagination
-          page={page}
-          totalPages={totalPages}
-          totalItems={filtered.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={(nextPageSize) => {
-            setPageSize(nextPageSize);
-            setPage(1);
-          }}
-          itemLabel={activeTab === 'empresas' ? 'empresa' : 'contato'}
-          itemLabelPlural={activeTab === 'empresas' ? 'empresas' : 'contatos'}
-          className="mt-4 rounded-xl border border-border/60 bg-card px-3 py-3 shadow-[var(--shadow-card)]"
-        />
       </div>
     </AppLayout>
   );
