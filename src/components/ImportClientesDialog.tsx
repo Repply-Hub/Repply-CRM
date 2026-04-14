@@ -202,7 +202,10 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             nome_contato: r.nome_contato || null,
             vendedor_id: vid,
           }));
-          const { error } = await supabase.from('clientes').insert(batch);
+          const { error } = await supabase.from('clientes').upsert(batch, {
+            onConflict: 'cnpj',
+            ignoreDuplicates: true,
+          });
           if (error) throw error;
         }
         imported += rows.slice(i, i + BATCH).length;
