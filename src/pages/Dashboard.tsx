@@ -316,7 +316,7 @@ const Dashboard = () => {
                   <CardDescription className="text-xs">Faturamento fechado por fabricante no período</CardDescription>
                 </div>
                 <Select value={fabricaSort} onValueChange={(v) => setFabricaSort(v as 'maior' | 'menor')}>
-                  <SelectTrigger className="w-[160px] h-8 text-xs">
+                  <SelectTrigger className="h-8 w-fit max-w-full shrink-0 whitespace-nowrap text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

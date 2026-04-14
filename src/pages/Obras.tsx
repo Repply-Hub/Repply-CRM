@@ -96,7 +96,7 @@ export default function Obras() {
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -108,7 +108,7 @@ export default function Obras() {
             </SelectContent>
           </Select>
           <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
               <SelectValue placeholder="Ordenar" />
             </SelectTrigger>
             <SelectContent>
