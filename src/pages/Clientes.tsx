@@ -359,7 +359,7 @@ const Clientes = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
                 <Settings2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Configurações</span>
+                <span className="hidden sm:inline">Opções</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
