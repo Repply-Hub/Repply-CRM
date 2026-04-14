@@ -192,7 +192,7 @@ const Pedidos = () => {
         ) : (
           <div className="flex min-w-0 flex-col gap-6 xl:flex-row">
             <div className="min-w-0 flex-1">
-              <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="mb-4 flex flex-row items-center gap-3">
                 <div className="relative w-full sm:max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -203,7 +203,7 @@ const Pedidos = () => {
                   />
                 </div>
                 <Select value={stageFilter} onValueChange={handleStageFilterChange}>
-                  <SelectTrigger className="w-full lg:w-48 shrink-0">
+                  <SelectTrigger className="w-48 shrink-0">
                     <SelectValue placeholder="Etapa" />
                   </SelectTrigger>
                   <SelectContent>
