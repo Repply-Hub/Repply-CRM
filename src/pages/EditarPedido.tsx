@@ -223,19 +223,23 @@ const EditarPedido = () => {
     );
   }
 
-  return (
-    <AppLayout>
-      <div className="p-6 max-w-4xl mx-auto">
-        <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate('/pedidos')}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Voltar para Pedidos
-        </Button>
+  const headerContent = (
+    <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+      <SidebarTrigger className="shrink-0 h-8 w-8 md:hidden" />
+      <Button variant="ghost" size="sm" className="shrink-0 -ml-1" onClick={() => navigate('/pedidos')}>
+        <ArrowLeft className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Voltar para Pedidos</span>
+      </Button>
+      <div className="h-5 w-px bg-border shrink-0" />
+      <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">Editar Pedido</h1>
+      <Badge variant={isClosedStatus ? 'secondary' : 'default'} className="shrink-0">
+        {STATUS_LABELS[pedidoStatus] || pedidoStatus}
+      </Badge>
+    </div>
+  );
 
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-xl font-bold text-foreground">Editar Pedido</h1>
-          <Badge variant={isClosedStatus ? 'secondary' : 'default'}>
-            {STATUS_LABELS[pedidoStatus] || pedidoStatus}
-          </Badge>
-        </div>
+  return (
+    <AppLayout headerContent={headerContent}>
+      <div className="p-6 max-w-4xl mx-auto">
 
         {isClosedStatus && (
           <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3 mb-4">
