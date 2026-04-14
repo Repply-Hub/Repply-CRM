@@ -227,8 +227,8 @@ const EditarPedido = () => {
   const headerContent = (
     <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
       <SidebarTrigger className="shrink-0 h-8 w-8 md:hidden" />
-      <Button variant="ghost" size="sm" className="shrink-0 -ml-1" onClick={() => navigate('/pedidos')}>
-        <ArrowLeft className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Voltar para Pedidos</span>
+      <Button variant="ghost" size="icon" className="shrink-0 -ml-1 h-8 w-8" onClick={() => navigate('/pedidos')}>
+        <ArrowLeft className="h-4 w-4" />
       </Button>
       <div className="h-5 w-px bg-border shrink-0" />
       <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">Editar Pedido</h1>
