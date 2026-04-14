@@ -347,7 +347,7 @@ const Clientes = () => {
           </div>
           {activeTab === 'empresas' && (
             <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filtrar por tipo" /></SelectTrigger>
+              <SelectTrigger className="w-fit max-w-full shrink-0"><SelectValue placeholder="Filtrar por tipo" /></SelectTrigger>
               <SelectContent>
                 {tipoFilterOptions.map(opt => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>

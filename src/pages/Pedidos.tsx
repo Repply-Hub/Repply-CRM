@@ -203,7 +203,7 @@ const Pedidos = () => {
                   />
                 </div>
                 <Select value={stageFilter} onValueChange={handleStageFilterChange}>
-                  <SelectTrigger className="w-48 shrink-0">
+                  <SelectTrigger className="w-fit max-w-full shrink-0">
                     <SelectValue placeholder="Etapa" />
                   </SelectTrigger>
                   <SelectContent>
