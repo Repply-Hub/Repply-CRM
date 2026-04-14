@@ -274,6 +274,9 @@ export default function Tarefas() {
                     const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                     return (
                       <TableRow key={t.id} className={`hover:bg-muted/30 transition-colors ${selected.has(t.id) ? 'bg-primary/5' : ''}`}>
+                        <TableCell className="w-10">
+                          <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} aria-label={`Selecionar ${t.titulo}`} />
+                        </TableCell>
                         <TableCell className="max-w-[300px]">
                           <p className="font-medium text-sm text-card-foreground">{t.titulo}</p>
                           {t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
