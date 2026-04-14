@@ -319,7 +319,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                 {importing ? (
                   <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importando...</>
                 ) : (
-                  <><CheckCircle2 className="h-4 w-4 mr-1" /> Importar {rows.length} clientes</>
+                  <><CheckCircle2 className="h-4 w-4 mr-1" /> Importar {rows.length} {target === 'contatos' ? 'contatos' : 'empresas'}</>
                 )}
               </Button>
             </div>
