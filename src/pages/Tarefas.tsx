@@ -191,6 +191,12 @@ export default function Tarefas() {
               <SelectItem value="concluida">Concluída</SelectItem>
             </SelectContent>
           </Select>
+          {someSelected && (
+            <Button variant="destructive" size="sm" className="gap-2 shrink-0" onClick={() => setConfirmDeleteOpen(true)}>
+              <Trash2 className="h-4 w-4" />
+              Excluir {selected.size}
+            </Button>
+          )}
           <Button onClick={openNew} size="sm" className="shrink-0">
             <Plus className="h-4 w-4 mr-1" />Nova Tarefa
           </Button>
