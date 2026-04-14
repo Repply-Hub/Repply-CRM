@@ -71,9 +71,9 @@ const Pedidos = () => {
 
   return (
     <AppLayout title="Negócios" subtitle={`${pedidos?.length ?? 0} pedidos`}>
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex gap-2">
+      <div className="p-4 sm:p-6">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">
@@ -109,7 +109,6 @@ const Pedidos = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Column settings dialog */}
             <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
               <DialogContent className="max-w-xs">
                 <DialogHeader>
@@ -152,7 +151,7 @@ const Pedidos = () => {
               </DialogContent>
             </Dialog>
           </div>
-          <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
+          <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate('/pedidos/novo')}>
             <Plus className="h-4 w-4 mr-1" /> Novo Pedido
           </Button>
         </div>
@@ -160,15 +159,15 @@ const Pedidos = () => {
         {isLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="flex gap-6">
-            <div className="flex-1">
-              <div className="flex flex-col sm:flex-row gap-3 mb-4 w-full">
-                <div className="relative flex-1 max-w-xs">
+          <div className="flex min-w-0 flex-col gap-6 xl:flex-row">
+            <div className="min-w-0 flex-1">
+              <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+                <div className="relative w-full sm:max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input className="pl-9" placeholder="Buscar pedidos..." value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
                 <Select value={stageFilter} onValueChange={setStageFilter}>
-                  <SelectTrigger className="w-full sm:w-48 shrink-0">
+                  <SelectTrigger className="w-full lg:w-48 shrink-0">
                     <SelectValue placeholder="Etapa" />
                   </SelectTrigger>
                   <SelectContent>
@@ -179,7 +178,7 @@ const Pedidos = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="rounded-xl border border-border overflow-hidden">
+              <div className="w-full rounded-xl border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
@@ -232,8 +231,8 @@ const Pedidos = () => {
             </div>
 
             {selectedOrder && (
-              <div className="w-80 shrink-0">
-                <Card className="sticky top-6">
+              <div className="w-full xl:w-80 xl:shrink-0">
+                <Card className="xl:sticky xl:top-6">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm">Histórico de Contatos</CardTitle>
                     <p className="text-xs text-muted-foreground">
