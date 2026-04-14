@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KANBAN_STAGES } from '@/data/mockData';
@@ -9,8 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil, FileDown, Settings2, Columns3 } from 'lucide-react';
+import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil, FileDown, Settings2, Columns3, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { type ColumnDefinition } from '@/components/ColumnSettings';
@@ -19,6 +21,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ImportPedidosDialog } from '@/components/ImportPedidosDialog';
 import { ListPagination } from '@/components/ListPagination';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'cliente', label: 'Cliente', locked: true },
@@ -44,6 +48,7 @@ const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone
 
 const Pedidos = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: pedidos, isLoading } = usePedidos();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -53,6 +58,11 @@ const Pedidos = () => {
   const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder);
+
+  // Bulk selection state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('pedidos_columns');
@@ -84,7 +94,7 @@ const Pedidos = () => {
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
   const visibleColumnCount = Math.max(
     1,
-    visibleColumns.filter(id => id !== 'acoes').length + (visibleColumns.includes('acoes') ? 2 : 0)
+    visibleColumns.filter(id => id !== 'acoes').length + (visibleColumns.includes('acoes') ? 2 : 0) + 1 // +1 for checkbox
   );
 
   useEffect(() => {
@@ -94,6 +104,59 @@ const Pedidos = () => {
   }, [page, totalPages]);
 
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
+
+  // Bulk selection helpers
+  const currentPageIds = paginated.map(p => p.id);
+  const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selected.has(id));
+  const someSelected = selected.size > 0;
+
+  const toggleOne = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allPageSelected) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const ids = Array.from(selected);
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const batch = ids.slice(i, i + BATCH_SIZE);
+        // Delete related records first
+        await supabase.from('itens_pedido').delete().in('pedido_id', batch);
+        await supabase.from('historico_contatos').delete().in('pedido_id', batch);
+        const { error } = await supabase.from('pedidos').delete().in('id', batch);
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] });
+      toast.success(`${ids.length} negócio(s) removido(s)!`);
+      setSelected(new Set());
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao remover');
+    } finally {
+      setIsDeleting(false);
+      setConfirmDeleteOpen(false);
+    }
+  };
 
   return (
     <AppLayout title="Negócios" subtitle={`${pedidos?.length ?? 0} pedidos`}>
@@ -133,6 +196,13 @@ const Pedidos = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {someSelected && (
+              <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
+                <Trash2 className="h-4 w-4" />
+                Excluir {selected.size}
+              </Button>
+            )}
 
             <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
               <DialogContent className="max-w-xs">
@@ -220,6 +290,9 @@ const Pedidos = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
+                      <TableHead className="w-10">
+                        <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                      </TableHead>
                       {visibleColumns.includes('cliente') && <TableHead>Cliente</TableHead>}
                       {visibleColumns.includes('obra') && <TableHead>Obra</TableHead>}
                       {visibleColumns.includes('fabricante') && <TableHead>Fabricante</TableHead>}
@@ -243,7 +316,10 @@ const Pedidos = () => {
                       </TableRow>
                     ) : (
                       paginated.map(p => (
-                        <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setSelectedOrder(p.id)}>
+                        <TableRow key={p.id} className={`cursor-pointer hover:bg-muted/30 ${selected.has(p.id) ? 'bg-primary/5' : ''}`} onClick={() => setSelectedOrder(p.id)}>
+                          <TableCell className="w-10" onClick={e => e.stopPropagation()}>
+                            <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} aria-label={`Selecionar ${p.cliente?.empresa}`} />
+                          </TableCell>
                           {visibleColumns.includes('cliente') && <TableCell className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>}
                           {visibleColumns.includes('obra') && <TableCell>{p.obra?.nome_obra ?? '-'}</TableCell>}
                           {visibleColumns.includes('fabricante') && <TableCell>{p.fabricante?.nome ?? '-'}</TableCell>}
@@ -347,6 +423,25 @@ const Pedidos = () => {
           </div>
         )}
       </div>
+
+      {/* Confirm bulk delete */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {selected.size} negócio(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todos os itens e histórico de contatos vinculados também serão removidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
     </AppLayout>
   );

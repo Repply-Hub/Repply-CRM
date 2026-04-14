@@ -4,7 +4,7 @@ import { useTarefas, useCreateTarefa, useUpdateTarefa, useDeleteTarefa, Tarefa }
 import { UserProfilePopover } from '@/components/UserProfilePopover';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useObras } from '@/hooks/use-obras';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,12 +12,15 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Plus, Search, Trash2, Pencil, Eye, Loader2, Calendar, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { ListPagination } from '@/components/ListPagination';
+import { supabase } from '@/integrations/supabase/client';
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -35,6 +38,7 @@ export default function Tarefas() {
   const { data: tarefas = [], isLoading } = useTarefas();
   const { data: vendedores = [] } = useVendedores();
   const { data: obras = [] } = useObras();
+  const queryClient = useQueryClient();
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
   const deleteTarefa = useDeleteTarefa();
@@ -47,6 +51,11 @@ export default function Tarefas() {
   const [viewOpen, setViewOpen] = useState(false);
   const [viewTarefa, setViewTarefa] = useState<Tarefa | null>(null);
   const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
+
+  // Bulk selection
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [form, setForm] = useState({
     titulo: '', descricao: '', status: 'pendente', prazo_final: '',
@@ -114,6 +123,56 @@ export default function Tarefas() {
     } catch { toast.error('Erro ao excluir'); }
   }
 
+  // Bulk selection helpers
+  const currentPageIds = paginated.map(t => t.id);
+  const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selected.has(id));
+  const someSelected = selected.size > 0;
+
+  const toggleOne = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allPageSelected) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const ids = Array.from(selected);
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const batch = ids.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase.from('tarefas').delete().in('id', batch);
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ['tarefas'] });
+      toast.success(`${ids.length} tarefa(s) removida(s)!`);
+      setSelected(new Set());
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao remover');
+    } finally {
+      setIsDeleting(false);
+      setConfirmDeleteOpen(false);
+    }
+  };
+
   return (
     <AppLayout title="Tarefas" subtitle={`${filtered.length} tarefa(s)`}>
       <div className="p-3 sm:p-4 md:p-6 max-w-[1400px] mx-auto space-y-4 md:space-y-6">
@@ -132,6 +191,12 @@ export default function Tarefas() {
               <SelectItem value="concluida">Concluída</SelectItem>
             </SelectContent>
           </Select>
+          {someSelected && (
+            <Button variant="destructive" size="sm" className="gap-2 shrink-0" onClick={() => setConfirmDeleteOpen(true)}>
+              <Trash2 className="h-4 w-4" />
+              Excluir {selected.size}
+            </Button>
+          )}
           <Button onClick={openNew} size="sm" className="shrink-0">
             <Plus className="h-4 w-4 mr-1" />Nova Tarefa
           </Button>
@@ -151,11 +216,14 @@ export default function Tarefas() {
                 const si = getStatusInfo(t.status);
                 const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                 return (
-                  <div key={t.id} className="rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200">
+                  <div key={t.id} className={`rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200 ${selected.has(t.id) ? 'ring-1 ring-primary/30 bg-primary/5' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm text-card-foreground line-clamp-2">{t.titulo}</p>
-                        {t.projeto && <p className="text-xs text-muted-foreground mt-1">{t.projeto}</p>}
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} className="mt-0.5" aria-label={`Selecionar ${t.titulo}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm text-card-foreground line-clamp-2">{t.titulo}</p>
+                          {t.projeto && <p className="text-xs text-muted-foreground mt-1">{t.projeto}</p>}
+                        </div>
                       </div>
                       <Badge className={`shrink-0 text-[10px] border ${si.className}`}>{si.label}</Badge>
                     </div>
@@ -187,6 +255,9 @@ export default function Tarefas() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
+                    <TableHead className="w-10">
+                      <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                    </TableHead>
                     <TableHead>Tarefa</TableHead>
                     <TableHead className="hidden lg:table-cell">Responsável</TableHead>
                     <TableHead className="hidden lg:table-cell">Prazo</TableHead>
@@ -197,12 +268,15 @@ export default function Tarefas() {
                 </TableHeader>
                 <TableBody>
                   {paginated.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">Nenhuma tarefa encontrada</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Nenhuma tarefa encontrada</TableCell></TableRow>
                   ) : paginated.map(t => {
                     const si = getStatusInfo(t.status);
                     const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                     return (
-                      <TableRow key={t.id} className="hover:bg-muted/30 transition-colors">
+                      <TableRow key={t.id} className={`hover:bg-muted/30 transition-colors ${selected.has(t.id) ? 'bg-primary/5' : ''}`}>
+                        <TableCell className="w-10">
+                          <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} aria-label={`Selecionar ${t.titulo}`} />
+                        </TableCell>
                         <TableCell className="max-w-[300px]">
                           <p className="font-medium text-sm text-card-foreground">{t.titulo}</p>
                           {t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
@@ -376,6 +450,24 @@ export default function Tarefas() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Confirm bulk delete */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {selected.size} tarefa(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. As tarefas selecionadas serão removidas permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
