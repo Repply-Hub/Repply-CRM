@@ -42,7 +42,7 @@ const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone
 const Pedidos = () => {
   const navigate = useNavigate();
   const { data: pedidos, isLoading } = usePedidos();
-  const [search, setSearch] = useState('');
+  const [columnsOpen, setColumnsOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder);
