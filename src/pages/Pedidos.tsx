@@ -18,6 +18,7 @@ import { type ColumnDefinition } from '@/components/ColumnSettings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { ImportPedidosDialog } from '@/components/ImportPedidosDialog';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'cliente', label: 'Cliente', locked: true },
@@ -44,6 +45,7 @@ const Pedidos = () => {
   const { data: pedidos, isLoading } = usePedidos();
   const [search, setSearch] = useState('');
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder);
@@ -101,7 +103,7 @@ const Pedidos = () => {
                 }}>
                   <FileDown className="h-4 w-4 mr-2" /> Exportar PDF
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast.info('Importação XLSX em breve!')}>
+                <DropdownMenuItem onClick={() => setImportOpen(true)}>
                   <Upload className="h-4 w-4 mr-2" /> Importar XLSX
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -270,6 +272,7 @@ const Pedidos = () => {
           </div>
         )}
       </div>
+      <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
     </AppLayout>
   );
 };
