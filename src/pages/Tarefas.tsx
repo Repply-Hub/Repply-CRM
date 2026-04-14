@@ -216,11 +216,14 @@ export default function Tarefas() {
                 const si = getStatusInfo(t.status);
                 const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                 return (
-                  <div key={t.id} className="rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200">
+                  <div key={t.id} className={`rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200 ${selected.has(t.id) ? 'ring-1 ring-primary/30 bg-primary/5' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm text-card-foreground line-clamp-2">{t.titulo}</p>
-                        {t.projeto && <p className="text-xs text-muted-foreground mt-1">{t.projeto}</p>}
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} className="mt-0.5" aria-label={`Selecionar ${t.titulo}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm text-card-foreground line-clamp-2">{t.titulo}</p>
+                          {t.projeto && <p className="text-xs text-muted-foreground mt-1">{t.projeto}</p>}
+                        </div>
                       </div>
                       <Badge className={`shrink-0 text-[10px] border ${si.className}`}>{si.label}</Badge>
                     </div>
