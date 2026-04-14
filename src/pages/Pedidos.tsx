@@ -74,11 +74,16 @@ const Pedidos = () => {
           <div className="flex gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Settings className="h-4 w-4 mr-1" /> Configurações
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Configurações</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem onClick={() => setColumnsOpen(true)}>
+                  <Columns3 className="h-4 w-4 mr-2" /> Colunas
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={async () => {
                   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
                   await generatePedidosPdf(
@@ -101,11 +106,49 @@ const Pedidos = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <ColumnSettings
-              columns={PEDIDOS_COLUMNS}
-              visibleColumns={visibleColumns}
-              onChange={handleColumnChange}
-            />
+
+            {/* Column settings dialog */}
+            <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
+              <DialogContent className="max-w-xs">
+                <DialogHeader>
+                  <DialogTitle className="text-sm">Exibir Colunas</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-2 pt-2">
+                  {PEDIDOS_COLUMNS.map((column) => (
+                    <div
+                      key={column.id}
+                      className={`flex items-center space-x-2 rounded-md p-1 transition-colors hover:bg-muted/50 ${column.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <Checkbox
+                        id={`col-ped-${column.id}`}
+                        checked={visibleColumns.includes(column.id)}
+                        onCheckedChange={() => {
+                          if (column.locked) return;
+                          if (visibleColumns.includes(column.id)) {
+                            if (visibleColumns.length > 1) handleColumnChange(visibleColumns.filter(id => id !== column.id));
+                          } else {
+                            const newVisible = PEDIDOS_COLUMNS.filter(c => visibleColumns.includes(c.id) || c.id === column.id).map(c => c.id);
+                            handleColumnChange(newVisible);
+                          }
+                        }}
+                        disabled={column.locked}
+                      />
+                      <Label htmlFor={`col-ped-${column.id}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
+                        {column.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-primary mt-1"
+                  onClick={() => handleColumnChange(PEDIDOS_COLUMNS.map(c => c.id))}
+                >
+                  Resetar todas
+                </Button>
+              </DialogContent>
+            </Dialog>
           </div>
           <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
             <Plus className="h-4 w-4 mr-1" /> Novo Pedido
