@@ -314,36 +314,38 @@ const Configuracoes = () => {
             </TabsContent>
           )}
 
-          <TabsContent value="automacao" className="mt-4">
-            <div className="grid gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Alertas de Inatividade</CardTitle>
-                  <CardDescription>Configure o tempo máximo que um pedido pode ficar parado</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <Label>Dias para alerta:</Label>
-                    <Input type="number" value={alertDays} onChange={e => setAlertDays(e.target.value)} className="w-20" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-card-foreground">Notificação por email</p>
-                      <p className="text-xs text-muted-foreground">Enviar email quando o pedido ficar parado</p>
+          {isGestor && (
+            <TabsContent value="automacao" className="mt-4">
+              <div className="grid gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Alertas de Inatividade</CardTitle>
+                    <CardDescription>Configure o tempo máximo que um pedido pode ficar parado</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <Label>Dias para alerta:</Label>
+                      <Input type="number" value={alertDays} onChange={e => setAlertDays(e.target.value)} className="w-20" />
                     </div>
-                    <Switch />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-card-foreground">Notificação no sistema</p>
-                      <p className="text-xs text-muted-foreground">Mostrar alerta visual no Kanban</p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-card-foreground">Notificação por email</p>
+                        <p className="text-xs text-muted-foreground">Enviar email quando o pedido ficar parado</p>
+                      </div>
+                      <Switch />
                     </div>
-                    <Switch defaultChecked />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-card-foreground">Notificação no sistema</p>
+                        <p className="text-xs text-muted-foreground">Mostrar alerta visual no Kanban</p>
+                      </div>
+                      <Switch defaultChecked />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </AppLayout>
