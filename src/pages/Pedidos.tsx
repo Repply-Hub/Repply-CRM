@@ -71,7 +71,7 @@ const Pedidos = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
-                  <Settings2 className="h-4 w-4 mr-1" /> Configurações
+                  <Settings className="h-4 w-4 mr-1" /> Configurações
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
@@ -95,15 +95,13 @@ const Pedidos = () => {
                 <DropdownMenuItem onClick={() => toast.info('Importação XLSX em breve!')}>
                   <Upload className="h-4 w-4 mr-2" /> Importar XLSX
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="p-0">
-                  <ColumnSettings
-                    columns={PEDIDOS_COLUMNS}
-                    visibleColumns={visibleColumns}
-                    onChange={handleColumnChange}
-                  />
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <ColumnSettings
+              columns={PEDIDOS_COLUMNS}
+              visibleColumns={visibleColumns}
+              onChange={handleColumnChange}
+            />
           </div>
           <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
             <Plus className="h-4 w-4 mr-1" /> Novo Pedido
