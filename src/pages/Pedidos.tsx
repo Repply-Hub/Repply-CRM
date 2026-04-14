@@ -18,6 +18,7 @@ import { type ColumnDefinition } from '@/components/ColumnSettings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { ImportPedidosDialog } from '@/components/ImportPedidosDialog';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'cliente', label: 'Cliente', locked: true },
