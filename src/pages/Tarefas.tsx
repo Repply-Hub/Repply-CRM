@@ -118,7 +118,7 @@ export default function Tarefas() {
             <Input placeholder="Buscar tarefas..." className="pl-9" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
           </div>
           <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-full sm:w-[180px] shrink-0"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-fit max-w-full shrink-0"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
               <SelectItem value="pendente">Pendente</SelectItem>
