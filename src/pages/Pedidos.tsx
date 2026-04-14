@@ -45,6 +45,7 @@ const Pedidos = () => {
   const { data: pedidos, isLoading } = usePedidos();
   const [search, setSearch] = useState('');
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder);
