@@ -81,48 +81,49 @@ export function ListPagination({
   };
 
   return (
-    <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between', className)}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <span className="text-xs sm:text-sm text-muted-foreground">
-          Mostrando {start}–{end} de {totalItems} {summaryLabel} · Página {safePage} de {safeTotalPages}
+    <div className={cn('flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between', className)}>
+      <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm text-muted-foreground">
+        <span className="whitespace-nowrap">
+          {start}–{end} de {totalItems} {summaryLabel}
         </span>
 
         {onPageSizeChange && (
-          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-            <span className="whitespace-nowrap">Visualizar</span>
-            <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
-              <SelectTrigger className="h-8 w-fit min-w-[88px] shrink-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {pageSizeOptions.map((option) => (
-                  <SelectItem key={option} value={String(option)}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="whitespace-nowrap">por página</span>
-          </div>
+          <>
+            <span className="text-muted-foreground/40">·</span>
+            <div className="flex items-center gap-1.5">
+              <span className="whitespace-nowrap">Exibir</span>
+              <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
+                <SelectTrigger className="h-7 w-fit min-w-[60px] shrink-0 text-xs sm:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageSizeOptions.map((option) => (
+                    <SelectItem key={option} value={String(option)}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
         )}
       </div>
 
       {safeTotalPages > 1 && (
-        <Pagination className="mx-0 w-full justify-start sm:w-auto sm:justify-end">
-          <PaginationContent>
+        <Pagination className="mx-0 w-auto justify-start sm:justify-end">
+          <PaginationContent className="flex-wrap">
             <PaginationItem>
               <PaginationLink
                 href="#"
-                size="default"
+                size="icon"
                 aria-label="Página anterior"
-                className={cn('gap-1 pl-2.5', safePage === 1 && 'pointer-events-none opacity-50')}
+                className={cn('h-8 w-8', safePage === 1 && 'pointer-events-none opacity-50')}
                 onClick={(event) => {
                   event.preventDefault();
                   handlePageChange(safePage - 1);
                 }}
               >
                 <ChevronLeft className="h-4 w-4" />
-                <span>Anterior</span>
               </PaginationLink>
             </PaginationItem>
 
@@ -135,6 +136,7 @@ export function ListPagination({
                     href="#"
                     isActive={safePage === token}
                     aria-label={`Ir para página ${token}`}
+                    className="h-8 w-8"
                     onClick={(event) => {
                       event.preventDefault();
                       handlePageChange(token);
@@ -146,18 +148,23 @@ export function ListPagination({
               </PaginationItem>
             ))}
 
+            <PaginationItem className="sm:hidden">
+              <span className="flex h-8 items-center px-2 text-xs text-muted-foreground">
+                {safePage}/{safeTotalPages}
+              </span>
+            </PaginationItem>
+
             <PaginationItem>
               <PaginationLink
                 href="#"
-                size="default"
+                size="icon"
                 aria-label="Próxima página"
-                className={cn('gap-1 pr-2.5', safePage === safeTotalPages && 'pointer-events-none opacity-50')}
+                className={cn('h-8 w-8', safePage === safeTotalPages && 'pointer-events-none opacity-50')}
                 onClick={(event) => {
                   event.preventDefault();
                   handlePageChange(safePage + 1);
                 }}
               >
-                <span>Próxima</span>
                 <ChevronRight className="h-4 w-4" />
               </PaginationLink>
             </PaginationItem>
