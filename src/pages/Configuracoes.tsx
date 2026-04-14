@@ -298,15 +298,21 @@ const Configuracoes = () => {
         <Tabs defaultValue={defaultTab}>
           <TabsList>
             <TabsTrigger value="perfil" className="gap-1.5"><UserCircle className="h-4 w-4" /> Perfil</TabsTrigger>
-            <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> {isGestor ? 'Usuários' : 'Funcionários'}</TabsTrigger>
-            <TabsTrigger value="automacao">Automação</TabsTrigger>
+            {isGestor && (
+              <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> Usuários</TabsTrigger>
+            )}
+            {isGestor && (
+              <TabsTrigger value="automacao">Automação</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="perfil" className="mt-4"><ProfileTab /></TabsContent>
 
-          <TabsContent value="vendedores" className="mt-4">
-            <UsuariosTab />
-          </TabsContent>
+          {isGestor && (
+            <TabsContent value="vendedores" className="mt-4">
+              <UsuariosTab />
+            </TabsContent>
+          )}
 
           <TabsContent value="automacao" className="mt-4">
             <div className="grid gap-4">
