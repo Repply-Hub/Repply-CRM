@@ -181,8 +181,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       for (let i = 0; i < rows.length; i += BATCH) {
         if (target === 'contatos') {
           const batch = rows.slice(i, i + BATCH).map(r => ({
-            empresa: r.empresa || 'Sem empresa',
-            nome_contato: r.nome_contato || null,
+            empresa: r.nome_contato ? (r.empresa || 'Sem empresa') : 'Sem empresa',
+            nome_contato: r.nome_contato || r.empresa || null,
             email: r.email || null,
             telefone: r.telefone || null,
             cargo: null as string | null,
