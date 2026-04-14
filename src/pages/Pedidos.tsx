@@ -103,7 +103,7 @@ const Pedidos = () => {
                 }}>
                   <FileDown className="h-4 w-4 mr-2" /> Exportar PDF
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast.info('Importação XLSX em breve!')}>
+                <DropdownMenuItem onClick={() => setImportOpen(true)}>
                   <Upload className="h-4 w-4 mr-2" /> Importar XLSX
                 </DropdownMenuItem>
               </DropdownMenuContent>
