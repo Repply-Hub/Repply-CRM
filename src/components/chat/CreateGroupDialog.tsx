@@ -126,8 +126,14 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
           </div>
           <div className="space-y-2">
             <Label>Membros</Label>
-            <ScrollArea className="h-[220px] border rounded-lg p-2">
+             <ScrollArea className="h-[220px] border rounded-lg p-2">
               <div className="space-y-1">
+                {members.filter(m => m.id !== myId).length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 py-8">
+                    <Users2 className="h-8 w-8 opacity-30" />
+                    <p className="text-xs text-center">Nenhum outro membro na sua empresa. Cadastre funcionários primeiro.</p>
+                  </div>
+                )}
                 {members.filter(m => m.id !== myId).map(m => (
                   <label
                     key={m.id}
