@@ -7,15 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFabricantes } from '@/hooks/use-clientes';
 import { useCreateFabricante } from '@/hooks/use-mutations';
 import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante } from '@/hooks/use-fabricantes';
-import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, ChevronLeft, ChevronRight, Phone, Mail, User, ArrowLeft, Hash } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'descricao', label: 'Descrição', locked: true },
@@ -25,12 +29,8 @@ const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'status', label: 'Status' },
   { id: 'acoes', label: 'Ações' },
 ];
-import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
+// ─── Fabricante Form Dialog ─────────────────────────────────────────
 function FabricanteForm({ open, onOpenChange, editData }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -102,6 +102,7 @@ function FabricanteForm({ open, onOpenChange, editData }: {
   );
 }
 
+// ─── Preco Form Dialog ──────────────────────────────────────────────
 function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -168,6 +169,102 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
   );
 }
 
+// ─── Fabricante Card Component ──────────────────────────────────────
+function FabricanteCard({ fab, isSelected, onClick }: {
+  fab: any;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left p-4 rounded-xl border transition-all duration-200 group
+        ${isSelected
+          ? 'border-primary bg-primary/8 shadow-[var(--shadow-card-hover)] ring-1 ring-primary/20'
+          : 'border-border/60 hover:border-primary/30 hover:bg-muted/40 hover:shadow-[var(--shadow-card)]'
+        }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className={`flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center transition-colors duration-200
+          ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'}`}>
+          <Factory className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm text-foreground truncate">{fab.nome}</p>
+          <div className="flex items-center gap-2 mt-1">
+            {fab.cnpj && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                <Hash className="h-3 w-3 flex-shrink-0" />
+                {fab.cnpj}
+              </span>
+            )}
+          </div>
+          {fab.nome_contato && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              <User className="h-3 w-3 flex-shrink-0" />
+              {fab.nome_contato}
+            </p>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// ─── Detail Header Component ────────────────────────────────────────
+function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
+  fab: any;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Card className="rounded-xl border-border/60 overflow-hidden">
+      <div className="h-1.5 w-full bg-[image:var(--gradient-brand)]" />
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Factory className="h-7 w-7 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-foreground">{fab.nome}</h2>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+                {fab.cnpj && (
+                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                    <Hash className="h-3.5 w-3.5" />
+                    {fab.cnpj}
+                  </span>
+                )}
+                {fab.nome_contato && (
+                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5" />
+                    {fab.nome_contato}
+                  </span>
+                )}
+                {fab.telefone && (
+                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5" />
+                    {fab.telefone}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5">
+              <Pencil className="h-3.5 w-3.5" /> Editar
+            </Button>
+            <Button variant="destructive" size="sm" onClick={onDelete} className="gap-1.5">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main Page ──────────────────────────────────────────────────────
 const Fabricantes = () => {
   const { data: fabricantes, isLoading } = useFabricantes();
   const [selectedFabId, setSelectedFabId] = useState<string | null>(null);
@@ -178,7 +275,6 @@ const Fabricantes = () => {
   const [editPreco, setEditPreco] = useState<any>(null);
   const [deleteAlert, setDeleteAlert] = useState<{ type: 'fab' | 'preco'; id: string } | null>(null);
 
-  // Column visibility state for Price Table
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('precos_columns');
     return saved ? JSON.parse(saved) : PRECOS_COLUMNS.map(c => c.id);
@@ -201,20 +297,17 @@ const Fabricantes = () => {
   const totalFabPages = Math.max(1, Math.ceil(filtered.length / FAB_PER_PAGE));
   const paginatedFabs = filtered.slice((fabPage - 1) * FAB_PER_PAGE, fabPage * FAB_PER_PAGE);
 
-  // Reset page when search changes
   const handleSearchChange = (val: string) => { setSearch(val); setFabPage(1); };
 
   const handleDelete = async () => {
     if (!deleteAlert) return;
     try {
       if (deleteAlert.type === 'fab') {
-        // Delete related precos first
         const { error: precosError } = await supabase
           .from('tabela_precos')
           .delete()
           .eq('fabricante_id', deleteAlert.id);
         if (precosError) throw precosError;
-
         await deleteFabricante.mutateAsync(deleteAlert.id);
         if (selectedFabId === deleteAlert.id) setSelectedFabId(null);
         toast.success('Fabricante excluído!');
@@ -233,152 +326,210 @@ const Fabricantes = () => {
     setDeleteAlert(null);
   };
 
+  // Mobile: show detail view when a fabricante is selected
+  const showingDetail = !!selectedFab;
+
   return (
-    <AppLayout title="Fabricantes & Tabelas de Preço" subtitle="Gerencie fabricantes e suas tabelas de preço">
-      <div className="p-6">
+    <AppLayout title="Fabricantes & Tabelas de Preço" subtitle={`${fabricantes?.length ?? 0} fabricantes cadastrados`}>
+      <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Fabricantes list */}
-          <Card className="lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2"><Factory className="h-4 w-4" /> Fabricantes</CardTitle>
-                <CardDescription>{filtered.length} cadastrados</CardDescription>
-              </div>
-              <Button size="sm" onClick={() => { setEditFab(null); setFabDialog(true); }}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar fabricante..." value={search} onChange={e => handleSearchChange(e.target.value)} className="pl-9" />
-              </div>
-              {isLoading ? (
-                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-              ) : (
-                <>
-                  <div className="space-y-1 max-h-[50vh] overflow-y-auto">
-                    {paginatedFabs.map(f => (
-                      <button
-                        key={f.id}
-                        onClick={() => setSelectedFabId(f.id)}
-                        className={`w-full text-left p-3 rounded-lg border transition-all ${selectedFabId === f.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-transparent hover:bg-muted/50'}`}
-                      >
-                        <p className="font-medium text-sm text-foreground">{f.nome}</p>
-                        <p className="text-xs text-muted-foreground">{f.cnpj || 'Sem CNPJ'} · {f.nome_contato || 'Sem contato'}</p>
-                      </button>
-                    ))}
-                    {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum fabricante encontrado</p>}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          {/* ── Left Panel: Fabricantes List ─────────────────────── */}
+          <div className={`lg:col-span-4 xl:col-span-3 ${showingDetail ? 'hidden lg:block' : ''}`}>
+            <Card className="rounded-xl border-border/60 sticky top-4">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <Factory className="h-4 w-4 text-primary" /> Fabricantes
+                    </CardTitle>
+                    <CardDescription className="text-xs mt-0.5">
+                      {filtered.length} cadastrado{filtered.length !== 1 ? 's' : ''}
+                    </CardDescription>
                   </div>
-                  {totalFabPages > 1 && (
-                    <div className="flex items-center justify-between pt-2 border-t">
-                      <span className="text-xs text-muted-foreground">Página {fabPage} de {totalFabPages}</span>
-                      <div className="flex gap-1">
-                        <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage <= 1} onClick={() => setFabPage(p => p - 1)}>
-                          <ChevronLeft className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage >= totalFabPages} onClick={() => setFabPage(p => p + 1)}>
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+                  <Button size="sm" onClick={() => { setEditFab(null); setFabDialog(true); }} className="gap-1.5 h-8">
+                    <Plus className="h-3.5 w-3.5" /> Novo
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar fabricante..."
+                    value={search}
+                    onChange={e => handleSearchChange(e.target.value)}
+                    className="pl-9 h-9 text-sm"
+                  />
+                </div>
 
-          {/* Right: Details + Price table */}
-          <div className="lg:col-span-2 space-y-4">
+                {isLoading ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="flex flex-col items-center py-10 text-center">
+                    <Factory className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                    <p className="text-sm text-muted-foreground font-medium">Nenhum fabricante encontrado</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">Tente outro termo de busca</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      {paginatedFabs.map(f => (
+                        <FabricanteCard
+                          key={f.id}
+                          fab={f}
+                          isSelected={selectedFabId === f.id}
+                          onClick={() => setSelectedFabId(f.id)}
+                        />
+                      ))}
+                    </div>
+                    {totalFabPages > 1 && (
+                      <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                        <span className="text-xs text-muted-foreground">
+                          {fabPage} de {totalFabPages}
+                        </span>
+                        <div className="flex gap-1">
+                          <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage <= 1} onClick={() => setFabPage(p => p - 1)}>
+                            <ChevronLeft className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage >= totalFabPages} onClick={() => setFabPage(p => p + 1)}>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ── Right Panel: Details + Price Table ───────────────── */}
+          <div className={`lg:col-span-8 xl:col-span-9 space-y-4 ${!showingDetail ? 'hidden lg:block' : ''}`}>
             {selectedFab ? (
               <>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{selectedFab.nome}</CardTitle>
-                      <CardDescription className="space-x-3">
-                        <span>CNPJ: {selectedFab.cnpj ?? '-'}</span>
-                        <span>Contato: {selectedFab.nome_contato ?? '-'}</span>
-                        <span>Tel: {selectedFab.telefone ?? '-'}</span>
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => { setEditFab(selectedFab); setFabDialog(true); }}>
-                        <Pencil className="h-4 w-4 mr-1" /> Editar
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => setDeleteAlert({ type: 'fab', id: selectedFab.id })}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                </Card>
+                {/* Mobile back button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="lg:hidden gap-1.5 mb-2 -ml-1 text-muted-foreground"
+                  onClick={() => setSelectedFabId(null)}
+                >
+                  <ArrowLeft className="h-4 w-4" /> Voltar
+                </Button>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4" /> Tabela de Preços</CardTitle>
-                      <CardDescription>{precos?.length ?? 0} itens</CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                      <ColumnSettings
-                        columns={PRECOS_COLUMNS}
-                        visibleColumns={visibleColumns}
-                        onChange={handleColumnChange}
-                      />
-                      <Button size="sm" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
-                        <Plus className="h-4 w-4 mr-1" /> Novo Item
-                      </Button>
+                <FabricanteDetailHeader
+                  fab={selectedFab}
+                  onEdit={() => { setEditFab(selectedFab); setFabDialog(true); }}
+                  onDelete={() => setDeleteAlert({ type: 'fab', id: selectedFab.id })}
+                />
+
+                {/* Price Table */}
+                <Card className="rounded-xl border-border/60">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-base font-bold flex items-center gap-2">
+                          <Package className="h-4 w-4 text-primary" /> Tabela de Preços
+                        </CardTitle>
+                        <CardDescription className="text-xs mt-0.5">
+                          {precos?.length ?? 0} ite{(precos?.length ?? 0) !== 1 ? 'ns' : 'm'} cadastrado{(precos?.length ?? 0) !== 1 ? 's' : ''}
+                        </CardDescription>
+                      </div>
+                      <div className="flex gap-2">
+                        <ColumnSettings
+                          columns={PRECOS_COLUMNS}
+                          visibleColumns={visibleColumns}
+                          onChange={handleColumnChange}
+                        />
+                        <Button size="sm" onClick={() => { setEditPreco(null); setPrecoDialog(true); }} className="gap-1.5 h-8">
+                          <Plus className="h-3.5 w-3.5" /> Novo Item
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     {loadingPrecos ? (
-                      <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                      <div className="flex justify-center py-12">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
                     ) : precos && precos.length > 0 ? (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            {visibleColumns.includes('descricao') && <TableHead>Descrição</TableHead>}
-                            {visibleColumns.includes('referencia') && <TableHead>Referência</TableHead>}
-                            {visibleColumns.includes('preco') && <TableHead>Preço Unit.</TableHead>}
-                            {visibleColumns.includes('unidade') && <TableHead>Unidade</TableHead>}
-                            {visibleColumns.includes('status') && <TableHead>Status</TableHead>}
-                            {visibleColumns.includes('acoes') && <TableHead className="w-20">Ações</TableHead>}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {precos.map(p => (
-                            <TableRow key={p.id}>
-                              {visibleColumns.includes('descricao') && <TableCell className="font-medium">{p.descricao_material}</TableCell>}
-                              {visibleColumns.includes('referencia') && <TableCell>{p.referencia ?? '-'}</TableCell>}
-                              {visibleColumns.includes('preco') && <TableCell>{p.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>}
-                              {visibleColumns.includes('unidade') && <TableCell>{p.unidade ?? '-'}</TableCell>}
-                              {visibleColumns.includes('status') && <TableCell><Badge variant={p.vigente ? 'default' : 'secondary'}>{p.vigente ? 'Vigente' : 'Inativo'}</Badge></TableCell>}
-                              {visibleColumns.includes('acoes') && (
-                                <TableCell>
-                                  <div className="flex gap-1">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditPreco(p); setPrecoDialog(true); }}>
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteAlert({ type: 'preco', id: p.id })}>
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              )}
+                      <div className="rounded-lg border border-border/50 overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/30 hover:bg-muted/30">
+                              {visibleColumns.includes('descricao') && <TableHead className="text-xs font-semibold">Descrição</TableHead>}
+                              {visibleColumns.includes('referencia') && <TableHead className="text-xs font-semibold">Referência</TableHead>}
+                              {visibleColumns.includes('preco') && <TableHead className="text-xs font-semibold">Preço Unit.</TableHead>}
+                              {visibleColumns.includes('unidade') && <TableHead className="text-xs font-semibold">Unidade</TableHead>}
+                              {visibleColumns.includes('status') && <TableHead className="text-xs font-semibold">Status</TableHead>}
+                              {visibleColumns.includes('acoes') && <TableHead className="text-xs font-semibold w-20">Ações</TableHead>}
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {precos.map(p => (
+                              <TableRow key={p.id} className="group">
+                                {visibleColumns.includes('descricao') && <TableCell className="font-medium text-sm">{p.descricao_material}</TableCell>}
+                                {visibleColumns.includes('referencia') && <TableCell className="text-sm text-muted-foreground">{p.referencia ?? '-'}</TableCell>}
+                                {visibleColumns.includes('preco') && (
+                                  <TableCell className="text-sm font-semibold text-foreground">
+                                    {p.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                  </TableCell>
+                                )}
+                                {visibleColumns.includes('unidade') && <TableCell className="text-sm text-muted-foreground">{p.unidade ?? '-'}</TableCell>}
+                                {visibleColumns.includes('status') && (
+                                  <TableCell>
+                                    <Badge
+                                      variant={p.vigente ? 'default' : 'secondary'}
+                                      className={p.vigente ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}
+                                    >
+                                      {p.vigente ? 'Vigente' : 'Inativo'}
+                                    </Badge>
+                                  </TableCell>
+                                )}
+                                {visibleColumns.includes('acoes') && (
+                                  <TableCell>
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditPreco(p); setPrecoDialog(true); }}>
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteAlert({ type: 'preco', id: p.id })}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground text-center py-8">Nenhum item de preço cadastrado</p>
+                      <div className="flex flex-col items-center py-12 text-center">
+                        <Package className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                        <p className="text-sm text-muted-foreground font-medium">Nenhum item de preço cadastrado</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Adicione itens à tabela de preços deste fabricante</p>
+                        <Button size="sm" variant="outline" className="mt-4 gap-1.5" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
+                          <Plus className="h-3.5 w-3.5" /> Adicionar primeiro item
+                        </Button>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
               </>
             ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                  <Factory className="h-12 w-12 mb-3 opacity-40" />
-                  <p className="text-sm">Selecione um fabricante para ver detalhes e tabela de preços</p>
+              <Card className="rounded-xl border-border/60">
+                <CardContent className="flex flex-col items-center justify-center py-24 text-center">
+                  <div className="h-16 w-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
+                    <Factory className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-base font-medium text-muted-foreground">Selecione um fabricante</p>
+                  <p className="text-sm text-muted-foreground/60 mt-1 max-w-sm">
+                    Escolha um fabricante na lista ao lado para visualizar seus detalhes e tabela de preços
+                  </p>
                 </CardContent>
               </Card>
             )}
