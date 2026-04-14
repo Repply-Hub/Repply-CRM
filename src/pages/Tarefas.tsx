@@ -268,12 +268,12 @@ export default function Tarefas() {
                 </TableHeader>
                 <TableBody>
                   {paginated.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">Nenhuma tarefa encontrada</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Nenhuma tarefa encontrada</TableCell></TableRow>
                   ) : paginated.map(t => {
                     const si = getStatusInfo(t.status);
                     const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                     return (
-                      <TableRow key={t.id} className="hover:bg-muted/30 transition-colors">
+                      <TableRow key={t.id} className={`hover:bg-muted/30 transition-colors ${selected.has(t.id) ? 'bg-primary/5' : ''}`}>
                         <TableCell className="max-w-[300px]">
                           <p className="font-medium text-sm text-card-foreground">{t.titulo}</p>
                           {t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
