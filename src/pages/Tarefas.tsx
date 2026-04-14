@@ -207,7 +207,7 @@ export default function Tarefas() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <>
+          <div className="space-y-3 md:space-y-0">
             {/* Mobile: card layout */}
             <div className="block md:hidden space-y-3">
               {paginated.length === 0 ? (
@@ -318,7 +318,7 @@ export default function Tarefas() {
               itemLabelPlural="tarefas"
               className="rounded-xl border border-border/60 bg-card px-3 py-3 shadow-[var(--shadow-card)] md:rounded-t-none md:border-t-0 md:shadow-none"
             />
-          </>
+          </div>
         )}
       </div>
 
