@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,12 +13,12 @@ import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil,
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { toast } from 'sonner';
 import { type ColumnDefinition } from '@/components/ColumnSettings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ImportPedidosDialog } from '@/components/ImportPedidosDialog';
+import { ListPagination } from '@/components/ListPagination';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'cliente', label: 'Cliente', locked: true },
@@ -29,6 +29,8 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'vendedor', label: 'Vendedor' },
   { id: 'acoes', label: 'Ações' },
 ];
+
+const PAGE_SIZE = 10;
 
 const stageColors: Record<string, string> = {
   novo_lead: 'bg-kanban-new text-white',
@@ -44,13 +46,13 @@ const Pedidos = () => {
   const navigate = useNavigate();
   const { data: pedidos, isLoading } = usePedidos();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder);
 
-  // Column visibility state
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('pedidos_columns');
     return saved ? JSON.parse(saved) : PEDIDOS_COLUMNS.map(c => c.id);
@@ -61,11 +63,34 @@ const Pedidos = () => {
     localStorage.setItem('pedidos_columns', JSON.stringify(newColumns));
   };
 
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const handleStageFilterChange = (value: string) => {
+    setStageFilter(value);
+    setPage(1);
+  };
+
   const filtered = (pedidos ?? []).filter(p =>
     ((p.cliente?.empresa ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (p.fabricante?.nome ?? '').toLowerCase().includes(search.toLowerCase())) &&
     (stageFilter === 'todos' || p.status === stageFilter)
   );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visibleColumnCount = Math.max(
+    1,
+    visibleColumns.filter(id => id !== 'acoes').length + (visibleColumns.includes('acoes') ? 2 : 0)
+  );
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
 
@@ -87,7 +112,6 @@ const Pedidos = () => {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={async () => {
-                  const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
                   await generatePedidosPdf(
                     filtered.map(p => ({
                       cliente: p.cliente?.empresa ?? '-',
@@ -126,9 +150,13 @@ const Pedidos = () => {
                         onCheckedChange={() => {
                           if (column.locked) return;
                           if (visibleColumns.includes(column.id)) {
-                            if (visibleColumns.length > 1) handleColumnChange(visibleColumns.filter(id => id !== column.id));
+                            if (visibleColumns.length > 1) {
+                              handleColumnChange(visibleColumns.filter(id => id !== column.id));
+                            }
                           } else {
-                            const newVisible = PEDIDOS_COLUMNS.filter(c => visibleColumns.includes(c.id) || c.id === column.id).map(c => c.id);
+                            const newVisible = PEDIDOS_COLUMNS
+                              .filter(c => visibleColumns.includes(c.id) || c.id === column.id)
+                              .map(c => c.id);
                             handleColumnChange(newVisible);
                           }
                         }}
@@ -151,22 +179,30 @@ const Pedidos = () => {
               </DialogContent>
             </Dialog>
           </div>
+
           <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate('/pedidos/novo')}>
             <Plus className="h-4 w-4 mr-1" /> Novo Pedido
           </Button>
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
         ) : (
           <div className="flex min-w-0 flex-col gap-6 xl:flex-row">
             <div className="min-w-0 flex-1">
               <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
                 <div className="relative w-full sm:max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input className="pl-9" placeholder="Buscar pedidos..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                  <Input
+                    className="pl-9"
+                    placeholder="Buscar pedidos..."
+                    value={search}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                  />
                 </div>
-                <Select value={stageFilter} onValueChange={setStageFilter}>
+                <Select value={stageFilter} onValueChange={handleStageFilterChange}>
                   <SelectTrigger className="w-full lg:w-48 shrink-0">
                     <SelectValue placeholder="Etapa" />
                   </SelectTrigger>
@@ -178,6 +214,7 @@ const Pedidos = () => {
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="w-full rounded-xl border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
@@ -197,36 +234,70 @@ const Pedidos = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map(p => (
-                      <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setSelectedOrder(p.id)}>
-                        {visibleColumns.includes('cliente') && <TableCell className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>}
-                        {visibleColumns.includes('obra') && <TableCell>{p.obra?.nome_obra ?? '-'}</TableCell>}
-                        {visibleColumns.includes('fabricante') && <TableCell>{p.fabricante?.nome ?? '-'}</TableCell>}
-                        {visibleColumns.includes('valor') && <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>}
-                        {visibleColumns.includes('etapa') && (
-                          <TableCell>
-                            <Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge>
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('vendedor') && <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>}
-                        {visibleColumns.includes('acoes') && (
-                          <>
-                            <TableCell>
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${p.id}/editar`); }} title="Editar pedido">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                            <TableCell>
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedOrder(p.id); }}>
-                                <MessageSquare className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </>
-                        )}
+                    {paginated.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={visibleColumnCount} className="py-12 text-center text-muted-foreground">
+                          Nenhum negócio encontrado
+                        </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      paginated.map(p => (
+                        <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setSelectedOrder(p.id)}>
+                          {visibleColumns.includes('cliente') && <TableCell className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>}
+                          {visibleColumns.includes('obra') && <TableCell>{p.obra?.nome_obra ?? '-'}</TableCell>}
+                          {visibleColumns.includes('fabricante') && <TableCell>{p.fabricante?.nome ?? '-'}</TableCell>}
+                          {visibleColumns.includes('valor') && <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>}
+                          {visibleColumns.includes('etapa') && (
+                            <TableCell>
+                              <Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge>
+                            </TableCell>
+                          )}
+                          {visibleColumns.includes('vendedor') && <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>}
+                          {visibleColumns.includes('acoes') && (
+                            <>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/pedidos/${p.id}/editar`);
+                                  }}
+                                  title="Editar pedido"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedOrder(p.id);
+                                  }}
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </>
+                          )}
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
+
+                <ListPagination
+                  page={page}
+                  totalPages={totalPages}
+                  totalItems={filtered.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setPage}
+                  itemLabel="negócio"
+                  itemLabelPlural="negócios"
+                  className="border-t border-border/60 bg-card px-3 py-3 sm:px-4"
+                />
               </div>
             </div>
 
