@@ -10,9 +10,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const DEFAULT_PERFIS = [
   { value: 'vendedor', label: 'Vendedor' },
-  { value: 'empresa', label: 'Empresa' },
   { value: 'gestor', label: 'Gestor' },
-  { value: 'admin', label: 'Admin' },
 ];
 
 export function PerfilSelect({ name, defaultValue }: { name: string; defaultValue: string }) {
