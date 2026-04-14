@@ -123,6 +123,56 @@ export default function Tarefas() {
     } catch { toast.error('Erro ao excluir'); }
   }
 
+  // Bulk selection helpers
+  const currentPageIds = paginated.map(t => t.id);
+  const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selected.has(id));
+  const someSelected = selected.size > 0;
+
+  const toggleOne = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allPageSelected) {
+      setSelected(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected(prev => {
+        const next = new Set(prev);
+        currentPageIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const ids = Array.from(selected);
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const batch = ids.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase.from('tarefas').delete().in('id', batch);
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ['tarefas'] });
+      toast.success(`${ids.length} tarefa(s) removida(s)!`);
+      setSelected(new Set());
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao remover');
+    } finally {
+      setIsDeleting(false);
+      setConfirmDeleteOpen(false);
+    }
+  };
+
   return (
     <AppLayout title="Tarefas" subtitle={`${filtered.length} tarefa(s)`}>
       <div className="p-3 sm:p-4 md:p-6 max-w-[1400px] mx-auto space-y-4 md:space-y-6">
