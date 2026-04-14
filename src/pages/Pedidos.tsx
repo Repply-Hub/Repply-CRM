@@ -272,6 +272,7 @@ const Pedidos = () => {
           </div>
         )}
       </div>
+      <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
     </AppLayout>
   );
 };
