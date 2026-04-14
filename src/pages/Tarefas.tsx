@@ -255,6 +255,9 @@ export default function Tarefas() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
+                    <TableHead className="w-10">
+                      <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                    </TableHead>
                     <TableHead>Tarefa</TableHead>
                     <TableHead className="hidden lg:table-cell">Responsável</TableHead>
                     <TableHead className="hidden lg:table-cell">Prazo</TableHead>
