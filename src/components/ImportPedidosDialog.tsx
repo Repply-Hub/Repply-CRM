@@ -9,31 +9,14 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
-
-const STATUS_MAP: Record<string, string> = {
-  'novo lead': 'novo_lead', 'novo_lead': 'novo_lead', 'novo': 'novo_lead', 'lead': 'novo_lead',
-  'elaboração': 'elaboracao', 'elaboracao': 'elaboracao', 'elaborando': 'elaboracao',
-  'enviado': 'enviado',
-  'negociação': 'negociacao', 'negociacao': 'negociacao',
-  'fechamento': 'fechamento', 'fechado': 'fechamento', 'ganho': 'fechamento',
-};
-
-type FieldKey = 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status';
-
-const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
-  { key: 'cliente', label: 'Cliente', required: true },
-  { key: 'fabricante', label: 'Fabricante', required: true },
-  { key: 'valor', label: 'Valor', required: false },
-  { key: 'status', label: 'Etapa/Status', required: false },
-  { key: 'observacoes', label: 'Observações', required: false },
-];
-
-function parseNumber(val: any): number {
-  if (typeof val === 'number') return val;
-  if (!val) return 0;
-  const str = val.toString().replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
-  return parseFloat(str) || 0;
-}
+import {
+  FIELDS,
+  createEmptyMapping,
+  detectImportPedidosMapping,
+  getImportedPedidosRows,
+  getSheetHeaders,
+  type FieldKey,
+} from '@/components/import-pedidos/importPedidosUtils';
 
 interface ImportPedidosDialogProps {
   open: boolean;
@@ -43,7 +26,7 @@ interface ImportPedidosDialogProps {
 export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogProps) {
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
-  const [mapping, setMapping] = useState<Record<FieldKey, string>>({ cliente: '', fabricante: '', valor: '', observacoes: '', status: '' });
+  const [mapping, setMapping] = useState<Record<FieldKey, string>>(createEmptyMapping());
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
@@ -53,7 +36,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const reset = () => {
     setRawData([]);
     setHeaders([]);
-    setMapping({ cliente: '', fabricante: '', valor: '', observacoes: '', status: '' });
+    setMapping(createEmptyMapping());
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
@@ -65,40 +48,20 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: 'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
+      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
 
       if (json.length === 0) {
         toast.error('Arquivo vazio ou sem dados válidos');
         return;
       }
 
-      const cols = Object.keys(json[0]);
+      const cols = getSheetHeaders(json);
       setRawData(json);
       setHeaders(cols);
 
-      // Auto-detect mapping
-      const autoMap: Record<FieldKey, string> = { cliente: '', fabricante: '', valor: '', observacoes: '', status: '' };
-      const used = new Set<string>();
-      const patterns: [RegExp[], FieldKey][] = [
-        [[/cliente/i, /empresa/i, /nome.*cliente/i, /razao/i], 'cliente'],
-        [[/fabricante/i, /fornecedor/i, /fabrica/i], 'fabricante'],
-        [[/valor/i, /total/i, /preco/i, /preço/i], 'valor'],
-        [[/obs/i, /observa/i, /notas/i, /descri/i], 'observacoes'],
-        [[/status/i, /etapa/i, /fase/i, /estagio/i], 'status'],
-      ];
-      for (const [regexps, field] of patterns) {
-        for (const col of cols) {
-          if (used.has(col)) continue;
-          const norm = col.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          if (regexps.some(r => r.test(norm))) {
-            autoMap[field] = col;
-            used.add(col);
-            break;
-          }
-        }
-      }
+      const autoMap = detectImportPedidosMapping(cols, json);
       setMapping(autoMap);
-      // Se mapeou as obrigatórias automaticamente, vai direto pro preview
+
       if (autoMap.cliente && autoMap.fabricante) {
         setStep('preview');
         toast.success(`${json.length} registros mapeados automaticamente`);
@@ -117,22 +80,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     if (file) handleFile(file);
   };
 
-  const canProceedToPreview = mapping.cliente && mapping.fabricante;
+  const canProceedToPreview = Boolean(mapping.cliente && mapping.fabricante);
 
-  const getMappedRows = () => {
-    return rawData.map(row => {
-      const cliente = mapping.cliente ? (row[mapping.cliente]?.toString().trim() || '') : '';
-      const fabricante = mapping.fabricante ? (row[mapping.fabricante]?.toString().trim() || '') : '';
-      const valor = mapping.valor ? parseNumber(row[mapping.valor]) : 0;
-      const observacoes = mapping.observacoes ? (row[mapping.observacoes]?.toString().trim() || '') : '';
-      let status = 'novo_lead';
-      if (mapping.status) {
-        const norm = (row[mapping.status]?.toString() || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        status = STATUS_MAP[norm] || 'novo_lead';
-      }
-      return { cliente, fabricante, valor, observacoes, status };
-    }).filter(r => r.cliente && r.fabricante);
-  };
+  const getMappedRows = () => getImportedPedidosRows(rawData, mapping);
 
   const handleImport = async () => {
     const rows = getMappedRows();
