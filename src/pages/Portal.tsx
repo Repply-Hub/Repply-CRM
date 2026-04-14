@@ -31,8 +31,9 @@ import { ColumnSettings } from '@/components/ColumnSettings';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { ListPagination } from '@/components/ListPagination';
 
-import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CloudDownload, List, Settings2, Calendar as CalendarLucide } from 'lucide-react';
+import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronDown, ChevronUp, CloudDownload, List, Settings2, Calendar as CalendarLucide } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -128,6 +129,7 @@ export default function Portal() {
   const [scraping, setScraping] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, SiteResult>>({});
   const [pages, setPages] = useState<Record<string, number>>({});
+  const [pageSizes, setPageSizes] = useState<Record<string, number>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<string>('extremoz');
   const [visibleColumns, setVisibleColumns] = useState<Record<string, string[]>>(() => {
@@ -141,7 +143,6 @@ export default function Portal() {
     localStorage.setItem('portal-visible-columns', JSON.stringify(visibleColumns));
   }, [visibleColumns]);
 
-  const ROWS_PER_PAGE = 10;
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const scrollToResults = (siteId: string) => {
@@ -1091,9 +1092,10 @@ export default function Portal() {
                         label: h
                       }));
 
-                      const currentPage = pages[site.id] || 0;
-                      const totalPages = Math.ceil(result.data.table.length / ROWS_PER_PAGE);
-                      const paginatedRows = result.data.table.slice(currentPage * ROWS_PER_PAGE, (currentPage + 1) * ROWS_PER_PAGE);
+                      const currentPageSize = pageSizes[site.id] || 10;
+                      const totalPages = Math.max(1, Math.ceil(result.data.table.length / currentPageSize));
+                      const currentPage = Math.min(pages[site.id] || 1, totalPages);
+                      const paginatedRows = result.data.table.slice((currentPage - 1) * currentPageSize, currentPage * currentPageSize);
                       return (
                         <div key={site.id} className="min-w-0" ref={(el) => { sectionRefs.current[site.id] = el; }}>
                           <div className="mb-2 flex items-center justify-between gap-2">
@@ -1174,33 +1176,20 @@ export default function Portal() {
                               </tbody>
                             </table>
                           </div>
-                          {totalPages > 1 && (
-                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                              <p className="text-xs text-muted-foreground">
-                                Página {currentPage + 1} de {totalPages}
-                              </p>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  disabled={currentPage === 0}
-                                  onClick={() => setPages((p) => ({ ...p, [site.id]: currentPage - 1 }))}
-                                >
-                                  <ChevronLeft className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  disabled={currentPage >= totalPages - 1}
-                                  onClick={() => setPages((p) => ({ ...p, [site.id]: currentPage + 1 }))}
-                                >
-                                  <ChevronRight className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </div>
-                          )}
+                          <ListPagination
+                            page={currentPage}
+                            totalPages={totalPages}
+                            totalItems={result.data.table.length}
+                            pageSize={currentPageSize}
+                            onPageChange={(nextPage) => setPages((prev) => ({ ...prev, [site.id]: nextPage }))}
+                            onPageSizeChange={(nextPageSize) => {
+                              setPageSizes((prev) => ({ ...prev, [site.id]: nextPageSize }));
+                              setPages((prev) => ({ ...prev, [site.id]: 1 }));
+                            }}
+                            itemLabel="registro"
+                            itemLabelPlural="registros"
+                            className="mt-2 rounded-xl border border-border/60 bg-card px-3 py-3"
+                          />
                         </div>
                       );
                     })}

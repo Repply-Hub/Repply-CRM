@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFabricantes } from '@/hooks/use-clientes';
 import { useCreateFabricante } from '@/hooks/use-mutations';
 import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante } from '@/hooks/use-fabricantes';
-import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, ChevronLeft, ChevronRight, Phone, Mail, User, ArrowLeft, Hash } from 'lucide-react';
+import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
@@ -20,6 +20,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { ListPagination } from '@/components/ListPagination';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'descricao', label: 'Descrição', locked: true },
@@ -290,12 +291,16 @@ const Fabricantes = () => {
   const { data: precos, isLoading: loadingPrecos } = useTabelaPrecos(selectedFabId);
 
   const [fabPage, setFabPage] = useState(1);
-  const FAB_PER_PAGE = 5;
+  const [fabPageSize, setFabPageSize] = useState(10);
 
   const selectedFab = fabricantes?.find(f => f.id === selectedFabId);
   const filtered = fabricantes?.filter(f => f.nome.toLowerCase().includes(search.toLowerCase())) ?? [];
-  const totalFabPages = Math.max(1, Math.ceil(filtered.length / FAB_PER_PAGE));
-  const paginatedFabs = filtered.slice((fabPage - 1) * FAB_PER_PAGE, fabPage * FAB_PER_PAGE);
+  const totalFabPages = Math.max(1, Math.ceil(filtered.length / fabPageSize));
+  const paginatedFabs = filtered.slice((fabPage - 1) * fabPageSize, fabPage * fabPageSize);
+
+  useEffect(() => {
+    if (fabPage > totalFabPages) setFabPage(totalFabPages);
+  }, [fabPage, totalFabPages]);
 
   const handleSearchChange = (val: string) => { setSearch(val); setFabPage(1); };
 
@@ -386,21 +391,20 @@ const Fabricantes = () => {
                         />
                       ))}
                     </div>
-                    {totalFabPages > 1 && (
-                      <div className="flex items-center justify-between pt-3 border-t border-border/50">
-                        <span className="text-xs text-muted-foreground">
-                          {fabPage} de {totalFabPages}
-                        </span>
-                        <div className="flex gap-1">
-                          <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage <= 1} onClick={() => setFabPage(p => p - 1)}>
-                            <ChevronLeft className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="outline" size="icon" className="h-7 w-7" disabled={fabPage >= totalFabPages} onClick={() => setFabPage(p => p + 1)}>
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
+                    <ListPagination
+                      page={fabPage}
+                      totalPages={totalFabPages}
+                      totalItems={filtered.length}
+                      pageSize={fabPageSize}
+                      onPageChange={setFabPage}
+                      onPageSizeChange={(nextPageSize) => {
+                        setFabPageSize(nextPageSize);
+                        setFabPage(1);
+                      }}
+                      itemLabel="fabricante"
+                      itemLabelPlural="fabricantes"
+                      className="border-t border-border/50 pt-3"
+                    />
                   </>
                 )}
               </CardContent>

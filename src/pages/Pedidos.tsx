@@ -47,6 +47,7 @@ const Pedidos = () => {
   const { data: pedidos, isLoading } = usePedidos();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
@@ -79,8 +80,8 @@ const Pedidos = () => {
     (stageFilter === 'todos' || p.status === stageFilter)
   );
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
   const visibleColumnCount = Math.max(
     1,
     visibleColumns.filter(id => id !== 'acoes').length + (visibleColumns.includes('acoes') ? 2 : 0)
@@ -292,8 +293,12 @@ const Pedidos = () => {
                   page={page}
                   totalPages={totalPages}
                   totalItems={filtered.length}
-                  pageSize={PAGE_SIZE}
+                  pageSize={pageSize}
                   onPageChange={setPage}
+                  onPageSizeChange={(nextPageSize) => {
+                    setPageSize(nextPageSize);
+                    setPage(1);
+                  }}
                   itemLabel="negócio"
                   itemLabelPlural="negócios"
                   className="border-t border-border/60 bg-card px-3 py-3 sm:px-4"
