@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil, FileDown, MoreVertical } from 'lucide-react';
+import { Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil, FileDown, Settings2, Columns3 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -71,10 +71,10 @@ const Pedidos = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
-                  <MoreVertical className="h-4 w-4 mr-1" /> Opções
+                  <Settings2 className="h-4 w-4 mr-1" /> Configurações
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuContent align="start" className="w-56">
                 <DropdownMenuItem onClick={async () => {
                   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
                   await generatePedidosPdf(
@@ -95,13 +95,15 @@ const Pedidos = () => {
                 <DropdownMenuItem onClick={() => toast.info('Importação XLSX em breve!')}>
                   <Upload className="h-4 w-4 mr-2" /> Importar XLSX
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="p-0">
+                  <ColumnSettings
+                    columns={PEDIDOS_COLUMNS}
+                    visibleColumns={visibleColumns}
+                    onChange={handleColumnChange}
+                  />
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <ColumnSettings
-              columns={PEDIDOS_COLUMNS}
-              visibleColumns={visibleColumns}
-              onChange={handleColumnChange}
-            />
           </div>
           <Button size="sm" onClick={() => navigate('/pedidos/novo')}>
             <Plus className="h-4 w-4 mr-1" /> Novo Pedido
