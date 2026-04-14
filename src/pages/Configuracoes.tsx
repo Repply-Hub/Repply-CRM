@@ -298,46 +298,54 @@ const Configuracoes = () => {
         <Tabs defaultValue={defaultTab}>
           <TabsList>
             <TabsTrigger value="perfil" className="gap-1.5"><UserCircle className="h-4 w-4" /> Perfil</TabsTrigger>
-            <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> {isGestor ? 'Usuários' : 'Funcionários'}</TabsTrigger>
-            <TabsTrigger value="automacao">Automação</TabsTrigger>
+            {isGestor && (
+              <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> Usuários</TabsTrigger>
+            )}
+            {isGestor && (
+              <TabsTrigger value="automacao">Automação</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="perfil" className="mt-4"><ProfileTab /></TabsContent>
 
-          <TabsContent value="vendedores" className="mt-4">
-            <UsuariosTab />
-          </TabsContent>
+          {isGestor && (
+            <TabsContent value="vendedores" className="mt-4">
+              <UsuariosTab />
+            </TabsContent>
+          )}
 
-          <TabsContent value="automacao" className="mt-4">
-            <div className="grid gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Alertas de Inatividade</CardTitle>
-                  <CardDescription>Configure o tempo máximo que um pedido pode ficar parado</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <Label>Dias para alerta:</Label>
-                    <Input type="number" value={alertDays} onChange={e => setAlertDays(e.target.value)} className="w-20" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-card-foreground">Notificação por email</p>
-                      <p className="text-xs text-muted-foreground">Enviar email quando o pedido ficar parado</p>
+          {isGestor && (
+            <TabsContent value="automacao" className="mt-4">
+              <div className="grid gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Alertas de Inatividade</CardTitle>
+                    <CardDescription>Configure o tempo máximo que um pedido pode ficar parado</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <Label>Dias para alerta:</Label>
+                      <Input type="number" value={alertDays} onChange={e => setAlertDays(e.target.value)} className="w-20" />
                     </div>
-                    <Switch />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-card-foreground">Notificação no sistema</p>
-                      <p className="text-xs text-muted-foreground">Mostrar alerta visual no Kanban</p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-card-foreground">Notificação por email</p>
+                        <p className="text-xs text-muted-foreground">Enviar email quando o pedido ficar parado</p>
+                      </div>
+                      <Switch />
                     </div>
-                    <Switch defaultChecked />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-card-foreground">Notificação no sistema</p>
+                        <p className="text-xs text-muted-foreground">Mostrar alerta visual no Kanban</p>
+                      </div>
+                      <Switch defaultChecked />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </AppLayout>
