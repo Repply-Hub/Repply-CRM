@@ -98,8 +98,14 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         }
       }
       setMapping(autoMap);
-      setStep('mapping');
-      toast.success(`${json.length} linhas encontradas com ${cols.length} colunas`);
+      // Se mapeou as obrigatórias automaticamente, vai direto pro preview
+      if (autoMap.cliente && autoMap.fabricante) {
+        setStep('preview');
+        toast.success(`${json.length} registros mapeados automaticamente`);
+      } else {
+        setStep('mapping');
+        toast.info(`Mapeie as colunas obrigatórias (Cliente e Fabricante)`);
+      }
     } catch (err: any) {
       toast.error('Erro ao ler o arquivo: ' + (err.message || 'formato inválido'));
     }
