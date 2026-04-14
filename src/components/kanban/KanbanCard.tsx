@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Building2, Factory, DollarSign, Pencil, GripVertical } from 'lucide-react';
+import { AlertTriangle, Building2, Factory, DollarSign, GripVertical } from 'lucide-react';
 import { Order } from '@/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
