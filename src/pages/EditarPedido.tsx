@@ -230,7 +230,7 @@ const EditarPedido = () => {
       <Button variant="ghost" size="icon" className="shrink-0 -ml-1 h-8 w-8" onClick={() => navigate('/pedidos')}>
         <ArrowLeft className="h-4 w-4" />
       </Button>
-      <div className="h-5 w-px bg-border shrink-0" />
+      
       <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">Editar Pedido</h1>
       <Badge variant={isClosedStatus ? 'secondary' : 'default'} className="shrink-0">
         {STATUS_LABELS[pedidoStatus] || pedidoStatus}
