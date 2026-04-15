@@ -44,6 +44,12 @@ const NovoPedido = () => {
   const { data: isGestor } = useIsGestor();
   const createPedido = useCreatePedidoCompleto();
 
+  const [clienteOpen, setClienteOpen] = useState(false);
+  const [fabricanteOpen, setFabricanteOpen] = useState(false);
+  const { data: myVendedorId } = useMyVendedorId();
+  const { data: isGestor } = useIsGestor();
+  const createPedido = useCreatePedidoCompleto();
+
   const [step, setStep] = useState(1);
 
   // Step 1 fields
