@@ -274,7 +274,6 @@ const NovoPedido = () => {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  </div>
                 </div>
 
                 {/* Obra (conditional) */}
