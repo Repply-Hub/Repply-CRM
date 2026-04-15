@@ -46,9 +46,6 @@ const NovoPedido = () => {
 
   const [clienteOpen, setClienteOpen] = useState(false);
   const [fabricanteOpen, setFabricanteOpen] = useState(false);
-  const { data: myVendedorId } = useMyVendedorId();
-  const { data: isGestor } = useIsGestor();
-  const createPedido = useCreatePedidoCompleto();
 
   const [step, setStep] = useState(1);
 
