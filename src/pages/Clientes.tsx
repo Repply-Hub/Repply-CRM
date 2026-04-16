@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -74,7 +74,7 @@ const Clientes = () => {
   const [typedConfirmText, setTypedConfirmText] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [columnsOpen, setColumnsOpen] = useState(false);
+  
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
   const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
@@ -423,9 +423,55 @@ const Clientes = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => setColumnsOpen(true)}>
-                <Columns3 className="h-4 w-4 mr-2" /> Colunas
-              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Columns3 className="h-4 w-4 mr-2" /> Colunas
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                  {(activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS).map((column) => {
+                    const currentVisible = activeTab === 'empresas' ? visibleFields : visibleContatoFields;
+                    const currentOnChange = activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange;
+                    const allCols = activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS;
+                    return (
+                      <div
+                        key={column.id}
+                        className={`flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50 ${column.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <Checkbox
+                          id={`col-menu-${column.id}`}
+                          checked={currentVisible.includes(column.id)}
+                          onCheckedChange={() => {
+                            if (column.locked) return;
+                            if (currentVisible.includes(column.id)) {
+                              if (currentVisible.length > 1) currentOnChange(currentVisible.filter(id => id !== column.id));
+                            } else {
+                              const newVisible = allCols.filter(c => currentVisible.includes(c.id) || c.id === column.id).map(c => c.id);
+                              currentOnChange(newVisible);
+                            }
+                          }}
+                          disabled={column.locked}
+                        />
+                        <Label htmlFor={`col-menu-${column.id}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
+                          {column.label}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      const allCols = activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS;
+                      const currentOnChange = activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange;
+                      currentOnChange(allCols.map(c => c.id));
+                    }}
+                    className="text-xs text-primary justify-center"
+                  >
+                    Resetar todas
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => {
                 const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
@@ -445,58 +491,6 @@ const Clientes = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Column settings dialog */}
-          <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
-            <DialogContent className="max-w-xs">
-              <DialogHeader>
-                <DialogTitle className="text-sm">Exibir Colunas</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-2 pt-2">
-                {(activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS).map((column) => {
-                  const currentVisible = activeTab === 'empresas' ? visibleFields : visibleContatoFields;
-                  const currentOnChange = activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange;
-                  const allCols = activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS;
-                  return (
-                    <div
-                      key={column.id}
-                      className={`flex items-center space-x-2 rounded-md p-1 transition-colors hover:bg-muted/50 ${column.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    >
-                      <Checkbox
-                        id={`col-dialog-${column.id}`}
-                        checked={currentVisible.includes(column.id)}
-                        onCheckedChange={() => {
-                          if (column.locked) return;
-                          if (currentVisible.includes(column.id)) {
-                            if (currentVisible.length > 1) currentOnChange(currentVisible.filter(id => id !== column.id));
-                          } else {
-                            const newVisible = allCols.filter(c => currentVisible.includes(c.id) || c.id === column.id).map(c => c.id);
-                            currentOnChange(newVisible);
-                          }
-                        }}
-                        disabled={column.locked}
-                      />
-                      <Label htmlFor={`col-dialog-${column.id}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
-                        {column.label}
-                      </Label>
-                    </div>
-                  );
-                })}
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-primary mt-1"
-                onClick={() => {
-                  const allCols = activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS;
-                  const currentOnChange = activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange;
-                  currentOnChange(allCols.map(c => c.id));
-                }}
-              >
-                Resetar todas
-              </Button>
-            </DialogContent>
-          </Dialog>
           {/* Import dialog (controlled) */}
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
 
