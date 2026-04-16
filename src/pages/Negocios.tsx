@@ -108,7 +108,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
-  const [columnsOpen, setColumnsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
