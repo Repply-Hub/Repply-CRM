@@ -499,6 +499,30 @@ const Clientes = () => {
           </Dialog>
           {/* Import dialog (controlled) */}
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
+
+          {/* Novo tipo dialog */}
+          <Dialog open={newTipoOpen} onOpenChange={(o) => { setNewTipoOpen(o); if (!o) setNewTipoName(''); }}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Criar novo tipo</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 pt-2">
+                <Label htmlFor="new-tipo-name">Nome do tipo</Label>
+                <Input
+                  id="new-tipo-name"
+                  value={newTipoName}
+                  onChange={(e) => setNewTipoName(e.target.value)}
+                  placeholder="Ex: Indústria, Cooperativa…"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTipo(); } }}
+                />
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" size="sm" onClick={() => setNewTipoOpen(false)}>Cancelar</Button>
+                  <Button size="sm" onClick={handleCreateTipo}>Criar tipo</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> {activeTab === 'empresas' ? 'Nova Empresa' : 'Novo Contato'}</Button>
