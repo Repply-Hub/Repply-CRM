@@ -181,7 +181,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
       acao: `Aplicou preset: ${preset}`,
       detalhes: { preset } as any,
     });
-    qc.invalidateQueries({ queryKey: ['permissoes_vendedor', vendedor.id] });
+    qc.invalidateQueries({ queryKey: ['permissoes_usuario', vendedor.id] });
     toast.success(`Preset "${preset}" aplicado!`);
   };
 

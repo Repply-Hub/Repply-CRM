@@ -205,7 +205,7 @@ export { MODULOS };
 
 export function usePermissoes(vendedorId?: string) {
   return useQuery({
-    queryKey: ['permissoes_vendedor', vendedorId],
+    queryKey: ['permissoes_usuario', vendedorId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('permissoes_usuario')
@@ -244,7 +244,7 @@ export function useUpsertPermissao() {
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ['permissoes_vendedor', vars.usuario_id] });
+      qc.invalidateQueries({ queryKey: ['permissoes_usuario', vars.usuario_id] });
     },
   });
 }
