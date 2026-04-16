@@ -39,7 +39,7 @@ export function AppSidebar() {
     queryKey: ['meu-perfil', user?.id],
     queryFn: async () => {
       const { data } = await supabase
-        .from('vendedores')
+        .from('usuarios')
         .select('id, nome, role')
         .eq('user_id', user!.id)
         .maybeSingle();

@@ -59,7 +59,7 @@ export function useIsGestor() {
 export interface NovoPedidoPayload {
   cliente_id: string;
   fabricante_id: string;
-  vendedor_id: string;
+  usuario_id: string;
   obra_id?: string;
   data_pedido: string;
   prazo_resposta?: string;
@@ -86,7 +86,7 @@ export function useCreatePedidoCompleto() {
         .insert({
           cliente_id: payload.cliente_id,
           fabricante_id: payload.fabricante_id,
-          vendedor_id: payload.vendedor_id,
+          usuario_id: payload.usuario_id,
           obra_id: payload.obra_id || null,
           data_pedido: payload.data_pedido,
           status: 'novo_lead',
@@ -116,7 +116,7 @@ export function useCreatePedidoCompleto() {
       if (payload.proximo_contato) {
         await supabase.from('historico_contatos').insert({
           pedido_id: pedido.id,
-          vendedor_id: payload.vendedor_id,
+          usuario_id: payload.usuario_id,
           tipo: 'automatico',
           descricao: 'Contato agendado na criação do pedido',
           proximo_contato_em: payload.proximo_contato,

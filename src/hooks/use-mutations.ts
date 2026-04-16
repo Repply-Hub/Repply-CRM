@@ -13,11 +13,11 @@ export function useCreateCliente() {
       telefone?: string;
       endereco?: string;
     }) => {
-      // Get current vendedor_id
+      // Get current usuario_id
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       const { error } = await supabase.from('clientes').insert({
         ...data,
-        vendedor_id: vid,
+        usuario_id: vid,
       });
       if (error) throw error;
     },
@@ -38,7 +38,7 @@ export function useCreateContato() {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       const { error } = await supabase.from('contatos').insert({
         ...data,
-        vendedor_id: vid,
+        usuario_id: vid,
       });
       if (error) throw error;
     },
@@ -100,7 +100,7 @@ export function useCreatePedido() {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       const { error } = await supabase.from('pedidos').insert({
         ...data,
-        vendedor_id: vid,
+        usuario_id: vid,
         status: 'novo_lead',
       });
       if (error) throw error;
@@ -113,13 +113,13 @@ export function useCreateVendedor() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: { nome: string; email: string; telefone?: string; role?: string }) => {
-      const { error } = await supabase.from('vendedores').insert({
+      const { error } = await supabase.from('usuarios').insert({
         ...data,
         role: data.role || 'vendedor',
       });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['vendedores'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['usuarios'] }),
   });
 }
 

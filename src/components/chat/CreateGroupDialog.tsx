@@ -60,7 +60,7 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
     setCreating(true);
     try {
       const { data: vendedor } = await supabase
-        .from('vendedores')
+        .from('usuarios')
         .select('id, empresa_id')
         .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
         .single();
@@ -83,7 +83,7 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
         .from('chat_grupo_membros')
         .insert(allMembers.map(vid => ({
           grupo_id: (grupo as any).id,
-          vendedor_id: vid,
+          usuario_id: vid,
         })) as any);
       if (mErr) throw mErr;
 

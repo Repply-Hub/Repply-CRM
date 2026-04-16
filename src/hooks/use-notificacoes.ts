@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface Notificacao {
   id: string;
-  vendedor_id: string;
+  usuario_id: string;
   pedido_id: string | null;
   cliente_id: string | null;
   tipo: string;

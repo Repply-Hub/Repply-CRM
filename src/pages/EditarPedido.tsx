@@ -81,7 +81,7 @@ const EditarPedido = () => {
       setClienteId(p.cliente_id);
       setObraId(p.obra_id || '');
       setFabricanteId(p.fabricante_id);
-      setVendedorId(p.vendedor_id);
+      setVendedorId(p.usuario_id);
       setDataPedido(parseISO(p.data_pedido));
       setPrazoResposta(p.prazo_resposta ? parseISO(p.prazo_resposta) : undefined);
       setOrigemLead(p.origem_lead || '');
@@ -184,7 +184,7 @@ const EditarPedido = () => {
         pedido_id: id,
         cliente_id: clienteId,
         fabricante_id: fabricanteId,
-        vendedor_id: vendedorId,
+        usuario_id: vendedorId,
         obra_id: obraId || undefined,
         data_pedido: format(dataPedido, 'yyyy-MM-dd'),
         prazo_resposta: prazoResposta ? format(prazoResposta, 'yyyy-MM-dd') : undefined,

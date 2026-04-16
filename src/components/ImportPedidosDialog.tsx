@@ -104,7 +104,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const missingClientes = [...new Set(rows.map(r => r.cliente))].filter(c => !clienteMap.has(c.toLowerCase().trim()));
       if (missingClientes.length > 0) {
         const { data: newClientes, error } = await supabase.from('clientes').insert(
-          missingClientes.map(c => ({ empresa: c, tipo: 'construtora', vendedor_id: vid }))
+          missingClientes.map(c => ({ empresa: c, tipo: 'construtora', usuario_id: vid }))
         ).select('id, empresa');
         if (error) throw error;
         newClientes?.forEach(c => clienteMap.set(c.empresa.toLowerCase().trim(), c.id));
@@ -125,7 +125,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         const batch = rows.slice(i, i + BATCH).map(r => ({
           cliente_id: clienteMap.get(r.cliente.toLowerCase().trim())!,
           fabricante_id: fabricanteMap.get(r.fabricante.toLowerCase().trim())!,
-          vendedor_id: vid,
+          usuario_id: vid,
           status: r.status,
           valor_total: r.valor || null,
           observacoes: r.observacoes || null,

@@ -10,7 +10,7 @@ export interface PedidoWithRelations {
   observacoes: string | null;
   cliente_id: string;
   fabricante_id: string;
-  vendedor_id: string;
+  usuario_id: string;
   obra_id: string | null;
   cliente: { id: string; empresa: string } | null;
   fabricante: { id: string; nome: string } | null;
@@ -53,7 +53,7 @@ export function useUpdatePedidoStatus() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pedidos'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['vw_indicadores_vendedor'] });
+      qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
       qc.invalidateQueries({ queryKey: ['vw_velocidade_por_fabricante'] });
     },
   });

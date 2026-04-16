@@ -17,10 +17,10 @@ export function useFaturamentoMensal() {
 
 export function useIndicadoresVendedor() {
   return useQuery({
-    queryKey: ['vw_indicadores_vendedor'],
+    queryKey: ['vw_indicadores_usuario'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('vw_indicadores_vendedor')
+        .from('vw_indicadores_usuario')
         .select('*');
       if (error) throw error;
       return data;

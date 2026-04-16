@@ -13,7 +13,7 @@ export interface Tarefa {
   observadores: string | null;
   projeto: string | null;
   marcadores: string | null;
-  vendedor_id: string | null;
+  usuario_id: string | null;
   created_at: string;
   updated_at: string;
 }

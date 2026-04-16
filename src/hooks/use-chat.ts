@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface ChatMessage {
   id: string;
   conteudo: string;
-  vendedor_id: string;
+  usuario_id: string;
   empresa_id: string;
   created_at: string;
   grupo_id?: string | null;
@@ -100,7 +100,7 @@ export function useSendMessage() {
     setSending(true);
     try {
       const { data: vendedor, error: vErr } = await supabase
-        .from('vendedores')
+        .from('usuarios')
         .select('id, empresa_id')
         .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
         .single();
@@ -128,7 +128,7 @@ export function useSendMessage() {
 
       const { error } = await supabase.from('chat_mensagens').insert({
         conteudo: conteudo || (file ? file.name : ''),
-        vendedor_id: vendedor.id,
+        usuario_id: vendedor.id,
         empresa_id: vendedor.empresa_id!,
         arquivo_url,
         arquivo_nome,
