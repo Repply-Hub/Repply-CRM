@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -409,8 +411,8 @@ const Clientes = () => {
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <Popover>
+            <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
@@ -419,49 +421,71 @@ const Clientes = () => {
                 <ListFilter className="h-4 w-4" />
                 <span className="hidden sm:inline">Filtros</span>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className={activeTab === 'empresas' ? 'w-[420px] p-4' : 'w-64 p-4'}>
-              <div className={activeTab === 'empresas' ? 'grid grid-cols-2 gap-0 divide-x divide-border' : ''}>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className={activeTab === 'empresas' ? 'w-auto min-w-[420px] p-4' : 'w-auto min-w-[220px] p-4'}
+            >
+              <div className={activeTab === 'empresas' ? 'flex gap-0 divide-x divide-border' : ''}>
                 {activeTab === 'empresas' && (
-                  <div className="min-w-0 pr-4">
+                  <div className="flex-1 min-w-[180px] pr-4">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tipo</p>
-                    <DropdownMenuRadioGroup
-                      value={tipoFilter}
-                      onValueChange={(v) => { setTipoFilter(v); setPage(1); }}
-                    >
-                      {tipoFilterOptions.map(opt => (
-                        <DropdownMenuRadioItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                    <DropdownMenuItem
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        setNewTipoTarget('filter');
-                        setNewTipoOpen(true);
-                      }}
-                      className="text-primary font-medium"
-                    >
-                      + Criar novo tipo…
-                    </DropdownMenuItem>
+                    <ScrollArea className="h-60">
+                      <div className="space-y-1 pr-3">
+                        {tipoFilterOptions.map(opt => (
+                          <label
+                            key={opt.value}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
+                          >
+                            <input
+                              type="radio"
+                              name="cliente-tipo"
+                              className="h-3.5 w-3.5 accent-primary"
+                              checked={tipoFilter === opt.value}
+                              onChange={() => { setTipoFilter(opt.value); setPage(1); }}
+                            />
+                            {opt.label}
+                          </label>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => { setNewTipoTarget('filter'); setNewTipoOpen(true); }}
+                          className="w-full text-left text-sm px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground text-primary font-medium"
+                        >
+                          + Criar novo tipo…
+                        </button>
+                      </div>
+                    </ScrollArea>
                   </div>
                 )}
-                <div className={activeTab === 'empresas' ? 'min-w-0 pl-4' : 'min-w-0'}>
+                <div className={activeTab === 'empresas' ? 'flex-1 min-w-[180px] pl-4' : 'min-w-0'}>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 inline-flex items-center gap-1.5">
                     <ArrowUpDown className="h-3 w-3" /> Ordenação
                   </p>
-                  <DropdownMenuRadioGroup
-                    value={sortOrder}
-                    onValueChange={(v) => { setSortOrder(v as 'asc' | 'desc'); setPage(1); }}
-                  >
-                    <DropdownMenuRadioItem value="asc">Nome (A → Z)</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="desc">Nome (Z → A)</DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
+                  <div className="space-y-1">
+                    {[
+                      { value: 'asc', label: 'Nome (A → Z)' },
+                      { value: 'desc', label: 'Nome (Z → A)' },
+                    ].map(opt => (
+                      <label
+                        key={opt.value}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
+                      >
+                        <input
+                          type="radio"
+                          name="cliente-sort"
+                          className="h-3.5 w-3.5 accent-primary"
+                          checked={sortOrder === opt.value}
+                          onChange={() => { setSortOrder(opt.value as 'asc' | 'desc'); setPage(1); }}
+                        />
+                        {opt.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </PopoverContent>
+          </Popover>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
