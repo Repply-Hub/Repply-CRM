@@ -106,7 +106,7 @@ export function PerfilSelect({ name, defaultValue }: { name: string; defaultValu
               )}
             </div>
           ))}
-          <SelectItem value="__add_new__" className="focus:bg-muted focus:text-primary">
+          <SelectItem value="__add_new__" className="focus:bg-muted focus:text-foreground">
             <span className="flex items-center gap-1"><Plus className="h-3.5 w-3.5" /> Novo perfil...</span>
           </SelectItem>
         </SelectContent>
