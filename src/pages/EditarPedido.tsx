@@ -335,18 +335,53 @@ const EditarPedido = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Data de Criação *</Label>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal cursor-default" disabled>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(dataPedido, "dd/MM/yyyy")}
-                    </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {format(dataPedido, "dd/MM/yyyy")}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dataPedido}
+                          onSelect={(d) => d && setDataPedido(d)}
+                          locale={ptBR}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="space-y-2">
                     <Label>Data de Fechamento</Label>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal cursor-default" disabled>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {prazoResposta ? format(prazoResposta, "dd/MM/yyyy") : <span className="text-muted-foreground">Preenchida ao dar ganho</span>}
-                    </Button>
-                    <p className="text-xs text-muted-foreground">Preenchida automaticamente ao mover para Fechamento</p>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {prazoResposta ? format(prazoResposta, "dd/MM/yyyy") : <span className="text-muted-foreground">Selecionar data</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={prazoResposta}
+                          onSelect={setPrazoResposta}
+                          locale={ptBR}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                        {prazoResposta && (
+                          <div className="p-2 border-t">
+                            <Button variant="ghost" size="sm" className="w-full" onClick={() => setPrazoResposta(undefined)}>
+                              Limpar
+                            </Button>
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                    <p className="text-xs text-muted-foreground">Se vazia, será preenchida automaticamente ao mover para Fechamento.</p>
                   </div>
                 </div>
 
