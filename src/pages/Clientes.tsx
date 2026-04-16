@@ -46,6 +46,10 @@ const CONTATO_FIELDS: ColumnDefinition[] = [
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física', condominio: 'Condomínio', hospital: 'Hospital', distribuidor: 'Distribuidor', hotel: 'Hotel', escola: 'Escola', instalador: 'Instalador' };
 
+const getTipoLabel = (value: string, customTipos: { value: string; label: string }[]) =>
+  tipoLabels[value] ?? customTipos.find(t => t.value === value)?.label ?? value;
+const getTipoIcon = (value: string) => tipoIcons[value] ?? Building2;
+
 type ViewTab = 'empresas' | 'contatos';
 
 const Clientes = () => {
@@ -80,6 +84,44 @@ const Clientes = () => {
   const [telefone, setTelefone] = useState('');
   const [nomeContato, setNomeContato] = useState('');
   const [cargo, setCargo] = useState('');
+  const [customTipos, setCustomTipos] = useState<{ value: string; label: string }[]>(() => {
+    const saved = localStorage.getItem('clientes_custom_tipos');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [newTipoOpen, setNewTipoOpen] = useState(false);
+  const [newTipoName, setNewTipoName] = useState('');
+  const [newTipoTarget, setNewTipoTarget] = useState<'form' | 'filter'>('form');
+
+  const handleCreateTipo = () => {
+    const label = newTipoName.trim();
+    if (!label) {
+      toast.error('Informe um nome para o tipo');
+      return;
+    }
+    const value = label
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (!value) {
+      toast.error('Nome inválido');
+      return;
+    }
+    const baseTipos = ['construtora', 'loja', 'pessoa_fisica', 'condominio', 'hospital', 'distribuidor', 'hotel', 'escola', 'instalador'];
+    if (baseTipos.includes(value) || customTipos.some(t => t.value === value)) {
+      toast.error('Esse tipo já existe');
+      return;
+    }
+    const next = [...customTipos, { value, label }];
+    setCustomTipos(next);
+    localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
+    if (newTipoTarget === 'form') setTipo(value);
+    else setTipoFilter(value);
+    setNewTipoName('');
+    setNewTipoOpen(false);
+    toast.success(`Tipo "${label}" criado`);
+  };
 
   const [visibleFields, setVisibleFields] = useState<string[]>(() => {
     const saved = localStorage.getItem('clientes_fields');
@@ -141,6 +183,7 @@ const Clientes = () => {
     { value: 'hotel', label: 'Hotel' },
     { value: 'escola', label: 'Escola' },
     { value: 'instalador', label: 'Instalador' },
+    ...customTipos,
   ];
 
   const handleCnpjChange = (value: string) => {
@@ -351,12 +394,24 @@ const Clientes = () => {
             />
           </div>
           {activeTab === 'empresas' && (
-            <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1); }}>
+            <Select
+              value={tipoFilter}
+              onValueChange={(v) => {
+                if (v === '__new__') {
+                  setNewTipoTarget('filter');
+                  setNewTipoOpen(true);
+                  return;
+                }
+                setTipoFilter(v);
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="w-fit max-w-full shrink-0"><SelectValue placeholder="Filtrar por tipo" /></SelectTrigger>
               <SelectContent>
                 {tipoFilterOptions.map(opt => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
+                <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -444,6 +499,30 @@ const Clientes = () => {
           </Dialog>
           {/* Import dialog (controlled) */}
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
+
+          {/* Novo tipo dialog */}
+          <Dialog open={newTipoOpen} onOpenChange={(o) => { setNewTipoOpen(o); if (!o) setNewTipoName(''); }}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Criar novo tipo</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 pt-2">
+                <Label htmlFor="new-tipo-name">Nome do tipo</Label>
+                <Input
+                  id="new-tipo-name"
+                  value={newTipoName}
+                  onChange={(e) => setNewTipoName(e.target.value)}
+                  placeholder="Ex: Indústria, Cooperativa…"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTipo(); } }}
+                />
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" size="sm" onClick={() => setNewTipoOpen(false)}>Cancelar</Button>
+                  <Button size="sm" onClick={handleCreateTipo}>Criar tipo</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> {activeTab === 'empresas' ? 'Nova Empresa' : 'Novo Contato'}</Button>
@@ -455,7 +534,17 @@ const Clientes = () => {
                   <>
                     <div>
                       <Label>Tipo</Label>
-                      <Select value={tipo} onValueChange={setTipo}>
+                      <Select
+                        value={tipo}
+                        onValueChange={(v) => {
+                          if (v === '__new__') {
+                            setNewTipoTarget('form');
+                            setNewTipoOpen(true);
+                            return;
+                          }
+                          setTipo(v);
+                        }}
+                      >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="construtora">Construtora</SelectItem>
@@ -467,6 +556,10 @@ const Clientes = () => {
                           <SelectItem value="hotel">Hotel</SelectItem>
                           <SelectItem value="escola">Escola</SelectItem>
                           <SelectItem value="instalador">Instalador</SelectItem>
+                          {customTipos.map(t => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                          ))}
+                          <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -602,7 +695,7 @@ const Clientes = () => {
                 </thead>
                 <tbody>
                   {paginatedEmpresas.map(client => {
-                    const Icon = tipoIcons[client.tipo] ?? Building2;
+                    const Icon = getTipoIcon(client.tipo);
                     return (
                       <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`}>
                         <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
@@ -618,7 +711,7 @@ const Clientes = () => {
                         </td>
                         {visibleFields.includes('tipo') && (
                           <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
-                            <Badge variant="secondary" className="text-[10px] font-medium">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
+                            <Badge variant="secondary" className="text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
                           </td>
                         )}
                         {visibleFields.includes('cnpj') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.cnpj || '—'}</td>}
