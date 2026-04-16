@@ -355,7 +355,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className={hasPipelineFilters ? 'border-primary' : ''}>
+                    <Button variant="outline" size="sm" className={cn("data-[state=open]:bg-accent data-[state=open]:text-accent-foreground", hasPipelineFilters && 'border-primary')}>
                       <Filter className="h-3.5 w-3.5 mr-1.5" />
                       Filtros
                       {hasPipelineFilters && (
