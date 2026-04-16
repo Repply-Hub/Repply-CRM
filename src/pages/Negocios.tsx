@@ -59,10 +59,14 @@ const stageColors: Record<string, string> = {
 
 const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone, whatsapp: MessageSquare, visita: Eye };
 
-type ViewMode = 'pipeline' | 'lista';
+type PageMode = 'pipeline' | 'negocios';
+type PipelineView = 'kanban' | 'lista';
+// Mantido para compatibilidade com a prop existente (rotas antigas)
+type LegacyView = 'pipeline' | 'lista';
 
 interface NegociosProps {
-  defaultView?: ViewMode;
+  /** Modo inicial da página: 'pipeline' (kanban) ou 'lista' (negócios em lista). */
+  defaultView?: LegacyView;
 }
 
 const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
@@ -73,21 +77,32 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
 
-  // O toggle Kanban/Lista existe apenas na rota de Pipeline (/).
-  // Em /pedidos (defaultView='lista') a visualização é fixa em lista.
-  const allowViewToggle = defaultView === 'pipeline';
-
-  // View mode (persistido apenas na rota de pipeline)
-  const [view, setView] = useState<ViewMode>(() => {
-    if (!allowViewToggle) return defaultView;
-    const saved = localStorage.getItem('negocios_view') as ViewMode | null;
-    return saved === 'pipeline' || saved === 'lista' ? saved : defaultView;
+  // ===== View toggles =====
+  // Toggle principal (sempre visível): Pipeline x Negócios.
+  const [mode, setMode] = useState<PageMode>(() => {
+    const saved = localStorage.getItem('negocios_mode') as PageMode | null;
+    if (saved === 'pipeline' || saved === 'negocios') return saved;
+    return defaultView === 'lista' ? 'negocios' : 'pipeline';
   });
-  const handleViewChange = (next: ViewMode) => {
-    if (!allowViewToggle) return;
-    setView(next);
-    localStorage.setItem('negocios_view', next);
+  const handleModeChange = (next: PageMode) => {
+    setMode(next);
+    localStorage.setItem('negocios_mode', next);
   };
+
+  // Sub-toggle (apenas quando mode === 'pipeline'): Kanban x Lista.
+  const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
+    const saved = localStorage.getItem('negocios_pipeline_view') as PipelineView | null;
+    return saved === 'kanban' || saved === 'lista' ? saved : 'kanban';
+  });
+  const handlePipelineViewChange = (next: PipelineView) => {
+    setPipelineView(next);
+    localStorage.setItem('negocios_pipeline_view', next);
+  };
+
+  // Renderização: kanban só quando estamos em Pipeline + Kanban.
+  // Em Negócios, ou em Pipeline+Lista, exibimos a lista (com filtros do pipeline quando aplicável).
+  const showKanban = mode === 'pipeline' && pipelineView === 'kanban';
+  const isPipelineMode = mode === 'pipeline';
 
   // List state
   const [search, setSearch] = useState('');
@@ -260,7 +275,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   // ===== Subtitle =====
-  const subtitle = view === 'pipeline'
+  const subtitle = isPipelineMode
     ? `${pipelineOrders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
     : `${pedidos?.length ?? 0} pedidos`;
 
@@ -270,21 +285,42 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         {/* Top bar: view toggle + actions */}
         <div className="mb-4 md:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            {allowViewToggle && (
+            {/* Toggle principal: Pipeline x Negócios (sempre visível) */}
+            <div className="inline-flex items-center rounded-md border border-border bg-background p-0.5">
+              <Button
+                variant={mode === 'pipeline' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => handleModeChange('pipeline')}
+                className="h-8 px-3"
+              >
+                Pipeline
+              </Button>
+              <Button
+                variant={mode === 'negocios' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => handleModeChange('negocios')}
+                className="h-8 px-3"
+              >
+                Negócios
+              </Button>
+            </div>
+
+            {/* Sub-toggle: Kanban x Lista — apenas no modo Pipeline */}
+            {isPipelineMode && (
               <div className="inline-flex items-center rounded-md border border-border bg-background p-0.5">
                 <Button
-                  variant={view === 'pipeline' ? 'default' : 'ghost'}
+                  variant={pipelineView === 'kanban' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => handleViewChange('pipeline')}
+                  onClick={() => handlePipelineViewChange('kanban')}
                   className="h-8 gap-1.5 px-3"
                 >
                   <LayoutGrid className="h-4 w-4" />
                   Kanban
                 </Button>
                 <Button
-                  variant={view === 'lista' ? 'default' : 'ghost'}
+                  variant={pipelineView === 'lista' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => handleViewChange('lista')}
+                  onClick={() => handlePipelineViewChange('lista')}
                   className="h-8 gap-1.5 px-3"
                 >
                   <ListIcon className="h-4 w-4" />
@@ -293,7 +329,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
 
-            {view === 'pipeline' && (
+            {isPipelineMode && (
               <>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -403,7 +439,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </>
             )}
 
-            {view === 'lista' && (
+            {!showKanban && (
               <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
                 <DialogContent className="max-w-xs">
                   <DialogHeader>
@@ -461,7 +497,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : view === 'pipeline' ? (
+        ) : showKanban ? (
           <DragDropContext onDragEnd={handleDragEnd}>
             <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-3 px-3 sm:mx-0 sm:px-0">
               {KANBAN_STAGES.map(stage => (
