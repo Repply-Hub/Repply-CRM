@@ -92,6 +92,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
   const { user } = useAuth();
   const qc = useQueryClient();
   const isGestor = vendedor.role === 'gestor' || vendedor.role === 'admin';
+  const [expandedModulo, setExpandedModulo] = useState<string | null>(null);
 
   const getPermissao = (modulo: string): Permissao | undefined =>
     permissoes?.find(p => p.modulo === modulo);
@@ -157,13 +158,19 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
     qc.invalidateQueries({ queryKey: ['permissoes_vendedor', vendedor.id] });
   };
 
+  const getPermCount = (modKey: string) => {
+    const perm = getPermissao(modKey);
+    const active = [perm?.pode_ver ?? true, perm?.pode_criar ?? false, perm?.pode_editar ?? false, perm?.pode_excluir ?? false].filter(Boolean).length;
+    return active;
+  };
+
   return (
     <TooltipProvider>
       <div className="rounded-lg border border-border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead className="min-w-[140px]">Módulo</TableHead>
+              <TableHead className="min-w-[180px]">Módulo</TableHead>
               <TableHead className="text-center w-20">
                 <Tooltip><TooltipTrigger asChild><div className="flex items-center justify-center gap-1"><Eye className="h-3.5 w-3.5" /> Ver</div></TooltipTrigger><TooltipContent>Permissão de visualização</TooltipContent></Tooltip>
               </TableHead>
@@ -192,14 +199,48 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
               const criar = perm?.pode_criar ?? false;
               const editar = perm?.pode_editar ?? false;
               const excluir = perm?.pode_excluir ?? false;
+              const isExpanded = expandedModulo === mod.key;
+              const activeCount = getPermCount(mod.key);
               return (
-                <TableRow key={mod.key} className="hover:bg-muted/20 transition-colors">
-                  <TableCell className="font-medium text-sm">{mod.label}</TableCell>
-                  <TableCell className="text-center"><Checkbox checked={ver} onCheckedChange={() => handleToggle(mod.key, 'pode_ver', ver)} /></TableCell>
-                  <TableCell className="text-center"><Checkbox checked={criar} onCheckedChange={() => handleToggle(mod.key, 'pode_criar', criar)} /></TableCell>
-                  <TableCell className="text-center"><Checkbox checked={editar} onCheckedChange={() => handleToggle(mod.key, 'pode_editar', editar)} /></TableCell>
-                  <TableCell className="text-center"><Checkbox checked={excluir} onCheckedChange={() => handleToggle(mod.key, 'pode_excluir', excluir)} /></TableCell>
-                </TableRow>
+                <React.Fragment key={mod.key}>
+                  <TableRow className={cn("hover:bg-muted/20 transition-colors cursor-pointer", isExpanded && "bg-muted/10")} onClick={() => setExpandedModulo(isExpanded ? null : mod.key)}>
+                    <TableCell className="font-medium text-sm">
+                      <div className="flex items-center gap-2">
+                        {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                        <span>{mod.label}</span>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">{activeCount}/4</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={ver} onCheckedChange={() => handleToggle(mod.key, 'pode_ver', ver)} /></TableCell>
+                    <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={criar} onCheckedChange={() => handleToggle(mod.key, 'pode_criar', criar)} /></TableCell>
+                    <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={editar} onCheckedChange={() => handleToggle(mod.key, 'pode_editar', editar)} /></TableCell>
+                    <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={excluir} onCheckedChange={() => handleToggle(mod.key, 'pode_excluir', excluir)} /></TableCell>
+                  </TableRow>
+                  {isExpanded && (
+                    <TableRow className="bg-muted/5 border-0">
+                      <TableCell colSpan={5} className="py-2 px-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-6">
+                          <div className="flex items-start gap-2 text-xs">
+                            <Eye className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", ver ? "text-blue-500" : "text-muted-foreground/30")} />
+                            <span className={cn(ver ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.ver}</span>
+                          </div>
+                          <div className="flex items-start gap-2 text-xs">
+                            <Plus className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", criar ? "text-emerald-500" : "text-muted-foreground/30")} />
+                            <span className={cn(criar ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.criar}</span>
+                          </div>
+                          <div className="flex items-start gap-2 text-xs">
+                            <PenLine className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", editar ? "text-amber-500" : "text-muted-foreground/30")} />
+                            <span className={cn(editar ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.editar}</span>
+                          </div>
+                          <div className="flex items-start gap-2 text-xs">
+                            <Trash className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", excluir ? "text-red-500" : "text-muted-foreground/30")} />
+                            <span className={cn(excluir ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.excluir}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               );
             })}
           </TableBody>
