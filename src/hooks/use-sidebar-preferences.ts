@@ -13,10 +13,9 @@ export interface SidebarItem {
 
 export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard', visible: true },
-  { id: 'pipeline', path: '/', label: 'Pipeline', icon: 'Kanban', visible: true },
+  { id: 'pedidos', path: '/', label: 'Negócios', icon: 'Kanban', visible: true },
   { id: 'clientes', path: '/clientes', label: 'Clientes', icon: 'Users', visible: true },
   { id: 'obras', path: '/obras', label: 'Obras', icon: 'HardHat', visible: true },
-  { id: 'pedidos', path: '/pedidos', label: 'Negócios', icon: 'FileText', visible: true },
   { id: 'fabricantes', path: '/fabricantes', label: 'Fabricantes', icon: 'Factory', visible: true },
   { id: 'portal', path: '/portal', label: 'Portal', icon: 'Globe', visible: true },
   { id: 'calendario', path: '/calendario', label: 'Calendário', icon: 'CalendarDays', visible: true },
@@ -42,8 +41,12 @@ export function useSidebarPreferences() {
         return DEFAULT_SIDEBAR_ITEMS;
       }
 
-      // Merge saved preferences with defaults to handle new items added after save
-      const saved = data.items as unknown as SidebarItem[];
+      // Merge saved preferences with defaults to handle new items added after save.
+      // Also: filter out legacy 'pipeline' item (now unified under 'pedidos') and
+      // normalize the 'pedidos' item to point to '/' with the unified label/icon.
+      const saved = (data.items as unknown as SidebarItem[])
+        .filter(i => i.id !== 'pipeline')
+        .map(i => i.id === 'pedidos' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i);
       const savedIds = new Set(saved.map(i => i.id));
       const newDefaults = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedIds.has(d.id));
       return [...saved, ...newDefaults];
