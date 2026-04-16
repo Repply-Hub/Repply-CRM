@@ -275,7 +275,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   // ===== Subtitle =====
-  const subtitle = view === 'pipeline'
+  const subtitle = isPipelineMode
     ? `${pipelineOrders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
     : `${pedidos?.length ?? 0} pedidos`;
 
@@ -285,21 +285,42 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         {/* Top bar: view toggle + actions */}
         <div className="mb-4 md:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            {allowViewToggle && (
+            {/* Toggle principal: Pipeline x Negócios (sempre visível) */}
+            <div className="inline-flex items-center rounded-md border border-border bg-background p-0.5">
+              <Button
+                variant={mode === 'pipeline' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => handleModeChange('pipeline')}
+                className="h-8 px-3"
+              >
+                Pipeline
+              </Button>
+              <Button
+                variant={mode === 'negocios' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => handleModeChange('negocios')}
+                className="h-8 px-3"
+              >
+                Negócios
+              </Button>
+            </div>
+
+            {/* Sub-toggle: Kanban x Lista — apenas no modo Pipeline */}
+            {isPipelineMode && (
               <div className="inline-flex items-center rounded-md border border-border bg-background p-0.5">
                 <Button
-                  variant={view === 'pipeline' ? 'default' : 'ghost'}
+                  variant={pipelineView === 'kanban' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => handleViewChange('pipeline')}
+                  onClick={() => handlePipelineViewChange('kanban')}
                   className="h-8 gap-1.5 px-3"
                 >
                   <LayoutGrid className="h-4 w-4" />
                   Kanban
                 </Button>
                 <Button
-                  variant={view === 'lista' ? 'default' : 'ghost'}
+                  variant={pipelineView === 'lista' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => handleViewChange('lista')}
+                  onClick={() => handlePipelineViewChange('lista')}
                   className="h-8 gap-1.5 px-3"
                 >
                   <ListIcon className="h-4 w-4" />
@@ -308,7 +329,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
 
-            {view === 'pipeline' && (
+            {isPipelineMode && (
               <>
                 <Popover>
                   <PopoverTrigger asChild>
