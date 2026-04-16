@@ -421,9 +421,9 @@ const Clientes = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className={activeTab === 'empresas' ? 'w-[420px] p-4' : 'w-64 p-4'}>
-              <div className={activeTab === 'empresas' ? 'grid grid-cols-2 gap-4' : ''}>
+              <div className={activeTab === 'empresas' ? 'grid grid-cols-2 gap-0 divide-x divide-border' : ''}>
                 {activeTab === 'empresas' && (
-                  <div className="min-w-0">
+                  <div className="min-w-0 pr-4">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tipo</p>
                     <DropdownMenuRadioGroup
                       value={tipoFilter}
@@ -447,7 +447,7 @@ const Clientes = () => {
                     </DropdownMenuItem>
                   </div>
                 )}
-                <div className="min-w-0">
+                <div className={activeTab === 'empresas' ? 'min-w-0 pl-4' : 'min-w-0'}>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 inline-flex items-center gap-1.5">
                     <ArrowUpDown className="h-3 w-3" /> Ordenação
                   </p>
