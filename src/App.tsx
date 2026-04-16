@@ -5,10 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
-import Index from "./pages/Index";
+import Negocios from "./pages/Negocios";
 import Clientes from "./pages/Clientes";
 import ClienteDetalhe from "./pages/ClienteDetalhe";
-import Pedidos from "./pages/Pedidos";
 import NovoPedido from "./pages/NovoPedido";
 import Dashboard from "./pages/Dashboard";
 import Configuracoes from "./pages/Configuracoes";
@@ -46,10 +45,10 @@ const AppRoutes = () => (
     <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
     <Route path="/esqueci-senha" element={<AuthRoute><EsqueciSenha /></AuthRoute>} />
     <Route path="/redefinir-senha" element={<RedefinirSenha />} />
-    <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+    <Route path="/" element={<ProtectedRoute><Negocios defaultView="pipeline" /></ProtectedRoute>} />
     <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
     <Route path="/clientes/:id" element={<ProtectedRoute><ClienteDetalhe /></ProtectedRoute>} />
-    <Route path="/pedidos" element={<ProtectedRoute><Pedidos /></ProtectedRoute>} />
+    <Route path="/pedidos" element={<ProtectedRoute><Negocios defaultView="lista" /></ProtectedRoute>} />
     <Route path="/pedidos/novo" element={<ProtectedRoute><NovoPedido /></ProtectedRoute>} />
     <Route path="/pedidos/:id/editar" element={<ProtectedRoute><EditarPedido /></ProtectedRoute>} />
     <Route path="/obras" element={<ProtectedRoute><Obras /></ProtectedRoute>} />
