@@ -461,53 +461,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </>
             )}
 
-            {!showKanban && (
-              <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
-                <DialogContent className="max-w-xs">
-                  <DialogHeader>
-                    <DialogTitle className="text-sm">Exibir Colunas</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid gap-2 pt-2">
-                    {PEDIDOS_COLUMNS.map((column) => (
-                      <div
-                        key={column.id}
-                        className={`flex items-center space-x-2 rounded-md p-1 transition-colors hover:bg-muted/50 ${column.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                      >
-                        <Checkbox
-                          id={`col-ped-${column.id}`}
-                          checked={visibleColumns.includes(column.id)}
-                          onCheckedChange={() => {
-                            if (column.locked) return;
-                            if (visibleColumns.includes(column.id)) {
-                              if (visibleColumns.length > 1) {
-                                handleColumnChange(visibleColumns.filter(id => id !== column.id));
-                              }
-                            } else {
-                              const newVisible = PEDIDOS_COLUMNS
-                                .filter(c => visibleColumns.includes(c.id) || c.id === column.id)
-                                .map(c => c.id);
-                              handleColumnChange(newVisible);
-                            }
-                          }}
-                          disabled={column.locked}
-                        />
-                        <Label htmlFor={`col-ped-${column.id}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
-                          {column.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-primary mt-1"
-                    onClick={() => handleColumnChange(PEDIDOS_COLUMNS.map(c => c.id))}
-                  >
-                    Resetar todas
-                  </Button>
-                </DialogContent>
-              </Dialog>
-            )}
+
+
           </div>
 
           <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate('/pedidos/novo')}>
