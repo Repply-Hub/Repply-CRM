@@ -558,7 +558,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   </SelectContent>
                 </Select>
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   {someSelected && (
                     <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
                       <Trash2 className="h-4 w-4" />
