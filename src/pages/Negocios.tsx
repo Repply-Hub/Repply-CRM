@@ -149,7 +149,29 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
 
   // ===== LIST data =====
-  const filtered = (pedidos ?? []).filter(p =>
+  // Quando estamos no modo Pipeline+Lista, a lista deve respeitar os mesmos filtros do Kanban
+  // (vendedor, fabricante, atenção, datas). Caso contrário (modo Negócios), usamos todos os pedidos.
+  const baseListPedidos = useMemo(() => {
+    const all = pedidos ?? [];
+    if (!isPipelineMode) return all;
+    return all.filter(p => {
+      if (selectedVendedores.length > 0 && !selectedVendedores.includes(p.usuario_id)) return false;
+      if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(p.fabricante_id)) return false;
+      if (showOnlyAttention) {
+        const days = Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000);
+        if (days < 7) return false;
+      }
+      if (dateFrom && new Date(p.data_pedido) < dateFrom) return false;
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        if (new Date(p.data_pedido) > end) return false;
+      }
+      return true;
+    });
+  }, [pedidos, isPipelineMode, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
+
+  const filtered = baseListPedidos.filter(p =>
     ((p.cliente?.empresa ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (p.fabricante?.nome ?? '').toLowerCase().includes(search.toLowerCase())) &&
     (stageFilter === 'todos' || p.status === stageFilter)
