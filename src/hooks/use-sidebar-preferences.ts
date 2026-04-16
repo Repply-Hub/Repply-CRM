@@ -13,10 +13,9 @@ export interface SidebarItem {
 
 export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard', visible: true },
-  { id: 'pipeline', path: '/', label: 'Pipeline', icon: 'Kanban', visible: true },
+  { id: 'pedidos', path: '/', label: 'Negócios', icon: 'Kanban', visible: true },
   { id: 'clientes', path: '/clientes', label: 'Clientes', icon: 'Users', visible: true },
   { id: 'obras', path: '/obras', label: 'Obras', icon: 'HardHat', visible: true },
-  { id: 'pedidos', path: '/pedidos', label: 'Negócios', icon: 'FileText', visible: true },
   { id: 'fabricantes', path: '/fabricantes', label: 'Fabricantes', icon: 'Factory', visible: true },
   { id: 'portal', path: '/portal', label: 'Portal', icon: 'Globe', visible: true },
   { id: 'calendario', path: '/calendario', label: 'Calendário', icon: 'CalendarDays', visible: true },
