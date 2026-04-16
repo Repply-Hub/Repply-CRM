@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useVendedores } from '@/hooks/use-clientes';
 import { useCreateVendedor } from '@/hooks/use-mutations';
 import { usePermissoes, useUpsertPermissao, MODULOS, type Permissao } from '@/hooks/use-permissoes';
-import { Plus, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, ChevronRight, History, CalendarIcon, Search, Building2, Crown, UserPlus, X, ChevronDown, ChevronUp, Mail, Phone } from 'lucide-react';
+import { Plus, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, ChevronRight, History, CalendarIcon, Search, Building2, Crown, UserPlus, X, ChevronDown, ChevronUp, Mail, Phone, Info } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
