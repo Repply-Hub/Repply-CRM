@@ -188,7 +188,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [page, totalPages]);
 
   // ===== PIPELINE data =====
-  const allOrders = (pedidos ?? []).map(p => ({
+  const allOrders = useMemo(() => (pedidos ?? []).map(p => ({
     id: p.id,
     clientName: p.cliente?.empresa ?? 'Sem cliente',
     obra: p.obra?.nome_obra ?? '-',
@@ -201,7 +201,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     vendedor: p.vendedor?.nome ?? '-',
     vendedorId: p.usuario_id,
     createdAt: p.data_pedido,
-  }));
+  })), [pedidos]);
 
   const pipelineOrders = useMemo(() => {
     return allOrders.filter(o => {
@@ -217,6 +217,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       return true;
     });
   }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
+
+  // Agrupa pedidos por etapa uma única vez (evita 5x .filter no render do Kanban)
+  const ordersByStage = useMemo(() => {
+    const map: Record<string, typeof pipelineOrders> = {};
+    for (const stage of KANBAN_STAGES) map[stage.key] = [];
+    for (const o of pipelineOrders) {
+      if (map[o.stage]) map[o.stage].push(o);
+    }
+    return map;
+  }, [pipelineOrders]);
 
   const totalPipeline = pipelineOrders.reduce((acc, o) => acc + o.valor, 0);
   const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo;
