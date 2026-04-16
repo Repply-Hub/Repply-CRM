@@ -708,7 +708,7 @@ export function UsuariosTab() {
             className="pl-9"
           />
         </div>
-        {isGestor && empresasData && empresasData.length > 0 && (
+        {isAdmin && empresasData && empresasData.length > 0 && (
           <Select value={empresaFilter} onValueChange={(val) => { setEmpresaFilter(val); setSelectedVendedor(null); }}>
             <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
               <SelectValue placeholder="Filtrar por empresa" />
