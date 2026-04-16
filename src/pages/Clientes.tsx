@@ -671,7 +671,7 @@ const Clientes = () => {
                 </thead>
                 <tbody>
                   {paginatedEmpresas.map(client => {
-                    const Icon = tipoIcons[client.tipo] ?? Building2;
+                    const Icon = getTipoIcon(client.tipo);
                     return (
                       <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`}>
                         <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
@@ -687,7 +687,7 @@ const Clientes = () => {
                         </td>
                         {visibleFields.includes('tipo') && (
                           <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
-                            <Badge variant="secondary" className="text-[10px] font-medium">{tipoLabels[client.tipo] ?? client.tipo}</Badge>
+                            <Badge variant="secondary" className="text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
                           </td>
                         )}
                         {visibleFields.includes('cnpj') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.cnpj || '—'}</td>}
