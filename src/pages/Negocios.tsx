@@ -272,7 +272,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 className="h-8 gap-1.5 px-3"
               >
                 <LayoutGrid className="h-4 w-4" />
-                Pipeline
+                Kanban
               </Button>
               <Button
                 variant={view === 'lista' ? 'default' : 'ghost'}
@@ -281,7 +281,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 className="h-8 gap-1.5 px-3"
               >
                 <ListIcon className="h-4 w-4" />
-                Negócios
+                Lista
               </Button>
             </div>
 
