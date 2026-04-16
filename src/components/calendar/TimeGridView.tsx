@@ -98,8 +98,10 @@ export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGr
   }, []);
 
   const handleColumnClick = (day: Date, e: React.MouseEvent<HTMLDivElement>) => {
+    // rect.top já reflete a posição rolada da coluna no viewport,
+    // então (clientY - rect.top) corresponde ao y dentro do conteúdo total da coluna.
     const rect = e.currentTarget.getBoundingClientRect();
-    const yInColumn = e.clientY - rect.top + (scrollRef.current?.scrollTop ?? 0);
+    const yInColumn = e.clientY - rect.top;
     onClickSlot(yPxToDate(day, yInColumn));
   };
 
