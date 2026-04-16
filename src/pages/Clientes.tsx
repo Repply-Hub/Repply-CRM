@@ -411,7 +411,11 @@ const Clientes = () => {
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 shrink-0 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
+              >
                 <ListFilter className="h-4 w-4" />
                 <span className="hidden sm:inline">Filtros</span>
               </Button>
