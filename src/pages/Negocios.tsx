@@ -264,21 +264,26 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         {/* Top bar: view toggle + actions */}
         <div className="mb-4 md:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <ToggleGroup
-              type="single"
-              value={view}
-              onValueChange={(v) => v && handleViewChange(v as ViewMode)}
-              className="border border-border rounded-md bg-background"
-            >
-              <ToggleGroupItem value="pipeline" size="sm" className="gap-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                <LayoutGrid className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Pipeline</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem value="lista" size="sm" className="gap-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                <ListIcon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Lista</span>
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <div className="inline-flex items-center rounded-md border border-border bg-background p-0.5">
+              <Button
+                variant={view === 'pipeline' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => handleViewChange('pipeline')}
+                className="h-8 gap-1.5 px-3"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                Pipeline
+              </Button>
+              <Button
+                variant={view === 'lista' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => handleViewChange('lista')}
+                className="h-8 gap-1.5 px-3"
+              >
+                <ListIcon className="h-4 w-4" />
+                Pedidos
+              </Button>
+            </div>
 
             {view === 'pipeline' && (
               <>
