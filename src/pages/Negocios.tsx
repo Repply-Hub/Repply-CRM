@@ -286,7 +286,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <div className="mb-4 md:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             {/* Toggle principal: Pipeline x Negócios (sempre visível) */}
-            <div className="inline-flex items-center rounded-md border border-border bg-background p-0.5">
+            <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
               <Button
                 variant={mode === 'pipeline' ? 'default' : 'ghost'}
                 size="sm"
