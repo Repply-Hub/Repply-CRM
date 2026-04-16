@@ -113,19 +113,56 @@ export function PerfilSelect({ name, defaultValue }: { name: string; defaultValu
           </SelectItem>
         </SelectContent>
       </Select>
-      {adding && (
-        <div className="flex gap-2">
-          <Input placeholder="Nome do perfil" value={newPerfil} onChange={e => setNewPerfil(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddPerfil())} className="h-8 text-sm" autoFocus />
-          <Button type="button" size="sm" className="h-8" onClick={handleAddPerfil}>Adicionar</Button>
-        </div>
-      )}
-      {editing && (
-        <div className="flex gap-2">
-          <Input placeholder="Novo nome" value={editNome} onChange={e => setEditNome(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleEditPerfil())} className="h-8 text-sm" autoFocus />
-          <Button type="button" size="sm" className="h-8" onClick={handleEditPerfil}>Salvar</Button>
-          <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => setEditing(null)}>Cancelar</Button>
-        </div>
-      )}
+
+      {/* Modal: Novo perfil */}
+      <Dialog open={adding} onOpenChange={(o) => { setAdding(o); if (!o) setNewPerfil(''); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Perfil</DialogTitle>
+            <DialogDescription>Crie um perfil personalizado para classificar seus usuários.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Nome do perfil</Label>
+            <Input
+              placeholder="Ex: Coordenador, Suporte..."
+              value={newPerfil}
+              onChange={(e) => setNewPerfil(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddPerfil())}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setAdding(false); setNewPerfil(''); }}>Cancelar</Button>
+            <Button type="button" onClick={handleAddPerfil} disabled={!newPerfil.trim()}>
+              <Plus className="h-4 w-4 mr-1" /> Criar perfil
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Editar perfil */}
+      <Dialog open={!!editing} onOpenChange={(o) => { if (!o) { setEditing(null); setEditNome(''); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Perfil</DialogTitle>
+            <DialogDescription>Atualize o nome do perfil personalizado.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Nome do perfil</Label>
+            <Input
+              placeholder="Novo nome"
+              value={editNome}
+              onChange={(e) => setEditNome(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEditPerfil())}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button type="button" onClick={handleEditPerfil} disabled={!editNome.trim()}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
