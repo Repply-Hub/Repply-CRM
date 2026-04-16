@@ -128,7 +128,7 @@ const NovoPedido = () => {
   // Validation
   const validateStep1 = () => {
     if (!clienteId) { toast.error('Selecione um cliente'); return false; }
-    if (isConstrutora && !obraId) { toast.error('Selecione uma obra'); return false; }
+    
     if (!fabricanteId) { toast.error('Selecione um fabricante'); return false; }
     if (!vendedorId) { toast.error('Selecione o responsável'); return false; }
     return true;
@@ -279,7 +279,7 @@ const NovoPedido = () => {
                 {/* Obra (conditional) */}
                 {isConstrutora && (
                   <div className="space-y-2">
-                    <Label>Obra *</Label>
+                    <Label>Obra</Label>
                     <Select value={obraId} onValueChange={handleObraChange}>
                       <SelectTrigger><SelectValue placeholder="Selecionar obra" /></SelectTrigger>
                       <SelectContent>
