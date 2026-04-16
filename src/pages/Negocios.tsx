@@ -170,14 +170,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     });
   }, [pedidos, isPipelineMode, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
 
-  const filtered = baseListPedidos.filter(p =>
-    ((p.cliente?.empresa ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      (p.fabricante?.nome ?? '').toLowerCase().includes(search.toLowerCase())) &&
-    (stageFilter === 'todos' || p.status === stageFilter)
-  );
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return baseListPedidos.filter(p => {
+      if (stageFilter !== 'todos' && p.status !== stageFilter) return false;
+      if (!q) return true;
+      const empresa = (p.cliente?.empresa ?? '').toLowerCase();
+      const fab = (p.fabricante?.nome ?? '').toLowerCase();
+      return empresa.includes(q) || fab.includes(q);
+    });
+  }, [baseListPedidos, search, stageFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize]
+  );
   const visibleColumnCount = Math.max(
     1,
     visibleColumns.filter(id => id !== 'acoes').length + (visibleColumns.includes('acoes') ? 2 : 0) + 1
