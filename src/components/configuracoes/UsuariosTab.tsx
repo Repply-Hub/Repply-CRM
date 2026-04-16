@@ -535,6 +535,15 @@ export function UsuariosTab() {
     },
   });
 
+  const { data: isAdmin } = useQuery({
+    queryKey: ['is_admin'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('is_admin');
+      if (error) throw error;
+      return data as boolean;
+    },
+  });
+
   const { data: empresasData } = useQuery({
     queryKey: ['empresas_list'],
     queryFn: async () => {
@@ -542,7 +551,7 @@ export function UsuariosTab() {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!isGestor,
+    enabled: !!isAdmin,
   });
 
   const { data: customPerfis } = useQuery({
@@ -699,7 +708,7 @@ export function UsuariosTab() {
             className="pl-9"
           />
         </div>
-        {isGestor && empresasData && empresasData.length > 0 && (
+        {isAdmin && empresasData && empresasData.length > 0 && (
           <Select value={empresaFilter} onValueChange={(val) => { setEmpresaFilter(val); setSelectedVendedor(null); }}>
             <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
               <SelectValue placeholder="Filtrar por empresa" />
