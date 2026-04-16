@@ -31,7 +31,7 @@ export function useSendWhatsApp() {
 
   return useMutation({
     mutationFn: async (params: {
-      vendedor_id: string;
+      usuario_id: string;
       pedido_id?: string;
       cliente_id?: string;
       telefone: string;
@@ -43,7 +43,7 @@ export function useSendWhatsApp() {
 
       // Registrar no banco antes de abrir
       const { error } = await supabase.from('mensagens_whatsapp').insert({
-        vendedor_id: params.vendedor_id,
+        usuario_id: params.usuario_id,
         pedido_id: params.pedido_id || null,
         cliente_id: params.cliente_id || null,
         telefone_destino: params.telefone,

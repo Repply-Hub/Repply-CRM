@@ -69,7 +69,7 @@ const Index = () => {
     daysInStage: Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000),
     alertDays: 7,
     vendedor: p.vendedor?.nome ?? '-',
-    vendedorId: p.vendedor_id,
+    vendedorId: p.usuario_id,
     createdAt: p.data_pedido,
   }));
 

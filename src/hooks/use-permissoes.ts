@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface Permissao {
   id: string;
-  vendedor_id: string;
+  usuario_id: string;
   modulo: string;
   pode_ver: boolean;
   pode_criar: boolean;
@@ -208,9 +208,9 @@ export function usePermissoes(vendedorId?: string) {
     queryKey: ['permissoes_vendedor', vendedorId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('permissoes_vendedor')
+        .from('permissoes_usuario')
         .select('*')
-        .eq('vendedor_id', vendedorId!);
+        .eq('usuario_id', vendedorId!);
       if (error) throw error;
       return (data ?? []).map(row => ({
         ...row,
@@ -227,7 +227,7 @@ export function useUpsertPermissao() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
-      vendedor_id: string;
+      usuario_id: string;
       modulo: string;
       pode_ver: boolean;
       pode_criar: boolean;
@@ -236,15 +236,15 @@ export function useUpsertPermissao() {
       funcionalidades?: Record<string, boolean>;
     }) => {
       const { error } = await supabase
-        .from('permissoes_vendedor')
+        .from('permissoes_usuario')
         .upsert({
           ...data,
           funcionalidades: data.funcionalidades ?? {},
-        } as any, { onConflict: 'vendedor_id,modulo' });
+        } as any, { onConflict: 'usuario_id,modulo' });
       if (error) throw error;
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ['permissoes_vendedor', vars.vendedor_id] });
+      qc.invalidateQueries({ queryKey: ['permissoes_vendedor', vars.usuario_id] });
     },
   });
 }

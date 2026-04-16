@@ -163,7 +163,7 @@ const NovoPedido = () => {
       await createPedido.mutateAsync({
         cliente_id: clienteId,
         fabricante_id: fabricanteId,
-        vendedor_id: vendedorId,
+        usuario_id: vendedorId,
         obra_id: obraId || undefined,
         data_pedido: format(dataPedido, 'yyyy-MM-dd'),
         prazo_resposta: prazoResposta ? format(prazoResposta, 'yyyy-MM-dd') : undefined,

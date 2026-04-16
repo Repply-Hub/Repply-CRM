@@ -44,11 +44,11 @@ function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nom
   const qc = useQueryClient();
   const updateMutation = useMutation({
     mutationFn: async (data: { nome: string; email: string; telefone?: string; role: string }) => {
-      const { error } = await supabase.from('vendedores').update(data).eq('id', vendedor.id);
+      const { error } = await supabase.from('usuarios').update(data).eq('id', vendedor.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['vendedores'] });
+      qc.invalidateQueries({ queryKey: ['usuarios'] });
       toast.success('Usuário atualizado!');
       onClose();
     },
@@ -124,7 +124,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
   const updatePermissao = async (modulo: string, updates: Partial<Pick<Permissao, 'pode_ver' | 'pode_criar' | 'pode_editar' | 'pode_excluir' | 'funcionalidades'>>, acaoLog: string, detalhes: any) => {
     const existing = getPermissao(modulo);
     const newData = {
-      vendedor_id: vendedor.id,
+      usuario_id: vendedor.id,
       modulo,
       pode_ver: updates.pode_ver ?? existing?.pode_ver ?? true,
       pode_criar: updates.pode_criar ?? existing?.pode_criar ?? false,
@@ -135,7 +135,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
     upsert.mutate(newData);
     await supabase.from('audit_permissoes').insert({
       admin_id: user?.id ?? '',
-      vendedor_id: vendedor.id,
+      usuario_id: vendedor.id,
       acao: acaoLog,
       detalhes,
     });
@@ -164,7 +164,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
       }, {} as Record<string, boolean>);
       const existingFuncs = (typeof existing?.funcionalidades === 'object' && existing?.funcionalidades !== null) ? existing.funcionalidades : {};
       return {
-        vendedor_id: vendedor.id,
+        usuario_id: vendedor.id,
         modulo: mod.key,
         pode_ver: preset !== 'nenhum',
         pode_criar: preset === 'operacional' || preset === 'total',
@@ -173,11 +173,11 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
         funcionalidades: preset === 'nenhum' ? {} : (preset === 'leitura' ? existingFuncs : baseFuncs),
       };
     });
-    const { error } = await supabase.from('permissoes_vendedor').upsert(rows as any[], { onConflict: 'vendedor_id,modulo' });
+    const { error } = await supabase.from('permissoes_usuario').upsert(rows as any[], { onConflict: 'usuario_id,modulo' });
     if (error) { toast.error('Erro ao aplicar preset'); return; }
     await supabase.from('audit_permissoes').insert({
       admin_id: user?.id ?? '',
-      vendedor_id: vendedor.id,
+      usuario_id: vendedor.id,
       acao: `Aplicou preset: ${preset}`,
       detalhes: { preset } as any,
     });
@@ -436,7 +436,7 @@ function AuditLog() {
   }
 
   const filtered = logs.filter(log => {
-    const matchesSearch = !search || getVendedorNome(log.vendedor_id).toLowerCase().includes(search.toLowerCase()) || log.acao.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = !search || getVendedorNome(log.usuario_id).toLowerCase().includes(search.toLowerCase()) || log.acao.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = !activeFilter || getActionMeta(log.acao).label === activeFilter;
     const logDate = new Date(log.created_at);
     const matchesDateFrom = !dateFrom || logDate >= new Date(dateFrom.setHours(0, 0, 0, 0));
@@ -549,7 +549,7 @@ function AuditLog() {
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium text-foreground">{getVendedorNome(log.vendedor_id)}</span>
+                                <span className="text-sm font-medium text-foreground">{getVendedorNome(log.usuario_id)}</span>
                                 {isBulk && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-primary/30 text-primary">Todos</Badge>}
                               </div>
                               <p className="text-xs text-muted-foreground mt-0.5">{log.acao}</p>
@@ -771,11 +771,11 @@ export function UsuariosTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('vendedores').delete().eq('id', id);
+      const { error } = await supabase.from('usuarios').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['vendedores'] });
+      qc.invalidateQueries({ queryKey: ['usuarios'] });
       toast.success('Usuário removido!');
       setSelectedVendedor(null);
     },

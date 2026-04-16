@@ -65,7 +65,7 @@ function ProfileTab() {
     queryKey: ['meu_perfil', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('vendedores')
+        .from('usuarios')
         .select('id, nome, email, telefone, role')
         .eq('user_id', user!.id)
         .single();
@@ -77,7 +77,7 @@ function ProfileTab() {
 
   const updatePerfil = useMutation({
     mutationFn: async (dados: { nome: string; telefone: string }) => {
-      const { error } = await supabase.from('vendedores').update(dados).eq('user_id', user!.id);
+      const { error } = await supabase.from('usuarios').update(dados).eq('user_id', user!.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -91,7 +91,7 @@ function ProfileTab() {
     mutationFn: async (email: string) => {
       const { error } = await supabase.auth.updateUser({ email });
       if (error) throw error;
-      await supabase.from('vendedores').update({ email }).eq('user_id', user!.id);
+      await supabase.from('usuarios').update({ email }).eq('user_id', user!.id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['meu_perfil', user?.id] });

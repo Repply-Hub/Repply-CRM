@@ -34,7 +34,7 @@ async function openWhatsAppForNotification(n: Notificacao, tipo: 'cobranca' | 'r
   const { data: vendedor } = await supabase.rpc('get_my_vendedor_id');
   if (vendedor) {
     await supabase.from('mensagens_whatsapp').insert({
-      vendedor_id: vendedor,
+      usuario_id: vendedor,
       pedido_id: n.pedido_id,
       cliente_id: n.cliente_id,
       telefone_destino: cliente.telefone,

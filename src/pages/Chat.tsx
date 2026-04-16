@@ -236,13 +236,13 @@ const Chat = () => {
     queryKey: ['chat-members'],
     queryFn: async () => {
       const { data: me } = await supabase
-        .from('vendedores')
+        .from('usuarios')
         .select('empresa_id')
         .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
         .single();
       if (!me?.empresa_id) return [];
       const { data, error } = await supabase
-        .from('vendedores')
+        .from('usuarios')
         .select('id, nome, email, role')
         .eq('empresa_id', me.empresa_id)
         .order('nome');
@@ -392,9 +392,9 @@ const Chat = () => {
                       </span>
                     </div>
                     {group.msgs.map((msg, i) => {
-                      const isMe = msg.vendedor_id === myVendedor;
+                      const isMe = msg.usuario_id === myVendedor;
                       const name = msg.vendedor?.nome ?? 'Desconhecido';
-                      const showAvatar = i === 0 || group.msgs[i - 1].vendedor_id !== msg.vendedor_id;
+                      const showAvatar = i === 0 || group.msgs[i - 1].usuario_id !== msg.usuario_id;
                       return (
                         <div
                           key={msg.id}
@@ -402,7 +402,7 @@ const Chat = () => {
                         >
                           {showAvatar ? (
                             <Avatar className="h-8 w-8 shrink-0">
-                              <AvatarFallback className={`${colorForId(msg.vendedor_id)} text-white text-xs`}>
+                              <AvatarFallback className={`${colorForId(msg.usuario_id)} text-white text-xs`}>
                                 {getInitials(name)}
                               </AvatarFallback>
                             </Avatar>

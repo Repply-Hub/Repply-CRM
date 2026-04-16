@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     // ========================================================
     const { data: followups, error: errFollow } = await supabase
       .from("historico_contatos")
-      .select("id, pedido_id, vendedor_id, proximo_contato_em, descricao")
+      .select("id, pedido_id, usuario_id, proximo_contato_em, descricao")
       .not("proximo_contato_em", "is", null)
       .lte("proximo_contato_em", new Date().toISOString());
 
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
           .from("notificacoes")
           .select("id")
           .eq("pedido_id", f.pedido_id)
-          .eq("vendedor_id", f.vendedor_id)
+          .eq("usuario_id", f.usuario_id)
           .eq("tipo", "followup")
           .gte("created_at", `${today}T00:00:00Z`)
           .limit(1);
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
         const { error: insertErr } = await supabase
           .from("notificacoes")
           .insert({
-            vendedor_id: f.vendedor_id,
+            usuario_id: f.usuario_id,
             pedido_id: f.pedido_id,
             cliente_id: pedido.cliente_id,
             tipo: "followup",
@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
           .from("notificacoes")
           .select("id")
           .eq("pedido_id", p.pedido_id)
-          .eq("vendedor_id", p.vendedor_id)
+          .eq("usuario_id", p.usuario_id)
           .eq("tipo", "inatividade")
           .gte("created_at", `${today}T00:00:00Z`)
           .limit(1);
@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
         const { error: insertErr } = await supabase
           .from("notificacoes")
           .insert({
-            vendedor_id: p.vendedor_id,
+            usuario_id: p.usuario_id,
             pedido_id: p.pedido_id,
             cliente_id: p.cliente_id,
             tipo: "inatividade",

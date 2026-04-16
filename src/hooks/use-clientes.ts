@@ -73,10 +73,10 @@ export function useFabricantes() {
 
 export function useVendedores() {
   return useQuery({
-    queryKey: ['vendedores'],
+    queryKey: ['usuarios'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('vendedores')
+        .from('usuarios')
         .select('*')
         .order('nome');
       if (error) throw error;

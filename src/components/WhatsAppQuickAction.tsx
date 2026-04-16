@@ -50,7 +50,7 @@ export function WhatsAppQuickAction({
 
       // Registrar no banco
       await sendWa.mutateAsync({
-        vendedor_id: vendedorId,
+        usuario_id: vendedorId,
         pedido_id: pedidoId,
         cliente_id: clienteId,
         telefone,
