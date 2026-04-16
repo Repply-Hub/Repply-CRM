@@ -281,7 +281,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 className="h-8 gap-1.5 px-3"
               >
                 <ListIcon className="h-4 w-4" />
-                Pedidos
+                Negócios
               </Button>
             </div>
 
