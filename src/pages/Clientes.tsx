@@ -431,6 +431,13 @@ const Clientes = () => {
               </SelectContent>
             </Select>
           )}
+          <Select value={sortOrder} onValueChange={(v) => { setSortOrder(v as 'asc' | 'desc'); setPage(1); }}>
+            <SelectTrigger className="w-fit max-w-full shrink-0"><SelectValue placeholder="Ordenar" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Nome (A → Z)</SelectItem>
+              <SelectItem value="desc">Nome (Z → A)</SelectItem>
+            </SelectContent>
+          </Select>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
