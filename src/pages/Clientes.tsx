@@ -390,12 +390,24 @@ const Clientes = () => {
             />
           </div>
           {activeTab === 'empresas' && (
-            <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1); }}>
+            <Select
+              value={tipoFilter}
+              onValueChange={(v) => {
+                if (v === '__new__') {
+                  setNewTipoTarget('filter');
+                  setNewTipoOpen(true);
+                  return;
+                }
+                setTipoFilter(v);
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="w-fit max-w-full shrink-0"><SelectValue placeholder="Filtrar por tipo" /></SelectTrigger>
               <SelectContent>
                 {tipoFilterOptions.map(opt => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
+                <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -494,7 +506,17 @@ const Clientes = () => {
                   <>
                     <div>
                       <Label>Tipo</Label>
-                      <Select value={tipo} onValueChange={setTipo}>
+                      <Select
+                        value={tipo}
+                        onValueChange={(v) => {
+                          if (v === '__new__') {
+                            setNewTipoTarget('form');
+                            setNewTipoOpen(true);
+                            return;
+                          }
+                          setTipo(v);
+                        }}
+                      >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="construtora">Construtora</SelectItem>
@@ -506,6 +528,10 @@ const Clientes = () => {
                           <SelectItem value="hotel">Hotel</SelectItem>
                           <SelectItem value="escola">Escola</SelectItem>
                           <SelectItem value="instalador">Instalador</SelectItem>
+                          {customTipos.map(t => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                          ))}
+                          <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
