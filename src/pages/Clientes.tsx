@@ -416,43 +416,46 @@ const Clientes = () => {
                 <span className="hidden sm:inline">Filtros</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {activeTab === 'empresas' && (
-                <>
-                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Tipo</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className={activeTab === 'empresas' ? 'w-[420px] p-3' : 'w-64 p-3'}>
+              <div className={activeTab === 'empresas' ? 'grid grid-cols-2 gap-4' : ''}>
+                {activeTab === 'empresas' && (
+                  <div className="min-w-0">
+                    <DropdownMenuLabel className="px-1 pb-1 text-xs text-muted-foreground font-normal">Tipo</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup
+                      value={tipoFilter}
+                      onValueChange={(v) => { setTipoFilter(v); setPage(1); }}
+                    >
+                      {tipoFilterOptions.map(opt => (
+                        <DropdownMenuRadioItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setNewTipoTarget('filter');
+                        setNewTipoOpen(true);
+                      }}
+                      className="text-primary font-medium"
+                    >
+                      + Criar novo tipo…
+                    </DropdownMenuItem>
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <DropdownMenuLabel className="px-1 pb-1 text-xs text-muted-foreground font-normal">
+                    <span className="inline-flex items-center gap-1.5"><ArrowUpDown className="h-3 w-3" /> Ordenação</span>
+                  </DropdownMenuLabel>
                   <DropdownMenuRadioGroup
-                    value={tipoFilter}
-                    onValueChange={(v) => { setTipoFilter(v); setPage(1); }}
+                    value={sortOrder}
+                    onValueChange={(v) => { setSortOrder(v as 'asc' | 'desc'); setPage(1); }}
                   >
-                    {tipoFilterOptions.map(opt => (
-                      <DropdownMenuRadioItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </DropdownMenuRadioItem>
-                    ))}
+                    <DropdownMenuRadioItem value="asc">Nome (A → Z)</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="desc">Nome (Z → A)</DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setNewTipoTarget('filter');
-                      setNewTipoOpen(true);
-                    }}
-                    className="text-primary font-medium"
-                  >
-                    + Criar novo tipo…
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                <span className="inline-flex items-center gap-1.5"><ArrowUpDown className="h-3 w-3" /> Ordenação</span>
-              </DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={sortOrder}
-                onValueChange={(v) => { setSortOrder(v as 'asc' | 'desc'); setPage(1); }}
-              >
-                <DropdownMenuRadioItem value="asc">Nome (A → Z)</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="desc">Nome (Z → A)</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
+                </div>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
           <DropdownMenu>
