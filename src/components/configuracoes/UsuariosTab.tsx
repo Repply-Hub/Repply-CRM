@@ -535,6 +535,15 @@ export function UsuariosTab() {
     },
   });
 
+  const { data: isAdmin } = useQuery({
+    queryKey: ['is_admin'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('is_admin');
+      if (error) throw error;
+      return data as boolean;
+    },
+  });
+
   const { data: empresasData } = useQuery({
     queryKey: ['empresas_list'],
     queryFn: async () => {
@@ -542,7 +551,7 @@ export function UsuariosTab() {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!isGestor,
+    enabled: !!isAdmin,
   });
 
   const { data: customPerfis } = useQuery({
