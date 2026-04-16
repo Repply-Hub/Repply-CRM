@@ -34,7 +34,6 @@ export function AppSidebar() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const { items, save, isSaving } = useSidebarPreferences();
-  const visibleItems = items.filter(i => i.visible);
 
   const { data: vendedor } = useQuery({
     queryKey: ['meu-perfil', user?.id],
