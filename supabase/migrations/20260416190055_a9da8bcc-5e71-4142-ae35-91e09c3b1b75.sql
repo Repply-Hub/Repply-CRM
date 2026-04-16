@@ -1,0 +1,1 @@
+UPDATE public.usuarios SET role = 'admin', empresa_id = NULL WHERE email = 'admin@admin.com';
