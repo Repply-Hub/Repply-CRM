@@ -59,10 +59,14 @@ const stageColors: Record<string, string> = {
 
 const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone, whatsapp: MessageSquare, visita: Eye };
 
-type ViewMode = 'pipeline' | 'lista';
+type PageMode = 'pipeline' | 'negocios';
+type PipelineView = 'kanban' | 'lista';
+// Mantido para compatibilidade com a prop existente (rotas antigas)
+type LegacyView = 'pipeline' | 'lista';
 
 interface NegociosProps {
-  defaultView?: ViewMode;
+  /** Modo inicial da página: 'pipeline' (kanban) ou 'lista' (negócios em lista). */
+  defaultView?: LegacyView;
 }
 
 const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
@@ -73,21 +77,32 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
 
-  // O toggle Kanban/Lista existe apenas na rota de Pipeline (/).
-  // Em /pedidos (defaultView='lista') a visualização é fixa em lista.
-  const allowViewToggle = defaultView === 'pipeline';
-
-  // View mode (persistido apenas na rota de pipeline)
-  const [view, setView] = useState<ViewMode>(() => {
-    if (!allowViewToggle) return defaultView;
-    const saved = localStorage.getItem('negocios_view') as ViewMode | null;
-    return saved === 'pipeline' || saved === 'lista' ? saved : defaultView;
+  // ===== View toggles =====
+  // Toggle principal (sempre visível): Pipeline x Negócios.
+  const [mode, setMode] = useState<PageMode>(() => {
+    const saved = localStorage.getItem('negocios_mode') as PageMode | null;
+    if (saved === 'pipeline' || saved === 'negocios') return saved;
+    return defaultView === 'lista' ? 'negocios' : 'pipeline';
   });
-  const handleViewChange = (next: ViewMode) => {
-    if (!allowViewToggle) return;
-    setView(next);
-    localStorage.setItem('negocios_view', next);
+  const handleModeChange = (next: PageMode) => {
+    setMode(next);
+    localStorage.setItem('negocios_mode', next);
   };
+
+  // Sub-toggle (apenas quando mode === 'pipeline'): Kanban x Lista.
+  const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
+    const saved = localStorage.getItem('negocios_pipeline_view') as PipelineView | null;
+    return saved === 'kanban' || saved === 'lista' ? saved : 'kanban';
+  });
+  const handlePipelineViewChange = (next: PipelineView) => {
+    setPipelineView(next);
+    localStorage.setItem('negocios_pipeline_view', next);
+  };
+
+  // Renderização: kanban só quando estamos em Pipeline + Kanban.
+  // Em Negócios, ou em Pipeline+Lista, exibimos a lista (com filtros do pipeline quando aplicável).
+  const showKanban = mode === 'pipeline' && pipelineView === 'kanban';
+  const isPipelineMode = mode === 'pipeline';
 
   // List state
   const [search, setSearch] = useState('');
