@@ -40,12 +40,26 @@ export function AppSidebar() {
     queryFn: async () => {
       const { data } = await supabase
         .from('vendedores')
-        .select('nome, role')
+        .select('id, nome, role')
         .eq('user_id', user!.id)
         .maybeSingle();
       return data;
     },
     enabled: !!user?.id,
+  });
+
+  const isVendedor = vendedor?.role === 'vendedor';
+  const { data: permissoes } = usePermissoes(isVendedor ? vendedor?.id : undefined);
+
+  // Filter visible items, and for vendedores also check permissoes_vendedor
+  const visibleItems = items.filter(i => {
+    if (!i.visible) return false;
+    if (!isVendedor) return true; // admins/empresa see all visible items
+    // For vendedores: check if they have pode_ver permission for this module
+    if (!permissoes || permissoes.length === 0) return true; // no permissions set = show all (default)
+    const perm = permissoes.find(p => p.modulo === i.id);
+    if (!perm) return true; // no specific permission = default visible
+    return perm.pode_ver;
   });
   const location = useLocation();
   const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
