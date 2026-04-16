@@ -170,14 +170,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     });
   }, [pedidos, isPipelineMode, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
 
-  const filtered = baseListPedidos.filter(p =>
-    ((p.cliente?.empresa ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      (p.fabricante?.nome ?? '').toLowerCase().includes(search.toLowerCase())) &&
-    (stageFilter === 'todos' || p.status === stageFilter)
-  );
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return baseListPedidos.filter(p => {
+      if (stageFilter !== 'todos' && p.status !== stageFilter) return false;
+      if (!q) return true;
+      const empresa = (p.cliente?.empresa ?? '').toLowerCase();
+      const fab = (p.fabricante?.nome ?? '').toLowerCase();
+      return empresa.includes(q) || fab.includes(q);
+    });
+  }, [baseListPedidos, search, stageFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize]
+  );
   const visibleColumnCount = Math.max(
     1,
     visibleColumns.filter(id => id !== 'acoes').length + (visibleColumns.includes('acoes') ? 2 : 0) + 1
@@ -188,7 +196,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [page, totalPages]);
 
   // ===== PIPELINE data =====
-  const allOrders = (pedidos ?? []).map(p => ({
+  const allOrders = useMemo(() => (pedidos ?? []).map(p => ({
     id: p.id,
     clientName: p.cliente?.empresa ?? 'Sem cliente',
     obra: p.obra?.nome_obra ?? '-',
@@ -201,7 +209,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     vendedor: p.vendedor?.nome ?? '-',
     vendedorId: p.usuario_id,
     createdAt: p.data_pedido,
-  }));
+  })), [pedidos]);
 
   const pipelineOrders = useMemo(() => {
     return allOrders.filter(o => {
@@ -217,6 +225,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       return true;
     });
   }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
+
+  // Agrupa pedidos por etapa uma única vez (evita 5x .filter no render do Kanban)
+  const ordersByStage = useMemo(() => {
+    const map: Record<string, typeof pipelineOrders> = {};
+    for (const stage of KANBAN_STAGES) map[stage.key] = [];
+    for (const o of pipelineOrders) {
+      if (map[o.stage]) map[o.stage].push(o);
+    }
+    return map;
+  }, [pipelineOrders]);
 
   const totalPipeline = pipelineOrders.reduce((acc, o) => acc + o.valor, 0);
   const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo;
@@ -482,7 +500,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   stageKey={stage.key}
                   label={stage.label}
                   colorClass={stage.color}
-                  orders={pipelineOrders.filter(o => o.stage === stage.key)}
+                  orders={ordersByStage[stage.key] ?? []}
                 />
               ))}
             </div>

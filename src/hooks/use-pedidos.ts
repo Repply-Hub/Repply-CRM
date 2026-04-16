@@ -22,19 +22,24 @@ export function usePedidos() {
   return useQuery({
     queryKey: ['pedidos'],
     queryFn: async () => {
+      // Seleciona apenas as colunas usadas na UI (evita trafegar campos pesados como observacoes/endereco)
       const { data, error } = await supabase
         .from('pedidos')
         .select(`
-          *,
+          id, status, valor_total, data_pedido, created_at, observacoes,
+          cliente_id, fabricante_id, usuario_id, obra_id,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
-          vendedor:vendedores(id, nome),
+          vendedor:usuarios!pedidos_vendedor_id_fkey(id, nome),
           obra:obras(id, nome_obra)
         `)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as unknown as PedidoWithRelations[];
     },
+    staleTime: 60_000, // 1min — evita refetch ao alternar entre páginas
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 
