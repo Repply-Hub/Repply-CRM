@@ -14,8 +14,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useCreateVendedor } from '@/hooks/use-mutations';
-import { usePermissoes, useUpsertPermissao, MODULOS, type Permissao } from '@/hooks/use-permissoes';
-import { Plus, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, ChevronRight, History, CalendarIcon, Search, Building2, Crown, UserPlus, X, ChevronDown, ChevronUp, Mail, Phone, Info } from 'lucide-react';
+import { usePermissoes, useUpsertPermissao, MODULOS, type Permissao, type Funcionalidade } from '@/hooks/use-permissoes';
+import { Plus, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, ChevronRight, History, CalendarIcon, Search, Building2, Crown, UserPlus, X, ChevronDown, ChevronUp, Mail, Phone, Info, Import, FileDown, Filter, ArrowRightLeft, MessageCircle, FileText, ToggleLeft, UserCheck, UsersRound, FileUp, Key, Globe, DollarSign } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -85,6 +85,17 @@ function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nom
   );
 }
 
+// ─── Funcionalidade icon helper ───
+function getFuncIcon(icon: Funcionalidade['icon']) {
+  const map: Record<string, typeof Import> = {
+    import: Import, export: FileDown, filter: Filter, move: ArrowRightLeft,
+    whatsapp: MessageCircle, pdf: FileText, status: ToggleLeft,
+    assign: UserCheck, group: UsersRound, file: FileUp, users: Users,
+    shield: Shield, key: Key, ics: CalendarIcon, scraping: Globe, prices: DollarSign,
+  };
+  return map[icon] || Info;
+}
+
 // ─── Inline Permissions Editor ───
 function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: string; role: string } }) {
   const { data: permissoes, isLoading } = usePermissoes(vendedor.id);
@@ -106,6 +117,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
       pode_criar: campo === 'pode_criar' ? !currentVal : (existing?.pode_criar ?? false),
       pode_editar: campo === 'pode_editar' ? !currentVal : (existing?.pode_editar ?? false),
       pode_excluir: campo === 'pode_excluir' ? !currentVal : (existing?.pode_excluir ?? false),
+      funcionalidades: existing?.funcionalidades ?? {},
     };
     upsert.mutate(newData);
     await supabase.from('audit_permissoes').insert({
@@ -113,6 +125,27 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
       vendedor_id: vendedor.id,
       acao: `Alterou ${campo} de ${modulo}`,
       detalhes: { campo, modulo, de: currentVal, para: !currentVal },
+    });
+  };
+
+  const handleToggleFuncionalidade = async (modulo: string, funcKey: string, currentVal: boolean) => {
+    const existing = getPermissao(modulo);
+    const newFuncs = { ...(existing?.funcionalidades ?? {}), [funcKey]: !currentVal };
+    const newData = {
+      vendedor_id: vendedor.id,
+      modulo,
+      pode_ver: existing?.pode_ver ?? true,
+      pode_criar: existing?.pode_criar ?? false,
+      pode_editar: existing?.pode_editar ?? false,
+      pode_excluir: existing?.pode_excluir ?? false,
+      funcionalidades: newFuncs,
+    };
+    upsert.mutate(newData);
+    await supabase.from('audit_permissoes').insert({
+      admin_id: user?.id ?? '',
+      vendedor_id: vendedor.id,
+      acao: `Alterou funcionalidade ${funcKey} de ${modulo}`,
+      detalhes: { tipo: 'funcionalidade', funcionalidade: funcKey, modulo, de: currentVal, para: !currentVal },
     });
   };
 
@@ -145,9 +178,10 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
         pode_criar: campo === 'pode_criar' ? newValue : (existing?.pode_criar ?? false),
         pode_editar: campo === 'pode_editar' ? newValue : (existing?.pode_editar ?? false),
         pode_excluir: campo === 'pode_excluir' ? newValue : (existing?.pode_excluir ?? false),
+        funcionalidades: existing?.funcionalidades ?? {},
       };
     });
-    const { error } = await supabase.from('permissoes_vendedor').upsert(rows, { onConflict: 'vendedor_id,modulo' });
+    const { error } = await supabase.from('permissoes_vendedor').upsert(rows as any[], { onConflict: 'vendedor_id,modulo' });
     if (error) { toast.error('Erro ao atualizar permissões'); return; }
     await supabase.from('audit_permissoes').insert({
       admin_id: user?.id ?? '',
@@ -159,9 +193,12 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
   };
 
   const getPermCount = (modKey: string) => {
+    const mod = MODULOS.find(m => m.key === modKey);
     const perm = getPermissao(modKey);
-    const active = [perm?.pode_ver ?? true, perm?.pode_criar ?? false, perm?.pode_editar ?? false, perm?.pode_excluir ?? false].filter(Boolean).length;
-    return active;
+    const crudActive = [perm?.pode_ver ?? true, perm?.pode_criar ?? false, perm?.pode_editar ?? false, perm?.pode_excluir ?? false].filter(Boolean).length;
+    const funcActive = (mod?.funcionalidades ?? []).filter(f => perm?.funcionalidades?.[f.key] ?? false).length;
+    const total = 4 + (mod?.funcionalidades?.length ?? 0);
+    return { active: crudActive + funcActive, total };
   };
 
   return (
@@ -200,15 +237,29 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
               const editar = perm?.pode_editar ?? false;
               const excluir = perm?.pode_excluir ?? false;
               const isExpanded = expandedModulo === mod.key;
-              const activeCount = getPermCount(mod.key);
+              const counts = getPermCount(mod.key);
+              const hasFuncs = mod.funcionalidades.length > 0;
               return (
                 <React.Fragment key={mod.key}>
-                  <TableRow className={cn("hover:bg-muted/20 transition-colors cursor-pointer", isExpanded && "bg-muted/10")} onClick={() => setExpandedModulo(isExpanded ? null : mod.key)}>
+                  <TableRow
+                    className={cn(
+                      "transition-colors",
+                      hasFuncs && "cursor-pointer hover:bg-muted/20",
+                      isExpanded && "bg-muted/10"
+                    )}
+                    onClick={() => hasFuncs && setExpandedModulo(isExpanded ? null : mod.key)}
+                  >
                     <TableCell className="font-medium text-sm">
                       <div className="flex items-center gap-2">
-                        {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                        {hasFuncs ? (
+                          isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        ) : (
+                          <span className="w-3.5" />
+                        )}
                         <span>{mod.label}</span>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">{activeCount}/4</Badge>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">
+                          {counts.active}/{counts.total}
+                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={ver} onCheckedChange={() => handleToggle(mod.key, 'pode_ver', ver)} /></TableCell>
@@ -216,25 +267,53 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
                     <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={editar} onCheckedChange={() => handleToggle(mod.key, 'pode_editar', editar)} /></TableCell>
                     <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={excluir} onCheckedChange={() => handleToggle(mod.key, 'pode_excluir', excluir)} /></TableCell>
                   </TableRow>
-                  {isExpanded && (
+                  {isExpanded && hasFuncs && (
                     <TableRow className="bg-muted/5 border-0">
-                      <TableCell colSpan={5} className="py-2 px-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-6">
-                          <div className="flex items-start gap-2 text-xs">
-                            <Eye className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", ver ? "text-blue-500" : "text-muted-foreground/30")} />
-                            <span className={cn(ver ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.ver}</span>
+                      <TableCell colSpan={5} className="py-3 px-3">
+                        {/* CRUD descriptions */}
+                        <div className="pl-6 mb-3">
+                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Permissões Básicas (CRUD)</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            <div className="flex items-start gap-2 text-xs">
+                              <Eye className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", ver ? "text-blue-500" : "text-muted-foreground/30")} />
+                              <span className={cn(ver ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.ver}</span>
+                            </div>
+                            <div className="flex items-start gap-2 text-xs">
+                              <Plus className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", criar ? "text-emerald-500" : "text-muted-foreground/30")} />
+                              <span className={cn(criar ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.criar}</span>
+                            </div>
+                            <div className="flex items-start gap-2 text-xs">
+                              <PenLine className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", editar ? "text-amber-500" : "text-muted-foreground/30")} />
+                              <span className={cn(editar ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.editar}</span>
+                            </div>
+                            <div className="flex items-start gap-2 text-xs">
+                              <Trash className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", excluir ? "text-red-500" : "text-muted-foreground/30")} />
+                              <span className={cn(excluir ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.excluir}</span>
+                            </div>
                           </div>
-                          <div className="flex items-start gap-2 text-xs">
-                            <Plus className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", criar ? "text-emerald-500" : "text-muted-foreground/30")} />
-                            <span className={cn(criar ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.criar}</span>
-                          </div>
-                          <div className="flex items-start gap-2 text-xs">
-                            <PenLine className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", editar ? "text-amber-500" : "text-muted-foreground/30")} />
-                            <span className={cn(editar ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.editar}</span>
-                          </div>
-                          <div className="flex items-start gap-2 text-xs">
-                            <Trash className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", excluir ? "text-red-500" : "text-muted-foreground/30")} />
-                            <span className={cn(excluir ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.excluir}</span>
+                        </div>
+
+                        {/* Funcionalidades específicas */}
+                        <div className="pl-6 border-t border-border/50 pt-3">
+                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Funcionalidades Específicas</p>
+                          <div className="space-y-1.5">
+                            {mod.funcionalidades.map(func => {
+                              const FuncIcon = getFuncIcon(func.icon);
+                              const isActive = perm?.funcionalidades?.[func.key] ?? false;
+                              return (
+                                <div key={func.key} className="flex items-center gap-3 group" onClick={e => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={isActive}
+                                    onCheckedChange={() => handleToggleFuncionalidade(mod.key, func.key, isActive)}
+                                  />
+                                  <FuncIcon className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-primary" : "text-muted-foreground/40")} />
+                                  <div className="flex-1 min-w-0">
+                                    <span className={cn("text-xs font-medium", isActive ? "text-foreground" : "text-muted-foreground")}>{func.label}</span>
+                                    <p className={cn("text-[11px] leading-tight", isActive ? "text-muted-foreground" : "text-muted-foreground/50")}>{func.descricao}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </TableCell>

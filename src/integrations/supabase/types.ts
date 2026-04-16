@@ -1062,6 +1062,7 @@ export type Database = {
       permissoes_vendedor: {
         Row: {
           created_at: string
+          funcionalidades: Json
           id: string
           modulo: string
           pode_criar: boolean
@@ -1073,6 +1074,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          funcionalidades?: Json
           id?: string
           modulo: string
           pode_criar?: boolean
@@ -1084,6 +1086,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          funcionalidades?: Json
           id?: string
           modulo?: string
           pode_criar?: boolean
@@ -1353,6 +1356,10 @@ export type Database = {
       delete_current_user: { Args: never; Returns: undefined }
       get_my_empresa_id: { Args: never; Returns: string }
       get_my_vendedor_id: { Args: never; Returns: string }
+      has_funcionalidade: {
+        Args: { _funcionalidade: string; _modulo: string; _vendedor_id: string }
+        Returns: boolean
+      }
       has_permission: {
         Args: { _acao: string; _modulo: string; _vendedor_id: string }
         Returns: boolean
