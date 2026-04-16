@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { useClientes } from '@/hooks/use-clientes';
+import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { usePedidos } from '@/hooks/use-pedidos';
-import { useUpdateCliente, useDeleteCliente } from '@/hooks/use-mutations';
+import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato } from '@/hooks/use-mutations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown, Users, X } from 'lucide-react';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { toast } from 'sonner';
 import { EnderecoForm } from '@/components/EnderecoForm';
@@ -38,17 +38,45 @@ const ClienteDetalhe = () => {
   const { data: pedidos, isLoading: loadingPedidos } = usePedidos();
   const updateCliente = useUpdateCliente();
   const deleteCliente = useDeleteCliente();
+  const createContato = useCreateContato();
+  const deleteContato = useDeleteContato();
+  const { data: contatos } = useContatos();
   const [editOpen, setEditOpen] = useState(false);
   const [enderecoOpen, setEnderecoOpen] = useState(true);
 
   const cliente = clientes?.find(c => c.id === id);
   const pedidosCliente = (pedidos ?? []).filter(p => p.cliente_id === id);
+  const contatosExtras = (contatos ?? []).filter((c: any) => cliente && c.empresa === cliente.empresa);
 
   // Edit form state
   const [editData, setEditData] = useState({
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '', telefone: '', nome_contato: '',
   });
   const [editEndereco, setEditEndereco] = useState<EnderecoFields>(emptyEndereco);
+
+  // Novo contato extra
+  const [novoContato, setNovoContato] = useState({ nome_contato: '', cargo: '', email: '', telefone: '' });
+  const handleAddContato = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cliente) return;
+    if (!novoContato.nome_contato.trim()) {
+      toast.error('Informe o nome do contato.');
+      return;
+    }
+    try {
+      await createContato.mutateAsync({
+        empresa: cliente.empresa,
+        nome_contato: novoContato.nome_contato.trim(),
+        cargo: novoContato.cargo.trim() || undefined,
+        email: novoContato.email.trim() || undefined,
+        telefone: novoContato.telefone.trim() || undefined,
+      });
+      toast.success('Contato adicionado!');
+      setNovoContato({ nome_contato: '', cargo: '', email: '', telefone: '' });
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
 
   const openEdit = () => {
     if (!cliente) return;
@@ -298,6 +326,107 @@ const ClienteDetalhe = () => {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Contatos extras (apenas para empresas, não pessoa física) */}
+        {cliente.tipo !== 'pessoa_fisica' && (
+          <Card className="border-border/40">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                Contatos Adicionais
+                {contatosExtras.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">{contatosExtras.length}</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {contatosExtras.length > 0 && (
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Tipo / Cargo</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Telefone</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {contatosExtras.map((c: any) => (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-medium">{c.nome_contato || '-'}</TableCell>
+                          <TableCell>
+                            {c.cargo ? <Badge variant="outline">{c.cargo}</Badge> : <span className="text-muted-foreground text-xs">-</span>}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{c.email || '-'}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{c.telefone || '-'}</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={async () => {
+                                try {
+                                  await deleteContato.mutateAsync(c.id);
+                                  toast.success('Contato removido!');
+                                } catch (err: any) {
+                                  toast.error(err.message);
+                                }
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              <form onSubmit={handleAddContato} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 items-end pt-2 border-t border-border">
+                <div className="lg:col-span-1">
+                  <Label className="text-xs">Nome do contato *</Label>
+                  <Input
+                    value={novoContato.nome_contato}
+                    onChange={e => setNovoContato(c => ({ ...c, nome_contato: e.target.value }))}
+                    placeholder="Ex: João Silva"
+                  />
+                </div>
+                <div className="lg:col-span-1">
+                  <Label className="text-xs">Tipo / Cargo</Label>
+                  <Input
+                    value={novoContato.cargo}
+                    onChange={e => setNovoContato(c => ({ ...c, cargo: e.target.value }))}
+                    placeholder="Ex: Comprador, Engenheiro"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Email</Label>
+                  <Input
+                    type="email"
+                    value={novoContato.email}
+                    onChange={e => setNovoContato(c => ({ ...c, email: e.target.value }))}
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Telefone</Label>
+                  <Input
+                    value={novoContato.telefone}
+                    onChange={e => setNovoContato(c => ({ ...c, telefone: e.target.value }))}
+                    placeholder="(00) 00000-0000"
+                  />
+                </div>
+                <Button type="submit" disabled={createContato.isPending} className="w-full lg:w-auto">
+                  <Plus className="h-4 w-4 mr-1" />
+                  {createContato.isPending ? 'Adicionando...' : 'Adicionar'}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         )}
