@@ -497,7 +497,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : view === 'pipeline' ? (
+        ) : showKanban ? (
           <DragDropContext onDragEnd={handleDragEnd}>
             <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-3 px-3 sm:mx-0 sm:px-0">
               {KANBAN_STAGES.map(stage => (
