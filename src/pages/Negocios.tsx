@@ -439,7 +439,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </>
             )}
 
-            {view === 'lista' && (
+            {!showKanban && (
               <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
                 <DialogContent className="max-w-xs">
                   <DialogHeader>
