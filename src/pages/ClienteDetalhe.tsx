@@ -38,17 +38,45 @@ const ClienteDetalhe = () => {
   const { data: pedidos, isLoading: loadingPedidos } = usePedidos();
   const updateCliente = useUpdateCliente();
   const deleteCliente = useDeleteCliente();
+  const createContato = useCreateContato();
+  const deleteContato = useDeleteContato();
+  const { data: contatos } = useContatos();
   const [editOpen, setEditOpen] = useState(false);
   const [enderecoOpen, setEnderecoOpen] = useState(true);
 
   const cliente = clientes?.find(c => c.id === id);
   const pedidosCliente = (pedidos ?? []).filter(p => p.cliente_id === id);
+  const contatosExtras = (contatos ?? []).filter((c: any) => cliente && c.empresa === cliente.empresa);
 
   // Edit form state
   const [editData, setEditData] = useState({
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '', telefone: '', nome_contato: '',
   });
   const [editEndereco, setEditEndereco] = useState<EnderecoFields>(emptyEndereco);
+
+  // Novo contato extra
+  const [novoContato, setNovoContato] = useState({ nome_contato: '', cargo: '', email: '', telefone: '' });
+  const handleAddContato = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cliente) return;
+    if (!novoContato.nome_contato.trim()) {
+      toast.error('Informe o nome do contato.');
+      return;
+    }
+    try {
+      await createContato.mutateAsync({
+        empresa: cliente.empresa,
+        nome_contato: novoContato.nome_contato.trim(),
+        cargo: novoContato.cargo.trim() || undefined,
+        email: novoContato.email.trim() || undefined,
+        telefone: novoContato.telefone.trim() || undefined,
+      });
+      toast.success('Contato adicionado!');
+      setNovoContato({ nome_contato: '', cargo: '', email: '', telefone: '' });
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
 
   const openEdit = () => {
     if (!cliente) return;
