@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3 } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/ImportClientesDialog';
 
 import { toast } from 'sonner';
@@ -409,35 +409,52 @@ const Clientes = () => {
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
-          {activeTab === 'empresas' && (
-            <Select
-              value={tipoFilter}
-              onValueChange={(v) => {
-                if (v === '__new__') {
-                  setNewTipoTarget('filter');
-                  setNewTipoOpen(true);
-                  return;
-                }
-                setTipoFilter(v);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-fit max-w-full shrink-0"><SelectValue placeholder="Filtrar por tipo" /></SelectTrigger>
-              <SelectContent>
-                {tipoFilterOptions.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-                <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-          <Select value={sortOrder} onValueChange={(v) => { setSortOrder(v as 'asc' | 'desc'); setPage(1); }}>
-            <SelectTrigger className="w-fit max-w-full shrink-0"><SelectValue placeholder="Ordenar" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">Nome (A → Z)</SelectItem>
-              <SelectItem value="desc">Nome (Z → A)</SelectItem>
-            </SelectContent>
-          </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 shrink-0">
+                <ListFilter className="h-4 w-4" />
+                <span className="hidden sm:inline">Filtros</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {activeTab === 'empresas' && (
+                <>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Tipo</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={tipoFilter}
+                    onValueChange={(v) => { setTipoFilter(v); setPage(1); }}
+                  >
+                    {tipoFilterOptions.map(opt => (
+                      <DropdownMenuRadioItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setNewTipoTarget('filter');
+                      setNewTipoOpen(true);
+                    }}
+                    className="text-primary font-medium"
+                  >
+                    + Criar novo tipo…
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                <span className="inline-flex items-center gap-1.5"><ArrowUpDown className="h-3 w-3" /> Ordenação</span>
+              </DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={sortOrder}
+                onValueChange={(v) => { setSortOrder(v as 'asc' | 'desc'); setPage(1); }}
+              >
+                <DropdownMenuRadioItem value="asc">Nome (A → Z)</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="desc">Nome (Z → A)</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
