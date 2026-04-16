@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Users, Check } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useVendedores } from '@/hooks/use-clientes';
+import { useAuth } from '@/hooks/use-auth';
 import type { CalendarEvent, EventoForm, CalendarType } from './types';
 import { EVENT_PRESET_COLORS, CALENDAR_COLORS } from './types';
 
@@ -33,7 +39,6 @@ interface EventDialogProps {
 }
 
 function toDatetimeLocal(iso: string): string {
-  // Converte ISO → valor para input datetime-local (YYYY-MM-DDTHH:mm)
   return iso.slice(0, 16);
 }
 
@@ -52,6 +57,7 @@ const defaultForm = (): EventoForm => {
     diaInteiro: false,
     tipoCalendario: 'empresa',
     cor: CALENDAR_COLORS.empresa,
+    participantes: [],
   };
 };
 
@@ -64,6 +70,14 @@ export function EventDialog({
   onDelete,
 }: EventDialogProps) {
   const [form, setForm] = useState<EventoForm>(defaultForm());
+  const [participantesOpen, setParticipantesOpen] = useState(false);
+  const { user } = useAuth();
+  const { data: usuarios } = useVendedores();
+
+  // Funcionários da empresa, exceto o próprio usuário logado
+  const funcionariosDisponiveis = useMemo(() => {
+    return (usuarios ?? []).filter((u: { user_id: string | null }) => u.user_id && u.user_id !== user?.id);
+  }, [usuarios, user?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,6 +97,7 @@ export function EventDialog({
         diaInteiro: editingEvent.diaInteiro,
         tipoCalendario: editingEvent.tipoCalendario,
         cor: editingEvent.cor,
+        participantes: [],
       });
     } else {
       setForm({ ...defaultForm(), ...initialData });
@@ -96,6 +111,14 @@ export function EventDialog({
     setForm((prev) => ({ ...prev, tipoCalendario: type, cor: CALENDAR_COLORS[type] }));
   };
 
+  const toggleParticipante = (userId: string) => {
+    const current = form.participantes ?? [];
+    const next = current.includes(userId)
+      ? current.filter((id) => id !== userId)
+      : [...current, userId];
+    set('participantes', next);
+  };
+
   const handleSubmit = () => {
     if (!form.titulo.trim()) return;
     onSave(form);
@@ -103,6 +126,7 @@ export function EventDialog({
   };
 
   const isEditing = !!editingEvent;
+  const participantesSelecionados = form.participantes ?? [];
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -134,7 +158,7 @@ export function EventDialog({
             />
           </div>
 
-          {/* Início */}
+          {/* Início / Fim */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Início</Label>
@@ -170,6 +194,75 @@ export function EventDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Participantes (só ao criar) */}
+          {!isEditing && funcionariosDisponiveis.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>Participantes</Label>
+              <Popover open={participantesOpen} onOpenChange={setParticipantesOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start font-normal"
+                  >
+                    <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                    {participantesSelecionados.length === 0
+                      ? <span className="text-muted-foreground">Selecionar funcionários…</span>
+                      : <span>{participantesSelecionados.length} selecionado(s)</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <ScrollArea className="max-h-[240px]">
+                    <div className="p-1">
+                      {funcionariosDisponiveis.map((u: { id: string; user_id: string; nome: string; email: string }) => {
+                        const checked = participantesSelecionados.includes(u.user_id);
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => toggleParticipante(u.user_id)}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent text-sm text-left"
+                          >
+                            <Checkbox checked={checked} className="pointer-events-none" />
+                            <div className="flex-1 min-w-0">
+                              <div className="truncate">{u.nome}</div>
+                              <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                            </div>
+                            {checked && <Check className="h-4 w-4 text-primary shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+
+              {participantesSelecionados.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {participantesSelecionados.map((uid) => {
+                    const u = funcionariosDisponiveis.find((x: { user_id: string }) => x.user_id === uid) as { nome: string } | undefined;
+                    if (!u) return null;
+                    return (
+                      <Badge key={uid} variant="secondary" className="gap-1">
+                        {u.nome}
+                        <button
+                          type="button"
+                          className="ml-1 hover:text-destructive"
+                          onClick={() => toggleParticipante(uid)}
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                O evento será adicionado ao calendário de cada participante.
+              </p>
+            </div>
+          )}
 
           {/* Cor */}
           <div className="space-y-1.5">

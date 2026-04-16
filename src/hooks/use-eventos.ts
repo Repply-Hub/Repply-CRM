@@ -176,8 +176,11 @@ export function useCreateEvento() {
         ? new Date(form.fim + 'T23:59:59').toISOString()
         : new Date(form.fim).toISOString();
 
-      const { error } = await supabase.from('eventos').insert({
-        user_id: user!.id,
+      // Sempre cria para o próprio usuário + cada participante selecionado.
+      const targets = new Set<string>([user!.id, ...(form.participantes ?? [])]);
+
+      const rows = Array.from(targets).map((uid) => ({
+        user_id: uid,
         titulo: form.titulo,
         descricao: form.descricao || null,
         inicio,
@@ -185,7 +188,9 @@ export function useCreateEvento() {
         dia_inteiro: form.diaInteiro,
         tipo_calendario: form.tipoCalendario,
         cor: form.cor,
-      });
+      }));
+
+      const { error } = await supabase.from('eventos').insert(rows);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['eventos'] }),

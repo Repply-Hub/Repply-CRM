@@ -21,6 +21,7 @@ export interface EventoForm {
   diaInteiro: boolean;
   tipoCalendario: CalendarType;
   cor: string;
+  participantes?: string[]; // user_ids (auth) — usado só na criação
 }
 
 export const CALENDAR_COLORS: Record<CalendarType, string> = {
