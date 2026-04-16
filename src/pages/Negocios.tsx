@@ -365,8 +365,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto min-w-[680px] max-w-[860px] p-4" align="start">
-                    <div className="flex gap-4">
-                      <div className="flex-1 min-w-[130px]">
+                    <div className="flex gap-0 divide-x divide-border">
+                      <div className="flex-1 min-w-[130px] pr-4">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
                         <div className="space-y-1 max-h-60 overflow-y-auto">
                           {(vendedores ?? []).map(v => (
@@ -377,7 +377,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           ))}
                         </div>
                       </div>
-                      <div className="flex-1 min-w-[130px]">
+                      <div className="flex-1 min-w-[130px] px-4">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fabricante</p>
                         <ScrollArea className="h-60">
                           <div className="space-y-1 pr-3">
@@ -390,7 +390,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           </div>
                         </ScrollArea>
                       </div>
-                      <div className="min-w-[140px]">
+                      <div className="min-w-[140px] px-4">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Período</p>
                         <div className="space-y-2">
                           <Popover>
@@ -417,7 +417,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           </Popover>
                         </div>
                       </div>
-                      <div className="flex flex-col justify-between min-w-[120px]">
+                      <div className="flex flex-col justify-between min-w-[120px] pl-4">
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
                           <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
