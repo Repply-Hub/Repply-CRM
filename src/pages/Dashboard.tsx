@@ -89,7 +89,7 @@ const Dashboard = () => {
   }));
 
   const conversaoVendedor = (vendedores ?? []).map(v => ({
-    nome: v.vendedor_nome ?? '',
+    nome: v.usuario_nome ?? '',
     conversao: Number(v.taxa_fechamento ?? 0),
   }));
 
