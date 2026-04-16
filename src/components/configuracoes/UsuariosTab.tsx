@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -96,7 +97,18 @@ function getFuncIcon(icon: Funcionalidade['icon']) {
   return map[icon] || Info;
 }
 
-// ─── Inline Permissions Editor ───
+// ─── Module icon helper ───
+function getModuloIcon(key: string) {
+  const map: Record<string, typeof Shield> = {
+    dashboard: FileText, pipeline: ArrowRightLeft, clientes: Building2,
+    contatos: Users, pedidos: FileText, obras: Shield, fabricantes: DollarSign,
+    portal: Globe, calendario: CalendarIcon, tarefas: UserCheck,
+    chat: MessageCircle, configuracoes: Shield,
+  };
+  return map[key] || Shield;
+}
+
+// ─── Inline Permissions Editor (card-based) ───
 function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: string; role: string } }) {
   const { data: permissoes, isLoading } = usePermissoes(vendedor.id);
   const upsert = useUpsertPermissao();
@@ -104,92 +116,73 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
   const qc = useQueryClient();
   const isGestor = vendedor.role === 'gestor' || vendedor.role === 'admin';
   const [expandedModulo, setExpandedModulo] = useState<string | null>(null);
+  const [searchModulo, setSearchModulo] = useState('');
 
   const getPermissao = (modulo: string): Permissao | undefined =>
     permissoes?.find(p => p.modulo === modulo);
 
-  const handleToggle = async (modulo: string, campo: keyof Pick<Permissao, 'pode_ver' | 'pode_criar' | 'pode_editar' | 'pode_excluir'>, currentVal: boolean) => {
+  const updatePermissao = async (modulo: string, updates: Partial<Pick<Permissao, 'pode_ver' | 'pode_criar' | 'pode_editar' | 'pode_excluir' | 'funcionalidades'>>, acaoLog: string, detalhes: any) => {
     const existing = getPermissao(modulo);
     const newData = {
       vendedor_id: vendedor.id,
       modulo,
-      pode_ver: campo === 'pode_ver' ? !currentVal : (existing?.pode_ver ?? true),
-      pode_criar: campo === 'pode_criar' ? !currentVal : (existing?.pode_criar ?? false),
-      pode_editar: campo === 'pode_editar' ? !currentVal : (existing?.pode_editar ?? false),
-      pode_excluir: campo === 'pode_excluir' ? !currentVal : (existing?.pode_excluir ?? false),
-      funcionalidades: existing?.funcionalidades ?? {},
+      pode_ver: updates.pode_ver ?? existing?.pode_ver ?? true,
+      pode_criar: updates.pode_criar ?? existing?.pode_criar ?? false,
+      pode_editar: updates.pode_editar ?? existing?.pode_editar ?? false,
+      pode_excluir: updates.pode_excluir ?? existing?.pode_excluir ?? false,
+      funcionalidades: updates.funcionalidades ?? existing?.funcionalidades ?? {},
     };
     upsert.mutate(newData);
     await supabase.from('audit_permissoes').insert({
       admin_id: user?.id ?? '',
       vendedor_id: vendedor.id,
-      acao: `Alterou ${campo} de ${modulo}`,
-      detalhes: { campo, modulo, de: currentVal, para: !currentVal },
-    });
-  };
-
-  const handleToggleFuncionalidade = async (modulo: string, funcKey: string, currentVal: boolean) => {
-    const existing = getPermissao(modulo);
-    const newFuncs = { ...(existing?.funcionalidades ?? {}), [funcKey]: !currentVal };
-    const newData = {
-      vendedor_id: vendedor.id,
-      modulo,
-      pode_ver: existing?.pode_ver ?? true,
-      pode_criar: existing?.pode_criar ?? false,
-      pode_editar: existing?.pode_editar ?? false,
-      pode_excluir: existing?.pode_excluir ?? false,
-      funcionalidades: newFuncs,
-    };
-    upsert.mutate(newData);
-    await supabase.from('audit_permissoes').insert({
-      admin_id: user?.id ?? '',
-      vendedor_id: vendedor.id,
-      acao: `Alterou funcionalidade ${funcKey} de ${modulo}`,
-      detalhes: { tipo: 'funcionalidade', funcionalidade: funcKey, modulo, de: currentVal, para: !currentVal },
+      acao: acaoLog,
+      detalhes,
     });
   };
 
   if (isGestor) {
     return (
-      <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground">
+      <div className="flex items-center gap-3 py-8 justify-center text-muted-foreground bg-primary/5 rounded-lg border border-primary/10">
         <Shield className="h-5 w-5 text-primary" />
-        <p className="text-sm">Gestores possuem acesso total a todos os módulos.</p>
+        <p className="text-sm">Gestores possuem <strong className="text-foreground">acesso total</strong> a todos os módulos.</p>
       </div>
     );
   }
 
   if (isLoading) {
-    return <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
-  const allVer = MODULOS.every(m => (getPermissao(m.key)?.pode_ver ?? true));
-  const allCriar = MODULOS.every(m => (getPermissao(m.key)?.pode_criar ?? false));
-  const allEditar = MODULOS.every(m => (getPermissao(m.key)?.pode_editar ?? false));
-  const allExcluir = MODULOS.every(m => (getPermissao(m.key)?.pode_excluir ?? false));
-
-  const handleToggleAll = async (campo: keyof Pick<Permissao, 'pode_ver' | 'pode_criar' | 'pode_editar' | 'pode_excluir'>, currentAll: boolean) => {
-    const newValue = !currentAll;
+  // Apply preset to all modules
+  const applyPreset = async (preset: 'leitura' | 'operacional' | 'total' | 'nenhum') => {
     const rows = MODULOS.map(mod => {
       const existing = getPermissao(mod.key);
+      const baseFuncs = mod.funcionalidades.reduce((acc, f) => {
+        acc[f.key] = preset === 'total' || (preset === 'operacional' && !['gerenciar_usuarios', 'gerenciar_permissoes'].includes(f.key));
+        return acc;
+      }, {} as Record<string, boolean>);
+      const existingFuncs = (typeof existing?.funcionalidades === 'object' && existing?.funcionalidades !== null) ? existing.funcionalidades : {};
       return {
         vendedor_id: vendedor.id,
         modulo: mod.key,
-        pode_ver: campo === 'pode_ver' ? newValue : (existing?.pode_ver ?? true),
-        pode_criar: campo === 'pode_criar' ? newValue : (existing?.pode_criar ?? false),
-        pode_editar: campo === 'pode_editar' ? newValue : (existing?.pode_editar ?? false),
-        pode_excluir: campo === 'pode_excluir' ? newValue : (existing?.pode_excluir ?? false),
-        funcionalidades: existing?.funcionalidades ?? {},
+        pode_ver: preset !== 'nenhum',
+        pode_criar: preset === 'operacional' || preset === 'total',
+        pode_editar: preset === 'operacional' || preset === 'total',
+        pode_excluir: preset === 'total',
+        funcionalidades: preset === 'nenhum' ? {} : (preset === 'leitura' ? existingFuncs : baseFuncs),
       };
     });
     const { error } = await supabase.from('permissoes_vendedor').upsert(rows as any[], { onConflict: 'vendedor_id,modulo' });
-    if (error) { toast.error('Erro ao atualizar permissões'); return; }
+    if (error) { toast.error('Erro ao aplicar preset'); return; }
     await supabase.from('audit_permissoes').insert({
       admin_id: user?.id ?? '',
       vendedor_id: vendedor.id,
-      acao: `Alterou ${campo} de TODOS os módulos para ${newValue ? 'ativo' : 'inativo'}`,
-      detalhes: { campo, para: newValue, modulos: 'todos' } as any,
+      acao: `Aplicou preset: ${preset}`,
+      detalhes: { preset } as any,
     });
     qc.invalidateQueries({ queryKey: ['permissoes_vendedor', vendedor.id] });
+    toast.success(`Preset "${preset}" aplicado!`);
   };
 
   const getPermCount = (modKey: string) => {
@@ -201,131 +194,208 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
     return { active: crudActive + funcActive, total };
   };
 
-  return (
-    <TooltipProvider>
-      <div className="rounded-lg border border-border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="min-w-[180px]">Módulo</TableHead>
-              <TableHead className="text-center w-20">
-                <Tooltip><TooltipTrigger asChild><div className="flex items-center justify-center gap-1"><Eye className="h-3.5 w-3.5" /> Ver</div></TooltipTrigger><TooltipContent>Permissão de visualização</TooltipContent></Tooltip>
-              </TableHead>
-              <TableHead className="text-center w-20">
-                <Tooltip><TooltipTrigger asChild><div className="flex items-center justify-center gap-1"><Plus className="h-3.5 w-3.5" /> Criar</div></TooltipTrigger><TooltipContent>Permissão de criação</TooltipContent></Tooltip>
-              </TableHead>
-              <TableHead className="text-center w-20">
-                <Tooltip><TooltipTrigger asChild><div className="flex items-center justify-center gap-1"><PenLine className="h-3.5 w-3.5" /> Editar</div></TooltipTrigger><TooltipContent>Permissão de edição</TooltipContent></Tooltip>
-              </TableHead>
-              <TableHead className="text-center w-20">
-                <Tooltip><TooltipTrigger asChild><div className="flex items-center justify-center gap-1"><Trash className="h-3.5 w-3.5" /> Excluir</div></TooltipTrigger><TooltipContent>Permissão de exclusão</TooltipContent></Tooltip>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow className="bg-muted/30 border-b-2 border-border">
-              <TableCell className="font-semibold text-sm text-primary">Todos</TableCell>
-              <TableCell className="text-center"><Checkbox checked={allVer} onCheckedChange={() => handleToggleAll('pode_ver', allVer)} /></TableCell>
-              <TableCell className="text-center"><Checkbox checked={allCriar} onCheckedChange={() => handleToggleAll('pode_criar', allCriar)} /></TableCell>
-              <TableCell className="text-center"><Checkbox checked={allEditar} onCheckedChange={() => handleToggleAll('pode_editar', allEditar)} /></TableCell>
-              <TableCell className="text-center"><Checkbox checked={allExcluir} onCheckedChange={() => handleToggleAll('pode_excluir', allExcluir)} /></TableCell>
-            </TableRow>
-            {MODULOS.map(mod => {
-              const perm = getPermissao(mod.key);
-              const ver = perm?.pode_ver ?? true;
-              const criar = perm?.pode_criar ?? false;
-              const editar = perm?.pode_editar ?? false;
-              const excluir = perm?.pode_excluir ?? false;
-              const isExpanded = expandedModulo === mod.key;
-              const counts = getPermCount(mod.key);
-              const hasFuncs = mod.funcionalidades.length > 0;
-              return (
-                <React.Fragment key={mod.key}>
-                  <TableRow
-                    className={cn(
-                      "transition-colors",
-                      hasFuncs && "cursor-pointer hover:bg-muted/20",
-                      isExpanded && "bg-muted/10"
-                    )}
-                    onClick={() => hasFuncs && setExpandedModulo(isExpanded ? null : mod.key)}
-                  >
-                    <TableCell className="font-medium text-sm">
-                      <div className="flex items-center gap-2">
-                        {hasFuncs ? (
-                          isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                        ) : (
-                          <span className="w-3.5" />
-                        )}
-                        <span>{mod.label}</span>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">
-                          {counts.active}/{counts.total}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={ver} onCheckedChange={() => handleToggle(mod.key, 'pode_ver', ver)} /></TableCell>
-                    <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={criar} onCheckedChange={() => handleToggle(mod.key, 'pode_criar', criar)} /></TableCell>
-                    <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={editar} onCheckedChange={() => handleToggle(mod.key, 'pode_editar', editar)} /></TableCell>
-                    <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={excluir} onCheckedChange={() => handleToggle(mod.key, 'pode_excluir', excluir)} /></TableCell>
-                  </TableRow>
-                  {isExpanded && hasFuncs && (
-                    <TableRow className="bg-muted/5 border-0">
-                      <TableCell colSpan={5} className="py-3 px-3">
-                        {/* CRUD descriptions */}
-                        <div className="pl-6 mb-3">
-                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Permissões Básicas (CRUD)</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                            <div className="flex items-start gap-2 text-xs">
-                              <Eye className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", ver ? "text-blue-500" : "text-muted-foreground/30")} />
-                              <span className={cn(ver ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.ver}</span>
-                            </div>
-                            <div className="flex items-start gap-2 text-xs">
-                              <Plus className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", criar ? "text-emerald-500" : "text-muted-foreground/30")} />
-                              <span className={cn(criar ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.criar}</span>
-                            </div>
-                            <div className="flex items-start gap-2 text-xs">
-                              <PenLine className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", editar ? "text-amber-500" : "text-muted-foreground/30")} />
-                              <span className={cn(editar ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.editar}</span>
-                            </div>
-                            <div className="flex items-start gap-2 text-xs">
-                              <Trash className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", excluir ? "text-red-500" : "text-muted-foreground/30")} />
-                              <span className={cn(excluir ? "text-foreground" : "text-muted-foreground line-through")}>{mod.descricoes.excluir}</span>
-                            </div>
-                          </div>
-                        </div>
+  const filteredModulos = MODULOS.filter(m =>
+    !searchModulo || m.label.toLowerCase().includes(searchModulo.toLowerCase())
+  );
 
-                        {/* Funcionalidades específicas */}
-                        <div className="pl-6 border-t border-border/50 pt-3">
-                          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Funcionalidades Específicas</p>
-                          <div className="space-y-1.5">
-                            {mod.funcionalidades.map(func => {
-                              const FuncIcon = getFuncIcon(func.icon);
-                              const isActive = perm?.funcionalidades?.[func.key] ?? false;
-                              return (
-                                <div key={func.key} className="flex items-center gap-3 group" onClick={e => e.stopPropagation()}>
-                                  <Checkbox
-                                    checked={isActive}
-                                    onCheckedChange={() => handleToggleFuncionalidade(mod.key, func.key, isActive)}
-                                  />
-                                  <FuncIcon className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-primary" : "text-muted-foreground/40")} />
-                                  <div className="flex-1 min-w-0">
-                                    <span className={cn("text-xs font-medium", isActive ? "text-foreground" : "text-muted-foreground")}>{func.label}</span>
-                                    <p className={cn("text-[11px] leading-tight", isActive ? "text-muted-foreground" : "text-muted-foreground/50")}>{func.descricao}</p>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
+  return (
+    <div className="space-y-4">
+      {/* Presets + Search */}
+      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar módulo..."
+            value={searchModulo}
+            onChange={e => setSearchModulo(e.target.value)}
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground hidden sm:inline">Presets:</span>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => applyPreset('leitura')}>
+            <Eye className="h-3 w-3 mr-1" /> Leitura
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => applyPreset('operacional')}>
+            <PenLine className="h-3 w-3 mr-1" /> Operacional
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => applyPreset('total')}>
+            <Shield className="h-3 w-3 mr-1" /> Total
+          </Button>
+          <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground" onClick={() => applyPreset('nenhum')}>
+            <X className="h-3 w-3 mr-1" /> Limpar
+          </Button>
+        </div>
       </div>
-    </TooltipProvider>
+
+      {/* Module cards */}
+      <div className="space-y-2">
+        {filteredModulos.map(mod => {
+          const perm = getPermissao(mod.key);
+          const ver = perm?.pode_ver ?? true;
+          const criar = perm?.pode_criar ?? false;
+          const editar = perm?.pode_editar ?? false;
+          const excluir = perm?.pode_excluir ?? false;
+          const isExpanded = expandedModulo === mod.key;
+          const counts = getPermCount(mod.key);
+          const ModIcon = getModuloIcon(mod.key);
+          const hasFuncs = mod.funcionalidades.length > 0;
+          const completionPct = (counts.active / counts.total) * 100;
+
+          return (
+            <div
+              key={mod.key}
+              className={cn(
+                "rounded-lg border transition-all overflow-hidden",
+                ver ? "border-border bg-card" : "border-border/50 bg-muted/20",
+                isExpanded && "border-primary/30 shadow-sm"
+              )}
+            >
+              {/* Header: clickable to expand */}
+              <button
+                type="button"
+                onClick={() => setExpandedModulo(isExpanded ? null : mod.key)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left"
+              >
+                <div className={cn(
+                  "h-9 w-9 rounded-lg flex items-center justify-center shrink-0",
+                  ver ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                )}>
+                  <ModIcon className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={cn("text-sm font-medium", !ver && "text-muted-foreground")}>{mod.label}</span>
+                    {!ver && <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Sem acesso</Badge>}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="h-1 flex-1 max-w-[100px] bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-full transition-all rounded-full",
+                          completionPct === 100 ? "bg-primary" : completionPct > 50 ? "bg-primary/70" : "bg-muted-foreground/40"
+                        )}
+                        style={{ width: `${completionPct}%` }}
+                      />
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">{counts.active}/{counts.total}</span>
+                  </div>
+                </div>
+                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform shrink-0", isExpanded && "rotate-180")} />
+              </button>
+
+              {/* Expanded content */}
+              {isExpanded && (
+                <div className="px-4 pb-4 space-y-4 border-t border-border/50 pt-4 bg-muted/10">
+                  {/* Master toggle: Ver */}
+                  <div className="flex items-center justify-between p-3 rounded-md bg-background border border-border">
+                    <div className="flex items-start gap-3 flex-1">
+                      <Eye className={cn("h-4 w-4 mt-0.5 shrink-0", ver ? "text-primary" : "text-muted-foreground/50")} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">Acesso ao módulo</p>
+                        <p className="text-xs text-muted-foreground">{mod.descricoes.ver}</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={ver}
+                      onCheckedChange={() => updatePermissao(mod.key, { pode_ver: !ver }, `Alterou pode_ver de ${mod.key}`, { campo: 'pode_ver', modulo: mod.key, de: ver, para: !ver })}
+                    />
+                  </div>
+
+                  {/* CRUD actions (only when ver is enabled) */}
+                  {ver && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">Ações Permitidas</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {[
+                          { key: 'pode_criar', icon: Plus, label: 'Criar', desc: mod.descricoes.criar, value: criar, color: 'emerald' },
+                          { key: 'pode_editar', icon: PenLine, label: 'Editar', desc: mod.descricoes.editar, value: editar, color: 'amber' },
+                          { key: 'pode_excluir', icon: Trash, label: 'Excluir', desc: mod.descricoes.excluir, value: excluir, color: 'red' },
+                        ].map(action => {
+                          const ActionIcon = action.icon;
+                          const colorClasses = {
+                            emerald: action.value ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border',
+                            amber: action.value ? 'border-amber-500/30 bg-amber-500/5' : 'border-border',
+                            red: action.value ? 'border-red-500/30 bg-red-500/5' : 'border-border',
+                          }[action.color];
+                          const iconColor = {
+                            emerald: action.value ? 'text-emerald-500' : 'text-muted-foreground/40',
+                            amber: action.value ? 'text-amber-500' : 'text-muted-foreground/40',
+                            red: action.value ? 'text-red-500' : 'text-muted-foreground/40',
+                          }[action.color];
+                          return (
+                            <button
+                              key={action.key}
+                              type="button"
+                              onClick={() => updatePermissao(mod.key, { [action.key]: !action.value } as any, `Alterou ${action.key} de ${mod.key}`, { campo: action.key, modulo: mod.key, de: action.value, para: !action.value })}
+                              className={cn(
+                                "flex items-start gap-2 p-3 rounded-md border text-left transition-all hover:bg-muted/50",
+                                colorClasses
+                              )}
+                            >
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <ActionIcon className={cn("h-4 w-4 shrink-0", iconColor)} />
+                                <div className="flex-1 min-w-0">
+                                  <p className={cn("text-sm font-medium", !action.value && "text-muted-foreground")}>{action.label}</p>
+                                  <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 line-clamp-2">{action.desc}</p>
+                                </div>
+                              </div>
+                              <Checkbox checked={action.value} className="mt-0.5 shrink-0 pointer-events-none" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Funcionalidades específicas */}
+                  {ver && hasFuncs && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">Funcionalidades Específicas</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {mod.funcionalidades.map(func => {
+                          const FuncIcon = getFuncIcon(func.icon);
+                          const isActive = perm?.funcionalidades?.[func.key] ?? false;
+                          return (
+                            <button
+                              key={func.key}
+                              type="button"
+                              onClick={() => updatePermissao(
+                                mod.key,
+                                { funcionalidades: { ...(perm?.funcionalidades ?? {}), [func.key]: !isActive } },
+                                `Alterou funcionalidade ${func.key} de ${mod.key}`,
+                                { tipo: 'funcionalidade', funcionalidade: func.key, modulo: mod.key, de: isActive, para: !isActive }
+                              )}
+                              className={cn(
+                                "flex items-start gap-2 p-3 rounded-md border text-left transition-all hover:bg-muted/50",
+                                isActive ? "border-primary/30 bg-primary/5" : "border-border"
+                              )}
+                            >
+                              <FuncIcon className={cn("h-4 w-4 shrink-0 mt-0.5", isActive ? "text-primary" : "text-muted-foreground/40")} />
+                              <div className="flex-1 min-w-0">
+                                <p className={cn("text-sm font-medium", !isActive && "text-muted-foreground")}>{func.label}</p>
+                                <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 line-clamp-2">{func.descricao}</p>
+                              </div>
+                              <Switch checked={isActive} className="shrink-0 pointer-events-none scale-75 origin-right" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {filteredModulos.length === 0 && (
+        <div className="text-center py-8 text-muted-foreground text-sm">
+          Nenhum módulo encontrado.
+        </div>
+      )}
+    </div>
   );
 }
 
