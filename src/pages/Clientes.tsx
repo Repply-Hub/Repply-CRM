@@ -179,6 +179,7 @@ const Clientes = () => {
     { value: 'hotel', label: 'Hotel' },
     { value: 'escola', label: 'Escola' },
     { value: 'instalador', label: 'Instalador' },
+    ...customTipos,
   ];
 
   const handleCnpjChange = (value: string) => {
