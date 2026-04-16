@@ -307,7 +307,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
             {/* Sub-toggle: Kanban x Lista — apenas no modo Pipeline */}
             {isPipelineMode && (
-              <div className="inline-flex items-center rounded-md border border-border bg-background p-0.5">
+              <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
                 <Button
                   variant={pipelineView === 'kanban' ? 'default' : 'ghost'}
                   size="sm"
