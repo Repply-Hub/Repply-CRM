@@ -149,20 +149,35 @@ const Clientes = () => {
   const isLoading = activeTab === 'empresas' ? loadingClientes : loadingContatos;
   const totalCount = (clients?.length ?? 0) + (contatosList?.length ?? 0);
 
-  const filteredEmpresas = empresas.filter(c => {
-    const matchSearch = c.empresa.toLowerCase().includes(search.toLowerCase()) ||
-      (c.nome_contato && c.nome_contato.toLowerCase().includes(search.toLowerCase())) ||
-      (c.email && c.email.toLowerCase().includes(search.toLowerCase()));
-    const matchTipo = tipoFilter === 'todos' || c.tipo === tipoFilter;
-    return matchSearch && matchTipo;
-  });
+  const sortByName = <T extends { empresa?: string | null; nome_contato?: string | null }>(arr: T[], key: 'empresa' | 'nome_contato') => {
+    const dir = sortOrder === 'asc' ? 1 : -1;
+    return [...arr].sort((a, b) => {
+      const av = ((a[key] as string | null | undefined) ?? '').toLowerCase();
+      const bv = ((b[key] as string | null | undefined) ?? '').toLowerCase();
+      return av.localeCompare(bv, 'pt-BR') * dir;
+    });
+  };
 
-  const filteredContatos = contatos.filter(c => {
-    const s = search.toLowerCase();
-    return (c.nome_contato && c.nome_contato.toLowerCase().includes(s)) ||
-      (c.empresa && c.empresa.toLowerCase().includes(s)) ||
-      (c.email && c.email.toLowerCase().includes(s));
-  });
+  const filteredEmpresas = sortByName(
+    empresas.filter(c => {
+      const matchSearch = c.empresa.toLowerCase().includes(search.toLowerCase()) ||
+        (c.nome_contato && c.nome_contato.toLowerCase().includes(search.toLowerCase())) ||
+        (c.email && c.email.toLowerCase().includes(search.toLowerCase()));
+      const matchTipo = tipoFilter === 'todos' || c.tipo === tipoFilter;
+      return matchSearch && matchTipo;
+    }),
+    'empresa',
+  );
+
+  const filteredContatos = sortByName(
+    contatos.filter(c => {
+      const s = search.toLowerCase();
+      return (c.nome_contato && c.nome_contato.toLowerCase().includes(s)) ||
+        (c.empresa && c.empresa.toLowerCase().includes(s)) ||
+        (c.email && c.email.toLowerCase().includes(s));
+    }),
+    'nome_contato',
+  );
 
   const filtered = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
