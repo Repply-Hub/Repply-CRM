@@ -80,6 +80,44 @@ const Clientes = () => {
   const [telefone, setTelefone] = useState('');
   const [nomeContato, setNomeContato] = useState('');
   const [cargo, setCargo] = useState('');
+  const [customTipos, setCustomTipos] = useState<{ value: string; label: string }[]>(() => {
+    const saved = localStorage.getItem('clientes_custom_tipos');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [newTipoOpen, setNewTipoOpen] = useState(false);
+  const [newTipoName, setNewTipoName] = useState('');
+  const [newTipoTarget, setNewTipoTarget] = useState<'form' | 'filter'>('form');
+
+  const handleCreateTipo = () => {
+    const label = newTipoName.trim();
+    if (!label) {
+      toast.error('Informe um nome para o tipo');
+      return;
+    }
+    const value = label
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (!value) {
+      toast.error('Nome inválido');
+      return;
+    }
+    const baseTipos = ['construtora', 'loja', 'pessoa_fisica', 'condominio', 'hospital', 'distribuidor', 'hotel', 'escola', 'instalador'];
+    if (baseTipos.includes(value) || customTipos.some(t => t.value === value)) {
+      toast.error('Esse tipo já existe');
+      return;
+    }
+    const next = [...customTipos, { value, label }];
+    setCustomTipos(next);
+    localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
+    if (newTipoTarget === 'form') setTipo(value);
+    else setTipoFilter(value);
+    setNewTipoName('');
+    setNewTipoOpen(false);
+    toast.success(`Tipo "${label}" criado`);
+  };
 
   const [visibleFields, setVisibleFields] = useState<string[]>(() => {
     const saved = localStorage.getItem('clientes_fields');
