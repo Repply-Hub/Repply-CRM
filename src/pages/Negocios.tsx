@@ -270,26 +270,28 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         {/* Top bar: view toggle + actions */}
         <div className="mb-4 md:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center rounded-md border border-border bg-background p-0.5">
-              <Button
-                variant={view === 'pipeline' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => handleViewChange('pipeline')}
-                className="h-8 gap-1.5 px-3"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                Kanban
-              </Button>
-              <Button
-                variant={view === 'lista' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => handleViewChange('lista')}
-                className="h-8 gap-1.5 px-3"
-              >
-                <ListIcon className="h-4 w-4" />
-                Lista
-              </Button>
-            </div>
+            {allowViewToggle && (
+              <div className="inline-flex items-center rounded-md border border-border bg-background p-0.5">
+                <Button
+                  variant={view === 'pipeline' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleViewChange('pipeline')}
+                  className="h-8 gap-1.5 px-3"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Kanban
+                </Button>
+                <Button
+                  variant={view === 'lista' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleViewChange('lista')}
+                  className="h-8 gap-1.5 px-3"
+                >
+                  <ListIcon className="h-4 w-4" />
+                  Lista
+                </Button>
+              </div>
+            )}
 
             {view === 'pipeline' && (
               <>
