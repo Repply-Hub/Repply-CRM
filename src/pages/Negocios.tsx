@@ -73,12 +73,18 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
 
-  // View mode (persisted)
+  // O toggle Kanban/Lista existe apenas na rota de Pipeline (/).
+  // Em /pedidos (defaultView='lista') a visualização é fixa em lista.
+  const allowViewToggle = defaultView === 'pipeline';
+
+  // View mode (persistido apenas na rota de pipeline)
   const [view, setView] = useState<ViewMode>(() => {
+    if (!allowViewToggle) return defaultView;
     const saved = localStorage.getItem('negocios_view') as ViewMode | null;
     return saved === 'pipeline' || saved === 'lista' ? saved : defaultView;
   });
   const handleViewChange = (next: ViewMode) => {
+    if (!allowViewToggle) return;
     setView(next);
     localStorage.setItem('negocios_view', next);
   };
