@@ -500,7 +500,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   stageKey={stage.key}
                   label={stage.label}
                   colorClass={stage.color}
-                  orders={pipelineOrders.filter(o => o.stage === stage.key)}
+                  orders={ordersByStage[stage.key] ?? []}
                 />
               ))}
             </div>
