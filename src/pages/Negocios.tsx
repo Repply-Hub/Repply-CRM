@@ -470,7 +470,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         ) : (
           <div className="flex min-w-0 flex-col gap-6 xl:flex-row">
             <div className="min-w-0 flex-1">
-              <div className="mb-4 flex flex-row items-center gap-3">
+              <div className="mb-4 flex flex-row flex-wrap items-center gap-3">
                 <div className="relative w-full sm:max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -491,6 +491,48 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     ))}
                   </SelectContent>
                 </Select>
+
+                <div className="ml-auto flex items-center gap-2">
+                  {someSelected && (
+                    <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
+                      <Trash2 className="h-4 w-4" />
+                      Excluir {selected.size}
+                    </Button>
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Settings2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Opções</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => setColumnsOpen(true)}>
+                        <Columns3 className="h-4 w-4 mr-2" /> Colunas
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={async () => {
+                        await generatePedidosPdf(
+                          filtered.map(p => ({
+                            cliente: p.cliente?.empresa ?? '-',
+                            obra: p.obra?.nome_obra ?? '-',
+                            fabricante: p.fabricante?.nome ?? '-',
+                            vendedor: p.vendedor?.nome ?? '-',
+                            valor: p.valor_total ?? 0,
+                            etapa: stageLabel(p.status),
+                            data: p.data_pedido,
+                          })),
+                          stageFilter !== 'todos' ? `Orçamentos - ${stageLabel(stageFilter)}` : 'Orçamentos - Todos'
+                        );
+                      }}>
+                        <FileDown className="h-4 w-4 mr-2" /> Exportar PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                        <Upload className="h-4 w-4 mr-2" /> Importar XLSX
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               <div className="w-full rounded-xl border border-border overflow-hidden">
