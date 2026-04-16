@@ -41,8 +41,12 @@ export function useSidebarPreferences() {
         return DEFAULT_SIDEBAR_ITEMS;
       }
 
-      // Merge saved preferences with defaults to handle new items added after save
-      const saved = data.items as unknown as SidebarItem[];
+      // Merge saved preferences with defaults to handle new items added after save.
+      // Also: filter out legacy 'pipeline' item (now unified under 'pedidos') and
+      // normalize the 'pedidos' item to point to '/' with the unified label/icon.
+      const saved = (data.items as unknown as SidebarItem[])
+        .filter(i => i.id !== 'pipeline')
+        .map(i => i.id === 'pedidos' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i);
       const savedIds = new Set(saved.map(i => i.id));
       const newDefaults = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedIds.has(d.id));
       return [...saved, ...newDefaults];
