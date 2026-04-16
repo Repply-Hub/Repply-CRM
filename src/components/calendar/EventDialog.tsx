@@ -50,8 +50,8 @@ const defaultForm = (): EventoForm => {
     inicio: format(now, "yyyy-MM-dd'T'HH:mm"),
     fim: format(later, "yyyy-MM-dd'T'HH:mm"),
     diaInteiro: false,
-    tipoCalendario: 'pessoal',
-    cor: CALENDAR_COLORS.pessoal,
+    tipoCalendario: 'empresa',
+    cor: CALENDAR_COLORS.empresa,
   };
 };
 
