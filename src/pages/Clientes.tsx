@@ -63,6 +63,7 @@ const Clientes = () => {
   const deleteContato = useDeleteContato();
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [activeTab, setActiveTab] = useState<ViewTab>('empresas');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
