@@ -170,6 +170,12 @@ export default function Calendario() {
     openNewEvent({ inicio, fim });
   };
 
+  const handleCreateRange = (start: Date, end: Date) => {
+    const inicio = format(start, "yyyy-MM-dd'T'HH:mm");
+    const fim = format(end, "yyyy-MM-dd'T'HH:mm");
+    openNewEvent({ inicio, fim });
+  };
+
   // --- Salvar evento ---
   const handleSave = (form: EventoForm) => {
     if (editingEvent) {
@@ -373,6 +379,7 @@ export default function Calendario() {
                 days={gridDays}
                 events={events}
                 onClickSlot={handleClickSlot}
+                onCreateRange={handleCreateRange}
                 onClickEvent={openEditEvent}
               />
             )}
