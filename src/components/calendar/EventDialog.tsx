@@ -166,7 +166,7 @@ export function EventDialog({
                 type={form.diaInteiro ? 'date' : 'datetime-local'}
                 value={form.inicio}
                 onChange={(e) => set('inicio', e.target.value)}
-                className="w-full pr-2 text-sm"
+                className="w-full pr-2 text-sm [&::-webkit-calendar-picker-indicator]:ml-1"
               />
             </div>
             <div className="space-y-1.5 min-w-0">
@@ -175,7 +175,7 @@ export function EventDialog({
                 type={form.diaInteiro ? 'date' : 'datetime-local'}
                 value={form.fim}
                 onChange={(e) => set('fim', e.target.value)}
-                className="w-full pr-2 text-sm"
+                className="w-full pr-2 text-sm [&::-webkit-calendar-picker-indicator]:ml-1"
               />
             </div>
           </div>
