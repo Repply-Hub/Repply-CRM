@@ -28,6 +28,7 @@ import { useVendedores } from '@/hooks/use-clientes';
 import { useAuth } from '@/hooks/use-auth';
 import type { CalendarEvent, EventoForm, CalendarType } from './types';
 import { EVENT_PRESET_COLORS, CALENDAR_COLORS } from './types';
+import { EventDateTimeField } from './EventDateTimeField';
 
 interface EventDialogProps {
   open: boolean;
@@ -160,24 +161,18 @@ export function EventDialog({
 
           {/* Início / Fim */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5 min-w-0">
-              <Label>Início</Label>
-              <Input
-                type={form.diaInteiro ? 'date' : 'datetime-local'}
-                value={form.inicio}
-                onChange={(e) => set('inicio', e.target.value)}
-                className="w-full pr-2 text-sm [&::-webkit-calendar-picker-indicator]:ml-1"
-              />
-            </div>
-            <div className="space-y-1.5 min-w-0">
-              <Label>Fim</Label>
-              <Input
-                type={form.diaInteiro ? 'date' : 'datetime-local'}
-                value={form.fim}
-                onChange={(e) => set('fim', e.target.value)}
-                className="w-full pr-2 text-sm [&::-webkit-calendar-picker-indicator]:ml-1"
-              />
-            </div>
+            <EventDateTimeField
+              label="Início"
+              type={form.diaInteiro ? 'date' : 'datetime-local'}
+              value={form.inicio}
+              onChange={(value) => set('inicio', value)}
+            />
+            <EventDateTimeField
+              label="Fim"
+              type={form.diaInteiro ? 'date' : 'datetime-local'}
+              value={form.fim}
+              onChange={(value) => set('fim', value)}
+            />
           </div>
 
           {/* Tipo de calendário */}
