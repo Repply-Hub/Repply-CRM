@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { format, isToday } from 'date-fns';
+import { format, isToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   HOUR_HEIGHT,
@@ -15,12 +15,21 @@ import type { CalendarEvent } from './types';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const GUTTER_WIDTH = 44;
+const DRAG_THRESHOLD_PX = 4; // distância mínima para considerar drag
 
 interface TimeGridViewProps {
   days: Date[];
   events: CalendarEvent[];
   onClickSlot: (date: Date) => void;
+  onCreateRange?: (start: Date, end: Date) => void;
   onClickEvent: (event: CalendarEvent) => void;
+}
+
+interface DragState {
+  day: Date;
+  startY: number;
+  currentY: number;
+  moved: boolean;
 }
 
 function EventBlock({
