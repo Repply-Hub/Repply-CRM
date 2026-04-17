@@ -45,23 +45,20 @@ export function EventDateTimeField({
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onPointerDown={(event) => {
-            if (!supportsShowPicker) return;
-            event.preventDefault();
-            openPicker();
-          }}
+          onClick={supportsShowPicker ? openPicker : undefined}
           className={cn(
             'w-full text-sm',
             supportsShowPicker &&
-              'appearance-none pr-12 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-10 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-clear-button]:appearance-none',
+              'picker-with-custom-icon pr-12 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-clear-button]:appearance-none',
           )}
           style={supportsShowPicker ? { colorScheme: 'normal' } : undefined}
         />
         {supportsShowPicker && (
           <button
             type="button"
-            onPointerDown={(event) => {
+            onClick={(event) => {
               event.preventDefault();
+              event.stopPropagation();
               openPicker();
             }}
             aria-label={`Abrir seletor de ${label.toLowerCase()}`}
