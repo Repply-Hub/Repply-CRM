@@ -160,20 +160,22 @@ export function EventDialog({
 
           {/* Início / Fim */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label>Início</Label>
               <Input
                 type={form.diaInteiro ? 'date' : 'datetime-local'}
                 value={form.inicio}
                 onChange={(e) => set('inicio', e.target.value)}
+                className="w-full pr-2 text-sm"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label>Fim</Label>
               <Input
                 type={form.diaInteiro ? 'date' : 'datetime-local'}
                 value={form.fim}
                 onChange={(e) => set('fim', e.target.value)}
+                className="w-full pr-2 text-sm"
               />
             </div>
           </div>
