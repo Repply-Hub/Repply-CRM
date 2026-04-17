@@ -272,7 +272,7 @@ export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClick
               <div
                 key={day.toISOString()}
                 data-day-col={day.toISOString()}
-                className="relative border-l border-border/20 select-none"
+                className={`relative border-l border-border/20 select-none ${drag ? 'cursor-ns-resize' : 'cursor-cell'}`}
                 style={isToday(day) ? { backgroundColor: 'rgba(59,130,246,0.04)' } : {}}
                 onMouseDown={(e) => handleMouseDown(day, e)}
               >
