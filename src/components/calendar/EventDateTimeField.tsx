@@ -45,7 +45,8 @@ export function EventDateTimeField({
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full pr-12 text-sm [&::-webkit-calendar-picker-indicator]:opacity-0"
+          className="w-full pr-12 text-sm [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none [&::-webkit-inner-spin-button]:hidden [&::-webkit-clear-button]:hidden"
+          style={{ colorScheme: 'normal' }}
         />
         <button
           type="button"
