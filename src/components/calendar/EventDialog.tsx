@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Trash2, Users, Check } from 'lucide-react';
+import { Trash2, Users, Check, ChevronDown } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -201,12 +201,15 @@ export function EventDialog({
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full justify-start font-normal"
+                    className="w-full justify-between font-normal h-10"
                   >
-                    <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-                    {participantesSelecionados.length === 0
-                      ? <span className="text-muted-foreground">Selecionar funcionários…</span>
-                      : <span>{participantesSelecionados.length} selecionado(s)</span>}
+                    <span className="flex items-center gap-2 min-w-0">
+                      <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      {participantesSelecionados.length === 0
+                        ? <span className="text-muted-foreground truncate">Selecionar funcionários…</span>
+                        : <span className="truncate">{participantesSelecionados.length} selecionado(s)</span>}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[400px] p-0" align="start">
