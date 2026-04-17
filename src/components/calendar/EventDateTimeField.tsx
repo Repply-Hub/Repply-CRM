@@ -28,12 +28,15 @@ export function EventDateTimeField({
     const input = inputRef.current as PickerCapableInput | null;
     if (!input) return;
 
-    if (typeof input.showPicker === 'function') {
-      input.showPicker();
-      return;
-    }
-
     input.focus();
+
+    if (typeof input.showPicker === 'function') {
+      try {
+        input.showPicker();
+      } catch {
+        // Some browsers throw if not focused or not user-initiated; fallback to focus only.
+      }
+    }
   };
 
   return (
@@ -56,6 +59,11 @@ export function EventDateTimeField({
         {supportsShowPicker && (
           <button
             type="button"
+            tabIndex={-1}
+            onMouseDown={(event) => {
+              // Prevent input from losing focus / default native picker conflict
+              event.preventDefault();
+            }}
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
