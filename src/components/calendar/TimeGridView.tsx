@@ -161,9 +161,14 @@ export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClick
       });
     };
 
+    // Força cursor durante o drag em toda a página
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = 'ns-resize';
+
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
     return () => {
+      document.body.style.cursor = previousCursor;
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
