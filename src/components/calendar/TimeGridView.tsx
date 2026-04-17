@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { format, isToday } from 'date-fns';
+import { format, isToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   HOUR_HEIGHT,
@@ -15,12 +15,21 @@ import type { CalendarEvent } from './types';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const GUTTER_WIDTH = 44;
+const DRAG_THRESHOLD_PX = 4; // distância mínima para considerar drag
 
 interface TimeGridViewProps {
   days: Date[];
   events: CalendarEvent[];
   onClickSlot: (date: Date) => void;
+  onCreateRange?: (start: Date, end: Date) => void;
   onClickEvent: (event: CalendarEvent) => void;
+}
+
+interface DragState {
+  day: Date;
+  startY: number;
+  currentY: number;
+  moved: boolean;
 }
 
 function EventBlock({
@@ -37,6 +46,8 @@ function EventBlock({
     <div
       role="button"
       tabIndex={0}
+      data-event-block
+      onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => { e.stopPropagation(); onClick(event); }}
       onKeyDown={(e) => e.key === 'Enter' && onClick(event)}
       className="absolute left-0.5 right-0.5 rounded px-1 sm:px-1.5 py-0.5 text-white text-[10px] sm:text-[11px] font-medium overflow-hidden cursor-pointer hover:brightness-90 transition-all z-10"
@@ -73,9 +84,10 @@ function AllDayChip({
   );
 }
 
-export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGridViewProps) {
+export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClickEvent }: TimeGridViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentTimePx, setCurrentTimePx] = useState(getCurrentTimePx());
+  const [drag, setDrag] = useState<DragState | null>(null);
   const isCurrentPeriod = days.some((d) => isToday(d));
 
   // Auto-scroll para horário atual (ou 8h)
@@ -97,13 +109,82 @@ export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGr
     return () => clearInterval(interval);
   }, []);
 
-  const handleColumnClick = (day: Date, e: React.MouseEvent<HTMLDivElement>) => {
-    // rect.top já reflete a posição rolada da coluna no viewport,
-    // então (clientY - rect.top) corresponde ao y dentro do conteúdo total da coluna.
+  // --- Drag-to-create handlers ---
+  const handleMouseDown = (day: Date, e: React.MouseEvent<HTMLDivElement>) => {
+    // Ignora cliques em eventos existentes
+    if ((e.target as HTMLElement).closest('[data-event-block]')) return;
+    if (e.button !== 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const yInColumn = e.clientY - rect.top;
-    onClickSlot(yPxToDate(day, yInColumn));
+    const y = e.clientY - rect.top;
+    setDrag({ day, startY: y, currentY: y, moved: false });
+    e.preventDefault();
   };
+
+  // Listeners globais durante o drag
+  useEffect(() => {
+    if (!drag) return;
+
+    const handleMove = (e: MouseEvent) => {
+      const col = document.querySelector<HTMLDivElement>(
+        `[data-day-col="${drag.day.toISOString()}"]`,
+      );
+      if (!col) return;
+      const rect = col.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      setDrag((prev) =>
+        prev
+          ? {
+              ...prev,
+              currentY: y,
+              moved: prev.moved || Math.abs(y - prev.startY) > DRAG_THRESHOLD_PX,
+            }
+          : prev,
+      );
+    };
+
+    const handleUp = () => {
+      setDrag((prev) => {
+        if (!prev) return null;
+        if (prev.moved && onCreateRange) {
+          const yStart = Math.min(prev.startY, prev.currentY);
+          const yEnd = Math.max(prev.startY, prev.currentY);
+          const startDate = yPxToDate(prev.day, yStart);
+          let endDate = yPxToDate(prev.day, yEnd);
+          if (endDate.getTime() - startDate.getTime() < 30 * 60 * 1000) {
+            endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
+          }
+          onCreateRange(startDate, endDate);
+        } else {
+          onClickSlot(yPxToDate(prev.day, prev.startY));
+        }
+        return null;
+      });
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [drag, onClickSlot, onCreateRange]);
+
+  // Preview do drag (em pixels) para a coluna ativa
+  const dragPreview = drag && drag.moved
+    ? {
+        top: Math.min(drag.startY, drag.currentY),
+        height: Math.max(Math.abs(drag.currentY - drag.startY), 4),
+        startDate: yPxToDate(drag.day, Math.min(drag.startY, drag.currentY)),
+        endDate: (() => {
+          const s = yPxToDate(drag.day, Math.min(drag.startY, drag.currentY));
+          let e = yPxToDate(drag.day, Math.max(drag.startY, drag.currentY));
+          if (e.getTime() - s.getTime() < 30 * 60 * 1000) {
+            e = new Date(s.getTime() + 30 * 60 * 1000);
+          }
+          return e;
+        })(),
+      }
+    : null;
 
   const colTemplate = `${GUTTER_WIDTH}px repeat(${days.length}, minmax(0, 1fr))`;
 
@@ -185,12 +266,15 @@ export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGr
             className="flex-1 relative"
             style={{ display: 'grid', gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}
           >
-            {days.map((day) => (
+            {days.map((day) => {
+              const isDragDay = drag && isSameDay(drag.day, day);
+              return (
               <div
                 key={day.toISOString()}
-                className="relative border-l border-border/20"
+                data-day-col={day.toISOString()}
+                className="relative border-l border-border/20 select-none"
                 style={isToday(day) ? { backgroundColor: 'rgba(59,130,246,0.04)' } : {}}
-                onClick={(e) => handleColumnClick(day, e)}
+                onMouseDown={(e) => handleMouseDown(day, e)}
               >
                 {/* Linhas de hora */}
                 {HOURS.map((h) => (
@@ -212,6 +296,17 @@ export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGr
                 {timedEvents(eventsForDay(events, day)).map((ev) => (
                   <EventBlock key={ev.id} event={ev} onClick={onClickEvent} />
                 ))}
+                {/* Preview do drag-to-create */}
+                {isDragDay && dragPreview && (
+                  <div
+                    className="absolute left-0.5 right-0.5 rounded bg-primary/30 border border-primary text-primary-foreground text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 pointer-events-none z-20 overflow-hidden"
+                    style={{ top: dragPreview.top, height: dragPreview.height }}
+                  >
+                    <p className="leading-tight text-foreground/80">
+                      {format(dragPreview.startDate, 'HH:mm')} – {format(dragPreview.endDate, 'HH:mm')}
+                    </p>
+                  </div>
+                )}
                 {/* Indicador de hora atual — em todas as colunas visíveis */}
                 <div
                   className="absolute left-0 right-0 z-20 pointer-events-none"
@@ -223,7 +318,8 @@ export function TimeGridView({ days, events, onClickSlot, onClickEvent }: TimeGr
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
