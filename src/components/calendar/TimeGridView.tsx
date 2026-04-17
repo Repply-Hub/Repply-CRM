@@ -161,9 +161,14 @@ export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClick
       });
     };
 
+    // Força cursor durante o drag em toda a página
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = 'ns-resize';
+
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
     return () => {
+      document.body.style.cursor = previousCursor;
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
@@ -272,7 +277,7 @@ export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClick
               <div
                 key={day.toISOString()}
                 data-day-col={day.toISOString()}
-                className="relative border-l border-border/20 select-none"
+                className={`relative border-l border-border/20 select-none ${drag ? 'cursor-ns-resize' : 'cursor-cell'}`}
                 style={isToday(day) ? { backgroundColor: 'rgba(59,130,246,0.04)' } : {}}
                 onMouseDown={(e) => handleMouseDown(day, e)}
               >
