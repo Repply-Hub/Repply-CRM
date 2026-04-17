@@ -46,6 +46,8 @@ function EventBlock({
     <div
       role="button"
       tabIndex={0}
+      data-event-block
+      onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => { e.stopPropagation(); onClick(event); }}
       onKeyDown={(e) => e.key === 'Enter' && onClick(event)}
       className="absolute left-0.5 right-0.5 rounded px-1 sm:px-1.5 py-0.5 text-white text-[10px] sm:text-[11px] font-medium overflow-hidden cursor-pointer hover:brightness-90 transition-all z-10"
@@ -264,12 +266,15 @@ export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClick
             className="flex-1 relative"
             style={{ display: 'grid', gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}
           >
-            {days.map((day) => (
+            {days.map((day) => {
+              const isDragDay = drag && isSameDay(drag.day, day);
+              return (
               <div
                 key={day.toISOString()}
-                className="relative border-l border-border/20"
+                data-day-col={day.toISOString()}
+                className="relative border-l border-border/20 select-none"
                 style={isToday(day) ? { backgroundColor: 'rgba(59,130,246,0.04)' } : {}}
-                onClick={(e) => handleColumnClick(day, e)}
+                onMouseDown={(e) => handleMouseDown(day, e)}
               >
                 {/* Linhas de hora */}
                 {HOURS.map((h) => (
@@ -291,6 +296,17 @@ export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClick
                 {timedEvents(eventsForDay(events, day)).map((ev) => (
                   <EventBlock key={ev.id} event={ev} onClick={onClickEvent} />
                 ))}
+                {/* Preview do drag-to-create */}
+                {isDragDay && dragPreview && (
+                  <div
+                    className="absolute left-0.5 right-0.5 rounded bg-primary/30 border border-primary text-primary-foreground text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 pointer-events-none z-20 overflow-hidden"
+                    style={{ top: dragPreview.top, height: dragPreview.height }}
+                  >
+                    <p className="leading-tight text-foreground/80">
+                      {format(dragPreview.startDate, 'HH:mm')} – {format(dragPreview.endDate, 'HH:mm')}
+                    </p>
+                  </div>
+                )}
                 {/* Indicador de hora atual — em todas as colunas visíveis */}
                 <div
                   className="absolute left-0 right-0 z-20 pointer-events-none"
@@ -302,7 +318,8 @@ export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClick
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
