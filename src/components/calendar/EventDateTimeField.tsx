@@ -51,7 +51,7 @@ export function EventDateTimeField({
           type="button"
           onClick={openPicker}
           aria-label={`Abrir seletor de ${label.toLowerCase()}`}
-          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md border-l border-border bg-muted/40 p-0 text-primary transition-colors hover:bg-accent hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <CalendarDays className="h-4 w-4" />
         </button>
