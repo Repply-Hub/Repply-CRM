@@ -130,12 +130,12 @@ export function EventDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-[440px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[440px] max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>{isEditing ? 'Editar evento' : 'Novo evento'}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 px-6 overflow-y-auto flex-1 min-h-0">
           {/* Título */}
           <div className="space-y-1.5">
             <Label htmlFor="titulo">Título</Label>
@@ -295,7 +295,7 @@ export function EventDialog({
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 px-6 py-4 border-t shrink-0">
           {isEditing && onDelete && editingEvent && (
             <Button
               variant="ghost"
