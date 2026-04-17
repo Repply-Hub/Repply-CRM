@@ -131,7 +131,7 @@ export function EventDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-[440px] max-h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="sm:max-w-[560px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>{isEditing ? 'Editar evento' : 'Novo evento'}</DialogTitle>
         </DialogHeader>
