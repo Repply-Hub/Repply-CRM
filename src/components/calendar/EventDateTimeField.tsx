@@ -59,6 +59,11 @@ export function EventDateTimeField({
         {supportsShowPicker && (
           <button
             type="button"
+            tabIndex={-1}
+            onMouseDown={(event) => {
+              // Prevent input from losing focus / default native picker conflict
+              event.preventDefault();
+            }}
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
