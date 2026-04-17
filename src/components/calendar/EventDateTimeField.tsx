@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { CalendarDays } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 interface EventDateTimeFieldProps {
   label: string;
@@ -21,19 +22,18 @@ export function EventDateTimeField({
   onChange,
 }: EventDateTimeFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const supportsShowPicker = typeof HTMLInputElement !== 'undefined' && 'showPicker' in HTMLInputElement.prototype;
 
   const openPicker = () => {
     const input = inputRef.current as PickerCapableInput | null;
     if (!input) return;
-
-    input.focus();
 
     if (typeof input.showPicker === 'function') {
       input.showPicker();
       return;
     }
 
-    input.click();
+    input.focus();
   };
 
   return (
@@ -45,17 +45,31 @@ export function EventDateTimeField({
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full pr-12 text-sm [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none [&::-webkit-inner-spin-button]:hidden [&::-webkit-clear-button]:hidden"
-          style={{ colorScheme: 'normal' }}
+          onPointerDown={(event) => {
+            if (!supportsShowPicker) return;
+            event.preventDefault();
+            openPicker();
+          }}
+          className={cn(
+            'w-full text-sm',
+            supportsShowPicker &&
+              'appearance-none pr-12 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:h-10 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-clear-button]:appearance-none',
+          )}
+          style={supportsShowPicker ? { colorScheme: 'normal' } : undefined}
         />
-        <button
-          type="button"
-          onClick={openPicker}
-          aria-label={`Abrir seletor de ${label.toLowerCase()}`}
-          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md border-l border-border bg-muted/40 p-0 text-primary transition-colors hover:bg-accent hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <CalendarDays className="h-4 w-4" />
-        </button>
+        {supportsShowPicker && (
+          <button
+            type="button"
+            onPointerDown={(event) => {
+              event.preventDefault();
+              openPicker();
+            }}
+            aria-label={`Abrir seletor de ${label.toLowerCase()}`}
+            className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md border-l border-border bg-muted/40 p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <CalendarDays className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );
