@@ -100,6 +100,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   });
   // extras: column name (planilha) -> nome no sistema (campos_extras)
   const [extras, setExtras] = useState<Record<string, string>>({});
+  // customColumns: nome → valor padrão (colunas criadas do zero, não vêm da planilha)
+  const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
