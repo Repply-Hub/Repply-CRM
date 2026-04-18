@@ -270,30 +270,85 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         </div>
 
         {step === 'upload' && (
-          <div
-            className="border-2 border-dashed border-border rounded-xl p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-            onClick={() => fileRef.current?.click()}
-          >
-            <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-            <p className="text-sm font-medium text-foreground mb-1">Arraste o arquivo aqui ou clique para selecionar</p>
-            <p className="text-xs text-muted-foreground mb-3">Formatos aceitos: .xlsx, .xls, .csv</p>
-            <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 max-w-md mx-auto text-left">
-              <p className="font-medium mb-1">Qualquer planilha é aceita!</p>
-              <p>Na próxima etapa, você poderá mapear as colunas da sua planilha para os campos do sistema.</p>
+          <div className="space-y-3">
+            <div
+              className="border-2 border-dashed border-border rounded-xl p-10 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="h-9 w-9 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm font-medium text-foreground mb-1">Arraste o arquivo aqui ou clique para selecionar</p>
+              <p className="text-xs text-muted-foreground">Formatos aceitos: .xlsx, .xls, .csv</p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFile(file);
+                }}
+              />
             </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFile(file);
-              }}
-            />
+
+            <div className="flex items-center gap-2">
+              <div className="h-px bg-border flex-1" />
+              <span className="text-xs text-muted-foreground">ou monte uma planilha</span>
+              <div className="h-px bg-border flex-1" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowTemplate(true)}
+                className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:border-primary/50 hover:bg-accent/30 transition-colors text-left"
+              >
+                <div className="h-9 w-9 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Download className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">Baixar modelo</div>
+                  <div className="text-xs text-muted-foreground">Gere um .xlsx com os campos que você precisa.</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep('manual')}
+                className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:border-primary/50 hover:bg-accent/30 transition-colors text-left"
+              >
+                <div className="h-9 w-9 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Pencil className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">Inserir manualmente</div>
+                  <div className="text-xs text-muted-foreground">Digite ou cole linhas direto na tela.</div>
+                </div>
+              </button>
+            </div>
           </div>
+        )}
+
+        {step === 'manual' && (
+          <ManualEntryStep
+            fields={visibleFields}
+            onCancel={() => setStep('upload')}
+            onConfirm={(rows, hdrs) => {
+              setRawData(rows);
+              setHeaders(hdrs);
+              setFileName('Entrada manual');
+              // Pre-map: each header equals a field label, so map by label match
+              const auto: Record<FieldKey, string> = {
+                empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
+                telefone: '', endereco: '', nome_contato: '', cargo: '',
+              };
+              visibleFields.forEach(f => {
+                if (hdrs.includes(f.label)) auto[f.key] = f.label;
+              });
+              setMapping(auto);
+              setStep('mapping');
+            }}
+          />
         )}
 
         {step === 'mapping' && (
