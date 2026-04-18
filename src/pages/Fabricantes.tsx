@@ -25,7 +25,9 @@ import { ProductImageUpload } from '@/components/catalogo/ProductImageUpload';
 import { ImportCatalogoDialog } from '@/components/catalogo/ImportCatalogoDialog';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
+  { id: 'imagem', label: 'Imagem' },
   { id: 'descricao', label: 'Descrição', locked: true },
+  { id: 'categoria', label: 'Categoria' },
   { id: 'referencia', label: 'Referência' },
   { id: 'preco', label: 'Preço Unit.' },
   { id: 'unidade', label: 'Unidade' },
