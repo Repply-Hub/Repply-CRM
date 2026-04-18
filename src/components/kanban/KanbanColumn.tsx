@@ -1,9 +1,12 @@
 import { memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Droppable } from '@hello-pangea/dnd';
+import { Plus } from 'lucide-react';
 import { KanbanCard } from './KanbanCard';
 import { Order, KanbanStage } from '@/types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
 
 interface KanbanColumnProps {
   stageKey: KanbanStage;
@@ -13,6 +16,7 @@ interface KanbanColumnProps {
 }
 
 export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders }: KanbanColumnProps) {
+  const navigate = useNavigate();
   const total = orders.reduce((acc, o) => acc + o.valor, 0);
 
   return (
@@ -51,6 +55,15 @@ export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorC
                 <KanbanCard key={order.id} order={order} index={idx} />
               ))}
               {provided.placeholder}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(`/pedidos/novo?status=${encodeURIComponent(stageKey)}`)}
+                className="mt-2 w-full justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-background/60 border border-dashed border-border/60 hover:border-border"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Novo Pedido
+              </Button>
             </div>
           </ScrollArea>
         )}
