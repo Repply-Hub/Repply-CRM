@@ -1323,30 +1323,36 @@ export type Database = {
       }
       tabela_precos: {
         Row: {
+          categoria: string | null
           created_at: string
           descricao_material: string
           fabricante_id: string
           id: string
+          imagem_url: string | null
           preco_unitario: number
           referencia: string | null
           unidade: string | null
           vigente: boolean
         }
         Insert: {
+          categoria?: string | null
           created_at?: string
           descricao_material: string
           fabricante_id: string
           id?: string
+          imagem_url?: string | null
           preco_unitario: number
           referencia?: string | null
           unidade?: string | null
           vigente?: boolean
         }
         Update: {
+          categoria?: string | null
           created_at?: string
           descricao_material?: string
           fabricante_id?: string
           id?: string
+          imagem_url?: string | null
           preco_unitario?: number
           referencia?: string | null
           unidade?: string | null
