@@ -13,11 +13,12 @@ import { MappingStep } from '@/components/import/MappingStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
-type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'cargo';
+type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'sobrenome_contato' | 'cargo';
 
 const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: boolean }[] = [
   { key: 'empresa', label: 'Empresa', required: true },
   { key: 'nome_contato', label: 'Nome', required: false },
+  { key: 'sobrenome_contato', label: 'Sobrenome', required: false },
   { key: 'razao_social', label: 'Razão social', required: false },
   { key: 'tipo', label: 'Tipo / Segmento', required: false },
   { key: 'cnpj', label: 'CNPJ / CPF', required: false },
@@ -55,14 +56,22 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   email: [/^e-?mail$/, /mail/],
   telefone: [/^telefone$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
   endereco: [/^endereco$/, /endereco/, /address/],
-  nome_contato: [/^nome$/, /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/, /contato/, /responsavel/],
+  nome_contato: [
+    /^nome$/, /^primeiro\s*nome$/, /^first\s*name$/, /^nome\s*proprio$/,
+    /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
+    /contato/, /responsavel/, /^nome\b/, /first.*name/,
+  ],
+  sobrenome_contato: [
+    /^sobrenome$/, /^ultimo\s*nome$/, /^last\s*name$/, /^surname$/, /^apelido$/,
+    /sobrenome/, /last.*name/, /surname/,
+  ],
   cargo: [/^cargo$/, /cargo/, /funcao/, /posicao/],
 };
 
 function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
   const result: Record<FieldKey, string> = {
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
-    telefone: '', endereco: '', nome_contato: '', cargo: '',
+    telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
   };
   const used = new Set<string>();
   // First pass: exact patterns
@@ -96,7 +105,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, string>>({
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
-    telefone: '', endereco: '', nome_contato: '', cargo: '',
+    telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
   });
   // extras: column name (planilha) -> nome no sistema (campos_extras)
   const [extras, setExtras] = useState<Record<string, string>>({});
@@ -118,7 +127,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     setHeaders([]);
     setMapping({
       empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
-      telefone: '', endereco: '', nome_contato: '', cargo: '',
+      telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
     });
     setExtras({});
     setCustomColumns({});
@@ -171,7 +180,9 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           return (row[col] ?? '').toString().trim();
         };
         const empresa = get('empresa');
-        const nome_contato = get('nome_contato');
+        const primeiro = get('nome_contato');
+        const sobrenome = get('sobrenome_contato');
+        const nome_contato = [primeiro, sobrenome].filter(Boolean).join(' ').trim();
         const tipoRaw = get('tipo');
 
         // Monta campos_extras com base nas colunas marcadas como "novas" (vindas da planilha)
@@ -202,7 +213,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : r.empresa);
   };
 
-  const canProceed = Boolean(mapping.empresa) || (target === 'contatos' && Boolean(mapping.nome_contato));
+  const canProceed = Boolean(mapping.empresa) || (target === 'contatos' && (Boolean(mapping.nome_contato) || Boolean(mapping.sobrenome_contato)));
 
   const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData, extras, customColumns]);
 
@@ -341,7 +352,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             onClearAll={() => {
               setMapping({
                 empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
-                telefone: '', endereco: '', nome_contato: '', cargo: '',
+                telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
               });
               setExtras({});
               setCustomColumns({});
