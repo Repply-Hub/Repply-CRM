@@ -201,7 +201,8 @@ export function detectImportPedidosMapping(
 export function getImportedPedidosRows(
   rows: Record<string, unknown>[],
   mapping: Record<FieldKey, string>,
-  extras: Record<string, string> = {}
+  extras: Record<string, string> = {},
+  customColumns: Record<string, string> = {}
 ) {
   return rows
     .map((row) => {
@@ -215,6 +216,11 @@ export function getImportedPedidosRows(
       Object.entries(extras).forEach(([col, name]) => {
         const v = (row[col] ?? '').toString().trim();
         if (v !== '') campos_extras[name || col] = v;
+      });
+      // Colunas criadas do zero (valor padrão aplicado a todas as linhas)
+      Object.entries(customColumns).forEach(([name, value]) => {
+        const v = (value ?? '').toString().trim();
+        if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
       return { cliente, fabricante, valor, observacoes, status, campos_extras };
