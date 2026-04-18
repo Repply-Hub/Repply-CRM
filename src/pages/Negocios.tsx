@@ -573,29 +573,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
-                          <Filter className="h-4 w-4 mr-2" /> Etapa
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-48">
-                          <DropdownMenuItem
-                            onSelect={(e) => { e.preventDefault(); handleStageFilterChange('todos'); }}
-                            className={stageFilter === 'todos' ? 'bg-accent font-medium' : ''}
-                          >
-                            Todas as etapas
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          {KANBAN_STAGES.map(s => (
-                            <DropdownMenuItem
-                              key={s.key}
-                              onSelect={(e) => { e.preventDefault(); handleStageFilterChange(s.key); }}
-                              className={stageFilter === s.key ? 'bg-accent font-medium' : ''}
-                            >
-                              {s.label}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>
                           <Columns3 className="h-4 w-4 mr-2" /> Colunas
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent className="w-56">
