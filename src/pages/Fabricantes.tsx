@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFabricantes } from '@/hooks/use-clientes';
 import { useCreateFabricante } from '@/hooks/use-mutations';
-import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante } from '@/hooks/use-fabricantes';
-import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash } from 'lucide-react';
+import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante, useCategorias } from '@/hooks/use-fabricantes';
+import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash, Upload, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
@@ -21,9 +21,13 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ListPagination } from '@/components/ListPagination';
+import { ProductImageUpload } from '@/components/catalogo/ProductImageUpload';
+import { ImportCatalogoDialog } from '@/components/catalogo/ImportCatalogoDialog';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
+  { id: 'imagem', label: 'Imagem' },
   { id: 'descricao', label: 'Descrição', locked: true },
+  { id: 'categoria', label: 'Categoria' },
   { id: 'referencia', label: 'Referência' },
   { id: 'preco', label: 'Preço Unit.' },
   { id: 'unidade', label: 'Unidade' },
@@ -108,26 +112,37 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   fabricanteId: string;
-  editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean };
+  editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean; categoria?: string | null; imagem_url?: string | null };
 }) {
   const createPreco = useCreatePreco();
   const updatePreco = useUpdatePreco();
+  const { data: categorias } = useCategorias();
   const [desc, setDesc] = useState(editData?.descricao_material ?? '');
   const [ref, setRef] = useState(editData?.referencia ?? '');
   const [preco, setPreco] = useState(editData?.preco_unitario?.toString() ?? '');
   const [unidade, setUnidade] = useState(editData?.unidade ?? 'un');
   const [vigente, setVigente] = useState(editData?.vigente ?? true);
+  const [categoria, setCategoria] = useState(editData?.categoria ?? '');
+  const [imagemUrl, setImagemUrl] = useState<string | null>(editData?.imagem_url ?? null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { descricao_material: desc, referencia: ref || undefined, preco_unitario: parseFloat(preco), unidade, vigente };
+    const payload = {
+      descricao_material: desc,
+      referencia: ref || undefined,
+      preco_unitario: parseFloat(preco),
+      unidade,
+      vigente,
+      categoria: categoria.trim() || null,
+      imagem_url: imagemUrl,
+    };
     try {
       if (editData) {
         await updatePreco.mutateAsync({ id: editData.id, ...payload });
-        toast.success('Preço atualizado!');
+        toast.success('Produto atualizado!');
       } else {
         await createPreco.mutateAsync({ fabricante_id: fabricanteId, ...payload });
-        toast.success('Preço cadastrado!');
+        toast.success('Produto cadastrado!');
       }
       onOpenChange(false);
     } catch (err: any) { toast.error(err.message); }
@@ -137,11 +152,29 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>{editData ? 'Editar' : 'Novo'} Item de Preço</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>{editData ? 'Editar' : 'Novo'} Produto</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div>
+            <Label className="mb-2 block">Imagem</Label>
+            <ProductImageUpload value={imagemUrl} onChange={setImagemUrl} fabricanteId={fabricanteId} />
+          </div>
           <div><Label>Descrição do Material</Label><Input value={desc} onChange={e => setDesc(e.target.value)} required /></div>
-          <div><Label>Referência</Label><Input value={ref} onChange={e => setRef(e.target.value)} placeholder="Código de referência" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label>Referência</Label><Input value={ref} onChange={e => setRef(e.target.value)} placeholder="Código" /></div>
+            <div>
+              <Label>Categoria</Label>
+              <Input
+                value={categoria}
+                onChange={e => setCategoria(e.target.value)}
+                list="categorias-list"
+                placeholder="Ex: Pisos, Louças"
+              />
+              <datalist id="categorias-list">
+                {(categorias ?? []).map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Preço Unitário (R$)</Label><Input type="number" step="0.01" value={preco} onChange={e => setPreco(e.target.value)} required /></div>
             <div>
@@ -161,7 +194,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="vigente" checked={vigente} onChange={e => setVigente(e.target.checked)} className="rounded border-input" />
-            <Label htmlFor="vigente">Preço vigente</Label>
+            <Label htmlFor="vigente">Produto vigente (disponível)</Label>
           </div>
           <Button type="submit" className="w-full" disabled={isPending}>{isPending ? 'Salvando...' : 'Salvar'}</Button>
         </form>
@@ -274,6 +307,8 @@ const Fabricantes = () => {
   const [editFab, setEditFab] = useState<any>(null);
   const [precoDialog, setPrecoDialog] = useState(false);
   const [editPreco, setEditPreco] = useState<any>(null);
+  const [importDialog, setImportDialog] = useState(false);
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
   const [deleteAlert, setDeleteAlert] = useState<{ type: 'fab' | 'preco'; id: string } | null>(null);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
@@ -297,6 +332,9 @@ const Fabricantes = () => {
   const filtered = fabricantes?.filter(f => f.nome.toLowerCase().includes(search.toLowerCase())) ?? [];
   const totalFabPages = Math.max(1, Math.ceil(filtered.length / fabPageSize));
   const paginatedFabs = filtered.slice((fabPage - 1) * fabPageSize, fabPage * fabPageSize);
+
+  const categoriasPreco = Array.from(new Set((precos ?? []).map((p: any) => p.categoria).filter(Boolean))) as string[];
+  const precosFiltrados = (precos ?? []).filter((p: any) => filtroCategoria === 'todas' || p.categoria === filtroCategoria);
 
   useEffect(() => {
     if (fabPage > totalFabPages) setFabPage(totalFabPages);
@@ -434,23 +472,33 @@ const Fabricantes = () => {
                 {/* Price Table */}
                 <Card className="rounded-xl border-border/60">
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div>
                         <CardTitle className="text-base font-bold flex items-center gap-2">
-                          <Package className="h-4 w-4 text-primary" /> Tabela de Preços
+                          <Package className="h-4 w-4 text-primary" /> Catálogo de Produtos
                         </CardTitle>
                         <CardDescription className="text-xs mt-0.5">
-                          {precos?.length ?? 0} ite{(precos?.length ?? 0) !== 1 ? 'ns' : 'm'} cadastrado{(precos?.length ?? 0) !== 1 ? 's' : ''}
+                          {precos?.length ?? 0} produto{(precos?.length ?? 0) !== 1 ? 's' : ''} cadastrado{(precos?.length ?? 0) !== 1 ? 's' : ''}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2">
-                        <ColumnSettings
-                          columns={PRECOS_COLUMNS}
-                          visibleColumns={visibleColumns}
-                          onChange={handleColumnChange}
-                        />
+                      <div className="flex gap-2 flex-wrap">
+                        {categoriasPreco.length > 0 && (
+                          <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                            <SelectTrigger className="h-8 text-xs w-40">
+                              <SelectValue placeholder="Categoria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="todas">Todas categorias</SelectItem>
+                              {categoriasPreco.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        <ColumnSettings columns={PRECOS_COLUMNS} visibleColumns={visibleColumns} onChange={handleColumnChange} />
+                        <Button size="sm" variant="outline" onClick={() => setImportDialog(true)} className="gap-1.5 h-8">
+                          <Upload className="h-3.5 w-3.5" /> Importar
+                        </Button>
                         <Button size="sm" onClick={() => { setEditPreco(null); setPrecoDialog(true); }} className="gap-1.5 h-8">
-                          <Plus className="h-3.5 w-3.5" /> Novo Item
+                          <Plus className="h-3.5 w-3.5" /> Novo Produto
                         </Button>
                       </div>
                     </div>
@@ -460,12 +508,14 @@ const Fabricantes = () => {
                       <div className="flex justify-center py-12">
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                       </div>
-                    ) : precos && precos.length > 0 ? (
+                    ) : precosFiltrados.length > 0 ? (
                       <div className="rounded-lg border border-border/50 overflow-hidden">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30 hover:bg-muted/30">
+                              {visibleColumns.includes('imagem') && <TableHead className="text-xs font-semibold w-16">Foto</TableHead>}
                               {visibleColumns.includes('descricao') && <TableHead className="text-xs font-semibold">Descrição</TableHead>}
+                              {visibleColumns.includes('categoria') && <TableHead className="text-xs font-semibold">Categoria</TableHead>}
                               {visibleColumns.includes('referencia') && <TableHead className="text-xs font-semibold">Referência</TableHead>}
                               {visibleColumns.includes('preco') && <TableHead className="text-xs font-semibold">Preço Unit.</TableHead>}
                               {visibleColumns.includes('unidade') && <TableHead className="text-xs font-semibold">Unidade</TableHead>}
@@ -474,22 +524,35 @@ const Fabricantes = () => {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {precos.map(p => (
+                            {precosFiltrados.map((p: any) => (
                               <TableRow key={p.id} className="group">
+                                {visibleColumns.includes('imagem') && (
+                                  <TableCell>
+                                    <div className="h-10 w-10 rounded-md bg-muted/40 border border-border/40 overflow-hidden flex items-center justify-center">
+                                      {p.imagem_url ? (
+                                        <img src={p.imagem_url} alt={p.descricao_material} className="h-full w-full object-cover" loading="lazy" />
+                                      ) : (
+                                        <ImageIcon className="h-4 w-4 text-muted-foreground/40" />
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                )}
                                 {visibleColumns.includes('descricao') && <TableCell className="font-medium text-sm">{p.descricao_material}</TableCell>}
+                                {visibleColumns.includes('categoria') && (
+                                  <TableCell className="text-xs">
+                                    {p.categoria ? <Badge variant="secondary" className="font-normal">{p.categoria}</Badge> : <span className="text-muted-foreground">-</span>}
+                                  </TableCell>
+                                )}
                                 {visibleColumns.includes('referencia') && <TableCell className="text-sm text-muted-foreground">{p.referencia ?? '-'}</TableCell>}
                                 {visibleColumns.includes('preco') && (
                                   <TableCell className="text-sm font-semibold text-foreground">
-                                    {p.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    {Number(p.preco_unitario).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                   </TableCell>
                                 )}
                                 {visibleColumns.includes('unidade') && <TableCell className="text-sm text-muted-foreground">{p.unidade ?? '-'}</TableCell>}
                                 {visibleColumns.includes('status') && (
                                   <TableCell>
-                                    <Badge
-                                      variant={p.vigente ? 'default' : 'secondary'}
-                                      className={p.vigente ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}
-                                    >
+                                    <Badge variant={p.vigente ? 'default' : 'secondary'} className={p.vigente ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}>
                                       {p.vigente ? 'Vigente' : 'Inativo'}
                                     </Badge>
                                   </TableCell>
@@ -514,11 +577,16 @@ const Fabricantes = () => {
                     ) : (
                       <div className="flex flex-col items-center py-12 text-center">
                         <Package className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                        <p className="text-sm text-muted-foreground font-medium">Nenhum item de preço cadastrado</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">Adicione itens à tabela de preços deste fabricante</p>
-                        <Button size="sm" variant="outline" className="mt-4 gap-1.5" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
-                          <Plus className="h-3.5 w-3.5" /> Adicionar primeiro item
-                        </Button>
+                        <p className="text-sm text-muted-foreground font-medium">Nenhum produto cadastrado</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Adicione produtos ao catálogo deste fabricante</p>
+                        <div className="flex gap-2 mt-4">
+                          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setImportDialog(true)}>
+                            <Upload className="h-3.5 w-3.5" /> Importar planilha
+                          </Button>
+                          <Button size="sm" className="gap-1.5" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
+                            <Plus className="h-3.5 w-3.5" /> Adicionar produto
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -543,6 +611,14 @@ const Fabricantes = () => {
 
       <FabricanteForm open={fabDialog} onOpenChange={setFabDialog} editData={editFab} />
       {selectedFabId && <PrecoForm open={precoDialog} onOpenChange={setPrecoDialog} fabricanteId={selectedFabId} editData={editPreco} />}
+      {selectedFabId && (
+        <ImportCatalogoDialog
+          open={importDialog}
+          onOpenChange={setImportDialog}
+          fabricanteId={selectedFabId}
+          fabricanteNome={selectedFab?.nome}
+        />
+      )}
 
       <AlertDialog open={!!deleteAlert} onOpenChange={(o) => !o && setDeleteAlert(null)}>
         <AlertDialogContent>
