@@ -136,6 +136,28 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     localStorage.setItem('pedidos_columns', JSON.stringify(newColumns));
   };
 
+  // Visibilidade das colunas (etapas) do Kanban
+  const [visibleKanbanStages, setVisibleKanbanStages] = useState<string[]>(() => {
+    const saved = localStorage.getItem('pedidos_kanban_stages');
+    return saved ? JSON.parse(saved) : KANBAN_STAGES.map(s => s.key);
+  });
+
+  const handleKanbanStagesChange = (next: string[]) => {
+    setVisibleKanbanStages(next);
+    localStorage.setItem('pedidos_kanban_stages', JSON.stringify(next));
+  };
+
+  const toggleKanbanStage = (key: string) => {
+    if (visibleKanbanStages.includes(key)) {
+      if (visibleKanbanStages.length > 1) {
+        handleKanbanStagesChange(visibleKanbanStages.filter(k => k !== key));
+      }
+    } else {
+      const next = KANBAN_STAGES.filter(s => visibleKanbanStages.includes(s.key) || s.key === key).map(s => s.key);
+      handleKanbanStagesChange(next);
+    }
+  };
+
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setPage(1);
@@ -349,8 +371,46 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <span className="hidden sm:inline">Opções</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        {!showKanban && (
+      <DropdownMenuContent align="end" sideOffset={4} className="w-48">
+        {showKanban ? (
+          <>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Columns3 className="h-4 w-4 mr-2" /> Colunas do Kanban
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-56">
+                {KANBAN_STAGES.map((stage) => (
+                  <div
+                    key={stage.key}
+                    className="flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50"
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    <Checkbox
+                      id={`kanban-stage-${stage.key}`}
+                      checked={visibleKanbanStages.includes(stage.key)}
+                      onCheckedChange={() => toggleKanbanStage(stage.key)}
+                      disabled={visibleKanbanStages.length === 1 && visibleKanbanStages.includes(stage.key)}
+                    />
+                    <Label htmlFor={`kanban-stage-${stage.key}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
+                      {stage.label}
+                    </Label>
+                  </div>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key));
+                  }}
+                  className="text-xs text-primary justify-center"
+                >
+                  Resetar todas
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+          </>
+        ) : (
           <>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
@@ -590,7 +650,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
 
-            {/* Em Kanban, Filtros e Exportar PDF ficam na topbar (não há linha de busca). */}
+            {/* Em Kanban, Filtros ficam na topbar à esquerda (não há linha de busca). */}
             {showKanban && (
               <>
                 {filtrosPopover}
@@ -599,14 +659,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     <X className="h-3.5 w-3.5" />
                   </Button>
                 )}
-                {opcoesDropdown}
               </>
             )}
           </div>
 
-          <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate('/pedidos/novo')}>
-            <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
-          </Button>
+          <div className="flex items-center gap-2 sm:justify-end">
+            {showKanban && opcoesDropdown}
+            <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate('/pedidos/novo')}>
+              <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -616,7 +678,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         ) : showKanban ? (
           <DragDropContext onDragEnd={handleDragEnd}>
             <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-3 px-3 sm:mx-0 sm:px-0">
-              {KANBAN_STAGES.map(stage => (
+              {KANBAN_STAGES.filter(stage => visibleKanbanStages.includes(stage.key)).map(stage => (
                 <KanbanColumn
                   key={stage.key}
                   stageKey={stage.key}
