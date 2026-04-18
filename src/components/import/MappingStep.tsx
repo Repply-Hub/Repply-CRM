@@ -743,12 +743,14 @@ export function MappingStep({
                             {h}
                           </span>
                           {field && fieldDef && (
-                            <Badge variant="outline" className="h-5 text-[10px] gap-1 border-primary/30 text-primary bg-primary/5">
-                              <Check className="h-2.5 w-2.5" />
-                              {fieldDef.label}
-                              {fieldDef.required && <span className="text-destructive ml-0.5">*</span>}
-                            </Badge>
-                            <FieldInfo fieldKey={fieldDef.key} />
+                            <>
+                              <Badge variant="outline" className="h-5 text-[10px] gap-1 border-primary/30 text-primary bg-primary/5">
+                                <Check className="h-2.5 w-2.5" />
+                                {fieldDef.label}
+                                {fieldDef.required && <span className="text-destructive ml-0.5">*</span>}
+                              </Badge>
+                              <FieldInfo fieldKey={fieldDef.key} />
+                            </>
                           )}
                           {isExtra && (
                             <Badge className="h-5 text-[10px] gap-1 bg-accent text-accent-foreground border-accent hover:bg-accent">
