@@ -8,7 +8,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import {
   FileSpreadsheet, X, ArrowRight, Sparkles, Search, Check, EyeOff, AlertCircle, Plus, Pencil,
-  CheckCircle2, Trash2, Wand2, GripVertical,
+  CheckCircle2, Trash2, Wand2, GripVertical, Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +21,118 @@ export interface FieldDef {
 
 const NONE = '__none__';
 const EXTRA_PREFIX = '__extra__:';
+
+/** Descrições contextuais para cada campo do sistema — explica o que cada nome genérico realmente representa. */
+const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: string }> = {
+  // Empresas / Contatos
+  empresa: {
+    desc: 'Nome principal da empresa (nome fantasia ou razão social abreviada).',
+    example: 'Engecomp Soluções LTDA',
+    storage: 'clientes.empresa',
+  },
+  razao_social: {
+    desc: 'Razão social completa registrada na Receita Federal.',
+    example: 'ENGECOMP SOLUÇÕES EM ENGENHARIA LTDA',
+    storage: 'clientes.razao_social',
+  },
+  tipo: {
+    desc: 'Categoria do cliente: construtora, escola, instalador, etc.',
+    example: 'construtora',
+    storage: 'clientes.tipo',
+  },
+  cnpj: {
+    desc: 'CNPJ ou CPF do cliente (apenas números ou formatado).',
+    example: '12.345.678/0001-90',
+    storage: 'clientes.cnpj',
+  },
+  email: {
+    desc: 'E-mail principal de contato da empresa ou pessoa.',
+    example: 'contato@empresa.com.br',
+    storage: 'clientes.email',
+  },
+  telefone: {
+    desc: 'Telefone principal — fixo ou celular, com DDD.',
+    example: '(84) 99999-9999',
+    storage: 'clientes.telefone',
+  },
+  endereco: {
+    desc: 'Endereço completo (rua, número, bairro, cidade, estado).',
+    example: 'Av. Hermes da Fonseca, 123, Tirol, Natal/RN',
+    storage: 'clientes.endereco',
+  },
+  nome_contato: {
+    desc: 'Nome da pessoa de contato dentro da empresa (não confunda com nome da empresa).',
+    example: 'João Silva',
+    storage: 'clientes.nome_contato',
+  },
+  cargo: {
+    desc: 'Cargo ou função do contato dentro da empresa.',
+    example: 'Engenheiro de Compras',
+    storage: 'contatos.cargo',
+  },
+  // Pedidos
+  cliente: {
+    desc: 'Nome da empresa cliente. Será criada automaticamente se não existir.',
+    example: 'Engecomp Soluções LTDA',
+    storage: 'pedidos.cliente_id (via clientes.empresa)',
+  },
+  fabricante: {
+    desc: 'Nome do fabricante. Será criado automaticamente se não existir.',
+    example: 'Tigre',
+    storage: 'pedidos.fabricante_id (via fabricantes.nome)',
+  },
+  valor: {
+    desc: 'Valor total do pedido em R$. Aceita 1.234,56 ou 1234.56.',
+    example: '15.420,75',
+    storage: 'pedidos.valor_total',
+  },
+  observacoes: {
+    desc: 'Notas livres sobre o pedido, prazo, condições etc.',
+    example: 'Entrega prevista para 15/12',
+    storage: 'pedidos.observacoes',
+  },
+  status: {
+    desc: 'Etapa do pipeline: novo lead, elaborando, enviado, negociação, fechado, perdido.',
+    example: 'novo_lead',
+    storage: 'pedidos.status',
+  },
+};
+
+/** Mini-componente: ícone "i" com tooltip explicando o campo. */
+function FieldInfo({ fieldKey }: { fieldKey: string }) {
+  const hint = FIELD_HINTS[fieldKey];
+  if (!hint) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="inline-flex items-center justify-center text-muted-foreground/60 hover:text-primary transition-colors shrink-0"
+          aria-label={`Sobre o campo ${fieldKey}`}
+        >
+          <Info className="h-3 w-3" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="max-w-[260px] space-y-1">
+        <p className="text-xs">{hint.desc}</p>
+        {hint.example && (
+          <p className="text-[10px] text-muted-foreground">
+            <span className="font-semibold">Exemplo:</span>{' '}
+            <span className="font-mono">{hint.example}</span>
+          </p>
+        )}
+        {hint.storage && (
+          <p className="text-[10px] text-muted-foreground">
+            <span className="font-semibold">Salvo em:</span>{' '}
+            <span className="font-mono">{hint.storage}</span>
+          </p>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 interface Props {
   fileName: string;
