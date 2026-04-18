@@ -238,8 +238,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [pipelineOrders]);
 
   const totalPipeline = pipelineOrders.reduce((acc, o) => acc + o.valor, 0);
-  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo;
-  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0);
+  const hasStageFilter = stageFilter !== 'todos';
+  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || hasStageFilter;
+  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (hasStageFilter ? 1 : 0);
 
   const toggleFilter = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
     setList(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -251,6 +252,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setShowOnlyAttention(false);
     setDateFrom(undefined);
     setDateTo(undefined);
+    handleStageFilterChange('todos');
   };
 
   const handleDragEnd = useCallback((result: DropResult) => {
@@ -388,117 +390,128 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
 
-            {isPipelineMode && (
-              <>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className={cn("data-[state=open]:bg-accent data-[state=open]:text-accent-foreground", hasPipelineFilters && 'border-primary')}>
-                      <Filter className="h-3.5 w-3.5 mr-1.5" />
-                      Filtros
-                      {hasPipelineFilters && (
-                        <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{activeFilterCount}</Badge>
-                      )}
-                      <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto min-w-[680px] max-w-[860px] p-4" align="start">
-                    <div className="flex gap-0 divide-x divide-border">
-                      <div className="flex-1 min-w-[130px] pr-4">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
-                        <div className="space-y-1 max-h-60 overflow-y-auto">
-                          {(vendedores ?? []).map(v => (
-                            <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                              <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
-                              {v.nome}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-[130px] px-4">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fabricante</p>
-                        <ScrollArea className="h-60">
-                          <div className="space-y-1 pr-3">
-                            {(fabricantes ?? []).map(f => (
-                              <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                                <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
-                                {f.nome}
-                              </label>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      </div>
-                      <div className="min-w-[140px] px-4">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Período</p>
-                        <div className="space-y-2">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm" className={cn("w-full justify-start text-left text-xs h-8", !dateFrom && "text-muted-foreground")}>
-                                <CalendarIcon className="h-3 w-3 mr-1.5" />
-                                {dateFrom ? format(dateFrom, 'dd/MM/yy', { locale: ptBR }) : 'De'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
-                            </PopoverContent>
-                          </Popover>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm" className={cn("w-full justify-start text-left text-xs h-8", !dateTo && "text-muted-foreground")}>
-                                <CalendarIcon className="h-3 w-3 mr-1.5" />
-                                {dateTo ? format(dateTo, 'dd/MM/yy', { locale: ptBR }) : 'Até'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                      <div className="flex flex-col justify-between min-w-[120px] pl-4">
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
-                          <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                            <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
-                            <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                            Atenção
-                          </label>
-                        </div>
-                        {hasPipelineFilters && (
-                          <Button variant="ghost" size="sm" onClick={clearPipelineFilters} className="w-full text-muted-foreground mt-2">
-                            <X className="h-3.5 w-3.5 mr-1" /> Limpar
-                          </Button>
-                        )}
-                      </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("data-[state=open]:bg-accent data-[state=open]:text-accent-foreground", hasPipelineFilters && 'border-primary')}>
+                  <Filter className="h-3.5 w-3.5 mr-1.5" />
+                  Filtros
+                  {hasPipelineFilters && (
+                    <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{activeFilterCount}</Badge>
+                  )}
+                  <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto min-w-[820px] max-w-[980px] p-4" align="start">
+                <div className="flex gap-0 divide-x divide-border">
+                  <div className="flex-1 min-w-[140px] pr-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Etapa</p>
+                    <div className="space-y-1">
+                      <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                        <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
+                        Todas as etapas
+                      </label>
+                      {KANBAN_STAGES.map(s => (
+                        <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                          <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
+                          {s.label}
+                        </label>
+                      ))}
                     </div>
-                  </PopoverContent>
-                </Popover>
+                  </div>
+                  <div className="flex-1 min-w-[130px] px-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
+                    <div className="space-y-1 max-h-60 overflow-y-auto">
+                      {(vendedores ?? []).map(v => (
+                        <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                          <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
+                          {v.nome}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-[130px] px-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fabricante</p>
+                    <ScrollArea className="h-60">
+                      <div className="space-y-1 pr-3">
+                        {(fabricantes ?? []).map(f => (
+                          <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                            <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
+                            {f.nome}
+                          </label>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                  <div className="min-w-[140px] px-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Período</p>
+                    <div className="space-y-2">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className={cn("w-full justify-start text-left text-xs h-8", !dateFrom && "text-muted-foreground")}>
+                            <CalendarIcon className="h-3 w-3 mr-1.5" />
+                            {dateFrom ? format(dateFrom, 'dd/MM/yy', { locale: ptBR }) : 'De'}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                        </PopoverContent>
+                      </Popover>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className={cn("w-full justify-start text-left text-xs h-8", !dateTo && "text-muted-foreground")}>
+                            <CalendarIcon className="h-3 w-3 mr-1.5" />
+                            {dateTo ? format(dateTo, 'dd/MM/yy', { locale: ptBR }) : 'Até'}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                  <div className="flex flex-col justify-between min-w-[120px] pl-4">
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
+                      <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                        <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
+                        <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                        Atenção
+                      </label>
+                    </div>
+                    {hasPipelineFilters && (
+                      <Button variant="ghost" size="sm" onClick={clearPipelineFilters} className="w-full text-muted-foreground mt-2">
+                        <X className="h-3.5 w-3.5 mr-1" /> Limpar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
 
-                {hasPipelineFilters && (
-                  <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground">
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                )}
+            {hasPipelineFilters && (
+              <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
 
-                {/* Em Pipeline + Kanban, mantemos o botão externo de PDF (não há dropdown "Opções" no Kanban). */}
-                {showKanban && (
-                  <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
-                    await generatePedidosPdf(
-                      pipelineOrders.map(o => ({
-                        cliente: o.clientName,
-                        obra: o.obra,
-                        fabricante: o.fabricante,
-                        vendedor: o.vendedor,
-                        valor: o.valor,
-                        etapa: stageLabel(o.stage),
-                        data: o.createdAt,
-                      })),
-                      hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
-                    );
-                  }}>
-                    <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
-                  </Button>
-                )}
-              </>
+            {/* Em Pipeline + Kanban, mantemos o botão externo de PDF (não há dropdown "Opções" no Kanban). */}
+            {showKanban && (
+              <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
+                await generatePedidosPdf(
+                  pipelineOrders.map(o => ({
+                    cliente: o.clientName,
+                    obra: o.obra,
+                    fabricante: o.fabricante,
+                    vendedor: o.vendedor,
+                    valor: o.valor,
+                    etapa: stageLabel(o.stage),
+                    data: o.createdAt,
+                  })),
+                  hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
+                );
+              }}>
+                <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
+              </Button>
             )}
 
 
@@ -541,19 +554,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     onChange={(e) => handleSearchChange(e.target.value)}
                   />
                 </div>
-                {stageFilter !== 'todos' && (
-                  <Badge variant="secondary" className="gap-1.5 h-9 px-3">
-                    Etapa: {stageLabel(stageFilter)}
-                    <button
-                      type="button"
-                      onClick={() => handleStageFilterChange('todos')}
-                      className="ml-0.5 rounded-sm hover:bg-muted-foreground/20"
-                      aria-label="Limpar filtro de etapa"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                )}
+
 
                 <div className="flex items-center gap-2">
                   {someSelected && (
@@ -570,29 +571,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>
-                          <Filter className="h-4 w-4 mr-2" /> Etapa
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-48">
-                          <DropdownMenuItem
-                            onSelect={(e) => { e.preventDefault(); handleStageFilterChange('todos'); }}
-                            className={stageFilter === 'todos' ? 'bg-accent font-medium' : ''}
-                          >
-                            Todas as etapas
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          {KANBAN_STAGES.map(s => (
-                            <DropdownMenuItem
-                              key={s.key}
-                              onSelect={(e) => { e.preventDefault(); handleStageFilterChange(s.key); }}
-                              className={stageFilter === s.key ? 'bg-accent font-medium' : ''}
-                            >
-                              {s.label}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
                           <Columns3 className="h-4 w-4 mr-2" /> Colunas
