@@ -138,11 +138,33 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     localStorage.setItem('pedidos_columns', JSON.stringify(newColumns));
   };
 
-  // Visibilidade das colunas (etapas) do Kanban
+  // Visibilidade das colunas (etapas) do Kanban — sincronizada com o catálogo dinâmico
   const [visibleKanbanStages, setVisibleKanbanStages] = useState<string[]>(() => {
     const saved = localStorage.getItem('pedidos_kanban_stages');
-    return saved ? JSON.parse(saved) : KANBAN_STAGES.map(s => s.key);
+    return saved ? JSON.parse(saved) : [];
   });
+
+  // Quando o catálogo de colunas mudar, garante que novas colunas apareçam por padrão
+  // e colunas removidas sejam descartadas das preferências locais.
+  useEffect(() => {
+    if (!kanbanColunas) return;
+    const allKeys = kanbanColunas.map(c => c.slug);
+    setVisibleKanbanStages(prev => {
+      const filtered = prev.filter(k => allKeys.includes(k));
+      const novas = allKeys.filter(k => !prev.includes(k));
+      // Se nada salvo ainda, mostra todas
+      if (prev.length === 0) {
+        localStorage.setItem('pedidos_kanban_stages', JSON.stringify(allKeys));
+        return allKeys;
+      }
+      const next = [...filtered, ...novas];
+      if (next.length !== prev.length || next.some((k, i) => k !== prev[i])) {
+        localStorage.setItem('pedidos_kanban_stages', JSON.stringify(next));
+        return next;
+      }
+      return prev;
+    });
+  }, [kanbanColunas]);
 
   const handleKanbanStagesChange = (next: string[]) => {
     setVisibleKanbanStages(next);
