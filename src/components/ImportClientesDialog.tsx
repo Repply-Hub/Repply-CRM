@@ -121,6 +121,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       telefone: '', endereco: '', nome_contato: '', cargo: '',
     });
     setExtras({});
+    setCustomColumns({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
