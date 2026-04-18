@@ -476,7 +476,7 @@ export function MappingStep({
         )}
 
         {/* Mapping list */}
-        <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border bg-card">
+        <div className="rounded-xl border bg-card">
           {/* Custom columns section (criadas do zero) */}
           {customCount > 0 && (
             <div className="border-b bg-accent/5">
