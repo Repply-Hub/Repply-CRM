@@ -3,13 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
+import { MappingStep } from '@/components/import/MappingStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
@@ -294,97 +294,31 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         )}
 
         {step === 'mapping' && (
-          <div className="flex flex-col gap-4 flex-1 min-h-0">
-            <div className="flex items-center justify-between">
-              <Badge variant="secondary" className="gap-1">
-                <FileSpreadsheet className="h-3 w-3" />
-                {fileName} — {rawData.length} linhas
-              </Badge>
-              <Button variant="ghost" size="sm" onClick={reset}>
-                <X className="h-4 w-4 mr-1" /> Trocar arquivo
-              </Button>
-            </div>
-
-            <div className="text-sm font-medium text-foreground">
-              Mapeie as colunas da sua planilha aos campos do sistema:
-            </div>
-
-            <div className="grid gap-3 max-h-[40vh] overflow-y-auto pr-1">
-              {visibleFields.map(field => (
-                <div key={field.key} className="flex items-center gap-3">
-                  <div className="w-40 text-sm flex items-center gap-1.5 shrink-0">
-                    {field.label}
-                    {field.required && <span className="text-destructive text-xs">*</span>}
-                  </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <Select
-                    value={mapping[field.key] || '_none_'}
-                    onValueChange={(v) => setMapping(prev => ({ ...prev, [field.key]: v === '_none_' ? '' : v }))}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Selecionar coluna..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none_">— Não mapear —</SelectItem>
-                      {headers.map(h => (
-                        <SelectItem key={h} value={h}>
-                          {h}
-                          <span className="ml-2 text-muted-foreground text-xs">
-                            (ex: {rawData[0]?.[h]?.toString().slice(0, 30) || '—'})
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex-1 max-h-[180px] border rounded-lg overflow-auto mt-2">
-              <Table className="min-w-[400px]">
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs sticky top-0 bg-muted/50">#</TableHead>
-                    {headers.slice(0, 6).map(h => (
-                      <TableHead key={h} className="text-xs sticky top-0 bg-muted/50 whitespace-nowrap">{h}</TableHead>
-                    ))}
-                    {headers.length > 6 && <TableHead className="text-xs sticky top-0 bg-muted/50">...</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rawData.slice(0, 5).map((row, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
-                      {headers.slice(0, 6).map(h => (
-                        <TableCell key={h} className="text-xs whitespace-nowrap max-w-[150px] truncate">
-                          {row[h]?.toString() || '—'}
-                        </TableCell>
-                      ))}
-                      {headers.length > 6 && <TableCell className="text-xs text-muted-foreground">…</TableCell>}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={reset}>Cancelar</Button>
-              <Button
-                disabled={!canProceed}
-                onClick={() => {
-                  const mapped = getMappedRows();
-                  if (mapped.length === 0) {
-                    toast.error('Nenhum registro válido com o mapeamento atual');
-                    return;
-                  }
-                  setStep('preview');
-                }}
-              >
-                Próximo — Pré-visualizar <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-          </div>
+          <MappingStep
+            fileName={fileName}
+            rawData={rawData}
+            headers={headers}
+            mapping={mapping}
+            setMapping={setMapping}
+            visibleFields={visibleFields}
+            onReset={reset}
+            onAutoDetect={() => setMapping(autoDetectMapping(headers))}
+            onClearAll={() => setMapping({
+              empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
+              telefone: '', endereco: '', nome_contato: '', cargo: '',
+            })}
+            canProceed={canProceed}
+            onNext={() => {
+              const mapped = getMappedRows();
+              if (mapped.length === 0) {
+                toast.error('Nenhum registro válido com o mapeamento atual');
+                return;
+              }
+              setStep('preview');
+            }}
+          />
         )}
+
 
         {step === 'preview' && (
           <div className="flex flex-col gap-4 flex-1 min-h-0">
@@ -402,7 +336,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             </div>
 
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
               Verifique os dados antes de importar.
             </div>
 
