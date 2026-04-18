@@ -829,11 +829,6 @@ export function MappingStep({
                                       <span>{f.label}</span>
                                       {f.required && <span className="text-destructive">*</span>}
                                       <FieldInfo fieldKey={f.key} interactive={false} />
-                                      {usedElsewhere && (
-                                        <span className="text-[10px] text-muted-foreground italic">
-                                          (em {usedBy})
-                                        </span>
-                                      )}
                                     </span>
                                   </SelectItem>
                                 );
