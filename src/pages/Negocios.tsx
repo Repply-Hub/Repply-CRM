@@ -430,7 +430,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <div className="flex divide-x divide-border">
           {/* Coluna esquerda: visibilidade das colunas do Kanban */}
           <div className="p-2 min-w-[200px]">
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Colunas do Kanban</div>
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Colunas do Kanban</div>
             <div className="space-y-0.5">
               {KANBAN_STAGES.map((stage) => {
                 const checked = visibleKanbanStages.includes(stage.key);
@@ -464,6 +464,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
           {/* Coluna direita: ações */}
           <div className="p-2 min-w-[180px]">
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ações</div>
             <button
               type="button"
               onClick={() => setColunasDialogOpen(true)}
