@@ -541,17 +541,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     onChange={(e) => handleSearchChange(e.target.value)}
                   />
                 </div>
-                <Select value={stageFilter} onValueChange={handleStageFilterChange}>
-                  <SelectTrigger className="w-fit max-w-full shrink-0">
-                    <SelectValue placeholder="Etapa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas as etapas</SelectItem>
-                    {KANBAN_STAGES.map(s => (
-                      <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {stageFilter !== 'todos' && (
+                  <Badge variant="secondary" className="gap-1.5 h-9 px-3">
+                    Etapa: {stageLabel(stageFilter)}
+                    <button
+                      type="button"
+                      onClick={() => handleStageFilterChange('todos')}
+                      className="ml-0.5 rounded-sm hover:bg-muted-foreground/20"
+                      aria-label="Limpar filtro de etapa"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
 
                 <div className="flex items-center gap-2">
                   {someSelected && (
