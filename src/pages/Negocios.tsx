@@ -764,6 +764,23 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Dialog: selecionar página atual ou todos os filtrados */}
+      <AlertDialog open={selectAllDialogOpen} onOpenChange={setSelectAllDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Selecionar negócios</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja selecionar apenas os {currentPageIds.length} negócio(s) desta página ou todos os {filtered.length} negócio(s) filtrados?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" onClick={selectPageOnly}>Apenas esta página ({currentPageIds.length})</Button>
+            <Button variant="default" onClick={selectAllFiltered}>Todos ({filtered.length})</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
     </AppLayout>
   );
