@@ -200,7 +200,8 @@ export function detectImportPedidosMapping(
 
 export function getImportedPedidosRows(
   rows: Record<string, unknown>[],
-  mapping: Record<FieldKey, string>
+  mapping: Record<FieldKey, string>,
+  extras: Record<string, string> = {}
 ) {
   return rows
     .map((row) => {
@@ -210,7 +211,13 @@ export function getImportedPedidosRows(
       const observacoes = mapping.observacoes ? row[mapping.observacoes]?.toString().trim() || '' : '';
       const status = mapping.status ? resolveImportedPedidoStatus(row[mapping.status]) : 'novo_lead';
 
-      return { cliente, fabricante, valor, observacoes, status };
+      const campos_extras: Record<string, string> = {};
+      Object.entries(extras).forEach(([col, name]) => {
+        const v = (row[col] ?? '').toString().trim();
+        if (v !== '') campos_extras[name || col] = v;
+      });
+
+      return { cliente, fabricante, valor, observacoes, status, campos_extras };
     })
     .filter((row) => row.cliente && row.fabricante);
 }

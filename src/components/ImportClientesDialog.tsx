@@ -100,6 +100,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
     telefone: '', endereco: '', nome_contato: '', cargo: '',
   });
+  // extras: column name (planilha) -> nome no sistema (campos_extras)
+  const [extras, setExtras] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'manual' | 'mapping' | 'preview'>('upload');
@@ -119,6 +121,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
       telefone: '', endereco: '', nome_contato: '', cargo: '',
     });
+    setExtras({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
@@ -144,6 +147,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
       const auto = autoDetectMapping(cols);
       setMapping(auto);
+      setExtras({});
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
@@ -168,6 +172,14 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         const empresa = get('empresa');
         const nome_contato = get('nome_contato');
         const tipoRaw = get('tipo');
+
+        // Monta campos_extras com base nas colunas marcadas como "novas"
+        const campos_extras: Record<string, string> = {};
+        Object.entries(extras).forEach(([col, name]) => {
+          const v = (row[col] ?? '').toString().trim();
+          if (v !== '') campos_extras[name || col] = v;
+        });
+
         return {
           empresa: empresa || (target === 'contatos' ? (nome_contato ? 'Sem empresa' : '') : ''),
           razao_social: get('razao_social') || undefined,
@@ -178,6 +190,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           endereco: get('endereco') || undefined,
           nome_contato: nome_contato || undefined,
           cargo: get('cargo') || undefined,
+          campos_extras,
         };
       })
       .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : r.empresa);
@@ -185,7 +198,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
   const canProceed = Boolean(mapping.empresa) || (target === 'contatos' && Boolean(mapping.nome_contato));
 
-  const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData]);
+  const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData, extras]);
+
+  // Lista de campos extras únicos para mostrar no preview (com nome final)
+  const extraFieldNames = useMemo(
+    () => Array.from(new Set(Object.entries(extras).map(([col, name]) => (name || col).trim()).filter(Boolean))),
+    [extras]
+  );
 
   const handleImport = async () => {
     const rows = getMappedRows();
@@ -207,6 +226,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             email: r.email || null,
             telefone: r.telefone || null,
             cargo: r.cargo || null,
+            campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
           const { error } = await supabase.from('contatos').insert(batch);
@@ -221,6 +241,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             telefone: r.telefone || null,
             endereco: r.endereco || null,
             nome_contato: r.nome_contato || null,
+            campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
           const { error } = await supabase.from('clientes').upsert(batch, {
@@ -339,6 +360,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               setRawData(rows);
               setHeaders(hdrs);
               setFileName('Entrada manual');
+              setExtras({});
               // Pre-map: each header equals a field label, so map by label match
               const auto: Record<FieldKey, string> = {
                 empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
@@ -359,14 +381,19 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             rawData={rawData}
             headers={headers}
             mapping={mapping}
-            setMapping={setMapping}
+            setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
+            extras={extras}
+            setExtras={setExtras}
             visibleFields={visibleFields}
             onReset={reset}
-            onAutoDetect={() => setMapping(autoDetectMapping(headers))}
-            onClearAll={() => setMapping({
-              empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
-              telefone: '', endereco: '', nome_contato: '', cargo: '',
-            })}
+            onAutoDetect={() => { setMapping(autoDetectMapping(headers)); setExtras({}); }}
+            onClearAll={() => {
+              setMapping({
+                empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
+                telefone: '', endereco: '', nome_contato: '', cargo: '',
+              });
+              setExtras({});
+            }}
             canProceed={canProceed}
             onNext={() => {
               const mapped = getMappedRows();
@@ -383,12 +410,17 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         {step === 'preview' && (
           <div className="flex flex-col gap-4 flex-1 min-h-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary" className="gap-1">
                   <FileSpreadsheet className="h-3 w-3" />
                   {fileName}
                 </Badge>
                 <Badge variant="outline">{previewRows.length} registros</Badge>
+                {extraFieldNames.length > 0 && (
+                  <Badge className="bg-accent text-accent-foreground border-accent">
+                    +{extraFieldNames.length} coluna{extraFieldNames.length === 1 ? '' : 's'} extra{extraFieldNames.length === 1 ? '' : 's'}
+                  </Badge>
+                )}
               </div>
               <Button variant="ghost" size="sm" onClick={() => setStep('mapping')}>
                 <X className="h-4 w-4 mr-1" /> Voltar ao mapeamento
@@ -397,7 +429,12 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-              Verifique os dados antes de importar.
+              Verifique os dados antes de importar.{' '}
+              {extraFieldNames.length > 0 && (
+                <span>
+                  Colunas extras serão salvas em <span className="font-medium">campos_extras</span>: {extraFieldNames.join(', ')}.
+                </span>
+              )}
             </div>
 
             <div className="flex-1 max-h-[400px] border rounded-lg overflow-auto">
@@ -413,6 +450,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Telefone</TableHead>
                     {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Endereço</TableHead>}
                     {target === 'contatos' && <TableHead className="text-xs sticky top-0 bg-muted/50">Cargo</TableHead>}
+                    {extraFieldNames.map(name => (
+                      <TableHead key={name} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
+                        {name} <span className="text-[10px] opacity-70">(extra)</span>
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -427,6 +469,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                       <TableCell className="text-xs whitespace-nowrap">{r.telefone || '-'}</TableCell>
                       {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap max-w-[200px] truncate">{r.endereco || '-'}</TableCell>}
                       {target === 'contatos' && <TableCell className="text-xs whitespace-nowrap">{r.cargo || '-'}</TableCell>}
+                      {extraFieldNames.map(name => (
+                        <TableCell key={name} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
+                          {r.campos_extras?.[name] || '-'}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                 </TableBody>
