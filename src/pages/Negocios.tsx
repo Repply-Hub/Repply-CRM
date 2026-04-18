@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
@@ -479,22 +479,25 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   </Button>
                 )}
 
-                <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
-                  await generatePedidosPdf(
-                    pipelineOrders.map(o => ({
-                      cliente: o.clientName,
-                      obra: o.obra,
-                      fabricante: o.fabricante,
-                      vendedor: o.vendedor,
-                      valor: o.valor,
-                      etapa: stageLabel(o.stage),
-                      data: o.createdAt,
-                    })),
-                    hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
-                  );
-                }}>
-                  <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
-                </Button>
+                {/* Em Pipeline + Kanban, mantemos o botão externo de PDF (não há dropdown "Opções" no Kanban). */}
+                {showKanban && (
+                  <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
+                    await generatePedidosPdf(
+                      pipelineOrders.map(o => ({
+                        cliente: o.clientName,
+                        obra: o.obra,
+                        fabricante: o.fabricante,
+                        vendedor: o.vendedor,
+                        valor: o.valor,
+                        etapa: stageLabel(o.stage),
+                        data: o.createdAt,
+                      })),
+                      hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
+                    );
+                  }}>
+                    <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
+                  </Button>
+                )}
               </>
             )}
 
@@ -538,17 +541,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     onChange={(e) => handleSearchChange(e.target.value)}
                   />
                 </div>
-                <Select value={stageFilter} onValueChange={handleStageFilterChange}>
-                  <SelectTrigger className="w-fit max-w-full shrink-0">
-                    <SelectValue placeholder="Etapa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas as etapas</SelectItem>
-                    {KANBAN_STAGES.map(s => (
-                      <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {stageFilter !== 'todos' && (
+                  <Badge variant="secondary" className="gap-1.5 h-9 px-3">
+                    Etapa: {stageLabel(stageFilter)}
+                    <button
+                      type="button"
+                      onClick={() => handleStageFilterChange('todos')}
+                      className="ml-0.5 rounded-sm hover:bg-muted-foreground/20"
+                      aria-label="Limpar filtro de etapa"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
 
                 <div className="flex items-center gap-2">
                   {someSelected && (
@@ -565,6 +570,29 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          <Filter className="h-4 w-4 mr-2" /> Etapa
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="w-48">
+                          <DropdownMenuItem
+                            onSelect={(e) => { e.preventDefault(); handleStageFilterChange('todos'); }}
+                            className={stageFilter === 'todos' ? 'bg-accent font-medium' : ''}
+                          >
+                            Todas as etapas
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {KANBAN_STAGES.map(s => (
+                            <DropdownMenuItem
+                              key={s.key}
+                              onSelect={(e) => { e.preventDefault(); handleStageFilterChange(s.key); }}
+                              className={stageFilter === s.key ? 'bg-accent font-medium' : ''}
+                            >
+                              {s.label}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
                           <Columns3 className="h-4 w-4 mr-2" /> Colunas
