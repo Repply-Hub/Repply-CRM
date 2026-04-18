@@ -922,7 +922,8 @@ export function MappingStep({
                   </li>
                 );
               })}
-            </ul>
+              </ul>
+            </>
           )}
         </div>
 
