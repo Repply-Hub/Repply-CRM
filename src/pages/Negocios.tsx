@@ -50,13 +50,8 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
 
 const PAGE_SIZE = 10;
 
-const stageColors: Record<string, string> = {
-  novo_lead: 'bg-kanban-new text-white',
-  elaboracao: 'bg-kanban-budget text-white',
-  enviado: 'bg-kanban-sent text-white',
-  negociacao: 'bg-kanban-negotiation text-white',
-  fechamento: 'bg-kanban-closed text-white',
-};
+// Cores das etapas resolvidas dinamicamente a partir do slug da coluna armazenada no banco
+const getStageBadgeClass = (corToken: string) => `bg-${corToken} text-white`;
 
 const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone, whatsapp: MessageSquare, visita: Eye };
 
@@ -77,6 +72,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const updateStatus = useUpdatePedidoStatus();
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
+  const { data: kanbanColunas } = useKanbanColunas();
+  const KANBAN_STAGES = useMemo(
+    () => (kanbanColunas ?? []).map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
+    [kanbanColunas]
+  );
+  const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
 
   // ===== View toggles =====
   // Toggle principal (sempre visível): Pipeline x Negócios.
