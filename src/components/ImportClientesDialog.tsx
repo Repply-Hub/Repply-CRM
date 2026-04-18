@@ -204,12 +204,15 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
   const canProceed = Boolean(mapping.empresa) || (target === 'contatos' && Boolean(mapping.nome_contato));
 
-  const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData, extras]);
+  const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData, extras, customColumns]);
 
   // Lista de campos extras únicos para mostrar no preview (com nome final)
   const extraFieldNames = useMemo(
-    () => Array.from(new Set(Object.entries(extras).map(([col, name]) => (name || col).trim()).filter(Boolean))),
-    [extras]
+    () => Array.from(new Set([
+      ...Object.entries(extras).map(([col, name]) => (name || col).trim()),
+      ...Object.keys(customColumns).map(n => n.trim()),
+    ].filter(Boolean))),
+    [extras, customColumns]
   );
 
   const handleImport = async () => {
