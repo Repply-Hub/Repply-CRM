@@ -16,8 +16,8 @@ const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'cargo';
 
 const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: boolean }[] = [
-  { key: 'empresa', label: 'Empresa / Nome', required: true },
-  { key: 'nome_contato', label: 'Nome do contato', required: false },
+  { key: 'empresa', label: 'Empresa', required: true },
+  { key: 'nome_contato', label: 'Nome', required: false },
   { key: 'razao_social', label: 'Razão social', required: false },
   { key: 'tipo', label: 'Tipo / Segmento', required: false },
   { key: 'cnpj', label: 'CNPJ / CPF', required: false },
