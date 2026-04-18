@@ -4,27 +4,36 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  FileSpreadsheet, X, ArrowRight, Sparkles, Search, Check, Minus, AlertCircle,
+  FileSpreadsheet, X, ArrowRight, Sparkles, Search, Check, Minus, AlertCircle, Plus, Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type FieldKey =
-  | 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email'
-  | 'telefone' | 'endereco' | 'nome_contato' | 'cargo';
-
 export interface FieldDef {
-  key: FieldKey;
+  key: string;
   label: string;
   required: boolean;
   forContatos?: boolean;
 }
 
+/**
+ * Mapping value per spreadsheet column:
+ *  - undefined / "" => Não importar
+ *  - "<fieldKey>"   => mapeado para campo nativo
+ *  - "__extra__:<nomeDaColuna>" => salvo em campos_extras com o nome dado
+ */
+const NONE = '__none__';
+const EXTRA_PREFIX = '__extra__:';
+
 interface Props {
   fileName: string;
   rawData: Record<string, any>[];
   headers: string[];
-  mapping: Record<FieldKey, string>;
-  setMapping: React.Dispatch<React.SetStateAction<Record<FieldKey, string>>>;
+  /** mapping: fieldKey -> column name (apenas campos nativos) */
+  mapping: Record<string, string>;
+  setMapping: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  /** extras: column name -> nome no sistema (campos extras criados pelo usuário) */
+  extras: Record<string, string>;
+  setExtras: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   visibleFields: FieldDef[];
   onReset: () => void;
   onAutoDetect: () => void;
@@ -33,37 +42,67 @@ interface Props {
   onNext: () => void;
 }
 
-const NONE = '__none__';
-
 export function MappingStep({
-  fileName, rawData, headers, mapping, setMapping, visibleFields,
+  fileName, rawData, headers, mapping, setMapping, extras, setExtras, visibleFields,
   onReset, onAutoDetect, onClearAll, canProceed, onNext,
 }: Props) {
   const [search, setSearch] = useState('');
+  const [editingExtra, setEditingExtra] = useState<string | null>(null);
 
-  // Reverse map: column → field
+  // Reverse map: column → field key (apenas nativos)
   const columnToField = useMemo(() => {
-    const m: Record<string, FieldKey | undefined> = {};
-    (Object.keys(mapping) as FieldKey[]).forEach(k => {
+    const m: Record<string, string | undefined> = {};
+    Object.keys(mapping).forEach(k => {
       const col = mapping[k];
       if (col) m[col] = k;
     });
     return m;
   }, [mapping]);
 
-  const setColumnField = (column: string, field: FieldKey | typeof NONE) => {
-    setMapping(prev => {
+  const setColumnSelection = (column: string, value: string) => {
+    // Remove from extras se estava lá
+    setExtras(prev => {
+      if (!(column in prev)) return prev;
       const next = { ...prev };
-      // Clear any field already mapped to this column
-      (Object.keys(next) as FieldKey[]).forEach(k => {
-        if (next[k] === column) next[k] = '';
-      });
-      if (field !== NONE) {
-        // Clear previous column for that field
-        next[field] = column;
-      }
+      delete next[column];
       return next;
     });
+
+    if (value === NONE) {
+      // Limpa qualquer campo nativo apontando para esta coluna
+      setMapping(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(k => { if (next[k] === column) next[k] = ''; });
+        return next;
+      });
+      return;
+    }
+
+    if (value.startsWith(EXTRA_PREFIX)) {
+      // Cria como campo extra; nome padrão = nome original da coluna
+      setMapping(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(k => { if (next[k] === column) next[k] = ''; });
+        return next;
+      });
+      setExtras(prev => ({ ...prev, [column]: column }));
+      setEditingExtra(column);
+      return;
+    }
+
+    // Campo nativo
+    setMapping(prev => {
+      const next = { ...prev };
+      // Limpa campo nativo já mapeado para esta coluna
+      Object.keys(next).forEach(k => { if (next[k] === column) next[k] = ''; });
+      // Limpa coluna anterior do campo escolhido
+      next[value] = column;
+      return next;
+    });
+  };
+
+  const renameExtra = (column: string, newName: string) => {
+    setExtras(prev => ({ ...prev, [column]: newName.trim() || column }));
   };
 
   const filteredHeaders = useMemo(() => {
@@ -73,6 +112,7 @@ export function MappingStep({
   }, [headers, search]);
 
   const mappedCount = Object.values(mapping).filter(Boolean).length;
+  const extrasCount = Object.keys(extras).length;
   const requiredMissing = visibleFields.filter(f => f.required && !mapping[f.key]);
 
   const sample = (col: string) => {
@@ -81,6 +121,13 @@ export function MappingStep({
       if (v !== undefined && v !== null && v !== '') return String(v);
     }
     return '';
+  };
+
+  const getSelectionValue = (column: string): string => {
+    const field = columnToField[column];
+    if (field) return field;
+    if (column in extras) return EXTRA_PREFIX + column;
+    return NONE;
   };
 
   return (
@@ -95,8 +142,14 @@ export function MappingStep({
           <Badge variant="outline">{rawData.length} linhas</Badge>
           <Badge variant="outline">{headers.length} colunas</Badge>
           <Badge variant={mappedCount > 0 ? 'default' : 'outline'}>
-            {mappedCount} mapeada{mappedCount === 1 ? '' : 's'}
+            {mappedCount} nativa{mappedCount === 1 ? '' : 's'}
           </Badge>
+          {extrasCount > 0 && (
+            <Badge className="bg-accent text-accent-foreground border-accent">
+              <Plus className="h-3 w-3 mr-1" />
+              {extrasCount} nova{extrasCount === 1 ? '' : 's'}
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <Button variant="outline" size="sm" onClick={onAutoDetect} className="gap-1.5">
@@ -149,32 +202,42 @@ export function MappingStep({
         )}
         {filteredHeaders.map((h) => {
           const field = columnToField[h];
-          const fieldDef = visibleFields.find(f => f.key === field);
-          const ignored = !field;
+          const isExtra = h in extras;
+          const ignored = !field && !isExtra;
+          const selectionValue = getSelectionValue(h);
+
           return (
             <div
               key={h}
               className={cn(
                 'grid grid-cols-12 gap-2 px-3 py-2 items-center border-b last:border-0 text-sm hover:bg-muted/30 transition-colors',
-                ignored && 'opacity-60'
+                ignored && 'opacity-60',
+                isExtra && 'bg-accent/30'
               )}
             >
               <div className="col-span-5 flex items-center gap-2 min-w-0">
                 <div className={cn(
                   'h-6 w-6 rounded-md flex items-center justify-center shrink-0',
-                  field ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                  field && 'bg-primary/10 text-primary',
+                  isExtra && 'bg-accent text-accent-foreground',
+                  ignored && 'bg-muted text-muted-foreground'
                 )}>
-                  {field ? <Check className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                  {field ? <Check className="h-3.5 w-3.5" /> : isExtra ? <Plus className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
                 </div>
                 <span className="font-medium truncate" title={h}>{h}</span>
+                {isExtra && (
+                  <Badge variant="outline" className="text-[10px] border-accent text-accent-foreground shrink-0">
+                    nova
+                  </Badge>
+                )}
               </div>
               <div className="col-span-3 text-xs text-muted-foreground truncate" title={sample(h)}>
                 {sample(h) || <span className="italic">vazio</span>}
               </div>
-              <div className="col-span-4">
+              <div className="col-span-4 space-y-1">
                 <Select
-                  value={field ?? NONE}
-                  onValueChange={(v) => setColumnField(h, v as any)}
+                  value={selectionValue}
+                  onValueChange={(v) => setColumnSelection(h, v)}
                 >
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue placeholder="Não mapear" />
@@ -182,6 +245,12 @@ export function MappingStep({
                   <SelectContent>
                     <SelectItem value={NONE} className="text-muted-foreground">
                       — Não importar —
+                    </SelectItem>
+                    <SelectItem value={EXTRA_PREFIX + h} className="text-accent-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <Plus className="h-3 w-3" />
+                        Adicionar como nova coluna
+                      </span>
                     </SelectItem>
                     {visibleFields.map(f => {
                       const usedBy = mapping[f.key];
@@ -202,6 +271,23 @@ export function MappingStep({
                     })}
                   </SelectContent>
                 </Select>
+
+                {isExtra && (
+                  <div className="flex items-center gap-1">
+                    <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <Input
+                      value={extras[h] ?? h}
+                      onChange={(e) => renameExtra(h, e.target.value)}
+                      onFocus={() => setEditingExtra(h)}
+                      onBlur={() => setEditingExtra(null)}
+                      placeholder="Nome no sistema"
+                      className={cn(
+                        'h-7 text-xs',
+                        editingExtra === h && 'ring-1 ring-accent'
+                      )}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -210,7 +296,7 @@ export function MappingStep({
 
       <div className="flex items-center justify-between gap-2 pt-1">
         <span className="text-xs text-muted-foreground">
-          Apenas colunas mapeadas serão importadas. As demais são ignoradas.
+          Colunas marcadas como <span className="font-medium text-accent-foreground">novas</span> são salvas em "campos extras" sem perder nenhuma informação.
         </span>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onReset}>Cancelar</Button>
