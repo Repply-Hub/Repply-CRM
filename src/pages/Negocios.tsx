@@ -599,22 +599,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     <X className="h-3.5 w-3.5" />
                   </Button>
                 )}
-                <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
-                  await generatePedidosPdf(
-                    pipelineOrders.map(o => ({
-                      cliente: o.clientName,
-                      obra: o.obra,
-                      fabricante: o.fabricante,
-                      vendedor: o.vendedor,
-                      valor: o.valor,
-                      etapa: stageLabel(o.stage),
-                      data: o.createdAt,
-                    })),
-                    hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
-                  );
-                }}>
-                  <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
-                </Button>
                 {opcoesDropdown}
               </>
             )}
