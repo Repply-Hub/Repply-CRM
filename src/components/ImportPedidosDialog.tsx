@@ -33,6 +33,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, string>>(createEmptyMapping());
   const [extras, setExtras] = useState<Record<string, string>>({});
+  const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
@@ -44,6 +45,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setHeaders([]);
     setMapping(createEmptyMapping());
     setExtras({});
+    setCustomColumns({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
@@ -70,6 +72,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const autoMap = detectImportPedidosMapping(cols, json);
       setMapping(autoMap);
       setExtras({});
+      setCustomColumns({});
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
@@ -85,16 +88,19 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   const canProceedToPreview = Boolean(mapping.cliente && mapping.fabricante);
 
-  const getMappedRows = () => getImportedPedidosRows(rawData, mapping, extras);
+  const getMappedRows = () => getImportedPedidosRows(rawData, mapping, extras, customColumns);
 
   const previewRows = useMemo(
     () => (step === 'preview' ? getMappedRows() : []),
-    [step, mapping, rawData, extras]
+    [step, mapping, rawData, extras, customColumns]
   );
 
   const extraFieldNames = useMemo(
-    () => Array.from(new Set(Object.entries(extras).map(([col, name]) => (name || col).trim()).filter(Boolean))),
-    [extras]
+    () => Array.from(new Set([
+      ...Object.entries(extras).map(([col, name]) => (name || col).trim()),
+      ...Object.keys(customColumns).map(n => n.trim()),
+    ].filter(Boolean))),
+    [extras, customColumns]
   );
 
   const handleImport = async () => {
@@ -216,10 +222,12 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
             extras={extras}
             setExtras={setExtras}
+            customColumns={customColumns}
+            setCustomColumns={setCustomColumns}
             visibleFields={VISIBLE_FIELDS}
             onReset={reset}
             onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
-            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); }}
+            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); }}
             canProceed={canProceedToPreview}
             onNext={() => {
               const mapped = getMappedRows();

@@ -100,6 +100,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   });
   // extras: column name (planilha) -> nome no sistema (campos_extras)
   const [extras, setExtras] = useState<Record<string, string>>({});
+  // customColumns: nome → valor padrão (colunas criadas do zero, não vêm da planilha)
+  const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
@@ -119,6 +121,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       telefone: '', endereco: '', nome_contato: '', cargo: '',
     });
     setExtras({});
+    setCustomColumns({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
@@ -145,6 +148,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       const auto = autoDetectMapping(cols);
       setMapping(auto);
       setExtras({});
+      setCustomColumns({});
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
@@ -170,11 +174,16 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         const nome_contato = get('nome_contato');
         const tipoRaw = get('tipo');
 
-        // Monta campos_extras com base nas colunas marcadas como "novas"
+        // Monta campos_extras com base nas colunas marcadas como "novas" (vindas da planilha)
         const campos_extras: Record<string, string> = {};
         Object.entries(extras).forEach(([col, name]) => {
           const v = (row[col] ?? '').toString().trim();
           if (v !== '') campos_extras[name || col] = v;
+        });
+        // Adiciona colunas criadas do zero (valor padrão aplicado a todas as linhas)
+        Object.entries(customColumns).forEach(([name, value]) => {
+          const v = (value ?? '').toString().trim();
+          if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
         });
 
         return {
@@ -195,12 +204,15 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
   const canProceed = Boolean(mapping.empresa) || (target === 'contatos' && Boolean(mapping.nome_contato));
 
-  const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData, extras]);
+  const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData, extras, customColumns]);
 
   // Lista de campos extras únicos para mostrar no preview (com nome final)
   const extraFieldNames = useMemo(
-    () => Array.from(new Set(Object.entries(extras).map(([col, name]) => (name || col).trim()).filter(Boolean))),
-    [extras]
+    () => Array.from(new Set([
+      ...Object.entries(extras).map(([col, name]) => (name || col).trim()),
+      ...Object.keys(customColumns).map(n => n.trim()),
+    ].filter(Boolean))),
+    [extras, customColumns]
   );
 
   const handleImport = async () => {
@@ -321,6 +333,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
             extras={extras}
             setExtras={setExtras}
+            customColumns={customColumns}
+            setCustomColumns={setCustomColumns}
             visibleFields={visibleFields}
             onReset={reset}
             onAutoDetect={() => { setMapping(autoDetectMapping(headers)); setExtras({}); }}
@@ -330,6 +344,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                 telefone: '', endereco: '', nome_contato: '', cargo: '',
               });
               setExtras({});
+              setCustomColumns({});
             }}
             canProceed={canProceed}
             onNext={() => {

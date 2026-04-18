@@ -8,7 +8,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import {
   FileSpreadsheet, X, ArrowRight, Sparkles, Search, Check, EyeOff, AlertCircle, Plus, Pencil,
-  CheckCircle2, ChevronDown,
+  CheckCircle2, Trash2, Wand2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +30,9 @@ interface Props {
   setMapping: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   extras: Record<string, string>;
   setExtras: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  /** Colunas criadas do zero pelo usuário: nome → valor padrão aplicado a todas as linhas */
+  customColumns?: Record<string, string>;
+  setCustomColumns?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   visibleFields: FieldDef[];
   onReset: () => void;
   onAutoDetect: () => void;
@@ -41,12 +44,57 @@ interface Props {
 type FilterMode = 'todas' | 'mapeadas' | 'novas' | 'ignoradas' | 'pendentes';
 
 export function MappingStep({
-  fileName, rawData, headers, mapping, setMapping, extras, setExtras, visibleFields,
+  fileName, rawData, headers, mapping, setMapping, extras, setExtras,
+  customColumns = {}, setCustomColumns, visibleFields,
   onReset, onAutoDetect, onClearAll, canProceed, onNext,
 }: Props) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterMode>('todas');
   const [editingExtra, setEditingExtra] = useState<string | null>(null);
+  const [newColName, setNewColName] = useState('');
+
+  const customNames = useMemo(() => Object.keys(customColumns), [customColumns]);
+  const customCount = customNames.length;
+
+  const addCustomColumn = () => {
+    if (!setCustomColumns) return;
+    const base = newColName.trim() || 'Nova coluna';
+    let name = base;
+    let i = 2;
+    const taken = new Set([...headers, ...customNames]);
+    while (taken.has(name)) { name = `${base} ${i++}`; }
+    setCustomColumns(prev => ({ ...prev, [name]: '' }));
+    setNewColName('');
+    setEditingExtra(name);
+  };
+
+  const updateCustomValue = (name: string, value: string) => {
+    setCustomColumns?.(prev => ({ ...prev, [name]: value }));
+  };
+
+  const renameCustomColumn = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    const taken = new Set([...headers, ...customNames.filter(n => n !== oldName)]);
+    if (taken.has(trimmed)) return;
+    setCustomColumns?.(prev => {
+      const next: Record<string, string> = {};
+      Object.keys(prev).forEach(k => {
+        if (k === oldName) next[trimmed] = prev[k];
+        else next[k] = prev[k];
+      });
+      return next;
+    });
+    setEditingExtra(trimmed);
+  };
+
+  const removeCustomColumn = (name: string) => {
+    setCustomColumns?.(prev => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  };
 
   const columnToField = useMemo(() => {
     const m: Record<string, string | undefined> = {};
@@ -280,9 +328,100 @@ export function MappingStep({
           )}
         </div>
 
+        {/* Criar coluna do zero */}
+        {setCustomColumns && (
+          <div className="flex items-center gap-2 rounded-lg border border-dashed border-accent/50 bg-accent/10 px-3 py-2">
+            <Wand2 className="h-4 w-4 text-accent-foreground shrink-0" />
+            <Input
+              placeholder="Criar coluna do zero (ex: Origem da campanha)"
+              value={newColName}
+              onChange={(e) => setNewColName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomColumn(); } }}
+              className="h-8 flex-1 bg-background text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={addCustomColumn}
+              className="h-8 gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" /> Adicionar
+            </Button>
+          </div>
+        )}
+
         {/* Mapping list */}
         <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border bg-card">
-          {filteredHeaders.length === 0 ? (
+          {/* Custom columns section (criadas do zero) */}
+          {customCount > 0 && (
+            <div className="border-b bg-accent/5">
+              <div className="px-4 py-2 flex items-center gap-2 bg-accent/15 border-b border-accent/20">
+                <Wand2 className="h-3.5 w-3.5 text-accent-foreground" />
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-accent-foreground">
+                  Colunas criadas do zero ({customCount})
+                </span>
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  Valor aplicado a todas as {rawData.length} linhas
+                </span>
+              </div>
+              <ul className="divide-y divide-accent/15">
+                {customNames.map((name) => (
+                  <li key={name} className="px-4 py-3 hover:bg-accent/10 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="h-9 w-9 rounded-lg bg-accent text-accent-foreground border border-accent flex items-center justify-center shrink-0 mt-0.5">
+                        <Wand2 className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={name}
+                            onChange={(e) => renameCustomColumn(name, e.target.value)}
+                            onFocus={() => setEditingExtra(name)}
+                            onBlur={() => setEditingExtra(null)}
+                            placeholder="Nome da nova coluna"
+                            className={cn(
+                              'h-8 text-sm font-semibold flex-1',
+                              editingExtra === name && 'ring-1 ring-accent border-accent'
+                            )}
+                          />
+                          <Badge className="h-5 text-[10px] gap-1 bg-accent text-accent-foreground border-accent hover:bg-accent shrink-0">
+                            <Wand2 className="h-2.5 w-2.5" />
+                            Do zero
+                          </Badge>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          Salvo em <span className="font-mono text-foreground/80">campos_extras.{name}</span>
+                        </div>
+                      </div>
+                      <div className="w-[220px] shrink-0">
+                        <Input
+                          value={customColumns[name] ?? ''}
+                          onChange={(e) => updateCustomValue(name, e.target.value)}
+                          placeholder="Valor padrão (opcional)"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeCustomColumn(name)}
+                            className="h-9 w-9 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Remover coluna</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {filteredHeaders.length === 0 && customCount === 0 ? (
             <div className="px-4 py-12 text-center">
               <Search className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
