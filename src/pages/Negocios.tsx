@@ -615,6 +615,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 }}>
                   <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
                 </Button>
+                {opcoesDropdown}
               </>
             )}
           </div>
