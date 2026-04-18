@@ -57,9 +57,10 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   telefone: [/^telefone$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
   endereco: [/^endereco$/, /endereco/, /address/],
   nome_contato: [
-    /^nome$/, /^primeiro\s*nome$/, /^first\s*name$/, /^nome\s*proprio$/,
+    /^nome$/, /^nome\s*completo$/, /^primeiro\s*nome$/, /^first\s*name$/, /^full\s*name$/, /^nome\s*proprio$/,
     /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
-    /contato/, /responsavel/, /^nome\b/, /first.*name/,
+    /^criado\s*por$/, /^owner$/, /^proprietario$/, /^atendente$/, /^consultor$/,
+    /contato/, /responsavel/, /^nome\b/, /first.*name/, /full.*name/, /criado\s*por/,
   ],
   sobrenome_contato: [
     /^sobrenome$/, /^ultimo\s*nome$/, /^last\s*name$/, /^surname$/, /^apelido$/,
