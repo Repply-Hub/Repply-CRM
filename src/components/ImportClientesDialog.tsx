@@ -171,6 +171,14 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         const empresa = get('empresa');
         const nome_contato = get('nome_contato');
         const tipoRaw = get('tipo');
+
+        // Monta campos_extras com base nas colunas marcadas como "novas"
+        const campos_extras: Record<string, string> = {};
+        Object.entries(extras).forEach(([col, name]) => {
+          const v = (row[col] ?? '').toString().trim();
+          if (v !== '') campos_extras[name || col] = v;
+        });
+
         return {
           empresa: empresa || (target === 'contatos' ? (nome_contato ? 'Sem empresa' : '') : ''),
           razao_social: get('razao_social') || undefined,
@@ -181,6 +189,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           endereco: get('endereco') || undefined,
           nome_contato: nome_contato || undefined,
           cargo: get('cargo') || undefined,
+          campos_extras,
         };
       })
       .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : r.empresa);
@@ -188,7 +197,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
   const canProceed = Boolean(mapping.empresa) || (target === 'contatos' && Boolean(mapping.nome_contato));
 
-  const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData]);
+  const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData, extras]);
+
+  // Lista de campos extras únicos para mostrar no preview (com nome final)
+  const extraFieldNames = useMemo(
+    () => Array.from(new Set(Object.entries(extras).map(([col, name]) => (name || col).trim()).filter(Boolean))),
+    [extras]
+  );
 
   const handleImport = async () => {
     const rows = getMappedRows();
