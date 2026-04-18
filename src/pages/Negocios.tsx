@@ -124,6 +124,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('pedidos_columns');
@@ -281,6 +282,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         currentPageIds.forEach(id => next.delete(id));
         return next;
       });
+    } else if (filtered.length > currentPageIds.length) {
+      setSelectAllDialogOpen(true);
     } else {
       setSelected(prev => {
         const next = new Set(prev);
@@ -288,6 +291,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         return next;
       });
     }
+  };
+
+  const selectPageOnly = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      currentPageIds.forEach(id => next.add(id));
+      return next;
+    });
+    setSelectAllDialogOpen(false);
+  };
+
+  const selectAllFiltered = () => {
+    setSelected(new Set(filtered.map(p => p.id)));
+    setSelectAllDialogOpen(false);
   };
 
   const handleBulkDelete = async () => {
