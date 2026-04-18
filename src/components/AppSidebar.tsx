@@ -1,4 +1,4 @@
-import { LogOut, UserCircle, Pencil, Check, X, Plus, GripVertical, Trash2, Eye, EyeOff } from 'lucide-react';
+import { LogOut, UserCircle, Pencil, Check, X, Plus, GripVertical, Trash2, Eye, EyeOff, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { useRef, useCallback, useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -88,6 +88,15 @@ export function AppSidebar() {
     }
   }, [setOpen, editMode]);
 
+  const toggleCollapsed = useCallback(() => {
+    // Botão único que alterna o estado fixado da sidebar.
+    // Limpa o flag de hover para que o estado escolhido não seja revertido por handleMouseLeave.
+    hoverOpened.current = false;
+    if (enterTimer.current) { clearTimeout(enterTimer.current); enterTimer.current = null; }
+    if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null; }
+    setOpen(collapsed);
+  }, [collapsed, setOpen]);
+
   const enterEditMode = useCallback(() => {
     setEditItems(JSON.parse(JSON.stringify(items)));
     setEditMode(true);
@@ -146,18 +155,40 @@ export function AppSidebar() {
         onMouseLeave={handleMouseLeave}
       >
         <SidebarHeader className="px-2 py-3 border-b border-primary/10 mb-2">
-          <Link
-            to="/dashboard"
-            className={`flex items-center overflow-visible hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : 'gap-3'}`}
-          >
-            <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
-            {!collapsed && (
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
-                <p className="text-[10px] text-sidebar-foreground/50 font-medium">Gestão Comercial</p>
-              </div>
+          <div className={`flex items-center gap-2 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+            <Link
+              to="/dashboard"
+              className={`flex items-center overflow-visible hover:opacity-80 transition-opacity min-w-0 ${collapsed ? 'justify-center' : 'gap-3 flex-1'}`}
+            >
+              <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
+                  <p className="text-[10px] text-sidebar-foreground/50 font-medium">Gestão Comercial</p>
+                </div>
+              )}
+            </Link>
+            {!isMobile && !editMode && !collapsed && (
+              <button
+                onClick={toggleCollapsed}
+                className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors"
+                title="Recolher sidebar"
+                aria-label="Recolher sidebar"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
             )}
-          </Link>
+          </div>
+          {!isMobile && !editMode && collapsed && (
+            <button
+              onClick={toggleCollapsed}
+              className="mt-2 inline-flex h-7 w-full items-center justify-center rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors"
+              title="Expandir sidebar"
+              aria-label="Expandir sidebar"
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </button>
+          )}
         </SidebarHeader>
 
         <SidebarContent className="py-2">
