@@ -84,9 +84,9 @@ export function AppSidebar() {
   const handleMouseLeave = useCallback(() => {
     if (editMode) return;
     if (enterTimer.current) { clearTimeout(enterTimer.current); enterTimer.current = null; }
-    // Once the cursor leaves the sidebar, release the pin so hover works
-    // normally on the next interaction.
-    userPinned.current = false;
+    // While pinned, hover behavior is fully ignored — the state only changes
+    // on the next explicit click of the toggle button.
+    if (userPinned.current) return;
     if (hoverOpened.current) {
       leaveTimer.current = setTimeout(() => {
         hoverOpened.current = false;
