@@ -304,6 +304,21 @@ export function AppSidebar() {
                 <LogOut className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
                 {!collapsed && <span className="text-[13px] text-sidebar-foreground/70">Sair</span>}
               </button>
+              {!isMobile && (
+                <button
+                  onClick={toggleCollapsed}
+                  className={`flex items-center overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 border-t border-sidebar-border/60 mt-1 pt-2 ${collapsed ? 'justify-center' : 'gap-3'}`}
+                  title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+                  aria-label={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+                >
+                  {collapsed ? (
+                    <PanelLeftOpen className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
+                  ) : (
+                    <PanelLeftClose className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
+                  )}
+                  {!collapsed && <span className="text-[13px] text-sidebar-foreground/70">Recolher</span>}
+                </button>
+              )}
             </>
           )}
         </SidebarFooter>
