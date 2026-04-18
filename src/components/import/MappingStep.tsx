@@ -8,7 +8,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import {
   FileSpreadsheet, X, ArrowRight, Sparkles, Search, Check, EyeOff, AlertCircle, Plus, Pencil,
-  CheckCircle2, Trash2, Wand2,
+  CheckCircle2, Trash2, Wand2, GripVertical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -52,6 +52,30 @@ export function MappingStep({
   const [filter, setFilter] = useState<FilterMode>('todas');
   const [editingExtra, setEditingExtra] = useState<string | null>(null);
   const [newColName, setNewColName] = useState('');
+  // Ordem customizada das colunas via drag-and-drop. Se vazio, usa headers original.
+  const [headerOrder, setHeaderOrder] = useState<string[]>([]);
+  const [draggingHeader, setDraggingHeader] = useState<string | null>(null);
+  const [dragOverHeader, setDragOverHeader] = useState<string | null>(null);
+
+  // Sincroniza ordem quando headers mudam (novo arquivo)
+  const orderedHeaders = useMemo(() => {
+    if (headerOrder.length === 0) return headers;
+    const knownSet = new Set(headerOrder);
+    const ordered = headerOrder.filter(h => headers.includes(h));
+    const newOnes = headers.filter(h => !knownSet.has(h));
+    return [...ordered, ...newOnes];
+  }, [headers, headerOrder]);
+
+  const moveHeader = (from: string, to: string) => {
+    if (from === to) return;
+    const base = orderedHeaders.slice();
+    const fromIdx = base.indexOf(from);
+    const toIdx = base.indexOf(to);
+    if (fromIdx < 0 || toIdx < 0) return;
+    base.splice(fromIdx, 1);
+    base.splice(toIdx, 0, from);
+    setHeaderOrder(base);
+  };
 
   const customNames = useMemo(() => Object.keys(customColumns), [customColumns]);
   const customCount = customNames.length;
@@ -173,7 +197,7 @@ export function MappingStep({
   const requiredMissing = visibleFields.filter(f => f.required && !mapping[f.key]);
 
   const filteredHeaders = useMemo(() => {
-    let list = headers;
+    let list = orderedHeaders;
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(h => h.toLowerCase().includes(q));
@@ -184,12 +208,12 @@ export function MappingStep({
         if (filter === 'mapeadas') return s === 'mapeada';
         if (filter === 'novas') return s === 'nova';
         if (filter === 'ignoradas') return s === 'ignorada';
-        if (filter === 'pendentes') return s === 'ignorada'; // não decidida
+        if (filter === 'pendentes') return s === 'ignorada';
         return true;
       });
     }
     return list;
-  }, [headers, search, filter, columnToField, extras]);
+  }, [orderedHeaders, search, filter, columnToField, extras]);
 
   // Bulk actions for current filter selection
   const bulkSetAllExtras = () => {
@@ -442,15 +466,52 @@ export function MappingStep({
                 return (
                   <li
                     key={h}
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggingHeader(h);
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', h);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (draggingHeader && draggingHeader !== h) setDragOverHeader(h);
+                    }}
+                    onDragLeave={() => {
+                      setDragOverHeader(prev => (prev === h ? null : prev));
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = draggingHeader || e.dataTransfer.getData('text/plain');
+                      if (from && from !== h) moveHeader(from, h);
+                      setDraggingHeader(null);
+                      setDragOverHeader(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingHeader(null);
+                      setDragOverHeader(null);
+                    }}
                     className={cn(
                       'group px-4 py-3 transition-colors',
                       isExtra && 'bg-accent/20',
                       field && 'bg-primary/[0.03]',
                       ignored && 'opacity-75',
-                      'hover:bg-muted/40'
+                      'hover:bg-muted/40',
+                      draggingHeader === h && 'opacity-40',
+                      dragOverHeader === h && 'border-t-2 border-primary'
                     )}
                   >
                     <div className="flex items-start gap-3">
+                      {/* Drag handle */}
+                      <button
+                        type="button"
+                        aria-label="Arrastar para reordenar"
+                        className="shrink-0 mt-2 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </button>
+
                       {/* Status indicator */}
                       <div className={cn(
                         'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border',
