@@ -330,6 +330,7 @@ export type Database = {
       }
       clientes: {
         Row: {
+          campos_extras: Json
           cnpj: string | null
           created_at: string
           email: string | null
@@ -344,6 +345,7 @@ export type Database = {
           usuario_id: string | null
         }
         Insert: {
+          campos_extras?: Json
           cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -358,6 +360,7 @@ export type Database = {
           usuario_id?: string | null
         }
         Update: {
+          campos_extras?: Json
           cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -428,6 +431,7 @@ export type Database = {
       }
       contatos: {
         Row: {
+          campos_extras: Json
           cargo: string | null
           created_at: string
           email: string | null
@@ -439,6 +443,7 @@ export type Database = {
           usuario_id: string | null
         }
         Insert: {
+          campos_extras?: Json
           cargo?: string | null
           created_at?: string
           email?: string | null
@@ -450,6 +455,7 @@ export type Database = {
           usuario_id?: string | null
         }
         Update: {
+          campos_extras?: Json
           cargo?: string | null
           created_at?: string
           email?: string | null
@@ -1131,6 +1137,7 @@ export type Database = {
       }
       pedidos: {
         Row: {
+          campos_extras: Json
           cliente_id: string
           created_at: string
           data_pedido: string
@@ -1147,6 +1154,7 @@ export type Database = {
           valor_total: number | null
         }
         Insert: {
+          campos_extras?: Json
           cliente_id: string
           created_at?: string
           data_pedido?: string
@@ -1163,6 +1171,7 @@ export type Database = {
           valor_total?: number | null
         }
         Update: {
+          campos_extras?: Json
           cliente_id?: string
           created_at?: string
           data_pedido?: string
