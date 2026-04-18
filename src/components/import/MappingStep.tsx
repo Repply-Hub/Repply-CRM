@@ -51,7 +51,23 @@ export function MappingStep({
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterMode>('todas');
   const [editingExtra, setEditingExtra] = useState<string | null>(null);
+  const [extraDraft, setExtraDraft] = useState<string>('');
   const [newColName, setNewColName] = useState('');
+
+  const startEditExtra = (column: string) => {
+    setEditingExtra(column);
+    setExtraDraft(extras[column] ?? column);
+  };
+  const cancelEditExtra = () => {
+    setEditingExtra(null);
+    setExtraDraft('');
+  };
+  const saveEditExtra = (column: string) => {
+    const value = extraDraft.trim() || column;
+    setExtras(prev => ({ ...prev, [column]: value }));
+    setEditingExtra(null);
+    setExtraDraft('');
+  };
   // Ordem customizada das colunas via drag-and-drop. Se vazio, usa headers original.
   const [headerOrder, setHeaderOrder] = useState<string[]>([]);
   const [draggingHeader, setDraggingHeader] = useState<string | null>(null);
