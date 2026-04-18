@@ -65,6 +65,11 @@ const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: st
     example: 'João Silva',
     storage: 'clientes.nome_contato',
   },
+  sobrenome_contato: {
+    desc: 'Sobrenome do contato. Será concatenado ao nome ao salvar (ex: "João" + "Silva" → "João Silva").',
+    example: 'Silva',
+    storage: 'clientes.nome_contato (concatenado)',
+  },
   cargo: {
     desc: 'Cargo ou função do contato dentro da empresa.',
     example: 'Engenheiro de Compras',
