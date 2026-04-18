@@ -1,4 +1,4 @@
-import { LogOut, UserCircle, Pencil, Check, X, Plus, GripVertical, Trash2, Eye, EyeOff } from 'lucide-react';
+import { LogOut, UserCircle, Pencil, Check, X, Plus, GripVertical, Trash2, Eye, EyeOff, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { useRef, useCallback, useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
