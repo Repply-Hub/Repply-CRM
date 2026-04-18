@@ -333,6 +333,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
             extras={extras}
             setExtras={setExtras}
+            customColumns={customColumns}
+            setCustomColumns={setCustomColumns}
             visibleFields={visibleFields}
             onReset={reset}
             onAutoDetect={() => { setMapping(autoDetectMapping(headers)); setExtras({}); }}
@@ -342,6 +344,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                 telefone: '', endereco: '', nome_contato: '', cargo: '',
               });
               setExtras({});
+              setCustomColumns({});
             }}
             canProceed={canProceed}
             onNext={() => {
