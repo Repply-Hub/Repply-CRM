@@ -8,7 +8,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import {
   FileSpreadsheet, X, ArrowRight, Sparkles, Search, Check, EyeOff, AlertCircle, Plus, Pencil,
-  CheckCircle2, ChevronDown,
+  CheckCircle2, Trash2, Wand2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
