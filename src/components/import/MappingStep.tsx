@@ -52,6 +52,30 @@ export function MappingStep({
   const [filter, setFilter] = useState<FilterMode>('todas');
   const [editingExtra, setEditingExtra] = useState<string | null>(null);
   const [newColName, setNewColName] = useState('');
+  // Ordem customizada das colunas via drag-and-drop. Se vazio, usa headers original.
+  const [headerOrder, setHeaderOrder] = useState<string[]>([]);
+  const [draggingHeader, setDraggingHeader] = useState<string | null>(null);
+  const [dragOverHeader, setDragOverHeader] = useState<string | null>(null);
+
+  // Sincroniza ordem quando headers mudam (novo arquivo)
+  const orderedHeaders = useMemo(() => {
+    if (headerOrder.length === 0) return headers;
+    const knownSet = new Set(headerOrder);
+    const ordered = headerOrder.filter(h => headers.includes(h));
+    const newOnes = headers.filter(h => !knownSet.has(h));
+    return [...ordered, ...newOnes];
+  }, [headers, headerOrder]);
+
+  const moveHeader = (from: string, to: string) => {
+    if (from === to) return;
+    const base = orderedHeaders.slice();
+    const fromIdx = base.indexOf(from);
+    const toIdx = base.indexOf(to);
+    if (fromIdx < 0 || toIdx < 0) return;
+    base.splice(fromIdx, 1);
+    base.splice(toIdx, 0, from);
+    setHeaderOrder(base);
+  };
 
   const customNames = useMemo(() => Object.keys(customColumns), [customColumns]);
   const customCount = customNames.length;
