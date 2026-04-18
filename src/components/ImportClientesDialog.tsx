@@ -48,14 +48,14 @@ function normalizeText(v: string): string {
 }
 
 const AUTO_RULES: Record<FieldKey, RegExp[]> = {
-  empresa: [/^empresa$/, /^nome\s*fantasia$/, /^nome$/, /empresa/, /fantasia/],
+  empresa: [/^empresa$/, /^nome\s*fantasia$/, /^nome\s*da\s*empresa$/, /^razao\s*social$/, /empresa/, /fantasia/],
   razao_social: [/^razao\s*social$/, /razao/],
   tipo: [/^tipo$/, /segmento/, /categoria/],
   cnpj: [/^cnpj$/, /^cpf$/, /cpf.*cnpj/, /cnpj/, /cpf/],
   email: [/^e-?mail$/, /mail/],
   telefone: [/^telefone$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
   endereco: [/^endereco$/, /endereco/, /address/],
-  nome_contato: [/^contato$/, /^nome\s*contato$/, /^responsavel$/, /contato/, /responsavel/],
+  nome_contato: [/^nome$/, /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/, /contato/, /responsavel/],
   cargo: [/^cargo$/, /cargo/, /funcao/, /posicao/],
 };
 
