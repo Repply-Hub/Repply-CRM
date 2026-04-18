@@ -314,19 +314,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       const BATCH_SIZE = 500;
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
-        await supabase.from('itens_pedido').delete().in('pedido_id', batch);
-        await supabase.from('historico_contatos').delete().in('pedido_id', batch);
+        const { error: itensErr } = await supabase.from('itens_pedido').delete().in('pedido_id', batch);
+        if (itensErr) throw itensErr;
+        const { error: histErr } = await supabase.from('historico_contatos').delete().in('pedido_id', batch);
+        if (histErr) throw histErr;
         const { error } = await supabase.from('pedidos').delete().in('id', batch);
         if (error) throw error;
       }
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
       toast.success(`${ids.length} negócio(s) removido(s)!`);
       setSelected(new Set());
+      setConfirmDeleteOpen(false);
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao remover');
+      console.error('[bulk-delete pedidos]', err);
+      toast.error(err?.message || 'Erro ao remover negócios');
     } finally {
       setIsDeleting(false);
-      setConfirmDeleteOpen(false);
     }
   };
 
