@@ -3,6 +3,10 @@ import type { Config } from "tailwindcss";
 export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  safelist: [
+    // Cores dinâmicas das colunas do Kanban (geradas via bg-${cor} / ring-${cor}/30 / text-${cor})
+    { pattern: /^(bg|ring|text)-(kanban-(new|budget|sent|negotiation|closed)|destructive|muted-foreground)(\/(10|20|30|40|50))?$/ },
+  ],
   prefix: "",
   theme: {
     container: {

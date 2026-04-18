@@ -4,7 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { KANBAN_STAGES } from '@/data/mockData';
+import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
+import { KanbanColunasDialog } from '@/components/kanban/KanbanColunasDialog';
 import { usePedidos, useHistoricoContatos, useUpdatePedidoStatus } from '@/hooks/use-pedidos';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import { Button } from '@/components/ui/button';
@@ -49,13 +50,8 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
 
 const PAGE_SIZE = 10;
 
-const stageColors: Record<string, string> = {
-  novo_lead: 'bg-kanban-new text-white',
-  elaboracao: 'bg-kanban-budget text-white',
-  enviado: 'bg-kanban-sent text-white',
-  negociacao: 'bg-kanban-negotiation text-white',
-  fechamento: 'bg-kanban-closed text-white',
-};
+// Cores das etapas resolvidas dinamicamente a partir do slug da coluna armazenada no banco
+const getStageBadgeClass = (corToken: string) => `bg-${corToken} text-white`;
 
 const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone, whatsapp: MessageSquare, visita: Eye };
 
@@ -76,6 +72,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const updateStatus = useUpdatePedidoStatus();
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
+  const { data: kanbanColunas } = useKanbanColunas();
+  const KANBAN_STAGES = useMemo(
+    () => (kanbanColunas ?? []).map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
+    [kanbanColunas]
+  );
+  const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
 
   // ===== View toggles =====
   // Toggle principal (sempre visível): Pipeline x Negócios.
@@ -136,11 +138,33 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     localStorage.setItem('pedidos_columns', JSON.stringify(newColumns));
   };
 
-  // Visibilidade das colunas (etapas) do Kanban
+  // Visibilidade das colunas (etapas) do Kanban — sincronizada com o catálogo dinâmico
   const [visibleKanbanStages, setVisibleKanbanStages] = useState<string[]>(() => {
     const saved = localStorage.getItem('pedidos_kanban_stages');
-    return saved ? JSON.parse(saved) : KANBAN_STAGES.map(s => s.key);
+    return saved ? JSON.parse(saved) : [];
   });
+
+  // Quando o catálogo de colunas mudar, garante que novas colunas apareçam por padrão
+  // e colunas removidas sejam descartadas das preferências locais.
+  useEffect(() => {
+    if (!kanbanColunas) return;
+    const allKeys = kanbanColunas.map(c => c.slug);
+    setVisibleKanbanStages(prev => {
+      const filtered = prev.filter(k => allKeys.includes(k));
+      const novas = allKeys.filter(k => !prev.includes(k));
+      // Se nada salvo ainda, mostra todas
+      if (prev.length === 0) {
+        localStorage.setItem('pedidos_kanban_stages', JSON.stringify(allKeys));
+        return allKeys;
+      }
+      const next = [...filtered, ...novas];
+      if (next.length !== prev.length || next.some((k, i) => k !== prev[i])) {
+        localStorage.setItem('pedidos_kanban_stages', JSON.stringify(next));
+        return next;
+      }
+      return prev;
+    });
+  }, [kanbanColunas]);
 
   const handleKanbanStagesChange = (next: string[]) => {
     setVisibleKanbanStages(next);
@@ -400,6 +424,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               className="text-xs text-primary justify-center"
             >
               Resetar todas
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setColunasDialogOpen(true); }}>
+              <Columns3 className="h-4 w-4 mr-2" /> Gerenciar colunas...
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
@@ -667,7 +695,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               {KANBAN_STAGES.filter(stage => visibleKanbanStages.includes(stage.key)).map(stage => (
                 <KanbanColumn
                   key={stage.key}
-                  stageKey={stage.key}
+                  stageKey={stage.key as any}
                   label={stage.label}
                   colorClass={stage.color}
                   orders={ordersByStage[stage.key] ?? []}
@@ -741,7 +769,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           {visibleColumns.includes('fabricante') && <TableCell>{p.fabricante?.nome ?? '-'}</TableCell>}
                           {visibleColumns.includes('valor') && <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>}
                           {visibleColumns.includes('etapa') && (
-                            <TableCell><Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge></TableCell>
+                            <TableCell>
+                              <Badge className={getStageBadgeClass(KANBAN_STAGES.find(s => s.key === p.status)?.color ?? 'muted-foreground')}>
+                                {stageLabel(p.status)}
+                              </Badge>
+                            </TableCell>
                           )}
                           {visibleColumns.includes('vendedor') && <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>}
                           {visibleColumns.includes('acoes') && (
@@ -860,6 +892,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </AlertDialog>
 
       <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
+      <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} />
     </AppLayout>
   );
 };
