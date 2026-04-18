@@ -501,7 +501,7 @@ export function MappingStep({
                       dragOverHeader === h && 'border-t-2 border-primary'
                     )}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-4">
                       {/* Drag handle */}
                       <button
                         type="button"
@@ -557,7 +557,7 @@ export function MappingStep({
                       </div>
 
                       {/* Action: select field */}
-                      <div className="w-[220px] shrink-0 space-y-1.5">
+                      <div className="w-[240px] shrink-0 flex flex-col gap-2">
                         <Select value={selectionValue} onValueChange={(v) => setColumnSelection(h, v)}>
                           <SelectTrigger className={cn(
                             'h-9 text-xs',
@@ -608,16 +608,19 @@ export function MappingStep({
                         </Select>
 
                         {isExtra && (
-                          <div className="relative">
-                            <Pencil className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                          <div className="rounded-md border border-accent/30 bg-accent/10 p-1.5 space-y-1">
+                            <label className="flex items-center gap-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-accent-foreground/80">
+                              <Pencil className="h-2.5 w-2.5" />
+                              Nome no sistema
+                            </label>
                             <Input
                               value={extras[h] ?? h}
                               onChange={(e) => renameExtra(h, e.target.value)}
                               onFocus={() => setEditingExtra(h)}
                               onBlur={() => setEditingExtra(null)}
-                              placeholder="Nome no sistema"
+                              placeholder="Ex: origem_lead"
                               className={cn(
-                                'h-8 pl-7 text-xs',
+                                'h-7 text-xs bg-background border-accent/40',
                                 editingExtra === h && 'ring-1 ring-accent border-accent'
                               )}
                             />
