@@ -9,6 +9,9 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
+import { validateFile } from '@/lib/file-validation';
+
+const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 import {
   FIELDS,
   createEmptyMapping,
@@ -43,6 +46,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   };
 
   const handleFile = async (file: File) => {
+    if (!validateFile(file, { allowedExtensions: IMPORT_ALLOWED_EXT })) return;
     setFileName(file.name);
     try {
       const buffer = await file.arrayBuffer();

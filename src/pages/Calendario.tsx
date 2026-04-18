@@ -25,6 +25,9 @@ import {
   useDeleteEvento,
 } from "@/hooks/use-eventos";
 import { toast } from "sonner";
+import { validateFile } from "@/lib/file-validation";
+
+const ICS_ALLOWED_EXT = ['.ics'];
 
 const CALENDAR_LABELS: Record<CalendarType, string> = {
   pessoal: "Meu calendário",
@@ -212,8 +215,9 @@ export default function Calendario() {
 
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
     e.target.value = "";
+    if (!file) return;
+    if (!validateFile(file, { allowedExtensions: ICS_ALLOWED_EXT })) return;
     setPendingFile(file);
   };
 

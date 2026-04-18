@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeFileName } from '@/lib/file-validation';
 
 export interface ChatMessage {
   id: string;
@@ -112,11 +113,11 @@ export function useSendMessage() {
 
       if (file) {
         const userId = (await supabase.auth.getUser()).data.user?.id;
-        const ext = file.name.split('.').pop();
-        const path = `${userId}/${Date.now()}.${ext}`;
+        const safeName = sanitizeFileName(file.name);
+        const path = `${userId}/${Date.now()}-${safeName}`;
         const { error: uploadError } = await supabase.storage
           .from('chat-files')
-          .upload(path, file);
+          .upload(path, file, { contentType: file.type || 'application/octet-stream' });
         if (uploadError) throw uploadError;
         const { data: urlData } = supabase.storage
           .from('chat-files')
