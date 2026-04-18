@@ -225,6 +225,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             email: r.email || null,
             telefone: r.telefone || null,
             cargo: r.cargo || null,
+            campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
           const { error } = await supabase.from('contatos').insert(batch);
@@ -239,6 +240,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             telefone: r.telefone || null,
             endereco: r.endereco || null,
             nome_contato: r.nome_contato || null,
+            campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
           const { error } = await supabase.from('clientes').upsert(batch, {
