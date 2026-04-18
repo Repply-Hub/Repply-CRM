@@ -426,7 +426,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <span className="hidden sm:inline">Opções</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={4} className="w-auto p-0">
+      <PopoverContent align="start" sideOffset={4} className="w-auto p-0">
         <div className="flex divide-x divide-border">
           {/* Coluna esquerda: visibilidade das colunas do Kanban */}
           <div className="p-2 min-w-[200px]">
