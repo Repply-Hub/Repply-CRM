@@ -5,10 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, MapPin, Search, Loader2, HardHat, Calendar } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { MapaObras } from '@/components/obras/MapaObras';
 
 const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'nome_obra', label: 'Nome da Obra', locked: true },
@@ -80,115 +82,146 @@ export default function Obras() {
     return list;
   }, [obras, search, statusFilter, sort]);
 
+  const obrasParaMapa = useMemo(
+    () =>
+      (obras ?? []).map((o: any) => ({
+        id: o.id,
+        nome_obra: o.nome_obra,
+        endereco_entrega: o.endereco_entrega,
+        status: o.status,
+        spe_cnpj: o.spe_cnpj,
+        latitude: o.latitude ?? null,
+        longitude: o.longitude ?? null,
+        cliente_empresa: o.clientes?.empresa ?? null,
+      })),
+    [obras]
+  );
+
   return (
     <AppLayout title="Obras" subtitle="Gerencie e acompanhe todas as obras cadastradas.">
       <div className="p-4 md:p-6 space-y-6">
+        <Tabs defaultValue="lista" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="lista" className="gap-2">
+              <List className="h-4 w-4" /> Lista
+            </TabsTrigger>
+            <TabsTrigger value="mapa" className="gap-2">
+              <MapIcon className="h-4 w-4" /> Mapa
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, endereço ou cliente..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os status</SelectItem>
-              <SelectItem value="em_andamento">Em andamento</SelectItem>
-              <SelectItem value="ativa">Ativa</SelectItem>
-              <SelectItem value="concluida">Concluída</SelectItem>
-              <SelectItem value="parada">Parada</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-            <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
-              <SelectValue placeholder="Ordenar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="recent">Mais recentes</SelectItem>
-              <SelectItem value="oldest">Mais antigas</SelectItem>
-              <SelectItem value="name_asc">Nome A-Z</SelectItem>
-              <SelectItem value="name_desc">Nome Z-A</SelectItem>
-            </SelectContent>
-          </Select>
-          <ColumnSettings
-            columns={OBRA_FIELDS}
-            visibleColumns={visibleFields}
-            onChange={handleFieldChange}
-          />
-        </div>
-
-        {/* Content */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-muted-foreground">
-            <HardHat className="h-12 w-12 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">Nenhuma obra encontrada</p>
-            <p className="text-sm mt-1">Ajuste os filtros ou cadastre uma nova obra.</p>
-          </div>
-        ) : (
-          <>
-            <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map((obra) => {
-                const status = STATUS_MAP[obra.status] || { label: obra.status, variant: 'outline' as const };
-                const cliente = obra.clientes as any;
-                return (
-                  <Card key={obra.id} className="flex flex-col">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <CardTitle className="text-base font-semibold leading-tight line-clamp-2">
-                          {obra.nome_obra}
-                        </CardTitle>
-                        <Badge variant={status.variant} className="shrink-0 text-xs">
-                          {status.label}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="flex-1 space-y-2 text-sm text-muted-foreground">
-                      {visibleFields.includes('cliente') && cliente?.empresa && (
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{cliente.empresa}</span>
-                        </div>
-                      )}
-                      {visibleFields.includes('endereco') && obra.endereco_entrega && (
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{obra.endereco_entrega}</span>
-                        </div>
-                      )}
-                      {visibleFields.includes('spe_cnpj') && obra.spe_cnpj && (
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-3.5 w-3.5 shrink-0" />
-                          <span className="text-xs">SPE: {obra.spe_cnpj}</span>
-                        </div>
-                      )}
-                      {visibleFields.includes('created_at') && (
-                        <div className="flex items-center gap-2 pt-1 border-t border-border/50">
-                          <Calendar className="h-3.5 w-3.5 shrink-0" />
-                          <span className="text-xs">
-                            Criada em {format(new Date(obra.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
-                          </span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+          <TabsContent value="lista" className="space-y-6 mt-0">
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome, endereço ou cliente..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os status</SelectItem>
+                  <SelectItem value="em_andamento">Em andamento</SelectItem>
+                  <SelectItem value="ativa">Ativa</SelectItem>
+                  <SelectItem value="concluida">Concluída</SelectItem>
+                  <SelectItem value="parada">Parada</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
+                <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
+                  <SelectValue placeholder="Ordenar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">Mais recentes</SelectItem>
+                  <SelectItem value="oldest">Mais antigas</SelectItem>
+                  <SelectItem value="name_asc">Nome A-Z</SelectItem>
+                  <SelectItem value="name_desc">Nome Z-A</SelectItem>
+                </SelectContent>
+              </Select>
+              <ColumnSettings
+                columns={OBRA_FIELDS}
+                visibleColumns={visibleFields}
+                onChange={handleFieldChange}
+              />
             </div>
-          </>
-        )}
+
+            {/* Content */}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-20 text-muted-foreground">
+                <HardHat className="h-12 w-12 mx-auto mb-3 opacity-40" />
+                <p className="font-medium">Nenhuma obra encontrada</p>
+                <p className="text-sm mt-1">Ajuste os filtros ou cadastre uma nova obra.</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filtered.map((obra) => {
+                    const status = STATUS_MAP[obra.status] || { label: obra.status, variant: 'outline' as const };
+                    const cliente = obra.clientes as any;
+                    return (
+                      <Card key={obra.id} className="flex flex-col">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="text-base font-semibold leading-tight line-clamp-2">
+                              {obra.nome_obra}
+                            </CardTitle>
+                            <Badge variant={status.variant} className="shrink-0 text-xs">
+                              {status.label}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="flex-1 space-y-2 text-sm text-muted-foreground">
+                          {visibleFields.includes('cliente') && cliente?.empresa && (
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{cliente.empresa}</span>
+                            </div>
+                          )}
+                          {visibleFields.includes('endereco') && obra.endereco_entrega && (
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{obra.endereco_entrega}</span>
+                            </div>
+                          )}
+                          {visibleFields.includes('spe_cnpj') && obra.spe_cnpj && (
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-3.5 w-3.5 shrink-0" />
+                              <span className="text-xs">SPE: {obra.spe_cnpj}</span>
+                            </div>
+                          )}
+                          {visibleFields.includes('created_at') && (
+                            <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+                              <Calendar className="h-3.5 w-3.5 shrink-0" />
+                              <span className="text-xs">
+                                Criada em {format(new Date(obra.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
+                              </span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="mapa" className="mt-0">
+            <MapaObras obras={obrasParaMapa} isLoading={isLoading} />
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
