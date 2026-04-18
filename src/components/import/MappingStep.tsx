@@ -560,10 +560,7 @@ export function MappingStep({
                     <SelectTrigger className="h-8 w-[140px] text-xs shrink-0">
                       <SelectValue placeholder="Escolher coluna..." />
                     </SelectTrigger>
-                    <SelectContent
-                      className="max-h-[260px] overflow-hidden [&_[data-radix-select-scroll-up-button]]:hidden [&_[data-radix-select-scroll-down-button]]:hidden [&_[data-radix-select-viewport]]:max-h-[252px] [&_[data-radix-select-viewport]]:overflow-y-auto"
-                      position="popper"
-                    >
+                    <SelectContent className="max-h-[260px]" position="popper">
                       {orderedHeaders.length === 0 ? (
                         <div className="px-2 py-1.5 text-xs text-muted-foreground">Sem colunas</div>
                       ) : (
@@ -786,10 +783,7 @@ export function MappingStep({
                           )}>
                             <SelectValue placeholder="Escolher destino..." />
                           </SelectTrigger>
-                          <SelectContent
-                            className="max-h-[280px] overflow-hidden [&_[data-radix-select-scroll-up-button]]:hidden [&_[data-radix-select-scroll-down-button]]:hidden [&_[data-radix-select-viewport]]:max-h-[272px] [&_[data-radix-select-viewport]]:overflow-y-auto"
-                            position="popper"
-                          >
+                          <SelectContent className="max-h-[280px]" position="popper">
                             <SelectGroup>
                               <SelectItem value={NONE} className="text-muted-foreground">
                                 <span className="flex items-center gap-1.5">
