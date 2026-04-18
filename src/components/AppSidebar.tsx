@@ -155,40 +155,18 @@ export function AppSidebar() {
         onMouseLeave={handleMouseLeave}
       >
         <SidebarHeader className="px-2 py-3 border-b border-primary/10 mb-2">
-          <div className={`flex items-center gap-2 ${collapsed ? 'justify-center' : 'justify-between'}`}>
-            <Link
-              to="/dashboard"
-              className={`flex items-center overflow-visible hover:opacity-80 transition-opacity min-w-0 ${collapsed ? 'justify-center' : 'gap-3 flex-1'}`}
-            >
-              <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
-              {!collapsed && (
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
-                  <p className="text-[10px] text-sidebar-foreground/50 font-medium">Gestão Comercial</p>
-                </div>
-              )}
-            </Link>
-            {!isMobile && !editMode && !collapsed && (
-              <button
-                onClick={toggleCollapsed}
-                className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors"
-                title="Recolher sidebar"
-                aria-label="Recolher sidebar"
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </button>
+          <Link
+            to="/dashboard"
+            className={`flex items-center overflow-visible hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : 'gap-3'}`}
+          >
+            <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
+                <p className="text-[10px] text-sidebar-foreground/50 font-medium">Gestão Comercial</p>
+              </div>
             )}
-          </div>
-          {!isMobile && !editMode && collapsed && (
-            <button
-              onClick={toggleCollapsed}
-              className="mt-2 inline-flex h-7 w-full items-center justify-center rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors"
-              title="Expandir sidebar"
-              aria-label="Expandir sidebar"
-            >
-              <PanelLeftOpen className="h-4 w-4" />
-            </button>
-          )}
+          </Link>
         </SidebarHeader>
 
         <SidebarContent className="py-2">
@@ -326,6 +304,21 @@ export function AppSidebar() {
                 <LogOut className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
                 {!collapsed && <span className="text-[13px] text-sidebar-foreground/70">Sair</span>}
               </button>
+              {!isMobile && (
+                <button
+                  onClick={toggleCollapsed}
+                  className={`flex items-center overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 border-t border-sidebar-border/60 mt-1 pt-2 ${collapsed ? 'justify-center' : 'gap-3'}`}
+                  title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+                  aria-label={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+                >
+                  {collapsed ? (
+                    <PanelLeftOpen className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
+                  ) : (
+                    <PanelLeftClose className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
+                  )}
+                  {!collapsed && <span className="text-[13px] text-sidebar-foreground/70">Recolher</span>}
+                </button>
+              )}
             </>
           )}
         </SidebarFooter>
