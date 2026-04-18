@@ -684,7 +684,16 @@ export function MappingStep({
               </p>
             </div>
           ) : (
-            <ul className="divide-y">
+            <>
+              {filteredHeaders.length > 0 && (
+                <div className="grid grid-cols-[16px_36px_1fr_240px] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span aria-hidden="true" />
+                  <span aria-hidden="true" />
+                  <span>Coluna da planilha</span>
+                  <span>Destino no sistema</span>
+                </div>
+              )}
+              <ul className="divide-y">
               {filteredHeaders.map((h) => {
                 const status = getStatus(h);
                 const field = columnToField[h];
@@ -913,7 +922,8 @@ export function MappingStep({
                   </li>
                 );
               })}
-            </ul>
+              </ul>
+            </>
           )}
         </div>
 
