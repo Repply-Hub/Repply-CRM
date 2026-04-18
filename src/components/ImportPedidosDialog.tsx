@@ -1,15 +1,15 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X, ArrowRight } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
+import { MappingStep, type FieldDef } from '@/components/import/MappingStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 import {
@@ -21,6 +21,8 @@ import {
   type FieldKey,
 } from '@/components/import-pedidos/importPedidosUtils';
 
+const VISIBLE_FIELDS: FieldDef[] = FIELDS.map(f => ({ key: f.key, label: f.label, required: f.required }));
+
 interface ImportPedidosDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,6 +32,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, string>>(createEmptyMapping());
+  const [extras, setExtras] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
@@ -40,6 +43,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setRawData([]);
     setHeaders([]);
     setMapping(createEmptyMapping());
+    setExtras({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
@@ -65,14 +69,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
       const autoMap = detectImportPedidosMapping(cols, json);
       setMapping(autoMap);
-
-      if (autoMap.cliente && autoMap.fabricante) {
-        setStep('preview');
-        toast.success(`${json.length} registros mapeados automaticamente`);
-      } else {
-        setStep('mapping');
-        toast.info(`Mapeie as colunas obrigatórias (Cliente e Fabricante)`);
-      }
+      setExtras({});
+      setStep('mapping');
+      toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
       toast.error('Erro ao ler o arquivo: ' + (err.message || 'formato inválido'));
     }
@@ -86,7 +85,17 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   const canProceedToPreview = Boolean(mapping.cliente && mapping.fabricante);
 
-  const getMappedRows = () => getImportedPedidosRows(rawData, mapping);
+  const getMappedRows = () => getImportedPedidosRows(rawData, mapping, extras);
+
+  const previewRows = useMemo(
+    () => (step === 'preview' ? getMappedRows() : []),
+    [step, mapping, rawData, extras]
+  );
+
+  const extraFieldNames = useMemo(
+    () => Array.from(new Set(Object.entries(extras).map(([col, name]) => (name || col).trim()).filter(Boolean))),
+    [extras]
+  );
 
   const handleImport = async () => {
     const rows = getMappedRows();
@@ -133,6 +142,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           status: r.status,
           valor_total: r.valor || null,
           observacoes: r.observacoes || null,
+          campos_extras: r.campos_extras || {},
           data_pedido: new Date().toISOString().split('T')[0],
         }));
         const { error } = await supabase.from('pedidos').insert(batch);
@@ -160,8 +170,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     return labels[s] || s;
   };
 
-  const previewRows = step === 'preview' ? getMappedRows() : [];
-
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
@@ -171,15 +179,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             Importar Negócios
           </DialogTitle>
         </DialogHeader>
-
-        {/* Step indicators */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-          <Badge variant={step === 'upload' ? 'default' : 'secondary'} className="text-xs">1. Upload</Badge>
-          <ArrowRight className="h-3 w-3" />
-          <Badge variant={step === 'mapping' ? 'default' : 'secondary'} className="text-xs">2. Mapear Colunas</Badge>
-          <ArrowRight className="h-3 w-3" />
-          <Badge variant={step === 'preview' ? 'default' : 'secondary'} className="text-xs">3. Confirmar</Badge>
-        </div>
 
         {step === 'upload' && (
           <div
@@ -193,7 +192,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             <p className="text-xs text-muted-foreground mb-3">Formatos aceitos: .xlsx, .xls, .csv</p>
             <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 max-w-md mx-auto text-left">
               <p className="font-medium mb-1">Qualquer planilha é aceita!</p>
-              <p>Na próxima etapa, você poderá mapear as colunas da sua planilha para os campos do sistema.</p>
+              <p>Colunas que não existirem no sistema podem ser adicionadas como "novas" durante o mapeamento.</p>
             </div>
             <input
               ref={fileRef}
@@ -209,106 +208,44 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         )}
 
         {step === 'mapping' && (
-          <div className="flex flex-col gap-4 flex-1 min-h-0">
-            <div className="flex items-center justify-between">
-              <Badge variant="secondary" className="gap-1">
-                <FileSpreadsheet className="h-3 w-3" />
-                {fileName} — {rawData.length} linhas
-              </Badge>
-              <Button variant="ghost" size="sm" onClick={reset}>
-                <X className="h-4 w-4 mr-1" /> Trocar arquivo
-              </Button>
-            </div>
-
-            <div className="text-sm font-medium text-foreground">Mapeie as colunas da sua planilha:</div>
-
-            <div className="grid gap-3">
-              {FIELDS.map(field => (
-                <div key={field.key} className="flex items-center gap-3">
-                  <div className="w-36 text-sm flex items-center gap-1.5">
-                    {field.label}
-                    {field.required && <span className="text-destructive text-xs">*</span>}
-                  </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <Select
-                    value={mapping[field.key] || '_none_'}
-                    onValueChange={(v) => setMapping(prev => ({ ...prev, [field.key]: v === '_none_' ? '' : v }))}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Selecionar coluna..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none_">— Não mapear —</SelectItem>
-                      {headers.map(h => (
-                        <SelectItem key={h} value={h}>
-                          {h}
-                          <span className="ml-2 text-muted-foreground text-xs">
-                            (ex: {rawData[0]?.[h]?.toString().slice(0, 30) || '—'})
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-            </div>
-
-            {/* Preview sample from raw data */}
-            <div className="flex-1 max-h-[200px] border rounded-lg overflow-auto mt-2">
-              <Table className="min-w-[400px]">
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs sticky top-0 bg-muted/50">#</TableHead>
-                    {headers.slice(0, 6).map(h => (
-                      <TableHead key={h} className="text-xs sticky top-0 bg-muted/50 whitespace-nowrap">{h}</TableHead>
-                    ))}
-                    {headers.length > 6 && <TableHead className="text-xs sticky top-0 bg-muted/50">...</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rawData.slice(0, 5).map((row, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
-                      {headers.slice(0, 6).map(h => (
-                        <TableCell key={h} className="text-xs whitespace-nowrap max-w-[150px] truncate">
-                          {row[h]?.toString() || '—'}
-                        </TableCell>
-                      ))}
-                      {headers.length > 6 && <TableCell className="text-xs text-muted-foreground">…</TableCell>}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={reset}>Cancelar</Button>
-              <Button
-                disabled={!canProceedToPreview}
-                onClick={() => {
-                  const mapped = getMappedRows();
-                  if (mapped.length === 0) {
-                    toast.error('Nenhum registro válido com o mapeamento atual');
-                    return;
-                  }
-                  setStep('preview');
-                }}
-              >
-                Próximo — Pré-visualizar <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-          </div>
+          <MappingStep
+            fileName={fileName}
+            rawData={rawData}
+            headers={headers}
+            mapping={mapping}
+            setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
+            extras={extras}
+            setExtras={setExtras}
+            visibleFields={VISIBLE_FIELDS}
+            onReset={reset}
+            onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
+            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); }}
+            canProceed={canProceedToPreview}
+            onNext={() => {
+              const mapped = getMappedRows();
+              if (mapped.length === 0) {
+                toast.error('Nenhum registro válido com o mapeamento atual');
+                return;
+              }
+              setStep('preview');
+            }}
+          />
         )}
 
         {step === 'preview' && (
           <div className="flex flex-col gap-4 flex-1 min-h-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary" className="gap-1">
                   <FileSpreadsheet className="h-3 w-3" />
                   {fileName}
                 </Badge>
                 <Badge variant="outline">{previewRows.length} registros válidos</Badge>
+                {extraFieldNames.length > 0 && (
+                  <Badge className="bg-accent text-accent-foreground border-accent">
+                    +{extraFieldNames.length} extra{extraFieldNames.length === 1 ? '' : 's'}
+                  </Badge>
+                )}
               </div>
               <Button variant="ghost" size="sm" onClick={() => setStep('mapping')}>
                 <X className="h-4 w-4 mr-1" /> Voltar ao mapeamento
@@ -316,8 +253,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             </div>
 
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
               Clientes e fabricantes não encontrados serão criados automaticamente.
+              {extraFieldNames.length > 0 && (
+                <span>Extras: {extraFieldNames.join(', ')}.</span>
+              )}
             </div>
 
             <div className="flex-1 max-h-[400px] border rounded-lg overflow-auto">
@@ -330,6 +270,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Valor</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Etapa</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Obs</TableHead>
+                    {extraFieldNames.map(name => (
+                      <TableHead key={name} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
+                        {name} <span className="text-[10px] opacity-70">(extra)</span>
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -343,6 +288,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{stageLabel(r.status)}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap max-w-[150px] truncate">{r.observacoes || '-'}</TableCell>
+                      {extraFieldNames.map(name => (
+                        <TableCell key={name} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
+                          {r.campos_extras?.[name] || '-'}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                 </TableBody>
