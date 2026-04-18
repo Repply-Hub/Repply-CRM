@@ -378,7 +378,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <DropdownMenuSubTrigger>
                 <Columns3 className="h-4 w-4 mr-2" /> Colunas do Kanban
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent alignOffset={-4} className="w-56">
+              <DropdownMenuSubContent className="w-56">
                 {KANBAN_STAGES.map((stage) => (
                   <div
                     key={stage.key}
