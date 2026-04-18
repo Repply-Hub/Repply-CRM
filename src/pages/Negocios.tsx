@@ -676,7 +676,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         ) : showKanban ? (
           <DragDropContext onDragEnd={handleDragEnd}>
             <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-3 px-3 sm:mx-0 sm:px-0">
-              {KANBAN_STAGES.map(stage => (
+              {KANBAN_STAGES.filter(stage => visibleKanbanStages.includes(stage.key)).map(stage => (
                 <KanbanColumn
                   key={stage.key}
                   stageKey={stage.key}
