@@ -82,8 +82,6 @@ export default function Obras() {
     return list;
   }, [obras, search, statusFilter, sort]);
 
-  return (
-    <AppLayout title="Obras" subtitle="Gerencie e acompanhe todas as obras cadastradas.">
   const obrasParaMapa = useMemo(
     () =>
       (obras ?? []).map((o: any) => ({
