@@ -2,8 +2,6 @@ import React from 'react';
 import { Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 export interface ColumnDefinition {
@@ -20,9 +18,20 @@ interface ColumnSettingsProps {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     hideTrigger?: boolean;
+    /** Texto exibido no trigger e no título da seção. Default: "Colunas" */
+    label?: string;
 }
 
-export function ColumnSettings({ columns, visibleColumns, onChange, className, open, onOpenChange, hideTrigger }: ColumnSettingsProps) {
+export function ColumnSettings({
+    columns,
+    visibleColumns,
+    onChange,
+    className,
+    open,
+    onOpenChange,
+    hideTrigger,
+    label = 'Colunas',
+}: ColumnSettingsProps) {
     const toggleColumn = (columnId: string) => {
         if (visibleColumns.includes(columnId)) {
             if (visibleColumns.length > 1) {
@@ -42,49 +51,51 @@ export function ColumnSettings({ columns, visibleColumns, onChange, className, o
                 <Button
                     variant="outline"
                     size="sm"
-                    className={cn("h-9 gap-2", hideTrigger && "hidden", className)}
+                    className={cn('h-9 gap-2', hideTrigger && 'hidden', className)}
                 >
                     <Settings2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Colunas</span>
+                    <span className="hidden sm:inline">Opções</span>
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-56 p-3" align="end">
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between border-b pb-2">
-                        <h4 className="font-medium text-sm leading-none">Exibir Colunas</h4>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto p-0 text-[10px] text-primary hover:bg-transparent"
-                            onClick={() => onChange(columns.map(c => c.id))}
-                        >
-                            Resetar
-                        </Button>
+            <PopoverContent align="start" sideOffset={4} className="w-auto p-0">
+                <div className="p-2 min-w-[220px]">
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        {label}
                     </div>
-                    <div className="grid gap-2">
-                        {columns.map((column) => (
-                            <div
-                                key={column.id}
-                                className={cn(
-                                    "flex items-center space-x-2 rounded-md p-1 transition-colors hover:bg-muted/50",
-                                    column.locked && "opacity-60 cursor-not-allowed"
-                                )}
-                            >
-                                <Checkbox
-                                    id={`col-${column.id}`}
-                                    checked={visibleColumns.includes(column.id)}
-                                    onCheckedChange={() => !column.locked && toggleColumn(column.id)}
-                                    disabled={column.locked}
-                                />
-                                <Label
-                                    htmlFor={`col-${column.id}`}
-                                    className="text-xs font-normal flex-1 cursor-pointer select-none"
+                    <div className="space-y-0.5">
+                        {columns.map((column) => {
+                            const checked = visibleColumns.includes(column.id);
+                            const disabled = column.locked || (checked && visibleColumns.length === 1);
+                            return (
+                                <button
+                                    key={column.id}
+                                    type="button"
+                                    disabled={disabled}
+                                    onClick={() => !column.locked && toggleColumn(column.id)}
+                                    className={cn(
+                                        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-normal transition-colors text-left',
+                                        'hover:bg-muted/60 disabled:cursor-not-allowed',
+                                        !checked && 'opacity-40'
+                                    )}
                                 >
-                                    {column.label}
-                                </Label>
-                            </div>
-                        ))}
+                                    <span
+                                        className={cn(
+                                            'h-2.5 w-2.5 rounded-full shrink-0',
+                                            checked ? 'bg-primary' : 'bg-muted-foreground/40'
+                                        )}
+                                    />
+                                    <span className="flex-1 truncate">{column.label}</span>
+                                </button>
+                            );
+                        })}
                     </div>
+                    <button
+                        type="button"
+                        onClick={() => onChange(columns.map(c => c.id))}
+                        className="w-full text-center text-xs text-primary font-medium px-2 py-2 mt-1 rounded-md hover:bg-muted/60 transition-colors"
+                    >
+                        Resetar todas
+                    </button>
                 </div>
             </PopoverContent>
         </Popover>

@@ -494,62 +494,84 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </PopoverContent>
     </Popover>
   ) : (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <Popover>
+      <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <Settings2 className="h-4 w-4" />
           <span className="hidden sm:inline">Opções</span>
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={4} className="w-56">
-        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Colunas</div>
-        {PEDIDOS_COLUMNS.map((column) => (
-          <div
-            key={column.id}
-            className={`flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50 ${column.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
-            onClick={(e) => e.preventDefault()}
-          >
-            <Checkbox
-              id={`col-menu-ped-${column.id}`}
-              checked={visibleColumns.includes(column.id)}
-              onCheckedChange={() => {
-                if (column.locked) return;
-                if (visibleColumns.includes(column.id)) {
-                  if (visibleColumns.length > 1) {
-                    handleColumnChange(visibleColumns.filter(id => id !== column.id));
-                  }
-                } else {
-                  const newVisible = PEDIDOS_COLUMNS
-                    .filter(c => visibleColumns.includes(c.id) || c.id === column.id)
-                    .map(c => c.id);
-                  handleColumnChange(newVisible);
-                }
-              }}
-              disabled={column.locked}
-            />
-            <Label htmlFor={`col-menu-ped-${column.id}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
-              {column.label}
-            </Label>
+      </PopoverTrigger>
+      <PopoverContent align="start" sideOffset={4} className="w-auto p-0">
+        <div className="flex divide-x divide-border">
+          {/* Coluna esquerda: visibilidade das colunas da tabela */}
+          <div className="p-2 min-w-[220px]">
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Colunas</div>
+            <div className="space-y-0.5">
+              {PEDIDOS_COLUMNS.map((column) => {
+                const checked = visibleColumns.includes(column.id);
+                const disabled = column.locked || (checked && visibleColumns.length === 1);
+                return (
+                  <button
+                    key={column.id}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => {
+                      if (column.locked) return;
+                      if (checked) {
+                        if (visibleColumns.length > 1) {
+                          handleColumnChange(visibleColumns.filter(id => id !== column.id));
+                        }
+                      } else {
+                        const newVisible = PEDIDOS_COLUMNS
+                          .filter(c => visibleColumns.includes(c.id) || c.id === column.id)
+                          .map(c => c.id);
+                        handleColumnChange(newVisible);
+                      }
+                    }}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-normal transition-colors text-left',
+                      'hover:bg-muted/60 disabled:cursor-not-allowed',
+                      !checked && 'opacity-40'
+                    )}
+                  >
+                    <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', checked ? 'bg-primary' : 'bg-muted-foreground/40')} />
+                    <span className="flex-1 truncate">{column.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => handleColumnChange(PEDIDOS_COLUMNS.map(c => c.id))}
+              className="w-full text-center text-xs text-primary font-medium px-2 py-2 mt-1 rounded-md hover:bg-muted/60 transition-colors"
+            >
+              Resetar todas
+            </button>
           </div>
-        ))}
-        <DropdownMenuItem
-          onSelect={(e) => {
-            e.preventDefault();
-            handleColumnChange(PEDIDOS_COLUMNS.map(c => c.id));
-          }}
-          className="text-xs text-primary justify-center"
-        >
-          Resetar todas
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleExportPdf}>
-          <FileDown className="h-4 w-4 mr-2" /> Exportar PDF
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setImportOpen(true)}>
-          <Upload className="h-4 w-4 mr-2" /> Importar XLSX
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+
+          {/* Coluna direita: ações */}
+          <div className="p-2 min-w-[180px]">
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ações</div>
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+            >
+              <FileDown className="h-4 w-4 text-muted-foreground" />
+              Exportar PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+            >
+              <Upload className="h-4 w-4 text-muted-foreground" />
+              Importar XLSX
+            </button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 
   // ===== Popover de Filtros (reutilizado em Kanban e Lista) =====
