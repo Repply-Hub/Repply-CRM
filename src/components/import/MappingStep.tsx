@@ -501,7 +501,7 @@ export function MappingStep({
                       dragOverHeader === h && 'border-t-2 border-primary'
                     )}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-4">
                       {/* Drag handle */}
                       <button
                         type="button"
