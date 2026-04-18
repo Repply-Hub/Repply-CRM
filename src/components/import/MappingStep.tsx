@@ -328,6 +328,28 @@ export function MappingStep({
           )}
         </div>
 
+        {/* Criar coluna do zero */}
+        {setCustomColumns && (
+          <div className="flex items-center gap-2 rounded-lg border border-dashed border-accent/50 bg-accent/10 px-3 py-2">
+            <Wand2 className="h-4 w-4 text-accent-foreground shrink-0" />
+            <Input
+              placeholder="Criar coluna do zero (ex: Origem da campanha)"
+              value={newColName}
+              onChange={(e) => setNewColName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomColumn(); } }}
+              className="h-8 flex-1 bg-background text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={addCustomColumn}
+              className="h-8 gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" /> Adicionar
+            </Button>
+          </div>
+        )}
+
         {/* Mapping list */}
         <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border bg-card">
           {filteredHeaders.length === 0 ? (
