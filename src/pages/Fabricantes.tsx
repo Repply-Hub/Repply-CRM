@@ -307,6 +307,8 @@ const Fabricantes = () => {
   const [editFab, setEditFab] = useState<any>(null);
   const [precoDialog, setPrecoDialog] = useState(false);
   const [editPreco, setEditPreco] = useState<any>(null);
+  const [importDialog, setImportDialog] = useState(false);
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
   const [deleteAlert, setDeleteAlert] = useState<{ type: 'fab' | 'preco'; id: string } | null>(null);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
