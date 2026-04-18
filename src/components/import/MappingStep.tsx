@@ -115,7 +115,7 @@ function FieldInfo({ fieldKey }: { fieldKey: string }) {
           <Info className="h-3 w-3" />
         </button>
       </TooltipTrigger>
-      <TooltipContent side="right" className="max-w-[260px] space-y-1">
+      <TooltipContent side="right" className="max-w-[260px] space-y-1 z-[100]">
         <p className="text-xs">{hint.desc}</p>
         {hint.example && (
           <p className="text-[10px] text-muted-foreground">
