@@ -314,19 +314,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       const BATCH_SIZE = 500;
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
-        await supabase.from('itens_pedido').delete().in('pedido_id', batch);
-        await supabase.from('historico_contatos').delete().in('pedido_id', batch);
+        const { error: itensErr } = await supabase.from('itens_pedido').delete().in('pedido_id', batch);
+        if (itensErr) throw itensErr;
+        const { error: histErr } = await supabase.from('historico_contatos').delete().in('pedido_id', batch);
+        if (histErr) throw histErr;
         const { error } = await supabase.from('pedidos').delete().in('id', batch);
         if (error) throw error;
       }
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
       toast.success(`${ids.length} negócio(s) removido(s)!`);
       setSelected(new Set());
+      setConfirmDeleteOpen(false);
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao remover');
+      console.error('[bulk-delete pedidos]', err);
+      toast.error(err?.message || 'Erro ao remover negócios');
     } finally {
       setIsDeleting(false);
-      setConfirmDeleteOpen(false);
     }
   };
 
@@ -757,9 +760,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <Button
+              variant="destructive"
+              onClick={(e) => { e.preventDefault(); handleBulkDelete(); }}
+              disabled={isDeleting}
+            >
               {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir'}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
