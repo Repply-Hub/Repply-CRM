@@ -669,7 +669,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               {KANBAN_STAGES.filter(stage => visibleKanbanStages.includes(stage.key)).map(stage => (
                 <KanbanColumn
                   key={stage.key}
-                  stageKey={stage.key}
+                  stageKey={stage.key as any}
                   label={stage.label}
                   colorClass={stage.color}
                   orders={ordersByStage[stage.key] ?? []}
@@ -743,7 +743,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           {visibleColumns.includes('fabricante') && <TableCell>{p.fabricante?.nome ?? '-'}</TableCell>}
                           {visibleColumns.includes('valor') && <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>}
                           {visibleColumns.includes('etapa') && (
-                            <TableCell><Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge></TableCell>
+                            <TableCell>
+                              <Badge className={getStageBadgeClass(KANBAN_STAGES.find(s => s.key === p.status)?.color ?? 'muted-foreground')}>
+                                {stageLabel(p.status)}
+                              </Badge>
+                            </TableCell>
                           )}
                           {visibleColumns.includes('vendedor') && <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>}
                           {visibleColumns.includes('acoes') && (
