@@ -182,11 +182,12 @@ export default function Tarefas() {
       queryClient.invalidateQueries({ queryKey: ['tarefas'] });
       toast.success(`${ids.length} tarefa(s) removida(s)!`);
       setSelected(new Set());
+      setConfirmDeleteOpen(false);
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao remover');
+      console.error('[bulk-delete tarefas]', err);
+      toast.error(err?.message || 'Erro ao remover tarefas');
     } finally {
       setIsDeleting(false);
-      setConfirmDeleteOpen(false);
     }
   };
 
