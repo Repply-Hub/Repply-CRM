@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFabricantes } from '@/hooks/use-clientes';
 import { useCreateFabricante } from '@/hooks/use-mutations';
-import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante } from '@/hooks/use-fabricantes';
-import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash } from 'lucide-react';
+import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante, useCategorias } from '@/hooks/use-fabricantes';
+import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash, Upload, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
@@ -21,6 +21,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ListPagination } from '@/components/ListPagination';
+import { ProductImageUpload } from '@/components/catalogo/ProductImageUpload';
+import { ImportCatalogoDialog } from '@/components/catalogo/ImportCatalogoDialog';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'descricao', label: 'Descrição', locked: true },
