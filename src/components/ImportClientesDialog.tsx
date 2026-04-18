@@ -449,6 +449,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           </div>
         )}
       </DialogContent>
+      <TemplateBuilder
+        open={showTemplate}
+        onClose={() => setShowTemplate(false)}
+        fields={visibleFields}
+        target={target}
+      />
     </Dialog>
   );
 }
+
