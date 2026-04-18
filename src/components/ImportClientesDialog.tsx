@@ -174,11 +174,16 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         const nome_contato = get('nome_contato');
         const tipoRaw = get('tipo');
 
-        // Monta campos_extras com base nas colunas marcadas como "novas"
+        // Monta campos_extras com base nas colunas marcadas como "novas" (vindas da planilha)
         const campos_extras: Record<string, string> = {};
         Object.entries(extras).forEach(([col, name]) => {
           const v = (row[col] ?? '').toString().trim();
           if (v !== '') campos_extras[name || col] = v;
+        });
+        // Adiciona colunas criadas do zero (valor padrão aplicado a todas as linhas)
+        Object.entries(customColumns).forEach(([name, value]) => {
+          const v = (value ?? '').toString().trim();
+          if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
         });
 
         return {
