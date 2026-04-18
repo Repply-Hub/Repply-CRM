@@ -30,6 +30,9 @@ interface Props {
   setMapping: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   extras: Record<string, string>;
   setExtras: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  /** Colunas criadas do zero pelo usuário: nome → valor padrão aplicado a todas as linhas */
+  customColumns?: Record<string, string>;
+  setCustomColumns?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   visibleFields: FieldDef[];
   onReset: () => void;
   onAutoDetect: () => void;
@@ -41,12 +44,57 @@ interface Props {
 type FilterMode = 'todas' | 'mapeadas' | 'novas' | 'ignoradas' | 'pendentes';
 
 export function MappingStep({
-  fileName, rawData, headers, mapping, setMapping, extras, setExtras, visibleFields,
+  fileName, rawData, headers, mapping, setMapping, extras, setExtras,
+  customColumns = {}, setCustomColumns, visibleFields,
   onReset, onAutoDetect, onClearAll, canProceed, onNext,
 }: Props) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterMode>('todas');
   const [editingExtra, setEditingExtra] = useState<string | null>(null);
+  const [newColName, setNewColName] = useState('');
+
+  const customNames = useMemo(() => Object.keys(customColumns), [customColumns]);
+  const customCount = customNames.length;
+
+  const addCustomColumn = () => {
+    if (!setCustomColumns) return;
+    const base = newColName.trim() || 'Nova coluna';
+    let name = base;
+    let i = 2;
+    const taken = new Set([...headers, ...customNames]);
+    while (taken.has(name)) { name = `${base} ${i++}`; }
+    setCustomColumns(prev => ({ ...prev, [name]: '' }));
+    setNewColName('');
+    setEditingExtra(name);
+  };
+
+  const updateCustomValue = (name: string, value: string) => {
+    setCustomColumns?.(prev => ({ ...prev, [name]: value }));
+  };
+
+  const renameCustomColumn = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    const taken = new Set([...headers, ...customNames.filter(n => n !== oldName)]);
+    if (taken.has(trimmed)) return;
+    setCustomColumns?.(prev => {
+      const next: Record<string, string> = {};
+      Object.keys(prev).forEach(k => {
+        if (k === oldName) next[trimmed] = prev[k];
+        else next[k] = prev[k];
+      });
+      return next;
+    });
+    setEditingExtra(trimmed);
+  };
+
+  const removeCustomColumn = (name: string) => {
+    setCustomColumns?.(prev => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  };
 
   const columnToField = useMemo(() => {
     const m: Record<string, string | undefined> = {};
