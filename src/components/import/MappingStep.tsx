@@ -99,23 +99,40 @@ const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: st
 };
 
 /** Mini-componente: ícone "i" com tooltip explicando o campo. */
-function FieldInfo({ fieldKey }: { fieldKey: string }) {
+function FieldInfo({ fieldKey, interactive = true }: { fieldKey: string; interactive?: boolean }) {
   const hint = FIELD_HINTS[fieldKey];
   if (!hint) return null;
+
+  const icon = (
+    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/80 transition-colors group-hover:border-primary/40 group-hover:text-primary">
+      <Info className="h-3 w-3" />
+    </span>
+  );
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="inline-flex items-center justify-center text-muted-foreground/60 hover:text-primary transition-colors shrink-0"
-          aria-label={`Sobre o campo ${fieldKey}`}
-        >
-          <Info className="h-3 w-3" />
-        </button>
+        {interactive ? (
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="group relative z-[160] inline-flex items-center justify-center shrink-0"
+            aria-label={`Sobre o campo ${fieldKey}`}
+          >
+            {icon}
+          </button>
+        ) : (
+          <span
+            className="group relative z-[160] inline-flex items-center justify-center shrink-0"
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-hidden="true"
+          >
+            {icon}
+          </span>
+        )}
       </TooltipTrigger>
-      <TooltipContent side="right" className="max-w-[260px] space-y-1 z-[100]">
+      <TooltipContent side="right" className="z-[220] max-w-[260px] space-y-1">
         <p className="text-xs">{hint.desc}</p>
         {hint.example && (
           <p className="text-[10px] text-muted-foreground">
@@ -811,7 +828,7 @@ export function MappingStep({
                                     <span className="flex items-center gap-1.5">
                                       <span>{f.label}</span>
                                       {f.required && <span className="text-destructive">*</span>}
-                                      <FieldInfo fieldKey={f.key} />
+                                      <FieldInfo fieldKey={f.key} interactive={false} />
                                       {usedElsewhere && (
                                         <span className="text-[10px] text-muted-foreground italic">
                                           (em {usedBy})
