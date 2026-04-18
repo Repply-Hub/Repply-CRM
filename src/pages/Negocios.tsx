@@ -238,8 +238,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [pipelineOrders]);
 
   const totalPipeline = pipelineOrders.reduce((acc, o) => acc + o.valor, 0);
-  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo;
-  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0);
+  const hasStageFilter = stageFilter !== 'todos';
+  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || hasStageFilter;
+  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (hasStageFilter ? 1 : 0);
 
   const toggleFilter = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
     setList(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -251,6 +252,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setShowOnlyAttention(false);
     setDateFrom(undefined);
     setDateTo(undefined);
+    handleStageFilterChange('todos');
   };
 
   const handleDragEnd = useCallback((result: DropResult) => {
