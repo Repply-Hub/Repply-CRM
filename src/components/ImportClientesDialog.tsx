@@ -16,8 +16,8 @@ const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'cargo';
 
 const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: boolean }[] = [
-  { key: 'empresa', label: 'Empresa / Nome', required: true },
-  { key: 'nome_contato', label: 'Nome do contato', required: false },
+  { key: 'empresa', label: 'Empresa', required: true },
+  { key: 'nome_contato', label: 'Nome', required: false },
   { key: 'razao_social', label: 'Razão social', required: false },
   { key: 'tipo', label: 'Tipo / Segmento', required: false },
   { key: 'cnpj', label: 'CNPJ / CPF', required: false },
@@ -48,14 +48,14 @@ function normalizeText(v: string): string {
 }
 
 const AUTO_RULES: Record<FieldKey, RegExp[]> = {
-  empresa: [/^empresa$/, /^nome\s*fantasia$/, /^nome$/, /empresa/, /fantasia/],
+  empresa: [/^empresa$/, /^nome\s*fantasia$/, /^nome\s*da\s*empresa$/, /^razao\s*social$/, /empresa/, /fantasia/],
   razao_social: [/^razao\s*social$/, /razao/],
   tipo: [/^tipo$/, /segmento/, /categoria/],
   cnpj: [/^cnpj$/, /^cpf$/, /cpf.*cnpj/, /cnpj/, /cpf/],
   email: [/^e-?mail$/, /mail/],
   telefone: [/^telefone$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
   endereco: [/^endereco$/, /endereco/, /address/],
-  nome_contato: [/^contato$/, /^nome\s*contato$/, /^responsavel$/, /contato/, /responsavel/],
+  nome_contato: [/^nome$/, /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/, /contato/, /responsavel/],
   cargo: [/^cargo$/, /cargo/, /funcao/, /posicao/],
 };
 
