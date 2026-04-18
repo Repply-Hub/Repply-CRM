@@ -136,6 +136,28 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     localStorage.setItem('pedidos_columns', JSON.stringify(newColumns));
   };
 
+  // Visibilidade das colunas (etapas) do Kanban
+  const [visibleKanbanStages, setVisibleKanbanStages] = useState<string[]>(() => {
+    const saved = localStorage.getItem('pedidos_kanban_stages');
+    return saved ? JSON.parse(saved) : KANBAN_STAGES.map(s => s.key);
+  });
+
+  const handleKanbanStagesChange = (next: string[]) => {
+    setVisibleKanbanStages(next);
+    localStorage.setItem('pedidos_kanban_stages', JSON.stringify(next));
+  };
+
+  const toggleKanbanStage = (key: string) => {
+    if (visibleKanbanStages.includes(key)) {
+      if (visibleKanbanStages.length > 1) {
+        handleKanbanStagesChange(visibleKanbanStages.filter(k => k !== key));
+      }
+    } else {
+      const next = KANBAN_STAGES.filter(s => visibleKanbanStages.includes(s.key) || s.key === key).map(s => s.key);
+      handleKanbanStagesChange(next);
+    }
+  };
+
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setPage(1);
