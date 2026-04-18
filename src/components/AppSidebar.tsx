@@ -88,6 +88,15 @@ export function AppSidebar() {
     }
   }, [setOpen, editMode]);
 
+  const toggleCollapsed = useCallback(() => {
+    // Botão único que alterna o estado fixado da sidebar.
+    // Limpa o flag de hover para que o estado escolhido não seja revertido por handleMouseLeave.
+    hoverOpened.current = false;
+    if (enterTimer.current) { clearTimeout(enterTimer.current); enterTimer.current = null; }
+    if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null; }
+    setOpen(collapsed);
+  }, [collapsed, setOpen]);
+
   const enterEditMode = useCallback(() => {
     setEditItems(JSON.parse(JSON.stringify(items)));
     setEditMode(true);
