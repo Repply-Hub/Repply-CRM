@@ -450,6 +450,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Telefone</TableHead>
                     {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Endereço</TableHead>}
                     {target === 'contatos' && <TableHead className="text-xs sticky top-0 bg-muted/50">Cargo</TableHead>}
+                    {extraFieldNames.map(name => (
+                      <TableHead key={name} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
+                        {name} <span className="text-[10px] opacity-70">(extra)</span>
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -464,6 +469,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                       <TableCell className="text-xs whitespace-nowrap">{r.telefone || '-'}</TableCell>
                       {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap max-w-[200px] truncate">{r.endereco || '-'}</TableCell>}
                       {target === 'contatos' && <TableCell className="text-xs whitespace-nowrap">{r.cargo || '-'}</TableCell>}
+                      {extraFieldNames.map(name => (
+                        <TableCell key={name} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
+                          {r.campos_extras?.[name] || '-'}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                 </TableBody>
