@@ -51,7 +51,23 @@ export function MappingStep({
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterMode>('todas');
   const [editingExtra, setEditingExtra] = useState<string | null>(null);
+  const [extraDraft, setExtraDraft] = useState<string>('');
   const [newColName, setNewColName] = useState('');
+
+  const startEditExtra = (column: string) => {
+    setEditingExtra(column);
+    setExtraDraft(extras[column] ?? column);
+  };
+  const cancelEditExtra = () => {
+    setEditingExtra(null);
+    setExtraDraft('');
+  };
+  const saveEditExtra = (column: string) => {
+    const value = extraDraft.trim() || column;
+    setExtras(prev => ({ ...prev, [column]: value }));
+    setEditingExtra(null);
+    setExtraDraft('');
+  };
   // Ordem customizada das colunas via drag-and-drop. Se vazio, usa headers original.
   const [headerOrder, setHeaderOrder] = useState<string[]>([]);
   const [draggingHeader, setDraggingHeader] = useState<string | null>(null);
@@ -609,21 +625,73 @@ export function MappingStep({
 
                         {isExtra && (
                           <div className="rounded-md border border-accent/30 bg-accent/10 p-1.5 space-y-1">
-                            <label className="flex items-center gap-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-accent-foreground/80">
-                              <Pencil className="h-2.5 w-2.5" />
-                              Nome no sistema
-                            </label>
-                            <Input
-                              value={extras[h] ?? h}
-                              onChange={(e) => renameExtra(h, e.target.value)}
-                              onFocus={() => setEditingExtra(h)}
-                              onBlur={() => setEditingExtra(null)}
-                              placeholder="Ex: origem_lead"
-                              className={cn(
-                                'h-7 text-xs bg-background border-accent/40',
-                                editingExtra === h && 'ring-1 ring-accent border-accent'
+                            <label className="flex items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-wide text-accent-foreground/80">
+                              <span className="flex items-center gap-1">
+                                <Pencil className="h-2.5 w-2.5" />
+                                Nome no sistema
+                              </span>
+                              {editingExtra !== h && (
+                                <button
+                                  type="button"
+                                  onClick={() => startEditExtra(h)}
+                                  className="text-[10px] font-medium normal-case text-accent-foreground hover:underline"
+                                >
+                                  Editar
+                                </button>
                               )}
-                            />
+                            </label>
+
+                            {editingExtra === h ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  autoFocus
+                                  value={extraDraft}
+                                  onChange={(e) => setExtraDraft(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') { e.preventDefault(); saveEditExtra(h); }
+                                    if (e.key === 'Escape') { e.preventDefault(); cancelEditExtra(); }
+                                  }}
+                                  placeholder="Ex: origem_lead"
+                                  className="h-7 flex-1 text-xs bg-background border-accent ring-1 ring-accent"
+                                />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      onClick={() => saveEditExtra(h)}
+                                      className="h-7 w-7 p-0 shrink-0 bg-accent hover:bg-accent/90 text-accent-foreground"
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">Salvar (Enter)</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={cancelEditExtra}
+                                      className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">Cancelar (Esc)</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => startEditExtra(h)}
+                                className="w-full text-left h-7 px-2 text-xs rounded border border-accent/30 bg-background/60 hover:bg-background hover:border-accent/60 transition-colors truncate"
+                                title={extras[h] ?? h}
+                              >
+                                <span className="font-mono text-foreground/90">{extras[h] ?? h}</span>
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
