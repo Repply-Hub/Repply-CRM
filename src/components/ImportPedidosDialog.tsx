@@ -222,10 +222,12 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
             extras={extras}
             setExtras={setExtras}
+            customColumns={customColumns}
+            setCustomColumns={setCustomColumns}
             visibleFields={VISIBLE_FIELDS}
             onReset={reset}
             onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
-            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); }}
+            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); }}
             canProceed={canProceedToPreview}
             onNext={() => {
               const mapped = getMappedRows();
