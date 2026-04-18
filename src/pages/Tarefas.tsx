@@ -485,6 +485,23 @@ export default function Tarefas() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog: selecionar página atual ou todos os filtrados */}
+      <AlertDialog open={selectAllDialogOpen} onOpenChange={setSelectAllDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Selecionar tarefas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja selecionar apenas as {currentPageIds.length} tarefa(s) desta página ou todas as {filtered.length} tarefa(s) filtradas?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" onClick={selectPageOnly}>Apenas esta página ({currentPageIds.length})</Button>
+            <Button variant="default" onClick={selectAllFiltered}>Todas ({filtered.length})</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
