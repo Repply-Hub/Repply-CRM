@@ -211,6 +211,27 @@ export function MappingStep({
   const extrasCount = Object.keys(extras).length;
   const ignoredCount = headers.length - mappedCount - extrasCount;
   const requiredMissing = visibleFields.filter(f => f.required && !mapping[f.key]);
+  const unmappedFields = useMemo(
+    () => visibleFields.filter(f => !mapping[f.key]),
+    [visibleFields, mapping]
+  );
+
+  const assignFieldToColumn = (fieldKey: string, column: string) => {
+    if (!column) return;
+    setExtras(prev => {
+      if (!(column in prev)) return prev;
+      const next = { ...prev };
+      delete next[column];
+      return next;
+    });
+    setMapping(prev => {
+      const next = { ...prev };
+      // Limpa qualquer outro field que apontava p/ essa coluna
+      Object.keys(next).forEach(k => { if (next[k] === column) next[k] = ''; });
+      next[fieldKey] = column;
+      return next;
+    });
+  };
 
   const filteredHeaders = useMemo(() => {
     let list = orderedHeaders;
@@ -387,6 +408,70 @@ export function MappingStep({
             >
               <Plus className="h-3.5 w-3.5" /> Adicionar
             </Button>
+          </div>
+        )}
+
+        {/* Campos do sistema não mapeados — atribuição manual */}
+        {unmappedFields.length > 0 && (
+          <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-foreground">
+                  Campos do sistema sem coluna atribuída ({unmappedFields.length})
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Não detectamos coluna correspondente. Atribua manualmente se existir na sua planilha.
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {unmappedFields.map((f) => (
+                <div
+                  key={f.key}
+                  className={cn(
+                    'flex items-center gap-2 rounded-md border bg-background p-2',
+                    f.required ? 'border-destructive/40' : 'border-border'
+                  )}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-foreground truncate flex items-center gap-1">
+                      {f.label}
+                      {f.required && <span className="text-destructive">*</span>}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {f.required ? 'Obrigatório' : 'Opcional'}
+                    </div>
+                  </div>
+                  <Select value="" onValueChange={(v) => assignFieldToColumn(f.key, v)}>
+                    <SelectTrigger className="h-8 w-[140px] text-xs shrink-0">
+                      <SelectValue placeholder="Escolher coluna..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[260px]">
+                      {orderedHeaders.length === 0 ? (
+                        <div className="px-2 py-1.5 text-xs text-muted-foreground">Sem colunas</div>
+                      ) : (
+                        orderedHeaders.map((h) => {
+                          const usedBy = columnToField[h];
+                          return (
+                            <SelectItem key={h} value={h}>
+                              <span className="flex items-center gap-1.5 max-w-[260px]">
+                                <span className="truncate">{h}</span>
+                                {usedBy && (
+                                  <span className="text-[10px] text-muted-foreground italic shrink-0">
+                                    (em uso)
+                                  </span>
+                                )}
+                              </span>
+                            </SelectItem>
+                          );
+                        })
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
