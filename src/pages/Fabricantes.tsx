@@ -333,6 +333,9 @@ const Fabricantes = () => {
   const totalFabPages = Math.max(1, Math.ceil(filtered.length / fabPageSize));
   const paginatedFabs = filtered.slice((fabPage - 1) * fabPageSize, fabPage * fabPageSize);
 
+  const categoriasPreco = Array.from(new Set((precos ?? []).map((p: any) => p.categoria).filter(Boolean))) as string[];
+  const precosFiltrados = (precos ?? []).filter((p: any) => filtroCategoria === 'todas' || p.categoria === filtroCategoria);
+
   useEffect(() => {
     if (fabPage > totalFabPages) setFabPage(totalFabPages);
   }, [fabPage, totalFabPages]);
