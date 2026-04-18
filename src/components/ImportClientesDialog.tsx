@@ -410,12 +410,17 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         {step === 'preview' && (
           <div className="flex flex-col gap-4 flex-1 min-h-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary" className="gap-1">
                   <FileSpreadsheet className="h-3 w-3" />
                   {fileName}
                 </Badge>
                 <Badge variant="outline">{previewRows.length} registros</Badge>
+                {extraFieldNames.length > 0 && (
+                  <Badge className="bg-accent text-accent-foreground border-accent">
+                    +{extraFieldNames.length} coluna{extraFieldNames.length === 1 ? '' : 's'} extra{extraFieldNames.length === 1 ? '' : 's'}
+                  </Badge>
+                )}
               </div>
               <Button variant="ghost" size="sm" onClick={() => setStep('mapping')}>
                 <X className="h-4 w-4 mr-1" /> Voltar ao mapeamento
@@ -424,7 +429,12 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-              Verifique os dados antes de importar.
+              Verifique os dados antes de importar.{' '}
+              {extraFieldNames.length > 0 && (
+                <span>
+                  Colunas extras serão salvas em <span className="font-medium">campos_extras</span>: {extraFieldNames.join(', ')}.
+                </span>
+              )}
             </div>
 
             <div className="flex-1 max-h-[400px] border rounded-lg overflow-auto">
