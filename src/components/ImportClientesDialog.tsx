@@ -102,8 +102,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const [extras, setExtras] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
-  const [step, setStep] = useState<'upload' | 'manual' | 'mapping' | 'preview'>('upload');
-  const [showTemplate, setShowTemplate] = useState(false);
+  const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
