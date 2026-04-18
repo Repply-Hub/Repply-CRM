@@ -100,6 +100,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
     telefone: '', endereco: '', nome_contato: '', cargo: '',
   });
+  // extras: column name (planilha) -> nome no sistema (campos_extras)
+  const [extras, setExtras] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'manual' | 'mapping' | 'preview'>('upload');
@@ -119,6 +121,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
       telefone: '', endereco: '', nome_contato: '', cargo: '',
     });
+    setExtras({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
