@@ -371,7 +371,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <span className="hidden sm:inline">Opções</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={4} className="w-48">
+      <DropdownMenuContent align="end" sideOffset={4} className="w-56">
         {showKanban ? (
           <>
             <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Colunas do Kanban</div>
