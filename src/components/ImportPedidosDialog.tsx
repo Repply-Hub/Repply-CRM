@@ -33,6 +33,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, string>>(createEmptyMapping());
   const [extras, setExtras] = useState<Record<string, string>>({});
+  const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
@@ -44,6 +45,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setHeaders([]);
     setMapping(createEmptyMapping());
     setExtras({});
+    setCustomColumns({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
