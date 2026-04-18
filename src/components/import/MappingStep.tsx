@@ -296,7 +296,7 @@ export function MappingStep({
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="flex flex-col gap-4 flex-1 min-h-0">
+      <div className="flex flex-col gap-4">
         {/* Top summary card */}
         <div className="rounded-xl border bg-card shadow-sm">
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/30 rounded-t-xl">
