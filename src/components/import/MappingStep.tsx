@@ -550,6 +550,7 @@ export function MappingStep({
                     <div className="text-xs font-medium text-foreground truncate flex items-center gap-1">
                       {f.label}
                       {f.required && <span className="text-destructive">*</span>}
+                      <FieldInfo fieldKey={f.key} />
                     </div>
                     <div className="text-[10px] text-muted-foreground">
                       {f.required ? 'Obrigatório' : 'Opcional'}
@@ -747,6 +748,7 @@ export function MappingStep({
                               {fieldDef.label}
                               {fieldDef.required && <span className="text-destructive ml-0.5">*</span>}
                             </Badge>
+                            <FieldInfo fieldKey={fieldDef.key} />
                           )}
                           {isExtra && (
                             <Badge className="h-5 text-[10px] gap-1 bg-accent text-accent-foreground border-accent hover:bg-accent">
@@ -807,6 +809,7 @@ export function MappingStep({
                                     <span className="flex items-center gap-1.5">
                                       <span>{f.label}</span>
                                       {f.required && <span className="text-destructive">*</span>}
+                                      <FieldInfo fieldKey={f.key} />
                                       {usedElsewhere && (
                                         <span className="text-[10px] text-muted-foreground italic">
                                           (em {usedBy})
