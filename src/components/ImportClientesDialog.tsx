@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -13,28 +13,18 @@ import { validateFile } from '@/lib/file-validation';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
-interface ParsedRow {
-  empresa: string;
-  tipo: string;
-  cnpj?: string;
-  razao_social?: string;
-  email?: string;
-  telefone?: string;
-  endereco?: string;
-  nome_contato?: string;
-}
+type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'cargo';
 
-const COLUMN_MAP: [RegExp, keyof ParsedRow][] = [
-  // Order matters: more specific patterns first
-  [/^(razao\s*social|razao_social)$/, 'razao_social'],
-  [/^(nome\s*fantasia|nome_fantasia)$/, 'empresa'],
-  [/^(empresa|nome)$/, 'empresa'],
-  [/^(tipo|segmento|categoria)$/, 'tipo'],
-  [/^(cnpj|cpf|cpf\s*\/?\s*cnpj)$/, 'cnpj'],
-  [/^(e-?mail)$/, 'email'],
-  [/^(telefone|phone|fone|celular|tel)$/, 'telefone'],
-  [/^(endereco|endere[cç]o|address)$/, 'endereco'],
-  [/^(contato|nome\s*contato|nome_contato|responsavel|responsável)$/, 'nome_contato'],
+const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: boolean }[] = [
+  { key: 'empresa', label: 'Empresa / Nome', required: true },
+  { key: 'nome_contato', label: 'Nome do contato', required: false },
+  { key: 'razao_social', label: 'Razão social', required: false },
+  { key: 'tipo', label: 'Tipo / Segmento', required: false },
+  { key: 'cnpj', label: 'CNPJ / CPF', required: false },
+  { key: 'email', label: 'E-mail', required: false },
+  { key: 'telefone', label: 'Telefone', required: false },
+  { key: 'endereco', label: 'Endereço', required: false },
+  { key: 'cargo', label: 'Cargo', required: false, forContatos: true },
 ];
 
 const TIPO_MAP: Record<string, string> = {
@@ -53,12 +43,41 @@ const TIPO_MAP: Record<string, string> = {
   instalador: 'instalador',
 };
 
-function normalizeHeader(h: string): keyof ParsedRow | null {
-  const key = h.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  for (const [pattern, field] of COLUMN_MAP) {
-    if (pattern.test(key)) return field;
-  }
-  return null;
+function normalizeText(v: string): string {
+  return v.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+const AUTO_RULES: Record<FieldKey, RegExp[]> = {
+  empresa: [/^empresa$/, /^nome\s*fantasia$/, /^nome$/, /empresa/, /fantasia/],
+  razao_social: [/^razao\s*social$/, /razao/],
+  tipo: [/^tipo$/, /segmento/, /categoria/],
+  cnpj: [/^cnpj$/, /^cpf$/, /cpf.*cnpj/, /cnpj/, /cpf/],
+  email: [/^e-?mail$/, /mail/],
+  telefone: [/^telefone$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
+  endereco: [/^endereco$/, /endereco/, /address/],
+  nome_contato: [/^contato$/, /^nome\s*contato$/, /^responsavel$/, /contato/, /responsavel/],
+  cargo: [/^cargo$/, /cargo/, /funcao/, /posicao/],
+};
+
+function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
+  const result: Record<FieldKey, string> = {
+    empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
+    telefone: '', endereco: '', nome_contato: '', cargo: '',
+  };
+  const used = new Set<string>();
+  // First pass: exact patterns
+  (Object.keys(AUTO_RULES) as FieldKey[]).forEach(field => {
+    for (const h of headers) {
+      if (used.has(h)) continue;
+      const norm = normalizeText(h);
+      if (AUTO_RULES[field].some(r => r.test(norm))) {
+        result[field] = h;
+        used.add(h);
+        break;
+      }
+    }
+  });
+  return result;
 }
 
 interface ImportClientesDialogProps {
@@ -72,15 +91,31 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = controlledOnOpenChange || setInternalOpen;
-  const [rows, setRows] = useState<ParsedRow[]>([]);
+
+  const [rawData, setRawData] = useState<Record<string, any>[]>([]);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<Record<FieldKey, string>>({
+    empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
+    telefone: '', endereco: '', nome_contato: '', cargo: '',
+  });
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
-  const [step, setStep] = useState<'upload' | 'preview'>('upload');
+  const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
+  const visibleFields = useMemo(
+    () => FIELDS.filter(f => target === 'contatos' || !f.forContatos),
+    [target]
+  );
+
   const reset = () => {
-    setRows([]);
+    setRawData([]);
+    setHeaders([]);
+    setMapping({
+      empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
+      telefone: '', endereco: '', nome_contato: '', cargo: '',
+    });
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
@@ -93,77 +128,21 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: 'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
+      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
 
       if (json.length === 0) {
         toast.error('Arquivo vazio ou sem dados válidos');
         return;
       }
 
-      const headers = Object.keys(json[0]);
-      const mappedHeaders: Record<string, keyof ParsedRow> = {};
-      const usedFields = new Set<keyof ParsedRow>();
-      
-      // First pass: exact regex match
-      headers.forEach(h => {
-        const mapped = normalizeHeader(h);
-        if (mapped && !usedFields.has(mapped)) {
-          mappedHeaders[h] = mapped;
-          usedFields.add(mapped);
-        }
-      });
+      const cols = Array.from(new Set(json.flatMap(r => Object.keys(r))));
+      setRawData(json);
+      setHeaders(cols);
 
-      // Second pass: partial/fuzzy match for unmapped headers
-      const partialMap: [string, keyof ParsedRow][] = [
-        ['empresa', 'empresa'], ['nome', 'empresa'], ['razao', 'razao_social'],
-        ['cnpj', 'cnpj'], ['cpf', 'cnpj'], ['mail', 'email'],
-        ['tel', 'telefone'], ['fone', 'telefone'], ['ender', 'endereco'],
-        ['contato', 'nome_contato'], ['responsavel', 'nome_contato'],
-      ];
-      headers.forEach(h => {
-        if (mappedHeaders[h]) return;
-        const norm = h.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        for (const [partial, field] of partialMap) {
-          if (!usedFields.has(field) && norm.includes(partial)) {
-            mappedHeaders[h] = field;
-            usedFields.add(field);
-            break;
-          }
-        }
-      });
-
-      const unmapped = headers.filter(h => !mappedHeaders[h]);
-      if (unmapped.length > 0) {
-        console.log('Colunas não mapeadas:', unmapped);
-      }
-      console.log('Mapeamento de colunas:', mappedHeaders);
-
-      if (!Object.values(mappedHeaders).includes('empresa')) {
-        toast.error(`Coluna "Empresa" ou "Nome" não encontrada. Colunas do arquivo: ${headers.join(', ')}`);
-        return;
-      }
-
-      const parsed: ParsedRow[] = json.map(row => {
-        const result: ParsedRow = { empresa: '', tipo: 'construtora' };
-        for (const [original, mapped] of Object.entries(mappedHeaders)) {
-          const val = row[original]?.toString().trim() || '';
-          if (mapped === 'tipo') {
-            result.tipo = TIPO_MAP[val.toLowerCase()] || 'construtora';
-          } else {
-            (result as any)[mapped] = val || undefined;
-          }
-        }
-        return result;
-      }).filter(r => r.empresa);
-
-      if (parsed.length === 0) {
-        toast.error('Nenhum registro válido encontrado');
-        return;
-      }
-
-      setRows(parsed);
-      setStep('preview');
-      toast.success(`${parsed.length} registros encontrados`);
+      const auto = autoDetectMapping(cols);
+      setMapping(auto);
+      setStep('mapping');
+      toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
       toast.error('Erro ao ler o arquivo: ' + (err.message || 'formato inválido'));
     }
@@ -175,7 +154,42 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     if (file) handleFile(file);
   };
 
+  const getMappedRows = () => {
+    return rawData
+      .map(row => {
+        const get = (k: FieldKey) => {
+          const col = mapping[k];
+          if (!col) return '';
+          return (row[col] ?? '').toString().trim();
+        };
+        const empresa = get('empresa');
+        const nome_contato = get('nome_contato');
+        const tipoRaw = get('tipo');
+        return {
+          empresa: empresa || (target === 'contatos' ? (nome_contato ? 'Sem empresa' : '') : ''),
+          razao_social: get('razao_social') || undefined,
+          tipo: TIPO_MAP[tipoRaw.toLowerCase()] || (tipoRaw ? tipoRaw.toLowerCase() : 'construtora'),
+          cnpj: get('cnpj') || undefined,
+          email: get('email') || undefined,
+          telefone: get('telefone') || undefined,
+          endereco: get('endereco') || undefined,
+          nome_contato: nome_contato || undefined,
+          cargo: get('cargo') || undefined,
+        };
+      })
+      .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : r.empresa);
+  };
+
+  const canProceed = Boolean(mapping.empresa) || (target === 'contatos' && Boolean(mapping.nome_contato));
+
+  const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData]);
+
   const handleImport = async () => {
+    const rows = getMappedRows();
+    if (rows.length === 0) {
+      toast.error('Nenhum registro válido após o mapeamento');
+      return;
+    }
     setImporting(true);
     try {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
@@ -185,11 +199,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       for (let i = 0; i < rows.length; i += BATCH) {
         if (target === 'contatos') {
           const batch = rows.slice(i, i + BATCH).map(r => ({
-            empresa: r.nome_contato ? (r.empresa || 'Sem empresa') : 'Sem empresa',
+            empresa: r.empresa || (r.nome_contato ? 'Sem empresa' : 'Sem empresa'),
             nome_contato: r.nome_contato || r.empresa || null,
             email: r.email || null,
             telefone: r.telefone || null,
-            cargo: null as string | null,
+            cargo: r.cargo || null,
             usuario_id: vid,
           }));
           const { error } = await supabase.from('contatos').insert(batch);
@@ -243,6 +257,15 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           </DialogTitle>
         </DialogHeader>
 
+        {/* Step indicators */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+          <Badge variant={step === 'upload' ? 'default' : 'secondary'} className="text-xs">1. Upload</Badge>
+          <ArrowRight className="h-3 w-3" />
+          <Badge variant={step === 'mapping' ? 'default' : 'secondary'} className="text-xs">2. Mapear Colunas</Badge>
+          <ArrowRight className="h-3 w-3" />
+          <Badge variant={step === 'preview' ? 'default' : 'secondary'} className="text-xs">3. Confirmar</Badge>
+        </div>
+
         {step === 'upload' && (
           <div
             className="border-2 border-dashed border-border rounded-xl p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
@@ -252,7 +275,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           >
             <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
             <p className="text-sm font-medium text-foreground mb-1">Arraste o arquivo aqui ou clique para selecionar</p>
-            <p className="text-xs text-muted-foreground">Formatos aceitos: .xlsx, .xls, .csv</p>
+            <p className="text-xs text-muted-foreground mb-3">Formatos aceitos: .xlsx, .xls, .csv</p>
+            <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 max-w-md mx-auto text-left">
+              <p className="font-medium mb-1">Qualquer planilha é aceita!</p>
+              <p>Na próxima etapa, você poderá mapear as colunas da sua planilha para os campos do sistema.</p>
+            </div>
             <input
               ref={fileRef}
               type="file"
@@ -266,6 +293,99 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           </div>
         )}
 
+        {step === 'mapping' && (
+          <div className="flex flex-col gap-4 flex-1 min-h-0">
+            <div className="flex items-center justify-between">
+              <Badge variant="secondary" className="gap-1">
+                <FileSpreadsheet className="h-3 w-3" />
+                {fileName} — {rawData.length} linhas
+              </Badge>
+              <Button variant="ghost" size="sm" onClick={reset}>
+                <X className="h-4 w-4 mr-1" /> Trocar arquivo
+              </Button>
+            </div>
+
+            <div className="text-sm font-medium text-foreground">
+              Mapeie as colunas da sua planilha aos campos do sistema:
+            </div>
+
+            <div className="grid gap-3 max-h-[40vh] overflow-y-auto pr-1">
+              {visibleFields.map(field => (
+                <div key={field.key} className="flex items-center gap-3">
+                  <div className="w-40 text-sm flex items-center gap-1.5 shrink-0">
+                    {field.label}
+                    {field.required && <span className="text-destructive text-xs">*</span>}
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <Select
+                    value={mapping[field.key] || '_none_'}
+                    onValueChange={(v) => setMapping(prev => ({ ...prev, [field.key]: v === '_none_' ? '' : v }))}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Selecionar coluna..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none_">— Não mapear —</SelectItem>
+                      {headers.map(h => (
+                        <SelectItem key={h} value={h}>
+                          {h}
+                          <span className="ml-2 text-muted-foreground text-xs">
+                            (ex: {rawData[0]?.[h]?.toString().slice(0, 30) || '—'})
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex-1 max-h-[180px] border rounded-lg overflow-auto mt-2">
+              <Table className="min-w-[400px]">
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">#</TableHead>
+                    {headers.slice(0, 6).map(h => (
+                      <TableHead key={h} className="text-xs sticky top-0 bg-muted/50 whitespace-nowrap">{h}</TableHead>
+                    ))}
+                    {headers.length > 6 && <TableHead className="text-xs sticky top-0 bg-muted/50">...</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rawData.slice(0, 5).map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
+                      {headers.slice(0, 6).map(h => (
+                        <TableCell key={h} className="text-xs whitespace-nowrap max-w-[150px] truncate">
+                          {row[h]?.toString() || '—'}
+                        </TableCell>
+                      ))}
+                      {headers.length > 6 && <TableCell className="text-xs text-muted-foreground">…</TableCell>}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={reset}>Cancelar</Button>
+              <Button
+                disabled={!canProceed}
+                onClick={() => {
+                  const mapped = getMappedRows();
+                  if (mapped.length === 0) {
+                    toast.error('Nenhum registro válido com o mapeamento atual');
+                    return;
+                  }
+                  setStep('preview');
+                }}
+              >
+                Próximo — Pré-visualizar <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {step === 'preview' && (
           <div className="flex flex-col gap-4 flex-1 min-h-0">
             <div className="flex items-center justify-between">
@@ -274,16 +394,16 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                   <FileSpreadsheet className="h-3 w-3" />
                   {fileName}
                 </Badge>
-                <Badge variant="outline">{rows.length} registros</Badge>
+                <Badge variant="outline">{previewRows.length} registros</Badge>
               </div>
-              <Button variant="ghost" size="sm" onClick={reset}>
-                <X className="h-4 w-4 mr-1" /> Trocar arquivo
+              <Button variant="ghost" size="sm" onClick={() => setStep('mapping')}>
+                <X className="h-4 w-4 mr-1" /> Voltar ao mapeamento
               </Button>
             </div>
 
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
-              Verifique os dados antes de importar. Colunas reconhecidas automaticamente.
+              Verifique os dados antes de importar.
             </div>
 
             <div className="flex-1 max-h-[400px] border rounded-lg overflow-auto">
@@ -292,41 +412,45 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                   <TableRow className="bg-muted/50">
                     <TableHead className="text-xs sticky top-0 bg-muted/50">#</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Empresa</TableHead>
-                    <TableHead className="text-xs sticky top-0 bg-muted/50">Tipo</TableHead>
+                    {target === 'contatos' && <TableHead className="text-xs sticky top-0 bg-muted/50">Contato</TableHead>}
+                    {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Tipo</TableHead>}
                     <TableHead className="text-xs sticky top-0 bg-muted/50">CNPJ</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Email</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Telefone</TableHead>
-                    <TableHead className="text-xs sticky top-0 bg-muted/50">Endereço</TableHead>
+                    {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Endereço</TableHead>}
+                    {target === 'contatos' && <TableHead className="text-xs sticky top-0 bg-muted/50">Cargo</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.slice(0, 50).map((r, i) => (
+                  {previewRows.slice(0, 50).map((r, i) => (
                     <TableRow key={i}>
                       <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="text-xs font-medium whitespace-nowrap">{r.empresa}</TableCell>
-                      <TableCell className="text-xs whitespace-nowrap">{r.tipo}</TableCell>
+                      {target === 'contatos' && <TableCell className="text-xs whitespace-nowrap">{r.nome_contato || '-'}</TableCell>}
+                      {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap">{r.tipo}</TableCell>}
                       <TableCell className="text-xs whitespace-nowrap">{r.cnpj || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{r.email || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{r.telefone || '-'}</TableCell>
-                      <TableCell className="text-xs whitespace-nowrap max-w-[200px] truncate">{r.endereco || '-'}</TableCell>
+                      {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap max-w-[200px] truncate">{r.endereco || '-'}</TableCell>}
+                      {target === 'contatos' && <TableCell className="text-xs whitespace-nowrap">{r.cargo || '-'}</TableCell>}
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              {rows.length > 50 && (
+              {previewRows.length > 50 && (
                 <p className="text-xs text-muted-foreground text-center py-2">
-                  Mostrando 50 de {rows.length} registros
+                  Mostrando 50 de {previewRows.length} registros
                 </p>
               )}
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={reset}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setStep('mapping')}>Voltar</Button>
               <Button onClick={handleImport} disabled={importing}>
                 {importing ? (
                   <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importando...</>
                 ) : (
-                  <><CheckCircle2 className="h-4 w-4 mr-1" /> Importar {rows.length} {target === 'contatos' ? 'contatos' : 'empresas'}</>
+                  <><CheckCircle2 className="h-4 w-4 mr-1" /> Importar {previewRows.length} {target === 'contatos' ? 'contatos' : 'empresas'}</>
                 )}
               </Button>
             </div>
