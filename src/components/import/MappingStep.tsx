@@ -352,7 +352,76 @@ export function MappingStep({
 
         {/* Mapping list */}
         <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border bg-card">
-          {filteredHeaders.length === 0 ? (
+          {/* Custom columns section (criadas do zero) */}
+          {customCount > 0 && (
+            <div className="border-b bg-accent/5">
+              <div className="px-4 py-2 flex items-center gap-2 bg-accent/15 border-b border-accent/20">
+                <Wand2 className="h-3.5 w-3.5 text-accent-foreground" />
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-accent-foreground">
+                  Colunas criadas do zero ({customCount})
+                </span>
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  Valor aplicado a todas as {rawData.length} linhas
+                </span>
+              </div>
+              <ul className="divide-y divide-accent/15">
+                {customNames.map((name) => (
+                  <li key={name} className="px-4 py-3 hover:bg-accent/10 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="h-9 w-9 rounded-lg bg-accent text-accent-foreground border border-accent flex items-center justify-center shrink-0 mt-0.5">
+                        <Wand2 className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={name}
+                            onChange={(e) => renameCustomColumn(name, e.target.value)}
+                            onFocus={() => setEditingExtra(name)}
+                            onBlur={() => setEditingExtra(null)}
+                            placeholder="Nome da nova coluna"
+                            className={cn(
+                              'h-8 text-sm font-semibold flex-1',
+                              editingExtra === name && 'ring-1 ring-accent border-accent'
+                            )}
+                          />
+                          <Badge className="h-5 text-[10px] gap-1 bg-accent text-accent-foreground border-accent hover:bg-accent shrink-0">
+                            <Wand2 className="h-2.5 w-2.5" />
+                            Do zero
+                          </Badge>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          Salvo em <span className="font-mono text-foreground/80">campos_extras.{name}</span>
+                        </div>
+                      </div>
+                      <div className="w-[220px] shrink-0">
+                        <Input
+                          value={customColumns[name] ?? ''}
+                          onChange={(e) => updateCustomValue(name, e.target.value)}
+                          placeholder="Valor padrão (opcional)"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeCustomColumn(name)}
+                            className="h-9 w-9 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Remover coluna</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {filteredHeaders.length === 0 && customCount === 0 ? (
             <div className="px-4 py-12 text-center">
               <Search className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
