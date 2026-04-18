@@ -116,7 +116,11 @@ export function useDeletePreco() {
       const { error } = await supabase.from('tabela_precos').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tabela_precos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tabela_precos'] });
+      qc.invalidateQueries({ queryKey: ['catalogo_global'] });
+      qc.invalidateQueries({ queryKey: ['catalogo_categorias'] });
+    },
   });
 }
 
