@@ -381,14 +381,19 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             rawData={rawData}
             headers={headers}
             mapping={mapping}
-            setMapping={setMapping}
+            setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
+            extras={extras}
+            setExtras={setExtras}
             visibleFields={visibleFields}
             onReset={reset}
-            onAutoDetect={() => setMapping(autoDetectMapping(headers))}
-            onClearAll={() => setMapping({
-              empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
-              telefone: '', endereco: '', nome_contato: '', cargo: '',
-            })}
+            onAutoDetect={() => { setMapping(autoDetectMapping(headers)); setExtras({}); }}
+            onClearAll={() => {
+              setMapping({
+                empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
+                telefone: '', endereco: '', nome_contato: '', cargo: '',
+              });
+              setExtras({});
+            }}
             canProceed={canProceed}
             onNext={() => {
               const mapped = getMappedRows();
