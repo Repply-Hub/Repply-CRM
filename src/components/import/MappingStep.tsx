@@ -197,7 +197,7 @@ export function MappingStep({
   const requiredMissing = visibleFields.filter(f => f.required && !mapping[f.key]);
 
   const filteredHeaders = useMemo(() => {
-    let list = headers;
+    let list = orderedHeaders;
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(h => h.toLowerCase().includes(q));
@@ -208,12 +208,12 @@ export function MappingStep({
         if (filter === 'mapeadas') return s === 'mapeada';
         if (filter === 'novas') return s === 'nova';
         if (filter === 'ignoradas') return s === 'ignorada';
-        if (filter === 'pendentes') return s === 'ignorada'; // não decidida
+        if (filter === 'pendentes') return s === 'ignorada';
         return true;
       });
     }
     return list;
-  }, [headers, search, filter, columnToField, extras]);
+  }, [orderedHeaders, search, filter, columnToField, extras]);
 
   // Bulk actions for current filter selection
   const bulkSetAllExtras = () => {
