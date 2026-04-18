@@ -390,132 +390,33 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
 
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("data-[state=open]:bg-accent data-[state=open]:text-accent-foreground", hasPipelineFilters && 'border-primary')}>
-                  <Filter className="h-3.5 w-3.5 mr-1.5" />
-                  Filtros
-                  {hasPipelineFilters && (
-                    <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{activeFilterCount}</Badge>
-                  )}
-                  <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto min-w-[820px] max-w-[980px] p-4" align="start">
-                <div className="flex gap-0 divide-x divide-border">
-                  <div className="flex-1 min-w-[140px] pr-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Etapa</p>
-                    <div className="space-y-1">
-                      <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                        <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
-                        Todas as etapas
-                      </label>
-                      {KANBAN_STAGES.map(s => (
-                        <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                          <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
-                          {s.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-[130px] px-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
-                    <div className="space-y-1 max-h-60 overflow-y-auto">
-                      {(vendedores ?? []).map(v => (
-                        <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                          <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
-                          {v.nome}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-[130px] px-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fabricante</p>
-                    <ScrollArea className="h-60">
-                      <div className="space-y-1 pr-3">
-                        {(fabricantes ?? []).map(f => (
-                          <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                            <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
-                            {f.nome}
-                          </label>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                  <div className="min-w-[140px] px-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Período</p>
-                    <div className="space-y-2">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className={cn("w-full justify-start text-left text-xs h-8", !dateFrom && "text-muted-foreground")}>
-                            <CalendarIcon className="h-3 w-3 mr-1.5" />
-                            {dateFrom ? format(dateFrom, 'dd/MM/yy', { locale: ptBR }) : 'De'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
-                        </PopoverContent>
-                      </Popover>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className={cn("w-full justify-start text-left text-xs h-8", !dateTo && "text-muted-foreground")}>
-                            <CalendarIcon className="h-3 w-3 mr-1.5" />
-                            {dateTo ? format(dateTo, 'dd/MM/yy', { locale: ptBR }) : 'Até'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-                  <div className="flex flex-col justify-between min-w-[120px] pl-4">
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
-                      <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                        <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
-                        <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                        Atenção
-                      </label>
-                    </div>
-                    {hasPipelineFilters && (
-                      <Button variant="ghost" size="sm" onClick={clearPipelineFilters} className="w-full text-muted-foreground mt-2">
-                        <X className="h-3.5 w-3.5 mr-1" /> Limpar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            {hasPipelineFilters && (
-              <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground">
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            )}
-
-            {/* Em Pipeline + Kanban, mantemos o botão externo de PDF (não há dropdown "Opções" no Kanban). */}
+            {/* Em Kanban, Filtros e Exportar PDF ficam na topbar (não há linha de busca). */}
             {showKanban && (
-              <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
-                await generatePedidosPdf(
-                  pipelineOrders.map(o => ({
-                    cliente: o.clientName,
-                    obra: o.obra,
-                    fabricante: o.fabricante,
-                    vendedor: o.vendedor,
-                    valor: o.valor,
-                    etapa: stageLabel(o.stage),
-                    data: o.createdAt,
-                  })),
-                  hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
-                );
-              }}>
-                <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
-              </Button>
+              <>
+                {filtrosPopover}
+                {hasPipelineFilters && (
+                  <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={async () => {
+                  await generatePedidosPdf(
+                    pipelineOrders.map(o => ({
+                      cliente: o.clientName,
+                      obra: o.obra,
+                      fabricante: o.fabricante,
+                      vendedor: o.vendedor,
+                      valor: o.valor,
+                      etapa: stageLabel(o.stage),
+                      data: o.createdAt,
+                    })),
+                    hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
+                  );
+                }}>
+                  <FileDown className="h-4 w-4 mr-1" /> Exportar PDF
+                </Button>
+              </>
             )}
-
-
-
           </div>
 
           <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate('/pedidos/novo')}>
