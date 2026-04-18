@@ -73,7 +73,7 @@ export function AppSidebar() {
       enterTimer.current = setTimeout(() => {
         hoverOpened.current = true;
         setOpen(true);
-      }, 300);
+      }, 80);
     }
   }, [collapsed, setOpen, editMode]);
 
@@ -84,7 +84,7 @@ export function AppSidebar() {
       leaveTimer.current = setTimeout(() => {
         hoverOpened.current = false;
         setOpen(false);
-      }, 400);
+      }, 150);
     }
   }, [setOpen, editMode]);
 
