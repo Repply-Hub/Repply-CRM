@@ -178,7 +178,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-primary" />
@@ -241,7 +241,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         )}
 
         {step === 'preview' && (
-          <div className="flex flex-col gap-4 flex-1 min-h-0">
+          <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary" className="gap-1">
@@ -268,7 +268,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               )}
             </div>
 
-            <div className="flex-1 max-h-[400px] border rounded-lg overflow-auto">
+            <div className="border rounded-lg overflow-x-auto">
               <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow className="bg-muted/50">

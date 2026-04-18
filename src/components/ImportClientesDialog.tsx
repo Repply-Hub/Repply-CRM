@@ -282,7 +282,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-primary" />
@@ -360,7 +360,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
 
         {step === 'preview' && (
-          <div className="flex flex-col gap-4 flex-1 min-h-0">
+          <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary" className="gap-1">
@@ -389,7 +389,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               )}
             </div>
 
-            <div className="flex-1 max-h-[400px] border rounded-lg overflow-auto">
+            <div className="border rounded-lg overflow-x-auto">
               <Table className="min-w-[700px]">
                 <TableHeader>
                   <TableRow className="bg-muted/50">
