@@ -336,7 +336,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             </div>
 
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
+              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
               Verifique os dados antes de importar.
             </div>
 
