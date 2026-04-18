@@ -464,6 +464,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
           {/* Coluna direita: ações */}
           <div className="p-2 min-w-[180px]">
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ações</div>
             <button
               type="button"
               onClick={() => setColunasDialogOpen(true)}
