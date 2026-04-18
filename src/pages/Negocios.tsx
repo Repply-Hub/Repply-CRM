@@ -426,6 +426,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               Resetar todas
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setColunasDialogOpen(true); }}>
+              <Columns3 className="h-4 w-4 mr-2" /> Gerenciar colunas...
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
           </>
         ) : (
           <>
