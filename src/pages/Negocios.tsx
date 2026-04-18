@@ -402,7 +402,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             {KANBAN_STAGES.map((stage) => (
               <div
                 key={stage.key}
-                className="flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50"
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50"
                 onClick={(e) => e.preventDefault()}
               >
                 <Checkbox
@@ -410,8 +410,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   checked={visibleKanbanStages.includes(stage.key)}
                   onCheckedChange={() => toggleKanbanStage(stage.key)}
                   disabled={visibleKanbanStages.length === 1 && visibleKanbanStages.includes(stage.key)}
+                  className="hidden"
                 />
-                <Label htmlFor={`kanban-stage-${stage.key}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
+                <Label
+                  htmlFor={`kanban-stage-${stage.key}`}
+                  className={cn(
+                    'flex items-center gap-2 text-xs font-normal flex-1 cursor-pointer select-none transition-opacity',
+                    !visibleKanbanStages.includes(stage.key) && 'opacity-40'
+                  )}
+                >
+                  <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', `bg-${stage.color}`)} />
                   {stage.label}
                 </Label>
               </div>
@@ -421,7 +429,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 e.preventDefault();
                 handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key));
               }}
-              className="text-xs text-primary justify-center"
+              className="text-xs text-primary justify-center font-medium"
             >
               Resetar todas
             </DropdownMenuItem>
