@@ -112,26 +112,37 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   fabricanteId: string;
-  editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean };
+  editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean; categoria?: string | null; imagem_url?: string | null };
 }) {
   const createPreco = useCreatePreco();
   const updatePreco = useUpdatePreco();
+  const { data: categorias } = useCategorias();
   const [desc, setDesc] = useState(editData?.descricao_material ?? '');
   const [ref, setRef] = useState(editData?.referencia ?? '');
   const [preco, setPreco] = useState(editData?.preco_unitario?.toString() ?? '');
   const [unidade, setUnidade] = useState(editData?.unidade ?? 'un');
   const [vigente, setVigente] = useState(editData?.vigente ?? true);
+  const [categoria, setCategoria] = useState(editData?.categoria ?? '');
+  const [imagemUrl, setImagemUrl] = useState<string | null>(editData?.imagem_url ?? null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { descricao_material: desc, referencia: ref || undefined, preco_unitario: parseFloat(preco), unidade, vigente };
+    const payload = {
+      descricao_material: desc,
+      referencia: ref || undefined,
+      preco_unitario: parseFloat(preco),
+      unidade,
+      vigente,
+      categoria: categoria.trim() || null,
+      imagem_url: imagemUrl,
+    };
     try {
       if (editData) {
         await updatePreco.mutateAsync({ id: editData.id, ...payload });
-        toast.success('Preço atualizado!');
+        toast.success('Produto atualizado!');
       } else {
         await createPreco.mutateAsync({ fabricante_id: fabricanteId, ...payload });
-        toast.success('Preço cadastrado!');
+        toast.success('Produto cadastrado!');
       }
       onOpenChange(false);
     } catch (err: any) { toast.error(err.message); }
@@ -141,11 +152,29 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>{editData ? 'Editar' : 'Novo'} Item de Preço</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>{editData ? 'Editar' : 'Novo'} Produto</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <div>
+            <Label className="mb-2 block">Imagem</Label>
+            <ProductImageUpload value={imagemUrl} onChange={setImagemUrl} fabricanteId={fabricanteId} />
+          </div>
           <div><Label>Descrição do Material</Label><Input value={desc} onChange={e => setDesc(e.target.value)} required /></div>
-          <div><Label>Referência</Label><Input value={ref} onChange={e => setRef(e.target.value)} placeholder="Código de referência" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label>Referência</Label><Input value={ref} onChange={e => setRef(e.target.value)} placeholder="Código" /></div>
+            <div>
+              <Label>Categoria</Label>
+              <Input
+                value={categoria}
+                onChange={e => setCategoria(e.target.value)}
+                list="categorias-list"
+                placeholder="Ex: Pisos, Louças"
+              />
+              <datalist id="categorias-list">
+                {(categorias ?? []).map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Preço Unitário (R$)</Label><Input type="number" step="0.01" value={preco} onChange={e => setPreco(e.target.value)} required /></div>
             <div>
@@ -165,7 +194,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="vigente" checked={vigente} onChange={e => setVigente(e.target.checked)} className="rounded border-input" />
-            <Label htmlFor="vigente">Preço vigente</Label>
+            <Label htmlFor="vigente">Produto vigente (disponível)</Label>
           </div>
           <Button type="submit" className="w-full" disabled={isPending}>{isPending ? 'Salvando...' : 'Salvar'}</Button>
         </form>
