@@ -211,6 +211,27 @@ export function MappingStep({
   const extrasCount = Object.keys(extras).length;
   const ignoredCount = headers.length - mappedCount - extrasCount;
   const requiredMissing = visibleFields.filter(f => f.required && !mapping[f.key]);
+  const unmappedFields = useMemo(
+    () => visibleFields.filter(f => !mapping[f.key]),
+    [visibleFields, mapping]
+  );
+
+  const assignFieldToColumn = (fieldKey: string, column: string) => {
+    if (!column) return;
+    setExtras(prev => {
+      if (!(column in prev)) return prev;
+      const next = { ...prev };
+      delete next[column];
+      return next;
+    });
+    setMapping(prev => {
+      const next = { ...prev };
+      // Limpa qualquer outro field que apontava p/ essa coluna
+      Object.keys(next).forEach(k => { if (next[k] === column) next[k] = ''; });
+      next[fieldKey] = column;
+      return next;
+    });
+  };
 
   const filteredHeaders = useMemo(() => {
     let list = orderedHeaders;
