@@ -371,93 +371,79 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <span className="hidden sm:inline">Opções</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={4} className="w-48">
+      <DropdownMenuContent align="end" sideOffset={4} className="w-56">
         {showKanban ? (
           <>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Columns3 className="h-4 w-4 mr-2" /> Colunas do Kanban
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-56">
-                {KANBAN_STAGES.map((stage) => (
-                  <div
-                    key={stage.key}
-                    className="flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50"
-                    onClick={(e) => e.preventDefault()}
-                  >
-                    <Checkbox
-                      id={`kanban-stage-${stage.key}`}
-                      checked={visibleKanbanStages.includes(stage.key)}
-                      onCheckedChange={() => toggleKanbanStage(stage.key)}
-                      disabled={visibleKanbanStages.length === 1 && visibleKanbanStages.includes(stage.key)}
-                    />
-                    <Label htmlFor={`kanban-stage-${stage.key}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
-                      {stage.label}
-                    </Label>
-                  </div>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key));
-                  }}
-                  className="text-xs text-primary justify-center"
-                >
-                  Resetar todas
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Colunas do Kanban</div>
+            {KANBAN_STAGES.map((stage) => (
+              <div
+                key={stage.key}
+                className="flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50"
+                onClick={(e) => e.preventDefault()}
+              >
+                <Checkbox
+                  id={`kanban-stage-${stage.key}`}
+                  checked={visibleKanbanStages.includes(stage.key)}
+                  onCheckedChange={() => toggleKanbanStage(stage.key)}
+                  disabled={visibleKanbanStages.length === 1 && visibleKanbanStages.includes(stage.key)}
+                />
+                <Label htmlFor={`kanban-stage-${stage.key}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
+                  {stage.label}
+                </Label>
+              </div>
+            ))}
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key));
+              }}
+              className="text-xs text-primary justify-center"
+            >
+              Resetar todas
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         ) : (
           <>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Columns3 className="h-4 w-4 mr-2" /> Colunas
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-56">
-                {PEDIDOS_COLUMNS.map((column) => (
-                  <div
-                    key={column.id}
-                    className={`flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50 ${column.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    onClick={(e) => e.preventDefault()}
-                  >
-                    <Checkbox
-                      id={`col-menu-ped-${column.id}`}
-                      checked={visibleColumns.includes(column.id)}
-                      onCheckedChange={() => {
-                        if (column.locked) return;
-                        if (visibleColumns.includes(column.id)) {
-                          if (visibleColumns.length > 1) {
-                            handleColumnChange(visibleColumns.filter(id => id !== column.id));
-                          }
-                        } else {
-                          const newVisible = PEDIDOS_COLUMNS
-                            .filter(c => visibleColumns.includes(c.id) || c.id === column.id)
-                            .map(c => c.id);
-                          handleColumnChange(newVisible);
-                        }
-                      }}
-                      disabled={column.locked}
-                    />
-                    <Label htmlFor={`col-menu-ped-${column.id}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
-                      {column.label}
-                    </Label>
-                  </div>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    handleColumnChange(PEDIDOS_COLUMNS.map(c => c.id));
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Colunas</div>
+            {PEDIDOS_COLUMNS.map((column) => (
+              <div
+                key={column.id}
+                className={`flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50 ${column.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                onClick={(e) => e.preventDefault()}
+              >
+                <Checkbox
+                  id={`col-menu-ped-${column.id}`}
+                  checked={visibleColumns.includes(column.id)}
+                  onCheckedChange={() => {
+                    if (column.locked) return;
+                    if (visibleColumns.includes(column.id)) {
+                      if (visibleColumns.length > 1) {
+                        handleColumnChange(visibleColumns.filter(id => id !== column.id));
+                      }
+                    } else {
+                      const newVisible = PEDIDOS_COLUMNS
+                        .filter(c => visibleColumns.includes(c.id) || c.id === column.id)
+                        .map(c => c.id);
+                      handleColumnChange(newVisible);
+                    }
                   }}
-                  className="text-xs text-primary justify-center"
-                >
-                  Resetar todas
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+                  disabled={column.locked}
+                />
+                <Label htmlFor={`col-menu-ped-${column.id}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
+                  {column.label}
+                </Label>
+              </div>
+            ))}
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                handleColumnChange(PEDIDOS_COLUMNS.map(c => c.id));
+              }}
+              className="text-xs text-primary justify-center"
+            >
+              Resetar todas
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         )}
