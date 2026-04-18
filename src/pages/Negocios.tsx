@@ -374,40 +374,33 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       <DropdownMenuContent align="end" sideOffset={4} className="w-48">
         {showKanban ? (
           <>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Columns3 className="h-4 w-4 mr-2" /> Colunas do Kanban
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-56">
-                {KANBAN_STAGES.map((stage) => (
-                  <div
-                    key={stage.key}
-                    className="flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50"
-                    onClick={(e) => e.preventDefault()}
-                  >
-                    <Checkbox
-                      id={`kanban-stage-${stage.key}`}
-                      checked={visibleKanbanStages.includes(stage.key)}
-                      onCheckedChange={() => toggleKanbanStage(stage.key)}
-                      disabled={visibleKanbanStages.length === 1 && visibleKanbanStages.includes(stage.key)}
-                    />
-                    <Label htmlFor={`kanban-stage-${stage.key}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
-                      {stage.label}
-                    </Label>
-                  </div>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key));
-                  }}
-                  className="text-xs text-primary justify-center"
-                >
-                  Resetar todas
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Colunas do Kanban</div>
+            {KANBAN_STAGES.map((stage) => (
+              <div
+                key={stage.key}
+                className="flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50"
+                onClick={(e) => e.preventDefault()}
+              >
+                <Checkbox
+                  id={`kanban-stage-${stage.key}`}
+                  checked={visibleKanbanStages.includes(stage.key)}
+                  onCheckedChange={() => toggleKanbanStage(stage.key)}
+                  disabled={visibleKanbanStages.length === 1 && visibleKanbanStages.includes(stage.key)}
+                />
+                <Label htmlFor={`kanban-stage-${stage.key}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
+                  {stage.label}
+                </Label>
+              </div>
+            ))}
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key));
+              }}
+              className="text-xs text-primary justify-center"
+            >
+              Resetar todas
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         ) : (
