@@ -611,6 +611,14 @@ const Fabricantes = () => {
 
       <FabricanteForm open={fabDialog} onOpenChange={setFabDialog} editData={editFab} />
       {selectedFabId && <PrecoForm open={precoDialog} onOpenChange={setPrecoDialog} fabricanteId={selectedFabId} editData={editPreco} />}
+      {selectedFabId && (
+        <ImportCatalogoDialog
+          open={importDialog}
+          onOpenChange={setImportDialog}
+          fabricanteId={selectedFabId}
+          fabricanteNome={selectedFab?.nome}
+        />
+      )}
 
       <AlertDialog open={!!deleteAlert} onOpenChange={(o) => !o && setDeleteAlert(null)}>
         <AlertDialogContent>
