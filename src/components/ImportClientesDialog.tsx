@@ -359,6 +359,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               setRawData(rows);
               setHeaders(hdrs);
               setFileName('Entrada manual');
+              setExtras({});
               // Pre-map: each header equals a field label, so map by label match
               const auto: Record<FieldKey, string> = {
                 empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
