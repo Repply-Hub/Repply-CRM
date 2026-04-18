@@ -56,6 +56,7 @@ export default function Tarefas() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
 
   const [form, setForm] = useState({
     titulo: '', descricao: '', status: 'pendente', prazo_final: '',
@@ -143,6 +144,8 @@ export default function Tarefas() {
         currentPageIds.forEach(id => next.delete(id));
         return next;
       });
+    } else if (filtered.length > currentPageIds.length) {
+      setSelectAllDialogOpen(true);
     } else {
       setSelected(prev => {
         const next = new Set(prev);
@@ -150,6 +153,20 @@ export default function Tarefas() {
         return next;
       });
     }
+  };
+
+  const selectPageOnly = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      currentPageIds.forEach(id => next.add(id));
+      return next;
+    });
+    setSelectAllDialogOpen(false);
+  };
+
+  const selectAllFiltered = () => {
+    setSelected(new Set(filtered.map(t => t.id)));
+    setSelectAllDialogOpen(false);
   };
 
   const handleBulkDelete = async () => {
