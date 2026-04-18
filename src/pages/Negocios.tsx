@@ -702,10 +702,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
 
-            {/* Em Kanban, Filtros ficam na topbar à esquerda (não há linha de busca). */}
+            {/* Em Kanban, Filtros e Opções ficam na topbar à esquerda (não há linha de busca). */}
             {showKanban && (
               <>
                 {filtrosPopover}
+                {opcoesDropdown}
                 {hasPipelineFilters && (
                   <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground">
                     <X className="h-3.5 w-3.5" />
@@ -716,7 +717,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           </div>
 
           <div className="flex items-center gap-2 sm:justify-end">
-            {showKanban && opcoesDropdown}
             <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate('/pedidos/novo')}>
               <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
             </Button>
