@@ -65,9 +65,13 @@ export function AppSidebar() {
   const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverOpened = useRef(false);
+  // When the user explicitly clicks the collapse/expand button we "pin" the
+  // chosen state and ignore hover events until the cursor leaves the sidebar.
+  const userPinned = useRef(false);
 
   const handleMouseEnter = useCallback(() => {
     if (editMode) return;
+    if (userPinned.current) return; // respect explicit user choice
     if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null; }
     if (collapsed) {
       enterTimer.current = setTimeout(() => {
@@ -80,6 +84,9 @@ export function AppSidebar() {
   const handleMouseLeave = useCallback(() => {
     if (editMode) return;
     if (enterTimer.current) { clearTimeout(enterTimer.current); enterTimer.current = null; }
+    // Once the cursor leaves the sidebar, release the pin so hover works
+    // normally on the next interaction.
+    userPinned.current = false;
     if (hoverOpened.current) {
       leaveTimer.current = setTimeout(() => {
         hoverOpened.current = false;
@@ -90,8 +97,10 @@ export function AppSidebar() {
 
   const toggleCollapsed = useCallback(() => {
     // Botão único que alterna o estado fixado da sidebar.
-    // Limpa o flag de hover para que o estado escolhido não seja revertido por handleMouseLeave.
+    // Pin the state so hover doesn't revert the user's choice while the
+    // cursor is still hovering the sidebar.
     hoverOpened.current = false;
+    userPinned.current = true;
     if (enterTimer.current) { clearTimeout(enterTimer.current); enterTimer.current = null; }
     if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null; }
     setOpen(collapsed);
