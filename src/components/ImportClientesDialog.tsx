@@ -147,6 +147,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
       const auto = autoDetectMapping(cols);
       setMapping(auto);
+      setExtras({});
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
