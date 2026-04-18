@@ -280,8 +280,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
         {/* Step indicators */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-          <Badge variant={step === 'upload' || step === 'manual' ? 'default' : 'secondary'} className="text-xs">
-            1. {step === 'manual' ? 'Entrada manual' : 'Origem'}
+          <Badge variant={step === 'upload' ? 'default' : 'secondary'} className="text-xs">
+            1. Origem
           </Badge>
           <ArrowRight className="h-3 w-3" />
           <Badge variant={step === 'mapping' ? 'default' : 'secondary'} className="text-xs">2. Mapear Colunas</Badge>
