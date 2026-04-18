@@ -88,16 +88,19 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   const canProceedToPreview = Boolean(mapping.cliente && mapping.fabricante);
 
-  const getMappedRows = () => getImportedPedidosRows(rawData, mapping, extras);
+  const getMappedRows = () => getImportedPedidosRows(rawData, mapping, extras, customColumns);
 
   const previewRows = useMemo(
     () => (step === 'preview' ? getMappedRows() : []),
-    [step, mapping, rawData, extras]
+    [step, mapping, rawData, extras, customColumns]
   );
 
   const extraFieldNames = useMemo(
-    () => Array.from(new Set(Object.entries(extras).map(([col, name]) => (name || col).trim()).filter(Boolean))),
-    [extras]
+    () => Array.from(new Set([
+      ...Object.entries(extras).map(([col, name]) => (name || col).trim()),
+      ...Object.keys(customColumns).map(n => n.trim()),
+    ].filter(Boolean))),
+    [extras, customColumns]
   );
 
   const handleImport = async () => {
