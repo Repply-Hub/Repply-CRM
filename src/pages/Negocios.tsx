@@ -124,6 +124,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('pedidos_columns');
@@ -281,6 +282,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         currentPageIds.forEach(id => next.delete(id));
         return next;
       });
+    } else if (filtered.length > currentPageIds.length) {
+      setSelectAllDialogOpen(true);
     } else {
       setSelected(prev => {
         const next = new Set(prev);
@@ -288,6 +291,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         return next;
       });
     }
+  };
+
+  const selectPageOnly = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      currentPageIds.forEach(id => next.add(id));
+      return next;
+    });
+    setSelectAllDialogOpen(false);
+  };
+
+  const selectAllFiltered = () => {
+    setSelected(new Set(filtered.map(p => p.id)));
+    setSelectAllDialogOpen(false);
   };
 
   const handleBulkDelete = async () => {
@@ -743,6 +760,23 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <AlertDialogAction onClick={handleBulkDelete} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir'}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog: selecionar página atual ou todos os filtrados */}
+      <AlertDialog open={selectAllDialogOpen} onOpenChange={setSelectAllDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Selecionar negócios</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja selecionar apenas os {currentPageIds.length} negócio(s) desta página ou todos os {filtered.length} negócio(s) filtrados?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" onClick={selectPageOnly}>Apenas esta página ({currentPageIds.length})</Button>
+            <Button variant="default" onClick={selectAllFiltered}>Todos ({filtered.length})</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

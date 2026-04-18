@@ -56,6 +56,7 @@ export default function Tarefas() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
 
   const [form, setForm] = useState({
     titulo: '', descricao: '', status: 'pendente', prazo_final: '',
@@ -143,6 +144,8 @@ export default function Tarefas() {
         currentPageIds.forEach(id => next.delete(id));
         return next;
       });
+    } else if (filtered.length > currentPageIds.length) {
+      setSelectAllDialogOpen(true);
     } else {
       setSelected(prev => {
         const next = new Set(prev);
@@ -150,6 +153,20 @@ export default function Tarefas() {
         return next;
       });
     }
+  };
+
+  const selectPageOnly = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      currentPageIds.forEach(id => next.add(id));
+      return next;
+    });
+    setSelectAllDialogOpen(false);
+  };
+
+  const selectAllFiltered = () => {
+    setSelected(new Set(filtered.map(t => t.id)));
+    setSelectAllDialogOpen(false);
   };
 
   const handleBulkDelete = async () => {
@@ -465,6 +482,23 @@ export default function Tarefas() {
             <AlertDialogAction onClick={handleBulkDelete} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir'}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog: selecionar página atual ou todos os filtrados */}
+      <AlertDialog open={selectAllDialogOpen} onOpenChange={setSelectAllDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Selecionar tarefas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja selecionar apenas as {currentPageIds.length} tarefa(s) desta página ou todas as {filtered.length} tarefa(s) filtradas?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" onClick={selectPageOnly}>Apenas esta página ({currentPageIds.length})</Button>
+            <Button variant="default" onClick={selectAllFiltered}>Todas ({filtered.length})</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
