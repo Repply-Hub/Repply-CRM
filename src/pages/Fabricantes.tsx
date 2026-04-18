@@ -469,23 +469,33 @@ const Fabricantes = () => {
                 {/* Price Table */}
                 <Card className="rounded-xl border-border/60">
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div>
                         <CardTitle className="text-base font-bold flex items-center gap-2">
-                          <Package className="h-4 w-4 text-primary" /> Tabela de Preços
+                          <Package className="h-4 w-4 text-primary" /> Catálogo de Produtos
                         </CardTitle>
                         <CardDescription className="text-xs mt-0.5">
-                          {precos?.length ?? 0} ite{(precos?.length ?? 0) !== 1 ? 'ns' : 'm'} cadastrado{(precos?.length ?? 0) !== 1 ? 's' : ''}
+                          {precos?.length ?? 0} produto{(precos?.length ?? 0) !== 1 ? 's' : ''} cadastrado{(precos?.length ?? 0) !== 1 ? 's' : ''}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2">
-                        <ColumnSettings
-                          columns={PRECOS_COLUMNS}
-                          visibleColumns={visibleColumns}
-                          onChange={handleColumnChange}
-                        />
+                      <div className="flex gap-2 flex-wrap">
+                        {categoriasPreco.length > 0 && (
+                          <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                            <SelectTrigger className="h-8 text-xs w-40">
+                              <SelectValue placeholder="Categoria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="todas">Todas categorias</SelectItem>
+                              {categoriasPreco.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        <ColumnSettings columns={PRECOS_COLUMNS} visibleColumns={visibleColumns} onChange={handleColumnChange} />
+                        <Button size="sm" variant="outline" onClick={() => setImportDialog(true)} className="gap-1.5 h-8">
+                          <Upload className="h-3.5 w-3.5" /> Importar
+                        </Button>
                         <Button size="sm" onClick={() => { setEditPreco(null); setPrecoDialog(true); }} className="gap-1.5 h-8">
-                          <Plus className="h-3.5 w-3.5" /> Novo Item
+                          <Plus className="h-3.5 w-3.5" /> Novo Produto
                         </Button>
                       </div>
                     </div>
@@ -495,12 +505,14 @@ const Fabricantes = () => {
                       <div className="flex justify-center py-12">
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                       </div>
-                    ) : precos && precos.length > 0 ? (
+                    ) : precosFiltrados.length > 0 ? (
                       <div className="rounded-lg border border-border/50 overflow-hidden">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30 hover:bg-muted/30">
+                              {visibleColumns.includes('imagem') && <TableHead className="text-xs font-semibold w-16">Foto</TableHead>}
                               {visibleColumns.includes('descricao') && <TableHead className="text-xs font-semibold">Descrição</TableHead>}
+                              {visibleColumns.includes('categoria') && <TableHead className="text-xs font-semibold">Categoria</TableHead>}
                               {visibleColumns.includes('referencia') && <TableHead className="text-xs font-semibold">Referência</TableHead>}
                               {visibleColumns.includes('preco') && <TableHead className="text-xs font-semibold">Preço Unit.</TableHead>}
                               {visibleColumns.includes('unidade') && <TableHead className="text-xs font-semibold">Unidade</TableHead>}
@@ -509,22 +521,35 @@ const Fabricantes = () => {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {precos.map(p => (
+                            {precosFiltrados.map((p: any) => (
                               <TableRow key={p.id} className="group">
+                                {visibleColumns.includes('imagem') && (
+                                  <TableCell>
+                                    <div className="h-10 w-10 rounded-md bg-muted/40 border border-border/40 overflow-hidden flex items-center justify-center">
+                                      {p.imagem_url ? (
+                                        <img src={p.imagem_url} alt={p.descricao_material} className="h-full w-full object-cover" loading="lazy" />
+                                      ) : (
+                                        <ImageIcon className="h-4 w-4 text-muted-foreground/40" />
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                )}
                                 {visibleColumns.includes('descricao') && <TableCell className="font-medium text-sm">{p.descricao_material}</TableCell>}
+                                {visibleColumns.includes('categoria') && (
+                                  <TableCell className="text-xs">
+                                    {p.categoria ? <Badge variant="secondary" className="font-normal">{p.categoria}</Badge> : <span className="text-muted-foreground">-</span>}
+                                  </TableCell>
+                                )}
                                 {visibleColumns.includes('referencia') && <TableCell className="text-sm text-muted-foreground">{p.referencia ?? '-'}</TableCell>}
                                 {visibleColumns.includes('preco') && (
                                   <TableCell className="text-sm font-semibold text-foreground">
-                                    {p.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    {Number(p.preco_unitario).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                   </TableCell>
                                 )}
                                 {visibleColumns.includes('unidade') && <TableCell className="text-sm text-muted-foreground">{p.unidade ?? '-'}</TableCell>}
                                 {visibleColumns.includes('status') && (
                                   <TableCell>
-                                    <Badge
-                                      variant={p.vigente ? 'default' : 'secondary'}
-                                      className={p.vigente ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}
-                                    >
+                                    <Badge variant={p.vigente ? 'default' : 'secondary'} className={p.vigente ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}>
                                       {p.vigente ? 'Vigente' : 'Inativo'}
                                     </Badge>
                                   </TableCell>
@@ -549,11 +574,16 @@ const Fabricantes = () => {
                     ) : (
                       <div className="flex flex-col items-center py-12 text-center">
                         <Package className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                        <p className="text-sm text-muted-foreground font-medium">Nenhum item de preço cadastrado</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">Adicione itens à tabela de preços deste fabricante</p>
-                        <Button size="sm" variant="outline" className="mt-4 gap-1.5" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
-                          <Plus className="h-3.5 w-3.5" /> Adicionar primeiro item
-                        </Button>
+                        <p className="text-sm text-muted-foreground font-medium">Nenhum produto cadastrado</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Adicione produtos ao catálogo deste fabricante</p>
+                        <div className="flex gap-2 mt-4">
+                          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setImportDialog(true)}>
+                            <Upload className="h-3.5 w-3.5" /> Importar planilha
+                          </Button>
+                          <Button size="sm" className="gap-1.5" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
+                            <Plus className="h-3.5 w-3.5" /> Adicionar produto
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </CardContent>
