@@ -892,6 +892,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </AlertDialog>
 
       <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
+      <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} />
     </AppLayout>
   );
 };
