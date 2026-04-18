@@ -72,6 +72,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const autoMap = detectImportPedidosMapping(cols, json);
       setMapping(autoMap);
       setExtras({});
+      setCustomColumns({});
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
