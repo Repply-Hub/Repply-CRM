@@ -27,6 +27,7 @@ import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cn
 import { EnderecoForm } from '@/components/EnderecoForm';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/ListPagination';
+import { cn } from '@/lib/utils';
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'empresa', label: 'Nome/Empresa', locked: true },
