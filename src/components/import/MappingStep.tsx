@@ -466,15 +466,52 @@ export function MappingStep({
                 return (
                   <li
                     key={h}
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggingHeader(h);
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', h);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (draggingHeader && draggingHeader !== h) setDragOverHeader(h);
+                    }}
+                    onDragLeave={() => {
+                      setDragOverHeader(prev => (prev === h ? null : prev));
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = draggingHeader || e.dataTransfer.getData('text/plain');
+                      if (from && from !== h) moveHeader(from, h);
+                      setDraggingHeader(null);
+                      setDragOverHeader(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingHeader(null);
+                      setDragOverHeader(null);
+                    }}
                     className={cn(
                       'group px-4 py-3 transition-colors',
                       isExtra && 'bg-accent/20',
                       field && 'bg-primary/[0.03]',
                       ignored && 'opacity-75',
-                      'hover:bg-muted/40'
+                      'hover:bg-muted/40',
+                      draggingHeader === h && 'opacity-40',
+                      dragOverHeader === h && 'border-t-2 border-primary'
                     )}
                   >
                     <div className="flex items-start gap-3">
+                      {/* Drag handle */}
+                      <button
+                        type="button"
+                        aria-label="Arrastar para reordenar"
+                        className="shrink-0 mt-2 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </button>
+
                       {/* Status indicator */}
                       <div className={cn(
                         'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border',
