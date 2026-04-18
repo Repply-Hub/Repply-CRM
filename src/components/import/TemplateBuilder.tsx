@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Download, FileSpreadsheet, X } from 'lucide-react';
 import { toast } from 'sonner';
-import type { FieldDef, FieldKey } from '@/components/import/MappingStep';
+import type { FieldDef } from '@/components/import/MappingStep';
 
 interface Props {
   open: boolean;
@@ -13,7 +13,7 @@ interface Props {
   target: 'empresas' | 'contatos';
 }
 
-const SAMPLE: Record<FieldKey, string> = {
+const SAMPLE: Record<string, string> = {
   empresa: 'Construtora Exemplo Ltda',
   razao_social: 'Construtora Exemplo Ltda',
   tipo: 'construtora',
@@ -26,13 +26,13 @@ const SAMPLE: Record<FieldKey, string> = {
 };
 
 export function TemplateBuilder({ open, onClose, fields, target }: Props) {
-  const [selected, setSelected] = useState<Set<FieldKey>>(
+  const [selected, setSelected] = useState<Set<string>>(
     () => new Set(fields.filter(f => f.required || ['cnpj', 'email', 'telefone'].includes(f.key)).map(f => f.key))
   );
 
   if (!open) return null;
 
-  const toggle = (k: FieldKey) => {
+  const toggle = (k: string) => {
     setSelected(prev => {
       const next = new Set(prev);
       if (next.has(k)) next.delete(k);
