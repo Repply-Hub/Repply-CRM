@@ -386,8 +386,113 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     ? `${pipelineOrders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
     : `${pedidos?.length ?? 0} pedidos`;
 
-  // ===== Dropdown de Opções (reutilizado em Kanban e Lista) =====
-  const opcoesDropdown = (
+  // ===== Ações compartilhadas =====
+  const handleExportPdf = async () => {
+    if (showKanban) {
+      await generatePedidosPdf(
+        pipelineOrders.map(o => ({
+          cliente: o.clientName,
+          obra: o.obra,
+          fabricante: o.fabricante,
+          vendedor: o.vendedor,
+          valor: o.valor,
+          etapa: stageLabel(o.stage),
+          data: o.createdAt,
+        })),
+        hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
+      );
+    } else {
+      await generatePedidosPdf(
+        filtered.map(p => ({
+          cliente: p.cliente?.empresa ?? '-',
+          obra: p.obra?.nome_obra ?? '-',
+          fabricante: p.fabricante?.nome ?? '-',
+          vendedor: p.vendedor?.nome ?? '-',
+          valor: p.valor_total ?? 0,
+          etapa: stageLabel(p.status),
+          data: p.data_pedido,
+        })),
+        stageFilter !== 'todos' ? `Orçamentos - ${stageLabel(stageFilter)}` : 'Orçamentos - Todos'
+      );
+    }
+  };
+
+  // ===== Popover/Dropdown de Opções =====
+  const opcoesDropdown = showKanban ? (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Settings2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Opções</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={4} className="w-auto p-0">
+        <div className="flex divide-x divide-border">
+          {/* Coluna esquerda: visibilidade das colunas do Kanban */}
+          <div className="p-2 min-w-[200px]">
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Colunas do Kanban</div>
+            <div className="space-y-0.5">
+              {KANBAN_STAGES.map((stage) => {
+                const checked = visibleKanbanStages.includes(stage.key);
+                const disabled = visibleKanbanStages.length === 1 && checked;
+                return (
+                  <button
+                    key={stage.key}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => toggleKanbanStage(stage.key)}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-normal transition-colors text-left',
+                      'hover:bg-muted/60 disabled:cursor-not-allowed',
+                      !checked && 'opacity-40'
+                    )}
+                  >
+                    <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', `bg-${stage.color}`)} />
+                    <span className="flex-1 truncate">{stage.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
+              className="w-full text-center text-xs text-primary font-medium px-2 py-2 mt-1 rounded-md hover:bg-muted/60 transition-colors"
+            >
+              Resetar todas
+            </button>
+          </div>
+
+          {/* Coluna direita: ações */}
+          <div className="p-2 min-w-[180px]">
+            <button
+              type="button"
+              onClick={() => setColunasDialogOpen(true)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+            >
+              <Columns3 className="h-4 w-4 text-muted-foreground" />
+              Gerenciar colunas...
+            </button>
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+            >
+              <FileDown className="h-4 w-4 text-muted-foreground" />
+              Exportar PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+            >
+              <Upload className="h-4 w-4 text-muted-foreground" />
+              Importar
+            </button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  ) : (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
@@ -396,122 +501,47 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={4} className="w-56">
-        {showKanban ? (
-          <>
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Colunas do Kanban</div>
-            {KANBAN_STAGES.map((stage) => (
-              <div
-                key={stage.key}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50"
-                onClick={(e) => e.preventDefault()}
-              >
-                <Checkbox
-                  id={`kanban-stage-${stage.key}`}
-                  checked={visibleKanbanStages.includes(stage.key)}
-                  onCheckedChange={() => toggleKanbanStage(stage.key)}
-                  disabled={visibleKanbanStages.length === 1 && visibleKanbanStages.includes(stage.key)}
-                  className="hidden"
-                />
-                <Label
-                  htmlFor={`kanban-stage-${stage.key}`}
-                  className={cn(
-                    'flex items-center gap-2 text-xs font-normal flex-1 cursor-pointer select-none transition-opacity',
-                    !visibleKanbanStages.includes(stage.key) && 'opacity-40'
-                  )}
-                >
-                  <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', `bg-${stage.color}`)} />
-                  {stage.label}
-                </Label>
-              </div>
-            ))}
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key));
+        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Colunas</div>
+        {PEDIDOS_COLUMNS.map((column) => (
+          <div
+            key={column.id}
+            className={`flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50 ${column.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
+            onClick={(e) => e.preventDefault()}
+          >
+            <Checkbox
+              id={`col-menu-ped-${column.id}`}
+              checked={visibleColumns.includes(column.id)}
+              onCheckedChange={() => {
+                if (column.locked) return;
+                if (visibleColumns.includes(column.id)) {
+                  if (visibleColumns.length > 1) {
+                    handleColumnChange(visibleColumns.filter(id => id !== column.id));
+                  }
+                } else {
+                  const newVisible = PEDIDOS_COLUMNS
+                    .filter(c => visibleColumns.includes(c.id) || c.id === column.id)
+                    .map(c => c.id);
+                  handleColumnChange(newVisible);
+                }
               }}
-              className="text-xs text-primary justify-center font-medium"
-            >
-              Resetar todas
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setColunasDialogOpen(true); }}>
-              <Columns3 className="h-4 w-4 mr-2" /> Gerenciar colunas...
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        ) : (
-          <>
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Colunas</div>
-            {PEDIDOS_COLUMNS.map((column) => (
-              <div
-                key={column.id}
-                className={`flex items-center space-x-2 rounded-md p-1.5 transition-colors hover:bg-muted/50 ${column.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                onClick={(e) => e.preventDefault()}
-              >
-                <Checkbox
-                  id={`col-menu-ped-${column.id}`}
-                  checked={visibleColumns.includes(column.id)}
-                  onCheckedChange={() => {
-                    if (column.locked) return;
-                    if (visibleColumns.includes(column.id)) {
-                      if (visibleColumns.length > 1) {
-                        handleColumnChange(visibleColumns.filter(id => id !== column.id));
-                      }
-                    } else {
-                      const newVisible = PEDIDOS_COLUMNS
-                        .filter(c => visibleColumns.includes(c.id) || c.id === column.id)
-                        .map(c => c.id);
-                      handleColumnChange(newVisible);
-                    }
-                  }}
-                  disabled={column.locked}
-                />
-                <Label htmlFor={`col-menu-ped-${column.id}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
-                  {column.label}
-                </Label>
-              </div>
-            ))}
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                handleColumnChange(PEDIDOS_COLUMNS.map(c => c.id));
-              }}
-              className="text-xs text-primary justify-center"
-            >
-              Resetar todas
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        )}
-        <DropdownMenuItem onClick={async () => {
-          if (showKanban) {
-            await generatePedidosPdf(
-              pipelineOrders.map(o => ({
-                cliente: o.clientName,
-                obra: o.obra,
-                fabricante: o.fabricante,
-                vendedor: o.vendedor,
-                valor: o.valor,
-                etapa: stageLabel(o.stage),
-                data: o.createdAt,
-              })),
-              hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
-            );
-          } else {
-            await generatePedidosPdf(
-              filtered.map(p => ({
-                cliente: p.cliente?.empresa ?? '-',
-                obra: p.obra?.nome_obra ?? '-',
-                fabricante: p.fabricante?.nome ?? '-',
-                vendedor: p.vendedor?.nome ?? '-',
-                valor: p.valor_total ?? 0,
-                etapa: stageLabel(p.status),
-                data: p.data_pedido,
-              })),
-              stageFilter !== 'todos' ? `Orçamentos - ${stageLabel(stageFilter)}` : 'Orçamentos - Todos'
-            );
-          }
-        }}>
+              disabled={column.locked}
+            />
+            <Label htmlFor={`col-menu-ped-${column.id}`} className="text-xs font-normal flex-1 cursor-pointer select-none">
+              {column.label}
+            </Label>
+          </div>
+        ))}
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            handleColumnChange(PEDIDOS_COLUMNS.map(c => c.id));
+          }}
+          className="text-xs text-primary justify-center"
+        >
+          Resetar todas
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleExportPdf}>
           <FileDown className="h-4 w-4 mr-2" /> Exportar PDF
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setImportOpen(true)}>
