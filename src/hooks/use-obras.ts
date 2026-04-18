@@ -7,7 +7,7 @@ export function useObras() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('obras')
-        .select('*, clientes(empresa, tipo)')
+        .select('*, latitude, longitude, geocoded_at, clientes(empresa, tipo)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
