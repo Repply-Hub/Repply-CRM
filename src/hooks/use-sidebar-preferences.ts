@@ -42,24 +42,14 @@ export function useSidebarPreferences() {
       }
 
       // Merge saved preferences with defaults to handle new items added after save.
-      // Normalize 'pedidos' to apontar para /pedidos (Negócios = lista) e garantir
-      // que o item 'pipeline' exista (apontando para / = Kanban).
+      // Remove o antigo item 'pedidos' (Lista de Negócios) — funcionalidade unificada em 'pipeline' (/).
+      // Garante que 'pipeline' aponte para / com label 'Negócios'.
       const saved = (data.items as unknown as SidebarItem[])
-        .map(i => i.id === 'pedidos' ? { ...i, path: '/pedidos', label: 'Lista de Negócios', icon: 'List' } : i)
+        .filter(i => i.id !== 'pedidos')
         .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i);
       const savedIds = new Set(saved.map(i => i.id));
       const newDefaults = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedIds.has(d.id));
-      // Insere 'pipeline' logo antes de 'pedidos' caso esteja faltando, para manter ordem coerente
-      const merged = [...saved];
-      if (!savedIds.has('pipeline')) {
-        const pipelineDefault = DEFAULT_SIDEBAR_ITEMS.find(d => d.id === 'pipeline');
-        const pedidosIdx = merged.findIndex(i => i.id === 'pedidos');
-        if (pipelineDefault) {
-          if (pedidosIdx >= 0) merged.splice(pedidosIdx, 0, pipelineDefault);
-          else merged.push(pipelineDefault);
-        }
-      }
-      return [...merged, ...newDefaults.filter(d => d.id !== 'pipeline')];
+      return [...saved, ...newDefaults];
     },
     enabled: !!user?.id,
   });
