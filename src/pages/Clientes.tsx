@@ -141,6 +141,18 @@ const Clientes = () => {
     }
     const baseTipos = ['construtora', 'loja', 'pessoa_fisica', 'condominio', 'hospital', 'distribuidor', 'hotel', 'escola', 'instalador'];
     if (baseTipos.includes(value) || customTipos.some(t => t.value === value)) {
+      // Se for um padrão oculto, basta reexibi-lo
+      if (baseTipos.includes(value) && hiddenTipos.includes(value)) {
+        const next = hiddenTipos.filter(v => v !== value);
+        setHiddenTipos(next);
+        localStorage.setItem('clientes_hidden_tipos', JSON.stringify(next));
+        if (newTipoTarget === 'form') setTipo(value);
+        else setTipoFilter(value);
+        setNewTipoName('');
+        setNewTipoOpen(false);
+        toast.success(`Tipo "${tipoLabels[value] ?? label}" reativado`);
+        return;
+      }
       toast.error('Esse tipo já existe');
       return;
     }
