@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { ListPagination } from '@/components/ListPagination';
 import { supabase } from '@/integrations/supabase/client';
 import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
+import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -389,7 +390,14 @@ export default function Tarefas() {
                 </Select>
               </div>
             </div>
-            <div><Label>Participantes</Label><Input value={form.participantes} onChange={e => setForm(f => ({ ...f, participantes: e.target.value }))} placeholder="Separados por vírgula" /></div>
+            <div>
+              <Label>Participantes</Label>
+              <ParticipantesMultiSelect
+                value={form.participantes}
+                onChange={(v) => setForm(f => ({ ...f, participantes: v }))}
+                usuarios={vendedores.map((v: any) => ({ id: v.id, nome: v.nome }))}
+              />
+            </div>
             <div><Label>Observadores</Label><Input value={form.observadores} onChange={e => setForm(f => ({ ...f, observadores: e.target.value }))} placeholder="Separados por vírgula" /></div>
             <div>
               <Label>Marcadores</Label>
