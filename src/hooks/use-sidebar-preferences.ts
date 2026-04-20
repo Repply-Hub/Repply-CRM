@@ -13,7 +13,8 @@ export interface SidebarItem {
 
 export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard', visible: true },
-  { id: 'pedidos', path: '/', label: 'Negócios', icon: 'Kanban', visible: true },
+  { id: 'pipeline', path: '/', label: 'Pipeline', icon: 'Kanban', visible: true },
+  { id: 'pedidos', path: '/pedidos', label: 'Negócios', icon: 'List', visible: true },
   { id: 'clientes', path: '/clientes', label: 'Clientes', icon: 'Users', visible: true },
   { id: 'obras', path: '/obras', label: 'Obras', icon: 'HardHat', visible: true },
   { id: 'fabricantes', path: '/fabricantes', label: 'Fabricantes', icon: 'Factory', visible: true },
@@ -42,14 +43,24 @@ export function useSidebarPreferences() {
       }
 
       // Merge saved preferences with defaults to handle new items added after save.
-      // Also: filter out legacy 'pipeline' item (now unified under 'pedidos') and
-      // normalize the 'pedidos' item to point to '/' with the unified label/icon.
+      // Normalize 'pedidos' to apontar para /pedidos (Negócios = lista) e garantir
+      // que o item 'pipeline' exista (apontando para / = Kanban).
       const saved = (data.items as unknown as SidebarItem[])
-        .filter(i => i.id !== 'pipeline')
-        .map(i => i.id === 'pedidos' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i);
+        .map(i => i.id === 'pedidos' ? { ...i, path: '/pedidos', label: 'Negócios', icon: 'List' } : i)
+        .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Pipeline', icon: 'Kanban' } : i);
       const savedIds = new Set(saved.map(i => i.id));
       const newDefaults = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedIds.has(d.id));
-      return [...saved, ...newDefaults];
+      // Insere 'pipeline' logo antes de 'pedidos' caso esteja faltando, para manter ordem coerente
+      const merged = [...saved];
+      if (!savedIds.has('pipeline')) {
+        const pipelineDefault = DEFAULT_SIDEBAR_ITEMS.find(d => d.id === 'pipeline');
+        const pedidosIdx = merged.findIndex(i => i.id === 'pedidos');
+        if (pipelineDefault) {
+          if (pedidosIdx >= 0) merged.splice(pedidosIdx, 0, pipelineDefault);
+          else merged.push(pipelineDefault);
+        }
+      }
+      return [...merged, ...newDefaults.filter(d => d.id !== 'pipeline')];
     },
     enabled: !!user?.id,
   });
