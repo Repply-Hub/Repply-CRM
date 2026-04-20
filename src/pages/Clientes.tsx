@@ -616,26 +616,71 @@ const Clientes = () => {
           {/* Import dialog (controlled) */}
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
 
-          {/* Novo tipo dialog */}
+          {/* Novo tipo dialog — criação + gerenciamento */}
           <Dialog open={newTipoOpen} onOpenChange={(o) => { setNewTipoOpen(o); if (!o) setNewTipoName(''); }}>
-            <DialogContent className="sm:max-w-sm">
+            <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Criar novo tipo</DialogTitle>
+                <DialogTitle>Gerenciar tipos</DialogTitle>
               </DialogHeader>
-              <div className="space-y-3 pt-2">
-                <Label htmlFor="new-tipo-name">Nome do tipo</Label>
-                <Input
-                  id="new-tipo-name"
-                  value={newTipoName}
-                  onChange={(e) => setNewTipoName(e.target.value)}
-                  placeholder="Ex: Indústria, Cooperativa…"
-                  autoFocus
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTipo(); } }}
-                />
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="outline" size="sm" onClick={() => setNewTipoOpen(false)}>Cancelar</Button>
-                  <Button size="sm" onClick={handleCreateTipo}>Criar tipo</Button>
+
+              {/* Criação */}
+              <div className="space-y-2 pt-2 pb-3 border-b">
+                <Label htmlFor="new-tipo-name">Novo tipo</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="new-tipo-name"
+                    value={newTipoName}
+                    onChange={(e) => setNewTipoName(e.target.value)}
+                    placeholder="Ex: Indústria, Cooperativa…"
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTipo(); } }}
+                  />
+                  <Button size="sm" onClick={handleCreateTipo}>
+                    <Plus className="h-4 w-4 mr-1" /> Criar
+                  </Button>
                 </div>
+              </div>
+
+              {/* Lista gerenciável */}
+              <div className="space-y-3 pt-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tipos existentes</p>
+                {(() => {
+                  const all = [
+                    ...baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => ({ value: v, label: tipoLabels[v], custom: false })),
+                    ...customTipos.map(t => ({ ...t, custom: true })),
+                  ];
+                  if (all.length === 0) {
+                    return <p className="text-sm text-muted-foreground text-center py-3">Nenhum tipo cadastrado</p>;
+                  }
+                  return (
+                    <div className="space-y-1">
+                      {all.map(t => (
+                        <div key={t.value} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 hover:bg-muted/40 transition-colors">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm">{t.label}</span>
+                            {!t.custom && (
+                              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">padrão</span>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setConfirmDeleteTipo({ value: t.value, label: t.label })}
+                            title={`Excluir "${t.label}"`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="flex justify-end pt-3">
+                <Button variant="outline" size="sm" onClick={() => setNewTipoOpen(false)}>Fechar</Button>
               </div>
             </DialogContent>
           </Dialog>
