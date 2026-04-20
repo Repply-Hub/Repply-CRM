@@ -179,7 +179,7 @@ export function MarcadoresMultiSelect({ value, onChange }: Props) {
               Gerenciar
             </Button>
           </div>
-          <ScrollArea className="max-h-72">
+          <ScrollArea className="h-72">
             <div className="p-2 space-y-3">
               {categorias.length === 0 && (
                 <p className="text-xs text-muted-foreground px-2 py-3 text-center">
