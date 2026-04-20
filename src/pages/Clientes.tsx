@@ -48,6 +48,7 @@ const CONTATO_FIELDS: ColumnDefinition[] = [
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física', condominio: 'Condomínio', hospital: 'Hospital', distribuidor: 'Distribuidor', hotel: 'Hotel', escola: 'Escola', instalador: 'Instalador' };
+const baseTipos = ['construtora', 'loja', 'pessoa_fisica', 'condominio', 'hospital', 'distribuidor', 'hotel', 'escola', 'instalador'];
 
 const getTipoLabel = (value: string, customTipos: { value: string; label: string }[]) =>
   tipoLabels[value] ?? customTipos.find(t => t.value === value)?.label ?? value;
@@ -92,18 +93,33 @@ const Clientes = () => {
     const saved = localStorage.getItem('clientes_custom_tipos');
     return saved ? JSON.parse(saved) : [];
   });
+  const [hiddenTipos, setHiddenTipos] = useState<string[]>(() => {
+    const saved = localStorage.getItem('clientes_hidden_tipos');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [newTipoOpen, setNewTipoOpen] = useState(false);
   const [newTipoName, setNewTipoName] = useState('');
   const [newTipoTarget, setNewTipoTarget] = useState<'form' | 'filter'>('form');
   const [confirmDeleteTipo, setConfirmDeleteTipo] = useState<{ value: string; label: string } | null>(null);
 
   const handleDeleteTipo = (value: string) => {
-    const next = customTipos.filter(t => t.value !== value);
-    setCustomTipos(next);
-    localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
-    if (tipo === value) setTipo('construtora');
+    // Remove de personalizados, se for; senão, oculta o tipo padrão
+    const isCustom = customTipos.some(t => t.value === value);
+    if (isCustom) {
+      const next = customTipos.filter(t => t.value !== value);
+      setCustomTipos(next);
+      localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
+    } else {
+      const next = Array.from(new Set([...hiddenTipos, value]));
+      setHiddenTipos(next);
+      localStorage.setItem('clientes_hidden_tipos', JSON.stringify(next));
+    }
+    // Recalcula próxima opção válida para tipo do form
+    const remaining = baseTipos.filter(v => v !== value && !(isCustom ? hiddenTipos : [...hiddenTipos, value]).includes(v));
+    const fallback = remaining[0] ?? customTipos.find(t => t.value !== value)?.value ?? '';
+    if (tipo === value) setTipo(fallback);
     if (tipoFilter === value) setTipoFilter('todos');
-    toast.success('Tipo personalizado excluído');
+    toast.success('Tipo excluído');
     setConfirmDeleteTipo(null);
   };
 
@@ -125,6 +141,18 @@ const Clientes = () => {
     }
     const baseTipos = ['construtora', 'loja', 'pessoa_fisica', 'condominio', 'hospital', 'distribuidor', 'hotel', 'escola', 'instalador'];
     if (baseTipos.includes(value) || customTipos.some(t => t.value === value)) {
+      // Se for um padrão oculto, basta reexibi-lo
+      if (baseTipos.includes(value) && hiddenTipos.includes(value)) {
+        const next = hiddenTipos.filter(v => v !== value);
+        setHiddenTipos(next);
+        localStorage.setItem('clientes_hidden_tipos', JSON.stringify(next));
+        if (newTipoTarget === 'form') setTipo(value);
+        else setTipoFilter(value);
+        setNewTipoName('');
+        setNewTipoOpen(false);
+        toast.success(`Tipo "${tipoLabels[value] ?? label}" reativado`);
+        return;
+      }
       toast.error('Esse tipo já existe');
       return;
     }
@@ -204,15 +232,7 @@ const Clientes = () => {
 
   const tipoFilterOptions = [
     { value: 'todos', label: 'Todos os tipos' },
-    { value: 'construtora', label: 'Construtora' },
-    { value: 'loja', label: 'Loja' },
-    { value: 'pessoa_fisica', label: 'Pessoa Física' },
-    { value: 'condominio', label: 'Condomínio' },
-    { value: 'hospital', label: 'Hospital' },
-    { value: 'distribuidor', label: 'Distribuidor' },
-    { value: 'hotel', label: 'Hotel' },
-    { value: 'escola', label: 'Escola' },
-    { value: 'instalador', label: 'Instalador' },
+    ...baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => ({ value: v, label: tipoLabels[v] })),
     ...customTipos,
   ];
 
@@ -643,26 +663,23 @@ const Clientes = () => {
                       >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="construtora">Construtora</SelectItem>
-                          <SelectItem value="loja">Loja</SelectItem>
-                          <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
-                          <SelectItem value="condominio">Condomínio</SelectItem>
-                          <SelectItem value="hospital">Hospital</SelectItem>
-                          <SelectItem value="distribuidor">Distribuidor</SelectItem>
-                          <SelectItem value="hotel">Hotel</SelectItem>
-                          <SelectItem value="escola">Escola</SelectItem>
-                          <SelectItem value="instalador">Instalador</SelectItem>
+                          {baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => (
+                            <SelectItem key={v} value={v}>{tipoLabels[v]}</SelectItem>
+                          ))}
                           {customTipos.map(t => (
                             <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                           ))}
                           <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
                         </SelectContent>
                       </Select>
-                      {customTipos.length > 0 && (
+                      {(baseTipos.filter(v => !hiddenTipos.includes(v)).length + customTipos.length) > 0 && (
                         <div className="mt-2">
-                          <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Tipos personalizados</p>
+                          <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Gerenciar tipos</p>
                           <div className="flex flex-wrap gap-1.5">
-                            {customTipos.map(t => (
+                            {[
+                              ...baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => ({ value: v, label: tipoLabels[v] })),
+                              ...customTipos,
+                            ].map(t => (
                               <div key={t.value} className="inline-flex items-center gap-1 rounded-full bg-muted/60 pl-2.5 pr-1 py-0.5 text-xs">
                                 <span>{t.label}</span>
                                 <button
@@ -917,7 +934,7 @@ const Clientes = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir tipo "{confirmDeleteTipo?.label}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              O tipo personalizado será removido da lista. Empresas já cadastradas com este tipo continuarão existindo, mas o rótulo deixará de aparecer nos seletores.
+              O tipo será removido dos seletores. Empresas já cadastradas com este tipo continuarão existindo, mas o rótulo deixará de aparecer. Tipos padrão podem ser reativados criando um novo tipo com o mesmo nome.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
