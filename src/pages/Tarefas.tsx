@@ -114,7 +114,10 @@ export default function Tarefas() {
         toast.success('Tarefa criada');
       }
       setDialogOpen(false);
-    } catch { toast.error('Erro ao salvar tarefa'); }
+    } catch (err: any) {
+      console.error('[tarefas] erro ao salvar:', err);
+      toast.error(err?.message || 'Erro ao salvar tarefa');
+    }
   }
 
   async function handleDelete(id: string) {
