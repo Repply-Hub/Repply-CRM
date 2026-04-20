@@ -232,15 +232,7 @@ const Clientes = () => {
 
   const tipoFilterOptions = [
     { value: 'todos', label: 'Todos os tipos' },
-    { value: 'construtora', label: 'Construtora' },
-    { value: 'loja', label: 'Loja' },
-    { value: 'pessoa_fisica', label: 'Pessoa Física' },
-    { value: 'condominio', label: 'Condomínio' },
-    { value: 'hospital', label: 'Hospital' },
-    { value: 'distribuidor', label: 'Distribuidor' },
-    { value: 'hotel', label: 'Hotel' },
-    { value: 'escola', label: 'Escola' },
-    { value: 'instalador', label: 'Instalador' },
+    ...baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => ({ value: v, label: tipoLabels[v] })),
     ...customTipos,
   ];
 
