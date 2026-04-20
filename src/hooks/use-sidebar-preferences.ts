@@ -46,8 +46,8 @@ export function useSidebarPreferences() {
       // Normalize 'pedidos' to apontar para /pedidos (Negócios = lista) e garantir
       // que o item 'pipeline' exista (apontando para / = Kanban).
       const saved = (data.items as unknown as SidebarItem[])
-        .map(i => i.id === 'pedidos' ? { ...i, path: '/pedidos', label: 'Negócios', icon: 'List' } : i)
-        .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Pipeline', icon: 'Kanban' } : i);
+        .map(i => i.id === 'pedidos' ? { ...i, path: '/pedidos', label: 'Lista de Negócios', icon: 'List' } : i)
+        .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i);
       const savedIds = new Set(saved.map(i => i.id));
       const newDefaults = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedIds.has(d.id));
       // Insere 'pipeline' logo antes de 'pedidos' caso esteja faltando, para manter ordem coerente
