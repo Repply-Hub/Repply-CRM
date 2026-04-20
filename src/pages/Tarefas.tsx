@@ -21,6 +21,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { ListPagination } from '@/components/ListPagination';
 import { supabase } from '@/integrations/supabase/client';
+import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
 
 const DEFAULT_PAGE_SIZE = 10;
 
