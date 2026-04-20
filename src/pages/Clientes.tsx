@@ -95,6 +95,17 @@ const Clientes = () => {
   const [newTipoOpen, setNewTipoOpen] = useState(false);
   const [newTipoName, setNewTipoName] = useState('');
   const [newTipoTarget, setNewTipoTarget] = useState<'form' | 'filter'>('form');
+  const [confirmDeleteTipo, setConfirmDeleteTipo] = useState<{ value: string; label: string } | null>(null);
+
+  const handleDeleteTipo = (value: string) => {
+    const next = customTipos.filter(t => t.value !== value);
+    setCustomTipos(next);
+    localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
+    if (tipo === value) setTipo('construtora');
+    if (tipoFilter === value) setTipoFilter('todos');
+    toast.success('Tipo personalizado excluído');
+    setConfirmDeleteTipo(null);
+  };
 
   const handleCreateTipo = () => {
     const label = newTipoName.trim();
