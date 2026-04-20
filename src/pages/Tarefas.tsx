@@ -23,6 +23,7 @@ import { ListPagination } from '@/components/ListPagination';
 import { supabase } from '@/integrations/supabase/client';
 import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
 import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
+import { ProjetoSelect } from '@/components/tarefas/ProjetoSelect';
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -380,14 +381,10 @@ export default function Tarefas() {
               </div>
               <div>
                 <Label>Projeto</Label>
-                <Select value={form.projeto} onValueChange={v => setForm(f => ({ ...f, projeto: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione um projeto" /></SelectTrigger>
-                  <SelectContent>
-                    {obras.map((o: any) => (
-                      <SelectItem key={o.id} value={o.nome_obra}>{o.nome_obra}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ProjetoSelect
+                  value={form.projeto}
+                  onChange={(v) => setForm(f => ({ ...f, projeto: v }))}
+                />
               </div>
             </div>
             <div>
