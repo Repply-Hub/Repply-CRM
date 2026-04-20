@@ -80,19 +80,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
 
   // ===== View toggles =====
-  // Toggle principal (sempre visível): Pipeline x Negócios.
-  // A rota é a fonte da verdade: '/' => pipeline, '/pedidos' => negócios.
-  // Isso garante que os itens da sidebar (Pipeline / Negócios) tenham
-  // exatamente o mesmo efeito do toggle interno desta página.
-  const initialMode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
-  const [mode, setMode] = useState<PageMode>(initialMode);
-  useEffect(() => {
-    setMode(defaultView === 'lista' ? 'negocios' : 'pipeline');
-  }, [defaultView]);
-  const handleModeChange = (next: PageMode) => {
-    setMode(next);
-    navigate(next === 'pipeline' ? '/' : '/pedidos', { replace: true });
-  };
+  // O modo é controlado pela sidebar/rota: '/' => pipeline, '/pedidos' => negócios.
+  const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
 
   // Sub-toggle (apenas quando mode === 'pipeline'): Kanban x Lista.
   const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
@@ -684,25 +673,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         {/* Top bar: view toggle + actions */}
         <div className="mb-4 md:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            {/* Toggle principal: Pipeline x Negócios (sempre visível) */}
-            <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
-              <Button
-                variant={mode === 'pipeline' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => handleModeChange('pipeline')}
-                className="h-8 px-3"
-              >
-                Pipeline
-              </Button>
-              <Button
-                variant={mode === 'negocios' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => handleModeChange('negocios')}
-                className="h-8 px-3"
-              >
-                Negócios
-              </Button>
-            </div>
+            {/* Modo controlado pela sidebar (Pipeline ou Negócios) */}
 
             {/* Sub-toggle: Kanban x Lista — apenas no modo Pipeline */}
             {isPipelineMode && (
