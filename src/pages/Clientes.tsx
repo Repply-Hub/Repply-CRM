@@ -934,7 +934,7 @@ const Clientes = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir tipo "{confirmDeleteTipo?.label}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              O tipo personalizado será removido da lista. Empresas já cadastradas com este tipo continuarão existindo, mas o rótulo deixará de aparecer nos seletores.
+              O tipo será removido dos seletores. Empresas já cadastradas com este tipo continuarão existindo, mas o rótulo deixará de aparecer. Tipos padrão podem ser reativados criando um novo tipo com o mesmo nome.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
