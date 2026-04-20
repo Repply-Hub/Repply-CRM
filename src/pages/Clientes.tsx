@@ -911,6 +911,26 @@ const Clientes = () => {
           </>
         )}
       </div>
+
+      <AlertDialog open={!!confirmDeleteTipo} onOpenChange={(o) => !o && setConfirmDeleteTipo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tipo "{confirmDeleteTipo?.label}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O tipo personalizado será removido da lista. Empresas já cadastradas com este tipo continuarão existindo, mas o rótulo deixará de aparecer nos seletores.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDeleteTipo && handleDeleteTipo(confirmDeleteTipo.value)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };
