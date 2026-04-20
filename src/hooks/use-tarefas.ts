@@ -36,7 +36,21 @@ export function useCreateTarefa() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (tarefa: Partial<Tarefa>) => {
-      const { error } = await supabase.from('tarefas' as any).insert(tarefa as any);
+      // Garante que o usuario_id seja o do usuário logado (exigido pela RLS)
+      const { data: usuarioRow, error: usuarioErr } = await supabase
+        .from('usuarios')
+        .select('id, nome')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
+        .maybeSingle();
+      if (usuarioErr) throw usuarioErr;
+      if (!usuarioRow?.id) throw new Error('Usuário não encontrado. Faça login novamente.');
+
+      const payload = {
+        ...tarefa,
+        usuario_id: usuarioRow.id,
+        criado_por: tarefa.criado_por ?? usuarioRow.nome ?? null,
+      };
+      const { error } = await supabase.from('tarefas' as any).insert(payload as any);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tarefas'] }),
