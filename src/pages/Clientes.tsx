@@ -92,18 +92,33 @@ const Clientes = () => {
     const saved = localStorage.getItem('clientes_custom_tipos');
     return saved ? JSON.parse(saved) : [];
   });
+  const [hiddenTipos, setHiddenTipos] = useState<string[]>(() => {
+    const saved = localStorage.getItem('clientes_hidden_tipos');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [newTipoOpen, setNewTipoOpen] = useState(false);
   const [newTipoName, setNewTipoName] = useState('');
   const [newTipoTarget, setNewTipoTarget] = useState<'form' | 'filter'>('form');
   const [confirmDeleteTipo, setConfirmDeleteTipo] = useState<{ value: string; label: string } | null>(null);
 
   const handleDeleteTipo = (value: string) => {
-    const next = customTipos.filter(t => t.value !== value);
-    setCustomTipos(next);
-    localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
-    if (tipo === value) setTipo('construtora');
+    // Remove de personalizados, se for; senão, oculta o tipo padrão
+    const isCustom = customTipos.some(t => t.value === value);
+    if (isCustom) {
+      const next = customTipos.filter(t => t.value !== value);
+      setCustomTipos(next);
+      localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
+    } else {
+      const next = Array.from(new Set([...hiddenTipos, value]));
+      setHiddenTipos(next);
+      localStorage.setItem('clientes_hidden_tipos', JSON.stringify(next));
+    }
+    // Recalcula próxima opção válida para tipo do form
+    const remaining = baseTipos.filter(v => v !== value && !(isCustom ? hiddenTipos : [...hiddenTipos, value]).includes(v));
+    const fallback = remaining[0] ?? customTipos.find(t => t.value !== value)?.value ?? '';
+    if (tipo === value) setTipo(fallback);
     if (tipoFilter === value) setTipoFilter('todos');
-    toast.success('Tipo personalizado excluído');
+    toast.success('Tipo excluído');
     setConfirmDeleteTipo(null);
   };
 
