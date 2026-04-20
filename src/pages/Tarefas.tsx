@@ -21,6 +21,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { ListPagination } from '@/components/ListPagination';
 import { supabase } from '@/integrations/supabase/client';
+import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -390,7 +391,13 @@ export default function Tarefas() {
             </div>
             <div><Label>Participantes</Label><Input value={form.participantes} onChange={e => setForm(f => ({ ...f, participantes: e.target.value }))} placeholder="Separados por vírgula" /></div>
             <div><Label>Observadores</Label><Input value={form.observadores} onChange={e => setForm(f => ({ ...f, observadores: e.target.value }))} placeholder="Separados por vírgula" /></div>
-            <div><Label>Marcadores</Label><Input value={form.marcadores} onChange={e => setForm(f => ({ ...f, marcadores: e.target.value }))} placeholder="Ex: urgente, financeiro, revisão" /></div>
+            <div>
+              <Label>Marcadores</Label>
+              <MarcadoresMultiSelect
+                value={form.marcadores}
+                onChange={(v) => setForm(f => ({ ...f, marcadores: v }))}
+              />
+            </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
