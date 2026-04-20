@@ -717,29 +717,6 @@ const Clientes = () => {
                           <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
                         </SelectContent>
                       </Select>
-                      {(baseTipos.filter(v => !hiddenTipos.includes(v)).length + customTipos.length) > 0 && (
-                        <div className="mt-2">
-                          <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Gerenciar tipos</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {[
-                              ...baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => ({ value: v, label: tipoLabels[v] })),
-                              ...customTipos,
-                            ].map(t => (
-                              <div key={t.value} className="inline-flex items-center gap-1 rounded-full bg-muted/60 pl-2.5 pr-1 py-0.5 text-xs">
-                                <span>{t.label}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmDeleteTipo(t)}
-                                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                  title={`Excluir "${t.label}"`}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                     <div>
                       <Label>CNPJ</Label>
