@@ -13,8 +13,8 @@ export interface SidebarItem {
 
 export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard', visible: true },
-  { id: 'pipeline', path: '/', label: 'Pipeline', icon: 'Kanban', visible: true },
-  { id: 'pedidos', path: '/pedidos', label: 'Negócios', icon: 'List', visible: true },
+  { id: 'pipeline', path: '/', label: 'Negócios', icon: 'Kanban', visible: true },
+  { id: 'pedidos', path: '/pedidos', label: 'Lista de Negócios', icon: 'List', visible: true },
   { id: 'clientes', path: '/clientes', label: 'Clientes', icon: 'Users', visible: true },
   { id: 'obras', path: '/obras', label: 'Obras', icon: 'HardHat', visible: true },
   { id: 'fabricantes', path: '/fabricantes', label: 'Fabricantes', icon: 'Factory', visible: true },
@@ -46,8 +46,8 @@ export function useSidebarPreferences() {
       // Normalize 'pedidos' to apontar para /pedidos (Negócios = lista) e garantir
       // que o item 'pipeline' exista (apontando para / = Kanban).
       const saved = (data.items as unknown as SidebarItem[])
-        .map(i => i.id === 'pedidos' ? { ...i, path: '/pedidos', label: 'Negócios', icon: 'List' } : i)
-        .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Pipeline', icon: 'Kanban' } : i);
+        .map(i => i.id === 'pedidos' ? { ...i, path: '/pedidos', label: 'Lista de Negócios', icon: 'List' } : i)
+        .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i);
       const savedIds = new Set(saved.map(i => i.id));
       const newDefaults = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedIds.has(d.id));
       // Insere 'pipeline' logo antes de 'pedidos' caso esteja faltando, para manter ordem coerente
