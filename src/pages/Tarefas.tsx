@@ -25,8 +25,8 @@ import { supabase } from '@/integrations/supabase/client';
 const DEFAULT_PAGE_SIZE = 10;
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-  pendente: { label: 'Pendente', className: 'bg-warning/15 text-warning-foreground border-warning/30' },
-  em_andamento: { label: 'Em andamento', className: 'bg-primary/15 text-primary border-primary/30' },
+  pendente: { label: 'Pendente', className: 'bg-destructive/15 text-destructive border-destructive/30' },
+  em_andamento: { label: 'Em andamento', className: 'bg-warning/15 text-warning border-warning/30' },
   concluida: { label: 'Concluída', className: 'bg-success/15 text-success border-success/30' },
 };
 
