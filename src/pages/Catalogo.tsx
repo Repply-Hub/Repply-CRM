@@ -3,22 +3,38 @@ import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useCatalogoGlobal } from '@/hooks/use-fabricantes';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useCatalogoGlobal, useDeleteCategoria } from '@/hooks/use-fabricantes';
 import { useFabricantes } from '@/hooks/use-clientes';
-import { Search, Package, ImageIcon, Loader2 } from 'lucide-react';
+import { Search, Package, ImageIcon, Loader2, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Catalogo = () => {
   const { data: produtos, isLoading } = useCatalogoGlobal();
   const { data: fabricantes } = useFabricantes();
+  const deleteCategoria = useDeleteCategoria();
   const [busca, setBusca] = useState('');
   const [fabricanteId, setFabricanteId] = useState('todos');
   const [categoria, setCategoria] = useState('todas');
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const categorias = useMemo(() => {
     const set = new Set<string>();
     (produtos ?? []).forEach((p: any) => p.categoria && set.add(p.categoria));
     return Array.from(set).sort();
+  }, [produtos]);
+
+  const countByCategoria = useMemo(() => {
+    const map = new Map<string, number>();
+    (produtos ?? []).forEach((p: any) => {
+      if (p.categoria) map.set(p.categoria, (map.get(p.categoria) ?? 0) + 1);
+    });
+    return map;
   }, [produtos]);
 
   const filtered = useMemo(() => {
@@ -34,6 +50,18 @@ const Catalogo = () => {
       );
     });
   }, [produtos, busca, fabricanteId, categoria]);
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return;
+    try {
+      const res = await deleteCategoria.mutateAsync(confirmDelete);
+      toast.success(`Categoria "${confirmDelete}" excluída (${res.affected} produto(s) atualizado(s))`);
+      if (categoria === confirmDelete) setCategoria('todas');
+      setConfirmDelete(null);
+    } catch (err: any) {
+      toast.error('Erro ao excluir categoria', { description: err?.message });
+    }
+  };
 
   return (
     <AppLayout title="Catálogo de Produtos" subtitle={`${filtered.length} produto(s)`}>
@@ -51,15 +79,52 @@ const Catalogo = () => {
                 {(fabricantes ?? []).map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={categoria} onValueChange={setCategoria}>
-              <SelectTrigger className="w-52"><SelectValue placeholder="Categoria" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas categorias</SelectItem>
-                {categorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1">
+              <Select value={categoria} onValueChange={setCategoria}>
+                <SelectTrigger className="w-52"><SelectValue placeholder="Categoria" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas categorias</SelectItem>
+                  {categorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {categoria !== 'todas' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => setConfirmDelete(categoria)}
+                  title={`Excluir categoria "${categoria}"`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
+
+        {categorias.length > 0 && (
+          <Card className="rounded-xl border-border/60">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Gerenciar categorias</p>
+              <div className="flex flex-wrap gap-2">
+                {categorias.map(c => (
+                  <div key={c} className="inline-flex items-center gap-1 rounded-full bg-muted/60 pl-3 pr-1 py-1 text-xs">
+                    <span className="font-medium">{c}</span>
+                    <span className="text-muted-foreground">({countByCategoria.get(c) ?? 0})</span>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(c)}
+                      className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      title={`Excluir categoria "${c}"`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -99,6 +164,29 @@ const Catalogo = () => {
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={o => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir categoria "{confirmDelete}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelete && countByCategoria.get(confirmDelete)
+                ? `${countByCategoria.get(confirmDelete)} produto(s) ficarão sem categoria. Os produtos NÃO serão excluídos.`
+                : 'Esta ação removerá a categoria do sistema.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={deleteCategoria.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteCategoria.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };
