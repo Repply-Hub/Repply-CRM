@@ -80,19 +80,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
 
   // ===== View toggles =====
-  // Toggle principal (sempre visível): Pipeline x Negócios.
-  // A rota é a fonte da verdade: '/' => pipeline, '/pedidos' => negócios.
-  // Isso garante que os itens da sidebar (Pipeline / Negócios) tenham
-  // exatamente o mesmo efeito do toggle interno desta página.
-  const initialMode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
-  const [mode, setMode] = useState<PageMode>(initialMode);
-  useEffect(() => {
-    setMode(defaultView === 'lista' ? 'negocios' : 'pipeline');
-  }, [defaultView]);
-  const handleModeChange = (next: PageMode) => {
-    setMode(next);
-    navigate(next === 'pipeline' ? '/' : '/pedidos', { replace: true });
-  };
+  // O modo é controlado pela sidebar/rota: '/' => pipeline, '/pedidos' => negócios.
+  const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
 
   // Sub-toggle (apenas quando mode === 'pipeline'): Kanban x Lista.
   const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
