@@ -95,6 +95,17 @@ const Clientes = () => {
   const [newTipoOpen, setNewTipoOpen] = useState(false);
   const [newTipoName, setNewTipoName] = useState('');
   const [newTipoTarget, setNewTipoTarget] = useState<'form' | 'filter'>('form');
+  const [confirmDeleteTipo, setConfirmDeleteTipo] = useState<{ value: string; label: string } | null>(null);
+
+  const handleDeleteTipo = (value: string) => {
+    const next = customTipos.filter(t => t.value !== value);
+    setCustomTipos(next);
+    localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
+    if (tipo === value) setTipo('construtora');
+    if (tipoFilter === value) setTipoFilter('todos');
+    toast.success('Tipo personalizado excluído');
+    setConfirmDeleteTipo(null);
+  };
 
   const handleCreateTipo = () => {
     const label = newTipoName.trim();
@@ -647,6 +658,26 @@ const Clientes = () => {
                           <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
                         </SelectContent>
                       </Select>
+                      {customTipos.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Tipos personalizados</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {customTipos.map(t => (
+                              <div key={t.value} className="inline-flex items-center gap-1 rounded-full bg-muted/60 pl-2.5 pr-1 py-0.5 text-xs">
+                                <span>{t.label}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteTipo(t)}
+                                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                  title={`Excluir "${t.label}"`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <Label>CNPJ</Label>
@@ -880,6 +911,26 @@ const Clientes = () => {
           </>
         )}
       </div>
+
+      <AlertDialog open={!!confirmDeleteTipo} onOpenChange={(o) => !o && setConfirmDeleteTipo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tipo "{confirmDeleteTipo?.label}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O tipo personalizado será removido da lista. Empresas já cadastradas com este tipo continuarão existindo, mas o rótulo deixará de aparecer nos seletores.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDeleteTipo && handleDeleteTipo(confirmDeleteTipo.value)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };
