@@ -59,6 +59,8 @@ const NovoPedido = () => {
   const [prazoResposta, setPrazoResposta] = useState<Date | undefined>();
   const [origemLead, setOrigemLead] = useState('');
   const [enderecoEntrega, setEnderecoEntrega] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Step 2 fields
   const [itens, setItens] = useState<ItemPedido[]>([]);
