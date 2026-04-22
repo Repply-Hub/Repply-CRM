@@ -392,6 +392,21 @@ const EditarPedido = () => {
                   <Input value={enderecoEntrega} onChange={e => setEnderecoEntrega(e.target.value)} placeholder="Endereço de entrega" />
                 </div>
 
+                {pdfUrl && (
+                  <div className="space-y-2">
+                    <Label>Arquivo PDF</Label>
+                    <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <span className="text-sm font-medium flex-1 truncate">PDF do Pedido</span>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+                          Ver PDF
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-end pt-4">
                   <Button onClick={handleNext}>
                     Próximo <ArrowRight className="h-4 w-4 ml-1" />
