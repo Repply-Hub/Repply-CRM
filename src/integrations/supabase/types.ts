@@ -1147,6 +1147,7 @@ export type Database = {
           obra_id: string | null
           observacoes: string | null
           origem_lead: string | null
+          pdf_url: string | null
           prazo_resposta: string | null
           status: string
           updated_at: string
@@ -1164,6 +1165,7 @@ export type Database = {
           obra_id?: string | null
           observacoes?: string | null
           origem_lead?: string | null
+          pdf_url?: string | null
           prazo_resposta?: string | null
           status?: string
           updated_at?: string
@@ -1181,6 +1183,7 @@ export type Database = {
           obra_id?: string | null
           observacoes?: string | null
           origem_lead?: string | null
+          pdf_url?: string | null
           prazo_resposta?: string | null
           status?: string
           updated_at?: string

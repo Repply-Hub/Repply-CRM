@@ -66,6 +66,7 @@ export interface NovoPedidoPayload {
   origem_lead?: string;
   endereco_entrega?: string;
   observacoes?: string;
+  pdf_url?: string;
   itens: {
     descricao_material: string;
     referencia_fabricante?: string;
@@ -91,6 +92,7 @@ export function useCreatePedidoCompleto() {
           data_pedido: payload.data_pedido,
           status: 'novo_lead',
           observacoes: payload.observacoes || null,
+          pdf_url: payload.pdf_url || null,
           prazo_resposta: payload.prazo_resposta || null,
           origem_lead: payload.origem_lead || null,
           endereco_entrega: payload.endereco_entrega || null,

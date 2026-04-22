@@ -16,7 +16,7 @@ import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes
 import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor } from '@/hooks/use-novo-pedido';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -73,6 +73,7 @@ const EditarPedido = () => {
   // Step 2 fields
   const [itens, setItens] = useState<ItemPedido[]>([]);
   const [observacoes, setObservacoes] = useState('');
+  const [pdfUrl, setPdfUrl] = useState('');
 
   // Populate form when data loads
   useEffect(() => {
@@ -87,6 +88,7 @@ const EditarPedido = () => {
       setOrigemLead(p.origem_lead || '');
       setEnderecoEntrega(p.endereco_entrega || '');
       setObservacoes(p.observacoes || '');
+      setPdfUrl(p.pdf_url || '');
       setItens(pedidoData.itens.map(i => ({
         id: i.id,
         descricao_material: i.descricao_material,
@@ -389,6 +391,21 @@ const EditarPedido = () => {
                   <Label>Endereço de Entrega</Label>
                   <Input value={enderecoEntrega} onChange={e => setEnderecoEntrega(e.target.value)} placeholder="Endereço de entrega" />
                 </div>
+
+                {pdfUrl && (
+                  <div className="space-y-2">
+                    <Label>Arquivo PDF</Label>
+                    <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <span className="text-sm font-medium flex-1 truncate">PDF do Pedido</span>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+                          Ver PDF
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-end pt-4">
                   <Button onClick={handleNext}>

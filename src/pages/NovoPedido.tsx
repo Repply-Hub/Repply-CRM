@@ -13,8 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
 import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCreatePedidoCompleto } from '@/hooks/use-novo-pedido';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Check, ChevronsUpDown } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Check, ChevronsUpDown, FileText, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -58,6 +59,8 @@ const NovoPedido = () => {
   const [prazoResposta, setPrazoResposta] = useState<Date | undefined>();
   const [origemLead, setOrigemLead] = useState('');
   const [enderecoEntrega, setEnderecoEntrega] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Step 2 fields
   const [itens, setItens] = useState<ItemPedido[]>([]);
@@ -131,6 +134,7 @@ const NovoPedido = () => {
     
     if (!fabricanteId) { toast.error('Selecione um fabricante'); return false; }
     if (!vendedorId) { toast.error('Selecione o responsável'); return false; }
+    if (!pdfFile) { toast.error('Anexe o PDF do pedido (obrigatório)'); return false; }
     return true;
   };
 
@@ -150,16 +154,38 @@ const NovoPedido = () => {
 
   const handleSubmit = async () => {
     if (!validateStep2()) return;
+    if (!pdfFile) { toast.error('Anexe o PDF do pedido (obrigatório)'); return false; }
 
-    let proximoContatoISO: string | undefined;
-    if (proximoContato) {
-      const dt = new Date(proximoContato);
-      const [h, m] = proximoContatoHora.split(':').map(Number);
-      dt.setHours(h, m, 0, 0);
-      proximoContatoISO = dt.toISOString();
-    }
+    setIsUploading(true);
+    let pdfUrl = '';
 
     try {
+      // 1. Upload PDF
+      const fileExt = pdfFile.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).slice(2)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError, data } = await supabase.storage
+        .from('pedido-anexos')
+        .upload(filePath, pdfFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('pedido-anexos')
+        .getPublicUrl(filePath);
+      
+      pdfUrl = publicUrl;
+
+      // 2. Create Pedido
+      let proximoContatoISO: string | undefined;
+      if (proximoContato) {
+        const dt = new Date(proximoContato);
+        const [h, m] = proximoContatoHora.split(':').map(Number);
+        dt.setHours(h, m, 0, 0);
+        proximoContatoISO = dt.toISOString();
+      }
+
       await createPedido.mutateAsync({
         cliente_id: clienteId,
         fabricante_id: fabricanteId,
@@ -170,6 +196,7 @@ const NovoPedido = () => {
         origem_lead: origemLead || undefined,
         endereco_entrega: enderecoEntrega || undefined,
         observacoes: observacoes || undefined,
+        pdf_url: pdfUrl,
         itens: itens.map(i => ({
           descricao_material: i.descricao_material,
           referencia_fabricante: i.referencia_fabricante || undefined,
@@ -183,6 +210,8 @@ const NovoPedido = () => {
       navigate('/');
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -319,6 +348,52 @@ const NovoPedido = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                {/* Anexo PDF */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    Anexar PDF *
+                    <span className="text-xs font-normal text-muted-foreground">(Obrigatório)</span>
+                  </Label>
+                  <div className={cn(
+                    "relative border-2 border-dashed rounded-lg p-4 transition-colors",
+                    pdfFile ? "border-primary/50 bg-primary/5" : "border-muted hover:border-primary/30"
+                  )}>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="flex items-center justify-center gap-3">
+                      {pdfFile ? (
+                        <>
+                          <FileText className="h-6 w-6 text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{pdfFile.name}</p>
+                            <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive" 
+                            onClick={(e) => { e.stopPropagation(); setPdfFile(null); }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-6 w-6 text-muted-foreground" />
+                          <div className="text-center">
+                            <p className="text-sm font-medium">Clique ou arraste o PDF aqui</p>
+                            <p className="text-xs text-muted-foreground">Apenas arquivos PDF são aceitos</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -506,9 +581,9 @@ const NovoPedido = () => {
                   <Button variant="outline" onClick={() => setStep(1)}>
                     <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
                   </Button>
-                  <Button onClick={handleSubmit} disabled={createPedido.isPending}>
+                  <Button onClick={handleSubmit} disabled={createPedido.isPending || isUploading}>
                     <Save className="h-4 w-4 mr-1" />
-                    {createPedido.isPending ? 'Criando...' : 'Criar Pedido'}
+                    {isUploading ? 'Enviando PDF...' : createPedido.isPending ? 'Criando...' : 'Criar Pedido'}
                   </Button>
                 </div>
               </div>
