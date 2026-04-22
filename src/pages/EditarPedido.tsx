@@ -16,7 +16,7 @@ import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes
 import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor } from '@/hooks/use-novo-pedido';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
