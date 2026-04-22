@@ -66,6 +66,7 @@ export interface NovoPedidoPayload {
   origem_lead?: string;
   endereco_entrega?: string;
   observacoes?: string;
+  pdf_url?: string;
   itens: {
     descricao_material: string;
     referencia_fabricante?: string;
