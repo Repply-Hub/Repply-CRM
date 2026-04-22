@@ -581,9 +581,9 @@ const NovoPedido = () => {
                   <Button variant="outline" onClick={() => setStep(1)}>
                     <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
                   </Button>
-                  <Button onClick={handleSubmit} disabled={createPedido.isPending}>
+                  <Button onClick={handleSubmit} disabled={createPedido.isPending || isUploading}>
                     <Save className="h-4 w-4 mr-1" />
-                    {createPedido.isPending ? 'Criando...' : 'Criar Pedido'}
+                    {isUploading ? 'Enviando PDF...' : createPedido.isPending ? 'Criando...' : 'Criar Pedido'}
                   </Button>
                 </div>
               </div>
