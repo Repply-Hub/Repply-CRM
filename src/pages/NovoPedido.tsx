@@ -154,16 +154,38 @@ const NovoPedido = () => {
 
   const handleSubmit = async () => {
     if (!validateStep2()) return;
+    if (!pdfFile) { toast.error('Anexe o PDF do pedido (obrigatório)'); return false; }
 
-    let proximoContatoISO: string | undefined;
-    if (proximoContato) {
-      const dt = new Date(proximoContato);
-      const [h, m] = proximoContatoHora.split(':').map(Number);
-      dt.setHours(h, m, 0, 0);
-      proximoContatoISO = dt.toISOString();
-    }
+    setIsUploading(true);
+    let pdfUrl = '';
 
     try {
+      // 1. Upload PDF
+      const fileExt = pdfFile.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).slice(2)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError, data } = await supabase.storage
+        .from('pedido-anexos')
+        .upload(filePath, pdfFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('pedido-anexos')
+        .getPublicUrl(filePath);
+      
+      pdfUrl = publicUrl;
+
+      // 2. Create Pedido
+      let proximoContatoISO: string | undefined;
+      if (proximoContato) {
+        const dt = new Date(proximoContato);
+        const [h, m] = proximoContatoHora.split(':').map(Number);
+        dt.setHours(h, m, 0, 0);
+        proximoContatoISO = dt.toISOString();
+      }
+
       await createPedido.mutateAsync({
         cliente_id: clienteId,
         fabricante_id: fabricanteId,
