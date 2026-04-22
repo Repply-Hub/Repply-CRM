@@ -196,6 +196,7 @@ const NovoPedido = () => {
         origem_lead: origemLead || undefined,
         endereco_entrega: enderecoEntrega || undefined,
         observacoes: observacoes || undefined,
+        pdf_url: pdfUrl,
         itens: itens.map(i => ({
           descricao_material: i.descricao_material,
           referencia_fabricante: i.referencia_fabricante || undefined,
@@ -209,6 +210,8 @@ const NovoPedido = () => {
       navigate('/');
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
