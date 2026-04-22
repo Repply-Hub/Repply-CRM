@@ -134,6 +134,7 @@ const NovoPedido = () => {
     
     if (!fabricanteId) { toast.error('Selecione um fabricante'); return false; }
     if (!vendedorId) { toast.error('Selecione o responsável'); return false; }
+    if (!pdfFile) { toast.error('Anexe o PDF do pedido (obrigatório)'); return false; }
     return true;
   };
 
