@@ -73,6 +73,7 @@ const EditarPedido = () => {
   // Step 2 fields
   const [itens, setItens] = useState<ItemPedido[]>([]);
   const [observacoes, setObservacoes] = useState('');
+  const [pdfUrl, setPdfUrl] = useState('');
 
   // Populate form when data loads
   useEffect(() => {
