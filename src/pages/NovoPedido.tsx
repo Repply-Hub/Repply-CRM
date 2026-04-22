@@ -351,6 +351,52 @@ const NovoPedido = () => {
                   </div>
                 </div>
 
+                {/* Anexo PDF */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    Anexar PDF *
+                    <span className="text-xs font-normal text-muted-foreground">(Obrigatório)</span>
+                  </Label>
+                  <div className={cn(
+                    "relative border-2 border-dashed rounded-lg p-4 transition-colors",
+                    pdfFile ? "border-primary/50 bg-primary/5" : "border-muted hover:border-primary/30"
+                  )}>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="flex items-center justify-center gap-3">
+                      {pdfFile ? (
+                        <>
+                          <FileText className="h-6 w-6 text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{pdfFile.name}</p>
+                            <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive" 
+                            onClick={(e) => { e.stopPropagation(); setPdfFile(null); }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-6 w-6 text-muted-foreground" />
+                          <div className="text-center">
+                            <p className="text-sm font-medium">Clique ou arraste o PDF aqui</p>
+                            <p className="text-xs text-muted-foreground">Apenas arquivos PDF são aceitos</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Data de Criação */}
                   <div className="space-y-2">
