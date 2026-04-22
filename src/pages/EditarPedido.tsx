@@ -88,6 +88,7 @@ const EditarPedido = () => {
       setOrigemLead(p.origem_lead || '');
       setEnderecoEntrega(p.endereco_entrega || '');
       setObservacoes(p.observacoes || '');
+      setPdfUrl(p.pdf_url || '');
       setItens(pedidoData.itens.map(i => ({
         id: i.id,
         descricao_material: i.descricao_material,
