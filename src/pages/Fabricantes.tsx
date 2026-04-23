@@ -15,6 +15,7 @@ import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpd
 import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash, Upload, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { useTableSettings } from '@/hooks/use-table-settings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
