@@ -53,6 +53,7 @@ export default function Obras() {
     handleRename,
     handleAddColumn,
     handleRemoveColumn,
+    handleReorder,
     getLabel
   } = useTableSettings({
     key: 'obras',
