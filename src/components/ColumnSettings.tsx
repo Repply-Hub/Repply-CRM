@@ -91,11 +91,15 @@ export function ColumnSettings({
                 <Button
                     variant="outline"
                     size="sm"
-                    className={cn('h-9 gap-2 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground data-[state=open]:border-primary', hideTrigger && 'hidden', className)}
+                    className={cn(
+                        'h-9 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/[0.04] data-[state=open]:text-primary data-[state=open]:border-primary/60 shadow-sm active:scale-[0.98]',
+                        hideTrigger && 'hidden',
+                        className
+                    )}
                 >
-                    <Settings2 className="h-4 w-4" />
+                    <Settings2 className="h-4 w-4 text-muted-foreground group-data-[state=open]:text-primary" />
                     <span className="hidden sm:inline">Opções</span>
-                    <ChevronDown className="h-3.5 w-3.5 ml-0.5" />
+                    <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </Button>
             </PopoverTrigger>
             <PopoverContent align="start" sideOffset={4} className="w-[260px] p-0">
