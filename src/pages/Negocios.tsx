@@ -68,7 +68,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
   const { data: kanbanColunas } = useKanbanColunas();
-  
+  const { data: customCols = [] } = useColunasCustomizadas('pedidos');
+
   const KANBAN_STAGES = useMemo(
     () => (kanbanColunas ?? []).map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
     [kanbanColunas]
@@ -90,6 +91,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     ...col,
     customLabel: customLabels[col.id]
   }));
+
+  const allColumns = useMemo(() => {
+    const mappedCustom: ColumnDefinition[] = customCols.map(c => ({
+      id: c.slug,
+      label: c.nome,
+    }));
+    return [...currentColumns, ...mappedCustom];
+  }, [currentColumns, customCols]);
 
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
   const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
