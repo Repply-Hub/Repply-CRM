@@ -184,7 +184,8 @@ const Clientes = () => {
     setPageSize,
     handleRename,
     handleAddColumn,
-    handleRemoveColumn
+    handleRemoveColumn,
+    getLabel
   } = activeTab === 'empresas' ? empresasSettings : contatosSettings;
 
   const empresas = clients ?? [];
