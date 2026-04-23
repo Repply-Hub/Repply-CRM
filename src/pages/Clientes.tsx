@@ -790,18 +790,20 @@ const Clientes = () => {
                     <th className="py-2.5 px-4 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
-                    <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['empresa'] || 'Nome/Empresa'}</th>
-                    {visibleFields.includes('tipo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['tipo'] || 'Tipo'}</th>}
-                    {visibleFields.includes('cnpj') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['cnpj'] || 'CPF/CNPJ'}</th>}
-                    {visibleFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">{customLabels['email'] || 'E-mail'}</th>}
-                    {visibleFields.includes('endereco') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden xl:table-cell">{customLabels['endereco'] || 'Endereço'}</th>}
-                    {visibleFields.includes('obras_count') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['obras_count'] || 'Obras'}</th>}
+                    <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                      {getLabel('empresa')}
+                    </th>
+                    {visibleColumns.filter(id => id !== 'empresa').map(colId => (
+                      <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                        {getLabel(colId)}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedEmpresas.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-12 text-center text-muted-foreground">
+                      <td colSpan={visibleColumns.length + 1} className="py-12 text-center text-muted-foreground">
                         <div className="flex flex-col items-center justify-center">
                           <Building2 className="h-12 w-12 mb-3 opacity-30" />
                           <p className="text-sm font-medium">Nenhuma empresa encontrada</p>
@@ -811,6 +813,8 @@ const Clientes = () => {
                     </tr>
                   ) : paginatedEmpresas.map(client => {
                     const Icon = getTipoIcon(client.tipo);
+                    const camposExtras = (client as any).campos_extras || {};
+
                     return (
                       <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`}>
                         <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
@@ -824,15 +828,32 @@ const Clientes = () => {
                             <span className="font-medium truncate max-w-[200px]">{client.empresa}</span>
                           </div>
                         </td>
-                        {visibleFields.includes('tipo') && (
-                          <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
-                            <Badge variant="secondary" className="text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
-                          </td>
-                        )}
-                        {visibleFields.includes('cnpj') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.cnpj || '—'}</td>}
-                        {visibleFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]" onClick={() => navigate(`/clientes/${client.id}`)}>{client.email || '—'}</td>}
-                        {visibleFields.includes('endereco') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden xl:table-cell truncate max-w-[250px]" onClick={() => navigate(`/clientes/${client.id}`)}>{client.endereco || '—'}</td>}
-                        {visibleFields.includes('obras_count') && <td className="py-2.5 px-4 text-xs hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}</td>}
+                        {visibleColumns.filter(id => id !== 'empresa').map(colId => {
+                          const isCustom = colId.startsWith('custom_');
+                          let value: any = isCustom ? camposExtras[colId] : (client as any)[colId];
+                          
+                          if (colId === 'tipo') {
+                            return (
+                              <td key={colId} className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
+                                <Badge variant="secondary" className="text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
+                              </td>
+                            );
+                          }
+                          
+                          if (colId === 'obras_count') {
+                            return (
+                              <td key={colId} className="py-2.5 px-4 text-xs" onClick={() => navigate(`/clientes/${client.id}`)}>
+                                {client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}
+                              </td>
+                            );
+                          }
+
+                          return (
+                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]" onClick={() => navigate(`/clientes/${client.id}`)}>
+                              {value || '—'}
+                            </td>
+                          );
+                        })}
                       </tr>
                     );
                   })}
