@@ -647,15 +647,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <div className="flex min-w-0 flex-col gap-6 xl:flex-row">
             <div className="min-w-0 flex-1">
               <div className="mb-4 flex flex-row flex-wrap items-center gap-2">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    className="pl-9"
-                    placeholder="Buscar pedidos..."
-                    value={search}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                  />
-                </div>
                 {filtrosPopover}
                 {hasPipelineFilters && (
                   <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground" title="Limpar filtros">
