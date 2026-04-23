@@ -598,6 +598,7 @@ export type Database = {
       }
       fabricantes: {
         Row: {
+          campos_extras: Json
           cnpj: string | null
           created_at: string
           id: string
@@ -607,6 +608,7 @@ export type Database = {
           ultima_atualizacao_preco: string | null
         }
         Insert: {
+          campos_extras?: Json
           cnpj?: string | null
           created_at?: string
           id?: string
@@ -616,6 +618,7 @@ export type Database = {
           ultima_atualizacao_preco?: string | null
         }
         Update: {
+          campos_extras?: Json
           cnpj?: string | null
           created_at?: string
           id?: string
@@ -1142,6 +1145,7 @@ export type Database = {
       }
       obras: {
         Row: {
+          campos_extras: Json
           cliente_id: string
           created_at: string
           endereco_entrega: string | null
@@ -1154,6 +1158,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          campos_extras?: Json
           cliente_id: string
           created_at?: string
           endereco_entrega?: string | null
@@ -1166,6 +1171,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          campos_extras?: Json
           cliente_id?: string
           created_at?: string
           endereco_entrega?: string | null
@@ -1484,6 +1490,7 @@ export type Database = {
       }
       tarefas: {
         Row: {
+          campos_extras: Json
           created_at: string
           criado_por: string | null
           descricao: string | null
@@ -1500,6 +1507,7 @@ export type Database = {
           usuario_id: string | null
         }
         Insert: {
+          campos_extras?: Json
           created_at?: string
           criado_por?: string | null
           descricao?: string | null
@@ -1516,6 +1524,7 @@ export type Database = {
           usuario_id?: string | null
         }
         Update: {
+          campos_extras?: Json
           created_at?: string
           criado_por?: string | null
           descricao?: string | null
