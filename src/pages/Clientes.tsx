@@ -873,11 +873,11 @@ const Clientes = () => {
                     <th className="py-2.5 px-4 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
-                    {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome</th>}
-                    {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Empresa</th>}
-                    {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Cargo</th>}
-                    {visibleContatoFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">E-mail</th>}
-                    {visibleContatoFields.includes('telefone') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Telefone</th>}
+                    {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['nome_contato'] || 'Nome'}</th>}
+                    {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['empresa'] || 'Empresa'}</th>}
+                    {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['cargo'] || 'Cargo'}</th>}
+                    {visibleContatoFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">{customLabels['email'] || 'E-mail'}</th>}
+                    {visibleContatoFields.includes('telefone') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['telefone'] || 'Telefone'}</th>}
                   </tr>
                 </thead>
                 <tbody>
