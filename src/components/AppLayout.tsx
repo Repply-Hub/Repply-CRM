@@ -1,6 +1,7 @@
 import { AppSidebar } from './AppSidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { NotificationCenter } from '@/components/NotificationCenter';
+import { useBranding } from '@/hooks/use-branding';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,12 +12,17 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, title, subtitle, headerContent, mainClassName }: AppLayoutProps) {
+  const branding = useBranding();
+  
   return (
     <SidebarProvider defaultOpen={false}>
       <div className="h-screen flex w-full overflow-hidden">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="min-h-[3.5rem] md:min-h-[4rem] flex items-center justify-between px-2 sm:px-4 md:px-6 shrink-0 py-2 sm:py-4 gap-1.5 sm:gap-2 border-b border-primary/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30 transition-all duration-300">
+          <header 
+            className="min-h-[3.5rem] md:min-h-[4rem] flex items-center justify-between px-2 sm:px-4 md:px-6 shrink-0 py-2 sm:py-4 gap-1.5 sm:gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30 transition-all duration-300"
+            style={{ borderBottomColor: branding.cor ? `${branding.cor}40` : undefined }}
+          >
             <div className="min-w-0 flex-1 flex items-center gap-1.5 sm:gap-2">
               <SidebarTrigger className="shrink-0 h-8 w-8 md:hidden" />
               {headerContent ?? (
