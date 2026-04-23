@@ -386,10 +386,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const optionsPopover = (
     <ColumnSettings
-      columns={currentColumns}
+      columns={columns}
       visibleColumns={visibleColumns}
-      onChange={handleColumnChange}
+      onChange={setVisibleColumns}
       onRename={handleRename}
+      onAdd={handleAddColumn}
+      onRemove={handleRemoveColumn}
     >
       <div className="p-2 border-t border-border/50">
         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
