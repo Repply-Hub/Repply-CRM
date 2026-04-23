@@ -582,8 +582,6 @@ const Clientes = () => {
             <Upload className="h-4 w-4" />
             <span className="hidden sm:inline">Importar</span>
           </Button>
-          {/* Import dialog (controlled) */}
-          <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
 
           {/* Novo tipo dialog — criação + gerenciamento */}
           <Dialog open={newTipoOpen} onOpenChange={(o) => { setNewTipoOpen(o); if (!o) setNewTipoName(''); }}>
