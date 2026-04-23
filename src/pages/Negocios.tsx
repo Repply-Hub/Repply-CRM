@@ -546,6 +546,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ações</div>
             <button
               type="button"
+              onClick={() => setColunasDialogOpen(true)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+            >
+              <Columns3 className="h-4 w-4 text-muted-foreground" />
+              Gerenciar colunas...
+            </button>
+            <button
+              type="button"
               onClick={handleExportPdf}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
             >
