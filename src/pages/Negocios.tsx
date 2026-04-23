@@ -238,6 +238,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   })), [pedidos]);
 
   const pipelineOrders = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return allOrders.filter(o => {
       if (selectedVendedores.length > 0 && !selectedVendedores.includes(o.vendedorId)) return false;
       if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(o.fabricanteId)) return false;
@@ -248,9 +249,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         end.setHours(23, 59, 59, 999);
         if (new Date(o.createdAt) > end) return false;
       }
+      if (q) {
+        const clientName = o.clientName.toLowerCase();
+        const obra = o.obra.toLowerCase();
+        const fabricante = o.fabricante.toLowerCase();
+        if (!clientName.includes(q) && !obra.includes(q) && !fabricante.includes(q)) return false;
+      }
       return true;
     });
-  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
+  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo, search]);
 
   const ordersByStage = useMemo(() => {
     const map: Record<string, typeof pipelineOrders> = {};
@@ -564,7 +571,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   return (
     <AppLayout title="Negócios" subtitle={subtitle}>
       <div className="p-3 sm:p-4 md:p-6 max-w-[1600px]">
-        <div className="mb-4 md:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 md:mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             {isPipelineMode && (
               <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
@@ -588,6 +595,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </Button>
               </div>
             )}
+            
+            <div className="relative flex-1 min-w-[240px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9 h-9"
+                placeholder="Buscar por cliente, obra ou fabricante..."
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+              />
+            </div>
+
             {showKanban && (
               <>
                 {filtrosPopover}
@@ -639,15 +657,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <div className="flex min-w-0 flex-col gap-6 xl:flex-row">
             <div className="min-w-0 flex-1">
               <div className="mb-4 flex flex-row flex-wrap items-center gap-2">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    className="pl-9"
-                    placeholder="Buscar pedidos..."
-                    value={search}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                  />
-                </div>
                 {filtrosPopover}
                 {hasPipelineFilters && (
                   <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground" title="Limpar filtros">
