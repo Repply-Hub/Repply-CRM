@@ -24,6 +24,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
 import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
 import { ProjetoSelect } from '@/components/tarefas/ProjetoSelect';
+import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+
+const TAREFA_COLUMNS: ColumnDefinition[] = [
+  { id: 'titulo', label: 'Tarefa', locked: true },
+  { id: 'responsavel', label: 'Responsável' },
+  { id: 'prazo_final', label: 'Prazo' },
+  { id: 'status', label: 'Status' },
+  { id: 'projeto', label: 'Projeto' },
+];
 
 const DEFAULT_PAGE_SIZE = 10;
 
