@@ -536,86 +536,47 @@ const Clientes = () => {
               </div>
             </PopoverContent>
           </Popover>
+          <ColumnSettings
+            columns={currentColumns}
+            visibleColumns={activeTab === 'empresas' ? visibleFields : visibleContatoFields}
+            onChange={activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange}
+            onRename={handleRename}
+            label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
+          />
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
-                <Settings2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Opções</span>
+                <FileDown className="h-4 w-4" />
+                <span className="hidden sm:inline">Exportar</span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="start" sideOffset={4} className="w-auto p-0">
-              <div className="flex divide-x divide-border">
-                {/* Coluna esquerda: visibilidade das colunas da tabela */}
-                <div className="p-2 min-w-[220px]">
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Colunas</div>
-                  <div className="space-y-0.5">
-                    {(activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS).map((column) => {
-                      const currentVisible = activeTab === 'empresas' ? visibleFields : visibleContatoFields;
-                      const currentOnChange = activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange;
-                      const allCols = activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS;
-                      const checked = currentVisible.includes(column.id);
-                      const disabled = column.locked || (checked && currentVisible.length === 1);
-                      return (
-                        <button
-                          key={column.id}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => {
-                            if (column.locked) return;
-                            if (checked) {
-                              if (currentVisible.length > 1) currentOnChange(currentVisible.filter(id => id !== column.id));
-                            } else {
-                              const newVisible = allCols.filter(c => currentVisible.includes(c.id) || c.id === column.id).map(c => c.id);
-                              currentOnChange(newVisible);
-                            }
-                          }}
-                          className={cn(
-                            'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-normal transition-colors text-left',
-                            'hover:bg-muted/60 disabled:cursor-not-allowed',
-                            !checked && 'opacity-40'
-                          )}
-                        >
-                          <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', checked ? 'bg-primary' : 'bg-muted-foreground/40')} />
-                          <span className="flex-1 truncate">{column.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const allCols = activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS;
-                      const currentOnChange = activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange;
-                      currentOnChange(allCols.map(c => c.id));
-                    }}
-                    className="w-full text-center text-xs text-primary font-medium px-2 py-2 mt-1 rounded-md hover:bg-muted/60 transition-colors"
-                  >
-                    Resetar todas
-                  </button>
-                </div>
-
-                {/* Coluna direita: ações */}
-                <div className="p-2 min-w-[200px]">
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ações</div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                      exportToFile(data, activeTab, 'xlsx');
-                    }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                    Exportar Excel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                      exportToFile(data, activeTab, 'csv');
-                    }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-                  >
+            <PopoverContent align="end" className="w-48 p-2">
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                    exportToFile(data, activeTab, 'xlsx');
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+                >
+                  <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                  Excel (.xlsx)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                    exportToFile(data, activeTab, 'csv');
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  CSV (.csv)
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     Exportar CSV
                   </button>
