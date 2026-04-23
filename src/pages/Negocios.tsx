@@ -78,6 +78,21 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     [kanbanColunas]
   );
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
+  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('pedidos_custom_labels');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const handleRename = (columnId: string, newLabel: string) => {
+    const next = { ...customLabels, [columnId]: newLabel };
+    setCustomLabels(next);
+    localStorage.setItem('pedidos_custom_labels', JSON.stringify(next));
+  };
+
+  const currentColumns = PEDIDOS_COLUMNS.map(col => ({
+    ...col,
+    customLabel: customLabels[col.id]
+  }));
 
   // ===== View toggles =====
   // O modo é controlado pela sidebar/rota: '/' => pipeline, '/pedidos' => negócios.

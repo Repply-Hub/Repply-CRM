@@ -23,6 +23,7 @@ interface ColumnSettingsProps {
     hideTrigger?: boolean;
     /** Texto exibido no trigger e no título da seção. Default: "Colunas" */
     label?: string;
+    children?: React.ReactNode;
 }
 
 export function ColumnSettings({
