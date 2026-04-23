@@ -187,7 +187,11 @@ const Clientes = () => {
     handleAddColumn,
     handleRemoveColumn,
     handleReorder,
-    getLabel
+    getLabel,
+    presets,
+    savePreset,
+    loadPreset,
+    deletePreset
   } = activeTab === 'empresas' ? empresasSettings : contatosSettings;
 
   const empresas = clients ?? [];
@@ -521,6 +525,10 @@ const Clientes = () => {
             onAdd={handleAddColumn}
             onRemove={handleRemoveColumn}
             onReorder={handleReorder}
+            presets={presets}
+            onSavePreset={savePreset}
+            onLoadPreset={loadPreset}
+            onDeletePreset={deletePreset}
             label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
           >
             <div className="pt-2 border-t border-border/50 mt-1 px-1 pb-2 space-y-1">
