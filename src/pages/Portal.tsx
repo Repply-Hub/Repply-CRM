@@ -163,6 +163,16 @@ export default function Portal() {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
+  const handleReorder = useCallback((siteId: string, startIndex: number, endIndex: number) => {
+    setVisibleColumns(prev => {
+      const current = prev[siteId] || [];
+      const result = Array.from(current);
+      const [removed] = result.splice(startIndex, 1);
+      result.splice(endIndex, 0, removed);
+      return { ...prev, [siteId]: result };
+    });
+  }, []);
+
   // Auto-load data on mount
   useEffect(() => {
     fetchExtremozFromDb();
