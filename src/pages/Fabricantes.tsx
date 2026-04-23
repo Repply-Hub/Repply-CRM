@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'imagem', label: 'Imagem' },
-  { id: 'descricao', label: 'Descrição', locked: true },
+  { id: 'descricao', label: 'Descrição' },
   { id: 'categoria', label: 'Categoria' },
   { id: 'referencia', label: 'Referência' },
   { id: 'preco', label: 'Preço Unit.' },
@@ -99,7 +99,7 @@ function FabricanteForm({ open, onOpenChange, editData }: {
               {cnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
             </div>
           </div>
-          <div><Label>Nome</Label><Input value={nome} onChange={e => setNome(e.target.value)} required placeholder="Nome do fabricante" /></div>
+          <div><Label>Nome</Label><Input value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome do fabricante" /></div>
           <div><Label>Contato</Label><Input value={contato} onChange={e => setContato(e.target.value)} placeholder="Nome do contato" /></div>
           <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
           <Button type="submit" className="w-full" disabled={isPending}>{isPending ? 'Salvando...' : 'Salvar'}</Button>

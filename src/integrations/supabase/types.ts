@@ -193,7 +193,7 @@ export type Database = {
           descricao: string | null
           empresa_id: string
           id: string
-          nome: string
+          nome: string | null
         }
         Insert: {
           created_at?: string
@@ -201,7 +201,7 @@ export type Database = {
           descricao?: string | null
           empresa_id: string
           id?: string
-          nome: string
+          nome?: string | null
         }
         Update: {
           created_at?: string
@@ -209,7 +209,7 @@ export type Database = {
           descricao?: string | null
           empresa_id?: string
           id?: string
-          nome?: string
+          nome?: string | null
         }
         Relationships: [
           {
@@ -334,7 +334,7 @@ export type Database = {
           cnpj: string | null
           created_at: string
           email: string | null
-          empresa: string
+          empresa: string | null
           endereco: string | null
           id: string
           nome_contato: string | null
@@ -349,7 +349,7 @@ export type Database = {
           cnpj?: string | null
           created_at?: string
           email?: string | null
-          empresa: string
+          empresa?: string | null
           endereco?: string | null
           id?: string
           nome_contato?: string | null
@@ -364,7 +364,7 @@ export type Database = {
           cnpj?: string | null
           created_at?: string
           email?: string | null
-          empresa?: string
+          empresa?: string | null
           endereco?: string | null
           id?: string
           nome_contato?: string | null
@@ -405,6 +405,50 @@ export type Database = {
           },
         ]
       }
+      colunas_customizadas: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          nome: string | null
+          ordem: number
+          slug: string
+          tabela: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          nome?: string | null
+          ordem?: number
+          slug: string
+          tabela: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          nome?: string | null
+          ordem?: number
+          slug?: string
+          tabela?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "colunas_customizadas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       configuracoes_automacao: {
         Row: {
           chave: string
@@ -435,7 +479,7 @@ export type Database = {
           cargo: string | null
           created_at: string
           email: string | null
-          empresa: string
+          empresa: string | null
           id: string
           nome_contato: string | null
           telefone: string | null
@@ -447,7 +491,7 @@ export type Database = {
           cargo?: string | null
           created_at?: string
           email?: string | null
-          empresa: string
+          empresa?: string | null
           id?: string
           nome_contato?: string | null
           telefone?: string | null
@@ -459,7 +503,7 @@ export type Database = {
           cargo?: string | null
           created_at?: string
           email?: string | null
-          empresa?: string
+          empresa?: string | null
           id?: string
           nome_contato?: string | null
           telefone?: string | null
@@ -470,28 +514,43 @@ export type Database = {
       }
       empresas: {
         Row: {
+          banner_url: string | null
           cnpj: string | null
           codigo_acesso: string
+          cor_primaria: string | null
           created_at: string
           id: string
-          nome: string
+          logo_url: string | null
+          nome: string | null
+          nome_fantasia: string | null
           owner_id: string
+          subtitulo_header: string | null
         }
         Insert: {
+          banner_url?: string | null
           cnpj?: string | null
           codigo_acesso?: string
+          cor_primaria?: string | null
           created_at?: string
           id?: string
-          nome: string
+          logo_url?: string | null
+          nome?: string | null
+          nome_fantasia?: string | null
           owner_id: string
+          subtitulo_header?: string | null
         }
         Update: {
+          banner_url?: string | null
           cnpj?: string | null
           codigo_acesso?: string
+          cor_primaria?: string | null
           created_at?: string
           id?: string
-          nome?: string
+          logo_url?: string | null
+          nome?: string | null
+          nome_fantasia?: string | null
           owner_id?: string
+          subtitulo_header?: string | null
         }
         Relationships: []
       }
@@ -539,28 +598,31 @@ export type Database = {
       }
       fabricantes: {
         Row: {
+          campos_extras: Json
           cnpj: string | null
           created_at: string
           id: string
-          nome: string
+          nome: string | null
           nome_contato: string | null
           telefone: string | null
           ultima_atualizacao_preco: string | null
         }
         Insert: {
+          campos_extras?: Json
           cnpj?: string | null
           created_at?: string
           id?: string
-          nome: string
+          nome?: string | null
           nome_contato?: string | null
           telefone?: string | null
           ultima_atualizacao_preco?: string | null
         }
         Update: {
+          campos_extras?: Json
           cnpj?: string | null
           created_at?: string
           id?: string
-          nome?: string
+          nome?: string | null
           nome_contato?: string | null
           telefone?: string | null
           ultima_atualizacao_preco?: string | null
@@ -695,7 +757,7 @@ export type Database = {
           empresa_id: string
           id: string
           is_sistema: boolean
-          nome: string
+          nome: string | null
           ordem: number
           slug: string
           updated_at: string
@@ -706,7 +768,7 @@ export type Database = {
           empresa_id: string
           id?: string
           is_sistema?: boolean
-          nome: string
+          nome?: string | null
           ordem?: number
           slug: string
           updated_at?: string
@@ -717,7 +779,7 @@ export type Database = {
           empresa_id?: string
           id?: string
           is_sistema?: boolean
-          nome?: string
+          nome?: string | null
           ordem?: number
           slug?: string
           updated_at?: string
@@ -1083,6 +1145,7 @@ export type Database = {
       }
       obras: {
         Row: {
+          campos_extras: Json
           cliente_id: string
           created_at: string
           endereco_entrega: string | null
@@ -1090,11 +1153,12 @@ export type Database = {
           id: string
           latitude: number | null
           longitude: number | null
-          nome_obra: string
+          nome_obra: string | null
           spe_cnpj: string | null
           status: string
         }
         Insert: {
+          campos_extras?: Json
           cliente_id: string
           created_at?: string
           endereco_entrega?: string | null
@@ -1102,11 +1166,12 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
-          nome_obra: string
+          nome_obra?: string | null
           spe_cnpj?: string | null
           status?: string
         }
         Update: {
+          campos_extras?: Json
           cliente_id?: string
           created_at?: string
           endereco_entrega?: string | null
@@ -1114,7 +1179,7 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
-          nome_obra?: string
+          nome_obra?: string | null
           spe_cnpj?: string | null
           status?: string
         }
@@ -1260,19 +1325,19 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          nome: string
+          nome: string | null
           slug: string
         }
         Insert: {
           created_at?: string
           id?: string
-          nome: string
+          nome?: string | null
           slug: string
         }
         Update: {
           created_at?: string
           id?: string
-          nome?: string
+          nome?: string | null
           slug?: string
         }
         Relationships: []
@@ -1425,6 +1490,7 @@ export type Database = {
       }
       tarefas: {
         Row: {
+          campos_extras: Json
           created_at: string
           criado_por: string | null
           descricao: string | null
@@ -1441,6 +1507,7 @@ export type Database = {
           usuario_id: string | null
         }
         Insert: {
+          campos_extras?: Json
           created_at?: string
           criado_por?: string | null
           descricao?: string | null
@@ -1457,6 +1524,7 @@ export type Database = {
           usuario_id?: string | null
         }
         Update: {
+          campos_extras?: Json
           created_at?: string
           criado_por?: string | null
           descricao?: string | null
@@ -1476,31 +1544,34 @@ export type Database = {
       }
       usuarios: {
         Row: {
+          avatar_url: string | null
           created_at: string
           email: string
           empresa_id: string | null
           id: string
-          nome: string
+          nome: string | null
           role: string
           telefone: string | null
           user_id: string | null
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           email: string
           empresa_id?: string | null
           id?: string
-          nome: string
+          nome?: string | null
           role?: string
           telefone?: string | null
           user_id?: string | null
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           email?: string
           empresa_id?: string | null
           id?: string
-          nome?: string
+          nome?: string | null
           role?: string
           telefone?: string | null
           user_id?: string | null

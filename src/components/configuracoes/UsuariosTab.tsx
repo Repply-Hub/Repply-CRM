@@ -69,7 +69,7 @@ function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nom
     <DialogContent>
       <DialogHeader><DialogTitle>Editar Usuário</DialogTitle></DialogHeader>
       <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-        <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" required defaultValue={vendedor.nome} /></div>
+        <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" defaultValue={vendedor.nome} /></div>
         <div className="space-y-1.5"><Label>Email</Label><Input name="email" type="email" required defaultValue={vendedor.email} /></div>
         <div className="space-y-1.5"><Label>Telefone</Label><Input name="telefone" defaultValue={vendedor.telefone ?? ''} placeholder="(00) 00000-0000" /></div>
         <div className="space-y-1.5">

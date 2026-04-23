@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 import { ExportClientesButton } from '@/components/ExportClientesButton';
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
-  { id: 'empresa', label: 'Nome/Empresa', locked: true },
+  { id: 'empresa', label: 'Nome/Empresa' },
   { id: 'tipo', label: 'Tipo' },
   { id: 'cnpj', label: 'CPF/CNPJ' },
   { id: 'email', label: 'E-mail' },
@@ -41,7 +41,7 @@ const CLIENTE_FIELDS: ColumnDefinition[] = [
 ];
 
 const CONTATO_FIELDS: ColumnDefinition[] = [
-  { id: 'nome_contato', label: 'Nome', locked: true },
+  { id: 'nome_contato', label: 'Nome' },
   { id: 'empresa', label: 'Empresa' },
   { id: 'email', label: 'E-mail' },
   { id: 'telefone', label: 'Telefone' },
@@ -671,7 +671,7 @@ const Clientes = () => {
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-1">Ao sair do campo, o CNPJ será validado e os dados preenchidos automaticamente</p>
                     </div>
-                    <div><Label>Nome</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} required placeholder="Nome fantasia ou nome" /></div>
+                    <div><Label>Nome</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Nome fantasia ou nome" /></div>
                     <div><Label>Razão Social</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" /></div>
                     <div className="grid grid-cols-2 gap-3">
                       <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
@@ -681,7 +681,7 @@ const Clientes = () => {
                   </>
                 ) : (
                   <>
-                    <div><Label>Nome do contato</Label><Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} required placeholder="Nome completo" /></div>
+                    <div><Label>Nome do contato</Label><Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome completo" /></div>
                     <div><Label>Empresa</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Empresa vinculada" /></div>
                     <div><Label>Cargo</Label><Input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Cargo ou função" /></div>
                     <div className="grid grid-cols-2 gap-3">

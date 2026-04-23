@@ -147,7 +147,7 @@ function ProfileTab() {
   if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (!perfil) return null;
 
-  const iniciais = perfil.nome.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
+  const iniciais = (perfil.nome || 'Usuário').split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -171,7 +171,7 @@ function ProfileTab() {
               </div>
             </div>
             <form onSubmit={handleSalvarPerfil} className="space-y-3">
-              <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" required defaultValue={perfil.nome} placeholder="Seu nome completo" className="h-10" /></div>
+              <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" defaultValue={perfil.nome} placeholder="Seu nome completo" className="h-10" /></div>
               <div className="space-y-1.5"><Label>Telefone</Label><Input name="telefone" defaultValue={perfil.telefone ?? ''} placeholder="(00) 00000-0000" className="h-10" /></div>
               <Button type="submit" size="sm" disabled={updatePerfil.isPending}>
                 {updatePerfil.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

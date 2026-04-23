@@ -5,7 +5,7 @@ export function useCreateCliente() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
-      empresa: string;
+      empresa?: string;
       razao_social?: string;
       tipo: string;
       cnpj?: string;
@@ -29,7 +29,7 @@ export function useCreateContato() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
-      empresa: string;
+      empresa?: string;
       nome_contato?: string;
       email?: string;
       telefone?: string;
@@ -112,7 +112,7 @@ export function useCreatePedido() {
 export function useCreateVendedor() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { nome: string; email: string; telefone?: string; role?: string }) => {
+    mutationFn: async (data: { nome?: string; email: string; telefone?: string; role?: string }) => {
       const { error } = await supabase.from('usuarios').insert({
         ...data,
         role: data.role || 'vendedor',
@@ -126,7 +126,7 @@ export function useCreateVendedor() {
 export function useCreateFabricante() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { nome: string; cnpj?: string; nome_contato?: string; telefone?: string }) => {
+    mutationFn: async (data: { nome?: string; cnpj?: string; nome_contato?: string; telefone?: string }) => {
       const { error } = await supabase.from('fabricantes').insert(data);
       if (error) throw error;
     },
