@@ -34,6 +34,8 @@ export function ColumnSettings({
     visibleColumns,
     onChange,
     onRename,
+    onAdd,
+    onRemove,
     className,
     open,
     onOpenChange,
@@ -43,6 +45,8 @@ export function ColumnSettings({
 }: ColumnSettingsProps) {
     const [editingId, setEditingId] = React.useState<string | null>(null);
     const [editValue, setEditValue] = React.useState('');
+    const [newColumnLabel, setNewColumnLabel] = React.useState('');
+    const [isAdding, setIsAdding] = React.useState(false);
 
     const toggleColumn = (columnId: string) => {
         if (visibleColumns.includes(columnId)) {
