@@ -58,19 +58,32 @@ export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorC
                   Solte aqui para mover
                 </div>
               )}
-              {orders.map((order, idx) => (
-                <KanbanCard key={order.id} order={order} index={idx} />
+              {paginatedOrders.map((order, idx) => (
+                <KanbanCard key={order.id} order={order} index={(page - 1) * pageSize + idx} />
               ))}
               {provided.placeholder}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate(`/pedidos/novo?status=${encodeURIComponent(stageKey)}`)}
-                className="mt-2 w-full justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-background/60 border border-dashed border-border/60 hover:border-border"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Novo Pedido
-              </Button>
+              
+              <div className="mt-2 space-y-2">
+                {totalItems > pageSize && (
+                  <ListPagination
+                    page={page}
+                    totalPages={totalPages}
+                    totalItems={totalItems}
+                    pageSize={pageSize}
+                    onPageChange={setPage}
+                    className="p-1 scale-[0.8] origin-left"
+                  />
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/pedidos/novo?status=${encodeURIComponent(stageKey)}`)}
+                  className="w-full justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-background/60 border border-dashed border-border/60 hover:border-border"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Novo Pedido
+                </Button>
+              </div>
             </div>
           </ScrollArea>
         )}
