@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/ImportClientesDialog';
 
 import { toast } from 'sonner';
@@ -532,21 +532,23 @@ const Clientes = () => {
             onAdd={handleAddColumn}
             onRemove={handleRemoveColumn}
             label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Settings2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Opções</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="gap-2">
-                  <FileDown className="h-4 w-4 text-muted-foreground" />
-                  <span>Exportar</span>
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-48">
+          >
+            <div className="pt-2 border-t border-border mt-1 px-2 pb-2 space-y-1">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                Ações
+              </p>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-full flex items-center justify-between px-2 py-1.5 text-xs rounded-md hover:bg-muted transition-colors">
+                    <div className="flex items-center gap-2">
+                      <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>Exportar</span>
+                    </div>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
                   <DropdownMenuItem
                     onClick={() => {
                       const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
@@ -567,14 +569,18 @@ const Clientes = () => {
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     CSV (.csv)
                   </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuItem onClick={() => setImportOpen(true)} className="gap-2">
-                <Upload className="h-4 w-4 text-muted-foreground" />
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <button
+                onClick={() => setImportOpen(true)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-muted transition-colors text-left"
+              >
+                <Upload className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>Importar</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </button>
+            </div>
+          </ColumnSettings>
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
 
           {/* Novo tipo dialog — criação + gerenciamento */}
