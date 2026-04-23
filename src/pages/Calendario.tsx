@@ -1,10 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/AppLayout";
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -108,6 +110,7 @@ export default function Calendario() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [initialSlot, setInitialSlot] = useState<Partial<EventoForm>>({});
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [isImporting, setIsImporting] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -117,6 +120,16 @@ export default function Calendario() {
 
   const isMobile = useIsMobile();
   const events = useCalendarEvents(visibleCalendars);
+
+  const filteredEvents = useMemo(() => {
+    if (!searchQuery.trim()) return events;
+    const q = searchQuery.toLowerCase();
+    return events.filter(e => 
+      e.titulo.toLowerCase().includes(q) || 
+      (e.descricao?.toLowerCase().includes(q))
+    );
+  }, [events, searchQuery]);
+
   const { mutate: createEvento } = useCreateEvento();
   const { mutateAsync: bulkCreateEventos } = useBulkCreateEventos();
   const { mutate: updateEvento } = useUpdateEvento();
@@ -302,6 +315,17 @@ export default function Calendario() {
         <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Sidebar esquerda — oculta em mobile */}
           <aside className="hidden lg:flex w-56 border-r flex-col gap-5 p-3 shrink-0 overflow-y-auto min-h-0">
+            {/* Barra de Pesquisa */}
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar eventos..."
+                className="pl-8 h-9 text-xs"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
             {/* Mini calendário — células w-7 (28px) × 7 = 196px + p-2 = 212px < 224px */}
             <Calendar
               mode="single"
@@ -371,7 +395,7 @@ export default function Calendario() {
             {viewMode === "mes" ? (
               <CalendarMonthView
                 date={currentDate}
-                events={events}
+                events={filteredEvents}
                 onClickDay={(day) => {
                   setCurrentDate(day);
                   setViewMode("dia");
@@ -381,7 +405,7 @@ export default function Calendario() {
             ) : (
               <TimeGridView
                 days={gridDays}
-                events={events}
+                events={filteredEvents}
                 onClickSlot={handleClickSlot}
                 onCreateRange={handleCreateRange}
                 onClickEvent={openEditEvent}
