@@ -110,15 +110,21 @@ export default function Calendario() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [initialSlot, setInitialSlot] = useState<Partial<EventoForm>>({});
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [isImporting, setIsImporting] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [importCalendarType, setImportCalendarType] = useState<CalendarType>("empresa");
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
-
+// ... keep existing code
   const isMobile = useIsMobile();
   const events = useCalendarEvents(visibleCalendars);
+
+  const filteredEvents = useMemo(() => {
+    if (!searchQuery.trim()) return events;
+    const q = searchQuery.toLowerCase();
+    return events.filter(e => 
+      e.titulo.toLowerCase().includes(q) || 
+      (e.descricao?.toLowerCase().includes(q))
+    );
+  }, [events, searchQuery]);
   const { mutate: createEvento } = useCreateEvento();
   const { mutateAsync: bulkCreateEventos } = useBulkCreateEventos();
   const { mutate: updateEvento } = useUpdateEvento();
