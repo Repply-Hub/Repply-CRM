@@ -10,6 +10,7 @@ export interface ColumnDefinition {
     label: string;
     customLabel?: string;
     locked?: boolean;
+    isCustom?: boolean;
 }
 
 interface ColumnSettingsProps {
@@ -17,6 +18,8 @@ interface ColumnSettingsProps {
     visibleColumns: string[];
     onChange: (visibleColumns: string[]) => void;
     onRename?: (columnId: string, newLabel: string) => void;
+    onAdd?: (label: string) => void;
+    onRemove?: (columnId: string) => void;
     className?: string;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
