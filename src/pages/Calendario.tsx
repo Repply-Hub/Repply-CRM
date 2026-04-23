@@ -9,7 +9,23 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-// ... keep existing code
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CalendarHeader } from "@/components/calendar/CalendarHeader";
+import { TimeGridView } from "@/components/calendar/TimeGridView";
+import { CalendarMonthView } from "@/components/calendar/CalendarMonthView";
+import { EventDialog } from "@/components/calendar/EventDialog";
+import { getWeekDays } from "@/components/calendar/calendarUtils";
+import type { ViewMode, CalendarType, EventoForm, CalendarEvent } from "@/components/calendar/types";
+import { CALENDAR_COLORS } from "@/components/calendar/types";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import {
+  useCalendarEvents,
+  useCreateEvento,
+  useBulkCreateEventos,
+  useUpdateEvento,
+  useDeleteEvento,
+} from "@/hooks/use-eventos";
 import { toast } from "sonner";
 import { validateFile } from "@/lib/file-validation";
 
