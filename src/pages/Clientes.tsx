@@ -166,6 +166,11 @@ const Clientes = () => {
     toast.success(`Tipo "${label}" criado`);
   };
 
+  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('clientes_custom_labels');
+    return saved ? JSON.parse(saved) : {};
+  });
+
   const [visibleFields, setVisibleFields] = useState<string[]>(() => {
     const saved = localStorage.getItem('clientes_fields');
     return saved ? JSON.parse(saved) : CLIENTE_FIELDS.map(c => c.id);
@@ -175,6 +180,13 @@ const Clientes = () => {
     const saved = localStorage.getItem('contatos_fields');
     return saved ? JSON.parse(saved) : CONTATO_FIELDS.map(c => c.id);
   });
+
+  const handleRename = (columnId: string, newLabel: string) => {
+    const next = { ...customLabels, [columnId]: newLabel };
+    setCustomLabels(next);
+    localStorage.setItem('clientes_custom_labels', JSON.stringify(next));
+    toast.success('Coluna renomeada');
+  };
 
   const handleFieldChange = (newFields: string[]) => {
     setVisibleFields(newFields);
@@ -222,6 +234,12 @@ const Clientes = () => {
   );
 
   const filtered = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+  
+  const currentColumns: ColumnDefinition[] = (activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS).map(col => ({
+    ...col,
+    customLabel: customLabels[col.id]
+  }));
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginatedEmpresas = filteredEmpresas.slice((page - 1) * pageSize, page * pageSize);
   const paginatedContatos = filteredContatos.slice((page - 1) * pageSize, page * pageSize);
@@ -518,103 +536,52 @@ const Clientes = () => {
               </div>
             </PopoverContent>
           </Popover>
+          <ColumnSettings
+            columns={currentColumns}
+            visibleColumns={activeTab === 'empresas' ? visibleFields : visibleContatoFields}
+            onChange={activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange}
+            onRename={handleRename}
+            label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
+          />
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
-                <Settings2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Opções</span>
+                <FileDown className="h-4 w-4" />
+                <span className="hidden sm:inline">Exportar</span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="start" sideOffset={4} className="w-auto p-0">
-              <div className="flex divide-x divide-border">
-                {/* Coluna esquerda: visibilidade das colunas da tabela */}
-                <div className="p-2 min-w-[220px]">
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Colunas</div>
-                  <div className="space-y-0.5">
-                    {(activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS).map((column) => {
-                      const currentVisible = activeTab === 'empresas' ? visibleFields : visibleContatoFields;
-                      const currentOnChange = activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange;
-                      const allCols = activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS;
-                      const checked = currentVisible.includes(column.id);
-                      const disabled = column.locked || (checked && currentVisible.length === 1);
-                      return (
-                        <button
-                          key={column.id}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => {
-                            if (column.locked) return;
-                            if (checked) {
-                              if (currentVisible.length > 1) currentOnChange(currentVisible.filter(id => id !== column.id));
-                            } else {
-                              const newVisible = allCols.filter(c => currentVisible.includes(c.id) || c.id === column.id).map(c => c.id);
-                              currentOnChange(newVisible);
-                            }
-                          }}
-                          className={cn(
-                            'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-normal transition-colors text-left',
-                            'hover:bg-muted/60 disabled:cursor-not-allowed',
-                            !checked && 'opacity-40'
-                          )}
-                        >
-                          <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', checked ? 'bg-primary' : 'bg-muted-foreground/40')} />
-                          <span className="flex-1 truncate">{column.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const allCols = activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS;
-                      const currentOnChange = activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange;
-                      currentOnChange(allCols.map(c => c.id));
-                    }}
-                    className="w-full text-center text-xs text-primary font-medium px-2 py-2 mt-1 rounded-md hover:bg-muted/60 transition-colors"
-                  >
-                    Resetar todas
-                  </button>
-                </div>
-
-                {/* Coluna direita: ações */}
-                <div className="p-2 min-w-[200px]">
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ações</div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                      exportToFile(data, activeTab, 'xlsx');
-                    }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                    Exportar Excel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                      exportToFile(data, activeTab, 'csv');
-                    }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-                  >
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    Exportar CSV
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImportOpen(true)}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-                  >
-                    <Upload className="h-4 w-4 text-muted-foreground" />
-                    Importar
-                  </button>
-                </div>
+            <PopoverContent align="end" className="w-48 p-2">
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                    exportToFile(data, activeTab, 'xlsx');
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+                >
+                  <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                  Excel (.xlsx)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                    exportToFile(data, activeTab, 'csv');
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  CSV (.csv)
+                </button>
               </div>
             </PopoverContent>
           </Popover>
-          {/* Import dialog (controlled) */}
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline">Importar</span>
+          </Button>
 
           {/* Novo tipo dialog — criação + gerenciamento */}
           <Dialog open={newTipoOpen} onOpenChange={(o) => { setNewTipoOpen(o); if (!o) setNewTipoName(''); }}>
@@ -834,12 +801,12 @@ const Clientes = () => {
                     <th className="py-2.5 px-4 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
-                    <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome/Empresa</th>
-                    {visibleFields.includes('tipo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Tipo</th>}
-                    {visibleFields.includes('cnpj') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">CPF/CNPJ</th>}
-                    {visibleFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">E-mail</th>}
-                    {visibleFields.includes('endereco') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden xl:table-cell">Endereço</th>}
-                    {visibleFields.includes('obras_count') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Obras</th>}
+                    <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['empresa'] || 'Nome/Empresa'}</th>
+                    {visibleFields.includes('tipo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['tipo'] || 'Tipo'}</th>}
+                    {visibleFields.includes('cnpj') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['cnpj'] || 'CPF/CNPJ'}</th>}
+                    {visibleFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">{customLabels['email'] || 'E-mail'}</th>}
+                    {visibleFields.includes('endereco') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden xl:table-cell">{customLabels['endereco'] || 'Endereço'}</th>}
+                    {visibleFields.includes('obras_count') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['obras_count'] || 'Obras'}</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -906,11 +873,11 @@ const Clientes = () => {
                     <th className="py-2.5 px-4 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
-                    {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Nome</th>}
-                    {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">Empresa</th>}
-                    {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Cargo</th>}
-                    {visibleContatoFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">E-mail</th>}
-                    {visibleContatoFields.includes('telefone') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">Telefone</th>}
+                    {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['nome_contato'] || 'Nome'}</th>}
+                    {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['empresa'] || 'Empresa'}</th>}
+                    {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['cargo'] || 'Cargo'}</th>}
+                    {visibleContatoFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">{customLabels['email'] || 'E-mail'}</th>}
+                    {visibleContatoFields.includes('telefone') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['telefone'] || 'Telefone'}</th>}
                   </tr>
                 </thead>
                 <tbody>
