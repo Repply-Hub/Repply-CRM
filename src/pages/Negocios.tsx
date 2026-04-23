@@ -403,65 +403,75 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       onRemove={handleRemoveColumn}
       hideColumns={showKanban}
     >
-      <div className={cn("p-2", !showKanban && "border-t border-border/50")}>
-        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          {showKanban ? 'Personalizar Etapas' : 'Ações'}
+      <div className={cn("p-1", !showKanban && "border-t border-border/50")}>
+        <div className="px-4 py-2.5 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
+          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+            {showKanban ? 'Personalizar Etapas' : 'Ações'}
+          </span>
         </div>
-        {showKanban ? (
-          <div className="space-y-0.5 mb-2">
-            {KANBAN_STAGES.map((stage) => {
-              const checked = visibleKanbanStages.includes(stage.key);
-              const disabled = visibleKanbanStages.length === 1 && checked;
-              return (
-                <button
-                  key={stage.key}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => toggleKanbanStage(stage.key)}
-                  className={cn(
-                    'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-normal transition-colors text-left',
-                    'hover:bg-muted/60 disabled:cursor-not-allowed',
-                    !checked && 'opacity-40'
-                  )}
-                >
-                  <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', `bg-${stage.color}`)} />
-                  <span className="flex-1 truncate">{stage.label}</span>
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
-              className="w-full text-center text-xs text-primary font-medium px-2 py-2 mt-1 rounded-md hover:bg-muted/60 transition-colors"
-            >
-              Resetar etapas
-            </button>
-          </div>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => setColunasDialogOpen(true)}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-        >
-          <Columns3 className="h-4 w-4 text-muted-foreground" />
-          Gerenciar colunas...
-        </button>
-        <button
-          type="button"
-          onClick={handleExportPdf}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-        >
-          <FileDown className="h-4 w-4 text-muted-foreground" />
-          Exportar PDF
-        </button>
-        <button
-          type="button"
-          onClick={() => setImportOpen(true)}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-        >
-          <Upload className="h-4 w-4 text-muted-foreground" />
-          Importar
-        </button>
+        
+        <div className="px-1.5 py-0.5 space-y-1">
+          {showKanban ? (
+            <div className="space-y-1">
+              {KANBAN_STAGES.map((stage) => {
+                const checked = visibleKanbanStages.includes(stage.key);
+                const disabled = visibleKanbanStages.length === 1 && checked;
+                return (
+                  <button
+                    key={stage.key}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => toggleKanbanStage(stage.key)}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left',
+                      'hover:bg-muted/80 disabled:cursor-not-allowed',
+                      !checked && 'opacity-40'
+                    )}
+                  >
+                    <span className={cn('h-3.5 w-3.5 rounded-md shrink-0 border border-border/40', `bg-${stage.color}`)} />
+                    <span className="flex-1 truncate">{stage.label}</span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
+                className="w-full text-center text-[11px] text-primary font-bold px-2 py-2 mt-1 rounded-md hover:bg-primary/5 transition-colors uppercase tracking-wider"
+              >
+                Resetar etapas
+              </button>
+            </div>
+          ) : null}
+          
+          {!showKanban && (
+            <>
+              <button
+                type="button"
+                onClick={() => setColunasDialogOpen(true)}
+                className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium hover:bg-muted/80 transition-all text-left"
+              >
+                <Columns3 className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Gerenciar colunas...</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium hover:bg-muted/80 transition-all text-left"
+              >
+                <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Exportar PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium hover:bg-muted/80 transition-all text-left"
+              >
+                <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Importar</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </ColumnSettings>
   );

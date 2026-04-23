@@ -70,11 +70,11 @@ export function ExportClientesButton({ data, type }: ExportClientesButtonProps) 
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => exportFile('xlsx')} className="gap-2">
-          <FileSpreadsheet className="h-4 w-4" /> Excel (.xlsx)
+        <DropdownMenuItem onClick={() => exportFile('xlsx')} className="gap-3 text-[13px]">
+          <FileSpreadsheet className="h-3.5 w-3.5 text-muted-foreground" /> Excel (.xlsx)
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => exportFile('csv')} className="gap-2">
-          <FileText className="h-4 w-4" /> CSV (.csv)
+        <DropdownMenuItem onClick={() => exportFile('csv')} className="gap-3 text-[13px]">
+          <FileText className="h-3.5 w-3.5 text-muted-foreground" /> CSV (.csv)
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
