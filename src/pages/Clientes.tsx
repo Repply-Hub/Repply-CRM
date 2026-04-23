@@ -166,6 +166,11 @@ const Clientes = () => {
     toast.success(`Tipo "${label}" criado`);
   };
 
+  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('clientes_custom_labels');
+    return saved ? JSON.parse(saved) : {};
+  });
+
   const [visibleFields, setVisibleFields] = useState<string[]>(() => {
     const saved = localStorage.getItem('clientes_fields');
     return saved ? JSON.parse(saved) : CLIENTE_FIELDS.map(c => c.id);
@@ -175,6 +180,13 @@ const Clientes = () => {
     const saved = localStorage.getItem('contatos_fields');
     return saved ? JSON.parse(saved) : CONTATO_FIELDS.map(c => c.id);
   });
+
+  const handleRename = (columnId: string, newLabel: string) => {
+    const next = { ...customLabels, [columnId]: newLabel };
+    setCustomLabels(next);
+    localStorage.setItem('clientes_custom_labels', JSON.stringify(next));
+    toast.success('Coluna renomeada');
+  };
 
   const handleFieldChange = (newFields: string[]) => {
     setVisibleFields(newFields);
