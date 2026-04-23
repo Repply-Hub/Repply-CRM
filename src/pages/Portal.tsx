@@ -902,7 +902,7 @@ export default function Portal() {
     <AppLayout title="Portal de Consultas" subtitle="Consulte licenças e publicações oficiais de órgãos públicos.">
       <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         {/* Search bar */}
-        <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
