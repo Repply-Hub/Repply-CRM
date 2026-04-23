@@ -251,6 +251,7 @@ export default function Tarefas() {
             visibleColumns={visibleColumns}
             onChange={setVisibleColumns}
             onRename={handleRename}
+            onReorder={handleReorder}
             onAdd={handleAddColumn}
             onRemove={handleRemoveColumn}
           />
