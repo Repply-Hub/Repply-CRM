@@ -165,16 +165,19 @@ export function AppSidebar() {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <SidebarHeader className="px-2 py-3 border-b border-primary/10 mb-2">
+        <SidebarHeader 
+          className="px-2 py-3 border-b border-primary/10 mb-2"
+          style={{ backgroundColor: branding.cor ? `${branding.cor}15` : undefined }}
+        >
           <Link
             to="/dashboard"
             className={`flex items-center overflow-visible hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : 'gap-3'}`}
           >
-            <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
+            <img src={branding.logo || logoSidebar} alt={branding.nome} className="shrink-0 object-contain rounded-md bg-white p-1" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
             {!collapsed && (
               <div className="min-w-0">
-                <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
-                <p className="text-[10px] text-sidebar-foreground/50 font-medium">Gestão Comercial</p>
+                <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">{branding.nome}</p>
+                <p className="text-[10px] text-sidebar-foreground/50 font-medium">{branding.subtitulo}</p>
               </div>
             )}
           </Link>
