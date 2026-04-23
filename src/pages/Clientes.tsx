@@ -577,21 +577,11 @@ const Clientes = () => {
               </div>
             </PopoverContent>
           </Popover>
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    Exportar CSV
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImportOpen(true)}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-                  >
-                    <Upload className="h-4 w-4 text-muted-foreground" />
-                    Importar
-                  </button>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline">Importar</span>
+          </Button>
           {/* Import dialog (controlled) */}
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
 
