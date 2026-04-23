@@ -75,21 +75,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   );
 
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
-  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('pedidos_custom_labels');
-    return saved ? JSON.parse(saved) : {};
+  const {
+    columns,
+    visibleColumns,
+    setVisibleColumns,
+    pageSize,
+    setPageSize,
+    handleRename,
+    handleAddColumn,
+    handleRemoveColumn,
+    getLabel
+  } = useTableSettings({
+    key: 'pedidos',
+    defaultColumns: PEDIDOS_COLUMNS,
   });
-
-  const handleRename = (columnId: string, newLabel: string) => {
-    const next = { ...customLabels, [columnId]: newLabel };
-    setCustomLabels(next);
-    localStorage.setItem('pedidos_custom_labels', JSON.stringify(next));
-  };
-
-  const currentColumns = PEDIDOS_COLUMNS.map(col => ({
-    ...col,
-    customLabel: customLabels[col.id]
-  }));
 
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
   const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
@@ -107,7 +106,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [importOpen, setImportOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
