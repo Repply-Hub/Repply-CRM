@@ -542,39 +542,10 @@ const Clientes = () => {
               </div>
               
               <div className="px-1.5 space-y-1">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="w-full flex items-center justify-between px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left group">
-                      <div className="flex items-center gap-3">
-                        <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>Exportar</span>
-                      </div>
-                      <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-48">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                        exportToFile(data, activeTab, 'xlsx');
-                      }}
-                      className="gap-3 text-[13px]"
-                    >
-                      <FileSpreadsheet className="h-3.5 w-3.5 text-muted-foreground" />
-                      Excel (.xlsx)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                        exportToFile(data, activeTab, 'csv');
-                      }}
-                      className="gap-3 text-[13px]"
-                    >
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                      CSV (.csv)
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <ExportClientesButton 
+                  data={activeTab === 'empresas' ? filteredEmpresas : filteredContatos} 
+                  type={activeTab} 
+                />
 
                 <button
                   onClick={() => setImportOpen(true)}
