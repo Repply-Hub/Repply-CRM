@@ -6,6 +6,17 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export interface ColumnDefinition {
     id: string;
