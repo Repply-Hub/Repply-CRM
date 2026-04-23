@@ -97,10 +97,8 @@ export default function Obras() {
     return list;
   }, [obras, search, statusFilter, sort]);
 
-  const currentColumns = OBRA_FIELDS.map(col => ({
-    ...col,
-    label: customLabels[col.id] || col.label
-  }));
+  // currentColumns replaced by hook's columns
+
 
   const obrasParaMapa = useMemo(
     () =>
