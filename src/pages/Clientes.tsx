@@ -536,7 +536,7 @@ const Clientes = () => {
             label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
           >
             <div className="pt-2 border-t border-border/50 mt-1 px-1 pb-2 space-y-1">
-              <div className="px-3 py-2 flex items-center justify-between bg-muted/30">
+              <div className="px-4 py-2.5 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
                 <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Ações</span>
               </div>
               
@@ -557,9 +557,9 @@ const Clientes = () => {
                         const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
                         exportToFile(data, activeTab, 'xlsx');
                       }}
-                      className="gap-2"
+                      className="gap-3 text-[13px]"
                     >
-                      <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                      <FileSpreadsheet className="h-3.5 w-3.5 text-muted-foreground" />
                       Excel (.xlsx)
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -567,9 +567,9 @@ const Clientes = () => {
                         const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
                         exportToFile(data, activeTab, 'csv');
                       }}
-                      className="gap-2"
+                      className="gap-3 text-[13px]"
                     >
-                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                       CSV (.csv)
                     </DropdownMenuItem>
                   </DropdownMenuContent>

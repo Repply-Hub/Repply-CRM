@@ -404,13 +404,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       hideColumns={showKanban}
     >
       <div className={cn("p-1", !showKanban && "border-t border-border/50")}>
-        <div className="px-3 py-2 flex items-center justify-between bg-muted/30">
+        <div className="px-4 py-2.5 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
           <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
             {showKanban ? 'Personalizar Etapas' : 'Ações'}
           </span>
         </div>
         
-        <div className="px-1.5 py-1 space-y-1">
+        <div className="px-1.5 py-0.5 space-y-1">
           {showKanban ? (
             <div className="space-y-1">
               {KANBAN_STAGES.map((stage) => {
