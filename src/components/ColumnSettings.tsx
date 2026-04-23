@@ -25,6 +25,8 @@ interface ColumnSettingsProps {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     hideTrigger?: boolean;
+    /** Se true, oculta a lista de colunas */
+    hideColumns?: boolean;
     /** Texto exibido no trigger e no título da seção. Default: "Colunas" */
     label?: string;
     children?: React.ReactNode;
@@ -42,6 +44,7 @@ export function ColumnSettings({
     onOpenChange,
     hideTrigger,
     label = 'Colunas',
+    hideColumns = false,
     children,
 }: ColumnSettingsProps) {
     const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -95,19 +98,20 @@ export function ColumnSettings({
                 </Button>
             </PopoverTrigger>
             <PopoverContent align="start" sideOffset={4} className="w-[260px] p-0">
-                <div className="p-2">
-                    <div className="px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        <span>{label}</span>
-                        {onAdd && (
-                            <button
-                                onClick={() => setIsAdding(!isAdding)}
-                                className="h-5 w-5 rounded hover:bg-muted flex items-center justify-center text-primary"
-                                title="Criar nova coluna"
-                            >
-                                <Plus className="h-3.5 w-3.5" />
-                            </button>
-                        )}
-                    </div>
+                {!hideColumns && (
+                    <div className="p-2">
+                        <div className="px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            <span>{label}</span>
+                            {onAdd && (
+                                <button
+                                    onClick={() => setIsAdding(!isAdding)}
+                                    className="h-5 w-5 rounded hover:bg-muted flex items-center justify-center text-primary"
+                                    title="Criar nova coluna"
+                                >
+                                    <Plus className="h-3.5 w-3.5" />
+                                </button>
+                            )}
+                        </div>
 
                     {isAdding && onAdd && (
                         <div className="px-2 py-2 mb-2 bg-muted/40 rounded-md space-y-2">
@@ -223,6 +227,7 @@ export function ColumnSettings({
                         </button>
                     </div>
                 </div>
+                )}
                 {children}
             </PopoverContent>
         </Popover>
