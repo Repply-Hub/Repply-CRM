@@ -227,13 +227,13 @@ export function ColumnSettings({
                             })}
                         </div>
                     </ScrollArea>
-                    <div className="pt-1 border-t border-border mt-1">
+                    <div className="p-1.5 bg-muted/20 border-t border-border/50">
                         <button
                             type="button"
                             onClick={() => onChange(columns.map(c => c.id))}
-                            className="w-full text-center text-[10px] text-primary font-medium px-2 py-1.5 rounded-md hover:bg-muted/60 transition-colors"
+                            className="w-full text-center text-[11px] text-primary font-bold px-3 py-2 rounded-lg hover:bg-primary/10 transition-all active:scale-[0.98] uppercase tracking-wider"
                         >
-                            Resetar todas
+                            Restaurar padrão
                         </button>
                     </div>
                 </div>
