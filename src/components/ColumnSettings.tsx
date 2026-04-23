@@ -47,7 +47,8 @@ interface ColumnSettingsProps {
     visibleColumns: string[];
     onChange: (visibleColumns: string[]) => void;
     onRename?: (columnId: string, newLabel: string) => void;
-    onAdd?: (label: string) => void;
+    onTypeChange?: (columnId: string, type: ColumnDataType) => void;
+    onAdd?: (label: string, type: ColumnDataType) => void;
     onRemove?: (columnId: string) => void;
     onReorder?: (startIndex: number, endIndex: number) => void;
     presets?: ColumnPreset[];
@@ -65,11 +66,20 @@ interface ColumnSettingsProps {
     children?: React.ReactNode;
 }
 
+const DATA_TYPES: { value: ColumnDataType; label: string; icon: any }[] = [
+    { value: 'text', label: 'Texto', icon: Type },
+    { value: 'number', label: 'Número', icon: Hash },
+    { value: 'date', label: 'Data', icon: Calendar },
+    { value: 'boolean', label: 'Booleano', icon: ToggleLeft },
+    { value: 'currency', label: 'Moeda', icon: DollarSign },
+];
+
 export function ColumnSettings({
     columns,
     visibleColumns,
     onChange,
     onRename,
+    onTypeChange,
     onAdd,
     onRemove,
     onReorder,
@@ -88,6 +98,7 @@ export function ColumnSettings({
     const [editingId, setEditingId] = React.useState<string | null>(null);
     const [editValue, setEditValue] = React.useState('');
     const [newColumnLabel, setNewColumnLabel] = React.useState('');
+    const [newColumnType, setNewColumnType] = React.useState<ColumnDataType>('text');
     const [isAdding, setIsAdding] = React.useState(false);
     const [newPresetName, setNewPresetName] = React.useState('');
     const [isSavingPreset, setIsSavingPreset] = React.useState(false);
@@ -119,8 +130,9 @@ export function ColumnSettings({
 
     const handleAdd = () => {
         if (newColumnLabel.trim() && onAdd) {
-            onAdd(newColumnLabel.trim());
+            onAdd(newColumnLabel.trim(), newColumnType);
             setNewColumnLabel('');
+            setNewColumnType('text');
             setIsAdding(false);
         }
     };
@@ -179,6 +191,21 @@ export function ColumnSettings({
                                     if (e.key === 'Escape') setIsAdding(false);
                                 }}
                             />
+                            <Select value={newColumnType} onValueChange={(val: ColumnDataType) => setNewColumnType(val)}>
+                                <SelectTrigger className="h-7 text-xs">
+                                    <SelectValue placeholder="Tipo de dado" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {DATA_TYPES.map(type => (
+                                        <SelectItem key={type.value} value={type.value} className="text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <type.icon className="h-3 w-3" />
+                                                {type.label}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <div className="flex gap-1.5">
                                 <Button size="sm" className="h-6 flex-1 text-[10px]" onClick={handleAdd}>Adicionar</Button>
                                 <Button size="sm" variant="ghost" className="h-6 flex-1 text-[10px]" onClick={() => setIsAdding(false)}>Cancelar</Button>
@@ -199,6 +226,7 @@ export function ColumnSettings({
                                             const checked = visibleColumns.includes(column.id);
                                             const disabled = column.locked || (checked && visibleColumns.length === 1);
                                             const isEditing = editingId === column.id;
+                                            const typeIcon = DATA_TYPES.find(t => t.value === (column.type || 'text'))?.icon || Type;
 
                                             return (
                                                 <Draggable 
@@ -251,40 +279,69 @@ export function ColumnSettings({
                                                                     {checked && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                                                                 </div>
                                                                 {isEditing ? (
-                                                                    <div className="flex-1 flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                                                    <div className="flex-1 flex flex-col gap-1.5" onClick={e => e.stopPropagation()}>
                                                                         <Input
                                                                             value={editValue}
                                                                             onChange={e => setEditValue(e.target.value)}
-                                                                            className="h-6 text-[10px] py-0 px-1.5"
+                                                                            className="h-7 text-xs py-0 px-2"
                                                                             autoFocus
                                                                             onKeyDown={e => {
                                                                                 if (e.key === 'Enter') handleRename();
                                                                                 if (e.key === 'Escape') setEditingId(null);
                                                                             }}
                                                                         />
-                                                                        <button 
-                                                                            type="button"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleRename();
-                                                                            }}
-                                                                            className="h-5 w-5 rounded hover:bg-primary/20 flex items-center justify-center text-primary"
-                                                                        >
-                                                                            <Check className="h-3 w-3" />
-                                                                        </button>
-                                                                        <button 
-                                                                            type="button"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                setEditingId(null);
-                                                                            }}
-                                                                            className="h-5 w-5 rounded hover:bg-destructive/20 flex items-center justify-center text-destructive"
-                                                                        >
-                                                                            <X className="h-3 w-3" />
-                                                                        </button>
+                                                                        {onTypeChange && column.isCustom && (
+                                                                            <Select 
+                                                                                value={column.type || 'text'} 
+                                                                                onValueChange={(val: ColumnDataType) => onTypeChange(column.id, val)}
+                                                                            >
+                                                                                <SelectTrigger className="h-6 text-[10px]">
+                                                                                    <SelectValue />
+                                                                                </SelectTrigger>
+                                                                                <SelectContent>
+                                                                                    {DATA_TYPES.map(type => (
+                                                                                        <SelectItem key={type.value} value={type.value} className="text-[10px]">
+                                                                                            <div className="flex items-center gap-1.5">
+                                                                                                <type.icon className="h-2.5 w-2.5" />
+                                                                                                {type.label}
+                                                                                            </div>
+                                                                                        </SelectItem>
+                                                                                    ))}
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        )}
+                                                                        <div className="flex gap-1 justify-end">
+                                                                            <button 
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    handleRename();
+                                                                                }}
+                                                                                className="h-5 w-5 rounded hover:bg-primary/20 flex items-center justify-center text-primary"
+                                                                            >
+                                                                                <Check className="h-3 w-3" />
+                                                                            </button>
+                                                                            <button 
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setEditingId(null);
+                                                                                }}
+                                                                                className="h-5 w-5 rounded hover:bg-destructive/20 flex items-center justify-center text-destructive"
+                                                                            >
+                                                                                <X className="h-3 w-3" />
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
                                                                 ) : (
-                                                                    <span className="flex-1 truncate">{column.customLabel || column.label}</span>
+                                                                    <div className="flex-1 flex items-center justify-between gap-2 overflow-hidden">
+                                                                        <span className="truncate">{column.customLabel || column.label}</span>
+                                                                        {column.type && column.type !== 'text' && (
+                                                                            <div className="flex items-center text-muted-foreground/60" title={DATA_TYPES.find(t => t.value === column.type)?.label}>
+                                                                                {React.createElement(typeIcon, { className: "h-3 w-3" })}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                             
@@ -298,7 +355,7 @@ export function ColumnSettings({
                                                                                 startEditing(column);
                                                                             }}
                                                                             className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
-                                                                            title="Renomear"
+                                                                            title="Renomear e configurar"
                                                                         >
                                                                             <Edit2 className="h-3 w-3" />
                                                                         </button>

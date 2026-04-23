@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import type { ColumnDefinition } from '@/components/ColumnSettings';
+import type { ColumnDefinition, ColumnDataType } from '@/components/ColumnSettings';
 import { toast } from 'sonner';
 
 interface TablePreset {
@@ -77,11 +77,19 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     setCustomLabels(prev => ({ ...prev, [columnId]: newLabel }));
   }, []);
 
-  const handleAddColumn = useCallback((label: string) => {
+  const handleTypeChange = useCallback((columnId: string, type: ColumnDataType) => {
+    setColumns(prev => prev.map(col => 
+      col.id === columnId ? { ...col, type } : col
+    ));
+    toast.success('Tipo de coluna atualizado');
+  }, []);
+
+  const handleAddColumn = useCallback((label: string, type: ColumnDataType = 'text') => {
     const id = `custom_${label.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
-    const newCol: ColumnDefinition = { id, label, isCustom: true };
+    const newCol: ColumnDefinition = { id, label, isCustom: true, type };
     setColumns(prev => [...prev, newCol]);
     setVisibleColumns(prev => [...prev, id]);
+    toast.success(`Coluna "${label}" adicionada`);
   }, []);
 
   const handleRemoveColumn = useCallback((columnId: string) => {
@@ -150,6 +158,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     pageSize,
     setPageSize,
     handleRename,
+    handleTypeChange,
     handleAddColumn,
     handleRemoveColumn,
     handleReorder,
