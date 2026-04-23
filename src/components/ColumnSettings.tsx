@@ -277,7 +277,7 @@ export function ColumnSettings({
                                                                             <Edit2 className="h-3 w-3" />
                                                                         </button>
                                                                     )}
-                                                                    {column.isCustom && onRemove && (
+                                                                    {!column.locked && onRemove && (
                                                                         <button
                                                                             type="button"
                                                                             onClick={(e) => {
