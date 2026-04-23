@@ -322,6 +322,7 @@ const Fabricantes = () => {
     handleRename: handlePrecoRename,
     handleAddColumn: handleAddPrecoColumn,
     handleRemoveColumn: handleRemovePrecoColumn,
+    handleReorder: handlePrecoReorder,
     getLabel: getPrecoLabel
   } = useTableSettings({
     key: 'fabricantes_precos',
