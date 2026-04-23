@@ -105,10 +105,11 @@ export function ColumnSettings({
                             {onAdd && (
                                 <button
                                     onClick={() => setIsAdding(!isAdding)}
-                                    className="h-5 w-5 rounded hover:bg-muted flex items-center justify-center text-primary"
+                                    className="flex items-center gap-1 h-6 px-2 rounded-md hover:bg-muted text-primary transition-colors"
                                     title="Criar nova coluna"
                                 >
                                     <Plus className="h-3.5 w-3.5" />
+                                    <span className="text-[10px] font-medium">Nova Coluna</span>
                                 </button>
                             )}
                         </div>
