@@ -61,15 +61,12 @@ export function ListPagination({
   itemLabelPlural,
   className,
 }: ListPaginationProps) {
-  if (totalItems === 0) {
-    return null;
-  }
-
+  const safeTotalItems = totalItems || 0;
   const safeTotalPages = Math.max(1, totalPages);
   const safePage = Math.min(Math.max(page, 1), safeTotalPages);
-  const start = (safePage - 1) * pageSize + 1;
-  const end = Math.min(safePage * pageSize, totalItems);
-  const summaryLabel = totalItems === 1 ? itemLabel : itemLabelPlural ?? `${itemLabel}s`;
+  const start = safeTotalItems === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const end = Math.min(safePage * pageSize, safeTotalItems);
+  const summaryLabel = safeTotalItems === 1 ? itemLabel : itemLabelPlural ?? `${itemLabel}s`;
   const pageTokens = getPageTokens(safePage, safeTotalPages);
 
   const handlePageChange = (nextPage: number) => {
