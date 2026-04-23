@@ -44,6 +44,7 @@ export function ColumnSettings({
     onOpenChange,
     hideTrigger,
     label = 'Colunas',
+    hideColumns = false,
     children,
 }: ColumnSettingsProps) {
     const [editingId, setEditingId] = React.useState<string | null>(null);
