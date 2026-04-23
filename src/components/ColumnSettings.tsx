@@ -139,8 +139,8 @@ export function ColumnSettings({
                         </div>
                     )}
 
-                    <ScrollArea className="max-h-[300px] overflow-y-auto">
-                        <div className="space-y-0.5">
+                    <ScrollArea className="max-h-[320px] overflow-y-auto px-1.5 py-2">
+                        <div className="space-y-1">
                             {columns.map((column) => {
                                 const checked = visibleColumns.includes(column.id);
                                 const disabled = column.locked || (checked && visibleColumns.length === 1);
