@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
+import { EmpresaTab } from '@/components/configuracoes/EmpresaTab';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
