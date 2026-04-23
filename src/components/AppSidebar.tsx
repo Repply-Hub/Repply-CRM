@@ -10,6 +10,7 @@ import { useSidebarPreferences, SidebarItem } from '@/hooks/use-sidebar-preferen
 import { usePermissoes } from '@/hooks/use-permissoes';
 import { getIconComponent } from '@/lib/sidebar-icons';
 import { SidebarAddItemDialog } from '@/components/SidebarAddItemDialog';
+import { useBranding } from '@/hooks/use-branding';
 import logoSidebar from '@/assets/logo-sidebar.svg';
 import { toast } from 'sonner';
 import {
