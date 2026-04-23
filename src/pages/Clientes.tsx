@@ -23,6 +23,7 @@ import { ImportClientesDialog } from '@/components/ImportClientesDialog';
 
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { useTableSettings } from '@/hooks/use-table-settings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 import { EnderecoForm } from '@/components/EnderecoForm';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
