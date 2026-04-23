@@ -145,10 +145,21 @@ export function ManualEntryStep({ fields, onCancel, onConfirm }: Props) {
           <thead className="sticky top-0 bg-muted/60 backdrop-blur z-10">
             <tr>
               <th className="px-2 py-2 text-xs font-medium text-muted-foreground w-10 text-center">#</th>
-              {fields.map(f => (
+              {activeBaseFields.map(f => (
                 <th key={f.key} className="px-2 py-2 text-xs font-medium text-left whitespace-nowrap">
-                  {f.label}
-                  {f.required && <span className="text-destructive ml-0.5">*</span>}
+                  <div className="flex items-center gap-1 group">
+                    <span>{f.label}</span>
+                    {f.required && <span className="text-destructive">*</span>}
+                    {!f.required && (
+                      <button
+                        onClick={() => removeBaseColumn(f.key)}
+                        className="opacity-0 group-hover:opacity-100 transition text-muted-foreground hover:text-destructive"
+                        title="Remover coluna"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                 </th>
               ))}
               {extraColumns.map(col => (
