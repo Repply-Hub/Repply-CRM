@@ -1,6 +1,7 @@
 import { AppSidebar } from './AppSidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { NotificationCenter } from '@/components/NotificationCenter';
+import { useBranding } from '@/hooks/use-branding';
 
 interface AppLayoutProps {
   children: React.ReactNode;
