@@ -81,7 +81,7 @@ export function ListPagination({
     <div className={cn('flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between', className)}>
       <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm text-muted-foreground">
         <span className="whitespace-nowrap">
-          {start}–{end} de {totalItems} {summaryLabel}
+          {start}–{end} de {safeTotalItems} {summaryLabel}
         </span>
 
         {onPageSizeChange && (
