@@ -470,43 +470,28 @@ export type Database = {
       }
       empresas: {
         Row: {
-          banner_url: string | null
           cnpj: string | null
           codigo_acesso: string
-          cor_primaria: string | null
           created_at: string
           id: string
-          logo_url: string | null
           nome: string
-          nome_fantasia: string | null
           owner_id: string
-          subtitulo_header: string | null
         }
         Insert: {
-          banner_url?: string | null
           cnpj?: string | null
           codigo_acesso?: string
-          cor_primaria?: string | null
           created_at?: string
           id?: string
-          logo_url?: string | null
           nome: string
-          nome_fantasia?: string | null
           owner_id: string
-          subtitulo_header?: string | null
         }
         Update: {
-          banner_url?: string | null
           cnpj?: string | null
           codigo_acesso?: string
-          cor_primaria?: string | null
           created_at?: string
           id?: string
-          logo_url?: string | null
           nome?: string
-          nome_fantasia?: string | null
           owner_id?: string
-          subtitulo_header?: string | null
         }
         Relationships: []
       }

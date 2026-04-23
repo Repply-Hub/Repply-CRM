@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Palette } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -18,7 +18,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
-import { EmpresaTab } from '@/components/configuracoes/EmpresaTab';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -303,9 +302,6 @@ const Configuracoes = () => {
               <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> Usuários</TabsTrigger>
             )}
             {isGestor && (
-              <TabsTrigger value="empresa" className="gap-1.5"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
-            )}
-            {isGestor && (
               <TabsTrigger value="automacao">Automação</TabsTrigger>
             )}
           </TabsList>
@@ -315,12 +311,6 @@ const Configuracoes = () => {
           {isGestor && (
             <TabsContent value="vendedores" className="mt-4">
               <UsuariosTab />
-            </TabsContent>
-          )}
-
-          {isGestor && (
-            <TabsContent value="empresa" className="mt-4">
-              <EmpresaTab />
             </TabsContent>
           )}
 
