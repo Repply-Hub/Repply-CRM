@@ -238,6 +238,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   })), [pedidos]);
 
   const pipelineOrders = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return allOrders.filter(o => {
       if (selectedVendedores.length > 0 && !selectedVendedores.includes(o.vendedorId)) return false;
       if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(o.fabricanteId)) return false;
@@ -248,9 +249,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         end.setHours(23, 59, 59, 999);
         if (new Date(o.createdAt) > end) return false;
       }
+      if (q) {
+        const clientName = o.clientName.toLowerCase();
+        const obra = o.obra.toLowerCase();
+        const fabricante = o.fabricante.toLowerCase();
+        if (!clientName.includes(q) && !obra.includes(q) && !fabricante.includes(q)) return false;
+      }
       return true;
     });
-  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
+  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo, search]);
 
   const ordersByStage = useMemo(() => {
     const map: Record<string, typeof pipelineOrders> = {};
