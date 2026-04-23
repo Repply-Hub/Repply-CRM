@@ -170,7 +170,6 @@ export function ListPagination({
             </PaginationItem>
           </PaginationContent>
         </Pagination>
-      </Pagination>
     </div>
   );
 }
