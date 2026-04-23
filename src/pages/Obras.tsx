@@ -37,28 +37,30 @@ export default function Obras() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
-
-  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('obras_custom_labels');
-    return saved ? JSON.parse(saved) : {};
+  const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
+    const saved = localStorage.getItem('obras_view_mode');
+    return (saved as any) || 'cards';
   });
 
-  // Field visibility state
-  const [visibleFields, setVisibleFields] = useState<string[]>(() => {
-    const saved = localStorage.getItem('obras_fields');
-    return saved ? JSON.parse(saved) : OBRA_FIELDS.map(c => c.id);
+  const {
+    columns,
+    visibleColumns,
+    setVisibleColumns,
+    pageSize,
+    setPageSize,
+    handleRename,
+    handleAddColumn,
+    handleRemoveColumn,
+    getLabel
+  } = useTableSettings({
+    key: 'obras',
+    defaultColumns: OBRA_FIELDS,
   });
 
-  const handleFieldChange = (newFields: string[]) => {
-    setVisibleFields(newFields);
-    localStorage.setItem('obras_fields', JSON.stringify(newFields));
-  };
-
-  const handleRename = (columnId: string, newLabel: string) => {
-    const next = { ...customLabels, [columnId]: newLabel };
-    setCustomLabels(next);
-    localStorage.setItem('obras_custom_labels', JSON.stringify(next));
-  };
+  useEffect(() => {
+    localStorage.setItem('obras_view_mode', viewMode);
+  }, [viewMode]);
 
   const filtered = useMemo(() => {
     if (!obras) return [];
