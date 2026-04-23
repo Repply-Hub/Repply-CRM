@@ -851,9 +851,15 @@ export function MappingStep({
                           </SelectContent>
                         </Select>
 
-                        {isExtra && (
-                          <div className="rounded-md border border-accent/30 bg-accent/10 p-1.5 space-y-1">
-                            <label className="flex items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-wide text-accent-foreground/80">
+                        {!ignored && (
+                          <div className={cn(
+                            "rounded-md border p-1.5 space-y-1",
+                            isExtra ? "border-accent/30 bg-accent/10" : "border-primary/20 bg-primary/5"
+                          )}>
+                            <label className={cn(
+                              "flex items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-wide",
+                              isExtra ? "text-accent-foreground/80" : "text-primary/80"
+                            )}>
                               <span className="flex items-center gap-1">
                                 <Pencil className="h-2.5 w-2.5" />
                                 Nome no sistema
@@ -862,7 +868,10 @@ export function MappingStep({
                                 <button
                                   type="button"
                                   onClick={() => startEditExtra(h)}
-                                  className="text-[10px] font-medium normal-case text-accent-foreground hover:underline"
+                                  className={cn(
+                                    "text-[10px] font-medium normal-case hover:underline",
+                                    isExtra ? "text-accent-foreground" : "text-primary"
+                                  )}
                                 >
                                   Editar
                                 </button>
@@ -880,7 +889,10 @@ export function MappingStep({
                                     if (e.key === 'Escape') { e.preventDefault(); cancelEditExtra(); }
                                   }}
                                   placeholder="Ex: origem_lead"
-                                  className="h-7 flex-1 text-xs bg-background border-accent ring-1 ring-accent"
+                                  className={cn(
+                                    "h-7 flex-1 text-xs bg-background border-accent ring-1 ring-accent",
+                                    !isExtra && "border-primary ring-primary"
+                                  )}
                                 />
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -888,7 +900,10 @@ export function MappingStep({
                                       type="button"
                                       size="sm"
                                       onClick={() => saveEditExtra(h)}
-                                      className="h-7 w-7 p-0 shrink-0 bg-accent hover:bg-accent/90 text-accent-foreground"
+                                      className={cn(
+                                        "h-7 w-7 p-0 shrink-0",
+                                        isExtra ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                      )}
                                     >
                                       <Check className="h-3.5 w-3.5" />
                                     </Button>
@@ -911,10 +926,15 @@ export function MappingStep({
                                 </Tooltip>
                               </div>
                             ) : (
-                              <button
+                               <button
                                 type="button"
                                 onClick={() => startEditExtra(h)}
-                                className="w-full text-left h-7 px-2 text-xs rounded border border-accent/30 bg-background/60 hover:bg-background hover:border-accent/60 transition-colors truncate"
+                                className={cn(
+                                  "w-full text-left h-7 px-2 text-xs rounded border transition-colors truncate",
+                                  isExtra 
+                                    ? "border-accent/30 bg-background/60 hover:bg-background hover:border-accent/60" 
+                                    : "border-primary/20 bg-background/60 hover:bg-background hover:border-primary/60"
+                                )}
                                 title={extras[h] ?? h}
                               >
                                 <span className="font-mono text-foreground/90">{extras[h] ?? h}</span>
