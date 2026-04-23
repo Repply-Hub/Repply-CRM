@@ -889,7 +889,10 @@ export function MappingStep({
                                     if (e.key === 'Escape') { e.preventDefault(); cancelEditExtra(); }
                                   }}
                                   placeholder="Ex: origem_lead"
-                                  className="h-7 flex-1 text-xs bg-background border-accent ring-1 ring-accent"
+                                  className={cn(
+                                    "h-7 flex-1 text-xs bg-background border-accent ring-1 ring-accent",
+                                    !isExtra && "border-primary ring-primary"
+                                  )}
                                 />
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -897,7 +900,10 @@ export function MappingStep({
                                       type="button"
                                       size="sm"
                                       onClick={() => saveEditExtra(h)}
-                                      className="h-7 w-7 p-0 shrink-0 bg-accent hover:bg-accent/90 text-accent-foreground"
+                                      className={cn(
+                                        "h-7 w-7 p-0 shrink-0",
+                                        isExtra ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                      )}
                                     >
                                       <Check className="h-3.5 w-3.5" />
                                     </Button>
