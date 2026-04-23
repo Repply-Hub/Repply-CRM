@@ -105,16 +105,16 @@ export function ColumnSettings({
             <PopoverContent align="end" sideOffset={8} className="w-[280px] p-0 shadow-2xl border-border/40 overflow-hidden">
                 {!hideColumns && (
                     <div className="p-2">
-                        <div className="px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            <span>{label}</span>
+                        <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50">
+                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
                             {onAdd && (
                                 <button
                                     onClick={() => setIsAdding(!isAdding)}
-                                    className="flex items-center gap-1 h-6 px-2 rounded-md hover:bg-muted text-primary transition-colors"
+                                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 group"
                                     title="Criar nova coluna"
                                 >
                                     <Plus className="h-3.5 w-3.5" />
-                                    <span className="text-[10px] font-medium">Nova Coluna</span>
+                                    <span className="text-[10px] font-bold">Nova Coluna</span>
                                 </button>
                             )}
                         </div>
