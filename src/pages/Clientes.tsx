@@ -166,37 +166,26 @@ const Clientes = () => {
     toast.success(`Tipo "${label}" criado`);
   };
 
-  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('clientes_custom_labels');
-    return saved ? JSON.parse(saved) : {};
+  const empresasSettings = useTableSettings({
+    key: 'clientes_empresas',
+    defaultColumns: CLIENTE_FIELDS,
   });
 
-  const [visibleFields, setVisibleFields] = useState<string[]>(() => {
-    const saved = localStorage.getItem('clientes_fields');
-    return saved ? JSON.parse(saved) : CLIENTE_FIELDS.map(c => c.id);
+  const contatosSettings = useTableSettings({
+    key: 'clientes_contatos',
+    defaultColumns: CONTATO_FIELDS,
   });
 
-  const [visibleContatoFields, setVisibleContatoFields] = useState<string[]>(() => {
-    const saved = localStorage.getItem('contatos_fields');
-    return saved ? JSON.parse(saved) : CONTATO_FIELDS.map(c => c.id);
-  });
-
-  const handleRename = (columnId: string, newLabel: string) => {
-    const next = { ...customLabels, [columnId]: newLabel };
-    setCustomLabels(next);
-    localStorage.setItem('clientes_custom_labels', JSON.stringify(next));
-    toast.success('Coluna renomeada');
-  };
-
-  const handleFieldChange = (newFields: string[]) => {
-    setVisibleFields(newFields);
-    localStorage.setItem('clientes_fields', JSON.stringify(newFields));
-  };
-
-  const handleContatoFieldChange = (newFields: string[]) => {
-    setVisibleContatoFields(newFields);
-    localStorage.setItem('contatos_fields', JSON.stringify(newFields));
-  };
+  const {
+    columns,
+    visibleColumns,
+    setVisibleColumns,
+    pageSize,
+    setPageSize,
+    handleRename,
+    handleAddColumn,
+    handleRemoveColumn
+  } = activeTab === 'empresas' ? empresasSettings : contatosSettings;
 
   const empresas = clients ?? [];
   const contatos = contatosList ?? [];
