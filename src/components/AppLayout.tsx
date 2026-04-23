@@ -12,6 +12,8 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, title, subtitle, headerContent, mainClassName }: AppLayoutProps) {
+  const branding = useBranding();
+  
   return (
     <SidebarProvider defaultOpen={false}>
       <div className="h-screen flex w-full overflow-hidden">
