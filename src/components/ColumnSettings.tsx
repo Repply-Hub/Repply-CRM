@@ -40,19 +40,6 @@ export function ColumnSettings({
     const [editValue, setEditValue] = React.useState('');
 
     const toggleColumn = (columnId: string) => {
-...
-    const startEditing = (column: ColumnDefinition) => {
-        setEditingId(column.id);
-        setEditValue(column.customLabel || column.label);
-    };
-
-    const handleRename = () => {
-        if (editingId && onRename) {
-            onRename(editingId, editValue);
-            setEditingId(null);
-        }
-    };
-
         if (visibleColumns.includes(columnId)) {
             if (visibleColumns.length > 1) {
                 onChange(visibleColumns.filter(id => id !== columnId));
@@ -62,6 +49,18 @@ export function ColumnSettings({
                 .filter(c => visibleColumns.includes(c.id) || c.id === columnId)
                 .map(c => c.id);
             onChange(newVisible);
+        }
+    };
+
+    const startEditing = (column: ColumnDefinition) => {
+        setEditingId(column.id);
+        setEditValue(column.customLabel || column.label);
+    };
+
+    const handleRename = () => {
+        if (editingId && onRename) {
+            onRename(editingId, editValue);
+            setEditingId(null);
         }
     };
 
