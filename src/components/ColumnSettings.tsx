@@ -256,7 +256,10 @@ export function ColumnSettings({
                                                                     {onRename && (
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => startEditing(column)}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                startEditing(column);
+                                                                            }}
                                                                             className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
                                                                             title="Renomear"
                                                                         >
@@ -266,7 +269,10 @@ export function ColumnSettings({
                                                                     {column.isCustom && onRemove && (
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => onRemove(column.id)}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                onRemove(column.id);
+                                                                            }}
                                                                             className="h-6 w-6 rounded hover:bg-destructive/10 flex items-center justify-center text-destructive/70 hover:text-destructive"
                                                                             title="Excluir"
                                                                         >
