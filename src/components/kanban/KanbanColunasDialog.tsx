@@ -28,6 +28,7 @@ export function KanbanColunasDialog({ open, onOpenChange }: Props) {
     const createMut = useCreateKanbanColuna();
     const updateMut = useUpdateKanbanColuna();
     const deleteMut = useDeleteKanbanColuna();
+    const reorderMut = useReorderKanbanColunas();
     const [page, setPage] = useState(1);
     const pageSize = 5;
 
