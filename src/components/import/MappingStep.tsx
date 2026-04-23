@@ -926,10 +926,15 @@ export function MappingStep({
                                 </Tooltip>
                               </div>
                             ) : (
-                              <button
+                               <button
                                 type="button"
                                 onClick={() => startEditExtra(h)}
-                                className="w-full text-left h-7 px-2 text-xs rounded border border-accent/30 bg-background/60 hover:bg-background hover:border-accent/60 transition-colors truncate"
+                                className={cn(
+                                  "w-full text-left h-7 px-2 text-xs rounded border transition-colors truncate",
+                                  isExtra 
+                                    ? "border-accent/30 bg-background/60 hover:bg-background hover:border-accent/60" 
+                                    : "border-primary/20 bg-background/60 hover:bg-background hover:border-primary/60"
+                                )}
                                 title={extras[h] ?? h}
                               >
                                 <span className="font-mono text-foreground/90">{extras[h] ?? h}</span>
