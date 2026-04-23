@@ -12,6 +12,7 @@ export interface PedidoWithRelations {
   fabricante_id: string;
   usuario_id: string;
   obra_id: string | null;
+  campos_extras: any;
   cliente: { id: string; empresa: string } | null;
   fabricante: { id: string; nome: string } | null;
   vendedor: { id: string; nome: string } | null;
@@ -26,7 +27,7 @@ export function usePedidos() {
       const { data, error } = await supabase
         .from('pedidos')
         .select(`
-          id, status, valor_total, data_pedido, created_at, observacoes,
+          id, status, valor_total, data_pedido, created_at, observacoes, campos_extras,
           cliente_id, fabricante_id, usuario_id, obra_id,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),

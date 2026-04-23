@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { KanbanColunasDialog } from '@/components/kanban/KanbanColunasDialog';
+import { useColunasCustomizadas } from '@/hooks/use-colunas-customizadas';
 import { usePedidos, useHistoricoContatos, useUpdatePedidoStatus } from '@/hooks/use-pedidos';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import { Button } from '@/components/ui/button';
@@ -68,6 +69,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
   const { data: kanbanColunas } = useKanbanColunas();
+  const { data: customCols = [] } = useColunasCustomizadas('pedidos');
   
   const KANBAN_STAGES = useMemo(
     () => (kanbanColunas ?? []).map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
@@ -399,6 +401,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       visibleColumns={visibleColumns}
       onChange={handleColumnChange}
       onRename={handleRename}
+      tabela="pedidos"
     >
       <div className="p-2 border-t border-border/50">
         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -443,22 +446,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <Columns3 className="h-4 w-4 text-muted-foreground" />
           Gerenciar colunas...
         </button>
-        <button
-          type="button"
-          onClick={handleExportPdf}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-        >
-          <FileDown className="h-4 w-4 text-muted-foreground" />
-          Exportar PDF
-        </button>
-        <button
-          type="button"
-          onClick={() => setImportOpen(true)}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-        >
-          <Upload className="h-4 w-4 text-muted-foreground" />
-          Importar
-        </button>
       </div>
     </ColumnSettings>
   );
@@ -466,35 +453,21 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const filtrosPopover = (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className={cn("data-[state=open]:bg-accent data-[state=open]:text-accent-foreground", hasPipelineFilters && 'border-primary')}>
-          <Filter className="h-3.5 w-3.5 mr-1.5" />
+        <Button variant="outline" size="sm" className="h-8 gap-1.5 px-3">
+          <Filter className="h-4 w-4" />
           Filtros
-          {hasPipelineFilters && (
-            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{activeFilterCount}</Badge>
+          {activeFilterCount > 0 && (
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+              {activeFilterCount}
+            </Badge>
           )}
-          <ChevronDown className="h-3.5 w-3.5 ml-1" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto min-w-[820px] max-w-[980px] p-4" align="start">
-        <div className="flex gap-0 divide-x divide-border">
-          <div className="flex-1 min-w-[140px] pr-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Etapa</p>
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
-                Todas as etapas
-              </label>
-              {KANBAN_STAGES.map(s => (
-                <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                  <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
-                  {s.label}
-                </label>
-              ))}
-            </div>
-          </div>
+      <PopoverContent className="w-[450px] p-0" align="start">
+        <div className="flex divide-x divide-border h-80">
           <div className="flex-1 min-w-[130px] px-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
-            <div className="space-y-1 max-h-60 overflow-y-auto">
+            <div className="space-y-1">
               {(vendedores ?? []).map(v => (
                 <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
                   <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
@@ -672,13 +645,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       {visibleColumns.includes('valor') && <TableHead>{currentColumns.find(c => c.id === 'valor')?.customLabel || 'Valor'}</TableHead>}
                       {visibleColumns.includes('etapa') && <TableHead>{currentColumns.find(c => c.id === 'etapa')?.customLabel || 'Etapa'}</TableHead>}
                       {visibleColumns.includes('vendedor') && <TableHead>{currentColumns.find(c => c.id === 'vendedor')?.customLabel || 'Vendedor'}</TableHead>}
+                      {customCols.filter(c => visibleColumns.includes(c.slug)).map(c => (
+                        <TableHead key={c.slug}>{c.nome}</TableHead>
+                      ))}
                       {visibleColumns.includes('acoes') && (<TableHead className="w-[100px]">Ações</TableHead>)}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginated.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumnCount} className="py-12 text-center text-muted-foreground">
+                        <TableCell colSpan={visibleColumnCount + customCols.filter(c => visibleColumns.includes(c.slug)).length} className="py-12 text-center text-muted-foreground">
                           Nenhum negócio encontrado
                         </TableCell>
                       </TableRow>
@@ -700,6 +676,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                             </TableCell>
                           )}
                           {visibleColumns.includes('vendedor') && <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>}
+                          {customCols.filter(c => visibleColumns.includes(c.slug)).map(c => (
+                            <TableCell key={c.slug}>{(p.campos_extras as any)?.[c.slug] ?? '-'}</TableCell>
+                          ))}
                           {visibleColumns.includes('acoes') && (
                             <TableCell>
                               <div className="flex gap-1" onClick={e => e.stopPropagation()}>
