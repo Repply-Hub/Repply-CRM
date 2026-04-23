@@ -310,21 +310,13 @@ export default function Calendario() {
             onNavigate={navigate}
             onNewEvent={() => openNewEvent()}
             onImport={handleImportClick}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
           />
         </div>
         <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Sidebar esquerda — oculta em mobile */}
           <aside className="hidden lg:flex w-56 border-r flex-col gap-5 p-3 shrink-0 overflow-y-auto min-h-0">
-            {/* Barra de Pesquisa */}
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Pesquisar eventos..."
-                className="pl-8 h-9 text-xs"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
 
             {/* Mini calendário — células w-7 (28px) × 7 = 196px + p-2 = 212px < 224px */}
             <Calendar
