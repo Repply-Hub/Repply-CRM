@@ -18,20 +18,18 @@ import {
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon,
 } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { type ColumnDefinition } from '@/components/ColumnSettings';
+import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ImportPedidosDialog } from '@/components/ImportPedidosDialog';
 import { ListPagination } from '@/components/ListPagination';
 import { KanbanColumn } from '@/components/kanban/KanbanColumn';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -50,18 +48,15 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
 
 const PAGE_SIZE = 10;
 
-// Cores das etapas resolvidas dinamicamente a partir do slug da coluna armazenada no banco
 const getStageBadgeClass = (corToken: string) => `bg-${corToken} text-white`;
 
 const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone, whatsapp: MessageSquare, visita: Eye };
 
 type PageMode = 'pipeline' | 'negocios';
 type PipelineView = 'kanban' | 'lista';
-// Mantido para compatibilidade com a prop existente (rotas antigas)
 type LegacyView = 'pipeline' | 'lista';
 
 interface NegociosProps {
-  /** Modo inicial da página: 'pipeline' (kanban) ou 'lista' (negócios em lista). */
   defaultView?: LegacyView;
 }
 
@@ -73,10 +68,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
   const { data: kanbanColunas } = useKanbanColunas();
+  
   const KANBAN_STAGES = useMemo(
     () => (kanbanColunas ?? []).map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
     [kanbanColunas]
   );
+
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
   const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
     const saved = localStorage.getItem('pedidos_custom_labels');
@@ -94,26 +91,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     customLabel: customLabels[col.id]
   }));
 
-  // ===== View toggles =====
-  // O modo é controlado pela sidebar/rota: '/' => pipeline, '/pedidos' => negócios.
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
-
-  // Sub-toggle (apenas quando mode === 'pipeline'): Kanban x Lista.
   const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
     const saved = localStorage.getItem('negocios_pipeline_view') as PipelineView | null;
     return saved === 'kanban' || saved === 'lista' ? saved : 'kanban';
   });
+
   const handlePipelineViewChange = (next: PipelineView) => {
     setPipelineView(next);
     localStorage.setItem('negocios_pipeline_view', next);
   };
 
-  // Renderização: kanban só quando estamos em Pipeline + Kanban.
-  // Em Negócios, ou em Pipeline+Lista, exibimos a lista (com filtros do pipeline quando aplicável).
   const showKanban = mode === 'pipeline' && pipelineView === 'kanban';
   const isPipelineMode = mode === 'pipeline';
 
-  // List state
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
@@ -122,14 +113,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder);
 
-  // Pipeline filters
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
   const [selectedFabricantes, setSelectedFabricantes] = useState<string[]>([]);
   const [showOnlyAttention, setShowOnlyAttention] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
-  // Bulk selection state
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -145,21 +134,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     localStorage.setItem('pedidos_columns', JSON.stringify(newColumns));
   };
 
-  // Visibilidade das colunas (etapas) do Kanban — sincronizada com o catálogo dinâmico
   const [visibleKanbanStages, setVisibleKanbanStages] = useState<string[]>(() => {
     const saved = localStorage.getItem('pedidos_kanban_stages');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Quando o catálogo de colunas mudar, garante que novas colunas apareçam por padrão
-  // e colunas removidas sejam descartadas das preferências locais.
   useEffect(() => {
     if (!kanbanColunas) return;
     const allKeys = kanbanColunas.map(c => c.slug);
     setVisibleKanbanStages(prev => {
       const filtered = prev.filter(k => allKeys.includes(k));
       const novas = allKeys.filter(k => !prev.includes(k));
-      // Se nada salvo ainda, mostra todas
       if (prev.length === 0) {
         localStorage.setItem('pedidos_kanban_stages', JSON.stringify(allKeys));
         return allKeys;
@@ -201,9 +186,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
 
-  // ===== LIST data =====
-  // Quando estamos no modo Pipeline+Lista, a lista deve respeitar os mesmos filtros do Kanban
-  // (vendedor, fabricante, atenção, datas). Caso contrário (modo Negócios), usamos todos os pedidos.
   const baseListPedidos = useMemo(() => {
     const all = pedidos ?? [];
     if (!isPipelineMode) return all;
@@ -249,7 +231,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  // ===== PIPELINE data =====
   const allOrders = useMemo(() => (pedidos ?? []).map(p => ({
     id: p.id,
     clientName: p.cliente?.empresa ?? 'Sem cliente',
@@ -280,7 +261,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     });
   }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
 
-  // Agrupa pedidos por etapa uma única vez (evita 5x .filter no render do Kanban)
   const ordersByStage = useMemo(() => {
     const map: Record<string, typeof pipelineOrders> = {};
     for (const stage of KANBAN_STAGES) map[stage.key] = [];
@@ -288,12 +268,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       if (map[o.stage]) map[o.stage].push(o);
     }
     return map;
-  }, [pipelineOrders]);
+  }, [pipelineOrders, KANBAN_STAGES]);
 
   const totalPipeline = pipelineOrders.reduce((acc, o) => acc + o.valor, 0);
-  const hasStageFilter = stageFilter !== 'todos';
-  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || hasStageFilter;
-  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (hasStageFilter ? 1 : 0);
+  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || stageFilter !== 'todos';
+  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (stageFilter !== 'todos' ? 1 : 0);
 
   const toggleFilter = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
     setList(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -315,9 +294,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     const label = KANBAN_STAGES.find(s => s.key === destination.droppableId)?.label ?? destination.droppableId;
     updateStatus.mutate({ id: draggableId, status: destination.droppableId });
     toast.success(`Pedido movido para "${label}"`);
-  }, [updateStatus]);
+  }, [updateStatus, KANBAN_STAGES]);
 
-  // ===== Bulk selection =====
   const currentPageIds = paginated.map(p => p.id);
   const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selected.has(id));
   const someSelected = selected.size > 0;
@@ -369,12 +347,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       const BATCH_SIZE = 500;
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
-        const { error: itensErr } = await supabase.from('itens_pedido').delete().in('pedido_id', batch);
-        if (itensErr) throw itensErr;
-        const { error: histErr } = await supabase.from('historico_contatos').delete().in('pedido_id', batch);
-        if (histErr) throw histErr;
-        const { error } = await supabase.from('pedidos').delete().in('id', batch);
-        if (error) throw error;
+        await supabase.from('itens_pedido').delete().in('pedido_id', batch);
+        await supabase.from('historico_contatos').delete().in('pedido_id', batch);
+        await supabase.from('pedidos').delete().in('id', batch);
       }
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
       toast.success(`${ids.length} negócio(s) removido(s)!`);
@@ -388,12 +363,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
-  // ===== Subtitle =====
-  const subtitle = isPipelineMode
-    ? `${pipelineOrders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-    : `${pedidos?.length ?? 0} pedidos`;
-
-  // ===== Ações compartilhadas =====
   const handleExportPdf = async () => {
     if (showKanban) {
       await generatePedidosPdf(
@@ -424,172 +393,76 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
-  // ===== Popover/Dropdown de Opções =====
-  const opcoesDropdown = showKanban ? (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Settings2 className="h-4 w-4" />
-          <span className="hidden sm:inline">Opções</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={4} className="w-auto p-0">
-        <div className="flex divide-x divide-border">
-          {/* Coluna esquerda: visibilidade das colunas do Kanban */}
-          <div className="p-2 min-w-[200px]">
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personalizar Etapas (Kanban)</div>
-            <div className="space-y-0.5">
-              {KANBAN_STAGES.map((stage) => {
-                const checked = visibleKanbanStages.includes(stage.key);
-                const disabled = visibleKanbanStages.length === 1 && checked;
-                return (
-                  <button
-                    key={stage.key}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => toggleKanbanStage(stage.key)}
-                    className={cn(
-                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-normal transition-colors text-left',
-                      'hover:bg-muted/60 disabled:cursor-not-allowed',
-                      !checked && 'opacity-40'
-                    )}
-                  >
-                    <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', `bg-${stage.color}`)} />
-                    <span className="flex-1 truncate">{stage.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+  const optionsPopover = (
+    <ColumnSettings
+      columns={currentColumns}
+      visibleColumns={visibleColumns}
+      onChange={handleColumnChange}
+      onRename={handleRename}
+    >
+      <div className="p-2 border-t border-border/50">
+        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          {showKanban ? 'Personalizar Etapas' : 'Ações'}
+        </div>
+        {showKanban ? (
+          <div className="space-y-0.5 mb-2">
+            {KANBAN_STAGES.map((stage) => {
+              const checked = visibleKanbanStages.includes(stage.key);
+              const disabled = visibleKanbanStages.length === 1 && checked;
+              return (
+                <button
+                  key={stage.key}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => toggleKanbanStage(stage.key)}
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-normal transition-colors text-left',
+                    'hover:bg-muted/60 disabled:cursor-not-allowed',
+                    !checked && 'opacity-40'
+                  )}
+                >
+                  <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', `bg-${stage.color}`)} />
+                  <span className="flex-1 truncate">{stage.label}</span>
+                </button>
+              );
+            })}
             <button
               type="button"
               onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
               className="w-full text-center text-xs text-primary font-medium px-2 py-2 mt-1 rounded-md hover:bg-muted/60 transition-colors"
             >
-              Resetar todas
+              Resetar etapas
             </button>
           </div>
-
-          {/* Coluna direita: ações */}
-          <div className="p-2 min-w-[180px]">
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ações</div>
-            <button
-              type="button"
-              onClick={() => setColunasDialogOpen(true)}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-            >
-              <Columns3 className="h-4 w-4 text-muted-foreground" />
-              Personalizar colunas...
-            </button>
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-            >
-              <FileDown className="h-4 w-4 text-muted-foreground" />
-              Exportar PDF
-            </button>
-            <button
-              type="button"
-              onClick={() => setImportOpen(true)}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-            >
-              <Upload className="h-4 w-4 text-muted-foreground" />
-              Importar
-            </button>
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  ) : (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Settings2 className="h-4 w-4" />
-          <span className="hidden sm:inline">Opções</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={4} className="w-auto p-0">
-        <div className="flex divide-x divide-border">
-          {/* Coluna esquerda: visibilidade das colunas da tabela */}
-          <div className="p-2 min-w-[220px]">
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personalizar Colunas</div>
-            <div className="space-y-0.5">
-              {PEDIDOS_COLUMNS.map((column) => {
-                const checked = visibleColumns.includes(column.id);
-                const disabled = column.locked || (checked && visibleColumns.length === 1);
-                return (
-                  <button
-                    key={column.id}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => {
-                      if (column.locked) return;
-                      if (checked) {
-                        if (visibleColumns.length > 1) {
-                          handleColumnChange(visibleColumns.filter(id => id !== column.id));
-                        }
-                      } else {
-                        const newVisible = PEDIDOS_COLUMNS
-                          .filter(c => visibleColumns.includes(c.id) || c.id === column.id)
-                          .map(c => c.id);
-                        handleColumnChange(newVisible);
-                      }
-                    }}
-                    className={cn(
-                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-normal transition-colors text-left',
-                      'hover:bg-muted/60 disabled:cursor-not-allowed',
-                      !checked && 'opacity-40'
-                    )}
-                  >
-                    <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', checked ? 'bg-primary' : 'bg-muted-foreground/40')} />
-                    <span className="flex-1 truncate">{column.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={() => handleColumnChange(PEDIDOS_COLUMNS.map(c => c.id))}
-              className="w-full text-center text-xs text-primary font-medium px-2 py-2 mt-1 rounded-md hover:bg-muted/60 transition-colors"
-            >
-              Resetar todas
-            </button>
-          </div>
-
-          {/* Coluna direita: ações */}
-          <div className="p-2 min-w-[180px]">
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ações</div>
-            <button
-              type="button"
-              onClick={() => setColunasDialogOpen(true)}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-            >
-              <Columns3 className="h-4 w-4 text-muted-foreground" />
-              Personalizar colunas...
-            </button>
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-            >
-              <FileDown className="h-4 w-4 text-muted-foreground" />
-              Exportar PDF
-            </button>
-            <button
-              type="button"
-              onClick={() => setImportOpen(true)}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-            >
-              <Upload className="h-4 w-4 text-muted-foreground" />
-              Importar XLSX
-            </button>
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => setColunasDialogOpen(true)}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+        >
+          <Columns3 className="h-4 w-4 text-muted-foreground" />
+          Gerenciar colunas...
+        </button>
+        <button
+          type="button"
+          onClick={handleExportPdf}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+        >
+          <FileDown className="h-4 w-4 text-muted-foreground" />
+          Exportar PDF
+        </button>
+        <button
+          type="button"
+          onClick={() => setImportOpen(true)}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+        >
+          <Upload className="h-4 w-4 text-muted-foreground" />
+          Importar
+        </button>
+      </div>
+    </ColumnSettings>
   );
 
-  // ===== Popover de Filtros (reutilizado em Kanban e Lista) =====
   const filtrosPopover = (
     <Popover>
       <PopoverTrigger asChild>
@@ -654,7 +527,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                  <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className="p-3 pointer-events-auto" />
                 </PopoverContent>
               </Popover>
               <Popover>
@@ -665,7 +538,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                  <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className="p-3 pointer-events-auto" />
                 </PopoverContent>
               </Popover>
             </div>
@@ -690,15 +563,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     </Popover>
   );
 
+  const subtitle = isPipelineMode
+    ? `${pipelineOrders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+    : `${pedidos?.length ?? 0} pedidos`;
+
   return (
     <AppLayout title="Negócios" subtitle={subtitle}>
       <div className="p-3 sm:p-4 md:p-6 max-w-[1600px]">
-        {/* Top bar: view toggle + actions */}
         <div className="mb-4 md:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            {/* Modo controlado pela sidebar (Pipeline ou Negócios) */}
-
-            {/* Sub-toggle: Kanban x Lista — apenas no modo Pipeline */}
             {isPipelineMode && (
               <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
                 <Button
@@ -721,12 +594,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </Button>
               </div>
             )}
-
-            {/* Em Kanban, Filtros e Opções ficam na topbar à esquerda (não há linha de busca). */}
             {showKanban && (
               <>
                 {filtrosPopover}
-                {opcoesDropdown}
+                {optionsPopover}
                 {hasPipelineFilters && (
                   <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground">
                     <X className="h-3.5 w-3.5" />
@@ -735,7 +606,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </>
             )}
           </div>
-
           <div className="flex items-center gap-2 sm:justify-end">
             <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate('/pedidos/novo')}>
               <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
@@ -774,23 +644,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     onChange={(e) => handleSearchChange(e.target.value)}
                   />
                 </div>
-
                 {filtrosPopover}
-
                 {hasPipelineFilters && (
                   <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground" title="Limpar filtros">
                     <X className="h-3.5 w-3.5" />
                   </Button>
                 )}
-
                 {someSelected && (
                   <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
                     <Trash2 className="h-4 w-4" />
                     Excluir {selected.size}
                   </Button>
                 )}
-
-                {opcoesDropdown}
+                {optionsPopover}
               </div>
 
               <div className="w-full rounded-xl border border-border overflow-hidden">
@@ -800,13 +666,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       <TableHead className="w-10">
                         <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
-                      {visibleColumns.includes('cliente') && <TableHead>Cliente</TableHead>}
-                      {visibleColumns.includes('obra') && <TableHead>Obra</TableHead>}
-                      {visibleColumns.includes('fabricante') && <TableHead>Fabricante</TableHead>}
-                      {visibleColumns.includes('valor') && <TableHead>Valor</TableHead>}
-                      {visibleColumns.includes('etapa') && <TableHead>Etapa</TableHead>}
-                      {visibleColumns.includes('vendedor') && <TableHead>Vendedor</TableHead>}
-                      {visibleColumns.includes('acoes') && (<><TableHead></TableHead><TableHead></TableHead></>)}
+                      {visibleColumns.includes('cliente') && <TableHead>{currentColumns.find(c => c.id === 'cliente')?.customLabel || 'Cliente'}</TableHead>}
+                      {visibleColumns.includes('obra') && <TableHead>{currentColumns.find(c => c.id === 'obra')?.customLabel || 'Obra'}</TableHead>}
+                      {visibleColumns.includes('fabricante') && <TableHead>{currentColumns.find(c => c.id === 'fabricante')?.customLabel || 'Fabricante'}</TableHead>}
+                      {visibleColumns.includes('valor') && <TableHead>{currentColumns.find(c => c.id === 'valor')?.customLabel || 'Valor'}</TableHead>}
+                      {visibleColumns.includes('etapa') && <TableHead>{currentColumns.find(c => c.id === 'etapa')?.customLabel || 'Etapa'}</TableHead>}
+                      {visibleColumns.includes('vendedor') && <TableHead>{currentColumns.find(c => c.id === 'vendedor')?.customLabel || 'Vendedor'}</TableHead>}
+                      {visibleColumns.includes('acoes') && (<TableHead className="w-[100px]">Ações</TableHead>)}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -835,25 +701,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           )}
                           {visibleColumns.includes('vendedor') && <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>}
                           {visibleColumns.includes('acoes') && (
-                            <>
-                              <TableCell>
-                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${p.id}/editar`); }} title="Editar pedido">
+                            <TableCell>
+                              <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/pedidos/${p.id}/editar`)} title="Editar pedido">
                                   <Pencil className="h-4 w-4" />
                                 </Button>
-                              </TableCell>
-                              <TableCell>
-                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedOrder(p.id); }}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedOrder(p.id)}>
                                   <MessageSquare className="h-4 w-4" />
                                 </Button>
-                              </TableCell>
-                            </>
+                              </div>
+                            </TableCell>
                           )}
                         </TableRow>
                       ))
                     )}
                   </TableBody>
                 </Table>
-
                 <ListPagination
                   page={page}
                   totalPages={totalPages}
@@ -867,7 +730,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 />
               </div>
             </div>
-
             {selectedOrder && (
               <div className="w-full xl:w-80 xl:shrink-0">
                 <Card className="xl:sticky xl:top-6">
@@ -910,29 +772,21 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         )}
       </div>
 
-      {/* Confirm bulk delete */}
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir {selected.size} negócio(s)?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Todos os itens e histórico de contatos vinculados também serão removidos.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Esta ação não pode ser desfeita. Todos os itens e histórico de contatos vinculados também serão removidos.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <Button
-              variant="destructive"
-              onClick={(e) => { e.preventDefault(); handleBulkDelete(); }}
-              disabled={isDeleting}
-            >
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeleting}>
               {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog: selecionar página atual ou todos os filtrados */}
       <AlertDialog open={selectAllDialogOpen} onOpenChange={setSelectAllDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
