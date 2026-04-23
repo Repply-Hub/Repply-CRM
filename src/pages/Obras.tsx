@@ -163,11 +163,29 @@ export default function Obras() {
                   <SelectItem value="name_desc">Nome Z-A</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="flex bg-muted p-1 rounded-md">
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={cn("p-1.5 rounded-sm transition-all", viewMode === 'cards' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")}
+                  title="Visualização em Cards"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={cn("p-1.5 rounded-sm transition-all", viewMode === 'table' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")}
+                  title="Visualização em Tabela"
+                >
+                  <TableIcon className="h-4 w-4" />
+                </button>
+              </div>
               <ColumnSettings
-                columns={currentColumns}
-                visibleColumns={visibleFields}
-                onChange={handleFieldChange}
+                columns={columns}
+                visibleColumns={visibleColumns}
+                onChange={setVisibleColumns}
                 onRename={handleRename}
+                onAdd={handleAddColumn}
+                onRemove={handleRemoveColumn}
               />
             </div>
 
