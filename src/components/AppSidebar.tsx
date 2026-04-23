@@ -1,4 +1,5 @@
-import { LogOut, UserCircle, Pencil, Check, X, Plus, GripVertical, Trash2, Eye, EyeOff, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LogOut, UserCircle, Pencil, Check, X, Plus, GripVertical, Trash2, Eye, EyeOff, PanelLeftClose, PanelLeftOpen, Camera } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useLocation, Link } from 'react-router-dom';
 import { useRef, useCallback, useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -40,7 +41,7 @@ export function AppSidebar() {
     queryFn: async () => {
       const { data } = await supabase
         .from('usuarios')
-        .select('id, nome, role')
+        .select('id, nome, role, avatar_url')
         .eq('user_id', user!.id)
         .maybeSingle();
       return data;
@@ -296,9 +297,12 @@ export function AppSidebar() {
                 to="/configuracoes?tab=perfil"
                 className={`flex items-center overflow-hidden rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 ${collapsed ? 'justify-center' : 'gap-3'}`}
               >
-                <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
-                  <UserCircle className="h-5 w-5 text-primary" />
-                </div>
+                <Avatar className="h-8 w-8 shrink-0 border border-sidebar-border">
+                  <AvatarImage src={vendedor?.avatar_url || ''} className="object-cover" />
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    <UserCircle className="h-5 w-5" />
+                  </AvatarFallback>
+                </Avatar>
                 {!collapsed && (
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-medium text-sidebar-foreground truncate">{vendedor?.nome ?? user?.email?.split('@')[0] ?? '—'}</p>
