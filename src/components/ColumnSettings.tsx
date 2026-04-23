@@ -1,11 +1,18 @@
 import React from 'react';
-import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen } from 'lucide-react';
+import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen, Type, Hash, Calendar, ToggleLeft, DollarSign } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -19,12 +26,15 @@ import {
 } from "@/components/ui/alert-dialog";
 
 
+export type ColumnDataType = 'text' | 'number' | 'date' | 'boolean' | 'currency';
+
 export interface ColumnDefinition {
     id: string;
     label: string;
     customLabel?: string;
     locked?: boolean;
     isCustom?: boolean;
+    type?: ColumnDataType;
 }
 
 interface ColumnPreset {
