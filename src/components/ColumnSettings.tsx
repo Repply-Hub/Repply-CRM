@@ -158,12 +158,16 @@ export function ColumnSettings({
                                                 !checked && !isEditing && 'opacity-50 grayscale-[0.5]'
                                             )}
                                         >
-                                            <span
+                                            <div
                                                 className={cn(
-                                                    'h-2.5 w-2.5 rounded-full shrink-0',
-                                                    checked ? 'bg-primary' : 'bg-muted-foreground/40'
+                                                    'h-3.5 w-3.5 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
+                                                    checked 
+                                                        ? 'bg-primary border-primary shadow-[0_2px_4px_rgba(var(--primary),0.3)]' 
+                                                        : 'bg-background border-border/60 group-hover/btn:border-primary/40'
                                                 )}
-                                            />
+                                            >
+                                                {checked && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                                            </div>
                                             {isEditing ? (
                                                 <div className="flex-1 flex items-center gap-1" onClick={e => e.stopPropagation()}>
                                                     <Input
