@@ -1,7 +1,8 @@
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Upload } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Upload, Search } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { ViewMode } from './types';
@@ -13,6 +14,8 @@ interface CalendarHeaderProps {
   onNavigate: (direction: 'prev' | 'next' | 'today') => void;
   onNewEvent: () => void;
   onImport?: () => void;
+  searchQuery?: string;
+  onSearchQueryChange?: (query: string) => void;
 }
 
 const VIEW_LABELS: Record<ViewMode, { full: string; short: string }> = {
@@ -45,6 +48,8 @@ export function CalendarHeader({
   onNavigate,
   onNewEvent,
   onImport,
+  searchQuery,
+  onSearchQueryChange,
 }: CalendarHeaderProps) {
   const isMobile = useIsMobile();
   return (
@@ -86,6 +91,18 @@ export function CalendarHeader({
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
+
+      {!isMobile && onSearchQueryChange !== undefined && (
+        <div className="relative w-full max-w-[200px] xl:max-w-[300px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar eventos..."
+            className="pl-8 h-8 text-xs bg-muted/30 border-muted"
+            value={searchQuery}
+            onChange={(e) => onSearchQueryChange(e.target.value)}
+          />
+        </div>
+      )}
 
       <div className="flex-1" />
 
