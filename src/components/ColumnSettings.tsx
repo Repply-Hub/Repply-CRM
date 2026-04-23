@@ -226,6 +226,7 @@ export function ColumnSettings({
                             Resetar todas
                         </button>
                     </div>
+                </div>
                 )}
                 {children}
             </PopoverContent>
