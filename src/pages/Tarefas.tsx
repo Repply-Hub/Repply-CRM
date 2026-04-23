@@ -437,16 +437,16 @@ export default function Tarefas() {
               </div>
               <div className="space-y-1.5">
                 <Label>Projeto / Obra</Label>
-                <ProjetoSelect value={form.projeto} onValueChange={v => setForm(f => ({ ...f, projeto: v }))} />
+                <ProjetoSelect value={form.projeto} onChange={v => setForm(f => ({ ...f, projeto: v }))} />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label>Participantes</Label>
-              <ParticipantesMultiSelect value={form.participantes} onValueChange={v => setForm(f => ({ ...f, participantes: v }))} />
+              <ParticipantesMultiSelect value={form.participantes} onChange={v => setForm(f => ({ ...f, participantes: v }))} usuarios={vendedores} />
             </div>
             <div className="space-y-1.5">
               <Label>Marcadores</Label>
-              <MarcadoresMultiSelect value={form.marcadores} onValueChange={v => setForm(f => ({ ...f, marcadores: v }))} />
+              <MarcadoresMultiSelect value={form.marcadores} onChange={v => setForm(f => ({ ...f, marcadores: v }))} />
             </div>
           </div>
           <DialogFooter className="mt-6">
