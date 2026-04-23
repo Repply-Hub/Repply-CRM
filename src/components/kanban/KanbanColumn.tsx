@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Droppable } from '@hello-pangea/dnd';
 import { Plus } from 'lucide-react';
@@ -7,6 +7,7 @@ import { Order, KanbanStage } from '@/types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { ListPagination } from '@/components/ListPagination';
 
 interface KanbanColumnProps {
   stageKey: KanbanStage;
