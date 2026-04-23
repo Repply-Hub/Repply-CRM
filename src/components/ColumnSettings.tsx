@@ -153,9 +153,9 @@ export function ColumnSettings({
                                             disabled={disabled || isEditing}
                                             onClick={() => !column.locked && toggleColumn(column.id)}
                                             className={cn(
-                                                'flex-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-normal transition-colors text-left',
-                                                'hover:bg-muted/60 disabled:cursor-not-allowed',
-                                                !checked && !isEditing && 'opacity-40'
+                                                'flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left group/btn',
+                                                'hover:bg-muted/80 disabled:cursor-not-allowed',
+                                                !checked && !isEditing && 'opacity-50 grayscale-[0.5]'
                                             )}
                                         >
                                             <span
