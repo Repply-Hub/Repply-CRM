@@ -91,7 +91,7 @@ export function ColumnSettings({
                 <Button
                     variant="outline"
                     size="sm"
-                    className={cn('h-9 gap-2', hideTrigger && 'hidden', className)}
+                    className={cn('h-9 gap-2 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground data-[state=open]:border-primary', hideTrigger && 'hidden', className)}
                 >
                     <Settings2 className="h-4 w-4" />
                     <span className="hidden sm:inline">Opções</span>
