@@ -122,15 +122,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
 
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem('pedidos_columns');
-    return saved ? JSON.parse(saved) : PEDIDOS_COLUMNS.map(c => c.id);
-  });
+  // Column settings are now managed by useTableSettings hook
 
-  const handleColumnChange = (newColumns: string[]) => {
-    setVisibleColumns(newColumns);
-    localStorage.setItem('pedidos_columns', JSON.stringify(newColumns));
-  };
 
   const [visibleKanbanStages, setVisibleKanbanStages] = useState<string[]>(() => {
     const saved = localStorage.getItem('pedidos_kanban_stages');
