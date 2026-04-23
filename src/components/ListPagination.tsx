@@ -109,8 +109,8 @@ export function ListPagination({
         )}
       </div>
 
-      {safeTotalPages > 1 && (
-        <Pagination className="mx-0 w-auto justify-start sm:justify-end">
+      {/* Always show pagination controls for visual consistency if items exist */}
+      <Pagination className="mx-0 w-auto justify-start sm:justify-end">
           <PaginationContent className="flex-wrap">
             <PaginationItem>
               <PaginationLink
@@ -170,7 +170,7 @@ export function ListPagination({
             </PaginationItem>
           </PaginationContent>
         </Pagination>
-      )}
+      </Pagination>
     </div>
   );
 }
