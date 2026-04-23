@@ -16,7 +16,10 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
         const parsed = JSON.parse(saved);
         // Merge saved custom columns with current default columns
         const customOnes = parsed.filter((c: ColumnDefinition) => c.isCustom);
-        return [...defaultColumns, ...customOnes];
+        // Maintain the order from saved, but ensure default columns are present if missing
+        // or just return saved if it exists. 
+        // For simplicity, let's just return saved if it exists, otherwise defaults.
+        return parsed;
       } catch (e) {
         return defaultColumns;
       }
@@ -66,6 +69,16 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     const newCol: ColumnDefinition = { id, label, isCustom: true };
     setColumns(prev => [...prev, newCol]);
     setVisibleColumns(prev => [...prev, id]);
+  }, []);
+
+  const handleRemoveColumn = useCallback((columnId: string) => {
+    setColumns(prev => prev.filter(c => c.id !== columnId));
+    setVisibleColumns(prev => prev.filter(id => id !== columnId));
+    setCustomLabels(prev => {
+      const next = { ...prev };
+      delete next[columnId];
+      return next;
+    });
   }, []);
 
   const handleReorder = useCallback((startIndex: number, endIndex: number) => {
