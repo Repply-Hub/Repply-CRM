@@ -185,14 +185,21 @@ export function ColumnSettings({
                                                                 <GripVertical className="h-3.5 w-3.5" />
                                                             </div>
 
-                                                            <button
-                                                                type="button"
-                                                                disabled={disabled || isEditing}
-                                                                onClick={() => !column.locked && toggleColumn(column.id)}
+                                                            <div
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                onClick={() => !disabled && !isEditing && toggleColumn(column.id)}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                                        e.preventDefault();
+                                                                        if (!disabled && !isEditing) toggleColumn(column.id);
+                                                                    }
+                                                                }}
                                                                 className={cn(
                                                                     'flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left group/btn',
                                                                     snapshot.isDragging ? 'bg-accent' : 'hover:bg-muted/80',
-                                                                    'disabled:cursor-not-allowed',
+                                                                    isEditing ? 'cursor-default' : 'cursor-pointer',
+                                                                    disabled && 'cursor-not-allowed',
                                                                     !checked && !isEditing && 'opacity-50 grayscale-[0.5]'
                                                                 )}
                                                             >
@@ -219,13 +226,21 @@ export function ColumnSettings({
                                                                             }}
                                                                         />
                                                                         <button 
-                                                                            onClick={handleRename}
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleRename();
+                                                                            }}
                                                                             className="h-5 w-5 rounded hover:bg-primary/20 flex items-center justify-center text-primary"
                                                                         >
                                                                             <Check className="h-3 w-3" />
                                                                         </button>
                                                                         <button 
-                                                                            onClick={() => setEditingId(null)}
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setEditingId(null);
+                                                                            }}
                                                                             className="h-5 w-5 rounded hover:bg-destructive/20 flex items-center justify-center text-destructive"
                                                                         >
                                                                             <X className="h-3 w-3" />
@@ -234,14 +249,17 @@ export function ColumnSettings({
                                                                 ) : (
                                                                     <span className="flex-1 truncate">{column.customLabel || column.label}</span>
                                                                 )}
-                                                            </button>
+                                                            </div>
                                                             
                                                             {!isEditing && (
                                                                 <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                                     {onRename && (
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => startEditing(column)}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                startEditing(column);
+                                                                            }}
                                                                             className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
                                                                             title="Renomear"
                                                                         >
@@ -251,7 +269,10 @@ export function ColumnSettings({
                                                                     {column.isCustom && onRemove && (
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => onRemove(column.id)}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                onRemove(column.id);
+                                                                            }}
                                                                             className="h-6 w-6 rounded hover:bg-destructive/10 flex items-center justify-center text-destructive/70 hover:text-destructive"
                                                                             title="Excluir"
                                                                         >
