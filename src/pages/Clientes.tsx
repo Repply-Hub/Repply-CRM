@@ -224,10 +224,8 @@ const Clientes = () => {
 
   const filtered = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
   
-  const currentColumns: ColumnDefinition[] = (activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS).map(col => ({
-    ...col,
-    customLabel: customLabels[col.id]
-  }));
+  // Hook replaces currentColumns calculation
+
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginatedEmpresas = filteredEmpresas.slice((page - 1) * pageSize, page * pageSize);
