@@ -13,6 +13,7 @@ import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettin
 import { ListPagination } from '@/components/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { MapaObras } from '@/components/obras/MapaObras';
+import { cn } from '@/lib/utils';
 
 const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'nome_obra', label: 'Nome da Obra', locked: true },
