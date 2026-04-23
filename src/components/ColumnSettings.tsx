@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings2, Edit2, Check, X, Plus } from 'lucide-react';
+import { Settings2, Edit2, Check, X, Plus, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -91,10 +91,11 @@ export function ColumnSettings({
                 <Button
                     variant="outline"
                     size="sm"
-                    className={cn('h-9 gap-2', hideTrigger && 'hidden', className)}
+                    className={cn('h-9 gap-2 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground data-[state=open]:border-primary', hideTrigger && 'hidden', className)}
                 >
                     <Settings2 className="h-4 w-4" />
                     <span className="hidden sm:inline">Opções</span>
+                    <ChevronDown className="h-3.5 w-3.5 ml-0.5" />
                 </Button>
             </PopoverTrigger>
             <PopoverContent align="start" sideOffset={4} className="w-[260px] p-0">
