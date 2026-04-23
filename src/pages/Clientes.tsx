@@ -884,17 +884,20 @@ const Clientes = () => {
                     <th className="py-2.5 px-4 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
-                    {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['nome_contato'] || 'Nome'}</th>}
-                    {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['empresa'] || 'Empresa'}</th>}
-                    {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['cargo'] || 'Cargo'}</th>}
-                    {visibleContatoFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">{customLabels['email'] || 'E-mail'}</th>}
-                    {visibleContatoFields.includes('telefone') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['telefone'] || 'Telefone'}</th>}
+                    <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                      {getLabel('nome_contato')}
+                    </th>
+                    {visibleColumns.filter(id => id !== 'nome_contato').map(colId => (
+                      <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                        {getLabel(colId)}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedContatos.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-12 text-center text-muted-foreground">
+                      <td colSpan={visibleColumns.length + 1} className="py-12 text-center text-muted-foreground">
                         <div className="flex flex-col items-center justify-center">
                           <Users className="h-12 w-12 mb-3 opacity-30" />
                           <p className="text-sm font-medium">Nenhum contato encontrado</p>
@@ -902,12 +905,14 @@ const Clientes = () => {
                         </div>
                       </td>
                     </tr>
-                  ) : paginatedContatos.map(contato => (
-                    <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`}>
-                      <td className="py-2.5 px-4 w-10">
-                        <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
-                      </td>
-                      {visibleContatoFields.includes('nome_contato') && (
+                  ) : paginatedContatos.map(contato => {
+                    const camposExtras = (contato as any).campos_extras || {};
+
+                    return (
+                      <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`}>
+                        <td className="py-2.5 px-4 w-10">
+                          <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
+                        </td>
                         <td className="py-2.5 px-4">
                           <div className="flex items-center gap-2.5">
                             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -916,13 +921,19 @@ const Clientes = () => {
                             <span className="font-medium truncate max-w-[200px]">{contato.nome_contato || 'Sem nome'}</span>
                           </div>
                         </td>
-                      )}
-                      {visibleContatoFields.includes('empresa') && <td className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]">{contato.empresa || '—'}</td>}
-                      {visibleContatoFields.includes('cargo') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{contato.cargo || '—'}</td>}
-                      {visibleContatoFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]">{contato.email || '—'}</td>}
-                      {visibleContatoFields.includes('telefone') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{contato.telefone || '—'}</td>}
-                    </tr>
-                  ))}
+                        {visibleColumns.filter(id => id !== 'nome_contato').map(colId => {
+                          const isCustom = colId.startsWith('custom_');
+                          const value: any = isCustom ? camposExtras[colId] : (contato as any)[colId];
+
+                          return (
+                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]">
+                              {value || '—'}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
