@@ -79,6 +79,7 @@ export default function Tarefas() {
     handleRename,
     handleAddColumn,
     handleRemoveColumn,
+    handleReorder,
     getLabel
   } = useTableSettings({
     key: 'tarefas',
@@ -250,6 +251,7 @@ export default function Tarefas() {
             visibleColumns={visibleColumns}
             onChange={setVisibleColumns}
             onRename={handleRename}
+            onReorder={handleReorder}
             onAdd={handleAddColumn}
             onRemove={handleRemoveColumn}
           />

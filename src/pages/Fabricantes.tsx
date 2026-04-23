@@ -322,6 +322,7 @@ const Fabricantes = () => {
     handleRename: handlePrecoRename,
     handleAddColumn: handleAddPrecoColumn,
     handleRemoveColumn: handleRemovePrecoColumn,
+    handleReorder: handlePrecoReorder,
     getLabel: getPrecoLabel
   } = useTableSettings({
     key: 'fabricantes_precos',
@@ -508,6 +509,7 @@ const Fabricantes = () => {
                           visibleColumns={visiblePrecoColumns}
                           onChange={setVisiblePrecoColumns}
                           onRename={handlePrecoRename}
+                          onReorder={handlePrecoReorder}
                           onAdd={handleAddPrecoColumn}
                           onRemove={handleRemovePrecoColumn}
                           className="h-8"

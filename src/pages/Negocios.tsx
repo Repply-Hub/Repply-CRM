@@ -84,6 +84,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     handleRename,
     handleAddColumn,
     handleRemoveColumn,
+    handleReorder,
     getLabel
   } = useTableSettings({
     key: 'pedidos',
@@ -397,6 +398,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       visibleColumns={visibleColumns}
       onChange={setVisibleColumns}
       onRename={handleRename}
+      onReorder={handleReorder}
       onAdd={handleAddColumn}
       onRemove={handleRemoveColumn}
       hideColumns={showKanban}

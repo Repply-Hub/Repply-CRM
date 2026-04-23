@@ -53,6 +53,7 @@ export default function Obras() {
     handleRename,
     handleAddColumn,
     handleRemoveColumn,
+    handleReorder,
     getLabel
   } = useTableSettings({
     key: 'obras',
@@ -185,6 +186,7 @@ export default function Obras() {
                 visibleColumns={visibleColumns}
                 onChange={setVisibleColumns}
                 onRename={handleRename}
+                onReorder={handleReorder}
                 onAdd={handleAddColumn}
                 onRemove={handleRemoveColumn}
               />
