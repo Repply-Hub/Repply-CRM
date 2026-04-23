@@ -36,6 +36,11 @@ export default function Obras() {
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
 
+  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('obras_custom_labels');
+    return saved ? JSON.parse(saved) : {};
+  });
+
   // Field visibility state
   const [visibleFields, setVisibleFields] = useState<string[]>(() => {
     const saved = localStorage.getItem('obras_fields');
@@ -45,6 +50,12 @@ export default function Obras() {
   const handleFieldChange = (newFields: string[]) => {
     setVisibleFields(newFields);
     localStorage.setItem('obras_fields', JSON.stringify(newFields));
+  };
+
+  const handleRename = (columnId: string, newLabel: string) => {
+    const next = { ...customLabels, [columnId]: newLabel };
+    setCustomLabels(next);
+    localStorage.setItem('obras_custom_labels', JSON.stringify(next));
   };
 
   const filtered = useMemo(() => {
@@ -81,6 +92,11 @@ export default function Obras() {
 
     return list;
   }, [obras, search, statusFilter, sort]);
+
+  const currentColumns = OBRA_FIELDS.map(col => ({
+    ...col,
+    label: customLabels[col.id] || col.label
+  }));
 
   const obrasParaMapa = useMemo(
     () =>
@@ -146,9 +162,10 @@ export default function Obras() {
                 </SelectContent>
               </Select>
               <ColumnSettings
-                columns={OBRA_FIELDS}
+                columns={currentColumns}
                 visibleColumns={visibleFields}
                 onChange={handleFieldChange}
+                onRename={handleRename}
               />
             </div>
 
