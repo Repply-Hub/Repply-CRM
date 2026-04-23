@@ -252,7 +252,7 @@ export function ColumnSettings({
                                                             </div>
                                                             
                                                             {!isEditing && (
-                                                                <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <div className="flex items-center transition-opacity">
                                                                     {onRename && (
                                                                         <button
                                                                             type="button"
