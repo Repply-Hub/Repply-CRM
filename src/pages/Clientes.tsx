@@ -29,6 +29,7 @@ import { EnderecoForm } from '@/components/EnderecoForm';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/ListPagination';
 import { cn } from '@/lib/utils';
+import { ExportClientesButton } from '@/components/ExportClientesButton';
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'empresa', label: 'Nome/Empresa', locked: true },
@@ -408,19 +409,6 @@ const Clientes = () => {
     }
   };
 
-  const exportToFile = (data: any[], type: 'empresas' | 'contatos', format: 'xlsx' | 'csv') => {
-    if (data.length === 0) { toast.error('Nenhum dado para exportar'); return; }
-    import('xlsx').then(XLSX => {
-      const rows = type === 'empresas'
-        ? data.map((c: any) => ({ Nome: c.empresa || '', Tipo: c.tipo || '', 'CPF/CNPJ': c.cnpj || '', Email: c.email || '', Telefone: c.telefone || '', Endereço: c.endereco || '' }))
-        : data.map((c: any) => ({ Nome: c.nome_contato || '', Empresa: c.empresa || '', Email: c.email || '', Telefone: c.telefone || '', Cargo: c.cargo || '' }));
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, type === 'empresas' ? 'Empresas' : 'Contatos');
-      XLSX.writeFile(wb, `${type}_${new Date().toISOString().slice(0, 10)}.${format}`, format === 'csv' ? { bookType: 'csv' } : undefined);
-      toast.success('Arquivo exportado com sucesso!');
-    });
-  };
 
   return (
     <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`}>
@@ -541,39 +529,10 @@ const Clientes = () => {
               </div>
               
               <div className="px-1.5 space-y-1">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="w-full flex items-center justify-between px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left group">
-                      <div className="flex items-center gap-3">
-                        <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>Exportar</span>
-                      </div>
-                      <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-48">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                        exportToFile(data, activeTab, 'xlsx');
-                      }}
-                      className="gap-3 text-[13px]"
-                    >
-                      <FileSpreadsheet className="h-3.5 w-3.5 text-muted-foreground" />
-                      Excel (.xlsx)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                        exportToFile(data, activeTab, 'csv');
-                      }}
-                      className="gap-3 text-[13px]"
-                    >
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                      CSV (.csv)
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <ExportClientesButton 
+                  data={activeTab === 'empresas' ? filteredEmpresas : filteredContatos} 
+                  type={activeTab} 
+                />
 
                 <button
                   onClick={() => setImportOpen(true)}
