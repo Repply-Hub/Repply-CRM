@@ -533,45 +533,49 @@ const Clientes = () => {
             onRemove={handleRemoveColumn}
             label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
           />
-          <Popover>
-            <PopoverTrigger asChild>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
-                <FileDown className="h-4 w-4" />
-                <span className="hidden sm:inline">Exportar</span>
+                <Settings2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Opções</span>
               </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-48 p-2">
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                    exportToFile(data, activeTab, 'xlsx');
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-                >
-                  <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                  Excel (.xlsx)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                    exportToFile(data, activeTab, 'csv');
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
-                >
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  CSV (.csv)
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="gap-2">
+                  <FileDown className="h-4 w-4 text-muted-foreground" />
+                  <span>Exportar</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-48">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                      exportToFile(data, activeTab, 'xlsx');
+                    }}
+                    className="gap-2"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                      exportToFile(data, activeTab, 'csv');
+                    }}
+                    className="gap-2"
+                  >
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    CSV (.csv)
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuItem onClick={() => setImportOpen(true)} className="gap-2">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <span>Importar</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Importar</span>
-          </Button>
 
           {/* Novo tipo dialog — criação + gerenciamento */}
           <Dialog open={newTipoOpen} onOpenChange={(o) => { setNewTipoOpen(o); if (!o) setNewTipoName(''); }}>
