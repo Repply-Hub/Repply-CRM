@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Upload } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -60,13 +61,15 @@ function ThemeSelector() {
 function ProfileTab() {
   const { user, signOut } = useAuth();
   const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['meu_perfil', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, email, telefone, role')
+        .select('id, nome, email, telefone, role, avatar_url')
         .eq('user_id', user!.id)
         .single();
       if (error) throw error;
@@ -76,7 +79,7 @@ function ProfileTab() {
   });
 
   const updatePerfil = useMutation({
-    mutationFn: async (dados: { nome: string; telefone: string }) => {
+    mutationFn: async (dados: { nome: string; telefone: string; avatar_url?: string }) => {
       const { error } = await supabase.from('usuarios').update(dados).eq('user_id', user!.id);
       if (error) throw error;
     },
@@ -86,6 +89,48 @@ function ProfileTab() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const uploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione uma imagem válida.');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('A imagem deve ter no máximo 2MB.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/${Math.random()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      await updatePerfil.mutateAsync({ 
+        nome: perfil?.nome || '', 
+        telefone: perfil?.telefone || '', 
+        avatar_url: publicUrl 
+      });
+
+    } catch (error: any) {
+      toast.error('Erro ao fazer upload: ' + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const updateEmail = useMutation({
     mutationFn: async (email: string) => {
@@ -159,8 +204,27 @@ function ProfileTab() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4 mb-5">
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="text-2xl font-bold text-primary">{iniciais}</span>
+              <div className="relative group">
+                <Avatar className="h-16 w-16 border-2 border-background shadow-sm">
+                  <AvatarImage src={perfil.avatar_url || ''} className="object-cover" />
+                  <AvatarFallback className="bg-primary/10 text-2xl font-bold text-primary">
+                    {iniciais}
+                  </AvatarFallback>
+                </Avatar>
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-wait"
+                >
+                  {uploading ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : <Camera className="h-5 w-5 text-white" />}
+                </button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={uploadAvatar} 
+                  className="hidden" 
+                  accept="image/*" 
+                />
               </div>
               <div>
                 <p className="font-semibold">{perfil.nome}</p>
