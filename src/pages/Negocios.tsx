@@ -392,8 +392,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       onRename={handleRename}
       onAdd={handleAddColumn}
       onRemove={handleRemoveColumn}
+      hideColumns={showKanban}
     >
-      <div className="p-2 border-t border-border/50">
+      <div className={cn("p-2", !showKanban && "border-t border-border/50")}>
         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           {showKanban ? 'Personalizar Etapas' : 'Ações'}
         </div>
