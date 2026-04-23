@@ -851,9 +851,15 @@ export function MappingStep({
                           </SelectContent>
                         </Select>
 
-                        {isExtra && (
-                          <div className="rounded-md border border-accent/30 bg-accent/10 p-1.5 space-y-1">
-                            <label className="flex items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-wide text-accent-foreground/80">
+                        {!ignored && (
+                          <div className={cn(
+                            "rounded-md border p-1.5 space-y-1",
+                            isExtra ? "border-accent/30 bg-accent/10" : "border-primary/20 bg-primary/5"
+                          )}>
+                            <label className={cn(
+                              "flex items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-wide",
+                              isExtra ? "text-accent-foreground/80" : "text-primary/80"
+                            )}>
                               <span className="flex items-center gap-1">
                                 <Pencil className="h-2.5 w-2.5" />
                                 Nome no sistema
@@ -862,7 +868,10 @@ export function MappingStep({
                                 <button
                                   type="button"
                                   onClick={() => startEditExtra(h)}
-                                  className="text-[10px] font-medium normal-case text-accent-foreground hover:underline"
+                                  className={cn(
+                                    "text-[10px] font-medium normal-case hover:underline",
+                                    isExtra ? "text-accent-foreground" : "text-primary"
+                                  )}
                                 >
                                   Editar
                                 </button>
