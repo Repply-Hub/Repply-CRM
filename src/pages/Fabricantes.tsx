@@ -323,7 +323,11 @@ const Fabricantes = () => {
     handleAddColumn: handleAddPrecoColumn,
     handleRemoveColumn: handleRemovePrecoColumn,
     handleReorder: handlePrecoReorder,
-    getLabel: getPrecoLabel
+    getLabel: getPrecoLabel,
+    presets: precoPresets,
+    savePreset: savePrecoPreset,
+    loadPreset: loadPrecoPreset,
+    deletePreset: deletePrecoPreset
   } = useTableSettings({
     key: 'fabricantes_precos',
     defaultColumns: PRECOS_COLUMNS,
@@ -512,6 +516,10 @@ const Fabricantes = () => {
                           onReorder={handlePrecoReorder}
                           onAdd={handleAddPrecoColumn}
                           onRemove={handleRemovePrecoColumn}
+                          presets={precoPresets}
+                          onSavePreset={savePrecoPreset}
+                          onLoadPreset={loadPrecoPreset}
+                          onDeletePreset={deletePrecoPreset}
                           className="h-8"
                         />
                         <Button size="sm" variant="outline" onClick={() => setImportDialog(true)} className="gap-1.5 h-8">
