@@ -65,6 +65,14 @@ export function ManualEntryStep({ fields, onCancel, onConfirm }: Props) {
     toast.success(`Coluna "${name}" adicionada`);
   };
 
+  const removeBaseColumn = (key: string) => {
+    setRemovedBaseKeys(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  };
+
   const removeExtraColumn = (name: string) => {
     setExtraColumns(prev => prev.filter(c => c !== name));
     setRows(prev => prev.map(r => {
