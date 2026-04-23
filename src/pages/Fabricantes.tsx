@@ -342,10 +342,8 @@ const Fabricantes = () => {
   const categoriasPreco = Array.from(new Set((precos ?? []).map((p: any) => p.categoria).filter(Boolean))) as string[];
   const precosFiltrados = (precos ?? []).filter((p: any) => filtroCategoria === 'todas' || p.categoria === filtroCategoria);
 
-  const currentPrecoColumns = PRECOS_COLUMNS.map(col => ({
-    ...col,
-    label: customLabels[col.id] || col.label
-  }));
+  // precoColumns is now handled by the hook
+
 
   useEffect(() => {
     if (fabPage > totalFabPages) setFabPage(totalFabPages);
