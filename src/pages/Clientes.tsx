@@ -825,12 +825,6 @@ const Clientes = () => {
         </Dialog>
         {isLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            {activeTab === 'empresas' ? <Building2 className="h-12 w-12 mb-3 opacity-30" /> : <Users className="h-12 w-12 mb-3 opacity-30" />}
-            <p className="text-sm font-medium">Nenhum {activeTab === 'empresas' ? 'empresa' : 'contato'} encontrado</p>
-            <p className="text-xs mt-1">Tente ajustar os filtros ou cadastre um novo</p>
-          </div>
         ) : activeTab === 'empresas' ? (
           <>
             <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-hidden">
@@ -849,7 +843,17 @@ const Clientes = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedEmpresas.map(client => {
+                  {paginatedEmpresas.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center">
+                          <Building2 className="h-12 w-12 mb-3 opacity-30" />
+                          <p className="text-sm font-medium">Nenhuma empresa encontrada</p>
+                          <p className="text-xs mt-1">Tente ajustar os filtros ou cadastre uma nova</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : paginatedEmpresas.map(client => {
                     const Icon = getTipoIcon(client.tipo);
                     return (
                       <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`}>
@@ -910,7 +914,17 @@ const Clientes = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedContatos.map(contato => (
+                  {paginatedContatos.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center">
+                          <Users className="h-12 w-12 mb-3 opacity-30" />
+                          <p className="text-sm font-medium">Nenhum contato encontrado</p>
+                          <p className="text-xs mt-1">Tente ajustar os filtros ou cadastre um novo</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : paginatedContatos.map(contato => (
                     <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`}>
                       <td className="py-2.5 px-4 w-10">
                         <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />

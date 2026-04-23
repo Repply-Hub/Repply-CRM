@@ -343,7 +343,7 @@ const ClienteDetalhe = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {contatosExtras.length > 0 && (
+              <div className="rounded-lg border border-border overflow-hidden mb-4">
                 <div className="rounded-lg border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
@@ -356,7 +356,13 @@ const ClienteDetalhe = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {contatosExtras.map((c: any) => (
+                      {contatosExtras.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            Nenhum contato adicional cadastrado.
+                          </TableCell>
+                        </TableRow>
+                      ) : contatosExtras.map((c: any) => (
                         <TableRow key={c.id}>
                           <TableCell className="font-medium">{c.nome_contato || '-'}</TableCell>
                           <TableCell>
@@ -386,7 +392,7 @@ const ClienteDetalhe = () => {
                     </TableBody>
                   </Table>
                 </div>
-              )}
+                </div>
 
               <form onSubmit={handleAddContato} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 items-end pt-2 border-t border-border">
                 <div className="lg:col-span-1">
@@ -444,8 +450,6 @@ const ClienteDetalhe = () => {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : pedidosCliente.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Nenhum pedido encontrado para este cliente.</p>
             ) : (
               <div className="rounded-lg border border-border overflow-hidden">
                 <Table>
@@ -458,16 +462,24 @@ const ClienteDetalhe = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pedidosCliente.map(p => (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-medium">{(p as any).fabricante?.nome ?? '-'}</TableCell>
-                        <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                        <TableCell>
-                          <Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge>
+                    {pedidosCliente.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                          Nenhum pedido encontrado para este cliente.
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{new Date(p.data_pedido).toLocaleDateString('pt-BR')}</TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      pedidosCliente.map(p => (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium">{(p as any).fabricante?.nome ?? '-'}</TableCell>
+                          <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                          <TableCell>
+                            <Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{new Date(p.data_pedido).toLocaleDateString('pt-BR')}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
