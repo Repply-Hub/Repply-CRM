@@ -92,19 +92,18 @@ export function CalendarHeader({
         ))}
       </ToggleGroup>
 
-      {!isMobile && onSearchQueryChange !== undefined && (
-        <div className="relative w-full max-w-[200px] xl:max-w-[300px]">
+      {onSearchQueryChange !== undefined && (
+        <div className="relative flex-1 min-w-[40px] max-w-[300px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Pesquisar eventos..."
-            className="pl-8 h-8 text-xs bg-muted/30 border-muted"
+            placeholder={isMobile ? "Buscar..." : "Pesquisar eventos..."}
+            className="pl-8 h-8 text-xs bg-muted/30 border-muted w-full"
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
           />
         </div>
       )}
 
-      <div className="flex-1" />
 
       {onImport && (
         <Button
