@@ -510,7 +510,7 @@ const Fabricantes = () => {
                             </SelectContent>
                           </Select>
                         )}
-                        <ColumnSettings columns={PRECOS_COLUMNS} visibleColumns={visibleColumns} onChange={handleColumnChange} />
+                        <ColumnSettings columns={currentPrecoColumns} visibleColumns={visibleColumns} onChange={handleColumnChange} onRename={handleRename} />
                         <Button size="sm" variant="outline" onClick={() => setImportDialog(true)} className="gap-1.5 h-8">
                           <Upload className="h-3.5 w-3.5" /> Importar
                         </Button>
@@ -530,14 +530,14 @@ const Fabricantes = () => {
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30 hover:bg-muted/30">
-                              {visibleColumns.includes('imagem') && <TableHead className="text-xs font-semibold w-16">Foto</TableHead>}
-                              {visibleColumns.includes('descricao') && <TableHead className="text-xs font-semibold">Descrição</TableHead>}
-                              {visibleColumns.includes('categoria') && <TableHead className="text-xs font-semibold">Categoria</TableHead>}
-                              {visibleColumns.includes('referencia') && <TableHead className="text-xs font-semibold">Referência</TableHead>}
-                              {visibleColumns.includes('preco') && <TableHead className="text-xs font-semibold">Preço Unit.</TableHead>}
-                              {visibleColumns.includes('unidade') && <TableHead className="text-xs font-semibold">Unidade</TableHead>}
-                              {visibleColumns.includes('status') && <TableHead className="text-xs font-semibold">Status</TableHead>}
-                              {visibleColumns.includes('acoes') && <TableHead className="text-xs font-semibold w-20">Ações</TableHead>}
+                              {visibleColumns.includes('imagem') && <TableHead className="text-xs font-semibold w-16">{customLabels['imagem'] || 'Foto'}</TableHead>}
+                              {visibleColumns.includes('descricao') && <TableHead className="text-xs font-semibold">{customLabels['descricao'] || 'Descrição'}</TableHead>}
+                              {visibleColumns.includes('categoria') && <TableHead className="text-xs font-semibold">{customLabels['categoria'] || 'Categoria'}</TableHead>}
+                              {visibleColumns.includes('referencia') && <TableHead className="text-xs font-semibold">{customLabels['referencia'] || 'Referência'}</TableHead>}
+                              {visibleColumns.includes('preco') && <TableHead className="text-xs font-semibold">{customLabels['preco'] || 'Preço Unit.'}</TableHead>}
+                              {visibleColumns.includes('unidade') && <TableHead className="text-xs font-semibold">{customLabels['unidade'] || 'Unidade'}</TableHead>}
+                              {visibleColumns.includes('status') && <TableHead className="text-xs font-semibold">{customLabels['status'] || 'Status'}</TableHead>}
+                              {visibleColumns.includes('acoes') && <TableHead className="text-xs font-semibold w-20">{customLabels['acoes'] || 'Ações'}</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
