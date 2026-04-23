@@ -659,54 +659,77 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       <TableHead className="w-10">
                         <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
-                      {visibleColumns.includes('cliente') && <TableHead>{currentColumns.find(c => c.id === 'cliente')?.customLabel || 'Cliente'}</TableHead>}
-                      {visibleColumns.includes('obra') && <TableHead>{currentColumns.find(c => c.id === 'obra')?.customLabel || 'Obra'}</TableHead>}
-                      {visibleColumns.includes('fabricante') && <TableHead>{currentColumns.find(c => c.id === 'fabricante')?.customLabel || 'Fabricante'}</TableHead>}
-                      {visibleColumns.includes('valor') && <TableHead>{currentColumns.find(c => c.id === 'valor')?.customLabel || 'Valor'}</TableHead>}
-                      {visibleColumns.includes('etapa') && <TableHead>{currentColumns.find(c => c.id === 'etapa')?.customLabel || 'Etapa'}</TableHead>}
-                      {visibleColumns.includes('vendedor') && <TableHead>{currentColumns.find(c => c.id === 'vendedor')?.customLabel || 'Vendedor'}</TableHead>}
-                      {visibleColumns.includes('acoes') && (<TableHead className="w-[100px]">Ações</TableHead>)}
+                      {visibleColumns.map(colId => (
+                        <TableHead key={colId} className={cn(colId === 'acoes' && "w-[100px]")}>
+                          {getLabel(colId)}
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginated.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumnCount} className="py-12 text-center text-muted-foreground">
+                        <TableCell colSpan={visibleColumns.length + 1} className="py-12 text-center text-muted-foreground">
                           Nenhum negócio encontrado
                         </TableCell>
                       </TableRow>
                     ) : (
-                      paginated.map(p => (
-                        <TableRow key={p.id} className={`cursor-pointer hover:bg-muted/30 ${selected.has(p.id) ? 'bg-primary/5' : ''}`} onClick={() => setSelectedOrder(p.id)}>
-                          <TableCell className="w-10" onClick={e => e.stopPropagation()}>
-                            <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} aria-label={`Selecionar ${p.cliente?.empresa}`} />
-                          </TableCell>
-                          {visibleColumns.includes('cliente') && <TableCell className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>}
-                          {visibleColumns.includes('obra') && <TableCell>{p.obra?.nome_obra ?? '-'}</TableCell>}
-                          {visibleColumns.includes('fabricante') && <TableCell>{p.fabricante?.nome ?? '-'}</TableCell>}
-                          {visibleColumns.includes('valor') && <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>}
-                          {visibleColumns.includes('etapa') && (
-                            <TableCell>
-                              <Badge className={getStageBadgeClass(KANBAN_STAGES.find(s => s.key === p.status)?.color ?? 'muted-foreground')}>
-                                {stageLabel(p.status)}
-                              </Badge>
+                      paginated.map(p => {
+                        const camposExtras = (p as any).campos_extras || {};
+                        return (
+                          <TableRow key={p.id} className={`cursor-pointer hover:bg-muted/30 ${selected.has(p.id) ? 'bg-primary/5' : ''}`} onClick={() => setSelectedOrder(p.id)}>
+                            <TableCell className="w-10" onClick={e => e.stopPropagation()}>
+                              <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} aria-label={`Selecionar ${p.cliente?.empresa}`} />
                             </TableCell>
-                          )}
-                          {visibleColumns.includes('vendedor') && <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>}
-                          {visibleColumns.includes('acoes') && (
-                            <TableCell>
-                              <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/pedidos/${p.id}/editar`)} title="Editar pedido">
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedOrder(p.id)}>
-                                  <MessageSquare className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))
+                            {visibleColumns.map(colId => {
+                              const isCustom = colId.startsWith('custom_');
+                              if (isCustom) {
+                                return (
+                                  <TableCell key={colId} className="text-xs text-muted-foreground">
+                                    {camposExtras[colId] || '—'}
+                                  </TableCell>
+                                );
+                              }
+
+                              switch (colId) {
+                                case 'cliente':
+                                  return <TableCell key={colId} className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>;
+                                case 'obra':
+                                  return <TableCell key={colId}>{p.obra?.nome_obra ?? '-'}</TableCell>;
+                                case 'fabricante':
+                                  return <TableCell key={colId}>{p.fabricante?.nome ?? '-'}</TableCell>;
+                                case 'valor':
+                                  return <TableCell key={colId}>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>;
+                                case 'etapa':
+                                  return (
+                                    <TableCell key={colId}>
+                                      <Badge className={getStageBadgeClass(KANBAN_STAGES.find(s => s.key === p.status)?.color ?? 'muted-foreground')}>
+                                        {stageLabel(p.status)}
+                                      </Badge>
+                                    </TableCell>
+                                  );
+                                case 'vendedor':
+                                  return <TableCell key={colId}>{p.vendedor?.nome ?? '-'}</TableCell>;
+                                case 'acoes':
+                                  return (
+                                    <TableCell key={colId}>
+                                      <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/pedidos/${p.id}/editar`)} title="Editar pedido">
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedOrder(p.id)}>
+                                          <MessageSquare className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  );
+                                default:
+                                  return <TableCell key={colId}>—</TableCell>;
+                              }
+                            })}
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
