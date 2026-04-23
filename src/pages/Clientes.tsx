@@ -524,10 +524,12 @@ const Clientes = () => {
             </PopoverContent>
           </Popover>
           <ColumnSettings
-            columns={currentColumns}
-            visibleColumns={activeTab === 'empresas' ? visibleFields : visibleContatoFields}
-            onChange={activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange}
+            columns={columns}
+            visibleColumns={visibleColumns}
+            onChange={setVisibleColumns}
             onRename={handleRename}
+            onAdd={handleAddColumn}
+            onRemove={handleRemoveColumn}
             label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
           />
           <Popover>
