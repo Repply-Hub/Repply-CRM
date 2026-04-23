@@ -497,7 +497,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <div className="flex divide-x divide-border">
           {/* Coluna esquerda: visibilidade das colunas da tabela */}
           <div className="p-2 min-w-[220px]">
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Colunas</div>
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personalizar Colunas</div>
             <div className="space-y-0.5">
               {PEDIDOS_COLUMNS.map((column) => {
                 const checked = visibleColumns.includes(column.id);
