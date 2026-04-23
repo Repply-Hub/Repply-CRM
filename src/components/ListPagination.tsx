@@ -61,15 +61,12 @@ export function ListPagination({
   itemLabelPlural,
   className,
 }: ListPaginationProps) {
-  if (totalItems === 0) {
-    return null;
-  }
-
+  const safeTotalItems = totalItems || 0;
   const safeTotalPages = Math.max(1, totalPages);
   const safePage = Math.min(Math.max(page, 1), safeTotalPages);
-  const start = (safePage - 1) * pageSize + 1;
-  const end = Math.min(safePage * pageSize, totalItems);
-  const summaryLabel = totalItems === 1 ? itemLabel : itemLabelPlural ?? `${itemLabel}s`;
+  const start = safeTotalItems === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const end = Math.min(safePage * pageSize, safeTotalItems);
+  const summaryLabel = safeTotalItems === 1 ? itemLabel : itemLabelPlural ?? `${itemLabel}s`;
   const pageTokens = getPageTokens(safePage, safeTotalPages);
 
   const handlePageChange = (nextPage: number) => {
@@ -84,7 +81,7 @@ export function ListPagination({
     <div className={cn('flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between', className)}>
       <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm text-muted-foreground">
         <span className="whitespace-nowrap">
-          {start}–{end} de {totalItems} {summaryLabel}
+          {start}–{end} de {safeTotalItems} {summaryLabel}
         </span>
 
         {onPageSizeChange && (
@@ -109,8 +106,8 @@ export function ListPagination({
         )}
       </div>
 
-      {safeTotalPages > 1 && (
-        <Pagination className="mx-0 w-auto justify-start sm:justify-end">
+      {/* Always show pagination controls for visual consistency if items exist */}
+      <Pagination className="mx-0 w-auto justify-start sm:justify-end">
           <PaginationContent className="flex-wrap">
             <PaginationItem>
               <PaginationLink
@@ -170,7 +167,6 @@ export function ListPagination({
             </PaginationItem>
           </PaginationContent>
         </Pagination>
-      )}
     </div>
   );
 }
