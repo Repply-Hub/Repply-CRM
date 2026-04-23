@@ -85,6 +85,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     handleAddColumn,
     handleRemoveColumn,
     handleReorder,
+    getLabel,
     presets,
     savePreset,
     loadPreset,
