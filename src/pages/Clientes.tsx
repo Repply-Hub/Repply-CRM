@@ -535,52 +535,54 @@ const Clientes = () => {
             onReorder={handleReorder}
             label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
           >
-            <div className="pt-2 border-t border-border mt-1 px-2 pb-2 space-y-1">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
-                Ações
-              </p>
+            <div className="pt-2 border-t border-border/50 mt-1 px-1 pb-2 space-y-1">
+              <div className="px-3 py-2 flex items-center justify-between bg-muted/30">
+                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Ações</span>
+              </div>
               
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="w-full flex items-center justify-between px-2 py-1.5 text-xs rounded-md hover:bg-muted transition-colors">
-                    <div className="flex items-center gap-2">
-                      <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>Exportar</span>
-                    </div>
-                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                      exportToFile(data, activeTab, 'xlsx');
-                    }}
-                    className="gap-2"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                    Excel (.xlsx)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
-                      exportToFile(data, activeTab, 'csv');
-                    }}
-                    className="gap-2"
-                  >
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    CSV (.csv)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="px-1.5 space-y-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="w-full flex items-center justify-between px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left group">
+                      <div className="flex items-center gap-3">
+                        <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>Exportar</span>
+                      </div>
+                      <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-48">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                        exportToFile(data, activeTab, 'xlsx');
+                      }}
+                      className="gap-2"
+                    >
+                      <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                      Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const data = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+                        exportToFile(data, activeTab, 'csv');
+                      }}
+                      className="gap-2"
+                    >
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      CSV (.csv)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
-              <button
-                onClick={() => setImportOpen(true)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-muted transition-colors text-left"
-              >
-                <Upload className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Importar</span>
-              </button>
+                <button
+                  onClick={() => setImportOpen(true)}
+                  className="w-full flex items-center gap-3 px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left"
+                >
+                  <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Importar</span>
+                </button>
+              </div>
             </div>
           </ColumnSettings>
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
