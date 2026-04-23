@@ -80,7 +80,11 @@ export default function Tarefas() {
     handleAddColumn,
     handleRemoveColumn,
     handleReorder,
-    getLabel
+    getLabel,
+    presets,
+    savePreset,
+    loadPreset,
+    deletePreset
   } = useTableSettings({
     key: 'tarefas',
     defaultColumns: TAREFA_COLUMNS,
@@ -254,6 +258,10 @@ export default function Tarefas() {
             onReorder={handleReorder}
             onAdd={handleAddColumn}
             onRemove={handleRemoveColumn}
+            presets={presets}
+            onSavePreset={savePreset}
+            onLoadPreset={loadPreset}
+            onDeletePreset={deletePreset}
           />
           <Button onClick={openNew} size="sm" className="shrink-0">
             <Plus className="h-4 w-4 mr-1" />Nova Tarefa

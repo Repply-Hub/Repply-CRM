@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical } from 'lucide-react';
+import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -18,12 +18,18 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+
 export interface ColumnDefinition {
     id: string;
     label: string;
     customLabel?: string;
     locked?: boolean;
     isCustom?: boolean;
+}
+
+interface ColumnPreset {
+    id: string;
+    name: string;
 }
 
 interface ColumnSettingsProps {
@@ -34,6 +40,10 @@ interface ColumnSettingsProps {
     onAdd?: (label: string) => void;
     onRemove?: (columnId: string) => void;
     onReorder?: (startIndex: number, endIndex: number) => void;
+    presets?: ColumnPreset[];
+    onSavePreset?: (name: string) => void;
+    onLoadPreset?: (id: string) => void;
+    onDeletePreset?: (id: string) => void;
     className?: string;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
@@ -53,6 +63,10 @@ export function ColumnSettings({
     onAdd,
     onRemove,
     onReorder,
+    presets = [],
+    onSavePreset,
+    onLoadPreset,
+    onDeletePreset,
     className,
     open,
     onOpenChange,
@@ -65,6 +79,8 @@ export function ColumnSettings({
     const [editValue, setEditValue] = React.useState('');
     const [newColumnLabel, setNewColumnLabel] = React.useState('');
     const [isAdding, setIsAdding] = React.useState(false);
+    const [newPresetName, setNewPresetName] = React.useState('');
+    const [isSavingPreset, setIsSavingPreset] = React.useState(false);
 
     const toggleColumn = (columnId: string) => {
         if (visibleColumns.includes(columnId)) {
@@ -303,6 +319,89 @@ export function ColumnSettings({
                             </Droppable>
                         </DragDropContext>
                     </ScrollArea>
+
+                    {(onSavePreset || presets.length > 0) && (
+                        <div className="p-3 border-t border-border/50 bg-muted/5 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Modelos</span>
+                                {onSavePreset && !isSavingPreset && (
+                                    <button
+                                        onClick={() => setIsSavingPreset(true)}
+                                        className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                    >
+                                        <Save className="h-3 w-3" /> Salvar atual
+                                    </button>
+                                )}
+                            </div>
+
+                            {isSavingPreset && (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <Input
+                                        placeholder="Nome do modelo..."
+                                        value={newPresetName}
+                                        onChange={e => setNewPresetName(e.target.value)}
+                                        className="h-8 text-xs bg-background"
+                                        autoFocus
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && newPresetName.trim()) {
+                                                onSavePreset?.(newPresetName);
+                                                setNewPresetName('');
+                                                setIsSavingPreset(false);
+                                            }
+                                            if (e.key === 'Escape') setIsSavingPreset(false);
+                                        }}
+                                    />
+                                    <div className="flex gap-2">
+                                        <Button 
+                                            size="sm" 
+                                            className="h-7 flex-1 text-[10px]" 
+                                            onClick={() => {
+                                                if (newPresetName.trim()) {
+                                                    onSavePreset?.(newPresetName);
+                                                    setNewPresetName('');
+                                                    setIsSavingPreset(false);
+                                                }
+                                            }}
+                                        >
+                                            Confirmar
+                                        </Button>
+                                        <Button 
+                                            size="sm" 
+                                            variant="ghost" 
+                                            className="h-7 flex-1 text-[10px]" 
+                                            onClick={() => setIsSavingPreset(false)}
+                                        >
+                                            Cancelar
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {presets.length > 0 && (
+                                <div className="space-y-1">
+                                    {presets.map(preset => (
+                                        <div key={preset.id} className="group flex items-center gap-1">
+                                            <button
+                                                onClick={() => onLoadPreset?.(preset.id)}
+                                                className="flex-1 flex items-center gap-2 px-2 py-1.5 text-xs font-medium rounded-md hover:bg-primary/5 hover:text-primary transition-colors text-left"
+                                            >
+                                                <FolderOpen className="h-3 w-3 opacity-50" />
+                                                <span className="truncate">{preset.name}</span>
+                                            </button>
+                                            <button
+                                                onClick={() => onDeletePreset?.(preset.id)}
+                                                className="h-6 w-6 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 flex items-center justify-center text-destructive/70 transition-all"
+                                                title="Excluir modelo"
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <div className="p-1.5 bg-muted/20 border-t border-border/50">
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -331,6 +430,7 @@ export function ColumnSettings({
                     </div>
                 </div>
                 )}
+
                 {children}
             </PopoverContent>
         </Popover>

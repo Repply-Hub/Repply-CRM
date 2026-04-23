@@ -1,5 +1,15 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { ColumnDefinition } from '@/components/ColumnSettings';
+import { toast } from 'sonner';
+
+interface TablePreset {
+  id: string;
+  name: string;
+  columns: ColumnDefinition[];
+  visibleColumns: string[];
+  customLabels: Record<string, string>;
+  pageSize: number;
+}
 
 interface TableSettingsOptions {
   key: string;
@@ -13,13 +23,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     const saved = localStorage.getItem(`${key}_all_columns`);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        // Merge saved custom columns with current default columns
-        const customOnes = parsed.filter((c: ColumnDefinition) => c.isCustom);
-        // Maintain the order from saved, but ensure default columns are present if missing
-        // or just return saved if it exists. 
-        // For simplicity, let's just return saved if it exists, otherwise defaults.
-        return parsed;
+        return JSON.parse(saved);
       } catch (e) {
         return defaultColumns;
       }
@@ -42,6 +46,11 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     return saved ? Number(saved) : defaultPageSize;
   });
 
+  const [presets, setPresets] = useState<TablePreset[]>(() => {
+    const saved = localStorage.getItem(`${key}_presets`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
   // 2. Persistence
   useEffect(() => {
     localStorage.setItem(`${key}_all_columns`, JSON.stringify(columns));
@@ -58,6 +67,10 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
   useEffect(() => {
     localStorage.setItem(`${key}_page_size`, String(pageSize));
   }, [key, pageSize]);
+
+  useEffect(() => {
+    localStorage.setItem(`${key}_presets`, JSON.stringify(presets));
+  }, [key, presets]);
 
   // 3. Actions
   const handleRename = useCallback((columnId: string, newLabel: string) => {
@@ -95,10 +108,40 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     return customLabels[columnId] || col?.label || columnId;
   }, [columns, customLabels]);
 
-  const currentColumns = columns.map(col => ({
+  const savePreset = useCallback((name: string) => {
+    if (!name.trim()) return;
+    const newPreset: TablePreset = {
+      id: Date.now().toString(),
+      name: name.trim(),
+      columns,
+      visibleColumns,
+      customLabels,
+      pageSize
+    };
+    setPresets(prev => [...prev, newPreset]);
+    toast.success(`Modelo "${name}" salvo com sucesso!`);
+  }, [columns, visibleColumns, customLabels, pageSize]);
+
+  const loadPreset = useCallback((presetId: string) => {
+    const preset = presets.find(p => p.id === presetId);
+    if (preset) {
+      setColumns(preset.columns);
+      setVisibleColumns(preset.visibleColumns);
+      setCustomLabels(preset.customLabels);
+      setPageSize(preset.pageSize);
+      toast.success(`Modelo "${preset.name}" aplicado!`);
+    }
+  }, [presets]);
+
+  const deletePreset = useCallback((presetId: string) => {
+    setPresets(prev => prev.filter(p => p.id !== presetId));
+    toast.success('Modelo excluído!');
+  }, []);
+
+  const currentColumns = useMemo(() => columns.map(col => ({
     ...col,
     customLabel: customLabels[col.id]
-  }));
+  })), [columns, customLabels]);
 
   return {
     columns: currentColumns,
@@ -111,5 +154,9 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     handleRemoveColumn,
     handleReorder,
     getLabel,
+    presets,
+    savePreset,
+    loadPreset,
+    deletePreset,
   };
 }

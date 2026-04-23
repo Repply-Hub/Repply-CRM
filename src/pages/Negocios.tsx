@@ -85,7 +85,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     handleAddColumn,
     handleRemoveColumn,
     handleReorder,
-    getLabel
+    getLabel,
+    presets,
+    savePreset,
+    loadPreset,
+    deletePreset
   } = useTableSettings({
     key: 'pedidos',
     defaultColumns: PEDIDOS_COLUMNS,

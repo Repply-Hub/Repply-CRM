@@ -54,7 +54,11 @@ export default function Obras() {
     handleAddColumn,
     handleRemoveColumn,
     handleReorder,
-    getLabel
+    getLabel,
+    presets,
+    savePreset,
+    loadPreset,
+    deletePreset
   } = useTableSettings({
     key: 'obras',
     defaultColumns: OBRA_FIELDS,
@@ -189,6 +193,10 @@ export default function Obras() {
                 onReorder={handleReorder}
                 onAdd={handleAddColumn}
                 onRemove={handleRemoveColumn}
+                presets={presets}
+                onSavePreset={savePreset}
+                onLoadPreset={loadPreset}
+                onDeletePreset={deletePreset}
               />
             </div>
 
