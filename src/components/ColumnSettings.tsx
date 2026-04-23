@@ -1,10 +1,11 @@
 import React from 'react';
-import { Settings2, Edit2, Check, X, Plus, ChevronDown } from 'lucide-react';
+import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 export interface ColumnDefinition {
     id: string;
@@ -21,6 +22,7 @@ interface ColumnSettingsProps {
     onRename?: (columnId: string, newLabel: string) => void;
     onAdd?: (label: string) => void;
     onRemove?: (columnId: string) => void;
+    onReorder?: (startIndex: number, endIndex: number) => void;
     className?: string;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
@@ -39,6 +41,7 @@ export function ColumnSettings({
     onRename,
     onAdd,
     onRemove,
+    onReorder,
     className,
     open,
     onOpenChange,
@@ -83,6 +86,13 @@ export function ColumnSettings({
             setNewColumnLabel('');
             setIsAdding(false);
         }
+    };
+
+    const handleDragEnd = (result: DropResult) => {
+        if (!result.destination) return;
+        if (result.destination.index === result.source.index) return;
+        
+        onReorder?.(result.source.index, result.destination.index);
     };
 
     return (
@@ -140,92 +150,126 @@ export function ColumnSettings({
                     )}
 
                     <ScrollArea className="max-h-[320px] overflow-y-auto px-1.5 py-2">
-                        <div className="space-y-1">
-                            {columns.map((column) => {
-                                const checked = visibleColumns.includes(column.id);
-                                const disabled = column.locked || (checked && visibleColumns.length === 1);
-                                const isEditing = editingId === column.id;
+                        <DragDropContext onDragEnd={handleDragEnd}>
+                            <Droppable droppableId="columns">
+                                {(provided) => (
+                                    <div 
+                                        {...provided.droppableProps}
+                                        ref={provided.innerRef}
+                                        className="space-y-1"
+                                    >
+                                        {columns.map((column, index) => {
+                                            const checked = visibleColumns.includes(column.id);
+                                            const disabled = column.locked || (checked && visibleColumns.length === 1);
+                                            const isEditing = editingId === column.id;
 
-                                return (
-                                    <div key={column.id} className="group flex items-center gap-1 pr-1">
-                                        <button
-                                            type="button"
-                                            disabled={disabled || isEditing}
-                                            onClick={() => !column.locked && toggleColumn(column.id)}
-                                            className={cn(
-                                                'flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left group/btn',
-                                                'hover:bg-muted/80 disabled:cursor-not-allowed',
-                                                !checked && !isEditing && 'opacity-50 grayscale-[0.5]'
-                                            )}
-                                        >
-                                            <div
-                                                className={cn(
-                                                    'h-3.5 w-3.5 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
-                                                    checked 
-                                                        ? 'bg-primary border-primary shadow-[0_2px_4px_rgba(var(--primary),0.3)]' 
-                                                        : 'bg-background border-border/60 group-hover/btn:border-primary/40'
-                                                )}
-                                            >
-                                                {checked && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-                                            </div>
-                                            {isEditing ? (
-                                                <div className="flex-1 flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                                    <Input
-                                                        value={editValue}
-                                                        onChange={e => setEditValue(e.target.value)}
-                                                        className="h-6 text-[10px] py-0 px-1.5"
-                                                        autoFocus
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Enter') handleRename();
-                                                            if (e.key === 'Escape') setEditingId(null);
-                                                        }}
-                                                    />
-                                                    <button 
-                                                        onClick={handleRename}
-                                                        className="h-5 w-5 rounded hover:bg-primary/20 flex items-center justify-center text-primary"
-                                                    >
-                                                        <Check className="h-3 w-3" />
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => setEditingId(null)}
-                                                        className="h-5 w-5 rounded hover:bg-destructive/20 flex items-center justify-center text-destructive"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <span className="flex-1 truncate">{column.customLabel || column.label}</span>
-                                            )}
-                                        </button>
-                                        
-                                        {!isEditing && (
-                                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                {onRename && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => startEditing(column)}
-                                                        className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
-                                                        title="Renomear"
-                                                    >
-                                                        <Edit2 className="h-3 w-3" />
-                                                    </button>
-                                                )}
-                                                {column.isCustom && onRemove && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => onRemove(column.id)}
-                                                        className="h-6 w-6 rounded hover:bg-destructive/10 flex items-center justify-center text-destructive/70 hover:text-destructive"
-                                                        title="Excluir"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
+                                            return (
+                                                <Draggable 
+                                                    key={column.id} 
+                                                    draggableId={column.id} 
+                                                    index={index}
+                                                >
+                                                    {(provided, snapshot) => (
+                                                        <div 
+                                                            ref={provided.innerRef}
+                                                            {...provided.draggableProps}
+                                                            className={cn(
+                                                                "group flex items-center gap-1 pr-1",
+                                                                snapshot.isDragging && "z-50"
+                                                            )}
+                                                        >
+                                                            <div 
+                                                                {...provided.dragHandleProps}
+                                                                className="p-1 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                                                            >
+                                                                <GripVertical className="h-3.5 w-3.5" />
+                                                            </div>
+
+                                                            <button
+                                                                type="button"
+                                                                disabled={disabled || isEditing}
+                                                                onClick={() => !column.locked && toggleColumn(column.id)}
+                                                                className={cn(
+                                                                    'flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left group/btn',
+                                                                    snapshot.isDragging ? 'bg-accent' : 'hover:bg-muted/80',
+                                                                    'disabled:cursor-not-allowed',
+                                                                    !checked && !isEditing && 'opacity-50 grayscale-[0.5]'
+                                                                )}
+                                                            >
+                                                                <div
+                                                                    className={cn(
+                                                                        'h-3.5 w-3.5 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
+                                                                        checked 
+                                                                            ? 'bg-primary border-primary shadow-[0_2px_4px_rgba(var(--primary),0.3)]' 
+                                                                            : 'bg-background border-border/60 group-hover/btn:border-primary/40'
+                                                                    )}
+                                                                >
+                                                                    {checked && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                                                                </div>
+                                                                {isEditing ? (
+                                                                    <div className="flex-1 flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                                                        <Input
+                                                                            value={editValue}
+                                                                            onChange={e => setEditValue(e.target.value)}
+                                                                            className="h-6 text-[10px] py-0 px-1.5"
+                                                                            autoFocus
+                                                                            onKeyDown={e => {
+                                                                                if (e.key === 'Enter') handleRename();
+                                                                                if (e.key === 'Escape') setEditingId(null);
+                                                                            }}
+                                                                        />
+                                                                        <button 
+                                                                            onClick={handleRename}
+                                                                            className="h-5 w-5 rounded hover:bg-primary/20 flex items-center justify-center text-primary"
+                                                                        >
+                                                                            <Check className="h-3 w-3" />
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => setEditingId(null)}
+                                                                            className="h-5 w-5 rounded hover:bg-destructive/20 flex items-center justify-center text-destructive"
+                                                                        >
+                                                                            <X className="h-3 w-3" />
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="flex-1 truncate">{column.customLabel || column.label}</span>
+                                                                )}
+                                                            </button>
+                                                            
+                                                            {!isEditing && (
+                                                                <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    {onRename && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => startEditing(column)}
+                                                                            className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
+                                                                            title="Renomear"
+                                                                        >
+                                                                            <Edit2 className="h-3 w-3" />
+                                                                        </button>
+                                                                    )}
+                                                                    {column.isCustom && onRemove && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => onRemove(column.id)}
+                                                                            className="h-6 w-6 rounded hover:bg-destructive/10 flex items-center justify-center text-destructive/70 hover:text-destructive"
+                                                                            title="Excluir"
+                                                                        >
+                                                                            <X className="h-3 w-3" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </Draggable>
+                                            );
+                                        })}
+                                        {provided.placeholder}
                                     </div>
-                                );
-                            })}
-                        </div>
+                                )}
+                            </Droppable>
+                        </DragDropContext>
                     </ScrollArea>
                     <div className="p-1.5 bg-muted/20 border-t border-border/50">
                         <button
