@@ -25,6 +25,8 @@ import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelec
 import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
 import { ProjetoSelect } from '@/components/tarefas/ProjetoSelect';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { useTableSettings } from '@/hooks/use-table-settings';
+import { cn } from '@/lib/utils';
 
 const TAREFA_COLUMNS: ColumnDefinition[] = [
   { id: 'titulo', label: 'Tarefa', locked: true },
@@ -33,8 +35,6 @@ const TAREFA_COLUMNS: ColumnDefinition[] = [
   { id: 'status', label: 'Status' },
   { id: 'projeto', label: 'Projeto' },
 ];
-
-const DEFAULT_PAGE_SIZE = 10;
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: 'Pendente', className: 'bg-destructive/15 text-destructive border-destructive/30' },
@@ -70,31 +70,20 @@ export default function Tarefas() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
 
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem('tarefas_columns');
-    return saved ? JSON.parse(saved) : TAREFA_COLUMNS.map(c => c.id);
+  const {
+    columns,
+    visibleColumns,
+    setVisibleColumns,
+    pageSize,
+    setPageSize,
+    handleRename,
+    handleAddColumn,
+    handleRemoveColumn,
+    getLabel
+  } = useTableSettings({
+    key: 'tarefas',
+    defaultColumns: TAREFA_COLUMNS,
   });
-
-  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('tarefas_custom_labels');
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  const handleColumnChange = (newColumns: string[]) => {
-    setVisibleColumns(newColumns);
-    localStorage.setItem('tarefas_columns', JSON.stringify(newColumns));
-  };
-
-  const handleRename = (columnId: string, newLabel: string) => {
-    const next = { ...customLabels, [columnId]: newLabel };
-    setCustomLabels(next);
-    localStorage.setItem('tarefas_custom_labels', JSON.stringify(next));
-  };
-
-  const currentColumns = TAREFA_COLUMNS.map(col => ({
-    ...col,
-    customLabel: customLabels[col.id]
-  }));
 
   const [form, setForm] = useState({
     titulo: '', descricao: '', status: 'pendente', prazo_final: '',
@@ -257,10 +246,12 @@ export default function Tarefas() {
             </Button>
           )}
           <ColumnSettings
-            columns={currentColumns}
+            columns={columns}
             visibleColumns={visibleColumns}
-            onChange={handleColumnChange}
+            onChange={setVisibleColumns}
             onRename={handleRename}
+            onAdd={handleAddColumn}
+            onRemove={handleRemoveColumn}
           />
           <Button onClick={openNew} size="sm" className="shrink-0">
             <Plus className="h-4 w-4 mr-1" />Nova Tarefa
@@ -326,11 +317,12 @@ export default function Tarefas() {
                     <TableHead className="w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </TableHead>
-                    <TableHead>Tarefa</TableHead>
-                    {visibleColumns.includes('responsavel') && <TableHead className="hidden lg:table-cell">{currentColumns.find(c => c.id === 'responsavel')?.customLabel || 'Responsável'}</TableHead>}
-                    {visibleColumns.includes('prazo_final') && <TableHead className="hidden lg:table-cell">{currentColumns.find(c => c.id === 'prazo_final')?.customLabel || 'Prazo'}</TableHead>}
-                    {visibleColumns.includes('status') && <TableHead>{currentColumns.find(c => c.id === 'status')?.customLabel || 'Status'}</TableHead>}
-                    {visibleColumns.includes('projeto') && <TableHead className="hidden xl:table-cell">{currentColumns.find(c => c.id === 'projeto')?.customLabel || 'Projeto'}</TableHead>}
+                    <TableHead>{getLabel('titulo')}</TableHead>
+                    {visibleColumns.filter(id => id !== 'titulo').map(colId => (
+                      <TableHead key={colId} className={cn("whitespace-nowrap", (colId === 'responsavel' || colId === 'prazo_final') && "hidden lg:table-cell", colId === 'projeto' && "hidden xl:table-cell")}>
+                        {getLabel(colId)}
+                      </TableHead>
+                    ))}
                     <TableHead className="w-[80px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
