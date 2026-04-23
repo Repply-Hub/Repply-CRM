@@ -95,6 +95,7 @@ export function ColumnSettings({
                 >
                     <Settings2 className="h-4 w-4" />
                     <span className="hidden sm:inline">Opções</span>
+                    <ChevronDown className="h-3.5 w-3.5 ml-0.5" />
                 </Button>
             </PopoverTrigger>
             <PopoverContent align="start" sideOffset={4} className="w-[260px] p-0">
