@@ -319,6 +319,12 @@ const Configuracoes = () => {
           )}
 
           {isGestor && (
+            <TabsContent value="empresa" className="mt-4">
+              <EmpresaTab />
+            </TabsContent>
+          )}
+
+          {isGestor && (
             <TabsContent value="automacao" className="mt-4">
               <div className="grid gap-4">
                 <Card>
