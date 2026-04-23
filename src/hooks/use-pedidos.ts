@@ -71,7 +71,7 @@ export function useHistoricoContatos(pedidoId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('historico_contatos')
-        .select('*, vendedor:vendedores(nome)')
+        .select('*, vendedor:usuarios(nome)')
         .eq('pedido_id', pedidoId!)
         .order('data_contato', { ascending: false });
       if (error) throw error;
