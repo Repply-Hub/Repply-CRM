@@ -102,7 +102,7 @@ export function ColumnSettings({
                     <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent align="start" sideOffset={4} className="w-[260px] p-0">
+            <PopoverContent align="end" sideOffset={8} className="w-[280px] p-0 shadow-2xl border-border/40 overflow-hidden">
                 {!hideColumns && (
                     <div className="p-2">
                         <div className="px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
