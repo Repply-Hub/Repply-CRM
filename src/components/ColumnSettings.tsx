@@ -63,6 +63,10 @@ export function ColumnSettings({
     onAdd,
     onRemove,
     onReorder,
+    presets = [],
+    onSavePreset,
+    onLoadPreset,
+    onDeletePreset,
     className,
     open,
     onOpenChange,
@@ -75,6 +79,8 @@ export function ColumnSettings({
     const [editValue, setEditValue] = React.useState('');
     const [newColumnLabel, setNewColumnLabel] = React.useState('');
     const [isAdding, setIsAdding] = React.useState(false);
+    const [newPresetName, setNewPresetName] = React.useState('');
+    const [isSavingPreset, setIsSavingPreset] = React.useState(false);
 
     const toggleColumn = (columnId: string) => {
         if (visibleColumns.includes(columnId)) {
