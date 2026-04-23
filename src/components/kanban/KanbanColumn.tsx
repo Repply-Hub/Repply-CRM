@@ -18,7 +18,13 @@ interface KanbanColumnProps {
 
 export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders }: KanbanColumnProps) {
   const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  
   const total = orders.reduce((acc, o) => acc + o.valor, 0);
+  const totalItems = orders.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const paginatedOrders = orders.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="flex flex-col w-64 sm:w-72 min-w-[256px] sm:min-w-[288px] shrink-0 max-h-[calc(100vh-180px)] sm:max-h-[calc(100vh-220px)]">
