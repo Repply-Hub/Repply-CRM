@@ -25,6 +25,8 @@ interface ColumnSettingsProps {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     hideTrigger?: boolean;
+    /** Se true, oculta a lista de colunas */
+    hideColumns?: boolean;
     /** Texto exibido no trigger e no título da seção. Default: "Colunas" */
     label?: string;
     children?: React.ReactNode;
