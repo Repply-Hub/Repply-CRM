@@ -15,6 +15,7 @@ import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpd
 import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash, Upload, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { useTableSettings } from '@/hooks/use-table-settings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -23,6 +24,7 @@ import {
 import { ListPagination } from '@/components/ListPagination';
 import { ProductImageUpload } from '@/components/catalogo/ProductImageUpload';
 import { ImportCatalogoDialog } from '@/components/catalogo/ImportCatalogoDialog';
+import { cn } from '@/lib/utils';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'imagem', label: 'Imagem' },
@@ -311,27 +313,20 @@ const Fabricantes = () => {
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
   const [deleteAlert, setDeleteAlert] = useState<{ type: 'fab' | 'preco'; id: string } | null>(null);
 
-  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('fabricantes_custom_labels');
-    return saved ? JSON.parse(saved) : {};
+  const {
+    columns: precoColumns,
+    visibleColumns: visiblePrecoColumns,
+    setVisibleColumns: setVisiblePrecoColumns,
+    pageSize: precoPageSize,
+    setPageSize: setPrecoPageSize,
+    handleRename: handlePrecoRename,
+    handleAddColumn: handleAddPrecoColumn,
+    handleRemoveColumn: handleRemovePrecoColumn,
+    getLabel: getPrecoLabel
+  } = useTableSettings({
+    key: 'fabricantes_precos',
+    defaultColumns: PRECOS_COLUMNS,
   });
-
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem('precos_columns');
-    return saved ? JSON.parse(saved) : PRECOS_COLUMNS.map(c => c.id);
-  });
-
-  const handleRename = (columnId: string, newLabel: string) => {
-    const next = { ...customLabels, [columnId]: newLabel };
-    setCustomLabels(next);
-    localStorage.setItem('fabricantes_custom_labels', JSON.stringify(next));
-    toast.success('Coluna renomeada');
-  };
-
-  const handleColumnChange = (newColumns: string[]) => {
-    setVisibleColumns(newColumns);
-    localStorage.setItem('precos_columns', JSON.stringify(newColumns));
-  };
 
   const deleteFabricante = useDeleteFabricante();
   const deletePreco = useDeletePreco();
@@ -348,10 +343,8 @@ const Fabricantes = () => {
   const categoriasPreco = Array.from(new Set((precos ?? []).map((p: any) => p.categoria).filter(Boolean))) as string[];
   const precosFiltrados = (precos ?? []).filter((p: any) => filtroCategoria === 'todas' || p.categoria === filtroCategoria);
 
-  const currentPrecoColumns = PRECOS_COLUMNS.map(col => ({
-    ...col,
-    label: customLabels[col.id] || col.label
-  }));
+  // precoColumns is now handled by the hook
+
 
   useEffect(() => {
     if (fabPage > totalFabPages) setFabPage(totalFabPages);
@@ -510,7 +503,15 @@ const Fabricantes = () => {
                             </SelectContent>
                           </Select>
                         )}
-                        <ColumnSettings columns={currentPrecoColumns} visibleColumns={visibleColumns} onChange={handleColumnChange} onRename={handleRename} />
+                        <ColumnSettings
+                          columns={precoColumns}
+                          visibleColumns={visiblePrecoColumns}
+                          onChange={setVisiblePrecoColumns}
+                          onRename={handlePrecoRename}
+                          onAdd={handleAddPrecoColumn}
+                          onRemove={handleRemovePrecoColumn}
+                          className="h-8"
+                        />
                         <Button size="sm" variant="outline" onClick={() => setImportDialog(true)} className="gap-1.5 h-8">
                           <Upload className="h-3.5 w-3.5" /> Importar
                         </Button>
@@ -530,64 +531,87 @@ const Fabricantes = () => {
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30 hover:bg-muted/30">
-                              {visibleColumns.includes('imagem') && <TableHead className="text-xs font-semibold w-16">{customLabels['imagem'] || 'Foto'}</TableHead>}
-                              {visibleColumns.includes('descricao') && <TableHead className="text-xs font-semibold">{customLabels['descricao'] || 'Descrição'}</TableHead>}
-                              {visibleColumns.includes('categoria') && <TableHead className="text-xs font-semibold">{customLabels['categoria'] || 'Categoria'}</TableHead>}
-                              {visibleColumns.includes('referencia') && <TableHead className="text-xs font-semibold">{customLabels['referencia'] || 'Referência'}</TableHead>}
-                              {visibleColumns.includes('preco') && <TableHead className="text-xs font-semibold">{customLabels['preco'] || 'Preço Unit.'}</TableHead>}
-                              {visibleColumns.includes('unidade') && <TableHead className="text-xs font-semibold">{customLabels['unidade'] || 'Unidade'}</TableHead>}
-                              {visibleColumns.includes('status') && <TableHead className="text-xs font-semibold">{customLabels['status'] || 'Status'}</TableHead>}
-                              {visibleColumns.includes('acoes') && <TableHead className="text-xs font-semibold w-20">{customLabels['acoes'] || 'Ações'}</TableHead>}
+                              {visiblePrecoColumns.map(colId => (
+                                <TableHead key={colId} className={cn("text-xs font-semibold whitespace-nowrap", colId === 'imagem' && "w-16", colId === 'acoes' && "w-20")}>
+                                  {getPrecoLabel(colId)}
+                                </TableHead>
+                              ))}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {precosFiltrados.map((p: any) => (
-                              <TableRow key={p.id} className="group">
-                                {visibleColumns.includes('imagem') && (
-                                  <TableCell>
-                                    <div className="h-10 w-10 rounded-md bg-muted/40 border border-border/40 overflow-hidden flex items-center justify-center">
-                                      {p.imagem_url ? (
-                                        <img src={p.imagem_url} alt={p.descricao_material} className="h-full w-full object-cover" loading="lazy" />
-                                      ) : (
-                                        <ImageIcon className="h-4 w-4 text-muted-foreground/40" />
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                )}
-                                {visibleColumns.includes('descricao') && <TableCell className="font-medium text-sm">{p.descricao_material}</TableCell>}
-                                {visibleColumns.includes('categoria') && (
-                                  <TableCell className="text-xs">
-                                    {p.categoria ? <Badge variant="secondary" className="font-normal">{p.categoria}</Badge> : <span className="text-muted-foreground">-</span>}
-                                  </TableCell>
-                                )}
-                                {visibleColumns.includes('referencia') && <TableCell className="text-sm text-muted-foreground">{p.referencia ?? '-'}</TableCell>}
-                                {visibleColumns.includes('preco') && (
-                                  <TableCell className="text-sm font-semibold text-foreground">
-                                    {Number(p.preco_unitario).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                  </TableCell>
-                                )}
-                                {visibleColumns.includes('unidade') && <TableCell className="text-sm text-muted-foreground">{p.unidade ?? '-'}</TableCell>}
-                                {visibleColumns.includes('status') && (
-                                  <TableCell>
-                                    <Badge variant={p.vigente ? 'default' : 'secondary'} className={p.vigente ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}>
-                                      {p.vigente ? 'Vigente' : 'Inativo'}
-                                    </Badge>
-                                  </TableCell>
-                                )}
-                                {visibleColumns.includes('acoes') && (
-                                  <TableCell>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditPreco(p); setPrecoDialog(true); }}>
-                                        <Pencil className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteAlert({ type: 'preco', id: p.id })}>
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                )}
-                              </TableRow>
-                            ))}
+                            {precosFiltrados.map((p: any) => {
+                              const camposExtras = p.campos_extras || {};
+                              return (
+                                <TableRow key={p.id} className="group">
+                                  {visiblePrecoColumns.map(colId => {
+                                    const isCustom = colId.startsWith('custom_');
+                                    if (isCustom) {
+                                      return (
+                                        <TableCell key={colId} className="text-xs text-muted-foreground">
+                                          {camposExtras[colId] || '—'}
+                                        </TableCell>
+                                      );
+                                    }
+
+                                    switch (colId) {
+                                      case 'imagem':
+                                        return (
+                                          <TableCell key={colId}>
+                                            <div className="h-10 w-10 rounded-md bg-muted/40 border border-border/40 overflow-hidden flex items-center justify-center">
+                                              {p.imagem_url ? (
+                                                <img src={p.imagem_url} alt={p.descricao_material} className="h-full w-full object-cover" loading="lazy" />
+                                              ) : (
+                                                <ImageIcon className="h-4 w-4 text-muted-foreground/40" />
+                                              )}
+                                            </div>
+                                          </TableCell>
+                                        );
+                                      case 'descricao':
+                                        return <TableCell key={colId} className="font-medium text-sm">{p.descricao_material}</TableCell>;
+                                      case 'categoria':
+                                        return (
+                                          <TableCell key={colId} className="text-xs">
+                                            {p.categoria ? <Badge variant="secondary" className="font-normal">{p.categoria}</Badge> : <span className="text-muted-foreground">-</span>}
+                                          </TableCell>
+                                        );
+                                      case 'referencia':
+                                        return <TableCell key={colId} className="text-sm text-muted-foreground">{p.referencia ?? '-'}</TableCell>;
+                                      case 'preco':
+                                        return (
+                                          <TableCell key={colId} className="text-sm font-semibold text-foreground">
+                                            {Number(p.preco_unitario).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                          </TableCell>
+                                        );
+                                      case 'unidade':
+                                        return <TableCell key={colId} className="text-sm text-muted-foreground">{p.unidade ?? '-'}</TableCell>;
+                                      case 'status':
+                                        return (
+                                          <TableCell key={colId}>
+                                            <Badge variant={p.vigente ? 'default' : 'secondary'} className={p.vigente ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}>
+                                              {p.vigente ? 'Vigente' : 'Inativo'}
+                                            </Badge>
+                                          </TableCell>
+                                        );
+                                      case 'acoes':
+                                        return (
+                                          <TableCell key={colId}>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditPreco(p); setPrecoDialog(true); }}>
+                                                <Pencil className="h-3.5 w-3.5" />
+                                              </Button>
+                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteAlert({ type: 'preco', id: p.id })}>
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                              </Button>
+                                            </div>
+                                          </TableCell>
+                                        );
+                                      default:
+                                        return <TableCell key={colId}>—</TableCell>;
+                                    }
+                                  })}
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Mail, Phone, Building2 } from 'lucide-react';
 
@@ -14,7 +14,6 @@ interface VendedorProfile {
   email: string;
   telefone: string | null;
   role: string;
-  avatar_url?: string;
 }
 
 export function UserProfilePopover({ name, className = '' }: UserProfilePopoverProps) {
@@ -28,7 +27,7 @@ export function UserProfilePopover({ name, className = '' }: UserProfilePopoverP
     try {
       const { data } = await supabase
         .from('usuarios')
-        .select('nome, email, telefone, role, avatar_url')
+        .select('nome, email, telefone, role')
         .ilike('nome', name)
         .limit(1)
         .maybeSingle();
@@ -68,7 +67,6 @@ export function UserProfilePopover({ name, className = '' }: UserProfilePopoverP
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
-                <AvatarImage src={profile.avatar_url || ''} className="object-cover" />
                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
                   {initials}
                 </AvatarFallback>

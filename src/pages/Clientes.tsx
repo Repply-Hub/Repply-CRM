@@ -23,6 +23,7 @@ import { ImportClientesDialog } from '@/components/ImportClientesDialog';
 
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { useTableSettings } from '@/hooks/use-table-settings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 import { EnderecoForm } from '@/components/EnderecoForm';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
@@ -70,7 +71,6 @@ const Clientes = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [activeTab, setActiveTab] = useState<ViewTab>('empresas');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -166,37 +166,27 @@ const Clientes = () => {
     toast.success(`Tipo "${label}" criado`);
   };
 
-  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('clientes_custom_labels');
-    return saved ? JSON.parse(saved) : {};
+  const empresasSettings = useTableSettings({
+    key: 'clientes_empresas',
+    defaultColumns: CLIENTE_FIELDS,
   });
 
-  const [visibleFields, setVisibleFields] = useState<string[]>(() => {
-    const saved = localStorage.getItem('clientes_fields');
-    return saved ? JSON.parse(saved) : CLIENTE_FIELDS.map(c => c.id);
+  const contatosSettings = useTableSettings({
+    key: 'clientes_contatos',
+    defaultColumns: CONTATO_FIELDS,
   });
 
-  const [visibleContatoFields, setVisibleContatoFields] = useState<string[]>(() => {
-    const saved = localStorage.getItem('contatos_fields');
-    return saved ? JSON.parse(saved) : CONTATO_FIELDS.map(c => c.id);
-  });
-
-  const handleRename = (columnId: string, newLabel: string) => {
-    const next = { ...customLabels, [columnId]: newLabel };
-    setCustomLabels(next);
-    localStorage.setItem('clientes_custom_labels', JSON.stringify(next));
-    toast.success('Coluna renomeada');
-  };
-
-  const handleFieldChange = (newFields: string[]) => {
-    setVisibleFields(newFields);
-    localStorage.setItem('clientes_fields', JSON.stringify(newFields));
-  };
-
-  const handleContatoFieldChange = (newFields: string[]) => {
-    setVisibleContatoFields(newFields);
-    localStorage.setItem('contatos_fields', JSON.stringify(newFields));
-  };
+  const {
+    columns,
+    visibleColumns,
+    setVisibleColumns,
+    pageSize,
+    setPageSize,
+    handleRename,
+    handleAddColumn,
+    handleRemoveColumn,
+    getLabel
+  } = activeTab === 'empresas' ? empresasSettings : contatosSettings;
 
   const empresas = clients ?? [];
   const contatos = contatosList ?? [];
@@ -235,10 +225,8 @@ const Clientes = () => {
 
   const filtered = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
   
-  const currentColumns: ColumnDefinition[] = (activeTab === 'empresas' ? CLIENTE_FIELDS : CONTATO_FIELDS).map(col => ({
-    ...col,
-    customLabel: customLabels[col.id]
-  }));
+  // Hook replaces currentColumns calculation
+
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginatedEmpresas = filteredEmpresas.slice((page - 1) * pageSize, page * pageSize);
@@ -537,10 +525,12 @@ const Clientes = () => {
             </PopoverContent>
           </Popover>
           <ColumnSettings
-            columns={currentColumns}
-            visibleColumns={activeTab === 'empresas' ? visibleFields : visibleContatoFields}
-            onChange={activeTab === 'empresas' ? handleFieldChange : handleContatoFieldChange}
+            columns={columns}
+            visibleColumns={visibleColumns}
+            onChange={setVisibleColumns}
             onRename={handleRename}
+            onAdd={handleAddColumn}
+            onRemove={handleRemoveColumn}
             label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
           />
           <Popover>
@@ -801,18 +791,20 @@ const Clientes = () => {
                     <th className="py-2.5 px-4 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
-                    <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['empresa'] || 'Nome/Empresa'}</th>
-                    {visibleFields.includes('tipo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['tipo'] || 'Tipo'}</th>}
-                    {visibleFields.includes('cnpj') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['cnpj'] || 'CPF/CNPJ'}</th>}
-                    {visibleFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">{customLabels['email'] || 'E-mail'}</th>}
-                    {visibleFields.includes('endereco') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden xl:table-cell">{customLabels['endereco'] || 'Endereço'}</th>}
-                    {visibleFields.includes('obras_count') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['obras_count'] || 'Obras'}</th>}
+                    <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                      {getLabel('empresa')}
+                    </th>
+                    {visibleColumns.filter(id => id !== 'empresa').map(colId => (
+                      <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                        {getLabel(colId)}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedEmpresas.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-12 text-center text-muted-foreground">
+                      <td colSpan={visibleColumns.length + 1} className="py-12 text-center text-muted-foreground">
                         <div className="flex flex-col items-center justify-center">
                           <Building2 className="h-12 w-12 mb-3 opacity-30" />
                           <p className="text-sm font-medium">Nenhuma empresa encontrada</p>
@@ -822,6 +814,8 @@ const Clientes = () => {
                     </tr>
                   ) : paginatedEmpresas.map(client => {
                     const Icon = getTipoIcon(client.tipo);
+                    const camposExtras = (client as any).campos_extras || {};
+
                     return (
                       <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`}>
                         <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
@@ -835,15 +829,32 @@ const Clientes = () => {
                             <span className="font-medium truncate max-w-[200px]">{client.empresa}</span>
                           </div>
                         </td>
-                        {visibleFields.includes('tipo') && (
-                          <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
-                            <Badge variant="secondary" className="text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
-                          </td>
-                        )}
-                        {visibleFields.includes('cnpj') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.cnpj || '—'}</td>}
-                        {visibleFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]" onClick={() => navigate(`/clientes/${client.id}`)}>{client.email || '—'}</td>}
-                        {visibleFields.includes('endereco') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden xl:table-cell truncate max-w-[250px]" onClick={() => navigate(`/clientes/${client.id}`)}>{client.endereco || '—'}</td>}
-                        {visibleFields.includes('obras_count') && <td className="py-2.5 px-4 text-xs hidden md:table-cell" onClick={() => navigate(`/clientes/${client.id}`)}>{client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}</td>}
+                        {visibleColumns.filter(id => id !== 'empresa').map(colId => {
+                          const isCustom = colId.startsWith('custom_');
+                          let value: any = isCustom ? camposExtras[colId] : (client as any)[colId];
+                          
+                          if (colId === 'tipo') {
+                            return (
+                              <td key={colId} className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
+                                <Badge variant="secondary" className="text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
+                              </td>
+                            );
+                          }
+                          
+                          if (colId === 'obras_count') {
+                            return (
+                              <td key={colId} className="py-2.5 px-4 text-xs" onClick={() => navigate(`/clientes/${client.id}`)}>
+                                {client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}
+                              </td>
+                            );
+                          }
+
+                          return (
+                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]" onClick={() => navigate(`/clientes/${client.id}`)}>
+                              {value || '—'}
+                            </td>
+                          );
+                        })}
                       </tr>
                     );
                   })}
@@ -873,17 +884,20 @@ const Clientes = () => {
                     <th className="py-2.5 px-4 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
-                    {visibleContatoFields.includes('nome_contato') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['nome_contato'] || 'Nome'}</th>}
-                    {visibleContatoFields.includes('empresa') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs">{customLabels['empresa'] || 'Empresa'}</th>}
-                    {visibleContatoFields.includes('cargo') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['cargo'] || 'Cargo'}</th>}
-                    {visibleContatoFields.includes('email') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden lg:table-cell">{customLabels['email'] || 'E-mail'}</th>}
-                    {visibleContatoFields.includes('telefone') && <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs hidden md:table-cell">{customLabels['telefone'] || 'Telefone'}</th>}
+                    <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                      {getLabel('nome_contato')}
+                    </th>
+                    {visibleColumns.filter(id => id !== 'nome_contato').map(colId => (
+                      <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                        {getLabel(colId)}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedContatos.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-12 text-center text-muted-foreground">
+                      <td colSpan={visibleColumns.length + 1} className="py-12 text-center text-muted-foreground">
                         <div className="flex flex-col items-center justify-center">
                           <Users className="h-12 w-12 mb-3 opacity-30" />
                           <p className="text-sm font-medium">Nenhum contato encontrado</p>
@@ -891,12 +905,14 @@ const Clientes = () => {
                         </div>
                       </td>
                     </tr>
-                  ) : paginatedContatos.map(contato => (
-                    <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`}>
-                      <td className="py-2.5 px-4 w-10">
-                        <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
-                      </td>
-                      {visibleContatoFields.includes('nome_contato') && (
+                  ) : paginatedContatos.map(contato => {
+                    const camposExtras = (contato as any).campos_extras || {};
+
+                    return (
+                      <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`}>
+                        <td className="py-2.5 px-4 w-10">
+                          <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
+                        </td>
                         <td className="py-2.5 px-4">
                           <div className="flex items-center gap-2.5">
                             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -905,13 +921,19 @@ const Clientes = () => {
                             <span className="font-medium truncate max-w-[200px]">{contato.nome_contato || 'Sem nome'}</span>
                           </div>
                         </td>
-                      )}
-                      {visibleContatoFields.includes('empresa') && <td className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]">{contato.empresa || '—'}</td>}
-                      {visibleContatoFields.includes('cargo') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{contato.cargo || '—'}</td>}
-                      {visibleContatoFields.includes('email') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden lg:table-cell truncate max-w-[200px]">{contato.email || '—'}</td>}
-                      {visibleContatoFields.includes('telefone') && <td className="py-2.5 px-4 text-xs text-muted-foreground hidden md:table-cell">{contato.telefone || '—'}</td>}
-                    </tr>
-                  ))}
+                        {visibleColumns.filter(id => id !== 'nome_contato').map(colId => {
+                          const isCustom = colId.startsWith('custom_');
+                          const value: any = isCustom ? camposExtras[colId] : (contato as any)[colId];
+
+                          return (
+                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]">
+                              {value || '—'}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

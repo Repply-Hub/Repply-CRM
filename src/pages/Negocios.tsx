@@ -6,7 +6,6 @@ import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { KanbanColunasDialog } from '@/components/kanban/KanbanColunasDialog';
-import { useColunasCustomizadas } from '@/hooks/use-colunas-customizadas';
 import { usePedidos, useHistoricoContatos, useUpdatePedidoStatus } from '@/hooks/use-pedidos';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import { Button } from '@/components/ui/button';
@@ -25,7 +24,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
-
+import { useTableSettings } from '@/hooks/use-table-settings';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ImportPedidosDialog } from '@/components/ImportPedidosDialog';
@@ -69,7 +68,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
   const { data: kanbanColunas } = useKanbanColunas();
-  const { data: customCols = [] } = useColunasCustomizadas('pedidos');
   
   const KANBAN_STAGES = useMemo(
     () => (kanbanColunas ?? []).map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
@@ -77,21 +75,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   );
 
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
-  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('pedidos_custom_labels');
-    return saved ? JSON.parse(saved) : {};
+  const {
+    columns,
+    visibleColumns,
+    setVisibleColumns,
+    pageSize,
+    setPageSize,
+    handleRename,
+    handleAddColumn,
+    handleRemoveColumn,
+    getLabel
+  } = useTableSettings({
+    key: 'pedidos',
+    defaultColumns: PEDIDOS_COLUMNS,
   });
-
-  const handleRename = (columnId: string, newLabel: string) => {
-    const next = { ...customLabels, [columnId]: newLabel };
-    setCustomLabels(next);
-    localStorage.setItem('pedidos_custom_labels', JSON.stringify(next));
-  };
-
-  const currentColumns = PEDIDOS_COLUMNS.map(col => ({
-    ...col,
-    customLabel: customLabels[col.id]
-  }));
 
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
   const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
@@ -109,7 +106,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [importOpen, setImportOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
@@ -126,15 +122,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
 
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem('pedidos_columns');
-    return saved ? JSON.parse(saved) : PEDIDOS_COLUMNS.map(c => c.id);
-  });
+  // Column settings are now managed by useTableSettings hook
 
-  const handleColumnChange = (newColumns: string[]) => {
-    setVisibleColumns(newColumns);
-    localStorage.setItem('pedidos_columns', JSON.stringify(newColumns));
-  };
 
   const [visibleKanbanStages, setVisibleKanbanStages] = useState<string[]>(() => {
     const saved = localStorage.getItem('pedidos_kanban_stages');
@@ -397,11 +386,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const optionsPopover = (
     <ColumnSettings
-      columns={currentColumns}
+      columns={columns}
       visibleColumns={visibleColumns}
-      onChange={handleColumnChange}
+      onChange={setVisibleColumns}
       onRename={handleRename}
-      tabela="pedidos"
+      onAdd={handleAddColumn}
+      onRemove={handleRemoveColumn}
     >
       <div className="p-2 border-t border-border/50">
         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -446,6 +436,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <Columns3 className="h-4 w-4 text-muted-foreground" />
           Gerenciar colunas...
         </button>
+        <button
+          type="button"
+          onClick={handleExportPdf}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+        >
+          <FileDown className="h-4 w-4 text-muted-foreground" />
+          Exportar PDF
+        </button>
+        <button
+          type="button"
+          onClick={() => setImportOpen(true)}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+        >
+          <Upload className="h-4 w-4 text-muted-foreground" />
+          Importar
+        </button>
       </div>
     </ColumnSettings>
   );
@@ -453,21 +459,35 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const filtrosPopover = (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5 px-3">
-          <Filter className="h-4 w-4" />
+        <Button variant="outline" size="sm" className={cn("data-[state=open]:bg-accent data-[state=open]:text-accent-foreground", hasPipelineFilters && 'border-primary')}>
+          <Filter className="h-3.5 w-3.5 mr-1.5" />
           Filtros
-          {activeFilterCount > 0 && (
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
-              {activeFilterCount}
-            </Badge>
+          {hasPipelineFilters && (
+            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">{activeFilterCount}</Badge>
           )}
+          <ChevronDown className="h-3.5 w-3.5 ml-1" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[450px] p-0" align="start">
-        <div className="flex divide-x divide-border h-80">
+      <PopoverContent className="w-auto min-w-[820px] max-w-[980px] p-4" align="start">
+        <div className="flex gap-0 divide-x divide-border">
+          <div className="flex-1 min-w-[140px] pr-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Etapa</p>
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
+                Todas as etapas
+              </label>
+              {KANBAN_STAGES.map(s => (
+                <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                  <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
+                  {s.label}
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="flex-1 min-w-[130px] px-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
-            <div className="space-y-1">
+            <div className="space-y-1 max-h-60 overflow-y-auto">
               {(vendedores ?? []).map(v => (
                 <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
                   <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
@@ -639,60 +659,77 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       <TableHead className="w-10">
                         <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
-                      {visibleColumns.includes('cliente') && <TableHead>{currentColumns.find(c => c.id === 'cliente')?.customLabel || 'Cliente'}</TableHead>}
-                      {visibleColumns.includes('obra') && <TableHead>{currentColumns.find(c => c.id === 'obra')?.customLabel || 'Obra'}</TableHead>}
-                      {visibleColumns.includes('fabricante') && <TableHead>{currentColumns.find(c => c.id === 'fabricante')?.customLabel || 'Fabricante'}</TableHead>}
-                      {visibleColumns.includes('valor') && <TableHead>{currentColumns.find(c => c.id === 'valor')?.customLabel || 'Valor'}</TableHead>}
-                      {visibleColumns.includes('etapa') && <TableHead>{currentColumns.find(c => c.id === 'etapa')?.customLabel || 'Etapa'}</TableHead>}
-                      {visibleColumns.includes('vendedor') && <TableHead>{currentColumns.find(c => c.id === 'vendedor')?.customLabel || 'Vendedor'}</TableHead>}
-                      {customCols.filter(c => visibleColumns.includes(c.slug)).map(c => (
-                        <TableHead key={c.slug}>{c.nome}</TableHead>
+                      {visibleColumns.map(colId => (
+                        <TableHead key={colId} className={cn(colId === 'acoes' && "w-[100px]")}>
+                          {getLabel(colId)}
+                        </TableHead>
                       ))}
-                      {visibleColumns.includes('acoes') && (<TableHead className="w-[100px]">Ações</TableHead>)}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginated.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumnCount + customCols.filter(c => visibleColumns.includes(c.slug)).length} className="py-12 text-center text-muted-foreground">
+                        <TableCell colSpan={visibleColumns.length + 1} className="py-12 text-center text-muted-foreground">
                           Nenhum negócio encontrado
                         </TableCell>
                       </TableRow>
                     ) : (
-                      paginated.map(p => (
-                        <TableRow key={p.id} className={`cursor-pointer hover:bg-muted/30 ${selected.has(p.id) ? 'bg-primary/5' : ''}`} onClick={() => setSelectedOrder(p.id)}>
-                          <TableCell className="w-10" onClick={e => e.stopPropagation()}>
-                            <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} aria-label={`Selecionar ${p.cliente?.empresa}`} />
-                          </TableCell>
-                          {visibleColumns.includes('cliente') && <TableCell className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>}
-                          {visibleColumns.includes('obra') && <TableCell>{p.obra?.nome_obra ?? '-'}</TableCell>}
-                          {visibleColumns.includes('fabricante') && <TableCell>{p.fabricante?.nome ?? '-'}</TableCell>}
-                          {visibleColumns.includes('valor') && <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>}
-                          {visibleColumns.includes('etapa') && (
-                            <TableCell>
-                              <Badge className={getStageBadgeClass(KANBAN_STAGES.find(s => s.key === p.status)?.color ?? 'muted-foreground')}>
-                                {stageLabel(p.status)}
-                              </Badge>
+                      paginated.map(p => {
+                        const camposExtras = (p as any).campos_extras || {};
+                        return (
+                          <TableRow key={p.id} className={`cursor-pointer hover:bg-muted/30 ${selected.has(p.id) ? 'bg-primary/5' : ''}`} onClick={() => setSelectedOrder(p.id)}>
+                            <TableCell className="w-10" onClick={e => e.stopPropagation()}>
+                              <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} aria-label={`Selecionar ${p.cliente?.empresa}`} />
                             </TableCell>
-                          )}
-                          {visibleColumns.includes('vendedor') && <TableCell>{p.vendedor?.nome ?? '-'}</TableCell>}
-                          {customCols.filter(c => visibleColumns.includes(c.slug)).map(c => (
-                            <TableCell key={c.slug}>{(p.campos_extras as any)?.[c.slug] ?? '-'}</TableCell>
-                          ))}
-                          {visibleColumns.includes('acoes') && (
-                            <TableCell>
-                              <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/pedidos/${p.id}/editar`)} title="Editar pedido">
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedOrder(p.id)}>
-                                  <MessageSquare className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))
+                            {visibleColumns.map(colId => {
+                              const isCustom = colId.startsWith('custom_');
+                              if (isCustom) {
+                                return (
+                                  <TableCell key={colId} className="text-xs text-muted-foreground">
+                                    {camposExtras[colId] || '—'}
+                                  </TableCell>
+                                );
+                              }
+
+                              switch (colId) {
+                                case 'cliente':
+                                  return <TableCell key={colId} className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>;
+                                case 'obra':
+                                  return <TableCell key={colId}>{p.obra?.nome_obra ?? '-'}</TableCell>;
+                                case 'fabricante':
+                                  return <TableCell key={colId}>{p.fabricante?.nome ?? '-'}</TableCell>;
+                                case 'valor':
+                                  return <TableCell key={colId}>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>;
+                                case 'etapa':
+                                  return (
+                                    <TableCell key={colId}>
+                                      <Badge className={getStageBadgeClass(KANBAN_STAGES.find(s => s.key === p.status)?.color ?? 'muted-foreground')}>
+                                        {stageLabel(p.status)}
+                                      </Badge>
+                                    </TableCell>
+                                  );
+                                case 'vendedor':
+                                  return <TableCell key={colId}>{p.vendedor?.nome ?? '-'}</TableCell>;
+                                case 'acoes':
+                                  return (
+                                    <TableCell key={colId}>
+                                      <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/pedidos/${p.id}/editar`)} title="Editar pedido">
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedOrder(p.id)}>
+                                          <MessageSquare className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  );
+                                default:
+                                  return <TableCell key={colId}>—</TableCell>;
+                              }
+                            })}
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

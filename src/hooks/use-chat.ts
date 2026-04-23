@@ -28,7 +28,7 @@ export interface ChatGrupo {
 async function fetchMessages(grupoId: string | null): Promise<ChatMessage[]> {
   let query = supabase
     .from('chat_mensagens')
-    .select('*, vendedor:usuarios(id, nome, email)')
+    .select('*, vendedor:vendedores!chat_mensagens_vendedor_id_fkey(id, nome, email)')
     .order('created_at', { ascending: true })
     .limit(200);
 

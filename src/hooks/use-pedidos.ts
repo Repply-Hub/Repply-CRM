@@ -12,7 +12,6 @@ export interface PedidoWithRelations {
   fabricante_id: string;
   usuario_id: string;
   obra_id: string | null;
-  campos_extras: any;
   cliente: { id: string; empresa: string } | null;
   fabricante: { id: string; nome: string } | null;
   vendedor: { id: string; nome: string } | null;
@@ -27,7 +26,7 @@ export function usePedidos() {
       const { data, error } = await supabase
         .from('pedidos')
         .select(`
-          id, status, valor_total, data_pedido, created_at, observacoes, campos_extras,
+          id, status, valor_total, data_pedido, created_at, observacoes,
           cliente_id, fabricante_id, usuario_id, obra_id,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
@@ -72,7 +71,7 @@ export function useHistoricoContatos(pedidoId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('historico_contatos')
-        .select('*, vendedor:usuarios(nome)')
+        .select('*, vendedor:vendedores(nome)')
         .eq('pedido_id', pedidoId!)
         .order('data_contato', { ascending: false });
       if (error) throw error;

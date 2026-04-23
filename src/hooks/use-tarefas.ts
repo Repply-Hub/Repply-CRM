@@ -14,7 +14,6 @@ export interface Tarefa {
   projeto: string | null;
   marcadores: string | null;
   usuario_id: string | null;
-  campos_extras: any;
   created_at: string;
   updated_at: string;
 }
@@ -50,7 +49,6 @@ export function useCreateTarefa() {
         ...tarefa,
         usuario_id: usuarioRow.id,
         criado_por: tarefa.criado_por ?? usuarioRow.nome ?? null,
-        campos_extras: tarefa.campos_extras || {},
       };
       const { error } = await supabase.from('tarefas' as any).insert(payload as any);
       if (error) throw error;
