@@ -20,10 +20,16 @@ const EMPTY_ROW = (allHeaders: string[]) =>
   allHeaders.reduce((acc, h) => ({ ...acc, [h]: '' }), {} as Record<string, string>);
 
 export function ManualEntryStep({ fields, onCancel, onConfirm }: Props) {
-  const baseHeaders = useMemo(() => fields.map(f => f.label), [fields]);
+  const [removedBaseKeys, setRemovedBaseKeys] = useState<Set<string>>(new Set());
+  
+  const activeBaseFields = useMemo(() => 
+    fields.filter(f => !removedBaseKeys.has(f.key)), 
+  [fields, removedBaseKeys]);
+
+  const baseHeaders = useMemo(() => activeBaseFields.map(f => f.label), [activeBaseFields]);
   const [extraColumns, setExtraColumns] = useState<string[]>([]);
   const [rows, setRows] = useState<Record<string, string>[]>(() => [
-    EMPTY_ROW(baseHeaders), EMPTY_ROW(baseHeaders), EMPTY_ROW(baseHeaders),
+    EMPTY_ROW(fields.map(f => f.label)), EMPTY_ROW(fields.map(f => f.label)), EMPTY_ROW(fields.map(f => f.label)),
   ]);
   const [newColOpen, setNewColOpen] = useState(false);
   const [newColName, setNewColName] = useState('');
