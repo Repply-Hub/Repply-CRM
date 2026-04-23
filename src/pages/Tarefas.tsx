@@ -70,6 +70,32 @@ export default function Tarefas() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
 
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('tarefas_columns');
+    return saved ? JSON.parse(saved) : TAREFA_COLUMNS.map(c => c.id);
+  });
+
+  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('tarefas_custom_labels');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const handleColumnChange = (newColumns: string[]) => {
+    setVisibleColumns(newColumns);
+    localStorage.setItem('tarefas_columns', JSON.stringify(newColumns));
+  };
+
+  const handleRename = (columnId: string, newLabel: string) => {
+    const next = { ...customLabels, [columnId]: newLabel };
+    setCustomLabels(next);
+    localStorage.setItem('tarefas_custom_labels', JSON.stringify(next));
+  };
+
+  const currentColumns = TAREFA_COLUMNS.map(col => ({
+    ...col,
+    customLabel: customLabels[col.id]
+  }));
+
   const [form, setForm] = useState({
     titulo: '', descricao: '', status: 'pendente', prazo_final: '',
     responsavel: '', participantes: '', observadores: '', projeto: '', marcadores: '',
@@ -230,6 +256,12 @@ export default function Tarefas() {
               Excluir {selected.size}
             </Button>
           )}
+          <ColumnSettings
+            columns={currentColumns}
+            visibleColumns={visibleColumns}
+            onChange={handleColumnChange}
+            onRename={handleRename}
+          />
           <Button onClick={openNew} size="sm" className="shrink-0">
             <Plus className="h-4 w-4 mr-1" />Nova Tarefa
           </Button>
