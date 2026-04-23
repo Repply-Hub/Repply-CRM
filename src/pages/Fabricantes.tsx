@@ -502,7 +502,15 @@ const Fabricantes = () => {
                             </SelectContent>
                           </Select>
                         )}
-                        <ColumnSettings columns={currentPrecoColumns} visibleColumns={visibleColumns} onChange={handleColumnChange} onRename={handleRename} />
+                        <ColumnSettings
+                          columns={precoColumns}
+                          visibleColumns={visiblePrecoColumns}
+                          onChange={setVisiblePrecoColumns}
+                          onRename={handlePrecoRename}
+                          onAdd={handleAddPrecoColumn}
+                          onRemove={handleRemovePrecoColumn}
+                          className="h-8"
+                        />
                         <Button size="sm" variant="outline" onClick={() => setImportDialog(true)} className="gap-1.5 h-8">
                           <Upload className="h-3.5 w-3.5" /> Importar
                         </Button>
@@ -522,14 +530,11 @@ const Fabricantes = () => {
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30 hover:bg-muted/30">
-                              {visibleColumns.includes('imagem') && <TableHead className="text-xs font-semibold w-16">{customLabels['imagem'] || 'Foto'}</TableHead>}
-                              {visibleColumns.includes('descricao') && <TableHead className="text-xs font-semibold">{customLabels['descricao'] || 'Descrição'}</TableHead>}
-                              {visibleColumns.includes('categoria') && <TableHead className="text-xs font-semibold">{customLabels['categoria'] || 'Categoria'}</TableHead>}
-                              {visibleColumns.includes('referencia') && <TableHead className="text-xs font-semibold">{customLabels['referencia'] || 'Referência'}</TableHead>}
-                              {visibleColumns.includes('preco') && <TableHead className="text-xs font-semibold">{customLabels['preco'] || 'Preço Unit.'}</TableHead>}
-                              {visibleColumns.includes('unidade') && <TableHead className="text-xs font-semibold">{customLabels['unidade'] || 'Unidade'}</TableHead>}
-                              {visibleColumns.includes('status') && <TableHead className="text-xs font-semibold">{customLabels['status'] || 'Status'}</TableHead>}
-                              {visibleColumns.includes('acoes') && <TableHead className="text-xs font-semibold w-20">{customLabels['acoes'] || 'Ações'}</TableHead>}
+                              {visiblePrecoColumns.map(colId => (
+                                <TableHead key={colId} className={cn("text-xs font-semibold whitespace-nowrap", colId === 'imagem' && "w-16", colId === 'acoes' && "w-20")}>
+                                  {getPrecoLabel(colId)}
+                                </TableHead>
+                              ))}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
