@@ -185,6 +185,7 @@ const Clientes = () => {
     handleRename,
     handleAddColumn,
     handleRemoveColumn,
+    handleReorder,
     getLabel
   } = activeTab === 'empresas' ? empresasSettings : contatosSettings;
 
