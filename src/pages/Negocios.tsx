@@ -623,6 +623,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   orders={ordersByStage[stage.key] ?? []}
                 />
               ))}
+              <button
+                type="button"
+                onClick={() => setColunasDialogOpen(true)}
+                className="flex flex-col items-center justify-center w-64 sm:w-72 min-w-[256px] sm:min-w-[288px] shrink-0 h-[200px] mt-[52px] rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-primary/40 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary gap-2 group"
+              >
+                <div className="h-10 w-10 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <span className="font-medium text-sm">Adicionar Etapa</span>
+              </button>
             </div>
           </DragDropContext>
         ) : (
