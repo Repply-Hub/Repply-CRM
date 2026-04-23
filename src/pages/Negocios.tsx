@@ -572,7 +572,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     <AppLayout title="Negócios" subtitle={subtitle}>
       <div className="p-3 sm:p-4 md:p-6 max-w-[1600px]">
         <div className="mb-4 md:mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex-1 flex flex-wrap items-center gap-2 min-w-0">
             {isPipelineMode && (
               <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
                 <Button
@@ -596,7 +596,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
             
-            <div className="relative flex-1 min-w-[240px] max-w-sm">
+            <div className="relative flex-1 min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 className="pl-9 h-9"

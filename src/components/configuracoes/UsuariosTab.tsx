@@ -202,7 +202,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
     <div className="space-y-4">
       {/* Presets + Search */}
       <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Buscar módulo..."
