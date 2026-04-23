@@ -23,6 +23,7 @@ interface ColumnSettingsProps {
     hideTrigger?: boolean;
     /** Texto exibido no trigger e no título da seção. Default: "Colunas" */
     label?: string;
+    children?: React.ReactNode;
 }
 
 export function ColumnSettings({
@@ -35,6 +36,7 @@ export function ColumnSettings({
     onOpenChange,
     hideTrigger,
     label = 'Colunas',
+    children,
 }: ColumnSettingsProps) {
     const [editingId, setEditingId] = React.useState<string | null>(null);
     const [editValue, setEditValue] = React.useState('');
@@ -156,6 +158,7 @@ export function ColumnSettings({
                         Resetar todas
                     </button>
                 </div>
+                {children}
             </PopoverContent>
         </Popover>
     );

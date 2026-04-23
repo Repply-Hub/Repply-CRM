@@ -24,6 +24,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
 import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
 import { ProjetoSelect } from '@/components/tarefas/ProjetoSelect';
+import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+
+const TAREFA_COLUMNS: ColumnDefinition[] = [
+  { id: 'titulo', label: 'Tarefa', locked: true },
+  { id: 'responsavel', label: 'Responsável' },
+  { id: 'prazo_final', label: 'Prazo' },
+  { id: 'status', label: 'Status' },
+  { id: 'projeto', label: 'Projeto' },
+];
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -60,6 +69,32 @@ export default function Tarefas() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
+
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('tarefas_columns');
+    return saved ? JSON.parse(saved) : TAREFA_COLUMNS.map(c => c.id);
+  });
+
+  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('tarefas_custom_labels');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const handleColumnChange = (newColumns: string[]) => {
+    setVisibleColumns(newColumns);
+    localStorage.setItem('tarefas_columns', JSON.stringify(newColumns));
+  };
+
+  const handleRename = (columnId: string, newLabel: string) => {
+    const next = { ...customLabels, [columnId]: newLabel };
+    setCustomLabels(next);
+    localStorage.setItem('tarefas_custom_labels', JSON.stringify(next));
+  };
+
+  const currentColumns = TAREFA_COLUMNS.map(col => ({
+    ...col,
+    customLabel: customLabels[col.id]
+  }));
 
   const [form, setForm] = useState({
     titulo: '', descricao: '', status: 'pendente', prazo_final: '',
@@ -221,6 +256,12 @@ export default function Tarefas() {
               Excluir {selected.size}
             </Button>
           )}
+          <ColumnSettings
+            columns={currentColumns}
+            visibleColumns={visibleColumns}
+            onChange={handleColumnChange}
+            onRename={handleRename}
+          />
           <Button onClick={openNew} size="sm" className="shrink-0">
             <Plus className="h-4 w-4 mr-1" />Nova Tarefa
           </Button>
@@ -246,18 +287,18 @@ export default function Tarefas() {
                         <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} className="mt-0.5" aria-label={`Selecionar ${t.titulo}`} />
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm text-card-foreground line-clamp-2">{t.titulo}</p>
-                          {t.projeto && <p className="text-xs text-muted-foreground mt-1">{t.projeto}</p>}
+                          {visibleColumns.includes('projeto') && t.projeto && <p className="text-xs text-muted-foreground mt-1">{t.projeto}</p>}
                         </div>
                       </div>
-                      <Badge className={`shrink-0 text-[10px] border ${si.className}`}>{si.label}</Badge>
+                      {visibleColumns.includes('status') && <Badge className={`shrink-0 text-[10px] border ${si.className}`}>{si.label}</Badge>}
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      {t.responsavel && (
+                      {visibleColumns.includes('responsavel') && t.responsavel && (
                         <span className="flex items-center gap-1">
                           <User className="h-3 w-3" /><UserProfilePopover name={t.responsavel} className="text-xs" />
                         </span>
                       )}
-                      {t.prazo_final && (
+                      {visibleColumns.includes('prazo_final') && t.prazo_final && (
                         <span className={`flex items-center gap-1 ${isOverdue ? 'text-destructive font-medium' : ''}`}>
                           <Calendar className="h-3 w-3" />
                           {format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR })}
@@ -267,6 +308,9 @@ export default function Tarefas() {
                     <div className="flex gap-1 pt-2 border-t border-border/40">
                       <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 hover:bg-primary/5" onClick={() => { setViewTarefa(t); setViewOpen(true); }}>
                         <Eye className="h-3.5 w-3.5 mr-1" />Ver
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 hover:bg-primary/5" onClick={() => openEdit(t)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1" />Editar
                       </Button>
                     </div>
                   </div>
@@ -283,11 +327,11 @@ export default function Tarefas() {
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </TableHead>
                     <TableHead>Tarefa</TableHead>
-                    <TableHead className="hidden lg:table-cell">Responsável</TableHead>
-                    <TableHead className="hidden lg:table-cell">Prazo</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden xl:table-cell">Projeto</TableHead>
-                    <TableHead className="w-[60px]">Ações</TableHead>
+                    {visibleColumns.includes('responsavel') && <TableHead className="hidden lg:table-cell">{currentColumns.find(c => c.id === 'responsavel')?.customLabel || 'Responsável'}</TableHead>}
+                    {visibleColumns.includes('prazo_final') && <TableHead className="hidden lg:table-cell">{currentColumns.find(c => c.id === 'prazo_final')?.customLabel || 'Prazo'}</TableHead>}
+                    {visibleColumns.includes('status') && <TableHead>{currentColumns.find(c => c.id === 'status')?.customLabel || 'Status'}</TableHead>}
+                    {visibleColumns.includes('projeto') && <TableHead className="hidden xl:table-cell">{currentColumns.find(c => c.id === 'projeto')?.customLabel || 'Projeto'}</TableHead>}
+                    <TableHead className="w-[80px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -303,21 +347,32 @@ export default function Tarefas() {
                         </TableCell>
                         <TableCell className="max-w-[300px]">
                           <p className="font-medium text-sm text-card-foreground">{t.titulo}</p>
-                          {t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
-                          {t.responsavel && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.responsavel}</p>}
+                          {visibleColumns.includes('projeto') && t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
+                          {visibleColumns.includes('responsavel') && t.responsavel && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.responsavel}</p>}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-sm whitespace-nowrap">{t.responsavel ? <UserProfilePopover name={t.responsavel} /> : '—'}</TableCell>
-                        <TableCell className={`hidden lg:table-cell text-sm whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : ''}`}>
-                          {t.prazo_final ? format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR }) : '—'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={`whitespace-nowrap text-[11px] border ${si.className}`}>{si.label}</Badge>
-                        </TableCell>
-                        <TableCell className="hidden xl:table-cell text-sm text-muted-foreground truncate max-w-[180px]">{t.projeto || '—'}</TableCell>
+                        {visibleColumns.includes('responsavel') && (
+                          <TableCell className="hidden lg:table-cell text-sm whitespace-nowrap">{t.responsavel ? <UserProfilePopover name={t.responsavel} /> : '—'}</TableCell>
+                        )}
+                        {visibleColumns.includes('prazo_final') && (
+                          <TableCell className={`hidden lg:table-cell text-sm whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : ''}`}>
+                            {t.prazo_final ? format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR }) : '—'}
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('status') && (
+                          <TableCell>
+                            <Badge className={`whitespace-nowrap text-[11px] border ${si.className}`}>{si.label}</Badge>
+                          </TableCell>
+                        )}
+                        {visibleColumns.includes('projeto') && (
+                          <TableCell className="hidden xl:table-cell text-sm text-muted-foreground truncate max-w-[180px]">{t.projeto || '—'}</TableCell>
+                        )}
                         <TableCell>
                           <div className="flex gap-0.5">
                             <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5" onClick={() => { setViewTarefa(t); setViewOpen(true); }}>
                               <Eye className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5" onClick={() => openEdit(t)}>
+                              <Pencil className="h-4 w-4 text-muted-foreground" />
                             </Button>
                           </div>
                         </TableCell>
@@ -365,148 +420,135 @@ export default function Tarefas() {
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>Prazo</Label><Input type="datetime-local" value={form.prazo_final} onChange={e => setForm(f => ({ ...f, prazo_final: e.target.value }))} /></div>
+              <div>
+                <Label>Prazo Final</Label>
+                <Input type="datetime-local" value={form.prazo_final} onChange={e => setForm(f => ({ ...f, prazo_final: e.target.value }))} />
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
+              <div className="space-y-1.5">
                 <Label>Responsável</Label>
                 <Select value={form.responsavel} onValueChange={v => setForm(f => ({ ...f, responsavel: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione um responsável" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
-                    {vendedores.map((v: any) => (
-                      <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>
-                    ))}
+                    {vendedores.map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Projeto</Label>
-                <ProjetoSelect
-                  value={form.projeto}
-                  onChange={(v) => setForm(f => ({ ...f, projeto: v }))}
-                />
+              <div className="space-y-1.5">
+                <Label>Projeto / Obra</Label>
+                <ProjetoSelect value={form.projeto} onChange={v => setForm(f => ({ ...f, projeto: v }))} />
               </div>
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label>Participantes</Label>
-              <ParticipantesMultiSelect
-                value={form.participantes}
-                onChange={(v) => setForm(f => ({ ...f, participantes: v }))}
-                usuarios={vendedores.map((v: any) => ({ id: v.id, nome: v.nome }))}
-              />
+              <ParticipantesMultiSelect value={form.participantes} onChange={v => setForm(f => ({ ...f, participantes: v }))} usuarios={vendedores} />
             </div>
-            <div><Label>Observadores</Label><Input value={form.observadores} onChange={e => setForm(f => ({ ...f, observadores: e.target.value }))} placeholder="Separados por vírgula" /></div>
-            <div>
+            <div className="space-y-1.5">
               <Label>Marcadores</Label>
-              <MarcadoresMultiSelect
-                value={form.marcadores}
-                onChange={(v) => setForm(f => ({ ...f, marcadores: v }))}
-              />
+              <MarcadoresMultiSelect value={form.marcadores} onChange={v => setForm(f => ({ ...f, marcadores: v }))} />
             </div>
           </div>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="mt-6">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={createTarefa.isPending || updateTarefa.isPending}>Salvar</Button>
+            <Button onClick={handleSave} disabled={createTarefa.isPending || updateTarefa.isPending}>
+              {(createTarefa.isPending || updateTarefa.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {editingTarefa ? 'Salvar Alterações' : 'Criar Tarefa'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog visualizar */}
+      {/* Dialog visualização */}
       <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Detalhes da Tarefa</DialogTitle></DialogHeader>
-          {viewTarefa && (
-            <div className="space-y-4 text-sm mt-2">
-              <div>
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Título</span>
-                <p className="mt-1 font-medium text-card-foreground">{viewTarefa.titulo}</p>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <div className="flex items-center justify-between pr-8">
+              <DialogTitle className="text-xl font-bold">{viewTarefa?.titulo}</DialogTitle>
+              <Badge className={getStatusInfo(viewTarefa?.status || '').className}>
+                {getStatusInfo(viewTarefa?.status || '').label}
+              </Badge>
+            </div>
+          </DialogHeader>
+          <div className="space-y-6 mt-4">
+            {viewTarefa?.descricao && (
+              <div className="bg-muted/30 p-4 rounded-lg">
+                <p className="text-sm text-foreground whitespace-pre-wrap">{viewTarefa.descricao}</p>
               </div>
-              {viewTarefa.descricao && (
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Descrição</span>
-                  <p className="mt-1 whitespace-pre-wrap text-card-foreground">{viewTarefa.descricao}</p>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</span>
-                  <div className="mt-1"><Badge className={`border ${getStatusInfo(viewTarefa.status).className}`}>{getStatusInfo(viewTarefa.status).label}</Badge></div>
-                </div>
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Prazo</span>
-                  <p className="mt-1">{viewTarefa.prazo_final ? format(new Date(viewTarefa.prazo_final), "dd/MM/yyyy HH:mm", { locale: ptBR }) : '—'}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Responsável</span>
-                  <div className="mt-1">{viewTarefa.responsavel ? <UserProfilePopover name={viewTarefa.responsavel} /> : '—'}</div>
-                </div>
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Criado por</span>
-                  <div className="mt-1">{viewTarefa.criado_por ? <UserProfilePopover name={viewTarefa.criado_por} /> : '—'}</div>
+            )}
+            
+            <div className="grid grid-cols-2 gap-y-4 text-sm">
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-xs uppercase font-semibold">Responsável</p>
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="h-3 w-3 text-primary" />
+                  </div>
+                  <span className="font-medium">{viewTarefa?.responsavel || 'Não definido'}</span>
                 </div>
               </div>
-              {viewTarefa.participantes && (
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Participantes</span>
-                  <p className="mt-1">{viewTarefa.participantes}</p>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-xs uppercase font-semibold">Prazo</p>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">
+                    {viewTarefa?.prazo_final ? format(new Date(viewTarefa.prazo_final), "dd/MM/yyyy HH:mm", { locale: ptBR }) : 'Sem prazo'}
+                  </span>
                 </div>
-              )}
-              {viewTarefa.observadores && (
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Observadores</span>
-                  <p className="mt-1">{viewTarefa.observadores}</p>
-                </div>
-              )}
-              {viewTarefa.projeto && (
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Projeto</span>
-                  <p className="mt-1">{viewTarefa.projeto}</p>
-                </div>
-              )}
-              {viewTarefa.marcadores && (
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Marcadores</span>
-                  <p className="mt-1">{viewTarefa.marcadores}</p>
-                </div>
-              )}
-              <div className="flex gap-2 pt-4 border-t border-border/40">
-                <Button variant="outline" className="flex-1" onClick={() => { setViewOpen(false); openEdit(viewTarefa); }}>
-                  <Pencil className="h-4 w-4 mr-1" />Editar
-                </Button>
-                <Button variant="destructive" className="flex-1" onClick={() => { handleDelete(viewTarefa.id); setViewOpen(false); }}>
-                  <Trash2 className="h-4 w-4 mr-1" />Excluir
-                </Button>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-xs uppercase font-semibold">Projeto</p>
+                <p className="font-medium">{viewTarefa?.projeto || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-xs uppercase font-semibold">Criada em</p>
+                <p className="font-medium">
+                  {viewTarefa?.created_at ? format(new Date(viewTarefa.created_at), "dd/MM/yyyy", { locale: ptBR }) : '—'}
+                </p>
               </div>
             </div>
-          )}
+
+            {viewTarefa?.marcadores && (
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs uppercase font-semibold">Marcadores</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {viewTarefa.marcadores.split(',').map(m => (
+                    <Badge key={m} variant="secondary" className="font-normal text-[11px]">{m.trim()}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="mt-6 flex-row gap-2">
+            <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => { if (viewTarefa) handleDelete(viewTarefa.id); setViewOpen(false); }}>
+              <Trash2 className="h-4 w-4 mr-2" /> Excluir
+            </Button>
+            <div className="flex-1" />
+            <Button variant="outline" onClick={() => setViewOpen(false)}>Fechar</Button>
+            <Button onClick={() => { if (viewTarefa) openEdit(viewTarefa); setViewOpen(false); }}>
+              <Pencil className="h-4 w-4 mr-2" /> Editar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Confirm bulk delete */}
+      {/* Bulk delete confirmation */}
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir {selected.size} tarefa(s)?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser desfeita. As tarefas selecionadas serão removidas permanentemente.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Esta ação não pode ser desfeita. Todos os dados das tarefas selecionadas serão removidos permanentemente.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <Button
-              variant="destructive"
-              onClick={(e) => { e.preventDefault(); handleBulkDelete(); }}
-              disabled={isDeleting}
-            >
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeleting}>
               {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog: selecionar página atual ou todos os filtrados */}
+      {/* Select all dialog */}
       <AlertDialog open={selectAllDialogOpen} onOpenChange={setSelectAllDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
