@@ -79,6 +79,7 @@ export default function Tarefas() {
     handleRename,
     handleAddColumn,
     handleRemoveColumn,
+    handleReorder,
     getLabel
   } = useTableSettings({
     key: 'tarefas',
