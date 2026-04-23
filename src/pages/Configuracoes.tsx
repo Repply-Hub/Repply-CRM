@@ -303,6 +303,9 @@ const Configuracoes = () => {
               <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> Usuários</TabsTrigger>
             )}
             {isGestor && (
+              <TabsTrigger value="empresa" className="gap-1.5"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
+            )}
+            {isGestor && (
               <TabsTrigger value="automacao">Automação</TabsTrigger>
             )}
           </TabsList>
