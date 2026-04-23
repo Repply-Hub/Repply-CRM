@@ -16,8 +16,8 @@ import { MapaObras } from '@/components/obras/MapaObras';
 import { cn } from '@/lib/utils';
 
 const OBRA_FIELDS: ColumnDefinition[] = [
-  { id: 'nome_obra', label: 'Nome da Obra', locked: true },
-  { id: 'status', label: 'Status', locked: true },
+  { id: 'nome_obra', label: 'Nome da Obra' },
+  { id: 'status', label: 'Status' },
   { id: 'cliente', label: 'Cliente' },
   { id: 'endereco', label: 'Endereço' },
   { id: 'spe_cnpj', label: 'CNPJ/SPE' },
