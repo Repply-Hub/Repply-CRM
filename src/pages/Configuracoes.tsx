@@ -61,13 +61,15 @@ function ThemeSelector() {
 function ProfileTab() {
   const { user, signOut } = useAuth();
   const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['meu_perfil', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, email, telefone, role')
+        .select('id, nome, email, telefone, role, avatar_url')
         .eq('user_id', user!.id)
         .single();
       if (error) throw error;
@@ -77,7 +79,7 @@ function ProfileTab() {
   });
 
   const updatePerfil = useMutation({
-    mutationFn: async (dados: { nome: string; telefone: string }) => {
+    mutationFn: async (dados: { nome: string; telefone: string; avatar_url?: string }) => {
       const { error } = await supabase.from('usuarios').update(dados).eq('user_id', user!.id);
       if (error) throw error;
     },
@@ -87,6 +89,48 @@ function ProfileTab() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const uploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione uma imagem válida.');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('A imagem deve ter no máximo 2MB.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/${Math.random()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      await updatePerfil.mutateAsync({ 
+        nome: perfil?.nome || '', 
+        telefone: perfil?.telefone || '', 
+        avatar_url: publicUrl 
+      });
+
+    } catch (error: any) {
+      toast.error('Erro ao fazer upload: ' + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const updateEmail = useMutation({
     mutationFn: async (email: string) => {
