@@ -29,6 +29,7 @@ import { EnderecoForm } from '@/components/EnderecoForm';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/ListPagination';
 import { cn } from '@/lib/utils';
+import { ExportClientesButton } from '@/components/ExportClientesButton';
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'empresa', label: 'Nome/Empresa', locked: true },
