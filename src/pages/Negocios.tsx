@@ -605,17 +605,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 onChange={(e) => handleSearchChange(e.target.value)}
               />
             </div>
-
-            {showKanban && (
-              <>
-                {filtrosPopover}
-                {optionsPopover}
-                {hasPipelineFilters && (
-                  <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground">
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </>
+            
+            {filtrosPopover}
+            {optionsPopover}
+            
+            {isPipelineMode && hasPipelineFilters && (
+              <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground" title="Limpar filtros">
+                <X className="h-3.5 w-3.5" />
+              </Button>
             )}
           </div>
           <div className="flex items-center gap-2 sm:justify-end">
@@ -656,20 +653,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         ) : (
           <div className="flex min-w-0 flex-col gap-6 xl:flex-row">
             <div className="min-w-0 flex-1">
-              <div className="mb-4 flex flex-row flex-wrap items-center gap-2">
-                {filtrosPopover}
-                {hasPipelineFilters && (
-                  <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground" title="Limpar filtros">
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                )}
+              <div className="mb-4">
                 {someSelected && (
                   <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
                     <Trash2 className="h-4 w-4" />
                     Excluir {selected.size}
                   </Button>
                 )}
-                {optionsPopover}
               </div>
 
               <div className="w-full rounded-xl border border-border overflow-hidden">
