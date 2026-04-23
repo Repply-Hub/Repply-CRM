@@ -29,6 +29,7 @@ import {
 export function AppSidebar() {
   const { state, setOpen, isMobile } = useSidebar();
   const { signOut, user } = useAuth();
+  const branding = useBranding();
   const collapsed = !isMobile && state === 'collapsed';
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState<SidebarItem[]>([]);
