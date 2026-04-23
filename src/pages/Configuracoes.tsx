@@ -204,8 +204,27 @@ function ProfileTab() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4 mb-5">
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="text-2xl font-bold text-primary">{iniciais}</span>
+              <div className="relative group">
+                <Avatar className="h-16 w-16 border-2 border-background shadow-sm">
+                  <AvatarImage src={perfil.avatar_url || ''} className="object-cover" />
+                  <AvatarFallback className="bg-primary/10 text-2xl font-bold text-primary">
+                    {iniciais}
+                  </AvatarFallback>
+                </Avatar>
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-wait"
+                >
+                  {uploading ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : <Camera className="h-5 w-5 text-white" />}
+                </button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={uploadAvatar} 
+                  className="hidden" 
+                  accept="image/*" 
+                />
               </div>
               <div>
                 <p className="font-semibold">{perfil.nome}</p>
