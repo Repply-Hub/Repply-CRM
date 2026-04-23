@@ -68,13 +68,12 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     setVisibleColumns(prev => [...prev, id]);
   }, []);
 
-  const handleRemoveColumn = useCallback((columnId: string) => {
-    setColumns(prev => prev.filter(c => c.id !== columnId));
-    setVisibleColumns(prev => prev.filter(id => id !== columnId));
-    setCustomLabels(prev => {
-      const next = { ...prev };
-      delete next[columnId];
-      return next;
+  const handleReorder = useCallback((startIndex: number, endIndex: number) => {
+    setColumns(prev => {
+      const result = Array.from(prev);
+      const [removed] = result.splice(startIndex, 1);
+      result.splice(endIndex, 0, removed);
+      return result;
     });
   }, []);
 
@@ -97,6 +96,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     handleRename,
     handleAddColumn,
     handleRemoveColumn,
+    handleReorder,
     getLabel,
   };
 }
