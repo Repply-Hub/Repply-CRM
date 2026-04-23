@@ -190,7 +190,6 @@ export default function Obras() {
               />
             </div>
 
-            {/* Content */}
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -204,54 +203,139 @@ export default function Obras() {
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filtered.map((obra) => {
-                    const status = STATUS_MAP[obra.status] || { label: obra.status, variant: 'outline' as const };
-                    const cliente = obra.clientes as any;
-                    return (
-                      <Card key={obra.id} className="flex flex-col">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <CardTitle className="text-base font-semibold leading-tight line-clamp-2">
-                              {obra.nome_obra}
-                            </CardTitle>
-                            <Badge variant={status.variant} className="shrink-0 text-xs">
-                              {status.label}
-                            </Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="flex-1 space-y-2 text-sm text-muted-foreground">
-                          {visibleFields.includes('cliente') && cliente?.empresa && (
-                            <div className="flex items-center gap-2">
-                              <Building2 className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">{cliente.empresa}</span>
+                
+                {viewMode === 'cards' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filtered.slice((page - 1) * pageSize, page * pageSize).map((obra) => {
+                      const status = STATUS_MAP[obra.status] || { label: obra.status, variant: 'outline' as const };
+                      const cliente = obra.clientes as any;
+                      const camposExtras = (obra as any).campos_extras || {};
+                      
+                      return (
+                        <Card key={obra.id} className="flex flex-col">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <CardTitle className="text-base font-semibold leading-tight line-clamp-2">
+                                {obra.nome_obra}
+                              </CardTitle>
+                              <Badge variant={status.variant} className="shrink-0 text-xs">
+                                {status.label}
+                              </Badge>
                             </div>
-                          )}
-                          {visibleFields.includes('endereco') && obra.endereco_entrega && (
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">{obra.endereco_entrega}</span>
-                            </div>
-                          )}
-                          {visibleFields.includes('spe_cnpj') && obra.spe_cnpj && (
-                            <div className="flex items-center gap-2">
-                              <Building2 className="h-3.5 w-3.5 shrink-0" />
-                              <span className="text-xs">SPE: {obra.spe_cnpj}</span>
-                            </div>
-                          )}
-                          {visibleFields.includes('created_at') && (
-                            <div className="flex items-center gap-2 pt-1 border-t border-border/50">
-                              <Calendar className="h-3.5 w-3.5 shrink-0" />
-                              <span className="text-xs">
-                                Criada em {format(new Date(obra.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
-                              </span>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+                          </CardHeader>
+                          <CardContent className="flex-1 space-y-2 text-sm text-muted-foreground">
+                            {visibleColumns.includes('cliente') && cliente?.empresa && (
+                              <div className="flex items-center gap-2">
+                                <Building2 className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{cliente.empresa}</span>
+                              </div>
+                            )}
+                            {visibleColumns.includes('endereco') && obra.endereco_entrega && (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{obra.endereco_entrega}</span>
+                              </div>
+                            )}
+                            {visibleColumns.includes('spe_cnpj') && obra.spe_cnpj && (
+                              <div className="flex items-center gap-2">
+                                <Building2 className="h-3.5 w-3.5 shrink-0" />
+                                <span className="text-xs">SPE: {obra.spe_cnpj}</span>
+                              </div>
+                            )}
+                            {visibleColumns.includes('created_at') && (
+                              <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+                                <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                <span className="text-xs">
+                                  Criada em {format(new Date(obra.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
+                                </span>
+                              </div>
+                            )}
+                            {/* Renderizar campos extras nos cards também? Ocuparia muito espaço. Talvez só se estiverem selecionados. */}
+                            {visibleColumns.filter(id => id.startsWith('custom_')).map(colId => (
+                              <div key={colId} className="flex items-center gap-2 text-xs">
+                                <span className="font-medium">{getLabel(colId)}:</span>
+                                <span>{camposExtras[colId] || '—'}</span>
+                              </div>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-border/60 overflow-x-auto bg-card">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                            {getLabel('nome_obra')}
+                          </th>
+                          {visibleColumns.filter(id => id !== 'nome_obra').map(colId => (
+                            <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                              {getLabel(colId)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.slice((page - 1) * pageSize, page * pageSize).map(obra => {
+                          const status = STATUS_MAP[obra.status] || { label: obra.status, variant: 'outline' as const };
+                          const cliente = obra.clientes as any;
+                          const camposExtras = (obra as any).campos_extras || {};
+
+                          return (
+                            <tr key={obra.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                              <td className="py-2.5 px-4 font-medium">{obra.nome_obra}</td>
+                              {visibleColumns.filter(id => id !== 'nome_obra').map(colId => {
+                                const isCustom = colId.startsWith('custom_');
+                                let value: any = isCustom ? camposExtras[colId] : (obra as any)[colId];
+                                
+                                if (colId === 'status') {
+                                  return (
+                                    <td key={colId} className="py-2.5 px-4">
+                                      <Badge variant={status.variant} className="text-[10px] font-medium">{status.label}</Badge>
+                                    </td>
+                                  );
+                                }
+                                
+                                if (colId === 'cliente') {
+                                  return (
+                                    <td key={colId} className="py-2.5 px-4 text-xs">{cliente?.empresa || '—'}</td>
+                                  );
+                                }
+
+                                if (colId === 'created_at') {
+                                  return (
+                                    <td key={colId} className="py-2.5 px-4 text-xs whitespace-nowrap">
+                                      {format(new Date(obra.created_at), "dd/MM/yy", { locale: ptBR })}
+                                    </td>
+                                  );
+                                }
+
+                                return (
+                                  <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]">
+                                    {value || '—'}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <ListPagination
+                  page={page}
+                  totalPages={Math.ceil(filtered.length / pageSize)}
+                  totalItems={filtered.length}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
+                  itemLabel="obra"
+                  className="mt-4"
+                />
               </>
             )}
           </TabsContent>
