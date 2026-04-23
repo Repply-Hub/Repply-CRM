@@ -605,17 +605,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 onChange={(e) => handleSearchChange(e.target.value)}
               />
             </div>
-
-            {showKanban && (
-              <>
-                {filtrosPopover}
-                {optionsPopover}
-                {hasPipelineFilters && (
-                  <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground">
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </>
+            
+            {filtrosPopover}
+            {optionsPopover}
+            
+            {isPipelineMode && hasPipelineFilters && (
+              <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground" title="Limpar filtros">
+                <X className="h-3.5 w-3.5" />
+              </Button>
             )}
           </div>
           <div className="flex items-center gap-2 sm:justify-end">
