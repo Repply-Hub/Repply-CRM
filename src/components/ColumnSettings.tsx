@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical } from 'lucide-react';
+import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -17,6 +17,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Separator } from '@/components/ui/separator';
 
 export interface ColumnDefinition {
     id: string;
@@ -24,6 +25,11 @@ export interface ColumnDefinition {
     customLabel?: string;
     locked?: boolean;
     isCustom?: boolean;
+}
+
+interface ColumnPreset {
+    id: string;
+    name: string;
 }
 
 interface ColumnSettingsProps {
@@ -34,6 +40,10 @@ interface ColumnSettingsProps {
     onAdd?: (label: string) => void;
     onRemove?: (columnId: string) => void;
     onReorder?: (startIndex: number, endIndex: number) => void;
+    presets?: ColumnPreset[];
+    onSavePreset?: (name: string) => void;
+    onLoadPreset?: (id: string) => void;
+    onDeletePreset?: (id: string) => void;
     className?: string;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
