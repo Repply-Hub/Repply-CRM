@@ -825,12 +825,6 @@ const Clientes = () => {
         </Dialog>
         {isLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            {activeTab === 'empresas' ? <Building2 className="h-12 w-12 mb-3 opacity-30" /> : <Users className="h-12 w-12 mb-3 opacity-30" />}
-            <p className="text-sm font-medium">Nenhum {activeTab === 'empresas' ? 'empresa' : 'contato'} encontrado</p>
-            <p className="text-xs mt-1">Tente ajustar os filtros ou cadastre um novo</p>
-          </div>
         ) : activeTab === 'empresas' ? (
           <>
             <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-hidden">
