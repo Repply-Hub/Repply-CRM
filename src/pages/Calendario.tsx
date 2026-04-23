@@ -113,7 +113,11 @@ export default function Calendario() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [isImporting, setIsImporting] = useState(false);
-// ... keep existing code
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importCalendarType, setImportCalendarType] = useState<CalendarType>("empresa");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
   const isMobile = useIsMobile();
   const events = useCalendarEvents(visibleCalendars);
 
@@ -125,6 +129,7 @@ export default function Calendario() {
       (e.descricao?.toLowerCase().includes(q))
     );
   }, [events, searchQuery]);
+
   const { mutate: createEvento } = useCreateEvento();
   const { mutateAsync: bulkCreateEventos } = useBulkCreateEventos();
   const { mutate: updateEvento } = useUpdateEvento();
@@ -310,6 +315,17 @@ export default function Calendario() {
         <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Sidebar esquerda — oculta em mobile */}
           <aside className="hidden lg:flex w-56 border-r flex-col gap-5 p-3 shrink-0 overflow-y-auto min-h-0">
+            {/* Barra de Pesquisa */}
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar eventos..."
+                className="pl-8 h-9 text-xs"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
             {/* Mini calendário — células w-7 (28px) × 7 = 196px + p-2 = 212px < 224px */}
             <Calendar
               mode="single"
@@ -379,7 +395,7 @@ export default function Calendario() {
             {viewMode === "mes" ? (
               <CalendarMonthView
                 date={currentDate}
-                events={events}
+                events={filteredEvents}
                 onClickDay={(day) => {
                   setCurrentDate(day);
                   setViewMode("dia");
@@ -389,7 +405,7 @@ export default function Calendario() {
             ) : (
               <TimeGridView
                 days={gridDays}
-                events={events}
+                events={filteredEvents}
                 onClickSlot={handleClickSlot}
                 onCreateRange={handleCreateRange}
                 onClickEvent={openEditEvent}
