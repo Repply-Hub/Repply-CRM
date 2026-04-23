@@ -422,7 +422,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <div className="flex divide-x divide-border">
           {/* Coluna esquerda: visibilidade das colunas do Kanban */}
           <div className="p-2 min-w-[200px]">
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Colunas do Kanban</div>
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personalizar Etapas (Kanban)</div>
             <div className="space-y-0.5">
               {KANBAN_STAGES.map((stage) => {
                 const checked = visibleKanbanStages.includes(stage.key);
@@ -463,7 +463,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
             >
               <Columns3 className="h-4 w-4 text-muted-foreground" />
-              Gerenciar colunas...
+              Personalizar colunas...
             </button>
             <button
               type="button"
@@ -497,7 +497,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <div className="flex divide-x divide-border">
           {/* Coluna esquerda: visibilidade das colunas da tabela */}
           <div className="p-2 min-w-[220px]">
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Colunas</div>
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personalizar Colunas</div>
             <div className="space-y-0.5">
               {PEDIDOS_COLUMNS.map((column) => {
                 const checked = visibleColumns.includes(column.id);
@@ -544,6 +544,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           {/* Coluna direita: ações */}
           <div className="p-2 min-w-[180px]">
             <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ações</div>
+            <button
+              type="button"
+              onClick={() => setColunasDialogOpen(true)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
+            >
+              <Columns3 className="h-4 w-4 text-muted-foreground" />
+              Personalizar colunas...
+            </button>
             <button
               type="button"
               onClick={handleExportPdf}
