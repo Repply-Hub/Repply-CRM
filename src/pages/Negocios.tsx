@@ -550,7 +550,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60 transition-colors text-left"
             >
               <Columns3 className="h-4 w-4 text-muted-foreground" />
-              Gerenciar colunas...
+              Personalizar colunas...
             </button>
             <button
               type="button"
