@@ -1,8 +1,9 @@
 import React from 'react';
-import { Settings2, Edit2, Check, X } from 'lucide-react';
+import { Settings2, Edit2, Check, X, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 export interface ColumnDefinition {
