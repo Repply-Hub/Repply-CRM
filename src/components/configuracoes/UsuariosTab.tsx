@@ -968,12 +968,16 @@ export function UsuariosTab() {
                               onClick={() => setSelectedVendedor(v.id)}
                             >
                               <div className={cn(
-                                'h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                                'h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-colors overflow-hidden',
                                 selectedVendedor === v.id ? 'bg-primary text-primary-foreground' : 'bg-primary/10'
                               )}>
-                                <span className={cn('text-sm font-bold', selectedVendedor === v.id ? '' : 'text-primary')}>
-                                  {v.nome.charAt(0).toUpperCase()}
-                                </span>
+                                {v.avatar_url ? (
+                                  <img src={v.avatar_url} alt={v.nome} className="h-full w-full object-cover" />
+                                ) : (
+                                  <span className={cn('text-sm font-bold', selectedVendedor === v.id ? '' : 'text-primary')}>
+                                    {v.nome.charAt(0).toUpperCase()}
+                                  </span>
+                                )}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium truncate">{v.nome}</p>
