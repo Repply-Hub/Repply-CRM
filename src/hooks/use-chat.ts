@@ -13,7 +13,7 @@ export interface ChatMessage {
   arquivo_url?: string | null;
   arquivo_nome?: string | null;
   arquivo_tipo?: string | null;
-  vendedor?: { id: string; nome: string; email: string };
+  vendedor?: { id: string; nome: string; email: string; avatar_url?: string | null };
 }
 
 export interface ChatGrupo {
