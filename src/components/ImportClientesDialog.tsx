@@ -51,7 +51,7 @@ function normalizeText(v: string): string {
 const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   empresa: [/^empresa$/, /^nome\s*fantasia$/, /^nome\s*da\s*empresa$/, /^razao\s*social$/, /empresa/, /fantasia/],
   razao_social: [/^razao\s*social$/, /razao/],
-  tipo: [/^tipo$/, /segmento/, /categoria/, /classificacao/],
+  tipo: [/^tipo$/, /segmento/, /categoria/],
   cnpj: [/^cnpj$/, /^cpf$/, /cpf.*cnpj/, /cnpj/, /cpf/],
   email: [/^e-?mail$/, /mail/],
   telefone: [/^telefone$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
@@ -59,8 +59,8 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   nome_contato: [
     /^nome$/, /^nome\s*completo$/, /^primeiro\s*nome$/, /^first\s*name$/, /^full\s*name$/, /^nome\s*proprio$/,
     /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
-    /^criado\s*por$/, /^criado$/, /^owner$/, /^proprietario$/, /^atendente$/, /^consultor$/,
-    /contato/, /responsavel/, /^nome\b/, /first.*name/, /full.*name/, /criado\s*por/, /criado/,
+    /^criado\s*por$/, /^contato\s*principal$/,
+    /contato/, /responsavel/, /^nome\b/, /first.*name/, /full.*name/
   ],
   sobrenome_contato: [
     /^sobrenome$/, /^ultimo\s*nome$/, /^last\s*name$/, /^surname$/, /^apelido$/,
@@ -360,7 +360,27 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             setCustomColumns={setCustomColumns}
             visibleFields={visibleFields}
             onReset={reset}
-            onAutoDetect={() => { setMapping(autoDetectMapping(headers)); setExtras({}); }}
+            onAutoDetect={() => {
+              const auto = autoDetectMapping(headers);
+              setMapping(auto);
+              
+              // Auto-detect extras: any column not mapped to a standard field
+              const used = new Set(Object.values(auto).filter(Boolean));
+              const newExtras: Record<string, string> = {};
+              
+              // Keywords that suggest a column should be an extra field rather than ignored
+              const extraKeywords = [/classificacao/, /criado/, /data/, /obs/, /nota/, /vendedor/, /origem/, /setor/, /departamento/];
+              
+              headers.forEach(h => {
+                if (!used.has(h)) {
+                  const norm = normalizeText(h);
+                  if (extraKeywords.some(r => r.test(norm))) {
+                    newExtras[h] = h;
+                  }
+                }
+              });
+              setExtras(newExtras);
+            }}
             onClearAll={() => {
               setMapping({
                 empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
