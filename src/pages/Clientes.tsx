@@ -885,7 +885,7 @@ const Clientes = () => {
                         {visibleColumns.map(colId => {
                           const isCustom = colId.startsWith('custom_');
                           const column = columns.find(col => col.id === colId);
-                          let value: any = isCustom && column ? getExtraValue(camposExtras, column) : getSchemaValueByColumn(client as any, column);
+                          let value: any = getColumnValue(client as any, column);
                           
                           if (colId === 'empresa') {
                             return (
@@ -980,7 +980,7 @@ const Clientes = () => {
                         {visibleColumns.map(colId => {
                           const isCustom = colId.startsWith('custom_');
                           const column = columns.find(col => col.id === colId);
-                          const value: any = isCustom && column ? getExtraValue(camposExtras, column) : getSchemaValueByColumn(contato as any, column);
+                          const value: any = getColumnValue(contato as any, column);
 
                           if (colId === 'nome_contato') {
                             return (
