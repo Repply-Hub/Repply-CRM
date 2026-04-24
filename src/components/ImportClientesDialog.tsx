@@ -393,12 +393,32 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             };
           });
           console.debug('[ImportClientes] batch final clientes', batch.slice(0, 5));
-          const { data: saved, error } = await supabase
-            .from('clientes')
-            .upsert(batch, { onConflict: 'cnpj' })
-            .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras');
-          if (error) throw error;
-          console.debug('[ImportClientes] clientes salvos/atualizados', saved?.slice(0, 5));
+          const inserts = batch.filter(r => !r.id);
+          const updates = batch.filter(r => r.id);
+
+          let totalSaved: any[] = [];
+          if (inserts.length > 0) {
+            const { data: saved, error: insertError } = await supabase
+              .from('clientes')
+              .insert(inserts)
+              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras');
+            if (insertError) throw insertError;
+            totalSaved = totalSaved.concat(saved || []);
+            console.debug('[ImportClientes] clientes novos inseridos', saved?.slice(0, 3));
+          }
+          if (updates.length > 0) {
+            for (const row of updates) {
+              const { id, ...updateData } = row;
+              const { data: saved, error: updateError } = await supabase
+                .from('clientes')
+                .update(updateData)
+                .eq('id', id)
+                .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras');
+              if (updateError) throw updateError;
+              totalSaved = totalSaved.concat(saved || []);
+            }
+            console.debug('[ImportClientes] clientes existentes atualizados', updates.length);
+          }
         }
         imported += rows.slice(i, i + BATCH).length;
       }
