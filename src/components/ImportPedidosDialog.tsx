@@ -296,6 +296,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                         {r.valor ? r.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{stageLabel(r.status)}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {r.data_pedido ? new Date(r.data_pedido).toLocaleDateString('pt-BR') : '-'}
+                      </TableCell>
                       <TableCell className="text-xs whitespace-nowrap max-w-[150px] truncate">{r.observacoes || '-'}</TableCell>
                       {extraFieldNames.map(name => (
                         <TableCell key={name} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
