@@ -264,11 +264,13 @@ const Chat = () => {
 
   useEffect(() => {
     if (!messages) return;
-    const scrollArea = document.querySelector('[data-radix-scroll-area-viewport]');
-    if (scrollArea) {
-      scrollArea.scrollTop = scrollArea.scrollHeight;
+    const scrollContainer = document.querySelector('[data-radix-scroll-area-viewport]');
+    if (scrollContainer) {
+      setTimeout(() => {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }, 50);
     }
-  }, [messages]);
+  }, [messages, target]);
 
   const handleSend = async () => {
     const trimmed = text.trim();
