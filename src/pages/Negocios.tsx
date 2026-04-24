@@ -855,7 +855,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       paginated.map(p => {
                         const camposExtras = (p as any).campos_extras || {};
                         return (
-                          <TableRow key={p.id} className={`cursor-pointer hover:bg-muted/30 ${selected.has(p.id) ? 'bg-primary/5' : ''}`} onClick={() => setSelectedOrder(p.id)}>
+                          <TableRow key={p.id} className={`cursor-pointer hover:bg-muted/30 ${selected.has(p.id) ? 'bg-primary/5' : ''}`} onClick={() => setViewOrderId(p.id)}>
                             <TableCell className="w-10" onClick={e => e.stopPropagation()}>
                               <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} aria-label={`Selecionar ${p.cliente?.empresa}`} />
                             </TableCell>
