@@ -60,13 +60,14 @@ function ThemeSelector() {
 function ProfileTab() {
   const { user, signOut } = useAuth();
   const qc = useQueryClient();
+  const [isUploading, setIsUploading] = useState(false);
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['meu_perfil', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, email, telefone, role')
+        .select('id, nome, email, telefone, role, avatar_url')
         .eq('user_id', user!.id)
         .single();
       if (error) throw error;
@@ -76,7 +77,7 @@ function ProfileTab() {
   });
 
   const updatePerfil = useMutation({
-    mutationFn: async (dados: { nome: string; telefone: string }) => {
+    mutationFn: async (dados: { nome?: string; telefone?: string; avatar_url?: string | null }) => {
       const { error } = await supabase.from('usuarios').update(dados).eq('user_id', user!.id);
       if (error) throw error;
     },
@@ -87,33 +88,35 @@ function ProfileTab() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setIsUploading(true);
+      if (!event.target.files || event.target.files.length === 0) return;
+      
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user!.id}/${Math.random()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      updatePerfil.mutate({ avatar_url: publicUrl });
+    } catch (error: any) {
+      toast.error('Erro ao fazer upload da imagem: ' + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const updateEmail = useMutation({
-    mutationFn: async (email: string) => {
-      const { error } = await supabase.auth.updateUser({ email });
-      if (error) throw error;
-      await supabase.from('usuarios').update({ email }).eq('user_id', user!.id);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['meu_perfil', user?.id] });
-      toast.success('Email atualizado! Verifique sua caixa de entrada para confirmar.');
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const updateSenha = useMutation({
-    mutationFn: async ({ novaSenha }: { novaSenha: string }) => {
-      const { error } = await supabase.auth.updateUser({ password: novaSenha });
-      if (error) throw error;
-    },
-    onSuccess: () => toast.success('Senha alterada com sucesso!'),
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const deletarConta = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('delete_current_user' as any);
-      if (error) throw error;
-    },
+// ... keep existing code
     onSuccess: async () => {
       toast.success('Conta excluída.');
       await signOut();
