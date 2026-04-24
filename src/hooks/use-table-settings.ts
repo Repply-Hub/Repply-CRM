@@ -30,7 +30,10 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
           const defaultCol = defaultColumns.find(d => d.id === col.id);
           return {
             ...col,
-            locked: defaultCol ? defaultCol.locked : col.locked
+            // Use explicitly defined locked value from default columns if available,
+            // otherwise default to false for columns found in defaults.
+            // Custom columns retain their saved locked state.
+            locked: defaultCol ? (defaultCol.locked ?? false) : col.locked
           };
         });
       } catch (e) {
