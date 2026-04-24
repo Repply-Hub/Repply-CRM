@@ -11,8 +11,9 @@ const TEMPLATES = {
 export type TipoMensagem = keyof typeof TEMPLATES;
 
 function formatPhone(phone: string): string {
+  const firstPhone = phone.split(',')[0] ?? phone;
   // Remove tudo que não é número
-  const digits = phone.replace(/\D/g, '');
+  const digits = firstPhone.replace(/\D/g, '');
   // Se não começa com 55, adiciona
   return digits.startsWith('55') ? digits : `55${digits}`;
 }
