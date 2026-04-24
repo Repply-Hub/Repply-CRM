@@ -178,7 +178,7 @@ function MembersList({
           <div className="pt-2 pb-1 px-3">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Membros</p>
           </div>
-          {members.map((m) => {
+          {members.filter(m => m.id !== myId).map((m) => {
             const isMe = m.id === myId;
             const isSelected = target.type === 'dm' && target.memberId === m.id;
             return (
