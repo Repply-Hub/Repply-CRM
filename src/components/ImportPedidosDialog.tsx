@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
-import { MappingStep, type FieldDef } from '@/components/import/MappingStep';
+import { MappingStep, sanitizeImportedRows, type FieldDef } from '@/components/import/MappingStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 import {
@@ -88,7 +88,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   const canProceedToPreview = Boolean(mapping.cliente || mapping.fabricante);
 
-  const getMappedRows = () => getImportedPedidosRows(rawData, mapping, extras, customColumns);
+  const getMappedRows = () => getImportedPedidosRows(
+    sanitizeImportedRows({ rawData, fields: VISIBLE_FIELDS, mapping, extras, customColumns }),
+    Object.fromEntries(VISIBLE_FIELDS.map((field) => [field.key, field.key])) as Record<FieldKey, string>,
+  );
 
   const previewRows = useMemo(
     () => (step === 'preview' ? getMappedRows() : []),

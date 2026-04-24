@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
-import { MappingStep } from '@/components/import/MappingStep';
+import { MappingStep, sanitizeImportedRows } from '@/components/import/MappingStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
@@ -180,13 +180,9 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   };
 
   const getMappedRows = () => {
-    return rawData
+    return sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns })
       .map(row => {
-        const get = (k: FieldKey) => {
-          const col = mapping[k];
-          if (!col) return '';
-          return (row[col] ?? '').toString().trim();
-        };
+        const get = (k: FieldKey) => (row[k] ?? '').toString().trim();
         const empresa = get('empresa');
         const razao_social = get('razao_social');
         const cnpj = get('cnpj');
@@ -194,18 +190,6 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         const sobrenome = get('sobrenome_contato');
         const nome_contato = [primeiro, sobrenome].filter(Boolean).join(' ').trim();
         const tipoRaw = get('tipo');
-
-        // Monta campos_extras com base nas colunas marcadas como "novas" (vindas da planilha)
-        const campos_extras: Record<string, string> = {};
-        Object.entries(extras).forEach(([col, name]) => {
-          const v = (row[col] ?? '').toString().trim();
-          if (v !== '') campos_extras[name || col] = v;
-        });
-        // Adiciona colunas criadas do zero (valor padrão aplicado a todas as linhas)
-        Object.entries(customColumns).forEach(([name, value]) => {
-          const v = (value ?? '').toString().trim();
-          if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
-        });
 
         // Resolve o nome da empresa usando fallbacks se necessário
         let resolvedEmpresa = empresa;
@@ -229,7 +213,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           cargo: get('cargo') || undefined,
           classificacao: get('classificacao') || undefined,
           data_criacao: get('data_criacao') || undefined,
-          campos_extras,
+          campos_extras: (row.campos_extras as Record<string, string>) || {},
         };
       })
       .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : (r.empresa || r.razao_social || r.cnpj));
