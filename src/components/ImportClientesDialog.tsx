@@ -70,7 +70,7 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   ],
   cargo: [/^cargo$/, /cargo/, /funcao/, /posicao/],
   classificacao: [/^classificacao$/, /^classificacao.*cliente$/, /^rank$/, /^ranking$/, /^score$/, /classificacao/],
-  data_criacao: [/^data\s*criacao$/, /^criado$/, /^criado\s*em$/, /^data\s*cadastro$/, /criado/],
+  data_criacao: [/^data\s*criacao$/, /^criado$/, /^criado\s*em$/, /^data\s*cadastro$/],
 };
 
 function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
