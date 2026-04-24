@@ -271,14 +271,10 @@ const EditarPedido = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Cliente *</Label>
-                    <Select value={clienteId} onValueChange={handleClienteChange}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
-                      <SelectContent>
-                        {(clientes ?? []).map(c => (
-                          <SelectItem key={c.id} value={c.id}>{c.empresa}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <EmpresaSelector 
+                      value={clienteId} 
+                      onValueChange={handleClienteChange} 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Fabricante *</Label>
