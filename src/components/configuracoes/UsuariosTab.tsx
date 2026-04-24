@@ -583,7 +583,7 @@ function AuditLog() {
 
 // ─── User Detail Panel ───
 function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId }: {
-  vendedor: { id: string; nome: string; email: string; telefone: string | null; role: string; user_id: string | null };
+  vendedor: { id: string; nome: string; email: string; telefone: string | null; role: string; user_id: string | null; avatar_url?: string | null };
   isGestor: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -601,8 +601,12 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId }
         <div className="h-1.5 bg-gradient-to-r from-primary to-primary/50" />
         <CardContent className="pt-5">
           <div className="flex items-start gap-4">
-            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0 ring-2 ring-primary/20">
-              <span className="text-xl font-bold text-primary">{iniciais}</span>
+            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0 ring-2 ring-primary/20 overflow-hidden">
+              {vendedor.avatar_url ? (
+                <img src={vendedor.avatar_url} alt={vendedor.nome} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-xl font-bold text-primary">{iniciais}</span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -964,12 +968,16 @@ export function UsuariosTab() {
                               onClick={() => setSelectedVendedor(v.id)}
                             >
                               <div className={cn(
-                                'h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                                'h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-colors overflow-hidden',
                                 selectedVendedor === v.id ? 'bg-primary text-primary-foreground' : 'bg-primary/10'
                               )}>
-                                <span className={cn('text-sm font-bold', selectedVendedor === v.id ? '' : 'text-primary')}>
-                                  {v.nome.charAt(0).toUpperCase()}
-                                </span>
+                                {v.avatar_url ? (
+                                  <img src={v.avatar_url} alt={v.nome} className="h-full w-full object-cover" />
+                                ) : (
+                                  <span className={cn('text-sm font-bold', selectedVendedor === v.id ? '' : 'text-primary')}>
+                                    {v.nome.charAt(0).toUpperCase()}
+                                  </span>
+                                )}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium truncate">{v.nome}</p>

@@ -36,6 +36,7 @@ interface Vendedor {
   nome: string;
   email: string;
   role: string;
+  avatar_url?: string | null;
 }
 
 type ChatTarget = { type: 'geral' } | { type: 'dm'; memberId: string } | { type: 'grupo'; grupoId: string };
@@ -92,7 +93,10 @@ function MembersList({
             className={cn('p-1 rounded-lg transition-colors', target.type === 'dm' && target.memberId === m.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
             title={m.nome}
           >
-            <Avatar className="h-7 w-7">
+            <Avatar className="h-7 w-7 border border-primary/10">
+              {m.avatar_url && (
+                <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+              )}
               <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                 {getInitials(m.nome)}
               </AvatarFallback>
@@ -187,7 +191,10 @@ function MembersList({
                 )}
               >
                 <div className="relative">
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-8 w-8 border border-primary/10">
+                    {m.avatar_url && (
+                      <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+                    )}
                     <AvatarFallback className={`${colorForId(m.id)} text-white text-[10px] font-semibold`}>
                       {getInitials(m.nome)}
                     </AvatarFallback>
@@ -247,7 +254,7 @@ const Chat = () => {
       if (!me?.empresa_id) return [];
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, email, role')
+        .select('id, nome, email, role, avatar_url')
         .eq('empresa_id', me.empresa_id)
         .order('nome');
       if (error) throw error;
@@ -352,7 +359,10 @@ const Chat = () => {
               </>
             ) : target.type === 'dm' ? (
               <>
-                <Avatar className="h-8 w-8">
+                <Avatar className="h-8 w-8 border border-primary/10">
+                  {selectedMemberData.avatar_url && (
+                    <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="h-full w-full object-cover" />
+                  )}
                   <AvatarFallback className={`${colorForId(target.memberId)} text-white text-xs`}>
                     {getInitials(chatHeaderName)}
                   </AvatarFallback>
@@ -407,7 +417,10 @@ const Chat = () => {
                           className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''} ${showAvatar ? 'mt-3' : 'mt-0.5'}`}
                         >
                           {showAvatar ? (
-                            <Avatar className="h-8 w-8 shrink-0">
+                            <Avatar className="h-8 w-8 shrink-0 border border-primary/10">
+                              {msg.vendedor?.avatar_url && (
+                                <img src={msg.vendedor.avatar_url} alt={name} className="h-full w-full object-cover" />
+                              )}
                               <AvatarFallback className={`${colorForId(msg.usuario_id)} text-white text-xs`}>
                                 {getInitials(name)}
                               </AvatarFallback>
