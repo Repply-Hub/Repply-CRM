@@ -44,6 +44,16 @@ const ClienteDetalhe = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [enderecoOpen, setEnderecoOpen] = useState(true);
 
+  const copyInfo = async (label: string, value?: string | null) => {
+    if (!value?.trim()) return;
+    try {
+      await navigator.clipboard.writeText(value.trim());
+      toast.success(`${label} copiado!`);
+    } catch {
+      toast.error('Não foi possível copiar a informação.');
+    }
+  };
+
   const cliente = clientes?.find(c => c.id === id);
   const pedidosCliente = (pedidos ?? []).filter(p => p.cliente_id === id);
   const contatosExtras = (contatos ?? []).filter((c: any) => cliente && c.empresa === cliente.empresa);
@@ -223,17 +233,39 @@ const ClienteDetalhe = () => {
         {/* Info Cards */}
         <div className="grid gap-4 md:grid-cols-3">
           {cliente.cnpj && (
-            <Card className="border-border/40">
+            <Card
+              role="button"
+              tabIndex={0}
+              className="border-border/40 cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => copyInfo(cliente.tipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ', cliente.cnpj)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  copyInfo(cliente.tipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ', cliente.cnpj);
+                }
+              }}
+            >
                <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
                  <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                  <div className="min-w-0">
-                   <p className="text-xs text-muted-foreground">CNPJ</p>
+                   <p className="text-xs text-muted-foreground">{cliente.tipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ'}</p>
                    <p className="text-sm font-medium text-foreground break-all">{cliente.cnpj}</p>
                  </div>
               </CardContent>
             </Card>
           )}
-          <Card className="border-border/40">
+          <Card
+            role={cliente.email ? 'button' : undefined}
+            tabIndex={cliente.email ? 0 : undefined}
+            className={`border-border/40 ${cliente.email ? 'cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : ''}`}
+            onClick={() => copyInfo('Email', cliente.email)}
+            onKeyDown={e => {
+              if (cliente.email && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                copyInfo('Email', cliente.email);
+              }
+            }}
+          >
              <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
                <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
                <div className="min-w-0">
@@ -245,7 +277,18 @@ const ClienteDetalhe = () => {
             </CardContent>
           </Card>
           {cliente.telefone && (
-            <Card className="border-border/40">
+            <Card
+              role="button"
+              tabIndex={0}
+              className="border-border/40 cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => copyInfo('Telefone', cliente.telefone)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  copyInfo('Telefone', cliente.telefone);
+                }
+              }}
+            >
                <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
                  <div className="min-w-0">
