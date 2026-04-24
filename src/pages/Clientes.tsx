@@ -60,6 +60,23 @@ const getTipoLabel = (value: string, customTipos: { value: string; label: string
   tipoLabels[value] ?? customTipos.find(t => t.value === value)?.label ?? value;
 const getTipoIcon = (value: string) => tipoIcons[value] ?? Building2;
 
+const normalizeExtraKey = (value: string) => value
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
+
+const getExtraValue = (extras: Record<string, any>, column: ColumnDefinition) => {
+  const labels = [column.id, column.label, column.customLabel].filter(Boolean) as string[];
+  for (const key of labels) {
+    if (extras[key] !== undefined && extras[key] !== null && extras[key] !== '') return extras[key];
+  }
+  const normalizedEntries = Object.entries(extras).map(([key, value]) => [normalizeExtraKey(key), value] as const);
+  const normalizedLabels = labels.map(normalizeExtraKey);
+  return normalizedEntries.find(([key]) => normalizedLabels.includes(key))?.[1];
+};
+
 type ViewTab = 'empresas' | 'contatos';
 
 const Clientes = () => {
