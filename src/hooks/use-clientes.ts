@@ -77,7 +77,7 @@ export function useVendedores() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('*')
+        .select('*, avatar_url')
         .order('nome');
       if (error) throw error;
       return data;
