@@ -109,16 +109,32 @@ const SCHEMA_COLUMN_ALIASES: Record<string, string[]> = {
   endereco: ['endereco', 'endereço', 'address'],
 };
 
-const getSchemaValueByColumn = (row: Record<string, any>, column?: ColumnDefinition) => {
+const hasDisplayValue = (value: unknown) => value !== undefined && value !== null && value !== '';
+
+const getSchemaKeyByColumn = (column?: ColumnDefinition) => {
   if (!column) return undefined;
-  if (row[column.id] !== undefined && row[column.id] !== null && row[column.id] !== '') return row[column.id];
+  if (column.id in SCHEMA_COLUMN_ALIASES) return column.id;
 
   const labels = [column.id, column.label, column.customLabel].filter(Boolean).map(value => normalizeExtraKey(String(value)));
   const match = Object.entries(SCHEMA_COLUMN_ALIASES).find(([, aliases]) =>
     aliases.map(normalizeExtraKey).some(alias => labels.includes(alias))
   );
 
-  return match ? row[match[0]] : undefined;
+  return match?.[0];
+};
+
+const getColumnValue = (row: Record<string, any>, column?: ColumnDefinition) => {
+  if (!column) return undefined;
+
+  const camposExtras = row.campos_extras || {};
+  const schemaKey = getSchemaKeyByColumn(column);
+  if (schemaKey && hasDisplayValue(row[schemaKey])) return row[schemaKey];
+
+  const extraValue = getExtraValue(camposExtras, column);
+  if (hasDisplayValue(extraValue)) return extraValue;
+
+  if (hasDisplayValue(row[column.id])) return row[column.id];
+  return undefined;
 };
 
 type ViewTab = 'empresas' | 'contatos';
@@ -869,7 +885,7 @@ const Clientes = () => {
                         {visibleColumns.map(colId => {
                           const isCustom = colId.startsWith('custom_');
                           const column = columns.find(col => col.id === colId);
-                          let value: any = isCustom && column ? getExtraValue(camposExtras, column) : getSchemaValueByColumn(client as any, column);
+                          let value: any = getColumnValue(client as any, column);
                           
                           if (colId === 'empresa') {
                             return (
@@ -964,7 +980,7 @@ const Clientes = () => {
                         {visibleColumns.map(colId => {
                           const isCustom = colId.startsWith('custom_');
                           const column = columns.find(col => col.id === colId);
-                          const value: any = isCustom && column ? getExtraValue(camposExtras, column) : getSchemaValueByColumn(contato as any, column);
+                          const value: any = getColumnValue(contato as any, column);
 
                           if (colId === 'nome_contato') {
                             return (
