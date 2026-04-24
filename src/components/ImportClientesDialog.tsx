@@ -13,7 +13,7 @@ import { MappingStep } from '@/components/import/MappingStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
-type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'sobrenome_contato' | 'cargo';
+type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'sobrenome_contato' | 'cargo' | 'classificacao' | 'data_criacao';
 
 const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: boolean }[] = [
   { key: 'empresa', label: 'Empresa', required: false },
@@ -26,6 +26,8 @@ const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: b
   { key: 'telefone', label: 'Telefone', required: false },
   { key: 'endereco', label: 'Endereço', required: false },
   { key: 'cargo', label: 'Cargo', required: false, forContatos: true },
+  { key: 'classificacao', label: 'Classificação', required: false },
+  { key: 'data_criacao', label: 'Data de Criação', required: false },
 ];
 
 const TIPO_MAP: Record<string, string> = {
