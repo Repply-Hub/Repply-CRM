@@ -381,7 +381,7 @@ const Clientes = () => {
     if (activeTab === 'contatos') {
       try {
         await createContato.mutateAsync({
-          empresa: empresa || undefined,
+          empresa: clients?.find(c => c.id === empresa)?.empresa || undefined,
           nome_contato: nomeContato || undefined,
           email: (form.get('email') as string) || undefined,
           telefone: telefone || undefined,
