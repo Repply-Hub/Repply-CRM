@@ -524,6 +524,24 @@ export type Database = {
         }
         Relationships: []
       }
+      debug_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string | null
+        }
+        Relationships: []
+      }
       empresas: {
         Row: {
           banner_url: string | null
