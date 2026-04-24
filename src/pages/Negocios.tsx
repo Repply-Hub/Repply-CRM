@@ -1031,6 +1031,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
       <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
       <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} />
+      {viewOrderSheet}
+    </AppLayout>
     </AppLayout>
   );
 };
