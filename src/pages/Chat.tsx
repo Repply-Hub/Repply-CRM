@@ -178,7 +178,7 @@ function MembersList({
           <div className="pt-2 pb-1 px-3">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Membros</p>
           </div>
-          {members.map((m) => {
+          {members.filter(m => m.id !== myId).map((m) => {
             const isMe = m.id === myId;
             const isSelected = target.type === 'dm' && target.memberId === m.id;
             return (
@@ -263,8 +263,14 @@ const Chat = () => {
   });
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!messages) return;
+    const scrollContainer = document.querySelector('[data-radix-scroll-area-viewport]');
+    if (scrollContainer) {
+      setTimeout(() => {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }, 50);
+    }
+  }, [messages, target]);
 
   const handleSend = async () => {
     const trimmed = text.trim();
@@ -437,7 +443,7 @@ const Chat = () => {
                                 isMe
                                   ? 'bg-primary text-primary-foreground rounded-tr-sm'
                                   : 'bg-muted text-foreground rounded-tl-sm'
-                              }`}
+                              } ${msg.id.startsWith('temp-') ? 'opacity-50 grayscale-[0.5]' : ''}`}
                             >
                               {msg.arquivo_url && (
                                 <div className="mb-1">
