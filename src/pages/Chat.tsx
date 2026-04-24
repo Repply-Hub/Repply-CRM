@@ -238,6 +238,7 @@ const Chat = () => {
   const [text, setText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeGrupoId = target.type === 'grupo' ? target.grupoId : null;
@@ -282,6 +283,11 @@ const Chat = () => {
       }, 50);
     }
   }, [messages, target]);
+
+  useEffect(() => {
+    // Focus input when changing chat target
+    inputRef.current?.focus();
+  }, [target]);
 
   const handleSend = async () => {
     const trimmed = text.trim();
