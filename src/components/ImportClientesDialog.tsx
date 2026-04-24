@@ -360,22 +360,24 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           }));
 
           const cnpjs = Array.from(new Set(preparedBatch.map(r => r.cnpj).filter(Boolean))) as string[];
-          const existingByCnpj = new Map<string, any>();
+          const existingByKey = new Map<string, any>();
           if (cnpjs.length > 0) {
             const { data: existingRows, error: existingError } = await supabase
               .from('clientes')
-              .select('empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras,usuario_id')
-              .in('cnpj', cnpjs);
+              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras,usuario_id')
+              .in('cnpj', cnpjs)
+              .eq('usuario_id', vid);
             if (existingError) throw existingError;
             existingRows?.forEach(row => {
-              if (row.cnpj) existingByCnpj.set(row.cnpj, row);
+              if (row.cnpj) existingByKey.set(row.cnpj, row);
             });
           }
 
           const batch = preparedBatch.map((incoming) => {
-            const existing = incoming.cnpj ? existingByCnpj.get(incoming.cnpj) : undefined;
+            const existing = incoming.cnpj ? existingByKey.get(incoming.cnpj) : undefined;
             if (!existing) return incoming;
             return {
+              id: existing.id,
               empresa: hasValue(incoming.empresa) ? incoming.empresa : existing.empresa,
               tipo: hasValue(incoming.tipo) ? incoming.tipo : existing.tipo || 'construtora',
               cnpj: incoming.cnpj,
@@ -387,7 +389,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               classificacao: hasValue(incoming.classificacao) ? incoming.classificacao : existing.classificacao,
               data_criacao: hasValue(incoming.data_criacao) ? incoming.data_criacao : existing.data_criacao,
               campos_extras: mergeExtraFields(existing.campos_extras || {}, incoming.campos_extras || {}),
-              usuario_id: incoming.usuario_id || existing.usuario_id,
+              usuario_id: existing.usuario_id,
             };
           });
           console.debug('[ImportClientes] batch final clientes', batch.slice(0, 5));
