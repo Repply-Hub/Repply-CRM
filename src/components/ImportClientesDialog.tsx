@@ -112,6 +112,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const [mapping, setMapping] = useState<Record<FieldKey, string>>({
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
     telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+    classificacao: '', data_criacao: '',
   });
   // extras: column name (planilha) -> nome no sistema (campos_extras)
   const [extras, setExtras] = useState<Record<string, string>>({});
