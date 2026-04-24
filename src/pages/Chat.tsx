@@ -437,7 +437,7 @@ const Chat = () => {
                                 isMe
                                   ? 'bg-primary text-primary-foreground rounded-tr-sm'
                                   : 'bg-muted text-foreground rounded-tl-sm'
-                              }`}
+                              } ${msg.id.startsWith('temp-') ? 'opacity-50 grayscale-[0.5]' : ''}`}
                             >
                               {msg.arquivo_url && (
                                 <div className="mb-1">
