@@ -18,11 +18,11 @@ import { cn } from '@/lib/utils';
 
 const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'nome_obra', label: 'Nome da Obra', locked: false },
-  { id: 'status', label: 'Status' },
-  { id: 'cliente', label: 'Cliente' },
-  { id: 'endereco', label: 'Endereço' },
-  { id: 'spe_cnpj', label: 'CNPJ/SPE' },
-  { id: 'created_at', label: 'Data de Criação' },
+  { id: 'status', label: 'Status', locked: false },
+  { id: 'cliente', label: 'Cliente', locked: false },
+  { id: 'endereco', label: 'Endereço', locked: false },
+  { id: 'spe_cnpj', label: 'CNPJ/SPE', locked: false },
+  { id: 'created_at', label: 'Data de Criação', locked: false },
 ];
 
 const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
