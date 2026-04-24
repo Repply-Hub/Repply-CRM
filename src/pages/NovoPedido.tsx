@@ -16,6 +16,7 @@ import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCr
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Check, ChevronsUpDown, FileText, Upload } from 'lucide-react';
+import { EmpresaSelector } from '@/components/EmpresaSelector';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
