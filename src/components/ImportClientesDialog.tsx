@@ -256,7 +256,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     }
     setImporting(true);
     try {
-      const { data: vid } = await supabase.rpc('get_my_vendedor_id');
+      const { data: vid, error: rpcError } = await supabase.rpc('get_my_vendedor_id');
+      if (rpcError || !vid) {
+        console.error('Erro ao buscar ID do usuário:', rpcError);
+        throw new Error('Não foi possível identificar seu perfil de usuário. Verifique se seu cadastro está completo.');
+      }
       const BATCH = 500;
       let imported = 0;
 
@@ -303,7 +307,12 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       reset();
       setOpen(false);
     } catch (err: any) {
-      toast.error('Erro na importação: ' + (err.message || 'erro desconhecido'));
+      console.error('Erro na importação:', err);
+      let msg = err.message || 'erro desconhecido';
+      if (msg.includes('row-level security')) {
+        msg = 'Erro de permissão: você pode estar tentando atualizar um registro que pertence a outro usuário ou sua conta não tem permissão para esta ação.';
+      }
+      toast.error('Erro na importação: ' + msg);
     } finally {
       setImporting(false);
     }
