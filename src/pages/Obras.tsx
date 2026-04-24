@@ -277,10 +277,7 @@ export default function Obras() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-muted/50">
-                          <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
-                            {getLabel('nome_obra')}
-                          </th>
-                          {visibleColumns.filter(id => id !== 'nome_obra').map(colId => (
+                          {visibleColumns.map(colId => (
                             <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
                               {getLabel(colId)}
                             </th>
@@ -295,11 +292,14 @@ export default function Obras() {
 
                           return (
                             <tr key={obra.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                              <td className="py-2.5 px-4 font-medium">{obra.nome_obra}</td>
-                              {visibleColumns.filter(id => id !== 'nome_obra').map(colId => {
+                              {visibleColumns.map(colId => {
                                 const isCustom = colId.startsWith('custom_');
                                 let value: any = isCustom ? camposExtras[colId] : (obra as any)[colId];
                                 
+                                if (colId === 'nome_obra') {
+                                  return <td key={colId} className="py-2.5 px-4 font-medium">{obra.nome_obra}</td>;
+                                }
+
                                 if (colId === 'status') {
                                   return (
                                     <td key={colId} className="py-2.5 px-4">

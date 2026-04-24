@@ -29,7 +29,7 @@ import { useTableSettings } from '@/hooks/use-table-settings';
 import { cn } from '@/lib/utils';
 
 const TAREFA_COLUMNS: ColumnDefinition[] = [
-  { id: 'titulo', label: 'Tarefa', locked: true },
+  { id: 'titulo', label: 'Tarefa' },
   { id: 'responsavel', label: 'Responsável' },
   { id: 'prazo_final', label: 'Prazo' },
   { id: 'status', label: 'Status' },
@@ -327,8 +327,7 @@ export default function Tarefas() {
                     <TableHead className="w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </TableHead>
-                    <TableHead>{getLabel('titulo')}</TableHead>
-                    {visibleColumns.filter(id => id !== 'titulo').map(colId => (
+                    {visibleColumns.map(colId => (
                       <TableHead key={colId} className={cn("whitespace-nowrap", (colId === 'responsavel' || colId === 'prazo_final') && "hidden lg:table-cell", colId === 'projeto' && "hidden xl:table-cell")}>
                         {getLabel(colId)}
                       </TableHead>
@@ -347,27 +346,47 @@ export default function Tarefas() {
                         <TableCell className="w-10">
                           <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} aria-label={`Selecionar ${t.titulo}`} />
                         </TableCell>
-                        <TableCell className="max-w-[300px]">
-                          <p className="font-medium text-sm text-card-foreground">{t.titulo}</p>
-                          {visibleColumns.includes('projeto') && t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
-                          {visibleColumns.includes('responsavel') && t.responsavel && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.responsavel}</p>}
-                        </TableCell>
-                        {visibleColumns.includes('responsavel') && (
-                          <TableCell className="hidden lg:table-cell text-sm whitespace-nowrap">{t.responsavel ? <UserProfilePopover name={t.responsavel} /> : '—'}</TableCell>
-                        )}
-                        {visibleColumns.includes('prazo_final') && (
-                          <TableCell className={`hidden lg:table-cell text-sm whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : ''}`}>
-                            {t.prazo_final ? format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR }) : '—'}
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('status') && (
-                          <TableCell>
-                            <Badge className={`whitespace-nowrap text-[11px] border ${si.className}`}>{si.label}</Badge>
-                          </TableCell>
-                        )}
-                        {visibleColumns.includes('projeto') && (
-                          <TableCell className="hidden xl:table-cell text-sm text-muted-foreground truncate max-w-[180px]">{t.projeto || '—'}</TableCell>
-                        )}
+                        {visibleColumns.map(colId => {
+                          if (colId === 'titulo') {
+                            return (
+                              <TableCell key={colId} className="max-w-[300px]">
+                                <p className="font-medium text-sm text-card-foreground">{t.titulo}</p>
+                                {visibleColumns.includes('projeto') && t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
+                                {visibleColumns.includes('responsavel') && t.responsavel && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.responsavel}</p>}
+                              </TableCell>
+                            );
+                          }
+
+                          if (colId === 'responsavel') {
+                            return (
+                              <TableCell key={colId} className="hidden lg:table-cell text-sm whitespace-nowrap">{t.responsavel ? <UserProfilePopover name={t.responsavel} /> : '—'}</TableCell>
+                            );
+                          }
+
+                          if (colId === 'prazo_final') {
+                            return (
+                              <TableCell key={colId} className={`hidden lg:table-cell text-sm whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : ''}`}>
+                                {t.prazo_final ? format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR }) : '—'}
+                              </TableCell>
+                            );
+                          }
+
+                          if (colId === 'status') {
+                            return (
+                              <TableCell key={colId}>
+                                <Badge className={`whitespace-nowrap text-[11px] border ${si.className}`}>{si.label}</Badge>
+                              </TableCell>
+                            );
+                          }
+
+                          if (colId === 'projeto') {
+                            return (
+                              <TableCell key={colId} className="hidden xl:table-cell text-sm text-muted-foreground truncate max-w-[180px]">{t.projeto || '—'}</TableCell>
+                            );
+                          }
+
+                          return null;
+                        })}
                         <TableCell>
                           <div className="flex gap-0.5">
                             <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5" onClick={() => { setViewTarefa(t); setViewOpen(true); }}>
