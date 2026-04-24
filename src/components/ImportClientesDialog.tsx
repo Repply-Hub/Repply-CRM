@@ -227,6 +227,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           endereco: get('endereco') || undefined,
           nome_contato: nome_contato || undefined,
           cargo: get('cargo') || undefined,
+          classificacao: get('classificacao') || undefined,
+          data_criacao: get('data_criacao') || undefined,
           campos_extras,
         };
       })
