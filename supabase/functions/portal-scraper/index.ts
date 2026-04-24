@@ -435,7 +435,44 @@ async function processOnePdf(href: string, date: string, title: string): Promise
   return entries;
 }
 
-// ─── Main ───────────────────────────────────────────────────────────
+async function fetchExtremozPdfLinks(year: string, limit: number): Promise<Array<{ href: string; title: string; date: string }>> {
+  const url = `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${year}/`;
+  console.log(`Fetching Extremoz listing: ${url}`);
+  
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const resp = await fetch(url, { signal: controller.signal, headers: FETCH_HEADERS });
+    clearTimeout(timeout);
+    
+    if (!resp.ok) return [];
+    
+    const html = await resp.text();
+    const links: Array<{ href: string; title: string; date: string }> = [];
+    
+    // Regex to find PDF links in the listing
+    const regex = /<a\s+[^>]*href=["']([^"']+\.pdf)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let match;
+    
+    while ((match = regex.exec(html)) !== null) {
+      const href = match[1];
+      const text = match[2].replace(/<[^>]+>/g, '').trim();
+      
+      // Extract date if present in text or href
+      const dateMatch = text.match(/(\d{2}\/\d{2}\/\d{4})/) || href.match(/(\d{2}-\d{2}-\d{4})/);
+      const date = dateMatch ? dateMatch[1].replace(/-/g, '/') : '';
+      
+      links.push({ href, title: text || `Edição ${date}`, date });
+      if (links.length >= limit) break;
+    }
+    
+    return links;
+  } catch (err) {
+    console.error('fetchExtremozPdfLinks error:', err);
+    return [];
+  }
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {

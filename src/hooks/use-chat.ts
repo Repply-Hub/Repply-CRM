@@ -210,9 +210,10 @@ export function useSendMessage() {
 
       return { previousMessages, optimisticId, grupoId, recipientId };
     },
-    onError: (err, variables, context) => {
+    onError: (err: any, variables, context) => {
       qc.setQueryData(['chat_mensagens', variables.grupoId, variables.recipientId], context?.previousMessages);
-      toast.error('Erro ao enviar mensagem');
+      console.error('Erro ao enviar mensagem:', err);
+      toast.error(`Erro ao enviar mensagem: ${err.message || 'Erro desconhecido'}`);
     },
     onSuccess: (data, variables) => {
       qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId, variables.recipientId], (old) => {
