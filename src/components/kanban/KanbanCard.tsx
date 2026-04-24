@@ -11,7 +11,7 @@ interface KanbanCardProps {
   index: number;
 }
 
-export const KanbanCard = memo(function KanbanCard({ order, index }: KanbanCardProps) {
+export const KanbanCard = memo(function KanbanCard({ order, index, onClick }: KanbanCardProps & { onClick?: (id: string) => void }) {
   const navigate = useNavigate();
   const isAlert = order.daysInStage >= order.alertDays;
 
