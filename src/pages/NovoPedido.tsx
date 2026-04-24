@@ -250,30 +250,10 @@ const NovoPedido = () => {
                   {/* Cliente */}
                   <div className="space-y-2">
                     <Label>Cliente *</Label>
-                    <Popover open={clienteOpen} onOpenChange={setClienteOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" role="combobox" aria-expanded={clienteOpen} className="w-full justify-between font-normal">
-                          {clienteId ? (clientes ?? []).find(c => c.id === clienteId)?.empresa : "Selecionar cliente"}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Buscar cliente..." />
-                          <CommandList>
-                            <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                            <CommandGroup>
-                              {(clientes ?? []).map(c => (
-                                <CommandItem key={c.id} value={c.empresa} onSelect={() => { handleClienteChange(c.id); setClienteOpen(false); }}>
-                                  <Check className={cn("mr-2 h-4 w-4", clienteId === c.id ? "opacity-100" : "opacity-0")} />
-                                  {c.empresa}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                    <EmpresaSelector 
+                      value={clienteId} 
+                      onValueChange={handleClienteChange} 
+                    />
                   </div>
 
                   {/* Fabricante */}
