@@ -758,7 +758,7 @@ const Clientes = () => {
                     <div><Label>Razão Social</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" /></div>
                     <div className="grid grid-cols-2 gap-3">
                       <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
-                      <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
+                      <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" /></div>
                     </div>
                     <EnderecoForm value={endereco} onChange={setEndereco} />
                   </>
@@ -769,7 +769,7 @@ const Clientes = () => {
                     <div><Label>Cargo</Label><Input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Cargo ou função" /></div>
                     <div className="grid grid-cols-2 gap-3">
                       <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
-                      <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
+                      <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" /></div>
                     </div>
                   </>
                 )}
