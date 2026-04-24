@@ -598,7 +598,138 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </div>
       </PopoverContent>
     </Popover>
+  const selectedViewOrder = useMemo(() => 
+    (pedidos ?? []).find(p => p.id === viewOrderId),
+  [pedidos, viewOrderId]);
+
+  const viewOrderSheet = (
+    <Sheet open={!!viewOrderId} onOpenChange={(open) => !open && setViewOrderId(null)}>
+      <SheetContent className="sm:max-w-xl overflow-y-auto">
+        <SheetHeader className="pb-6 border-b">
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-1">
+              <SheetTitle className="text-xl font-bold">
+                {selectedViewOrder?.cliente?.empresa ?? 'Detalhes do Negócio'}
+              </SheetTitle>
+              <SheetDescription>
+                {selectedViewOrder?.obra?.nome_obra ?? 'Sem obra vinculada'}
+              </SheetDescription>
+            </div>
+            {selectedViewOrder && (
+              <Badge className={getStageBadgeClass(KANBAN_STAGES.find(s => s.key === selectedViewOrder.status)?.color ?? 'muted-foreground')}>
+                {stageLabel(selectedViewOrder.status)}
+              </Badge>
+            )}
+          </div>
+        </SheetHeader>
+
+        {selectedViewOrder ? (
+          <div className="py-6 space-y-8">
+            {/* Grid de Dados */}
+            <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Factory className="h-3 w-3" /> Fabricante
+                </p>
+                <p className="text-sm font-medium">{selectedViewOrder.fabricante?.nome ?? '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <DollarSign className="h-3 w-3" /> Valor Total
+                </p>
+                <p className="text-sm font-bold text-primary">
+                  {(selectedViewOrder.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="h-3 w-3" /> Vendedor Responsável
+                </p>
+                <p className="text-sm font-medium">{selectedViewOrder.vendedor?.nome ?? '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="h-3 w-3" /> Data do Pedido
+                </p>
+                <p className="text-sm font-medium">
+                  {format(new Date(selectedViewOrder.data_pedido), 'dd/MM/yyyy', { locale: ptBR })}
+                </p>
+              </div>
+            </div>
+
+            {/* Endereço */}
+            {selectedViewOrder.endereco_entrega && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Endereço de Entrega</p>
+                <div className="p-3 rounded-lg border bg-muted/30 flex items-start gap-3">
+                  <Building2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-sm text-muted-foreground leading-relaxed">{selectedViewOrder.endereco_entrega}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Observações */}
+            {selectedViewOrder.observacoes && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Observações</p>
+                <div className="p-4 rounded-lg border bg-muted/20">
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap italic">"{selectedViewOrder.observacoes}"</p>
+                </div>
+              </div>
+            )}
+
+            {/* Histórico Recente */}
+            <div className="space-y-4">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Últimos Contatos</p>
+              <div className="space-y-3">
+                {!contatos?.length ? (
+                  <p className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg">Nenhum registro de contato</p>
+                ) : (
+                  contatos.slice(0, 3).map(contact => {
+                    const Icon = contactIcons[contact.tipo] ?? MessageSquare;
+                    return (
+                      <div key={contact.id} className="flex gap-3 p-3 rounded-lg border hover:bg-muted/10 transition-colors">
+                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Icon className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-foreground leading-snug">{contact.descricao}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {format(new Date(contact.data_contato), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
+          <div className="flex flex-1 gap-2">
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => handleExportPdf()}>
+              <FileDown className="h-4 w-4 mr-2" /> PDF
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
+              <Pencil className="h-4 w-4 mr-2" /> Editar
+            </Button>
+            <Button variant="destructive" onClick={() => { setViewOrderId(null); setConfirmDeleteOpen(true); setSelected(new Set([viewOrderId!])); }}>
+              <Trash2 className="h-4 w-4 mr-2" /> Excluir
+            </Button>
+          </div>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
+
 
   const subtitle = isPipelineMode
     ? `${pipelineOrders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
