@@ -376,7 +376,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           const batch = preparedBatch.map((incoming) => {
             const existing = incoming.cnpj ? existingByKey.get(incoming.cnpj) : undefined;
             if (!existing) {
-              return { ...incoming, id: undefined };
+              return incoming;
             }
             return {
               id: existing.id,
@@ -393,7 +393,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               campos_extras: mergeExtraFields(existing.campos_extras || {}, incoming.campos_extras || {}),
               usuario_id: existing.usuario_id,
             };
-          }) as Array<{ id?: string; empresa: any; tipo: any; cnpj: any; razao_social: any; email: any; telefone: any; endereco: any; nome_contato: any; classificacao: any; data_criacao: any; campos_extras: any; usuario_id: string; }>;
+          }) as any[];
           console.debug('[ImportClientes] batch final clientes', batch.slice(0, 5));
           const inserts = batch.filter(r => !r.id);
           const updates = batch.filter(r => r.id);
