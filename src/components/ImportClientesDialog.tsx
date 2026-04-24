@@ -344,7 +344,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           if (error) throw error;
           console.debug('[ImportClientes] contatos salvos', saved?.slice(0, 5));
         } else {
-          const batch = rows.slice(i, i + BATCH).map(r => ({
+          const preparedBatch = rows.slice(i, i + BATCH).map(r => ({
             empresa: r.empresa,
             tipo: r.tipo || 'construtora',
             cnpj: r.cnpj || null,
@@ -358,6 +358,38 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
+
+          const cnpjs = Array.from(new Set(preparedBatch.map(r => r.cnpj).filter(Boolean))) as string[];
+          const existingByCnpj = new Map<string, any>();
+          if (cnpjs.length > 0) {
+            const { data: existingRows, error: existingError } = await supabase
+              .from('clientes')
+              .select('empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras,usuario_id')
+              .in('cnpj', cnpjs);
+            if (existingError) throw existingError;
+            existingRows?.forEach(row => {
+              if (row.cnpj) existingByCnpj.set(row.cnpj, row);
+            });
+          }
+
+          const batch = preparedBatch.map((incoming) => {
+            const existing = incoming.cnpj ? existingByCnpj.get(incoming.cnpj) : undefined;
+            if (!existing) return incoming;
+            return {
+              empresa: hasValue(incoming.empresa) ? incoming.empresa : existing.empresa,
+              tipo: hasValue(incoming.tipo) ? incoming.tipo : existing.tipo || 'construtora',
+              cnpj: incoming.cnpj,
+              razao_social: hasValue(incoming.razao_social) ? incoming.razao_social : existing.razao_social,
+              email: hasValue(incoming.email) ? incoming.email : existing.email,
+              telefone: hasValue(incoming.telefone) ? incoming.telefone : existing.telefone,
+              endereco: hasValue(incoming.endereco) ? incoming.endereco : existing.endereco,
+              nome_contato: hasValue(incoming.nome_contato) ? incoming.nome_contato : existing.nome_contato,
+              classificacao: hasValue(incoming.classificacao) ? incoming.classificacao : existing.classificacao,
+              data_criacao: hasValue(incoming.data_criacao) ? incoming.data_criacao : existing.data_criacao,
+              campos_extras: mergeExtraFields(existing.campos_extras || {}, incoming.campos_extras || {}),
+              usuario_id: incoming.usuario_id || existing.usuario_id,
+            };
+          });
           console.debug('[ImportClientes] batch final clientes', batch.slice(0, 5));
           const { data: saved, error } = await supabase
             .from('clientes')
