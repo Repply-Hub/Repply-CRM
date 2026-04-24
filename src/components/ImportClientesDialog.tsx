@@ -392,6 +392,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               setMapping({
                 empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
                 telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+                classificacao: '', data_criacao: '',
               });
               setExtras({});
               setCustomColumns({});
