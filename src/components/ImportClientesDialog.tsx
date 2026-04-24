@@ -53,7 +53,7 @@ function normalizeText(v: string): string {
 const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   empresa: [/^empresa$/, /^nome\s*fantasia$/, /^nome\s*da\s*empresa$/, /^razao\s*social$/, /empresa/, /fantasia/],
   razao_social: [/^razao\s*social$/, /razao/],
-  tipo: [/^tipo$/, /segmento/, /segmento\s*de\s*atuacao/, /categoria/],
+  tipo: [/^tipo$/, /segmento/, /segemento/, /segmento\s*de\s*atuacao/, /segemento\s*de\s*atuacao/, /categoria/],
   cnpj: [/^cnpj$/, /^cpf$/, /cpf.*cnpj/, /cnpj/, /cpf/],
   email: [/^e-?mail$/, /mail/],
   telefone: [/^telefone$/, /^telefone\s*de\s*trabalho$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
@@ -274,7 +274,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         return {
           empresa: resolvedEmpresa,
           razao_social: razao_social || undefined,
-          tipo: TIPO_MAP[tipoRaw.toLowerCase()] || (tipoRaw ? tipoRaw.toLowerCase() : 'construtora'),
+          tipo: TIPO_MAP[tipoRaw.toLowerCase()] || (tipoRaw ? tipoRaw.toLowerCase() : undefined),
           cnpj: cnpj || undefined,
           email: get('email') || undefined,
           telefone: get('telefone') || undefined,
