@@ -223,6 +223,7 @@ export function getImportedPedidosRows(
       const valor = mapping.valor ? parseNumber(row[mapping.valor]) : 0;
       const observacoes = mapping.observacoes ? row[mapping.observacoes]?.toString().trim() || '' : '';
       const status = mapping.status ? resolveImportedPedidoStatus(row[mapping.status]) : 'novo_lead';
+      const data_pedido = mapping.data_pedido ? row[mapping.data_pedido]?.toString().trim() : undefined;
 
       const campos_extras: Record<string, string> = {};
       Object.entries(extras).forEach(([col, name]) => {
