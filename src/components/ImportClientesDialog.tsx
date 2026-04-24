@@ -256,7 +256,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     }
     setImporting(true);
     try {
-      const { data: vid } = await supabase.rpc('get_my_vendedor_id');
+      const { data: vid, error: rpcError } = await supabase.rpc('get_my_vendedor_id');
+      if (rpcError || !vid) {
+        console.error('Erro ao buscar ID do usuário:', rpcError);
+        throw new Error('Não foi possível identificar seu perfil de usuário. Verifique se seu cadastro está completo.');
+      }
       const BATCH = 500;
       let imported = 0;
 
