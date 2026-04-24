@@ -478,6 +478,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </button>
             </>
           )}
+
+          {!showKanban && (
+            <>
         </div>
       </div>
     </ColumnSettings>
