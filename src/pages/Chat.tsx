@@ -231,7 +231,8 @@ const Chat = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeGrupoId = target.type === 'grupo' ? target.grupoId : null;
-  const { data: messages, isLoading } = useChatMessages(activeGrupoId);
+  const activeRecipientId = target.type === 'dm' ? target.recipientId : null;
+  const { data: messages, isLoading } = useChatMessages(activeGrupoId, activeRecipientId);
   const { send, sending } = useSendMessage();
   const { data: grupos = [] } = useChatGrupos();
 
