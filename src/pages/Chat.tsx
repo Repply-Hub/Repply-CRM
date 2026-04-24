@@ -279,7 +279,7 @@ const Chat = () => {
     setText('');
     const file = selectedFile;
     setSelectedFile(null);
-    await send(trimmed, file ?? undefined, activeGrupoId);
+    await send(trimmed, file ?? undefined, activeGrupoId, activeRecipientId);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
