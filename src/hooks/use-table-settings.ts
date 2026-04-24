@@ -119,6 +119,15 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
       const result = Array.from(prev);
       const [removed] = result.splice(startIndex, 1);
       result.splice(endIndex, 0, removed);
+      
+      // Sincroniza a ordem das colunas visíveis com a nova ordem geral
+      setVisibleColumns(currentVisible => {
+        const sortedVisible = result
+          .filter(col => currentVisible.includes(col.id))
+          .map(col => col.id);
+        return sortedVisible;
+      });
+      
       return result;
     });
   }, []);
