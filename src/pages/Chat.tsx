@@ -184,7 +184,7 @@ function MembersList({
             return (
               <button
                 key={m.id}
-                onClick={() => onSelect({ type: 'dm', memberId: m.id })}
+                onClick={() => onSelect({ type: 'dm', memberId: m.id, recipientId: m.id })}
                 className={cn(
                   'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
                   isSelected ? 'bg-primary/10' : 'hover:bg-muted/50'
