@@ -56,13 +56,19 @@ export function useChatMessages(grupoId: string | null = null) {
   useEffect(() => {
     const channel = supabase
       .channel('chat_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, () => {
-        qc.invalidateQueries({ queryKey: ['chat_mensagens'] });
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'chat_mensagens',
+        filter: grupoId ? `grupo_id=eq.${grupoId}` : 'grupo_id=is.null'
+      }, (payload) => {
+        // Optimistic check: if message is already in list (via mutation), don't force invalidate
+        qc.invalidateQueries({ queryKey: ['chat_mensagens', grupoId] });
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [qc]);
+  }, [qc, grupoId]);
 
   return query;
 }
