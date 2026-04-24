@@ -70,7 +70,7 @@ function MembersList({
 }) {
   if (collapsed) {
     return (
-      <div className="w-12 border-r border-border flex flex-col h-full shrink-0 items-center py-2 gap-1">
+      <div className="w-12 border-r border-border flex flex-col h-full shrink-0 items-center gap-1">
         <button
           onClick={() => onSelect({ type: 'geral' })}
           className={cn('p-1 rounded-lg transition-colors', target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50')}
@@ -113,7 +113,7 @@ function MembersList({
             </Avatar>
           </button>
         ))}
-        <div className="mt-auto pt-2">
+        <div className="mt-auto border-t border-border w-full flex justify-center py-2">
           <button onClick={onToggle} className="p-2 rounded-lg hover:bg-muted/50 transition-colors" title="Expandir equipe">
             <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
           </button>
@@ -124,7 +124,7 @@ function MembersList({
 
   return (
     <div className="w-64 border-r border-border flex flex-col h-full shrink-0">
-      <div className="px-4 py-3 border-b border-border flex items-center">
+      <div className="px-4 py-3 border-b border-border flex items-center min-h-[4rem]">
         <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 flex-1">
           <Users className="h-4 w-4 text-primary" />
           Equipe
@@ -222,7 +222,7 @@ function MembersList({
           })}
         </div>
       </ScrollArea>
-      <div className="border-t border-border px-3 py-2">
+      <div className="border-t border-border px-3 py-2 mt-auto">
         <button onClick={onToggle} className="flex items-center gap-2 w-full p-1.5 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground" title="Recolher equipe">
           <PanelLeftClose className="h-4 w-4" />
           <span className="text-[10px]">Recolher</span>
@@ -367,7 +367,7 @@ const Chat = () => {
 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Chat header */}
-          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 min-h-[4rem]">
             {target.type === 'grupo' ? (
               <>
                 <Avatar className="h-8 w-8">
