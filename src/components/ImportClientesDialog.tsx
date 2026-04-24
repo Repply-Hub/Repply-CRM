@@ -268,6 +268,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             email: r.email || null,
             telefone: r.telefone || null,
             cargo: r.cargo || null,
+            classificacao: r.classificacao || null,
+            data_criacao: r.data_criacao || null,
             campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
@@ -283,6 +285,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             telefone: r.telefone || null,
             endereco: r.endereco || null,
             nome_contato: r.nome_contato || null,
+            classificacao: r.classificacao || null,
+            data_criacao: r.data_criacao || null,
             campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
