@@ -11,6 +11,7 @@ export interface ChatMessage {
   empresa_id: string;
   created_at: string;
   grupo_id?: string | null;
+  recipient_id?: string | null;
   arquivo_url?: string | null;
   arquivo_nome?: string | null;
   arquivo_tipo?: string | null;
