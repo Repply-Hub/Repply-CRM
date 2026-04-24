@@ -38,12 +38,12 @@ import { cn } from '@/lib/utils';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'cliente', label: 'Cliente', locked: false },
-  { id: 'obra', label: 'Obra' },
-  { id: 'fabricante', label: 'Fabricante' },
-  { id: 'valor', label: 'Valor' },
-  { id: 'etapa', label: 'Etapa' },
-  { id: 'vendedor', label: 'Vendedor' },
-  { id: 'acoes', label: 'Ações' },
+  { id: 'obra', label: 'Obra', locked: false },
+  { id: 'fabricante', label: 'Fabricante', locked: false },
+  { id: 'valor', label: 'Valor', locked: false },
+  { id: 'etapa', label: 'Etapa', locked: false },
+  { id: 'vendedor', label: 'Vendedor', locked: false },
+  { id: 'acoes', label: 'Ações', locked: false },
 ];
 
 const PAGE_SIZE = 10;
