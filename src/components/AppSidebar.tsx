@@ -40,7 +40,7 @@ export function AppSidebar() {
     queryFn: async () => {
       const { data } = await supabase
         .from('usuarios')
-        .select('id, nome, role')
+        .select('id, nome, role, avatar_url')
         .eq('user_id', user!.id)
         .maybeSingle();
       return data;
