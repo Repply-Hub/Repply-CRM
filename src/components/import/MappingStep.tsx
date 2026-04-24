@@ -25,7 +25,7 @@ const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: st
   tipo: { desc: 'Categoria ou segmento do cliente.', example: 'construtora', storage: 'clientes.tipo', synonyms: ['tipo', 'segmento', 'segmento de atuação', 'segmento de atuacao', 'categoria', 'segemento', 'segemento de atuacao'] },
   cnpj: { desc: 'CNPJ ou CPF, salvo apenas com números.', example: '12.345.678/0001-90', storage: 'clientes.cnpj', synonyms: ['cnpj', 'cpf', 'documento', 'cpf cnpj'], type: 'cnpj' },
   email: { desc: 'E-mail principal.', example: 'contato@empresa.com.br', storage: 'clientes.email', synonyms: ['email', 'e-mail', 'mail'], type: 'email' },
-  telefone: { desc: 'Telefone com DDD, salvo apenas com números.', example: '(84) 99999-9999', storage: 'clientes.telefone', synonyms: ['telefone', 'telefone de trabalho', 'fone', 'celular', 'whatsapp', 'tel'], type: 'phone' },
+  telefone: { desc: 'Telefone com DDD. Para mais de um número, separe por vírgula.', example: '(84) 99999-9999, (84) 98888-8888', storage: 'clientes.telefone', synonyms: ['telefone', 'telefone de trabalho', 'fone', 'celular', 'whatsapp', 'tel'], type: 'phone' },
   endereco: { desc: 'Endereço completo.', example: 'Av. Hermes da Fonseca, 123, Natal/RN', storage: 'clientes.endereco', synonyms: ['endereco', 'endereço', 'address', 'localizacao'] },
   nome_contato: { desc: 'Nome da pessoa de contato.', example: 'João Silva', storage: 'clientes.nome_contato', synonyms: ['nome', 'contato', 'nome contato', 'responsavel', 'pessoa'] },
   sobrenome_contato: { desc: 'Sobrenome do contato, concatenado ao nome.', example: 'Silva', storage: 'clientes.nome_contato', synonyms: ['sobrenome', 'ultimo nome', 'last name'] },
@@ -118,7 +118,14 @@ export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): str
   const raw = value instanceof Date ? value.toISOString() : String(value).trim();
   if (!raw) return undefined;
 
-  if (type === 'cnpj' || type === 'phone') return raw.replace(/\D/g, '') || undefined;
+  if (type === 'cnpj') return raw.replace(/\D/g, '') || undefined;
+  if (type === 'phone') {
+    const phones = raw
+      .split(/[,;|/]+/)
+      .map(phone => phone.replace(/\D/g, ''))
+      .filter(Boolean);
+    return phones.join(', ') || undefined;
+  }
   if (type === 'email') return raw.toLowerCase();
   if (type === 'number') {
     const cleaned = raw.replace(/[^\d,.-]/g, '');
