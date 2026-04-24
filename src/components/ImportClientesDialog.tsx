@@ -325,7 +325,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             classificacao: r.classificacao || null,
             data_criacao: r.data_criacao || null,
             campos_extras: r.campos_extras || {},
-            vendedor_id: vid,
+            usuario_id: vid,
           }));
           const { error } = await supabase.from('contatos').insert(batch);
           if (error) throw error;
@@ -342,7 +342,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             classificacao: r.classificacao || null,
             data_criacao: r.data_criacao || null,
             campos_extras: r.campos_extras || {},
-            vendedor_id: vid,
+            usuario_id: vid,
           }));
           const { error } = await supabase.from('clientes').upsert(batch, {
             onConflict: 'cnpj',
