@@ -236,7 +236,7 @@ export function getImportedPedidosRows(
         if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
-      return { cliente, fabricante, valor, observacoes, status, campos_extras };
+      return { cliente, fabricante, valor, observacoes, status, data_pedido, campos_extras };
     })
     .filter((row) => row.cliente && row.fabricante);
 }
