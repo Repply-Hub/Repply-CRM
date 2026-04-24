@@ -279,7 +279,6 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           }));
           const { error } = await supabase.from('clientes').upsert(batch, {
             onConflict: 'cnpj',
-            ignoreDuplicates: true,
           });
           if (error) throw error;
         }
