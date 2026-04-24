@@ -254,7 +254,7 @@ const Chat = () => {
       if (!me?.empresa_id) return [];
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, email, role')
+        .select('id, nome, email, role, avatar_url')
         .eq('empresa_id', me.empresa_id)
         .order('nome');
       if (error) throw error;
