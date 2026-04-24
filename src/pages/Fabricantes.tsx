@@ -27,14 +27,14 @@ import { ImportCatalogoDialog } from '@/components/catalogo/ImportCatalogoDialog
 import { cn } from '@/lib/utils';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
-  { id: 'imagem', label: 'Imagem' },
-  { id: 'descricao', label: 'Descrição' },
-  { id: 'categoria', label: 'Categoria' },
-  { id: 'referencia', label: 'Referência' },
-  { id: 'preco', label: 'Preço Unit.' },
-  { id: 'unidade', label: 'Unidade' },
-  { id: 'status', label: 'Status' },
-  { id: 'acoes', label: 'Ações' },
+  { id: 'imagem', label: 'Imagem', locked: false },
+  { id: 'descricao', label: 'Descrição', locked: false },
+  { id: 'categoria', label: 'Categoria', locked: false },
+  { id: 'referencia', label: 'Referência', locked: false },
+  { id: 'preco', label: 'Preço Unit.', locked: false },
+  { id: 'unidade', label: 'Unidade', locked: false },
+  { id: 'status', label: 'Status', locked: false },
+  { id: 'acoes', label: 'Ações', locked: false },
 ];
 
 // ─── Fabricante Form Dialog ─────────────────────────────────────────
