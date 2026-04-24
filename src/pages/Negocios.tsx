@@ -450,7 +450,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             </div>
           ) : null}
           
-          {!showKanban && (
+          {showKanban && (
             <>
               <button
                 type="button"
