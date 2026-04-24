@@ -824,7 +824,8 @@ const Clientes = () => {
                         </td>
                         {visibleColumns.map(colId => {
                           const isCustom = colId.startsWith('custom_');
-                          let value: any = isCustom ? camposExtras[colId] : (client as any)[colId];
+                          const column = columns.find(col => col.id === colId);
+                          let value: any = isCustom && column ? getExtraValue(camposExtras, column) : (client as any)[colId];
                           
                           if (colId === 'empresa') {
                             return (
@@ -918,7 +919,8 @@ const Clientes = () => {
                         </td>
                         {visibleColumns.map(colId => {
                           const isCustom = colId.startsWith('custom_');
-                          const value: any = isCustom ? camposExtras[colId] : (contato as any)[colId];
+                          const column = columns.find(col => col.id === colId);
+                          const value: any = isCustom && column ? getExtraValue(camposExtras, column) : (contato as any)[colId];
 
                           if (colId === 'nome_contato') {
                             return (
