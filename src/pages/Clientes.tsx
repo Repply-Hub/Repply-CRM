@@ -68,13 +68,33 @@ const normalizeExtraKey = (value: string) => value
   .trim();
 
 const getExtraValue = (extras: Record<string, any>, column: ColumnDefinition) => {
-  const labels = [column.id, column.label, column.customLabel].filter(Boolean) as string[];
-  for (const key of labels) {
-    if (extras[key] !== undefined && extras[key] !== null && extras[key] !== '') return extras[key];
+  if (!extras) return '';
+  
+  // 1. Tentar por ID exato (mais preciso)
+  if (extras[column.id] !== undefined && extras[column.id] !== null && extras[column.id] !== '') {
+    return extras[column.id];
   }
-  const normalizedEntries = Object.entries(extras).map(([key, value]) => [normalizeExtraKey(key), value] as const);
-  const normalizedLabels = labels.map(normalizeExtraKey);
-  return normalizedEntries.find(([key]) => normalizedLabels.includes(key))?.[1];
+
+  // 2. Tentar por label
+  const labels = [column.label, column.customLabel].filter(Boolean) as string[];
+  for (const label of labels) {
+    if (extras[label] !== undefined && extras[label] !== null && extras[label] !== '') {
+      return extras[label];
+    }
+  }
+
+  // 3. Fallback para busca normalizada (menos preciso, mas evita perda de dados)
+  const searchLabels = [column.id, ...labels].map(normalizeExtraKey);
+  const entries = Object.entries(extras);
+  
+  for (const [key, value] of entries) {
+    if (value === undefined || value === null || value === '') continue;
+    if (searchLabels.includes(normalizeExtraKey(key))) {
+      return value;
+    }
+  }
+
+  return '';
 };
 
 type ViewTab = 'empresas' | 'contatos';
