@@ -408,11 +408,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       onAdd={handleAddColumn}
       onRemove={handleRemoveColumn}
       hideColumns={showKanban}
+      label="Colunas"
     >
       <div className={cn("p-1", !showKanban && "border-t border-border/50")}>
         <div className="px-4 py-2.5 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
           <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-            {showKanban ? 'Personalizar Etapas' : 'Ações'}
+            {showKanban ? 'Personalizar Etapas Kanban' : 'Ações'}
           </span>
         </div>
         
@@ -449,16 +450,18 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             </div>
           ) : null}
           
+          {showKanban && (
+            <button
+              type="button"
+              onClick={() => setColunasDialogOpen(true)}
+              className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium hover:bg-muted/80 transition-all text-left"
+            >
+              <Columns3 className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Gerenciar colunas kanban...</span>
+            </button>
+          )}
           {!showKanban && (
             <>
-              <button
-                type="button"
-                onClick={() => setColunasDialogOpen(true)}
-                className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium hover:bg-muted/80 transition-all text-left"
-              >
-                <Columns3 className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Gerenciar colunas...</span>
-              </button>
               <button
                 type="button"
                 onClick={handleExportPdf}
