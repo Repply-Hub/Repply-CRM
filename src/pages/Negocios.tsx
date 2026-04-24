@@ -1033,7 +1033,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} />
       {viewOrderSheet}
     </AppLayout>
-    </AppLayout>
   );
 };
 
