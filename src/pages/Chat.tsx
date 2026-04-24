@@ -536,20 +536,33 @@ const Chat = () => {
                               {msg.arquivo_url && (
                                 <div className="mb-1">
                                   {msg.arquivo_tipo?.startsWith('image/') ? (
-                                    <a href={msg.arquivo_url} target="_blank" rel="noopener noreferrer">
-                                      <img
-                                        src={msg.arquivo_url}
-                                        alt={msg.arquivo_nome || 'imagem'}
-                                        className="max-w-[240px] max-h-[200px] rounded-lg object-cover"
-                                      />
-                                    </a>
+                                    <div className="relative group/img">
+                                      <a href={msg.arquivo_url} target="_blank" rel="noopener noreferrer">
+                                        <img
+                                          src={msg.arquivo_url}
+                                          alt={msg.arquivo_nome || 'imagem'}
+                                          className="max-w-[240px] max-h-[200px] rounded-lg object-cover"
+                                        />
+                                      </a>
+                                      <a
+                                        href={msg.arquivo_url}
+                                        download={msg.arquivo_nome || 'imagem'}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="absolute top-2 right-2 p-1.5 bg-background/80 hover:bg-background rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity shadow-sm"
+                                        title="Baixar imagem"
+                                      >
+                                        <Download className="h-3.5 w-3.5 text-foreground" />
+                                      </a>
+                                    </div>
                                   ) : (
                                     <a
                                       href={msg.arquivo_url}
+                                      download={msg.arquivo_nome || 'Arquivo'}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className={`flex items-center gap-2 p-2 rounded-lg ${
-                                        isMe ? 'bg-primary-foreground/10' : 'bg-background/50'
+                                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                                        isMe ? 'bg-primary-foreground/10 hover:bg-primary-foreground/20' : 'bg-background/50 hover:bg-background/80'
                                       }`}
                                     >
                                       <FileText className="h-5 w-5 shrink-0" />
