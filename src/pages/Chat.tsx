@@ -359,7 +359,10 @@ const Chat = () => {
               </>
             ) : target.type === 'dm' ? (
               <>
-                <Avatar className="h-8 w-8">
+                <Avatar className="h-8 w-8 border border-primary/10">
+                  {selectedMemberData.avatar_url && (
+                    <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="h-full w-full object-cover" />
+                  )}
                   <AvatarFallback className={`${colorForId(target.memberId)} text-white text-xs`}>
                     {getInitials(chatHeaderName)}
                   </AvatarFallback>
