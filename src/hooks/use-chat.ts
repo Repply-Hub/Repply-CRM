@@ -113,7 +113,7 @@ export function useSendMessage() {
   const [sending, setSending] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: async ({ conteudo, file, grupoId }: { conteudo: string, file?: File, grupoId?: string | null }) => {
+    mutationFn: async ({ conteudo, file, grupoId, recipientId }: { conteudo: string, file?: File, grupoId?: string | null, recipientId?: string | null }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Usuário não autenticado');
 
@@ -152,6 +152,7 @@ export function useSendMessage() {
         arquivo_nome,
         arquivo_tipo,
         grupo_id: grupoId || null,
+        recipient_id: recipientId || null,
       };
 
       const { data: savedMsg, error } = await supabase
@@ -163,9 +164,9 @@ export function useSendMessage() {
       if (error) throw error;
       return savedMsg;
     },
-    onMutate: async ({ conteudo, file, grupoId }) => {
-      await qc.cancelQueries({ queryKey: ['chat_mensagens', grupoId] });
-      const previousMessages = qc.getQueryData<ChatMessage[]>(['chat_mensagens', grupoId]);
+    onMutate: async ({ conteudo, file, grupoId, recipientId }) => {
+      await qc.cancelQueries({ queryKey: ['chat_mensagens', grupoId, recipientId] });
+      const previousMessages = qc.getQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId]);
 
       // Mock optimistic message
       const { data: userData } = await supabase.auth.getUser();
