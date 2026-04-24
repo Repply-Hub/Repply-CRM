@@ -89,7 +89,7 @@ function MembersList({
         {members.map((m) => (
           <button
             key={m.id}
-            onClick={() => onSelect({ type: 'dm', memberId: m.id })}
+            onClick={() => onSelect({ type: 'dm', memberId: m.id, recipientId: m.id })}
             className={cn('p-1 rounded-lg transition-colors', target.type === 'dm' && target.memberId === m.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
             title={m.nome}
           >
