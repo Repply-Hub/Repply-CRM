@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -60,13 +60,14 @@ function ThemeSelector() {
 function ProfileTab() {
   const { user, signOut } = useAuth();
   const qc = useQueryClient();
+  const [isUploading, setIsUploading] = useState(false);
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['meu_perfil', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, email, telefone, role')
+        .select('id, nome, email, telefone, role, avatar_url')
         .eq('user_id', user!.id)
         .single();
       if (error) throw error;
@@ -76,7 +77,7 @@ function ProfileTab() {
   });
 
   const updatePerfil = useMutation({
-    mutationFn: async (dados: { nome: string; telefone: string }) => {
+    mutationFn: async (dados: { nome?: string; telefone?: string; avatar_url?: string | null }) => {
       const { error } = await supabase.from('usuarios').update(dados).eq('user_id', user!.id);
       if (error) throw error;
     },
@@ -86,6 +87,33 @@ function ProfileTab() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setIsUploading(true);
+      if (!event.target.files || event.target.files.length === 0) return;
+      
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user!.id}/${Math.random()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      updatePerfil.mutate({ avatar_url: publicUrl });
+    } catch (error: any) {
+      toast.error('Erro ao fazer upload da imagem: ' + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const updateEmail = useMutation({
     mutationFn: async (email: string) => {
@@ -159,8 +187,18 @@ function ProfileTab() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4 mb-5">
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="text-2xl font-bold text-primary">{iniciais}</span>
+              <div className="relative group">
+                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border border-border">
+                  {perfil.avatar_url ? (
+                    <img src={perfil.avatar_url} alt={perfil.nome} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-2xl font-bold text-primary">{iniciais}</span>
+                  )}
+                </div>
+                <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                  {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                  <input type="file" accept="image/*" onChange={uploadAvatar} disabled={isUploading} className="hidden" />
+                </label>
               </div>
               <div>
                 <p className="font-semibold">{perfil.nome}</p>
