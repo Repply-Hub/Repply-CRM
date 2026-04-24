@@ -799,18 +799,23 @@ const Clientes = () => {
                         <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
                           <Checkbox checked={selected.has(client.id)} onCheckedChange={() => toggleOne(client.id)} aria-label={`Selecionar ${client.empresa}`} />
                         </td>
-                        <td className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
-                          <div className="flex items-center gap-2.5">
-                            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                              <Icon className="h-4 w-4 text-primary" />
-                            </div>
-                            <span className="font-medium truncate max-w-[200px]">{client.empresa}</span>
-                          </div>
-                        </td>
-                        {visibleColumns.filter(id => id !== 'empresa').map(colId => {
+                        {visibleColumns.map(colId => {
                           const isCustom = colId.startsWith('custom_');
                           let value: any = isCustom ? camposExtras[colId] : (client as any)[colId];
                           
+                          if (colId === 'empresa') {
+                            return (
+                              <td key={colId} className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
+                                <div className="flex items-center gap-2.5">
+                                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                    <Icon className="h-4 w-4 text-primary" />
+                                  </div>
+                                  <span className="font-medium truncate max-w-[200px]">{client.empresa}</span>
+                                </div>
+                              </td>
+                            );
+                          }
+
                           if (colId === 'tipo') {
                             return (
                               <td key={colId} className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
