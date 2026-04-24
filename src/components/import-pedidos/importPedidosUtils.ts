@@ -1,7 +1,7 @@
 export type FieldKey = 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
-  { key: 'cliente', label: 'Cliente', required: true },
+  { key: 'cliente', label: 'Cliente', required: false },
   { key: 'fabricante', label: 'Fabricante', required: true },
   { key: 'valor', label: 'Valor', required: false },
   { key: 'status', label: 'Etapa/Status', required: false },
