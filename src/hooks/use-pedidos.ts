@@ -48,14 +48,28 @@ export function useUpdatePedidoStatus() {
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const updateData: Record<string, unknown> = { status };
-      // Preenche prazo_resposta (data de fechamento) automaticamente ao mover para "fechamento"
       if (status === 'fechamento') {
         updateData.prazo_resposta = new Date().toISOString().split('T')[0];
       }
       const { error } = await supabase.from('pedidos').update(updateData).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ['pedidos'] });
+      const previous = qc.getQueryData<PedidoWithRelations[]>(['pedidos']);
+      if (previous) {
+        qc.setQueryData<PedidoWithRelations[]>(['pedidos'], old => 
+          old?.map(p => p.id === id ? { ...p, status } : p)
+        );
+      }
+      return { previous };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previous) {
+        qc.setQueryData(['pedidos'], context.previous);
+      }
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['pedidos'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
       qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
