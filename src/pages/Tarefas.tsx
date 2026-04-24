@@ -322,7 +322,7 @@ export default function Tarefas() {
             </div>
 
             {/* Desktop: table layout */}
-            <div className="hidden md:block rounded-xl border border-border/60 border-b-0 rounded-b-none overflow-hidden shadow-[var(--shadow-card)]">
+            <div className="hidden md:block rounded-xl border border-border/60 border-b-0 rounded-b-none overflow-x-auto shadow-[var(--shadow-card)]">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
