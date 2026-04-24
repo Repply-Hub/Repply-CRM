@@ -121,6 +121,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
+  const [previewRowsSnapshot, setPreviewRowsSnapshot] = useState<any[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
@@ -141,6 +142,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     setCustomColumns({});
     setFileName('');
     setStep('upload');
+    setPreviewRowsSnapshot([]);
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -221,7 +223,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
   const canProceed = Boolean(mapping.empresa) || Boolean(mapping.razao_social) || Boolean(mapping.cnpj) || Boolean(mapping.nome_contato) || Boolean(mapping.sobrenome_contato) || Boolean(mapping.email);
 
-  const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData, extras, customColumns]);
+  const previewRows = useMemo(() => (step === 'preview' ? previewRowsSnapshot : []), [step, previewRowsSnapshot]);
 
   // Lista de campos extras únicos para mostrar no preview (com nome final)
   const extraFieldNames = useMemo(
@@ -233,7 +235,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   );
 
   const handleImport = async () => {
-    let rows = getMappedRows();
+    let rows = previewRowsSnapshot.length > 0 ? [...previewRowsSnapshot] : getMappedRows();
     if (rows.length === 0) {
       toast.error('Nenhum registro válido após o mapeamento');
       return;
