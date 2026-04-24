@@ -457,25 +457,19 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                     <TableHead className="text-xs sticky top-0 bg-muted/50">CNPJ</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Email</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Telefone</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Classif.</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Criado</TableHead>
                     {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Endereço</TableHead>}
                     {target === 'contatos' && <TableHead className="text-xs sticky top-0 bg-muted/50">Cargo</TableHead>}
-                    {extraFieldNames.map(name => (
-                      <TableHead key={name} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
-                        {name} <span className="text-[10px] opacity-70">(extra)</span>
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {previewRows.slice(0, 50).map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
+...
                       <TableCell className="text-xs font-medium whitespace-nowrap">{r.empresa}</TableCell>
                       {target === 'contatos' && <TableCell className="text-xs whitespace-nowrap">{r.nome_contato || '-'}</TableCell>}
                       {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap">{r.tipo}</TableCell>}
                       <TableCell className="text-xs whitespace-nowrap">{r.cnpj || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{r.email || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{r.telefone || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{r.classificacao || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{r.data_criacao || '-'}</TableCell>
                       {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap max-w-[200px] truncate">{r.endereco || '-'}</TableCell>}
                       {target === 'contatos' && <TableCell className="text-xs whitespace-nowrap">{r.cargo || '-'}</TableCell>}
                       {extraFieldNames.map(name => (
