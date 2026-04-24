@@ -408,6 +408,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       onAdd={handleAddColumn}
       onRemove={handleRemoveColumn}
       hideColumns={showKanban}
+      label="Colunas"
     >
       <div className={cn("p-1", !showKanban && "border-t border-border/50")}>
         <div className="px-4 py-2.5 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
