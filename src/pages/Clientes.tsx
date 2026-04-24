@@ -893,17 +893,22 @@ const Clientes = () => {
                         <td className="py-2.5 px-4 w-10">
                           <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
                         </td>
-                        <td className="py-2.5 px-4">
-                          <div className="flex items-center gap-2.5">
-                            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                              <User className="h-4 w-4 text-primary" />
-                            </div>
-                            <span className="font-medium truncate max-w-[200px]">{contato.nome_contato || 'Sem nome'}</span>
-                          </div>
-                        </td>
-                        {visibleColumns.filter(id => id !== 'nome_contato').map(colId => {
+                        {visibleColumns.map(colId => {
                           const isCustom = colId.startsWith('custom_');
                           const value: any = isCustom ? camposExtras[colId] : (contato as any)[colId];
+
+                          if (colId === 'nome_contato') {
+                            return (
+                              <td key={colId} className="py-2.5 px-4">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                    <User className="h-4 w-4 text-primary" />
+                                  </div>
+                                  <span className="font-medium truncate max-w-[200px]">{contato.nome_contato || 'Sem nome'}</span>
+                                </div>
+                              </td>
+                            );
+                          }
 
                           return (
                             <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]">
