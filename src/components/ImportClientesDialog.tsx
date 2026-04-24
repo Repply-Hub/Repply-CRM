@@ -181,6 +181,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           return (row[col] ?? '').toString().trim();
         };
         const empresa = get('empresa');
+        const razao_social = get('razao_social');
+        const cnpj = get('cnpj');
         const primeiro = get('nome_contato');
         const sobrenome = get('sobrenome_contato');
         const nome_contato = [primeiro, sobrenome].filter(Boolean).join(' ').trim();
@@ -198,11 +200,21 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
         });
 
+        // Resolve o nome da empresa usando fallbacks se necessário
+        let resolvedEmpresa = empresa;
+        if (!resolvedEmpresa) {
+          if (target === 'contatos') {
+            resolvedEmpresa = nome_contato ? 'Sem empresa' : '';
+          } else {
+            resolvedEmpresa = razao_social || cnpj || '';
+          }
+        }
+
         return {
-          empresa: empresa || (target === 'contatos' ? (nome_contato ? 'Sem empresa' : '') : ''),
-          razao_social: get('razao_social') || undefined,
+          empresa: resolvedEmpresa,
+          razao_social: razao_social || undefined,
           tipo: TIPO_MAP[tipoRaw.toLowerCase()] || (tipoRaw ? tipoRaw.toLowerCase() : 'construtora'),
-          cnpj: get('cnpj') || undefined,
+          cnpj: cnpj || undefined,
           email: get('email') || undefined,
           telefone: get('telefone') || undefined,
           endereco: get('endereco') || undefined,
@@ -211,7 +223,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           campos_extras,
         };
       })
-      .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : r.empresa);
+      .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : (r.empresa || r.razao_social || r.cnpj));
   };
 
   const canProceed = Boolean(mapping.empresa) || Boolean(mapping.nome_contato) || Boolean(mapping.sobrenome_contato) || Boolean(mapping.email);
