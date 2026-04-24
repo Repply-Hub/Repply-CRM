@@ -214,7 +214,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : r.empresa);
   };
 
-  const canProceed = Boolean(mapping.empresa) || (target === 'contatos' && (Boolean(mapping.nome_contato) || Boolean(mapping.sobrenome_contato)));
+  const canProceed = Boolean(mapping.empresa) || Boolean(mapping.nome_contato) || Boolean(mapping.sobrenome_contato) || Boolean(mapping.email);
 
   const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData, extras, customColumns]);
 
