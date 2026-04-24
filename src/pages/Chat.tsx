@@ -93,7 +93,10 @@ function MembersList({
             className={cn('p-1 rounded-lg transition-colors', target.type === 'dm' && target.memberId === m.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
             title={m.nome}
           >
-            <Avatar className="h-7 w-7">
+            <Avatar className="h-7 w-7 border border-primary/10">
+              {m.avatar_url && (
+                <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+              )}
               <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                 {getInitials(m.nome)}
               </AvatarFallback>
