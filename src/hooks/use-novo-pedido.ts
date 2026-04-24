@@ -109,7 +109,6 @@ export function useCreatePedidoCompleto() {
         quantidade: item.quantidade,
         unidade: item.unidade || null,
         preco_unitario: item.preco_unitario,
-        preco_total: item.quantidade * item.preco_unitario,
       }));
       const { error: itensErr } = await supabase.from('itens_pedido').insert(itensData);
       if (itensErr) throw itensErr;
