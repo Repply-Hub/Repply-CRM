@@ -11,6 +11,7 @@ export interface ChatMessage {
   empresa_id: string;
   created_at: string;
   grupo_id?: string | null;
+  recipient_id?: string | null;
   arquivo_url?: string | null;
   arquivo_nome?: string | null;
   arquivo_tipo?: string | null;
@@ -26,17 +27,27 @@ export interface ChatGrupo {
   created_at: string;
 }
 
-async function fetchMessages(grupoId: string | null): Promise<ChatMessage[]> {
+async function fetchMessages(grupoId: string | null, recipientId: string | null = null): Promise<ChatMessage[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: me } = await supabase.from('usuarios').select('id').eq('user_id', user.id).single();
+  if (!me) return [];
+
   let query = supabase
     .from('chat_mensagens')
-    .select('*, vendedor:usuarios(id, nome, email, avatar_url)')
+    .select('*, vendedor:usuarios!chat_mensagens_usuario_id_fkey(id, nome, email, avatar_url)')
     .order('created_at', { ascending: true })
     .limit(200);
 
   if (grupoId) {
     query = query.eq('grupo_id', grupoId);
+  } else if (recipientId) {
+    // DM privada entre os dois usuários
+    query = query.or(`and(usuario_id.eq.${me.id},recipient_id.eq.${recipientId}),and(usuario_id.eq.${recipientId},recipient_id.eq.${me.id})`);
   } else {
-    query = query.is('grupo_id', null);
+    // Chat Geral
+    query = query.is('grupo_id', null).is('recipient_id', null);
   }
 
   const { data, error } = await query;
@@ -44,25 +55,29 @@ async function fetchMessages(grupoId: string | null): Promise<ChatMessage[]> {
   return (data as any) ?? [];
 }
 
-export function useChatMessages(grupoId: string | null = null) {
+export function useChatMessages(grupoId: string | null = null, recipientId: string | null = null) {
   const qc = useQueryClient();
 
   const query = useQuery<ChatMessage[]>({
-    queryKey: ['chat_mensagens', grupoId],
-    queryFn: () => fetchMessages(grupoId),
+    queryKey: ['chat_mensagens', grupoId, recipientId],
+    queryFn: () => fetchMessages(grupoId, recipientId),
     refetchInterval: false,
   });
 
   useEffect(() => {
     const channel = supabase
-      .channel('chat_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, () => {
+      .channel(`chat_realtime_${grupoId || 'public'}_${recipientId || 'all'}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'chat_mensagens'
+      }, () => {
         qc.invalidateQueries({ queryKey: ['chat_mensagens'] });
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [qc]);
+  }, [qc, grupoId, recipientId]);
 
   return query;
 }
@@ -100,7 +115,7 @@ export function useSendMessage() {
   const [sending, setSending] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: async ({ conteudo, file, grupoId }: { conteudo: string, file?: File, grupoId?: string | null }) => {
+    mutationFn: async ({ conteudo, file, grupoId, recipientId }: { conteudo: string, file?: File, grupoId?: string | null, recipientId?: string | null }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Usuário não autenticado');
 
@@ -139,27 +154,27 @@ export function useSendMessage() {
         arquivo_nome,
         arquivo_tipo,
         grupo_id: grupoId || null,
+        recipient_id: recipientId || null,
       };
 
       const { data: savedMsg, error } = await supabase
         .from('chat_mensagens')
         .insert(newMsg)
-        .select('*, vendedor:usuarios(id, nome, email, avatar_url)')
+        .select('*, vendedor:usuarios!chat_mensagens_usuario_id_fkey(id, nome, email, avatar_url)')
         .single();
 
       if (error) throw error;
       return savedMsg;
     },
-    onMutate: async ({ conteudo, file, grupoId }) => {
-      await qc.cancelQueries({ queryKey: ['chat_mensagens', grupoId] });
-      const previousMessages = qc.getQueryData<ChatMessage[]>(['chat_mensagens', grupoId]);
+    onMutate: async ({ conteudo, file, grupoId, recipientId }) => {
+      await qc.cancelQueries({ queryKey: ['chat_mensagens', grupoId, recipientId] });
+      const previousMessages = qc.getQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId]);
 
       // Mock optimistic message
       const { data: userData } = await supabase.auth.getUser();
       const optimisticId = `temp-${Date.now()}`;
       
       if (previousMessages && userData.user) {
-        // Tentativa de pegar info do cache para o optimistic
         const myVendedor = qc.getQueryData<any>(['meu_perfil', userData.user.id]);
         
         const optimisticMsg: ChatMessage = {
@@ -169,6 +184,7 @@ export function useSendMessage() {
           empresa_id: '',
           created_at: new Date().toISOString(),
           grupo_id: grupoId || null,
+          recipient_id: recipientId || null,
           arquivo_url: file ? URL.createObjectURL(file) : null,
           arquivo_nome: file?.name || null,
           arquivo_tipo: file?.type || null,
@@ -180,27 +196,27 @@ export function useSendMessage() {
           } : undefined
         };
 
-        qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId], (old) => [...(old || []), optimisticMsg]);
+        qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId], (old) => [...(old || []), optimisticMsg]);
       }
 
-      return { previousMessages, optimisticId };
+      return { previousMessages, optimisticId, grupoId, recipientId };
     },
     onError: (err, variables, context) => {
-      qc.setQueryData(['chat_mensagens', variables.grupoId], context?.previousMessages);
+      qc.setQueryData(['chat_mensagens', variables.grupoId, variables.recipientId], context?.previousMessages);
       toast.error('Erro ao enviar mensagem');
     },
     onSuccess: (data, variables) => {
-      qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId], (old) => {
-        const filtered = (old || []).filter(m => !m.id.startsWith('temp-'));
-        return [...filtered, data];
+      qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId, variables.recipientId], (old) => {
+        const filtered = (old || []).filter(m => !m.id.toString().startsWith('temp-'));
+        return [...filtered, data as any as ChatMessage];
       });
     }
   });
 
-  const send = useCallback(async (conteudo: string, file?: File, grupoId?: string | null) => {
+  const send = useCallback(async (conteudo: string, file?: File, grupoId?: string | null, recipientId?: string | null) => {
     setSending(true);
     try {
-      await mutation.mutateAsync({ conteudo, file, grupoId });
+      await mutation.mutateAsync({ conteudo, file, grupoId, recipientId });
     } finally {
       setSending(false);
     }

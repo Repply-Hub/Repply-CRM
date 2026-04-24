@@ -39,7 +39,7 @@ interface Vendedor {
   avatar_url?: string | null;
 }
 
-type ChatTarget = { type: 'geral' } | { type: 'dm'; memberId: string } | { type: 'grupo'; grupoId: string };
+type ChatTarget = { type: 'geral' } | { type: 'dm'; memberId: string; recipientId: string } | { type: 'grupo'; grupoId: string };
 
 function MembersList({
   members,
@@ -89,7 +89,7 @@ function MembersList({
         {members.map((m) => (
           <button
             key={m.id}
-            onClick={() => onSelect({ type: 'dm', memberId: m.id })}
+            onClick={() => onSelect({ type: 'dm', memberId: m.id, recipientId: m.id })}
             className={cn('p-1 rounded-lg transition-colors', target.type === 'dm' && target.memberId === m.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
             title={m.nome}
           >
@@ -184,7 +184,7 @@ function MembersList({
             return (
               <button
                 key={m.id}
-                onClick={() => onSelect({ type: 'dm', memberId: m.id })}
+                onClick={() => onSelect({ type: 'dm', memberId: m.id, recipientId: m.id })}
                 className={cn(
                   'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
                   isSelected ? 'bg-primary/10' : 'hover:bg-muted/50'
@@ -231,7 +231,8 @@ const Chat = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeGrupoId = target.type === 'grupo' ? target.grupoId : null;
-  const { data: messages, isLoading } = useChatMessages(activeGrupoId);
+  const activeRecipientId = target.type === 'dm' ? target.recipientId : null;
+  const { data: messages, isLoading } = useChatMessages(activeGrupoId, activeRecipientId);
   const { send, sending } = useSendMessage();
   const { data: grupos = [] } = useChatGrupos();
 
@@ -278,7 +279,7 @@ const Chat = () => {
     setText('');
     const file = selectedFile;
     setSelectedFile(null);
-    await send(trimmed, file ?? undefined, activeGrupoId);
+    await send(trimmed, file ?? undefined, activeGrupoId, activeRecipientId);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
