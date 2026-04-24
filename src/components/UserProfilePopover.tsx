@@ -67,7 +67,10 @@ export function UserProfilePopover({ name, className = '' }: UserProfilePopoverP
         ) : profile ? (
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
+              <Avatar className="h-10 w-10 border border-border">
+                {profile.avatar_url && (
+                  <img src={profile.avatar_url} alt={profile.nome} className="h-full w-full object-cover" />
+                )}
                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
                   {initials}
                 </AvatarFallback>
