@@ -307,7 +307,12 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       reset();
       setOpen(false);
     } catch (err: any) {
-      toast.error('Erro na importação: ' + (err.message || 'erro desconhecido'));
+      console.error('Erro na importação:', err);
+      let msg = err.message || 'erro desconhecido';
+      if (msg.includes('row-level security')) {
+        msg = 'Erro de permissão: você pode estar tentando atualizar um registro que pertence a outro usuário ou sua conta não tem permissão para esta ação.';
+      }
+      toast.error('Erro na importação: ' + msg);
     } finally {
       setImporting(false);
     }
