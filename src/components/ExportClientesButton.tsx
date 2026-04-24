@@ -66,25 +66,23 @@ export function ExportClientesButton({ data, type }: ExportClientesButtonProps) 
       <DropdownMenuTrigger asChild>
         <button 
           disabled={exporting}
-          className="w-full flex items-center justify-between px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <div className="flex items-center gap-3">
-            {exporting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-            ) : (
-              <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
-            <span>Exportar</span>
-          </div>
-          <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+          {exporting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          ) : (
+            <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
+          <span>Exportar</span>
+          <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180 ml-auto" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => exportFile('xlsx')} className="gap-3 text-[13px]">
-          <FileSpreadsheet className="h-3.5 w-3.5 text-muted-foreground" /> Excel (.xlsx)
+      <DropdownMenuContent align="end" className="flex gap-1 p-1 min-w-0">
+        <DropdownMenuItem onClick={() => exportFile('xlsx')} className="flex-1 gap-2 text-[12px] py-1.5 justify-center">
+          <FileSpreadsheet className="h-3.5 w-3.5 text-muted-foreground" /> Excel
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => exportFile('csv')} className="gap-3 text-[13px]">
-          <FileText className="h-3.5 w-3.5 text-muted-foreground" /> CSV (.csv)
+        <DropdownMenuItem onClick={() => exportFile('csv')} className="flex-1 gap-2 text-[12px] py-1.5 justify-center">
+          <FileText className="h-3.5 w-3.5 text-muted-foreground" /> CSV
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

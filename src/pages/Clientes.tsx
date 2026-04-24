@@ -538,11 +538,11 @@ const Clientes = () => {
             label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
           >
             <div className="pt-2 border-t border-border/50 mt-1 px-1 pb-2 space-y-1">
-              <div className="px-4 py-2.5 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
+              <div className="px-4 py-2 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
                 <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Ações</span>
               </div>
               
-              <div className="px-1.5 space-y-1">
+              <div className="px-1.5 grid grid-cols-2 gap-1.5">
                 <ExportClientesButton 
                   data={activeTab === 'empresas' ? filteredEmpresas : filteredContatos} 
                   type={activeTab} 
@@ -550,7 +550,7 @@ const Clientes = () => {
 
                 <button
                   onClick={() => setImportOpen(true)}
-                  className="w-full flex items-center gap-3 px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left"
                 >
                   <Upload className="h-3.5 w-3.5 text-muted-foreground" />
                   <span>Importar</span>
