@@ -515,23 +515,6 @@ const Clientes = () => {
                     ))}
                   </div>
                 </div>
-                <div className="flex-1 min-w-[150px] pl-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Visibilidade</p>
-                  <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm">
-                    <Checkbox
-                      checked={!visibleColumns.includes(activeTab === 'empresas' ? 'empresa' : 'nome_contato')}
-                      onCheckedChange={(checked) => {
-                        const colId = activeTab === 'empresas' ? 'empresa' : 'nome_contato';
-                        if (checked) {
-                          setVisibleColumns(visibleColumns.filter(id => id !== colId));
-                        } else if (!visibleColumns.includes(colId)) {
-                          setVisibleColumns([colId, ...visibleColumns]);
-                        }
-                      }}
-                    />
-                    Ocultar Nome
-                  </label>
-                </div>
               </div>
             </PopoverContent>
           </Popover>
