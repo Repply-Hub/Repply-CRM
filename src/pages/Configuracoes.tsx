@@ -82,7 +82,7 @@ function ProfileTab() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['meu_perfil', user?.id] });
+      qc.invalidateQueries({ queryKey: ['meu_perfil'] });
       toast.success('Perfil atualizado!');
     },
     onError: (e: any) => toast.error(e.message),
