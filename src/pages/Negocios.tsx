@@ -458,7 +458,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium hover:bg-muted/80 transition-all text-left"
               >
                 <Columns3 className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Gerenciar colunas...</span>
+                <span>Gerenciar etapas kanban...</span>
               </button>
               <button
                 type="button"
