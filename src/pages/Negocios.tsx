@@ -598,6 +598,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </div>
       </PopoverContent>
     </Popover>
+  );
   const selectedViewOrder = useMemo(() => 
     (pedidos ?? []).find(p => p.id === viewOrderId),
   [pedidos, viewOrderId]);
