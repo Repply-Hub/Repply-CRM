@@ -50,6 +50,7 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /^status$/, score: 100 },
     { pattern: /^etapa$/, score: 98 },
     { pattern: /^fase$/, score: 98 },
+    { pattern: /classificacao/, score: 95 },
     { pattern: /status/, score: 88 },
     { pattern: /etapa/, score: 86 },
     { pattern: /fase/, score: 90 },
