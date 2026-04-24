@@ -77,6 +77,7 @@ function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
   const result: Record<FieldKey, string> = {
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
     telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+    classificacao: '', data_criacao: '',
   };
   const used = new Set<string>();
   // First pass: exact patterns
