@@ -18,6 +18,7 @@ import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-ped
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText } from 'lucide-react';
 import { EmpresaSelector } from '@/components/EmpresaSelector';
+import { FabricanteSelector } from '@/components/FabricanteSelector';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
