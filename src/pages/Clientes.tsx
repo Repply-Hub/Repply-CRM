@@ -766,7 +766,7 @@ const Clientes = () => {
                 ) : (
                   <>
                     <div><Label>Nome do contato</Label><Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome completo" /></div>
-                    <div><Label>Empresa</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Empresa vinculada" /></div>
+                    <div><Label>Empresa</Label><EmpresaSelector value={empresa} onValueChange={setEmpresa} placeholder="Vincular empresa..." /></div>
                     <div><Label>Cargo</Label><Input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Cargo ou função" /></div>
                     <div className="grid grid-cols-2 gap-3">
                       <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
