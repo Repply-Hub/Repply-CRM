@@ -32,12 +32,13 @@ import { cn } from '@/lib/utils';
 import { ExportClientesButton } from '@/components/ExportClientesButton';
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
-  { id: 'empresa', label: 'Nome/Empresa', locked: false },
+  { id: 'empresa', label: 'Empresa', locked: false },
   { id: 'tipo', label: 'Tipo' },
   { id: 'cnpj', label: 'CPF/CNPJ' },
   { id: 'classificacao', label: 'Classificação' },
-  { id: 'data_criacao', label: 'Criado em' },
+  { id: 'data_criacao', label: 'Criado' },
   { id: 'email', label: 'E-mail' },
+  { id: 'telefone', label: 'Telefone' },
   { id: 'endereco', label: 'Endereço' },
   { id: 'obras_count', label: 'Qtd. Obras' },
 ];
@@ -95,6 +96,29 @@ const getExtraValue = (extras: Record<string, any>, column: ColumnDefinition) =>
   }
 
   return '';
+};
+
+const SCHEMA_COLUMN_ALIASES: Record<string, string[]> = {
+  empresa: ['empresa', 'nome empresa', 'nome da empresa', 'nome fantasia', 'cliente'],
+  tipo: ['tipo', 'segmento', 'segmento atuacao', 'segmento de atuacao', 'categoria'],
+  cnpj: ['cnpj', 'cpf', 'cpf cnpj', 'cpf/cnpj', 'documento'],
+  email: ['email', 'e mail', 'e-mail', 'mail'],
+  telefone: ['telefone', 'telefone trabalho', 'telefone de trabalho', 'fone', 'celular', 'whatsapp'],
+  classificacao: ['classificacao', 'classificação'],
+  data_criacao: ['criado', 'criado em', 'data criacao', 'data de criacao', 'data cadastro'],
+  endereco: ['endereco', 'endereço', 'address'],
+};
+
+const getSchemaValueByColumn = (row: Record<string, any>, column?: ColumnDefinition) => {
+  if (!column) return undefined;
+  if (row[column.id] !== undefined && row[column.id] !== null && row[column.id] !== '') return row[column.id];
+
+  const labels = [column.id, column.label, column.customLabel].filter(Boolean).map(value => normalizeExtraKey(String(value)));
+  const match = Object.entries(SCHEMA_COLUMN_ALIASES).find(([, aliases]) =>
+    aliases.map(normalizeExtraKey).some(alias => labels.includes(alias))
+  );
+
+  return match ? row[match[0]] : undefined;
 };
 
 type ViewTab = 'empresas' | 'contatos';
