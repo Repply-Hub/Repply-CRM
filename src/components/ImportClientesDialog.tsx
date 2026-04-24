@@ -16,7 +16,7 @@ const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'sobrenome_contato' | 'cargo';
 
 const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: boolean }[] = [
-  { key: 'empresa', label: 'Empresa', required: true },
+  { key: 'empresa', label: 'Empresa', required: false },
   { key: 'nome_contato', label: 'Nome', required: false },
   { key: 'sobrenome_contato', label: 'Sobrenome', required: false },
   { key: 'razao_social', label: 'Razão social', required: false },
@@ -214,7 +214,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : r.empresa);
   };
 
-  const canProceed = Boolean(mapping.empresa) || (target === 'contatos' && (Boolean(mapping.nome_contato) || Boolean(mapping.sobrenome_contato)));
+  const canProceed = Boolean(mapping.empresa) || Boolean(mapping.nome_contato) || Boolean(mapping.sobrenome_contato) || Boolean(mapping.email);
 
   const previewRows = useMemo(() => (step === 'preview' ? getMappedRows() : []), [step, mapping, rawData, extras, customColumns]);
 
