@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 export function useCreateCliente() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: {
+    mutationFn: async (insertData: {
       empresa?: string;
       razao_social?: string;
       tipo: string;
@@ -15,12 +15,12 @@ export function useCreateCliente() {
     }) => {
       // Get current usuario_id
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
-      const { data, error } = await supabase.from('clientes').insert({
+      const { data: created, error } = await supabase.from('clientes').insert({
         ...insertData,
         usuario_id: vid,
       }).select('id').single();
       if (error) throw error;
-      return data;
+      return created;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['clientes'] }),
   });
