@@ -376,7 +376,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           const batch = preparedBatch.map((incoming) => {
             const existing = incoming.cnpj ? existingByKey.get(incoming.cnpj) : undefined;
             if (!existing) {
-              return { ...incoming, id: undefined };
+              return incoming;
             }
             return {
               id: existing.id,
