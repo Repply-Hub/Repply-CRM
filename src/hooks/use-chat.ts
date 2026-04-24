@@ -183,6 +183,7 @@ export function useSendMessage() {
           empresa_id: '',
           created_at: new Date().toISOString(),
           grupo_id: grupoId || null,
+          recipient_id: recipientId || null,
           arquivo_url: file ? URL.createObjectURL(file) : null,
           arquivo_nome: file?.name || null,
           arquivo_tipo: file?.type || null,
@@ -194,27 +195,27 @@ export function useSendMessage() {
           } : undefined
         };
 
-        qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId], (old) => [...(old || []), optimisticMsg]);
+        qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId], (old) => [...(old || []), optimisticMsg]);
       }
 
-      return { previousMessages, optimisticId };
+      return { previousMessages, optimisticId, grupoId, recipientId };
     },
     onError: (err, variables, context) => {
-      qc.setQueryData(['chat_mensagens', variables.grupoId], context?.previousMessages);
+      qc.setQueryData(['chat_mensagens', variables.grupoId, variables.recipientId], context?.previousMessages);
       toast.error('Erro ao enviar mensagem');
     },
     onSuccess: (data, variables) => {
-      qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId], (old) => {
+      qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId, variables.recipientId], (old) => {
         const filtered = (old || []).filter(m => !m.id.toString().startsWith('temp-'));
         return [...filtered, data as ChatMessage];
       });
     }
   });
 
-  const send = useCallback(async (conteudo: string, file?: File, grupoId?: string | null) => {
+  const send = useCallback(async (conteudo: string, file?: File, grupoId?: string | null, recipientId?: string | null) => {
     setSending(true);
     try {
-      await mutation.mutateAsync({ conteudo, file, grupoId });
+      await mutation.mutateAsync({ conteudo, file, grupoId, recipientId });
     } finally {
       setSending(false);
     }
