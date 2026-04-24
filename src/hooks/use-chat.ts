@@ -207,7 +207,7 @@ export function useSendMessage() {
     onSuccess: (data, variables) => {
       qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId, variables.recipientId], (old) => {
         const filtered = (old || []).filter(m => !m.id.toString().startsWith('temp-'));
-        return [...filtered, data as ChatMessage];
+        return [...filtered, data as any as ChatMessage];
       });
     }
   });
