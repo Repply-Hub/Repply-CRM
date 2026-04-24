@@ -30,7 +30,7 @@ export function usePedidos() {
           cliente_id, fabricante_id, usuario_id, obra_id,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
-          vendedor:usuarios!pedidos_vendedor_id_fkey(id, nome),
+          vendedor:usuarios(id, nome),
           obra:obras(id, nome_obra)
         `)
         .order('created_at', { ascending: false });
