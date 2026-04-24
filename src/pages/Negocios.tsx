@@ -703,7 +703,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       <TableHead className="w-10">
                         <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
-                      {visibleColumns.map(colId => (
+                      {tableVisibleColumns.map(colId => (
                         <TableHead key={colId} className={cn(colId === 'acoes' && "w-[100px]")}>
                           {getLabel(colId)}
                         </TableHead>
@@ -713,7 +713,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   <TableBody>
                     {paginated.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumns.length + 1} className="py-12 text-center text-muted-foreground">
+                        <TableCell colSpan={tableVisibleColumns.length + 1} className="py-12 text-center text-muted-foreground">
                           Nenhum negócio encontrado
                         </TableCell>
                       </TableRow>
@@ -725,8 +725,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                             <TableCell className="w-10" onClick={e => e.stopPropagation()}>
                               <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} aria-label={`Selecionar ${p.cliente?.empresa}`} />
                             </TableCell>
-                            {visibleColumns.map(colId => {
+                            {tableVisibleColumns.map(colId => {
                               const isCustom = colId.startsWith('custom_');
+                              const daysInStage = Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000);
+                              const isAlert = daysInStage >= 7;
                               if (isCustom) {
                                 return (
                                   <TableCell key={colId} className="text-xs text-muted-foreground">
@@ -736,6 +738,36 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                               }
 
                               switch (colId) {
+                                case 'negocio':
+                                  return (
+                                    <TableCell key={colId} className="min-w-[300px]">
+                                      <div className="space-y-2">
+                                        {isAlert && (
+                                          <div className="flex w-fit items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-1 text-[11px] font-semibold text-destructive">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            {daysInStage} dias nesta etapa
+                                          </div>
+                                        )}
+                                        <p className="pr-4 text-sm font-semibold leading-snug text-card-foreground">
+                                          {p.cliente?.empresa ?? 'Sem cliente'}
+                                        </p>
+                                        <div className="grid gap-1.5 text-xs text-muted-foreground sm:grid-cols-2">
+                                          <div className="flex min-w-0 items-center gap-2">
+                                            <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+                                            <span className="truncate">{p.obra?.nome_obra ?? '-'}</span>
+                                          </div>
+                                          <div className="flex min-w-0 items-center gap-2">
+                                            <Factory className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+                                            <span className="truncate">{p.fabricante?.nome ?? '-'}</span>
+                                          </div>
+                                          <div className="flex items-center gap-2 text-sm font-semibold text-card-foreground">
+                                            <DollarSign className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                                            {(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                  );
                                 case 'cliente':
                                   return <TableCell key={colId} className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>;
                                 case 'obra':
