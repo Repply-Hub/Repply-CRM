@@ -71,8 +71,17 @@ export function useChatMessages(grupoId: string | null = null, recipientId: stri
         event: 'INSERT', 
         schema: 'public', 
         table: 'chat_mensagens'
-      }, () => {
-        qc.invalidateQueries({ queryKey: ['chat_mensagens'] });
+      }, (payload) => {
+        const newMsg = payload.new as any;
+        
+        // Verifica se a nova mensagem pertence ao canal atual
+        const isCurrentGeral = !grupoId && !recipientId && !newMsg.grupo_id && !newMsg.recipient_id;
+        const isCurrentGrupo = grupoId && newMsg.grupo_id === grupoId;
+        const isCurrentDM = recipientId && (newMsg.recipient_id === recipientId || newMsg.usuario_id === recipientId);
+
+        if (isCurrentGeral || isCurrentGrupo || isCurrentDM) {
+          qc.invalidateQueries({ queryKey: ['chat_mensagens', grupoId, recipientId] });
+        }
       })
       .subscribe();
 
