@@ -13,9 +13,10 @@ interface KanbanColumnProps {
   label: string;
   colorClass: string;
   orders: Order[];
+  onCardClick?: (id: string) => void;
 }
 
-export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders }: KanbanColumnProps) {
+export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders, onCardClick }: KanbanColumnProps) {
   const navigate = useNavigate();
   const total = orders.reduce((acc, o) => acc + o.valor, 0);
 
@@ -52,7 +53,7 @@ export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorC
                 </div>
               )}
               {orders.map((order, idx) => (
-                <KanbanCard key={order.id} order={order} index={idx} />
+                <KanbanCard key={order.id} order={order} index={idx} onClick={onCardClick} />
               ))}
               {provided.placeholder}
               <Button

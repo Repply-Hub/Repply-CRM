@@ -11,7 +11,7 @@ interface KanbanCardProps {
   index: number;
 }
 
-export const KanbanCard = memo(function KanbanCard({ order, index }: KanbanCardProps) {
+export const KanbanCard = memo(function KanbanCard({ order, index, onClick }: KanbanCardProps & { onClick?: (id: string) => void }) {
   const navigate = useNavigate();
   const isAlert = order.daysInStage >= order.alertDays;
 
@@ -41,7 +41,7 @@ export const KanbanCard = memo(function KanbanCard({ order, index }: KanbanCardP
                     ? provided.draggableProps.style?.transition
                     : 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                 }}
-                onClick={() => navigate(`/pedidos/${order.id}/editar`)}
+                onClick={() => onClick ? onClick(order.id) : navigate(`/pedidos/${order.id}/editar`)}
               >
                 {/* Drag grip indicator - this is the drag handle */}
                 <div
