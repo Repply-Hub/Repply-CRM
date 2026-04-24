@@ -27,7 +27,7 @@ export function UserProfilePopover({ name, className = '' }: UserProfilePopoverP
     try {
       const { data } = await supabase
         .from('usuarios')
-        .select('nome, email, telefone, role')
+        .select('nome, email, telefone, role, avatar_url')
         .ilike('nome', name)
         .limit(1)
         .maybeSingle();
