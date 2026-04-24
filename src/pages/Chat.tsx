@@ -417,7 +417,10 @@ const Chat = () => {
                           className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''} ${showAvatar ? 'mt-3' : 'mt-0.5'}`}
                         >
                           {showAvatar ? (
-                            <Avatar className="h-8 w-8 shrink-0">
+                            <Avatar className="h-8 w-8 shrink-0 border border-primary/10">
+                              {msg.vendedor?.avatar_url && (
+                                <img src={msg.vendedor.avatar_url} alt={name} className="h-full w-full object-cover" />
+                              )}
                               <AvatarFallback className={`${colorForId(msg.usuario_id)} text-white text-xs`}>
                                 {getInitials(name)}
                               </AvatarFallback>
