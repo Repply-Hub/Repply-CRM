@@ -331,8 +331,10 @@ export type Database = {
       clientes: {
         Row: {
           campos_extras: Json
+          classificacao: string | null
           cnpj: string | null
           created_at: string
+          data_criacao: string | null
           email: string | null
           empresa: string | null
           endereco: string | null
@@ -346,8 +348,10 @@ export type Database = {
         }
         Insert: {
           campos_extras?: Json
+          classificacao?: string | null
           cnpj?: string | null
           created_at?: string
+          data_criacao?: string | null
           email?: string | null
           empresa?: string | null
           endereco?: string | null
@@ -361,8 +365,10 @@ export type Database = {
         }
         Update: {
           campos_extras?: Json
+          classificacao?: string | null
           cnpj?: string | null
           created_at?: string
+          data_criacao?: string | null
           email?: string | null
           empresa?: string | null
           endereco?: string | null
@@ -477,7 +483,9 @@ export type Database = {
         Row: {
           campos_extras: Json
           cargo: string | null
+          classificacao: string | null
           created_at: string
+          data_criacao: string | null
           email: string | null
           empresa: string | null
           id: string
@@ -489,7 +497,9 @@ export type Database = {
         Insert: {
           campos_extras?: Json
           cargo?: string | null
+          classificacao?: string | null
           created_at?: string
+          data_criacao?: string | null
           email?: string | null
           empresa?: string | null
           id?: string
@@ -501,7 +511,9 @@ export type Database = {
         Update: {
           campos_extras?: Json
           cargo?: string | null
+          classificacao?: string | null
           created_at?: string
+          data_criacao?: string | null
           email?: string | null
           empresa?: string | null
           id?: string

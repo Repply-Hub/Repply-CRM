@@ -75,6 +75,16 @@ const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: st
     example: 'Engenheiro de Compras',
     storage: 'contatos.cargo',
   },
+  classificacao: {
+    desc: 'Classificação, ranking ou categoria especial do cliente.',
+    example: 'Cliente Ouro',
+    storage: 'clientes.classificacao',
+  },
+  data_criacao: {
+    desc: 'Data em que o registro foi criado originalmente (em outro sistema).',
+    example: '01/01/2023',
+    storage: 'clientes.data_criacao',
+  },
   // Pedidos
   cliente: {
     desc: 'Nome da empresa cliente. Será criada automaticamente se não existir.',

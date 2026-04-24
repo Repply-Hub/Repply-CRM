@@ -13,7 +13,7 @@ import { MappingStep } from '@/components/import/MappingStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
-type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'sobrenome_contato' | 'cargo';
+type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'sobrenome_contato' | 'cargo' | 'classificacao' | 'data_criacao';
 
 const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: boolean }[] = [
   { key: 'empresa', label: 'Empresa', required: false },
@@ -26,6 +26,8 @@ const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: b
   { key: 'telefone', label: 'Telefone', required: false },
   { key: 'endereco', label: 'Endereço', required: false },
   { key: 'cargo', label: 'Cargo', required: false, forContatos: true },
+  { key: 'classificacao', label: 'Classificação', required: false },
+  { key: 'data_criacao', label: 'Data de Criação', required: false },
 ];
 
 const TIPO_MAP: Record<string, string> = {
@@ -67,12 +69,15 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
     /sobrenome/, /last.*name/, /surname/,
   ],
   cargo: [/^cargo$/, /cargo/, /funcao/, /posicao/],
+  classificacao: [/^classificacao$/, /^classificacao.*cliente$/, /^rank$/, /^ranking$/, /^score$/, /classificacao/],
+  data_criacao: [/^data\s*criacao$/, /^criado$/, /^criado\s*em$/, /^data\s*cadastro$/, /criado/],
 };
 
 function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
   const result: Record<FieldKey, string> = {
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
     telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+    classificacao: '', data_criacao: '',
   };
   const used = new Set<string>();
   // First pass: exact patterns
@@ -107,6 +112,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const [mapping, setMapping] = useState<Record<FieldKey, string>>({
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
     telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+    classificacao: '', data_criacao: '',
   });
   // extras: column name (planilha) -> nome no sistema (campos_extras)
   const [extras, setExtras] = useState<Record<string, string>>({});
@@ -129,6 +135,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     setMapping({
       empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
       telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+      classificacao: '', data_criacao: '',
     });
     setExtras({});
     setCustomColumns({});
@@ -220,6 +227,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           endereco: get('endereco') || undefined,
           nome_contato: nome_contato || undefined,
           cargo: get('cargo') || undefined,
+          classificacao: get('classificacao') || undefined,
+          data_criacao: get('data_criacao') || undefined,
           campos_extras,
         };
       })
@@ -259,6 +268,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             email: r.email || null,
             telefone: r.telefone || null,
             cargo: r.cargo || null,
+            classificacao: r.classificacao || null,
+            data_criacao: r.data_criacao || null,
             campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
@@ -274,6 +285,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             telefone: r.telefone || null,
             endereco: r.endereco || null,
             nome_contato: r.nome_contato || null,
+            classificacao: r.classificacao || null,
+            data_criacao: r.data_criacao || null,
             campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
@@ -385,6 +398,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               setMapping({
                 empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
                 telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+                classificacao: '', data_criacao: '',
               });
               setExtras({});
               setCustomColumns({});
@@ -443,25 +457,27 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                     <TableHead className="text-xs sticky top-0 bg-muted/50">CNPJ</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Email</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Telefone</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Classif.</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Criado</TableHead>
                     {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Endereço</TableHead>}
                     {target === 'contatos' && <TableHead className="text-xs sticky top-0 bg-muted/50">Cargo</TableHead>}
                     {extraFieldNames.map(name => (
-                      <TableHead key={name} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
-                        {name} <span className="text-[10px] opacity-70">(extra)</span>
-                      </TableHead>
+                      <TableHead key={name} className="text-xs sticky top-0 bg-muted/50">{name}</TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {previewRows.slice(0, 50).map((r, i) => (
                     <TableRow key={i}>
-                      <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="text-[10px] text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="text-xs font-medium whitespace-nowrap">{r.empresa}</TableCell>
                       {target === 'contatos' && <TableCell className="text-xs whitespace-nowrap">{r.nome_contato || '-'}</TableCell>}
                       {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap">{r.tipo}</TableCell>}
                       <TableCell className="text-xs whitespace-nowrap">{r.cnpj || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{r.email || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{r.telefone || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{r.classificacao || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{r.data_criacao || '-'}</TableCell>
                       {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap max-w-[200px] truncate">{r.endereco || '-'}</TableCell>}
                       {target === 'contatos' && <TableCell className="text-xs whitespace-nowrap">{r.cargo || '-'}</TableCell>}
                       {extraFieldNames.map(name => (
