@@ -249,12 +249,31 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   );
 
   const handleImport = async () => {
-    const rows = getMappedRows();
+    let rows = getMappedRows();
     if (rows.length === 0) {
       toast.error('Nenhum registro válido após o mapeamento');
       return;
     }
+
+    // Se o alvo for empresas, removemos duplicatas de CNPJ no mesmo lote
+    // para evitar o erro: "ON CONFLICT DO UPDATE command cannot affect row a second time"
+    if (target === 'empresas') {
+      const seen = new Set();
+      const deduplicated = [];
+      // Percorremos de trás para frente para manter a última ocorrência da planilha
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const r = rows[i];
+        if (r.cnpj) {
+          if (seen.has(r.cnpj)) continue;
+          seen.add(r.cnpj);
+        }
+        deduplicated.unshift(r);
+      }
+      rows = deduplicated;
+    }
+
     setImporting(true);
+
     try {
       const { data: vid, error: rpcError } = await supabase.rpc('get_my_vendedor_id');
       if (rpcError || !vid) {
