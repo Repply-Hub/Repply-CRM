@@ -30,10 +30,10 @@ import { cn } from '@/lib/utils';
 
 const TAREFA_COLUMNS: ColumnDefinition[] = [
   { id: 'titulo', label: 'Tarefa', locked: false },
-  { id: 'responsavel', label: 'Responsável' },
-  { id: 'prazo_final', label: 'Prazo' },
-  { id: 'status', label: 'Status' },
-  { id: 'projeto', label: 'Projeto' },
+  { id: 'responsavel', label: 'Responsável', locked: false },
+  { id: 'prazo_final', label: 'Prazo', locked: false },
+  { id: 'status', label: 'Status', locked: false },
+  { id: 'projeto', label: 'Projeto', locked: false },
 ];
 
 const statusConfig: Record<string, { label: string; className: string }> = {
