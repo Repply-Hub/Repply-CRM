@@ -27,7 +27,13 @@ export interface ChatGrupo {
   created_at: string;
 }
 
-async function fetchMessages(grupoId: string | null): Promise<ChatMessage[]> {
+async function fetchMessages(grupoId: string | null, recipientId: string | null = null): Promise<ChatMessage[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: me } = await supabase.from('usuarios').select('id').eq('user_id', user.id).single();
+  if (!me) return [];
+
   let query = supabase
     .from('chat_mensagens')
     .select('*, vendedor:usuarios!chat_mensagens_vendedor_id_fkey(id, nome, email, avatar_url)')
@@ -36,8 +42,10 @@ async function fetchMessages(grupoId: string | null): Promise<ChatMessage[]> {
 
   if (grupoId) {
     query = query.eq('grupo_id', grupoId);
+  } else if (recipientId) {
+    query = query.or(`and(usuario_id.eq.${me.id},recipient_id.eq.${recipientId}),and(usuario_id.eq.${recipientId},recipient_id.eq.${me.id})`);
   } else {
-    query = query.is('grupo_id', null);
+    query = query.is('grupo_id', null).is('recipient_id', null);
   }
 
   const { data, error } = await query;
@@ -45,31 +53,32 @@ async function fetchMessages(grupoId: string | null): Promise<ChatMessage[]> {
   return (data as any) ?? [];
 }
 
-export function useChatMessages(grupoId: string | null = null) {
+export function useChatMessages(grupoId: string | null = null, recipientId: string | null = null) {
   const qc = useQueryClient();
 
   const query = useQuery<ChatMessage[]>({
-    queryKey: ['chat_mensagens', grupoId],
-    queryFn: () => fetchMessages(grupoId),
+    queryKey: ['chat_mensagens', grupoId, recipientId],
+    queryFn: () => fetchMessages(grupoId, recipientId),
     refetchInterval: false,
   });
 
   useEffect(() => {
     const channel = supabase
-      .channel('chat_realtime')
+      .channel(`chat_realtime_${grupoId || 'public'}_${recipientId || 'all'}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
-        table: 'chat_mensagens',
-        filter: grupoId ? `grupo_id=eq.${grupoId}` : 'grupo_id=is.null'
-      }, (payload) => {
-        // Optimistic check: if message is already in list (via mutation), don't force invalidate
-        qc.invalidateQueries({ queryKey: ['chat_mensagens', grupoId] });
+        table: 'chat_mensagens'
+      }, () => {
+        qc.invalidateQueries({ queryKey: ['chat_mensagens'] });
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [qc, grupoId]);
+  }, [qc, grupoId, recipientId]);
+
+  return query;
+}
 
   return query;
 }
