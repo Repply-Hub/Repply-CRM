@@ -23,7 +23,16 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     const saved = localStorage.getItem(`${key}_all_columns`);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved) as ColumnDefinition[];
+        // Garantir que a propriedade 'locked' dos defaultColumns seja respeitada
+        // mesmo que existam dados antigos no localStorage
+        return parsed.map(col => {
+          const defaultCol = defaultColumns.find(d => d.id === col.id);
+          return {
+            ...col,
+            locked: defaultCol ? defaultCol.locked : col.locked
+          };
+        });
       } catch (e) {
         return defaultColumns;
       }
