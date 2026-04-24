@@ -15,6 +15,7 @@ const EMPTY_MAPPING: Record<FieldKey, string> = {
   valor: '',
   observacoes: '',
   status: '',
+  data_pedido: '',
 };
 
 const FIELD_KEYS = Object.keys(EMPTY_MAPPING) as FieldKey[];
