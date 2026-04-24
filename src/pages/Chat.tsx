@@ -238,6 +238,7 @@ const Chat = () => {
   const [text, setText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeGrupoId = target.type === 'grupo' ? target.grupoId : null;
@@ -282,6 +283,11 @@ const Chat = () => {
       }, 50);
     }
   }, [messages, target]);
+
+  useEffect(() => {
+    // Focus input when changing chat target
+    inputRef.current?.focus();
+  }, [target]);
 
   const handleSend = async () => {
     const trimmed = text.trim();
@@ -603,12 +609,14 @@ const Chat = () => {
                 <Paperclip className="h-4 w-4" />
               </Button>
               <Input
+                ref={inputRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Digite sua mensagem..."
                 className="flex-1"
                 disabled={sending}
+                autoFocus
               />
               <Button onClick={handleSend} disabled={sending || (!text.trim() && !selectedFile)} size="icon">
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
