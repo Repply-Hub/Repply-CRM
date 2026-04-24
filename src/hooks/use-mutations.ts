@@ -15,11 +15,12 @@ export function useCreateCliente() {
     }) => {
       // Get current usuario_id
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
-      const { error } = await supabase.from('clientes').insert({
-        ...data,
+      const { data, error } = await supabase.from('clientes').insert({
+        ...insertData,
         usuario_id: vid,
-      });
+      }).select('id').single();
       if (error) throw error;
+      return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['clientes'] }),
   });
