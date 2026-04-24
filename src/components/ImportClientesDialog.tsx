@@ -360,22 +360,26 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           }));
 
           const cnpjs = Array.from(new Set(preparedBatch.map(r => r.cnpj).filter(Boolean))) as string[];
-          const existingByCnpj = new Map<string, any>();
+          const existingByKey = new Map<string, any>();
           if (cnpjs.length > 0) {
             const { data: existingRows, error: existingError } = await supabase
               .from('clientes')
-              .select('empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras,usuario_id')
-              .in('cnpj', cnpjs);
+              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras,usuario_id')
+              .in('cnpj', cnpjs)
+              .eq('usuario_id', vid);
             if (existingError) throw existingError;
             existingRows?.forEach(row => {
-              if (row.cnpj) existingByCnpj.set(row.cnpj, row);
+              if (row.cnpj) existingByKey.set(row.cnpj, row);
             });
           }
 
           const batch = preparedBatch.map((incoming) => {
-            const existing = incoming.cnpj ? existingByCnpj.get(incoming.cnpj) : undefined;
-            if (!existing) return incoming;
+            const existing = incoming.cnpj ? existingByKey.get(incoming.cnpj) : undefined;
+            if (!existing) {
+              return { ...incoming, id: undefined };
+            }
             return {
+              id: existing.id,
               empresa: hasValue(incoming.empresa) ? incoming.empresa : existing.empresa,
               tipo: hasValue(incoming.tipo) ? incoming.tipo : existing.tipo || 'construtora',
               cnpj: incoming.cnpj,
@@ -387,16 +391,36 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               classificacao: hasValue(incoming.classificacao) ? incoming.classificacao : existing.classificacao,
               data_criacao: hasValue(incoming.data_criacao) ? incoming.data_criacao : existing.data_criacao,
               campos_extras: mergeExtraFields(existing.campos_extras || {}, incoming.campos_extras || {}),
-              usuario_id: incoming.usuario_id || existing.usuario_id,
+              usuario_id: existing.usuario_id,
             };
-          });
+          }) as Array<{ id?: string; empresa: any; tipo: any; cnpj: any; razao_social: any; email: any; telefone: any; endereco: any; nome_contato: any; classificacao: any; data_criacao: any; campos_extras: any; usuario_id: string; }>;
           console.debug('[ImportClientes] batch final clientes', batch.slice(0, 5));
-          const { data: saved, error } = await supabase
-            .from('clientes')
-            .upsert(batch, { onConflict: 'cnpj' })
-            .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras');
-          if (error) throw error;
-          console.debug('[ImportClientes] clientes salvos/atualizados', saved?.slice(0, 5));
+          const inserts = batch.filter(r => !r.id);
+          const updates = batch.filter(r => r.id);
+
+          let totalSaved: any[] = [];
+          if (inserts.length > 0) {
+            const { data: saved, error: insertError } = await supabase
+              .from('clientes')
+              .insert(inserts)
+              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras');
+            if (insertError) throw insertError;
+            totalSaved = totalSaved.concat(saved || []);
+            console.debug('[ImportClientes] clientes novos inseridos', saved?.slice(0, 3));
+          }
+          if (updates.length > 0) {
+            for (const row of updates) {
+              const { id, ...updateData } = row;
+              const { data: saved, error: updateError } = await supabase
+                .from('clientes')
+                .update(updateData)
+                .eq('id', id)
+                .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras');
+              if (updateError) throw updateError;
+              totalSaved = totalSaved.concat(saved || []);
+            }
+            console.debug('[ImportClientes] clientes existentes atualizados', updates.length);
+          }
         }
         imported += rows.slice(i, i + BATCH).length;
       }
