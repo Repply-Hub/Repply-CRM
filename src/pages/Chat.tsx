@@ -39,7 +39,7 @@ interface Vendedor {
   avatar_url?: string | null;
 }
 
-type ChatTarget = { type: 'geral' } | { type: 'dm'; memberId: string } | { type: 'grupo'; grupoId: string };
+type ChatTarget = { type: 'geral' } | { type: 'dm'; memberId: string; recipientId: string } | { type: 'grupo'; grupoId: string };
 
 function MembersList({
   members,
