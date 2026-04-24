@@ -71,8 +71,17 @@ export function useChatMessages(grupoId: string | null = null, recipientId: stri
         event: 'INSERT', 
         schema: 'public', 
         table: 'chat_mensagens'
-      }, () => {
-        qc.invalidateQueries({ queryKey: ['chat_mensagens'] });
+      }, (payload) => {
+        const newMsg = payload.new as any;
+        // Invalidação condicional para evitar recarregamentos desnecessários
+        // mas garantir que a mensagem chegue no canal certo
+        if (grupoId && newMsg.grupo_id === grupoId) {
+          qc.invalidateQueries({ queryKey: ['chat_mensagens', grupoId, null] });
+        } else if (recipientId && (newMsg.recipient_id === recipientId || newMsg.usuario_id === recipientId)) {
+          qc.invalidateQueries({ queryKey: ['chat_mensagens', null, recipientId] });
+        } else if (!grupoId && !recipientId && !newMsg.grupo_id && !newMsg.recipient_id) {
+          qc.invalidateQueries({ queryKey: ['chat_mensagens', null, null] });
+        }
       })
       .subscribe();
 
