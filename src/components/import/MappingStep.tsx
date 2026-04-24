@@ -1,166 +1,204 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator,
-} from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import {
-  FileSpreadsheet, X, ArrowRight, Sparkles, Search, Check, EyeOff, AlertCircle, Plus, Pencil,
-  CheckCircle2, Trash2, Wand2, GripVertical, Info,
-} from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertCircle, ArrowRight, CheckCircle2, EyeOff, FileSpreadsheet, Info, Plus, Search, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+export type SupabaseFieldType = 'text' | 'cnpj' | 'phone' | 'email' | 'date' | 'number' | 'status';
 
 export interface FieldDef {
   key: string;
   label: string;
   required: boolean;
   forContatos?: boolean;
+  type?: SupabaseFieldType;
 }
 
 const NONE = '__none__';
-const EXTRA_PREFIX = '__extra__:';
 
-/** Descrições contextuais para cada campo do sistema — explica o que cada nome genérico realmente representa. */
-const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: string }> = {
-  // Empresas / Contatos
-  empresa: {
-    desc: 'Nome principal da empresa (nome fantasia ou razão social abreviada).',
-    example: 'Engecomp Soluções LTDA',
-    storage: 'clientes.empresa',
-  },
-  razao_social: {
-    desc: 'Razão social completa registrada na Receita Federal.',
-    example: 'ENGECOMP SOLUÇÕES EM ENGENHARIA LTDA',
-    storage: 'clientes.razao_social',
-  },
-  tipo: {
-    desc: 'Categoria do cliente: construtora, escola, instalador, etc.',
-    example: 'construtora',
-    storage: 'clientes.tipo',
-  },
-  cnpj: {
-    desc: 'CNPJ ou CPF do cliente (apenas números ou formatado).',
-    example: '12.345.678/0001-90',
-    storage: 'clientes.cnpj',
-  },
-  email: {
-    desc: 'E-mail principal de contato da empresa ou pessoa.',
-    example: 'contato@empresa.com.br',
-    storage: 'clientes.email',
-  },
-  telefone: {
-    desc: 'Telefone principal — fixo ou celular, com DDD.',
-    example: '(84) 99999-9999',
-    storage: 'clientes.telefone',
-  },
-  endereco: {
-    desc: 'Endereço completo (rua, número, bairro, cidade, estado).',
-    example: 'Av. Hermes da Fonseca, 123, Tirol, Natal/RN',
-    storage: 'clientes.endereco',
-  },
-  nome_contato: {
-    desc: 'Nome da pessoa de contato dentro da empresa (não confunda com nome da empresa).',
-    example: 'João Silva',
-    storage: 'clientes.nome_contato',
-  },
-  sobrenome_contato: {
-    desc: 'Sobrenome do contato. Será concatenado ao nome ao salvar (ex: "João" + "Silva" → "João Silva").',
-    example: 'Silva',
-    storage: 'clientes.nome_contato (concatenado)',
-  },
-  cargo: {
-    desc: 'Cargo ou função do contato dentro da empresa.',
-    example: 'Engenheiro de Compras',
-    storage: 'contatos.cargo',
-  },
-  classificacao: {
-    desc: 'Classificação, ranking ou categoria especial do cliente.',
-    example: 'Cliente Ouro',
-    storage: 'clientes.classificacao',
-  },
-  data_criacao: {
-    desc: 'Data em que o registro foi criado originalmente (em outro sistema).',
-    example: '01/01/2023',
-    storage: 'clientes.data_criacao',
-  },
-  // Pedidos
-  cliente: {
-    desc: 'Nome da empresa cliente. Será criada automaticamente se não existir.',
-    example: 'Engecomp Soluções LTDA',
-    storage: 'pedidos.cliente_id (via clientes.empresa)',
-  },
-  fabricante: {
-    desc: 'Nome do fabricante. Será criado automaticamente se não existir.',
-    example: 'Tigre',
-    storage: 'pedidos.fabricante_id (via fabricantes.nome)',
-  },
-  valor: {
-    desc: 'Valor total do pedido em R$. Aceita 1.234,56 ou 1234.56.',
-    example: '15.420,75',
-    storage: 'pedidos.valor_total',
-  },
-  observacoes: {
-    desc: 'Notas livres sobre o pedido, prazo, condições etc.',
-    example: 'Entrega prevista para 15/12',
-    storage: 'pedidos.observacoes',
-  },
-  status: {
-    desc: 'Etapa do pipeline: novo lead, elaborando, enviado, negociação, fechado, perdido.',
-    example: 'novo_lead',
-    storage: 'pedidos.status',
-  },
+const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: string; synonyms?: string[]; type?: SupabaseFieldType }> = {
+  empresa: { desc: 'Nome principal da empresa.', example: 'Engecomp Soluções LTDA', storage: 'clientes.empresa', synonyms: ['empresa', 'nome fantasia', 'cliente', 'companhia'] },
+  razao_social: { desc: 'Razão social completa registrada.', example: 'ENGECOMP SOLUÇÕES EM ENGENHARIA LTDA', storage: 'clientes.razao_social', synonyms: ['razao social', 'razão social', 'social reason'] },
+  tipo: { desc: 'Categoria ou segmento do cliente.', example: 'construtora', storage: 'clientes.tipo', synonyms: ['tipo', 'segmento', 'categoria'] },
+  cnpj: { desc: 'CNPJ ou CPF, salvo apenas com números.', example: '12.345.678/0001-90', storage: 'clientes.cnpj', synonyms: ['cnpj', 'cpf', 'documento', 'cpf cnpj'], type: 'cnpj' },
+  email: { desc: 'E-mail principal.', example: 'contato@empresa.com.br', storage: 'clientes.email', synonyms: ['email', 'e-mail', 'mail'], type: 'email' },
+  telefone: { desc: 'Telefone com DDD, salvo apenas com números.', example: '(84) 99999-9999', storage: 'clientes.telefone', synonyms: ['telefone', 'fone', 'celular', 'whatsapp', 'tel'], type: 'phone' },
+  endereco: { desc: 'Endereço completo.', example: 'Av. Hermes da Fonseca, 123, Natal/RN', storage: 'clientes.endereco', synonyms: ['endereco', 'endereço', 'address', 'localizacao'] },
+  nome_contato: { desc: 'Nome da pessoa de contato.', example: 'João Silva', storage: 'clientes.nome_contato', synonyms: ['nome', 'contato', 'nome contato', 'responsavel', 'pessoa'] },
+  sobrenome_contato: { desc: 'Sobrenome do contato, concatenado ao nome.', example: 'Silva', storage: 'clientes.nome_contato', synonyms: ['sobrenome', 'ultimo nome', 'last name'] },
+  cargo: { desc: 'Cargo ou função do contato.', example: 'Engenheiro de Compras', storage: 'contatos.cargo', synonyms: ['cargo', 'funcao', 'função', 'posição'] },
+  classificacao: { desc: 'Classificação, ranking ou categoria especial.', example: 'Cliente Ouro', storage: 'clientes.classificacao', synonyms: ['classificacao', 'classificação', 'ranking', 'score'] },
+  data_criacao: { desc: 'Data de criação original, convertida para formato ISO quando possível.', example: '2024-01-31', storage: 'clientes.data_criacao', synonyms: ['data criacao', 'data criação', 'criado em', 'data cadastro'], type: 'date' },
+  cliente: { desc: 'Nome da empresa cliente.', example: 'Engecomp Soluções LTDA', storage: 'pedidos.cliente_id', synonyms: ['cliente', 'empresa', 'construtora'] },
+  fabricante: { desc: 'Nome do fabricante.', example: 'Tigre', storage: 'pedidos.fabricante_id', synonyms: ['fabricante', 'fornecedor', 'marca', 'pipeline'] },
+  valor: { desc: 'Valor total convertido para número.', example: '15420.75', storage: 'pedidos.valor_total', synonyms: ['valor', 'total', 'preco', 'preço', 'orcamento'], type: 'number' },
+  observacoes: { desc: 'Notas livres sobre o registro.', example: 'Entrega prevista para 15/12', storage: 'pedidos.observacoes', synonyms: ['observacoes', 'observações', 'obs', 'nota', 'descricao'] },
+  status: { desc: 'Etapa do pipeline normalizada.', example: 'novo_lead', storage: 'pedidos.status', synonyms: ['status', 'etapa', 'fase', 'classificacao'], type: 'status' },
+  data_pedido: { desc: 'Data do pedido convertida para YYYY-MM-DD.', example: '2024-01-31', storage: 'pedidos.data_pedido', synonyms: ['data', 'data pedido', 'criado em', 'date'], type: 'date' },
 };
 
-/** Mini-componente: ícone "i" com tooltip explicando o campo. */
-function FieldInfo({ fieldKey, interactive = true }: { fieldKey: string; interactive?: boolean }) {
+function normalizeText(value: unknown): string {
+  return (value ?? '')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function levenshtein(a: string, b: string): number {
+  const matrix = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      matrix[i][j] = a[i - 1] === b[j - 1]
+        ? matrix[i - 1][j - 1]
+        : Math.min(matrix[i - 1][j - 1], matrix[i][j - 1], matrix[i - 1][j]) + 1;
+    }
+  }
+  return matrix[a.length][b.length];
+}
+
+function fuzzyScore(field: FieldDef, header: string): number {
+  const normalizedHeader = normalizeText(header);
+  if (!normalizedHeader) return 0;
+
+  const terms = Array.from(new Set([
+    field.key,
+    field.label,
+    ...(FIELD_HINTS[field.key]?.synonyms ?? []),
+  ].map(normalizeText).filter(Boolean)));
+
+  return terms.reduce((best, term) => {
+    if (normalizedHeader === term) return Math.max(best, 100);
+    if (normalizedHeader.includes(term) || term.includes(normalizedHeader)) return Math.max(best, 86);
+    const maxLen = Math.max(normalizedHeader.length, term.length);
+    const similarity = maxLen === 0 ? 0 : 1 - levenshtein(normalizedHeader, term) / maxLen;
+    return Math.max(best, Math.round(similarity * 82));
+  }, 0);
+}
+
+export function detectFuzzyMapping(headers: string[], fields: FieldDef[]): Record<string, string> {
+  const candidates = fields.flatMap((field) => headers.map((header) => ({ field: field.key, header, score: fuzzyScore(field, header) })));
+  candidates.sort((a, b) => b.score - a.score);
+
+  const next: Record<string, string> = {};
+  const usedHeaders = new Set<string>();
+  for (const candidate of candidates) {
+    if (candidate.score < 68 || next[candidate.field] || usedHeaders.has(candidate.header)) continue;
+    next[candidate.field] = candidate.header;
+    usedHeaders.add(candidate.header);
+  }
+  fields.forEach((field) => { if (!(field.key in next)) next[field.key] = ''; });
+  return next;
+}
+
+export function getFieldType(field: FieldDef | string): SupabaseFieldType {
+  const key = typeof field === 'string' ? field : field.key;
+  const explicit = typeof field === 'string' ? undefined : field.type;
+  if (explicit) return explicit;
+  if (FIELD_HINTS[key]?.type) return FIELD_HINTS[key].type!;
+  if (/cnpj|cpf|documento/.test(key)) return 'cnpj';
+  if (/telefone|celular|whatsapp|fone/.test(key)) return 'phone';
+  if (/email|e_mail/.test(key)) return 'email';
+  if (/data|date|prazo/.test(key)) return 'date';
+  if (/valor|preco|total|quantidade/.test(key)) return 'number';
+  if (/status|etapa|fase/.test(key)) return 'status';
+  return 'text';
+}
+
+export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): string | number | undefined {
+  if (value === null || value === undefined) return undefined;
+  const raw = value instanceof Date ? value.toISOString() : String(value).trim();
+  if (!raw) return undefined;
+
+  if (type === 'cnpj' || type === 'phone') return raw.replace(/\D/g, '') || undefined;
+  if (type === 'email') return raw.toLowerCase();
+  if (type === 'number') {
+    const cleaned = raw.replace(/[^\d,.-]/g, '');
+    const normalized = cleaned.includes(',') && cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')
+      ? cleaned.replace(/\./g, '').replace(',', '.')
+      : cleaned.replace(/,/g, '');
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  if (type === 'date') {
+    if (typeof value === 'number') {
+      const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+      excelEpoch.setUTCDate(excelEpoch.getUTCDate() + value);
+      return excelEpoch.toISOString().slice(0, 10);
+    }
+    const br = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+    if (br) {
+      const year = br[3].length === 2 ? `20${br[3]}` : br[3];
+      return `${year}-${br[2].padStart(2, '0')}-${br[1].padStart(2, '0')}`;
+    }
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? raw : date.toISOString().slice(0, 10);
+  }
+  if (type === 'status') {
+    const normalized = normalizeText(raw);
+    if (/fech|ganho|concluid|won/.test(normalized)) return 'fechamento';
+    if (/negocia|tratativa/.test(normalized)) return 'negociacao';
+    if (/enviad|apresentad|proposta/.test(normalized)) return 'enviado';
+    if (/elabora|orcamento|cotacao|andamento/.test(normalized)) return 'elaboracao';
+    if (/novo|lead/.test(normalized)) return 'novo_lead';
+    return normalized.replace(/\s+/g, '_') || undefined;
+  }
+  return raw.replace(/\s+/g, ' ').trim() || undefined;
+}
+
+export function sanitizeImportedRows(params: {
+  rawData: Record<string, unknown>[];
+  fields: FieldDef[];
+  mapping: Record<string, string>;
+  extras?: Record<string, string>;
+  customColumns?: Record<string, string>;
+}) {
+  const { rawData, fields, mapping, extras = {}, customColumns = {} } = params;
+  return rawData.map((row) => {
+    const payload: Record<string, unknown> = {};
+    fields.forEach((field) => {
+      const header = mapping[field.key];
+      if (!header) return;
+      const sanitized = sanitizeFieldValue(row[header], getFieldType(field));
+      if (sanitized !== undefined && sanitized !== '') payload[field.key] = sanitized;
+    });
+
+    const campos_extras: Record<string, string> = {};
+    Object.entries(extras).forEach(([header, name]) => {
+      const sanitized = sanitizeFieldValue(row[header], 'text');
+      if (sanitized !== undefined && String(sanitized).trim()) campos_extras[(name || header).trim()] = String(sanitized);
+    });
+    Object.entries(customColumns).forEach(([name, value]) => {
+      const sanitized = sanitizeFieldValue(value, 'text');
+      if (sanitized !== undefined && String(sanitized).trim() && name.trim()) campos_extras[name.trim()] = String(sanitized);
+    });
+    payload.campos_extras = campos_extras;
+    return payload;
+  });
+}
+
+function FieldInfo({ fieldKey }: { fieldKey: string }) {
   const hint = FIELD_HINTS[fieldKey];
   if (!hint) return null;
-
-  const icon = (
-    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/80 transition-colors group-hover:border-primary/40 group-hover:text-primary">
-      <Info className="h-3 w-3" />
-    </span>
-  );
-
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        {interactive ? (
-          <button
-            type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="group relative z-[160] inline-flex items-center justify-center shrink-0"
-            aria-label={`Sobre o campo ${fieldKey}`}
-          >
-            {icon}
-          </button>
-        ) : (
-          <span
-            className="group relative z-[160] inline-flex items-center justify-center shrink-0"
-            onPointerDown={(e) => e.stopPropagation()}
-            aria-hidden="true"
-          >
-            {icon}
-          </span>
-        )}
+        <button type="button" className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
+          <Info className="h-3.5 w-3.5" />
+        </button>
       </TooltipTrigger>
-      <TooltipContent side="right" className="z-[220] max-w-[260px] space-y-1">
+      <TooltipContent side="right" className="z-[220] max-w-[280px] space-y-1">
         <p className="text-xs">{hint.desc}</p>
-        {hint.example && (
-          <p className="text-[10px] text-muted-foreground">
-            <span className="font-semibold">Exemplo:</span>{' '}
-            <span className="font-mono">{hint.example}</span>
-          </p>
-        )}
-        {hint.storage && (
-          <p className="text-[10px] text-muted-foreground">
-            <span className="font-semibold">Salvo em:</span>{' '}
-            <span className="font-mono">{hint.storage}</span>
-          </p>
-        )}
+        {hint.example && <p className="text-[10px] text-muted-foreground"><span className="font-semibold">Exemplo:</span> <span className="font-mono">{hint.example}</span></p>}
+        {hint.storage && <p className="text-[10px] text-muted-foreground"><span className="font-semibold">Salvo em:</span> <span className="font-mono">{hint.storage}</span></p>}
       </TooltipContent>
     </Tooltip>
   );
@@ -174,7 +212,6 @@ interface Props {
   setMapping: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   extras: Record<string, string>;
   setExtras: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  /** Colunas criadas do zero pelo usuário: nome → valor padrão aplicado a todas as linhas */
   customColumns?: Record<string, string>;
   setCustomColumns?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   visibleFields: FieldDef[];
@@ -182,10 +219,8 @@ interface Props {
   onAutoDetect: () => void;
   onClearAll: () => void;
   canProceed: boolean;
-  onNext: () => void;
+  onNext: (payload?: Record<string, unknown>[]) => void;
 }
-
-type FilterMode = 'todas' | 'mapeadas' | 'novas' | 'ignoradas' | 'pendentes';
 
 export function MappingStep({
   fileName, rawData, headers, mapping, setMapping, extras, setExtras,
@@ -193,255 +228,64 @@ export function MappingStep({
   onReset, onAutoDetect, onClearAll, canProceed, onNext,
 }: Props) {
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<FilterMode>('todas');
-  const [editingExtra, setEditingExtra] = useState<string | null>(null);
-  const [extraDraft, setExtraDraft] = useState<string>('');
-  const [newColName, setNewColName] = useState('');
 
-  const startEditExtra = (column: string) => {
-    setEditingExtra(column);
-    setExtraDraft(extras[column] ?? column);
-  };
-  const cancelEditExtra = () => {
-    setEditingExtra(null);
-    setExtraDraft('');
-  };
-  const saveEditExtra = (column: string) => {
-    const value = extraDraft.trim() || column;
-    setExtras(prev => ({ ...prev, [column]: value }));
-    setEditingExtra(null);
-    setExtraDraft('');
-  };
-  // Ordem customizada das colunas via drag-and-drop. Se vazio, usa headers original.
-  const [headerOrder, setHeaderOrder] = useState<string[]>([]);
-  const [draggingHeader, setDraggingHeader] = useState<string | null>(null);
-  const [dragOverHeader, setDragOverHeader] = useState<string | null>(null);
-
-  // Sincroniza ordem quando headers mudam (novo arquivo)
-  const orderedHeaders = useMemo(() => {
-    if (headerOrder.length === 0) return headers;
-    const knownSet = new Set(headerOrder);
-    const ordered = headerOrder.filter(h => headers.includes(h));
-    const newOnes = headers.filter(h => !knownSet.has(h));
-    return [...ordered, ...newOnes];
-  }, [headers, headerOrder]);
-
-  const moveHeader = (from: string, to: string) => {
-    if (from === to) return;
-    const base = orderedHeaders.slice();
-    const fromIdx = base.indexOf(from);
-    const toIdx = base.indexOf(to);
-    if (fromIdx < 0 || toIdx < 0) return;
-    base.splice(fromIdx, 1);
-    base.splice(toIdx, 0, from);
-    setHeaderOrder(base);
-  };
-
-  const customNames = useMemo(() => Object.keys(customColumns), [customColumns]);
-  const customCount = customNames.length;
-
-  const addCustomColumn = () => {
-    if (!setCustomColumns) return;
-    const base = newColName.trim() || 'Nova coluna';
-    let name = base;
-    let i = 2;
-    const taken = new Set([...headers, ...customNames]);
-    while (taken.has(name)) { name = `${base} ${i++}`; }
-    setCustomColumns(prev => ({ ...prev, [name]: '' }));
-    setNewColName('');
-    setEditingExtra(name);
-  };
-
-  const updateCustomValue = (name: string, value: string) => {
-    setCustomColumns?.(prev => ({ ...prev, [name]: value }));
-  };
-
-  const renameCustomColumn = (oldName: string, newName: string) => {
-    const trimmed = newName.trim();
-    if (!trimmed || trimmed === oldName) return;
-    const taken = new Set([...headers, ...customNames.filter(n => n !== oldName)]);
-    if (taken.has(trimmed)) return;
-    setCustomColumns?.(prev => {
-      const next: Record<string, string> = {};
-      Object.keys(prev).forEach(k => {
-        if (k === oldName) next[trimmed] = prev[k];
-        else next[k] = prev[k];
-      });
-      return next;
-    });
-    setEditingExtra(trimmed);
-  };
-
-  const removeCustomColumn = (name: string) => {
-    setCustomColumns?.(prev => {
+  useEffect(() => {
+    if (headers.length === 0 || visibleFields.length === 0) return;
+    setMapping((prev) => {
+      const fuzzy = detectFuzzyMapping(headers, visibleFields);
+      const used = new Set(Object.values(prev).filter(Boolean));
+      let changed = false;
       const next = { ...prev };
-      delete next[name];
-      return next;
-    });
-  };
-
-  const columnToField = useMemo(() => {
-    const m: Record<string, string | undefined> = {};
-    Object.keys(mapping).forEach(k => {
-      const col = mapping[k];
-      if (col) m[col] = k;
-    });
-    return m;
-  }, [mapping]);
-
-  const setColumnSelection = (column: string, value: string) => {
-    setExtras(prev => {
-      if (!(column in prev)) return prev;
-      const next = { ...prev };
-      delete next[column];
-      return next;
-    });
-
-    if (value === NONE) {
-      setMapping(prev => {
-        const next = { ...prev };
-        Object.keys(next).forEach(k => { if (next[k] === column) next[k] = ''; });
-        return next;
+      visibleFields.forEach((field) => {
+        if (next[field.key] || !fuzzy[field.key] || used.has(fuzzy[field.key])) return;
+        next[field.key] = fuzzy[field.key];
+        used.add(fuzzy[field.key]);
+        changed = true;
       });
-      return;
-    }
-
-    if (value.startsWith(EXTRA_PREFIX)) {
-      setMapping(prev => {
-        const next = { ...prev };
-        Object.keys(next).forEach(k => { if (next[k] === column) next[k] = ''; });
-        return next;
-      });
-      setExtras(prev => ({ ...prev, [column]: column }));
-      setEditingExtra(column);
-      return;
-    }
-
-    setMapping(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(k => { if (next[k] === column) next[k] = ''; });
-      next[value] = column;
-      return next;
+      return changed ? next : prev;
     });
-  };
+  }, [headers, visibleFields, setMapping]);
 
-  const renameExtra = (column: string, newName: string) => {
-    setExtras(prev => ({ ...prev, [column]: newName }));
-  };
+  const usedHeaders = useMemo(() => new Set(Object.values(mapping).filter(Boolean)), [mapping]);
+  const requiredMissing = visibleFields.filter((field) => field.required && !mapping[field.key]);
+  const mappedCount = visibleFields.filter((field) => Boolean(mapping[field.key])).length;
+  const extraCount = Object.keys(extras).length + Object.keys(customColumns).length;
+  const filteredFields = useMemo(() => {
+    const q = normalizeText(search);
+    if (!q) return visibleFields;
+    return visibleFields.filter((field) => normalizeText(`${field.label} ${field.key}`).includes(q));
+  }, [search, visibleFields]);
 
-  const sample = (col: string) => {
+  const sample = (header?: string) => {
+    if (!header) return '';
     for (const row of rawData) {
-      const v = row[col];
-      if (v !== undefined && v !== null && v !== '') return String(v);
+      const value = row[header];
+      if (value !== undefined && value !== null && value !== '') return String(value);
     }
     return '';
   };
 
-  const getStatus = (col: string): 'mapeada' | 'nova' | 'ignorada' => {
-    if (columnToField[col]) return 'mapeada';
-    if (col in extras) return 'nova';
-    return 'ignorada';
+  const setFieldHeader = (fieldKey: string, value: string) => {
+    setMapping((prev) => ({ ...prev, [fieldKey]: value === NONE ? '' : value }));
   };
 
-  const getSelectionValue = (column: string): string => {
-    const field = columnToField[column];
-    if (field) return field;
-    if (column in extras) return EXTRA_PREFIX + column;
-    return NONE;
+  const addExtra = (header: string) => setExtras((prev) => ({ ...prev, [header]: prev[header] || header }));
+  const removeExtra = (header: string) => setExtras((prev) => {
+    const next = { ...prev };
+    delete next[header];
+    return next;
+  });
+
+  const handleContinue = () => {
+    const payload = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns });
+    onNext(payload);
   };
 
-  // Counters
-  const mappedCount = Object.values(mapping).filter(Boolean).length;
-  const extrasCount = Object.keys(extras).length;
-  const ignoredCount = headers.length - mappedCount - extrasCount;
-  const requiredMissing = visibleFields.filter(f => f.required && !mapping[f.key]);
-  const unmappedFields = useMemo(
-    () => visibleFields.filter(f => !mapping[f.key]),
-    [visibleFields, mapping]
-  );
-
-  const assignFieldToColumn = (fieldKey: string, column: string) => {
-    if (!column) return;
-    setExtras(prev => {
-      if (!(column in prev)) return prev;
-      const next = { ...prev };
-      delete next[column];
-      return next;
-    });
-    setMapping(prev => {
-      const next = { ...prev };
-      // Limpa qualquer outro field que apontava p/ essa coluna
-      Object.keys(next).forEach(k => { if (next[k] === column) next[k] = ''; });
-      next[fieldKey] = column;
-      return next;
-    });
-  };
-
-  const filteredHeaders = useMemo(() => {
-    let list = orderedHeaders;
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(h => h.toLowerCase().includes(q));
-    }
-    if (filter !== 'todas') {
-      list = list.filter(h => {
-        const s = getStatus(h);
-        if (filter === 'mapeadas') return s === 'mapeada';
-        if (filter === 'novas') return s === 'nova';
-        if (filter === 'ignoradas') return s === 'ignorada';
-        if (filter === 'pendentes') return s === 'ignorada';
-        return true;
-      });
-    }
-    return list;
-  }, [orderedHeaders, search, filter, columnToField, extras]);
-
-  // Bulk actions for current filter selection
-  const bulkSetAllExtras = () => {
-    const targets = filteredHeaders.filter(h => getStatus(h) !== 'mapeada');
-    if (targets.length === 0) return;
-    setExtras(prev => {
-      const next = { ...prev };
-      targets.forEach(h => { next[h] = h; });
-      return next;
-    });
-  };
-
-  const bulkIgnoreAll = () => {
-    const targets = filteredHeaders.filter(h => getStatus(h) !== 'mapeada');
-    if (targets.length === 0) return;
-    setExtras(prev => {
-      const next = { ...prev };
-      targets.forEach(h => { delete next[h]; });
-      return next;
-    });
-  };
-
-  const FilterChip = ({ value, label, count, tone }: { value: FilterMode; label: string; count: number; tone?: string }) => (
-    <button
-      type="button"
-      onClick={() => setFilter(value)}
-      className={cn(
-        'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-xs font-medium border transition-colors',
-        filter === value
-          ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-          : 'bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground'
-      )}
-    >
-      {label}
-      <span className={cn(
-        'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold',
-        filter === value ? 'bg-primary-foreground/20 text-primary-foreground' : tone || 'bg-muted text-foreground'
-      )}>
-        {count}
-      </span>
-    </button>
-  );
+  const unmappedHeaders = headers.filter((header) => !usedHeaders.has(header));
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex flex-col gap-4">
-        {/* Top summary card */}
         <div className="rounded-xl border bg-card shadow-sm">
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/30 rounded-t-xl">
             <div className="flex items-center gap-2 min-w-0">
@@ -450,527 +294,170 @@ export function MappingStep({
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-foreground truncate">{fileName}</div>
-                <div className="text-xs text-muted-foreground">
-                  {rawData.length} linhas · {headers.length} colunas detectadas
-                </div>
+                <div className="text-xs text-muted-foreground">{rawData.length} linhas · {headers.length} cabeçalhos encontrados</div>
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={onAutoDetect} className="gap-1.5 h-8">
-                    <Sparkles className="h-3.5 w-3.5" /> Auto
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Detectar automaticamente os campos pelo nome da coluna</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={onClearAll} className="h-8 px-2">Limpar</Button>
-                </TooltipTrigger>
-                <TooltipContent>Remover todos os mapeamentos</TooltipContent>
-              </Tooltip>
-              <Button variant="ghost" size="sm" onClick={onReset} className="h-8 px-2">
-                <X className="h-3.5 w-3.5 mr-1" /> Trocar arquivo
-              </Button>
+              <Button variant="outline" size="sm" onClick={onAutoDetect} className="gap-1.5 h-8"><Sparkles className="h-3.5 w-3.5" /> Auto</Button>
+              <Button variant="ghost" size="sm" onClick={onClearAll} className="h-8 px-2">Limpar</Button>
+              <Button variant="ghost" size="sm" onClick={onReset} className="h-8 px-2"><X className="h-3.5 w-3.5 mr-1" /> Trocar arquivo</Button>
             </div>
           </div>
-
-          {/* Status pills row */}
           <div className="flex items-center gap-2 flex-wrap px-4 py-2.5">
-            <FilterChip value="todas" label="Todas" count={headers.length} />
-            <FilterChip value="mapeadas" label="Mapeadas" count={mappedCount} tone="bg-primary/10 text-primary" />
-            <FilterChip value="novas" label="Novas" count={extrasCount} tone="bg-accent text-accent-foreground" />
-            <FilterChip value="ignoradas" label="Ignoradas" count={ignoredCount} tone="bg-muted text-muted-foreground" />
+            <Badge variant="outline">{visibleFields.length} campos do schema</Badge>
+            <Badge className="bg-primary text-primary-foreground hover:bg-primary">{mappedCount} mapeados</Badge>
+            <Badge variant="secondary">{headers.length - usedHeaders.size} cabeçalhos livres</Badge>
+            {extraCount > 0 && <Badge className="bg-accent text-accent-foreground hover:bg-accent">+{extraCount} extras</Badge>}
           </div>
         </div>
 
-        {/* Required missing alert */}
         {requiredMissing.length > 0 && (
           <div className="flex items-start gap-2.5 text-xs bg-warning/10 border border-warning/30 rounded-lg px-3 py-2.5">
             <AlertCircle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
-            <div className="text-warning-foreground">
-              <span className="font-semibold">Campo obrigatório pendente: </span>
-              {requiredMissing.map((f, i) => (
-                <span key={f.key} className="font-medium">
-                  {f.label}{i < requiredMissing.length - 1 ? ', ' : ''}
-                </span>
-              ))}
-            </div>
+            <div className="text-warning-foreground"><span className="font-semibold">Campo obrigatório pendente: </span>{requiredMissing.map((f) => f.label).join(', ')}</div>
           </div>
         )}
 
-        {/* Search + bulk */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar coluna..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9"
-            />
-          </div>
-          {filter !== 'todas' && filter !== 'mapeadas' && (
-            <div className="flex items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={bulkSetAllExtras} className="h-9 gap-1.5">
-                    <Plus className="h-3.5 w-3.5" /> Tudo como nova
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Marca todas as colunas filtradas como novas</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" onClick={bulkIgnoreAll} className="h-9 gap-1.5">
-                    <EyeOff className="h-3.5 w-3.5" /> Ignorar todas
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Ignora todas as colunas filtradas</TooltipContent>
-              </Tooltip>
-            </div>
-          )}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar campo do schema..." value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9 h-9" />
         </div>
 
-        {/* Criar coluna do zero */}
-        {setCustomColumns && (
-          <div className="flex items-center gap-2 rounded-lg border border-dashed border-accent/50 bg-accent/10 px-3 py-2">
-            <Wand2 className="h-4 w-4 text-accent-foreground shrink-0" />
-            <Input
-              placeholder="Criar coluna do zero (ex: Origem da campanha)"
-              value={newColName}
-              onChange={(e) => setNewColName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomColumn(); } }}
-              className="h-8 flex-1 bg-background text-xs"
-            />
-            <Button
-              type="button"
-              size="sm"
-              onClick={addCustomColumn}
-              className="h-8 gap-1.5"
-            >
-              <Plus className="h-3.5 w-3.5" /> Adicionar
-            </Button>
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="grid grid-cols-[minmax(180px,1fr)_minmax(220px,320px)_minmax(140px,1fr)] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span>Campo do schema</span>
+            <span>Cabeçalho da planilha</span>
+            <span>Prévia sanitizada</span>
           </div>
-        )}
-
-        {/* Campos do sistema não mapeados — atribuição manual */}
-        {unmappedFields.length > 0 && (
-          <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-primary shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-foreground">
-                  Campos do sistema sem coluna atribuída ({unmappedFields.length})
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  Não detectamos coluna correspondente. Atribua manualmente se existir na sua planilha.
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {unmappedFields.map((f) => (
-                <div
-                  key={f.key}
-                  className={cn(
-                    'flex items-center gap-2 rounded-md border bg-background p-2',
-                    f.required ? 'border-destructive/40' : 'border-border'
-                  )}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-foreground truncate flex items-center gap-1">
-                      {f.label}
-                      {f.required && <span className="text-destructive">*</span>}
-                      <FieldInfo fieldKey={f.key} />
+          <div className="divide-y">
+            {filteredFields.map((field) => {
+              const selectedHeader = mapping[field.key] || '';
+              const rawSample = sample(selectedHeader);
+              const sanitizedSample = sanitizeFieldValue(rawSample, getFieldType(field));
+              const score = selectedHeader ? fuzzyScore(field, selectedHeader) : 0;
+              return (
+                <div key={field.key} className="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_minmax(220px,320px)_minmax(140px,1fr)] gap-3 md:gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm font-semibold text-foreground truncate">{field.label}</span>
+                      {field.required && <span className="text-destructive text-sm">*</span>}
+                      <FieldInfo fieldKey={field.key} />
                     </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {f.required ? 'Obrigatório' : 'Opcional'}
+                    <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+                      <span className="font-mono">{field.key}</span>
+                      <span>·</span>
+                      <span>{getFieldType(field)}</span>
                     </div>
                   </div>
-                  <Select value="" onValueChange={(v) => assignFieldToColumn(f.key, v)}>
-                    <SelectTrigger className="h-8 w-[140px] text-xs shrink-0">
-                      <SelectValue placeholder="Escolher coluna..." />
+
+                  <Select value={selectedHeader || NONE} onValueChange={(value) => setFieldHeader(field.key, value)}>
+                    <SelectTrigger className={cn('h-9 text-xs', selectedHeader && 'border-primary/40')}>
+                      <SelectValue placeholder="Não importar" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[260px]" position="popper">
-                      {orderedHeaders.length === 0 ? (
-                        <div className="px-2 py-1.5 text-xs text-muted-foreground">Sem colunas</div>
-                      ) : (
-                        orderedHeaders.map((h) => {
-                          const usedBy = columnToField[h];
-                          return (
-                            <SelectItem key={h} value={h}>
-                              <span className="flex items-center gap-1.5 max-w-[260px]">
-                                <span className="truncate">{h}</span>
-                                {usedBy && (
-                                  <span className="text-[10px] text-muted-foreground italic shrink-0">
-                                    (em uso)
-                                  </span>
-                                )}
-                              </span>
-                            </SelectItem>
-                          );
-                        })
-                      )}
+                    <SelectContent className="max-h-[320px]" position="popper">
+                      <SelectItem value={NONE} className="text-muted-foreground"><span className="flex items-center gap-1.5"><EyeOff className="h-3 w-3" /> Não importar</span></SelectItem>
+                      {headers.map((header) => {
+                        const inUseByOther = usedHeaders.has(header) && selectedHeader !== header;
+                        return (
+                          <SelectItem key={header} value={header}>
+                            <span className="flex items-center gap-2 max-w-[280px]">
+                              <span className="truncate">{header}</span>
+                              {inUseByOther && <span className="text-[10px] text-muted-foreground italic shrink-0">em uso</span>}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
+
+                  <div className="min-w-0 rounded-md border bg-background px-3 py-2 text-xs">
+                    {selectedHeader ? (
+                      <>
+                        <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                          <span>Fuzzy {score}%</span>
+                        </div>
+                        <div className="truncate" title={String(sanitizedSample ?? '')}>
+                          <span className="text-muted-foreground">Valor:</span>{' '}
+                          <span className="font-mono text-foreground">{sanitizedSample === undefined ? '-' : String(sanitizedSample)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground italic">Campo não será enviado</span>
+                    )}
+                  </div>
                 </div>
-              ))}
+              );
+            })}
+          </div>
+        </div>
+
+        {unmappedHeaders.length > 0 && (
+          <div className="rounded-xl border border-dashed bg-card p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-foreground">Cabeçalhos não usados</div>
+                <div className="text-[11px] text-muted-foreground">Marque apenas o que deve ir para campos_extras.</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {unmappedHeaders.map((header) => {
+                const active = header in extras;
+                return (
+                  <button
+                    key={header}
+                    type="button"
+                    onClick={() => active ? removeExtra(header) : addExtra(header)}
+                    className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors', active ? 'bg-accent text-accent-foreground border-accent' : 'bg-background text-muted-foreground border-border hover:bg-muted')}
+                  >
+                    {active ? <CheckCircle2 className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                    {header}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* Mapping list */}
-        <div className="rounded-xl border bg-card">
-          {/* Custom columns section (criadas do zero) */}
-          {customCount > 0 && (
-            <div className="border-b bg-accent/5">
-              <div className="px-4 py-2 flex items-center gap-2 bg-accent/15 border-b border-accent/20">
-                <Wand2 className="h-3.5 w-3.5 text-accent-foreground" />
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-accent-foreground">
-                  Colunas criadas do zero ({customCount})
-                </span>
-                <span className="text-[10px] text-muted-foreground ml-auto">
-                  Valor aplicado a todas as {rawData.length} linhas
-                </span>
-              </div>
-              <ul className="divide-y divide-accent/15">
-                {customNames.map((name) => (
-                  <li key={name} className="px-4 py-3 hover:bg-accent/10 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <div className="h-9 w-9 rounded-lg bg-accent text-accent-foreground border border-accent flex items-center justify-center shrink-0 mt-0.5">
-                        <Wand2 className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={name}
-                            onChange={(e) => renameCustomColumn(name, e.target.value)}
-                            onFocus={() => setEditingExtra(name)}
-                            onBlur={() => setEditingExtra(null)}
-                            placeholder="Nome da nova coluna"
-                            className={cn(
-                              'h-8 text-sm font-semibold flex-1',
-                              editingExtra === name && 'ring-1 ring-accent border-accent'
-                            )}
-                          />
-                          <Badge className="h-5 text-[10px] gap-1 bg-accent text-accent-foreground border-accent hover:bg-accent shrink-0">
-                            <Wand2 className="h-2.5 w-2.5" />
-                            Do zero
-                          </Badge>
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          Salvo em <span className="font-mono text-foreground/80">campos_extras.{name}</span>
-                        </div>
-                      </div>
-                      <div className="w-[220px] shrink-0">
-                        <Input
-                          value={customColumns[name] ?? ''}
-                          onChange={(e) => updateCustomValue(name, e.target.value)}
-                          placeholder="Valor padrão (opcional)"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeCustomColumn(name)}
-                            className="h-9 w-9 p-0 shrink-0 text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Remover coluna</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </li>
+        {setCustomColumns && (
+          <div className="rounded-xl border bg-card p-3 space-y-2">
+            <div className="text-xs font-semibold text-foreground">Campos extras manuais</div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nome do campo extra"
+                className="h-9 text-xs"
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  event.preventDefault();
+                  const value = event.currentTarget.value.trim();
+                  if (!value) return;
+                  setCustomColumns((prev) => ({ ...prev, [value]: prev[value] ?? '' }));
+                  event.currentTarget.value = '';
+                }}
+              />
+            </div>
+            {Object.keys(customColumns).length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {Object.entries(customColumns).map(([name, value]) => (
+                  <div key={name} className="flex items-center gap-2">
+                    <span className="text-xs font-mono min-w-0 flex-1 truncate">{name}</span>
+                    <Input value={value} onChange={(event) => setCustomColumns((prev) => ({ ...prev, [name]: event.target.value }))} className="h-8 text-xs w-36" placeholder="Valor padrão" />
+                    <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setCustomColumns((prev) => { const next = { ...prev }; delete next[name]; return next; })}><X className="h-3.5 w-3.5" /></Button>
+                  </div>
                 ))}
-              </ul>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
+        )}
 
-          {filteredHeaders.length === 0 && customCount === 0 ? (
-            <div className="px-4 py-12 text-center">
-              <Search className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">
-                {search ? `Nenhuma coluna encontrada para "${search}"` : 'Nenhuma coluna neste filtro'}
-              </p>
-            </div>
-          ) : (
-            <>
-              {filteredHeaders.length > 0 && (
-                <div className="grid grid-cols-[16px_36px_1fr_240px] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  <span aria-hidden="true" />
-                  <span aria-hidden="true" />
-                  <span>Coluna da planilha</span>
-                  <span>Destino no sistema</span>
-                </div>
-              )}
-              <ul className="divide-y">
-              {filteredHeaders.map((h) => {
-                const status = getStatus(h);
-                const field = columnToField[h];
-                const isExtra = status === 'nova';
-                const ignored = status === 'ignorada';
-                const selectionValue = getSelectionValue(h);
-                const exampleValue = sample(h);
-                const fieldDef = field ? visibleFields.find(f => f.key === field) : null;
-
-                return (
-                  <li
-                    key={h}
-                    draggable
-                    onDragStart={(e) => {
-                      setDraggingHeader(h);
-                      e.dataTransfer.effectAllowed = 'move';
-                      e.dataTransfer.setData('text/plain', h);
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = 'move';
-                      if (draggingHeader && draggingHeader !== h) setDragOverHeader(h);
-                    }}
-                    onDragLeave={() => {
-                      setDragOverHeader(prev => (prev === h ? null : prev));
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const from = draggingHeader || e.dataTransfer.getData('text/plain');
-                      if (from && from !== h) moveHeader(from, h);
-                      setDraggingHeader(null);
-                      setDragOverHeader(null);
-                    }}
-                    onDragEnd={() => {
-                      setDraggingHeader(null);
-                      setDragOverHeader(null);
-                    }}
-                    className={cn(
-                      'group px-4 py-3 transition-colors',
-                      isExtra && 'bg-accent/20',
-                      field && 'bg-primary/[0.03]',
-                      ignored && 'opacity-75',
-                      'hover:bg-muted/40',
-                      draggingHeader === h && 'opacity-40',
-                      dragOverHeader === h && 'border-t-2 border-primary'
-                    )}
-                  >
-                    <div className="flex items-start gap-4">
-                      {/* Drag handle */}
-                      <button
-                        type="button"
-                        aria-label="Arrastar para reordenar"
-                        className="shrink-0 mt-2 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-                        onMouseDown={(e) => e.stopPropagation()}
-                      >
-                        <GripVertical className="h-4 w-4" />
-                      </button>
-
-                      {/* Status indicator */}
-                      <div className={cn(
-                        'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border',
-                        field && 'bg-primary/10 text-primary border-primary/20',
-                        isExtra && 'bg-accent text-accent-foreground border-accent',
-                        ignored && 'bg-muted text-muted-foreground border-border'
-                      )}>
-                        {field ? <CheckCircle2 className="h-4 w-4" /> : isExtra ? <Plus className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                      </div>
-
-                      {/* Column info */}
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold text-foreground truncate" title={h}>
-                            {h}
-                          </span>
-                          {field && fieldDef && (
-                            <>
-                              <Badge variant="outline" className="h-5 text-[10px] gap-1 border-primary/30 text-primary bg-primary/5">
-                                <Check className="h-2.5 w-2.5" />
-                                {fieldDef.label}
-                                {fieldDef.required && <span className="text-destructive ml-0.5">*</span>}
-                              </Badge>
-                              <FieldInfo fieldKey={fieldDef.key} />
-                            </>
-                          )}
-                          {isExtra && (
-                            <Badge className="h-5 text-[10px] gap-1 bg-accent text-accent-foreground border-accent hover:bg-accent">
-                              <Plus className="h-2.5 w-2.5" />
-                              Nova coluna
-                            </Badge>
-                          )}
-                          {ignored && (
-                            <Badge variant="outline" className="h-5 text-[10px] text-muted-foreground">
-                              Ignorada
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate" title={exampleValue}>
-                          {exampleValue ? (
-                            <>Ex: <span className="font-mono text-foreground/80">{exampleValue}</span></>
-                          ) : (
-                            <span className="italic">sem exemplo</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action: select field */}
-                      <div className="w-[240px] shrink-0 flex flex-col gap-2">
-                        <Select value={selectionValue} onValueChange={(v) => setColumnSelection(h, v)}>
-                          <SelectTrigger className={cn(
-                            'h-9 text-xs',
-                            field && 'border-primary/40',
-                            isExtra && 'border-accent',
-                          )}>
-                            <SelectValue placeholder="Escolher destino..." />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[280px]" position="popper">
-                            <SelectGroup>
-                              <SelectItem value={NONE} className="text-muted-foreground">
-                                <span className="flex items-center gap-1.5">
-                                  <EyeOff className="h-3 w-3" />
-                                  Não importar
-                                </span>
-                              </SelectItem>
-                              <SelectItem value={EXTRA_PREFIX + h} className="text-accent-foreground font-medium">
-                                <span className="flex items-center gap-1.5">
-                                  <Plus className="h-3 w-3" />
-                                  Adicionar como nova coluna
-                                </span>
-                              </SelectItem>
-                            </SelectGroup>
-                            <SelectSeparator />
-                            <SelectGroup>
-                              <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                                Campos do sistema
-                              </SelectLabel>
-                              {visibleFields.map(f => {
-                                const usedBy = mapping[f.key];
-                                const usedElsewhere = usedBy && usedBy !== h;
-                                return (
-                                  <SelectItem key={f.key} value={f.key}>
-                                    <span className="flex items-center gap-1.5">
-                                      <span>{f.label}</span>
-                                      {f.required && <span className="text-destructive">*</span>}
-                                      <FieldInfo fieldKey={f.key} interactive={false} />
-                                    </span>
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-
-                        {!ignored && (
-                          <div className={cn(
-                            "rounded-md border p-1.5 space-y-1",
-                            isExtra ? "border-accent/30 bg-accent/10" : "border-primary/20 bg-primary/5"
-                          )}>
-                            <label className={cn(
-                              "flex items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-wide",
-                              isExtra ? "text-accent-foreground/80" : "text-primary/80"
-                            )}>
-                              <span className="flex items-center gap-1">
-                                <Pencil className="h-2.5 w-2.5" />
-                                Nome no sistema
-                              </span>
-                              {editingExtra !== h && (
-                                <button
-                                  type="button"
-                                  onClick={() => startEditExtra(h)}
-                                  className={cn(
-                                    "text-[10px] font-medium normal-case hover:underline",
-                                    isExtra ? "text-accent-foreground" : "text-primary"
-                                  )}
-                                >
-                                  Editar
-                                </button>
-                              )}
-                            </label>
-
-                            {editingExtra === h ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  autoFocus
-                                  value={extraDraft}
-                                  onChange={(e) => setExtraDraft(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') { e.preventDefault(); saveEditExtra(h); }
-                                    if (e.key === 'Escape') { e.preventDefault(); cancelEditExtra(); }
-                                  }}
-                                  placeholder="Ex: origem_lead"
-                                  className={cn(
-                                    "h-7 flex-1 text-xs bg-background border-accent ring-1 ring-accent",
-                                    !isExtra && "border-primary ring-primary"
-                                  )}
-                                />
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      onClick={() => saveEditExtra(h)}
-                                      className={cn(
-                                        "h-7 w-7 p-0 shrink-0",
-                                        isExtra ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                                      )}
-                                    >
-                                      <Check className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">Salvar (Enter)</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={cancelEditExtra}
-                                      className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-destructive"
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">Cancelar (Esc)</TooltipContent>
-                                </Tooltip>
-                              </div>
-                            ) : (
-                               <button
-                                type="button"
-                                onClick={() => startEditExtra(h)}
-                                className={cn(
-                                  "w-full text-left h-7 px-2 text-xs rounded border transition-colors truncate",
-                                  isExtra 
-                                    ? "border-accent/30 bg-background/60 hover:bg-background hover:border-accent/60" 
-                                    : "border-primary/20 bg-background/60 hover:bg-background hover:border-primary/60"
-                                )}
-                                title={extras[h] ?? h}
-                              >
-                                <span className="font-mono text-foreground/90">{extras[h] ?? h}</span>
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-              </ul>
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
         <div className="flex items-center justify-between gap-3 pt-1">
           <div className="text-xs text-muted-foreground flex items-center gap-1.5">
             <Sparkles className="h-3 w-3 text-accent-foreground" />
-            Colunas <span className="font-medium text-accent-foreground">novas</span> são salvas em "campos extras" — nada se perde.
+            Ao continuar, CNPJ/telefone, números, datas e status serão sanitizados antes do preview.
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onReset} size="sm">Cancelar</Button>
-            <Button disabled={!canProceed} onClick={onNext} size="sm" className="gap-1.5">
+            <Button disabled={!canProceed || requiredMissing.length > 0} onClick={handleContinue} size="sm" className="gap-1.5">
               Pré-visualizar <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
