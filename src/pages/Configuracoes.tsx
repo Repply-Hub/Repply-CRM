@@ -116,7 +116,32 @@ function ProfileTab() {
   };
 
   const updateEmail = useMutation({
-// ... keep existing code
+    mutationFn: async (email: string) => {
+      const { error } = await supabase.auth.updateUser({ email });
+      if (error) throw error;
+      await supabase.from('usuarios').update({ email }).eq('user_id', user!.id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meu_perfil', user?.id] });
+      toast.success('Email atualizado! Verifique sua caixa de entrada para confirmar.');
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const updateSenha = useMutation({
+    mutationFn: async ({ novaSenha }: { novaSenha: string }) => {
+      const { error } = await supabase.auth.updateUser({ password: novaSenha });
+      if (error) throw error;
+    },
+    onSuccess: () => toast.success('Senha alterada com sucesso!'),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const deletarConta = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('delete_current_user' as any);
+      if (error) throw error;
+    },
     onSuccess: async () => {
       toast.success('Conta excluída.');
       await signOut();
