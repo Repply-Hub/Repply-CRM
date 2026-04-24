@@ -42,7 +42,8 @@ describe('importPedidosUtils', () => {
       valor: 'Valor total',
       observacoes: 'Nome do negócio',
       status: 'Fase',
-    } as const;
+      data_pedido: '',
+    };
 
     expect(getImportedPedidosRows(rows, mapping)).toEqual([
       {
@@ -51,6 +52,8 @@ describe('importPedidosUtils', () => {
         valor: 10500,
         observacoes: 'Repav Rosário Edificações',
         status: 'negociacao',
+        data_pedido: undefined,
+        campos_extras: {},
       },
       {
         cliente: 'Construtora ABC',
@@ -58,6 +61,8 @@ describe('importPedidosUtils', () => {
         valor: 2000,
         observacoes: 'Obra Torre Sul',
         status: 'enviado',
+        data_pedido: undefined,
+        campos_extras: {},
       },
     ]);
   });

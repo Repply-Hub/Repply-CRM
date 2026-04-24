@@ -1,10 +1,11 @@
-export type FieldKey = 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status';
+export type FieldKey = 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status' | 'data_pedido';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'cliente', label: 'Cliente', required: false },
   { key: 'fabricante', label: 'Fabricante', required: false },
   { key: 'valor', label: 'Valor', required: false },
   { key: 'status', label: 'Etapa/Status', required: false },
+  { key: 'data_pedido', label: 'Data', required: false },
   { key: 'observacoes', label: 'Observações', required: false },
 ];
 
@@ -14,6 +15,7 @@ const EMPTY_MAPPING: Record<FieldKey, string> = {
   valor: '',
   observacoes: '',
   status: '',
+  data_pedido: '',
 };
 
 const FIELD_KEYS = Object.keys(EMPTY_MAPPING) as FieldKey[];
@@ -50,11 +52,20 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /^status$/, score: 100 },
     { pattern: /^etapa$/, score: 98 },
     { pattern: /^fase$/, score: 98 },
+    { pattern: /classificacao/, score: 95 },
     { pattern: /status/, score: 88 },
     { pattern: /etapa/, score: 86 },
     { pattern: /fase/, score: 90 },
     { pattern: /estagio/, score: 82 },
     { pattern: /pipeline stage/, score: 84 },
+  ],
+  data_pedido: [
+    { pattern: /^data$/, score: 100 },
+    { pattern: /^criado$/, score: 98 },
+    { pattern: /^criado\s*em$/, score: 98 },
+    { pattern: /data/, score: 85 },
+    { pattern: /criado/, score: 80 },
+    { pattern: /date/, score: 85 },
   ],
   observacoes: [
     { pattern: /observa/, score: 95 },
@@ -73,6 +84,7 @@ const MIN_SCORE: Record<FieldKey, number> = {
   valor: 66,
   observacoes: 68,
   status: 70,
+  data_pedido: 70,
 };
 
 const STATUS_RULES: Array<{ status: string; patterns: RegExp[] }> = [
@@ -211,6 +223,7 @@ export function getImportedPedidosRows(
       const valor = mapping.valor ? parseNumber(row[mapping.valor]) : 0;
       const observacoes = mapping.observacoes ? row[mapping.observacoes]?.toString().trim() || '' : '';
       const status = mapping.status ? resolveImportedPedidoStatus(row[mapping.status]) : 'novo_lead';
+      const data_pedido = mapping.data_pedido ? row[mapping.data_pedido]?.toString().trim() : undefined;
 
       const campos_extras: Record<string, string> = {};
       Object.entries(extras).forEach(([col, name]) => {
@@ -223,7 +236,7 @@ export function getImportedPedidosRows(
         if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
-      return { cliente, fabricante, valor, observacoes, status, campos_extras };
+      return { cliente, fabricante, valor, observacoes, status, data_pedido, campos_extras };
     })
     .filter((row) => row.cliente && row.fabricante);
 }

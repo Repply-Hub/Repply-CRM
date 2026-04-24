@@ -51,7 +51,7 @@ function normalizeText(v: string): string {
 const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   empresa: [/^empresa$/, /^nome\s*fantasia$/, /^nome\s*da\s*empresa$/, /^razao\s*social$/, /empresa/, /fantasia/],
   razao_social: [/^razao\s*social$/, /razao/],
-  tipo: [/^tipo$/, /segmento/, /categoria/],
+  tipo: [/^tipo$/, /segmento/, /categoria/, /classificacao/],
   cnpj: [/^cnpj$/, /^cpf$/, /cpf.*cnpj/, /cnpj/, /cpf/],
   email: [/^e-?mail$/, /mail/],
   telefone: [/^telefone$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
@@ -59,8 +59,8 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   nome_contato: [
     /^nome$/, /^nome\s*completo$/, /^primeiro\s*nome$/, /^first\s*name$/, /^full\s*name$/, /^nome\s*proprio$/,
     /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
-    /^criado\s*por$/, /^owner$/, /^proprietario$/, /^atendente$/, /^consultor$/,
-    /contato/, /responsavel/, /^nome\b/, /first.*name/, /full.*name/, /criado\s*por/,
+    /^criado\s*por$/, /^criado$/, /^owner$/, /^proprietario$/, /^atendente$/, /^consultor$/,
+    /contato/, /responsavel/, /^nome\b/, /first.*name/, /full.*name/, /criado\s*por/, /criado/,
   ],
   sobrenome_contato: [
     /^sobrenome$/, /^ultimo\s*nome$/, /^last\s*name$/, /^surname$/, /^apelido$/,

@@ -149,7 +149,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           valor_total: r.valor || null,
           observacoes: r.observacoes || null,
           campos_extras: r.campos_extras || {},
-          data_pedido: new Date().toISOString().split('T')[0],
+          data_pedido: (() => {
+            if (!r.data_pedido) return new Date().toISOString().split('T')[0];
+            const d = new Date(r.data_pedido);
+            return isNaN(d.getTime()) ? new Date().toISOString().split('T')[0] : d.toISOString().split('T')[0];
+          })(),
         }));
         const { error } = await supabase.from('pedidos').insert(batch);
         if (error) throw error;
@@ -277,6 +281,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Fabricante</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Valor</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Etapa</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Data</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Obs</TableHead>
                     {extraFieldNames.map(name => (
                       <TableHead key={name} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
@@ -295,6 +300,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                         {r.valor ? r.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{stageLabel(r.status)}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {r.data_pedido ? new Date(r.data_pedido).toLocaleDateString('pt-BR') : '-'}
+                      </TableCell>
                       <TableCell className="text-xs whitespace-nowrap max-w-[150px] truncate">{r.observacoes || '-'}</TableCell>
                       {extraFieldNames.map(name => (
                         <TableCell key={name} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
