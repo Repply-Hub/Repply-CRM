@@ -86,7 +86,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     if (file) handleFile(file);
   };
 
-  const canProceedToPreview = Boolean(mapping.cliente && mapping.fabricante);
+  const canProceedToPreview = Boolean(mapping.cliente || mapping.fabricante);
 
   const getMappedRows = () => getImportedPedidosRows(rawData, mapping, extras, customColumns);
 
