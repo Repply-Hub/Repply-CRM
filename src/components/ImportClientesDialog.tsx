@@ -321,6 +321,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       }
       const BATCH = 500;
       let imported = 0;
+      console.debug('[ImportClientes] preview snapshot usado na confirmação', rows.slice(0, 5));
 
       for (let i = 0; i < rows.length; i += BATCH) {
         if (target === 'contatos') {
@@ -335,8 +336,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
-          const { error } = await supabase.from('contatos').insert(batch);
+          console.debug('[ImportClientes] batch final contatos', batch.slice(0, 5));
+          const { data: saved, error } = await supabase
+            .from('contatos')
+            .insert(batch)
+            .select('id,empresa,nome_contato,email,telefone,cargo,classificacao,data_criacao,campos_extras');
           if (error) throw error;
+          console.debug('[ImportClientes] contatos salvos', saved?.slice(0, 5));
         } else {
           const batch = rows.slice(i, i + BATCH).map(r => ({
             empresa: r.empresa,
@@ -352,10 +358,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             campos_extras: r.campos_extras || {},
             usuario_id: vid,
           }));
-          const { error } = await supabase.from('clientes').upsert(batch, {
-            onConflict: 'cnpj',
-          });
+          console.debug('[ImportClientes] batch final clientes', batch.slice(0, 5));
+          const { data: saved, error } = await supabase
+            .from('clientes')
+            .upsert(batch, { onConflict: 'cnpj' })
+            .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras');
           if (error) throw error;
+          console.debug('[ImportClientes] clientes salvos/atualizados', saved?.slice(0, 5));
         }
         imported += rows.slice(i, i + BATCH).length;
       }
