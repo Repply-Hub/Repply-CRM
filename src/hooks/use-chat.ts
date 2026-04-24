@@ -80,9 +80,6 @@ export function useChatMessages(grupoId: string | null = null, recipientId: stri
   return query;
 }
 
-  return query;
-}
-
 export function useChatGrupos() {
   const qc = useQueryClient();
 
