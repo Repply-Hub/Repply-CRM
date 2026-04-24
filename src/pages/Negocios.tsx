@@ -37,10 +37,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
-  { id: 'cliente', label: 'Cliente', locked: false },
-  { id: 'obra', label: 'Obra', locked: false },
-  { id: 'fabricante', label: 'Fabricante', locked: false },
-  { id: 'valor', label: 'Valor', locked: false },
+  { id: 'negocio', label: 'Negócio', locked: false },
   { id: 'etapa', label: 'Etapa', locked: false },
   { id: 'vendedor', label: 'Vendedor', locked: false },
   { id: 'acoes', label: 'Ações', locked: false },
