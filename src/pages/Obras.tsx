@@ -52,6 +52,7 @@ export default function Obras() {
     pageSize,
     setPageSize,
     handleRename,
+    handleTypeChange,
     handleAddColumn,
     handleRemoveColumn,
     handleReorder,
@@ -191,6 +192,7 @@ export default function Obras() {
                 visibleColumns={visibleColumns}
                 onChange={setVisibleColumns}
                 onRename={handleRename}
+                onTypeChange={handleTypeChange}
                 onReorder={handleReorder}
                 onAdd={handleAddColumn}
                 onRemove={handleRemoveColumn}

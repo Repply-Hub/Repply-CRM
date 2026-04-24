@@ -347,7 +347,7 @@ export function ColumnSettings({
                                                             
                                                             {!isEditing && (
                                                                 <div className="flex items-center transition-opacity">
-                                                                    {onRename && (
+                                                                    {(onRename || onTypeChange) && (
                                                                         <button
                                                                             type="button"
                                                                             onClick={(e) => {
@@ -355,7 +355,7 @@ export function ColumnSettings({
                                                                                 startEditing(column);
                                                                             }}
                                                                             className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground"
-                                                                            title="Renomear e configurar"
+                                                                            title="Configurar coluna"
                                                                         >
                                                                             <Edit2 className="h-3 w-3" />
                                                                         </button>

@@ -82,6 +82,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     pageSize,
     setPageSize,
     handleRename,
+    handleTypeChange,
     handleAddColumn,
     handleRemoveColumn,
     handleReorder,
@@ -402,6 +403,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       visibleColumns={visibleColumns}
       onChange={setVisibleColumns}
       onRename={handleRename}
+      onTypeChange={handleTypeChange}
       onReorder={handleReorder}
       onAdd={handleAddColumn}
       onRemove={handleRemoveColumn}

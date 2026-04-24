@@ -320,6 +320,7 @@ const Fabricantes = () => {
     pageSize: precoPageSize,
     setPageSize: setPrecoPageSize,
     handleRename: handlePrecoRename,
+    handleTypeChange: handlePrecoTypeChange,
     handleAddColumn: handleAddPrecoColumn,
     handleRemoveColumn: handleRemovePrecoColumn,
     handleReorder: handlePrecoReorder,
@@ -513,6 +514,7 @@ const Fabricantes = () => {
                           visibleColumns={visiblePrecoColumns}
                           onChange={setVisiblePrecoColumns}
                           onRename={handlePrecoRename}
+                          onTypeChange={handlePrecoTypeChange}
                           onReorder={handlePrecoReorder}
                           onAdd={handleAddPrecoColumn}
                           onRemove={handleRemovePrecoColumn}
