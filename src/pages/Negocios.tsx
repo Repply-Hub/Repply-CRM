@@ -114,7 +114,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [importOpen, setImportOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
-  const { data: contatos } = useHistoricoContatos(selectedOrder);
+  const [viewOrderId, setViewOrderId] = useState<string | null>(null);
+  const { data: contatos } = useHistoricoContatos(selectedOrder || viewOrderId);
 
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
   const [selectedFabricantes, setSelectedFabricantes] = useState<string[]>([]);
