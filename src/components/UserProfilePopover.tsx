@@ -14,6 +14,7 @@ interface VendedorProfile {
   email: string;
   telefone: string | null;
   role: string;
+  avatar_url: string | null;
 }
 
 export function UserProfilePopover({ name, className = '' }: UserProfilePopoverProps) {
