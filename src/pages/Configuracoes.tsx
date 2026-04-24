@@ -82,7 +82,7 @@ function ProfileTab() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['meu_perfil', user?.id] });
+      qc.invalidateQueries({ queryKey: ['meu_perfil'] });
       toast.success('Perfil atualizado!');
     },
     onError: (e: any) => toast.error(e.message),
@@ -122,7 +122,7 @@ function ProfileTab() {
       await supabase.from('usuarios').update({ email }).eq('user_id', user!.id);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['meu_perfil', user?.id] });
+      qc.invalidateQueries({ queryKey: ['meu_perfil'] });
       toast.success('Email atualizado! Verifique sua caixa de entrada para confirmar.');
     },
     onError: (e: any) => toast.error(e.message),

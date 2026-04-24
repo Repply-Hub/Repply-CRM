@@ -36,7 +36,7 @@ export function AppSidebar() {
   const { items, save, isSaving } = useSidebarPreferences();
 
   const { data: vendedor } = useQuery({
-    queryKey: ['meu-perfil', user?.id],
+    queryKey: ['meu_perfil', user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('usuarios')

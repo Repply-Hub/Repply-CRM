@@ -1,6 +1,12 @@
 import { AppSidebar } from './AppSidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { NotificationCenter } from '@/components/NotificationCenter';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,6 +17,24 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, title, subtitle, headerContent, mainClassName }: AppLayoutProps) {
+  const { user } = useAuth();
+  const { data: perfil } = useQuery({
+    queryKey: ['meu_perfil', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('usuarios')
+        .select('nome, avatar_url')
+        .eq('user_id', user!.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  const initials = perfil?.nome
+    ? perfil.nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+    : '';
+
   return (
     <SidebarProvider defaultOpen={false}>
       <div className="h-screen flex w-full overflow-hidden">
@@ -26,7 +50,17 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
                 </div>
               )}
             </div>
-            <NotificationCenter />
+            <div className="flex items-center gap-2 sm:gap-4">
+              <NotificationCenter />
+              <Link to="/configuracoes?tab=perfil" className="shrink-0">
+                <Avatar className="h-8 w-8 border border-primary/20 hover:ring-2 hover:ring-primary/20 transition-all">
+                  <AvatarImage src={perfil?.avatar_url || ''} alt={perfil?.nome || ''} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
+                    {initials || <UserCircle className="h-4 w-4" />}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+            </div>
           </header>
           <main className={mainClassName ?? "flex-1 overflow-auto"}>
             {children}
