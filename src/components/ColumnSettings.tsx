@@ -290,7 +290,7 @@ export function ColumnSettings({
                                                                                 if (e.key === 'Escape') setEditingId(null);
                                                                             }}
                                                                         />
-                                                                        {onTypeChange && column.isCustom && (
+                                                                        {onTypeChange && (
                                                                             <Select 
                                                                                 value={column.type || 'text'} 
                                                                                 onValueChange={(val: ColumnDataType) => onTypeChange(column.id, val)}
