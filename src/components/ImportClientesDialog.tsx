@@ -359,7 +359,27 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             setCustomColumns={setCustomColumns}
             visibleFields={visibleFields}
             onReset={reset}
-            onAutoDetect={() => { setMapping(autoDetectMapping(headers)); setExtras({}); }}
+            onAutoDetect={() => {
+              const auto = autoDetectMapping(headers);
+              setMapping(auto);
+              
+              // Auto-detect extras: any column not mapped to a standard field
+              const used = new Set(Object.values(auto).filter(Boolean));
+              const newExtras: Record<string, string> = {};
+              
+              // Keywords that suggest a column should be an extra field rather than ignored
+              const extraKeywords = [/classificacao/, /criado/, /data/, /obs/, /nota/, /vendedor/, /origem/, /setor/, /departamento/];
+              
+              headers.forEach(h => {
+                if (!used.has(h)) {
+                  const norm = normalizeText(h);
+                  if (extraKeywords.some(r => r.test(norm))) {
+                    newExtras[h] = h;
+                  }
+                }
+              });
+              setExtras(newExtras);
+            }}
             onClearAll={() => {
               setMapping({
                 empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
