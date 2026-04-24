@@ -181,8 +181,65 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     if (file) handleFile(file);
   };
 
-  const getMappedRows = () => {
-    return sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns })
+  const hasValue = (value: unknown) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0;
+    return true;
+  };
+
+  const mergeExtraFields = (
+    current: Record<string, string> = {},
+    incoming: Record<string, string> = {},
+  ) => {
+    const merged = { ...current };
+    Object.entries(incoming).forEach(([key, value]) => {
+      if (hasValue(value)) merged[key] = value;
+    });
+    return merged;
+  };
+
+  const mergeRowsByCnpj = (rows: ReturnType<typeof getMappedRowsBase>) => {
+    const grouped = new Map<string, (typeof rows)[number]>();
+    const result: typeof rows = [];
+
+    rows.forEach((row) => {
+      const cnpjKey = row.cnpj?.trim();
+      if (!cnpjKey) {
+        result.push(row);
+        return;
+      }
+
+      const existing = grouped.get(cnpjKey);
+      if (!existing) {
+        const cloned = {
+          ...row,
+          campos_extras: { ...(row.campos_extras || {}) },
+        };
+        grouped.set(cnpjKey, cloned);
+        result.push(cloned);
+        return;
+      }
+
+      (Object.keys(row) as Array<keyof typeof row>).forEach((key) => {
+        if (key === 'campos_extras') {
+          existing.campos_extras = mergeExtraFields(existing.campos_extras, row.campos_extras);
+          return;
+        }
+
+        const incomingValue = row[key];
+        if (hasValue(incomingValue)) {
+          existing[key] = incomingValue;
+        }
+      });
+    });
+
+    return result;
+  };
+
+  const getMappedRowsBase = (sanitizedRows = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns })) => {
+    return sanitizedRows
       .map(row => {
         const get = (k: FieldKey) => (row[k] ?? '').toString().trim();
         const empresa = get('empresa');
@@ -221,6 +278,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : (r.empresa || r.razao_social || r.cnpj));
   };
 
+  const getMappedRows = (sanitizedRows?: ReturnType<typeof sanitizeImportedRows>) => {
+    const mappedRows = getMappedRowsBase(sanitizedRows);
+    return target === 'empresas' ? mergeRowsByCnpj(mappedRows) : mappedRows;
+  };
+
   const canProceed = Boolean(mapping.empresa) || Boolean(mapping.razao_social) || Boolean(mapping.cnpj) || Boolean(mapping.nome_contato) || Boolean(mapping.sobrenome_contato) || Boolean(mapping.email);
 
   const previewRows = useMemo(() => (step === 'preview' ? previewRowsSnapshot : []), [step, previewRowsSnapshot]);
@@ -235,27 +297,10 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   );
 
   const handleImport = async () => {
-    let rows = previewRowsSnapshot.length > 0 ? [...previewRowsSnapshot] : getMappedRows();
+    const rows = previewRowsSnapshot.length > 0 ? [...previewRowsSnapshot] : getMappedRows();
     if (rows.length === 0) {
       toast.error('Nenhum registro válido após o mapeamento');
       return;
-    }
-
-    // Se o alvo for empresas, removemos duplicatas de CNPJ no mesmo lote
-    // para evitar o erro: "ON CONFLICT DO UPDATE command cannot affect row a second time"
-    if (target === 'empresas') {
-      const seen = new Set();
-      const deduplicated = [];
-      // Percorremos de trás para frente para manter a última ocorrência da planilha
-      for (let i = rows.length - 1; i >= 0; i--) {
-        const r = rows[i];
-        if (r.cnpj) {
-          if (seen.has(r.cnpj)) continue;
-          seen.add(r.cnpj);
-        }
-        deduplicated.unshift(r);
-      }
-      rows = deduplicated;
     }
 
     setImporting(true);
@@ -418,8 +463,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               setCustomColumns({});
             }}
             canProceed={canProceed}
-            onNext={() => {
-              const mapped = getMappedRows();
+            onNext={(payload) => {
+              const mapped = getMappedRows(payload);
               if (mapped.length === 0) {
                 toast.error('Nenhum registro válido com o mapeamento atual');
                 return;
