@@ -36,6 +36,7 @@ interface Vendedor {
   nome: string;
   email: string;
   role: string;
+  avatar_url?: string | null;
 }
 
 type ChatTarget = { type: 'geral' } | { type: 'dm'; memberId: string } | { type: 'grupo'; grupoId: string };
