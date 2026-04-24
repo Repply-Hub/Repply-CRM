@@ -259,6 +259,7 @@ export type Database = {
           empresa_id: string
           grupo_id: string | null
           id: string
+          recipient_id: string | null
           usuario_id: string
         }
         Insert: {
@@ -270,6 +271,7 @@ export type Database = {
           empresa_id: string
           grupo_id?: string | null
           id?: string
+          recipient_id?: string | null
           usuario_id: string
         }
         Update: {
@@ -281,6 +283,7 @@ export type Database = {
           empresa_id?: string
           grupo_id?: string | null
           id?: string
+          recipient_id?: string | null
           usuario_id?: string
         }
         Relationships: [
@@ -297,6 +300,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "chat_grupos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_usuario"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pedidos_inativos"
+            referencedColumns: ["usuario_id"]
           },
           {
             foreignKeyName: "chat_mensagens_vendedor_id_fkey"
