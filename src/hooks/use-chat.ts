@@ -158,7 +158,7 @@ export function useSendMessage() {
       const { data: savedMsg, error } = await supabase
         .from('chat_mensagens')
         .insert(newMsg)
-        .select('*, vendedor:usuarios!chat_mensagens_vendedor_id_fkey(id, nome, email, avatar_url)')
+        .select('*, vendedor:usuarios!chat_mensagens_usuario_id_fkey(id, nome, email, avatar_url)')
         .single();
 
       if (error) throw error;
