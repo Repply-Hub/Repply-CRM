@@ -279,14 +279,10 @@ const EditarPedido = () => {
                   </div>
                   <div className="space-y-2">
                     <Label>Fabricante *</Label>
-                    <Select value={fabricanteId} onValueChange={setFabricanteId}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar fabricante" /></SelectTrigger>
-                      <SelectContent>
-                        {(fabricantes ?? []).map(f => (
-                          <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FabricanteSelector 
+                      value={fabricanteId} 
+                      onValueChange={setFabricanteId} 
+                    />
                   </div>
                 </div>
 
