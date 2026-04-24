@@ -44,6 +44,7 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
 ];
 
 const PAGE_SIZE = 10;
+const LEGACY_CARD_FIELDS = ['cliente', 'obra', 'fabricante', 'valor'];
 
 const getStageBadgeClass = (corToken: string) => `bg-${corToken} text-white`;
 
@@ -180,6 +181,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
 
+  useEffect(() => {
+    if (!visibleColumns.some(id => LEGACY_CARD_FIELDS.includes(id))) return;
+    setVisibleColumns(prev => {
+      const firstLegacyIndex = prev.findIndex(id => LEGACY_CARD_FIELDS.includes(id));
+      const withoutLegacy = prev.filter(id => !LEGACY_CARD_FIELDS.includes(id) && id !== 'negocio');
+      const next = [...withoutLegacy];
+      next.splice(Math.max(firstLegacyIndex, 0), 0, 'negocio');
+      return next;
+    });
+  }, [visibleColumns, setVisibleColumns]);
+
   const baseListPedidos = useMemo(() => {
     const all = pedidos ?? [];
     if (!isPipelineMode) return all;
@@ -216,9 +228,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     () => filtered.slice((page - 1) * pageSize, page * pageSize),
     [filtered, page, pageSize]
   );
+  const tableVisibleColumns = useMemo(() => {
+    const withoutLegacy = visibleColumns.filter(id => !LEGACY_CARD_FIELDS.includes(id));
+    return withoutLegacy.includes('negocio') ? withoutLegacy : ['negocio', ...withoutLegacy];
+  }, [visibleColumns]);
   const visibleColumnCount = Math.max(
     1,
-    visibleColumns.filter(id => id !== 'acoes').length + (visibleColumns.includes('acoes') ? 2 : 0) + 1
+    tableVisibleColumns.filter(id => id !== 'acoes').length + (tableVisibleColumns.includes('acoes') ? 2 : 0) + 1
   );
 
   useEffect(() => {
