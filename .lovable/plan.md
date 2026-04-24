@@ -1,57 +1,76 @@
-Plano para corrigir a importação de Empresas/Contatos
+## Problema identificado
+O preview da importação está correto, e os logs confirmam que o payload enviado ao backend também está correto. O problema acontece depois, em dois pontos do fluxo:
 
-O problema mais provável é que o preview mostra o objeto mapeado/sanitizado, mas ao confirmar a importação o app reconstrói o payload novamente e grava apenas um conjunto fixo de campos. Além disso, colunas criadas em “Opções > Nova Coluna” aparecem na lista como `custom_...`, enquanto a importação salva extras com o nome visível em `campos_extras`; isso pode fazer a coluna parecer vazia ou “trocada” depois de importar.
+1. A importação de empresas usa `upsert(..., { onConflict: 'cnpj' })`.
+   - Quando já existe um registro com o mesmo CNPJ, a linha nova atualiza o registro anterior.
+   - Se a mesma empresa aparece mais de uma vez no arquivo, ou já existe no banco, campos nativos como `empresa`, `telefone`, `email`, `endereco`, `classificacao` e `data_criacao` podem ser substituídos por outra combinação de valores.
+   - Isso explica a sensação de que “o preview estava certo, mas depois ficou inconsistente”.
 
-## O que será ajustado
+2. A listagem em `/clientes` tenta descobrir valores usando aliases de coluna e rótulos renomeados.
+   - Isso funciona para exibição flexível, mas mistura duas responsabilidades: campo nativo do schema vs campo extra importado.
+   - Se a coluna visível na lista foi renomeada para algo como “Telefone de Trabalho”, “Segmento de atuação” ou “Criado por”, a tela pode procurar no lugar errado e mostrar `—`, mesmo com o dado salvo.
 
-1. Usar exatamente o mesmo payload do preview na confirmação
-   - Ao clicar em “Pré-visualizar”, salvar os registros finais sanitizados em estado local.
-   - Ao clicar em “Importar”, usar esse mesmo snapshot, em vez de chamar `getMappedRows()` novamente.
-   - Isso garante que o que aparece no preview seja o que é enviado ao banco.
+Os logs de rede reforçam isso:
+- O `POST /rest/v1/clientes` contém dados corretos no corpo da requisição.
+- Exemplo real enviado: `empresa`, `telefone`, `data_criacao` e `campos_extras: { "Criado por": ... }` estavam corretos.
+- Portanto, a inconsistência não está no preview nem no mapeamento inicial; ela está na persistência via `upsert` e na resolução das colunas na listagem.
 
-2. Corrigir o vínculo das colunas extras
-   - Padronizar as chaves salvas em `campos_extras` para baterem com as colunas customizadas da lista.
-   - Exemplo: se a coluna da tabela é `custom_criado_por_...`, o valor importado precisa ser salvo com essa chave ou a tabela precisa saber resolver pelo rótulo correspondente.
-   - Ajustar a renderização da página `/clientes` para procurar o valor extra por:
-     - id da coluna customizada;
-     - rótulo da coluna;
-     - rótulo renomeado pelo usuário;
-     - fallback por normalização do nome.
+## O que vou implementar
+1. Separar explicitamente o que é campo nativo do schema e o que é campo extra.
+   - Campos do schema sempre serão lidos e exibidos pelo `id` real do banco (`empresa`, `tipo`, `cnpj`, `email`, `telefone`, `classificacao`, `data_criacao`, `endereco`).
+   - Campos extras continuarão em `campos_extras`, sem competir com os campos nativos.
 
-3. Exibir no preview a correspondência real com a lista final
-   - No preview, mostrar as colunas extras com o nome que será encontrado depois na tabela.
-   - Evitar situação em que o preview mostra “Criado por”, mas a lista busca `custom_criado_por_123` e exibe vazio.
+2. Corrigir a confirmação da importação para não “embaralhar” dados em updates por CNPJ.
+   - Revisar a estratégia atual de `upsert` por `cnpj`.
+   - Aplicar merge previsível antes do envio final, preservando os dados mais completos por campo.
+   - Garantir que o mesmo conjunto exibido no preview seja exatamente o conjunto persistido para cada CNPJ.
 
-4. Reduzir transformação duplicada na confirmação
-   - Manter a sanitização em `MappingStep.tsx` como fonte única.
-   - `ImportClientesDialog.tsx` ficará responsável apenas por validar, deduplicar e gravar os registros já montados.
+3. Ajustar a listagem de clientes para não depender de aliases ambíguos na leitura dos campos nativos.
+   - Renomear colunas na UI não deve alterar a origem do dado.
+   - Exemplo: a coluna exibida como “Telefone de Trabalho” deve continuar lendo `cliente.telefone`, e não tentar buscar em `campos_extras` ou em aliases frouxos.
 
-5. Testar o fluxo completo
-   - Importar uma planilha de Empresas com campos padrão e extras.
-   - Conferir que o preview e a tabela após importação exibem os mesmos valores nas mesmas colunas.
-   - Verificar também Contatos para não quebrar o fluxo existente.
+4. Tratar corretamente o campo “Criado por”.
+   - Se ele não faz parte do schema nativo, continuará sendo salvo em `campos_extras['Criado por']`.
+   - A lista passará a exibi-lo de forma consistente quando essa coluna estiver habilitada.
 
-## Arquivos envolvidos
+5. Adicionar logs temporários de diagnóstico no fluxo de confirmação.
+   - Vou registrar o snapshot do preview, o batch final montado para persistência e o resultado retornado após a operação.
+   - Isso ajuda a validar que preview, payload final e leitura da lista ficaram sincronizados.
 
+## Arquivos a ajustar
 - `src/components/ImportClientesDialog.tsx`
-- `src/components/import/MappingStep.tsx`, se precisar ajustar retorno/nomes dos extras
-- `src/pages/Clientes.tsx`, para resolver corretamente valores de `campos_extras` nas colunas customizadas
-- Possivelmente `src/hooks/use-table-settings.ts`, caso seja melhor centralizar a normalização de IDs de colunas extras
+  - endurecer a montagem final do batch
+  - revisar merge por CNPJ
+  - alinhar preview e persistência 1:1
+  - incluir logs temporários de conferência
 
-## Resultado esperado
+- `src/pages/Clientes.tsx`
+  - separar leitura de campos nativos e extras
+  - remover dependência ambígua de aliases para colunas nativas
+  - garantir exibição correta de “Criado por” e demais extras
 
-Depois da correção, a importação terá este comportamento:
+- `src/hooks/use-clientes.ts`
+  - revisar se a consulta precisa de algum ajuste para facilitar a leitura consistente dos campos
 
-```text
-Mapeamento escolhido pelo usuário
-        ↓
-Sanitização única dos dados
-        ↓
-Preview mostra o payload final
-        ↓
-Confirmar grava exatamente o mesmo payload
-        ↓
-Lista de clientes lê campos padrão e extras com as mesmas chaves
-```
+## Detalhes técnicos
+- O request observado já envia payload correto ao backend, por exemplo:
+  - `empresa: "Engecomp Soluções LTDA"`
+  - `telefone: "5584999020764"`
+  - `data_criacao: "2026-04-08"`
+  - `campos_extras: { "Criado por": "Érika Marques" }`
+- Isso indica que o sanitizador e o preview estão funcionando.
+- O ponto crítico é o `upsert` com `onConflict: 'cnpj'`, porque ele pode atualizar registros existentes e produzir resultado final diferente do que o usuário acabou de revisar.
+- Também há fragilidade na função que resolve o valor da coluna na tabela, porque hoje ela tenta inferir a origem do dado a partir de aliases e rótulos renomeados.
 
-Assim, se a coluna estiver correta no preview, ela também chegará correta na tabela após confirmar a importação.
+## Resultado esperado após a correção
+- O usuário verá no preview exatamente o mesmo conteúdo que será persistido.
+- Campos nativos como Empresa, Tipo, CNPJ, Email, Telefone, Classificação, Criado e Endereço aparecerão corretamente após confirmar.
+- “Criado por” deixará de ser ignorado e aparecerá de forma consistente como campo extra.
+- Renomear títulos de coluna na lista não afetará mais a origem real do dado.
+
+<lov-actions>
+  <lov-open-history>View History</lov-open-history>
+</lov-actions>
+<lov-actions>
+<lov-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</lov-link>
+</lov-actions>
