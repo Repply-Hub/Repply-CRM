@@ -924,6 +924,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                                   return (
                                     <TableCell key={colId}>
                                       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewOrderId(p.id)} title="Visualizar detalhes">
+                                          <Eye className="h-4 w-4" />
+                                        </Button>
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/pedidos/${p.id}/editar`)} title="Editar pedido">
                                           <Pencil className="h-4 w-4" />
                                         </Button>
