@@ -1,6 +1,12 @@
 import { AppSidebar } from './AppSidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { NotificationCenter } from '@/components/NotificationCenter';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface AppLayoutProps {
   children: React.ReactNode;
