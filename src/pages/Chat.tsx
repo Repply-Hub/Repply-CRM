@@ -1,18 +1,28 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { useChatMessages, useSendMessage, useChatGrupos, ChatGrupo } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, ChatGrupo, ChatMessage } from '@/hooks/use-chat';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen, Paperclip, FileText, Image, X, Download, Users2 } from 'lucide-react';
+import { 
+  Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen, 
+  Paperclip, FileText, Image, X, Download, Users2, Info, Calendar
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
 import { validateFile } from '@/lib/file-validation';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 const CHAT_ALLOWED_EXT = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv', '.zip', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 const CHAT_ALLOWED_MIME = ['image/', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument', 'application/vnd.ms-excel', 'text/plain', 'text/csv', 'application/zip', 'application/x-zip-compressed'];
@@ -392,6 +402,77 @@ const Chat = () => {
                 </div>
               </>
             )}
+            
+            <div className="ml-auto">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="w-full sm:max-w-md flex flex-col p-0">
+                  <SheetHeader className="p-4 border-b">
+                    <SheetTitle className="flex items-center gap-2">
+                      <Paperclip className="h-4 w-4 text-primary" />
+                      Arquivos da Conversa
+                    </SheetTitle>
+                  </SheetHeader>
+                  
+                  <ScrollArea className="flex-1">
+                    <div className="p-4 space-y-4">
+                      {messages?.filter(m => m.arquivo_url).length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                          <p className="text-sm">Nenhum arquivo enviado nesta conversa.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {messages?.filter(m => m.arquivo_url).map((msg) => {
+                            const isImage = msg.arquivo_tipo?.startsWith('image/');
+                            return (
+                              <div key={msg.id} className="flex flex-col gap-2 p-3 rounded-lg border bg-muted/30 group hover:bg-muted/50 transition-colors">
+                                <div className="flex items-start gap-3">
+                                  <div className="h-10 w-10 shrink-0 rounded bg-background border flex items-center justify-center text-primary overflow-hidden">
+                                    {isImage ? (
+                                      <img src={msg.arquivo_url!} alt={msg.arquivo_nome!} className="h-full w-full object-cover" />
+                                    ) : (
+                                      <FileText className="h-5 w-5" />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium text-foreground truncate" title={msg.arquivo_nome ?? 'Arquivo'}>
+                                      {msg.arquivo_nome ?? 'Arquivo'}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <Avatar className="h-4 w-4 shrink-0">
+                                        {msg.vendedor?.avatar_url && <img src={msg.vendedor.avatar_url} className="object-cover" />}
+                                        <AvatarFallback className="text-[6px]">{getInitials(msg.vendedor?.nome || '?')}</AvatarFallback>
+                                      </Avatar>
+                                      <p className="text-[10px] text-muted-foreground truncate">
+                                        {msg.vendedor?.nome} • {format(new Date(msg.created_at), "dd MMM, HH:mm", { locale: ptBR })}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <a 
+                                    href={msg.arquivo_url!} 
+                                    download={msg.arquivo_nome!} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="p-2 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </a>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
 
           {/* Messages */}
