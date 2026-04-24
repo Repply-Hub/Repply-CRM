@@ -407,6 +407,23 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       onRemove={handleRemoveColumn}
       hideColumns={showKanban}
     >
+      {!showKanban && (
+        <div className="px-4 py-2 space-y-2 border-b border-border/50 bg-muted/20">
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Checkbox
+              checked={!visibleColumns.includes('cliente')}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  setVisibleColumns(visibleColumns.filter(id => id !== 'cliente'));
+                } else if (!visibleColumns.includes('cliente')) {
+                  setVisibleColumns(['cliente', ...visibleColumns]);
+                }
+              }}
+            />
+            Ocultar Nome do Cliente
+          </label>
+        </div>
+      )}
       <div className={cn("p-1", !showKanban && "border-t border-border/50")}>
         <div className="px-4 py-2.5 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
           <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">

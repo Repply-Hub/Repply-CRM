@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -197,7 +198,23 @@ export default function Obras() {
                 onSavePreset={savePreset}
                 onLoadPreset={loadPreset}
                 onDeletePreset={deletePreset}
-              />
+              >
+                <div className="px-4 py-2 space-y-2 border-t border-border/50 bg-muted/20">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    <Checkbox
+                      checked={!visibleColumns.includes('nome_obra')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setVisibleColumns(visibleColumns.filter(id => id !== 'nome_obra'));
+                        } else if (!visibleColumns.includes('nome_obra')) {
+                          setVisibleColumns(['nome_obra', ...visibleColumns]);
+                        }
+                      }}
+                    />
+                    Ocultar Nome da Obra
+                  </label>
+                </div>
+              </ColumnSettings>
             </div>
 
             {isLoading ? (
