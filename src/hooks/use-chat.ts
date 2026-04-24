@@ -36,15 +36,17 @@ async function fetchMessages(grupoId: string | null, recipientId: string | null 
 
   let query = supabase
     .from('chat_mensagens')
-    .select('*, vendedor:usuarios!chat_mensagens_vendedor_id_fkey(id, nome, email, avatar_url)')
+    .select('*, vendedor:usuarios!chat_mensagens_usuario_id_fkey(id, nome, email, avatar_url)')
     .order('created_at', { ascending: true })
     .limit(200);
 
   if (grupoId) {
     query = query.eq('grupo_id', grupoId);
   } else if (recipientId) {
+    // DM privada entre os dois usuários
     query = query.or(`and(usuario_id.eq.${me.id},recipient_id.eq.${recipientId}),and(usuario_id.eq.${recipientId},recipient_id.eq.${me.id})`);
   } else {
+    // Chat Geral
     query = query.is('grupo_id', null).is('recipient_id', null);
   }
 
@@ -173,7 +175,6 @@ export function useSendMessage() {
       const optimisticId = `temp-${Date.now()}`;
       
       if (previousMessages && userData.user) {
-        // Tentativa de pegar info do cache para o optimistic
         const myVendedor = qc.getQueryData<any>(['meu_perfil', userData.user.id]);
         
         const optimisticMsg: ChatMessage = {
