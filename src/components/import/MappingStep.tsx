@@ -174,7 +174,10 @@ export function sanitizeImportedRows(params: {
     const campos_extras: Record<string, string> = {};
     Object.entries(extras).forEach(([header, name]) => {
       const sanitized = sanitizeFieldValue(row[header], 'text');
-      if (sanitized !== undefined && String(sanitized).trim()) campos_extras[(name || header).trim()] = String(sanitized);
+      if (sanitized !== undefined && String(sanitized).trim()) {
+        // Usar o cabeçalho original da planilha como chave para garantir que o Clientes.tsx o encontre
+        campos_extras[header.trim()] = String(sanitized);
+      }
     });
     Object.entries(customColumns).forEach(([name, value]) => {
       const sanitized = sanitizeFieldValue(value, 'text');
