@@ -772,10 +772,7 @@ const Clientes = () => {
                     <th className="py-2.5 px-4 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
-                    <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
-                      {getLabel('empresa')}
-                    </th>
-                    {visibleColumns.filter(id => id !== 'empresa').map(colId => (
+                    {visibleColumns.map(colId => (
                       <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
                         {getLabel(colId)}
                       </th>
