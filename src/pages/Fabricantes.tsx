@@ -513,6 +513,7 @@ const Fabricantes = () => {
                           visibleColumns={visiblePrecoColumns}
                           onChange={setVisiblePrecoColumns}
                           onRename={handlePrecoRename}
+                          onTypeChange={handlePrecoTypeChange}
                           onReorder={handlePrecoReorder}
                           onAdd={handleAddPrecoColumn}
                           onRemove={handleRemovePrecoColumn}

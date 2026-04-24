@@ -523,6 +523,7 @@ const Clientes = () => {
             visibleColumns={visibleColumns}
             onChange={setVisibleColumns}
             onRename={handleRename}
+            onTypeChange={handleTypeChange}
             onAdd={handleAddColumn}
             onRemove={handleRemoveColumn}
             onReorder={handleReorder}
