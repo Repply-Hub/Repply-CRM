@@ -609,12 +609,14 @@ const Chat = () => {
                 <Paperclip className="h-4 w-4" />
               </Button>
               <Input
+                ref={inputRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Digite sua mensagem..."
                 className="flex-1"
                 disabled={sending}
+                autoFocus
               />
               <Button onClick={handleSend} disabled={sending || (!text.trim() && !selectedFile)} size="icon">
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
