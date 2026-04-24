@@ -424,6 +424,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                 toast.error('Nenhum registro válido com o mapeamento atual');
                 return;
               }
+              setPreviewRowsSnapshot(mapped);
               setStep('preview');
             }}
           />
