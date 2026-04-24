@@ -412,7 +412,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       <div className={cn("p-1", !showKanban && "border-t border-border/50")}>
         <div className="px-4 py-2.5 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
           <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-            {showKanban ? 'Personalizar Etapas' : 'Ações'}
+            {showKanban ? 'Personalizar Etapas Kanban' : 'Ações'}
           </span>
         </div>
         
