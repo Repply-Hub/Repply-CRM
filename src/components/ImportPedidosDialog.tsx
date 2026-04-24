@@ -149,7 +149,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           valor_total: r.valor || null,
           observacoes: r.observacoes || null,
           campos_extras: r.campos_extras || {},
-          data_pedido: r.data_pedido ? new Date(r.data_pedido).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          data_pedido: (() => {
+            if (!r.data_pedido) return new Date().toISOString().split('T')[0];
+            const d = new Date(r.data_pedido);
+            return isNaN(d.getTime()) ? new Date().toISOString().split('T')[0] : d.toISOString().split('T')[0];
+          })(),
         }));
         const { error } = await supabase.from('pedidos').insert(batch);
         if (error) throw error;
