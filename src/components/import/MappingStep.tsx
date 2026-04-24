@@ -22,16 +22,16 @@ const NONE = '__none__';
 const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: string; synonyms?: string[]; type?: SupabaseFieldType }> = {
   empresa: { desc: 'Nome principal da empresa.', example: 'Engecomp Soluções LTDA', storage: 'clientes.empresa', synonyms: ['empresa', 'nome fantasia', 'cliente', 'companhia'] },
   razao_social: { desc: 'Razão social completa registrada.', example: 'ENGECOMP SOLUÇÕES EM ENGENHARIA LTDA', storage: 'clientes.razao_social', synonyms: ['razao social', 'razão social', 'social reason'] },
-  tipo: { desc: 'Categoria ou segmento do cliente.', example: 'construtora', storage: 'clientes.tipo', synonyms: ['tipo', 'segmento', 'categoria'] },
+  tipo: { desc: 'Categoria ou segmento do cliente.', example: 'construtora', storage: 'clientes.tipo', synonyms: ['tipo', 'segmento', 'segmento de atuação', 'segmento de atuacao', 'categoria'] },
   cnpj: { desc: 'CNPJ ou CPF, salvo apenas com números.', example: '12.345.678/0001-90', storage: 'clientes.cnpj', synonyms: ['cnpj', 'cpf', 'documento', 'cpf cnpj'], type: 'cnpj' },
   email: { desc: 'E-mail principal.', example: 'contato@empresa.com.br', storage: 'clientes.email', synonyms: ['email', 'e-mail', 'mail'], type: 'email' },
-  telefone: { desc: 'Telefone com DDD, salvo apenas com números.', example: '(84) 99999-9999', storage: 'clientes.telefone', synonyms: ['telefone', 'fone', 'celular', 'whatsapp', 'tel'], type: 'phone' },
+  telefone: { desc: 'Telefone com DDD, salvo apenas com números.', example: '(84) 99999-9999', storage: 'clientes.telefone', synonyms: ['telefone', 'telefone de trabalho', 'fone', 'celular', 'whatsapp', 'tel'], type: 'phone' },
   endereco: { desc: 'Endereço completo.', example: 'Av. Hermes da Fonseca, 123, Natal/RN', storage: 'clientes.endereco', synonyms: ['endereco', 'endereço', 'address', 'localizacao'] },
   nome_contato: { desc: 'Nome da pessoa de contato.', example: 'João Silva', storage: 'clientes.nome_contato', synonyms: ['nome', 'contato', 'nome contato', 'responsavel', 'pessoa'] },
   sobrenome_contato: { desc: 'Sobrenome do contato, concatenado ao nome.', example: 'Silva', storage: 'clientes.nome_contato', synonyms: ['sobrenome', 'ultimo nome', 'last name'] },
   cargo: { desc: 'Cargo ou função do contato.', example: 'Engenheiro de Compras', storage: 'contatos.cargo', synonyms: ['cargo', 'funcao', 'função', 'posição'] },
   classificacao: { desc: 'Classificação, ranking ou categoria especial.', example: 'Cliente Ouro', storage: 'clientes.classificacao', synonyms: ['classificacao', 'classificação', 'ranking', 'score'] },
-  data_criacao: { desc: 'Data de criação original, convertida para formato ISO quando possível.', example: '2024-01-31', storage: 'clientes.data_criacao', synonyms: ['data criacao', 'data criação', 'criado em', 'data cadastro'], type: 'date' },
+  data_criacao: { desc: 'Data de criação original, convertida para formato ISO quando possível.', example: '2024-01-31', storage: 'clientes.data_criacao', synonyms: ['data criacao', 'data criação', 'criado', 'criado em', 'data cadastro'], type: 'date' },
   cliente: { desc: 'Nome da empresa cliente.', example: 'Engecomp Soluções LTDA', storage: 'pedidos.cliente_id', synonyms: ['cliente', 'empresa', 'construtora'] },
   fabricante: { desc: 'Nome do fabricante.', example: 'Tigre', storage: 'pedidos.fabricante_id', synonyms: ['fabricante', 'fornecedor', 'marca', 'pipeline'] },
   valor: { desc: 'Valor total convertido para número.', example: '15420.75', storage: 'pedidos.valor_total', synonyms: ['valor', 'total', 'preco', 'preço', 'orcamento'], type: 'number' },
@@ -175,8 +175,8 @@ export function sanitizeImportedRows(params: {
     Object.entries(extras).forEach(([header, name]) => {
       const sanitized = sanitizeFieldValue(row[header], 'text');
       if (sanitized !== undefined && String(sanitized).trim()) {
-        // Usar o cabeçalho original da planilha como chave para garantir que o Clientes.tsx o encontre
-        campos_extras[header.trim()] = String(sanitized);
+        const key = (name || header).trim();
+        if (key) campos_extras[key] = String(sanitized);
       }
     });
     Object.entries(customColumns).forEach(([name, value]) => {
