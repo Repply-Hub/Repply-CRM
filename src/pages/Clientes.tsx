@@ -41,7 +41,7 @@ const CLIENTE_FIELDS: ColumnDefinition[] = [
 ];
 
 const CONTATO_FIELDS: ColumnDefinition[] = [
-  { id: 'nome_contato', label: 'Nome' },
+  { id: 'nome_contato', label: 'Nome', locked: false },
   { id: 'empresa', label: 'Empresa' },
   { id: 'email', label: 'E-mail' },
   { id: 'telefone', label: 'Telefone' },
