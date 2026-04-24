@@ -73,14 +73,12 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
 
     try {
       const result = await createCliente.mutateAsync(newEmpresa);
-      // useCreateCliente doesn't return the ID currently, let's adjust it or find another way
-      // Actually, standard useMutation return value doesn't include the response data unless defined.
-      // For now, we'll notify the user. They might need to re-select or we can enhance the mutation.
       toast.success('Empresa cadastrada com sucesso!');
       setDialogOpen(false);
+      if (result?.id) {
+        onValueChange(result.id);
+      }
       setNewEmpresa({ empresa: '', tipo: 'construtora', cnpj: '' });
-      // In a real scenario, we'd want the ID of the newly created cliente to select it automatically.
-      // Since useCreateCliente doesn't return it yet, we'll let the user know they can now find it.
     } catch (error: any) {
       toast.error('Erro ao cadastrar empresa: ' + error.message);
     }
