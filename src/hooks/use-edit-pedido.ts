@@ -8,7 +8,7 @@ export function usePedidoCompleto(pedidoId: string | null) {
     queryFn: async () => {
       const { data: pedido, error: pErr } = await supabase
         .from('pedidos')
-        .select('*, cliente:clientes(id, empresa, tipo), fabricante:fabricantes(id, nome), vendedor:vendedores(id, nome), obra:obras(id, nome_obra, endereco_entrega, spe_cnpj)')
+        .select('*, cliente:clientes(id, empresa, tipo), fabricante:fabricantes(id, nome), vendedor:usuarios(id, nome), obra:obras(id, nome_obra, endereco_entrega, spe_cnpj)')
         .eq('id', pedidoId!)
         .single();
       if (pErr) throw pErr;

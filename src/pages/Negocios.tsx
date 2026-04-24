@@ -304,12 +304,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     handleStageFilterChange('todos');
   };
 
-  const handleDragEnd = useCallback((result: DropResult) => {
+  const handleDragEnd = useCallback(async (result: DropResult) => {
     if (!result.destination) return;
     const { draggableId, source, destination } = result;
     if (source.droppableId === destination.droppableId) return;
     const label = KANBAN_STAGES.find(s => s.key === destination.droppableId)?.label ?? destination.droppableId;
-    updateStatus.mutate({ id: draggableId, status: destination.droppableId });
+    await updateStatus.mutateAsync({ id: draggableId, status: destination.droppableId });
     toast.success(`Pedido movido para "${label}"`);
   }, [updateStatus, KANBAN_STAGES]);
 
