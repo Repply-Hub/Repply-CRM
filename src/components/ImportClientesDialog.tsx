@@ -53,15 +53,15 @@ function normalizeText(v: string): string {
 const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   empresa: [/^empresa$/, /^nome\s*fantasia$/, /^nome\s*da\s*empresa$/, /^razao\s*social$/, /empresa/, /fantasia/],
   razao_social: [/^razao\s*social$/, /razao/],
-  tipo: [/^tipo$/, /segmento/, /categoria/],
+  tipo: [/^tipo$/, /segmento/, /segmento\s*de\s*atuacao/, /categoria/],
   cnpj: [/^cnpj$/, /^cpf$/, /cpf.*cnpj/, /cnpj/, /cpf/],
   email: [/^e-?mail$/, /mail/],
-  telefone: [/^telefone$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
+  telefone: [/^telefone$/, /^telefone\s*de\s*trabalho$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
   endereco: [/^endereco$/, /endereco/, /address/],
   nome_contato: [
     /^nome$/, /^nome\s*completo$/, /^primeiro\s*nome$/, /^first\s*name$/, /^full\s*name$/, /^nome\s*proprio$/,
     /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
-    /^criado\s*por$/, /^contato\s*principal$/,
+    /^contato\s*principal$/,
     /contato/, /responsavel/, /^nome\b/, /first.*name/, /full.*name/
   ],
   sobrenome_contato: [
@@ -70,7 +70,7 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   ],
   cargo: [/^cargo$/, /cargo/, /funcao/, /posicao/],
   classificacao: [/^classificacao$/, /^classificacao.*cliente$/, /^rank$/, /^ranking$/, /^score$/, /classificacao/],
-  data_criacao: [/^data\s*criacao$/, /^criado$/, /^criado\s*em$/, /^data\s*cadastro$/, /criado/],
+  data_criacao: [/^data\s*criacao$/, /^criado$/, /^criado\s*em$/, /^data\s*cadastro$/],
 };
 
 function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
@@ -93,6 +93,17 @@ function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
     }
   });
   return result;
+}
+
+function autoDetectExtras(headers: string[], mappedHeaders: Iterable<string>) {
+  const used = new Set(mappedHeaders);
+  const extraRules = [/^criado\s*por$/, /^created\s*by$/, /vendedor/, /responsavel\s*cadastro/, /origem/, /observacoes/, /obs/, /nota/, /setor/, /departamento/];
+  return headers.reduce<Record<string, string>>((acc, header) => {
+    if (used.has(header)) return acc;
+    const norm = normalizeText(header);
+    if (extraRules.some(rule => rule.test(norm))) acc[header] = header.trim();
+    return acc;
+  }, {});
 }
 
 interface ImportClientesDialogProps {
@@ -166,7 +177,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
       const auto = autoDetectMapping(cols);
       setMapping(auto);
-      setExtras({});
+      setExtras(autoDetectExtras(cols, Object.values(auto).filter(Boolean)));
       setCustomColumns({});
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
@@ -289,11 +300,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
   // Lista de campos extras únicos para mostrar no preview (com nome final)
   const extraFieldNames = useMemo(
-    () => Array.from(new Set([
-      ...Object.entries(extras).map(([col, name]) => (name || col).trim()),
-      ...Object.keys(customColumns).map(n => n.trim()),
-    ].filter(Boolean))),
-    [extras, customColumns]
+    () => Array.from(new Set(previewRowsSnapshot.flatMap(row => Object.keys(row.campos_extras || {})))),
+    [previewRowsSnapshot]
   );
 
   const handleImport = async () => {
@@ -435,23 +443,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             onAutoDetect={() => {
               const auto = autoDetectMapping(headers);
               setMapping(auto);
-              
-              // Auto-detect extras: any column not mapped to a standard field
-              const used = new Set(Object.values(auto).filter(Boolean));
-              const newExtras: Record<string, string> = {};
-              
-              // Keywords that suggest a column should be an extra field rather than ignored
-              const extraKeywords = [/classificacao/, /criado/, /data/, /obs/, /nota/, /vendedor/, /origem/, /setor/, /departamento/];
-              
-              headers.forEach(h => {
-                if (!used.has(h)) {
-                  const norm = normalizeText(h);
-                  if (extraKeywords.some(r => r.test(norm))) {
-                    newExtras[h] = h;
-                  }
-                }
-              });
-              setExtras(newExtras);
+              setExtras(autoDetectExtras(headers, Object.values(auto).filter(Boolean)));
             }}
             onClearAll={() => {
               setMapping({
