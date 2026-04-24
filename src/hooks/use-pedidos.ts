@@ -12,6 +12,7 @@ export interface PedidoWithRelations {
   fabricante_id: string;
   usuario_id: string;
   obra_id: string | null;
+  endereco_entrega: string | null;
   cliente: { id: string; empresa: string } | null;
   fabricante: { id: string; nome: string } | null;
   vendedor: { id: string; nome: string } | null;
