@@ -304,7 +304,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     handleStageFilterChange('todos');
   };
 
-  const handleDragEnd = useCallback((result: DropResult) => {
+  const handleDragEnd = useCallback(async (result: DropResult) => {
     if (!result.destination) return;
     const { draggableId, source, destination } = result;
     if (source.droppableId === destination.droppableId) return;
