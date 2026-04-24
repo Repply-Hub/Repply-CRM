@@ -428,8 +428,8 @@ const ClienteDetalhe = () => {
                     placeholder="(00) 00000-0000"
                   />
                 </div>
-                <Button type="submit" disabled={createContato.isPending} className="w-full lg:w-auto">
-                  <Plus className="h-4 w-4 mr-1" />
+                <Button type="submit" disabled={createContato.isPending} className="w-full lg:w-auto inline-flex items-center justify-center gap-2">
+                  <Plus className="h-4 w-4 shrink-0" />
                   {createContato.isPending ? 'Adicionando...' : 'Adicionar'}
                 </Button>
               </form>
