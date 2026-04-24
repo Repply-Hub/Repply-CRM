@@ -327,8 +327,7 @@ export default function Tarefas() {
                     <TableHead className="w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </TableHead>
-                    <TableHead>{getLabel('titulo')}</TableHead>
-                    {visibleColumns.filter(id => id !== 'titulo').map(colId => (
+                    {visibleColumns.map(colId => (
                       <TableHead key={colId} className={cn("whitespace-nowrap", (colId === 'responsavel' || colId === 'prazo_final') && "hidden lg:table-cell", colId === 'projeto' && "hidden xl:table-cell")}>
                         {getLabel(colId)}
                       </TableHead>
