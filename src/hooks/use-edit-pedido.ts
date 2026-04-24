@@ -81,7 +81,6 @@ export function useUpdatePedidoCompleto() {
             quantidade: item.quantidade,
             unidade: item.unidade || null,
             preco_unitario: item.preco_unitario,
-            preco_total: item.quantidade * item.preco_unitario,
           }))
         );
         if (upsertErr) throw upsertErr;
@@ -96,7 +95,6 @@ export function useUpdatePedidoCompleto() {
             quantidade: item.quantidade,
             unidade: item.unidade || null,
             preco_unitario: item.preco_unitario,
-            preco_total: item.quantidade * item.preco_unitario,
           }))
         );
         if (insertErr) throw insertErr;
