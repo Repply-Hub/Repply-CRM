@@ -601,8 +601,12 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId }
         <div className="h-1.5 bg-gradient-to-r from-primary to-primary/50" />
         <CardContent className="pt-5">
           <div className="flex items-start gap-4">
-            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0 ring-2 ring-primary/20">
-              <span className="text-xl font-bold text-primary">{iniciais}</span>
+            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0 ring-2 ring-primary/20 overflow-hidden">
+              {vendedor.avatar_url ? (
+                <img src={vendedor.avatar_url} alt={vendedor.nome} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-xl font-bold text-primary">{iniciais}</span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
