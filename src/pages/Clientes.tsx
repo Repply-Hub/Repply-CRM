@@ -20,6 +20,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/ImportClientesDialog';
+import { EmpresaSelector } from '@/components/EmpresaSelector';
 
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
@@ -380,7 +381,7 @@ const Clientes = () => {
     if (activeTab === 'contatos') {
       try {
         await createContato.mutateAsync({
-          empresa: empresa || 'Sem empresa',
+          empresa: clients?.find(c => c.id === empresa)?.empresa || undefined,
           nome_contato: nomeContato || undefined,
           email: (form.get('email') as string) || undefined,
           telefone: telefone || undefined,
@@ -765,7 +766,7 @@ const Clientes = () => {
                 ) : (
                   <>
                     <div><Label>Nome do contato</Label><Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome completo" /></div>
-                    <div><Label>Empresa</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Empresa vinculada" /></div>
+                    <div><Label>Empresa</Label><EmpresaSelector value={empresa} onValueChange={setEmpresa} placeholder="Vincular empresa..." /></div>
                     <div><Label>Cargo</Label><Input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Cargo ou função" /></div>
                     <div className="grid grid-cols-2 gap-3">
                       <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>

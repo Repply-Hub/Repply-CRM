@@ -131,3 +131,21 @@ export function useCreatePedidoCompleto() {
     },
   });
 }
+
+export function useCreateFabricanteCompleto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { nome: string; cnpj?: string; nome_contato?: string; telefone?: string }) => {
+      const { data: created, error } = await supabase
+        .from('fabricantes')
+        .insert(data)
+        .select('id')
+        .single();
+      if (error) throw error;
+      return created;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fabricantes'] });
+    },
+  });
+}

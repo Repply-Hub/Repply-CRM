@@ -17,6 +17,8 @@ import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor } from
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText } from 'lucide-react';
+import { EmpresaSelector } from '@/components/EmpresaSelector';
+import { FabricanteSelector } from '@/components/FabricanteSelector';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -270,25 +272,17 @@ const EditarPedido = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Cliente *</Label>
-                    <Select value={clienteId} onValueChange={handleClienteChange}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
-                      <SelectContent>
-                        {(clientes ?? []).map(c => (
-                          <SelectItem key={c.id} value={c.id}>{c.empresa}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <EmpresaSelector 
+                      value={clienteId} 
+                      onValueChange={handleClienteChange} 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Fabricante *</Label>
-                    <Select value={fabricanteId} onValueChange={setFabricanteId}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar fabricante" /></SelectTrigger>
-                      <SelectContent>
-                        {(fabricantes ?? []).map(f => (
-                          <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FabricanteSelector 
+                      value={fabricanteId} 
+                      onValueChange={setFabricanteId} 
+                    />
                   </div>
                 </div>
 

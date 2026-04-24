@@ -12,10 +12,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
-import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCreatePedidoCompleto } from '@/hooks/use-novo-pedido';
+import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCreatePedidoCompleto, useCreateFabricanteCompleto } from '@/hooks/use-novo-pedido';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Check, ChevronsUpDown, FileText, Upload } from 'lucide-react';
+import { EmpresaSelector } from '@/components/EmpresaSelector';
+import { FabricanteSelector } from '@/components/FabricanteSelector';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -249,59 +251,19 @@ const NovoPedido = () => {
                   {/* Cliente */}
                   <div className="space-y-2">
                     <Label>Cliente *</Label>
-                    <Popover open={clienteOpen} onOpenChange={setClienteOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" role="combobox" aria-expanded={clienteOpen} className="w-full justify-between font-normal">
-                          {clienteId ? (clientes ?? []).find(c => c.id === clienteId)?.empresa : "Selecionar cliente"}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Buscar cliente..." />
-                          <CommandList>
-                            <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                            <CommandGroup>
-                              {(clientes ?? []).map(c => (
-                                <CommandItem key={c.id} value={c.empresa} onSelect={() => { handleClienteChange(c.id); setClienteOpen(false); }}>
-                                  <Check className={cn("mr-2 h-4 w-4", clienteId === c.id ? "opacity-100" : "opacity-0")} />
-                                  {c.empresa}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                    <EmpresaSelector 
+                      value={clienteId} 
+                      onValueChange={handleClienteChange} 
+                    />
                   </div>
 
                   {/* Fabricante */}
                   <div className="space-y-2">
                     <Label>Fabricante *</Label>
-                    <Popover open={fabricanteOpen} onOpenChange={setFabricanteOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" role="combobox" aria-expanded={fabricanteOpen} className="w-full justify-between font-normal">
-                          {fabricanteId ? (fabricantes ?? []).find(f => f.id === fabricanteId)?.nome : "Selecionar fabricante"}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Buscar fabricante..." />
-                          <CommandList>
-                            <CommandEmpty>Nenhum fabricante encontrado.</CommandEmpty>
-                            <CommandGroup>
-                              {(fabricantes ?? []).map(f => (
-                                <CommandItem key={f.id} value={f.nome} onSelect={() => { setFabricanteId(f.id); setFabricanteOpen(false); }}>
-                                  <Check className={cn("mr-2 h-4 w-4", fabricanteId === f.id ? "opacity-100" : "opacity-0")} />
-                                  {f.nome}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                    <FabricanteSelector 
+                      value={fabricanteId} 
+                      onValueChange={setFabricanteId} 
+                    />
                   </div>
                 </div>
 
