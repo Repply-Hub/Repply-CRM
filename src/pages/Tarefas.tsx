@@ -29,7 +29,7 @@ import { useTableSettings } from '@/hooks/use-table-settings';
 import { cn } from '@/lib/utils';
 
 const TAREFA_COLUMNS: ColumnDefinition[] = [
-  { id: 'titulo', label: 'Tarefa', locked: true },
+  { id: 'titulo', label: 'Tarefa' },
   { id: 'responsavel', label: 'Responsável' },
   { id: 'prazo_final', label: 'Prazo' },
   { id: 'status', label: 'Status' },
