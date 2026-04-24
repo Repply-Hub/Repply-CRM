@@ -771,7 +771,7 @@ const Clientes = () => {
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : activeTab === 'empresas' ? (
           <>
-            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-hidden">
+            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
@@ -866,7 +866,7 @@ const Clientes = () => {
           </>
         ) : (
           <>
-            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-hidden">
+            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">

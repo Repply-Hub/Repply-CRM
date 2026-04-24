@@ -539,7 +539,7 @@ const Fabricantes = () => {
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                       </div>
                     ) : precosFiltrados.length > 0 ? (
-                      <div className="rounded-lg border border-border/50 overflow-hidden">
+                      <div className="rounded-lg border border-border/50 overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30 hover:bg-muted/30">
