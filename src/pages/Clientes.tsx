@@ -100,7 +100,7 @@ const getExtraValue = (extras: Record<string, any>, column: ColumnDefinition) =>
 
 const SCHEMA_COLUMN_ALIASES: Record<string, string[]> = {
   empresa: ['empresa', 'nome empresa', 'nome da empresa', 'nome fantasia', 'cliente'],
-  tipo: ['tipo', 'segmento', 'segmento atuacao', 'segmento de atuacao', 'categoria'],
+  tipo: ['tipo', 'segmento', 'segmento atuacao', 'segmento de atuacao', 'categoria', 'segemento', 'segemento de atuacao'],
   cnpj: ['cnpj', 'cpf', 'cpf cnpj', 'cpf/cnpj', 'documento'],
   email: ['email', 'e mail', 'e-mail', 'mail'],
   telefone: ['telefone', 'telefone trabalho', 'telefone de trabalho', 'fone', 'celular', 'whatsapp'],
