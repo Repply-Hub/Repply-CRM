@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 import { ExportClientesButton } from '@/components/ExportClientesButton';
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
-  { id: 'empresa', label: 'Nome/Empresa' },
+  { id: 'empresa', label: 'Nome/Empresa', locked: false },
   { id: 'tipo', label: 'Tipo' },
   { id: 'cnpj', label: 'CPF/CNPJ' },
   { id: 'email', label: 'E-mail' },
@@ -41,7 +41,7 @@ const CLIENTE_FIELDS: ColumnDefinition[] = [
 ];
 
 const CONTATO_FIELDS: ColumnDefinition[] = [
-  { id: 'nome_contato', label: 'Nome' },
+  { id: 'nome_contato', label: 'Nome', locked: false },
   { id: 'empresa', label: 'Empresa' },
   { id: 'email', label: 'E-mail' },
   { id: 'telefone', label: 'Telefone' },
