@@ -52,6 +52,7 @@ export default function Obras() {
     pageSize,
     setPageSize,
     handleRename,
+    handleTypeChange,
     handleAddColumn,
     handleRemoveColumn,
     handleReorder,

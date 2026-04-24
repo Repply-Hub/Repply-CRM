@@ -320,6 +320,7 @@ const Fabricantes = () => {
     pageSize: precoPageSize,
     setPageSize: setPrecoPageSize,
     handleRename: handlePrecoRename,
+    handleTypeChange: handlePrecoTypeChange,
     handleAddColumn: handleAddPrecoColumn,
     handleRemoveColumn: handleRemovePrecoColumn,
     handleReorder: handlePrecoReorder,

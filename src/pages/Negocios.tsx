@@ -82,6 +82,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     pageSize,
     setPageSize,
     handleRename,
+    handleTypeChange,
     handleAddColumn,
     handleRemoveColumn,
     handleReorder,
