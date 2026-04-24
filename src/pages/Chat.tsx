@@ -191,7 +191,10 @@ function MembersList({
                 )}
               >
                 <div className="relative">
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-8 w-8 border border-primary/10">
+                    {m.avatar_url && (
+                      <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+                    )}
                     <AvatarFallback className={`${colorForId(m.id)} text-white text-[10px] font-semibold`}>
                       {getInitials(m.nome)}
                     </AvatarFallback>
