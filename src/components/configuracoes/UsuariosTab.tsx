@@ -583,7 +583,7 @@ function AuditLog() {
 
 // ─── User Detail Panel ───
 function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId }: {
-  vendedor: { id: string; nome: string; email: string; telefone: string | null; role: string; user_id: string | null };
+  vendedor: { id: string; nome: string; email: string; telefone: string | null; role: string; user_id: string | null; avatar_url?: string | null };
   isGestor: boolean;
   onEdit: () => void;
   onDelete: () => void;
