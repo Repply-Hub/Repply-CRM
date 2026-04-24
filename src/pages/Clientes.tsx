@@ -35,6 +35,8 @@ const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'empresa', label: 'Nome/Empresa', locked: false },
   { id: 'tipo', label: 'Tipo' },
   { id: 'cnpj', label: 'CPF/CNPJ' },
+  { id: 'classificacao', label: 'Classificação' },
+  { id: 'data_criacao', label: 'Criado em' },
   { id: 'email', label: 'E-mail' },
   { id: 'endereco', label: 'Endereço' },
   { id: 'obras_count', label: 'Qtd. Obras' },
@@ -43,6 +45,8 @@ const CLIENTE_FIELDS: ColumnDefinition[] = [
 const CONTATO_FIELDS: ColumnDefinition[] = [
   { id: 'nome_contato', label: 'Nome', locked: false },
   { id: 'empresa', label: 'Empresa' },
+  { id: 'classificacao', label: 'Classificação' },
+  { id: 'data_criacao', label: 'Criado em' },
   { id: 'email', label: 'E-mail' },
   { id: 'telefone', label: 'Telefone' },
   { id: 'cargo', label: 'Cargo' },
