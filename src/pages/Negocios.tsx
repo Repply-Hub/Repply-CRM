@@ -460,6 +460,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <span>Gerenciar colunas kanban...</span>
             </button>
           )}
+          {!showKanban && (
             <>
               <button
                 type="button"
