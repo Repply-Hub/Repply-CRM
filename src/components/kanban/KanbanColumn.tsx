@@ -13,6 +13,7 @@ interface KanbanColumnProps {
   label: string;
   colorClass: string;
   orders: Order[];
+  onCardClick?: (id: string) => void;
 }
 
 export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders }: KanbanColumnProps) {
