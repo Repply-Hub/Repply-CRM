@@ -59,6 +59,14 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /estagio/, score: 82 },
     { pattern: /pipeline stage/, score: 84 },
   ],
+  data_pedido: [
+    { pattern: /^data$/, score: 100 },
+    { pattern: /^criado$/, score: 98 },
+    { pattern: /^criado\s*em$/, score: 98 },
+    { pattern: /data/, score: 85 },
+    { pattern: /criado/, score: 80 },
+    { pattern: /date/, score: 85 },
+  ],
   observacoes: [
     { pattern: /observa/, score: 95 },
     { pattern: /obs/, score: 92 },
@@ -76,6 +84,7 @@ const MIN_SCORE: Record<FieldKey, number> = {
   valor: 66,
   observacoes: 68,
   status: 70,
+  data_pedido: 70,
 };
 
 const STATUS_RULES: Array<{ status: string; patterns: RegExp[] }> = [
