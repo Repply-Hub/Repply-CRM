@@ -300,11 +300,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
   // Lista de campos extras únicos para mostrar no preview (com nome final)
   const extraFieldNames = useMemo(
-    () => Array.from(new Set([
-      ...Object.entries(extras).map(([col, name]) => (name || col).trim()),
-      ...Object.keys(customColumns).map(n => n.trim()),
-    ].filter(Boolean))),
-    [extras, customColumns]
+    () => Array.from(new Set(previewRowsSnapshot.flatMap(row => Object.keys(row.campos_extras || {})))),
+    [previewRowsSnapshot]
   );
 
   const handleImport = async () => {
@@ -446,23 +443,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             onAutoDetect={() => {
               const auto = autoDetectMapping(headers);
               setMapping(auto);
-              
-              // Auto-detect extras: any column not mapped to a standard field
-              const used = new Set(Object.values(auto).filter(Boolean));
-              const newExtras: Record<string, string> = {};
-              
-              // Keywords that suggest a column should be an extra field rather than ignored
-              const extraKeywords = [/classificacao/, /criado/, /data/, /obs/, /nota/, /vendedor/, /origem/, /setor/, /departamento/];
-              
-              headers.forEach(h => {
-                if (!used.has(h)) {
-                  const norm = normalizeText(h);
-                  if (extraKeywords.some(r => r.test(norm))) {
-                    newExtras[h] = h;
-                  }
-                }
-              });
-              setExtras(newExtras);
+              setExtras(autoDetectExtras(headers, Object.values(auto).filter(Boolean)));
             }}
             onClearAll={() => {
               setMapping({
