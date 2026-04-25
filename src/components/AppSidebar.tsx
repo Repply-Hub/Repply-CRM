@@ -163,7 +163,7 @@ export function AppSidebar() {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <SidebarHeader className="px-2 py-3 border-b border-primary/20 mb-2 min-h-[4rem] flex flex-col justify-center">
+        <SidebarHeader className="px-2 border-b border-primary/20 min-h-[4rem] flex flex-col justify-center">
           <Link
             to="/dashboard"
             className={`flex items-center overflow-visible hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : 'gap-3'}`}
