@@ -113,7 +113,7 @@ function MembersList({
             </Avatar>
           </button>
         ))}
-        <div className="mt-auto border-t border-border w-full flex justify-center py-2 h-[4.3rem] items-center bg-muted/30">
+        <div className="mt-auto border-t border-border w-full flex justify-center py-2 h-[4rem] items-center bg-muted/30">
           <button onClick={onToggle} className="p-2 rounded-lg hover:bg-muted/50 transition-colors" title="Expandir equipe">
             <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
           </button>
@@ -222,7 +222,7 @@ function MembersList({
           })}
         </div>
       </ScrollArea>
-      <div className="border-t border-border px-3 py-2 mt-auto bg-muted/30 h-[4.3rem] flex items-center">
+      <div className="border-t border-border px-3 py-2 mt-auto bg-muted/30 h-[4rem] flex items-center">
         <button onClick={onToggle} className="flex items-center gap-2 w-full p-1.5 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground" title="Recolher equipe">
           <PanelLeftClose className="h-4 w-4" />
           <span className="text-[10px]">Recolher</span>
