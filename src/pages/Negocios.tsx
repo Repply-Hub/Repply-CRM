@@ -682,7 +682,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <User className="h-3 w-3" /> Vendedor Responsável
                 </p>
-                <p className="text-sm font-medium">{selectedViewOrder.vendedor?.nome ?? '-'}</p>
+                {selectedViewOrder.vendedor ? (
+                  <button 
+                    onClick={() => navigate(`/usuarios/${selectedViewOrder.vendedor?.id}`)}
+                    className="text-sm font-medium hover:text-primary transition-colors text-left flex items-center gap-1 group"
+                  >
+                    {selectedViewOrder.vendedor.nome}
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                ) : (
+                  <p className="text-sm font-medium">-</p>
+                )}
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
