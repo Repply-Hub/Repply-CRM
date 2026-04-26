@@ -324,7 +324,47 @@ const ContatoDetalhe = () => {
                   onChange={e => setEditData(d => ({ ...d, nome_contato: e.target.value }))} 
                   required 
                 />
+        </div>
+
+        <Dialog open={vincularOpen} onOpenChange={setVincularOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Vincular Empresa</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Selecione a Empresa</Label>
+                <EmpresaSelector 
+                  value={selectedEmpresaId} 
+                  onValueChange={setSelectedEmpresaId} 
+                />
               </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setVincularOpen(false)}>Cancelar</Button>
+              <Button 
+                onClick={async () => {
+                  const emp = clientes?.find(c => c.id === selectedEmpresaId);
+                  if (emp && id) {
+                    try {
+                      await updateContato.mutateAsync({
+                        id,
+                        empresa: emp.empresa
+                      });
+                      toast.success('Empresa vinculada com sucesso!');
+                      setVincularOpen(false);
+                    } catch (err: any) {
+                      toast.error('Erro ao vincular: ' + err.message);
+                    }
+                  }
+                }}
+                disabled={!selectedEmpresaId || updateContato.isPending}
+              >
+                {updateContato.isPending ? 'Vinculando...' : 'Vincular'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
               <div>
                 <Label>E-mail</Label>
                 <Input 
