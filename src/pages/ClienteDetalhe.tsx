@@ -47,6 +47,9 @@ const ClienteDetalhe = () => {
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const [addContatoOpen, setAddContatoOpen] = useState(false);
   const [addObraOpen, setAddObraOpen] = useState(false);
+  const [vincularContatoOpen, setVincularContatoOpen] = useState(false);
+  const [selectedContatoId, setSelectedContatoId] = useState('');
+  const updateContato = useUpdateContato();
   const createObra = useCreateObra();
   const [novaObra, setNovaObra] = useState({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
   const [pedidosPage, setPedidosPage] = useState(1);
