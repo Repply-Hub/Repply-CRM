@@ -147,25 +147,24 @@ export default function Obras() {
     <AppLayout 
       title="Obras" 
       subtitle="Gerencie e acompanhe todas as obras cadastradas."
-      headerContent={
-        <div className="flex items-center justify-end flex-1">
-          <Button onClick={() => setDialogOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nova Obra
-          </Button>
-        </div>
-      }
     >
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="lista" className="gap-2">
-              <List className="h-4 w-4" /> Lista
-            </TabsTrigger>
-            <TabsTrigger value="mapa" className="gap-2">
-              <MapIcon className="h-4 w-4" /> Mapa
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between">
+            <TabsList>
+              <TabsTrigger value="lista" className="gap-2">
+                <List className="h-4 w-4" /> Lista
+              </TabsTrigger>
+              <TabsTrigger value="mapa" className="gap-2">
+                <MapIcon className="h-4 w-4" /> Mapa
+              </TabsTrigger>
+            </TabsList>
+
+            <Button onClick={() => setDialogOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nova Obra
+            </Button>
+          </div>
 
           <TabsContent value="lista" className="space-y-6 mt-0">
             {/* Filters */}
