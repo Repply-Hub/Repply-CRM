@@ -24,12 +24,16 @@ const ContatoDetalhe = () => {
   const navigate = useNavigate();
   const { data: contatos, isLoading } = useContatos();
   const { data: clientes } = useClientes();
+  const { data: todosPedidos } = usePedidos();
   const updateContato = useUpdateContato();
   const deleteContato = useDeleteContato();
   const [editOpen, setEditOpen] = useState(false);
 
   const contato = contatos?.find(c => c.id === id);
   const clienteVinculado = clientes?.find(c => c.empresa === contato?.empresa);
+
+  const pedidosRelacionados = todosPedidos?.filter(p => p.cliente_id === clienteVinculado?.id) || [];
+  const { data: historico } = useHistoricoContatos(null); // Just for structure, we might need a specific filter or mock if no direct link exists yet.
 
   const [editData, setEditData] = useState({
     nome_contato: '',
