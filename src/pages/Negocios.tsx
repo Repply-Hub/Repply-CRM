@@ -400,7 +400,25 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = async (specificPedidoId?: string) => {
+    if (specificPedidoId) {
+      const p = pedidos?.find(p => p.id === specificPedidoId);
+      if (!p) return;
+      await generatePedidosPdf(
+        [{
+          cliente: p.cliente?.empresa ?? '-',
+          obra: p.obra?.nome_obra ?? '-',
+          fabricante: p.fabricante?.nome ?? '-',
+          vendedor: p.vendedor?.nome ?? '-',
+          valor: p.valor_total ?? 0,
+          etapa: stageLabel(p.status),
+          data: p.data_pedido,
+        }],
+        `Negócio - ${p.cliente?.empresa ?? p.id}`
+      );
+      return;
+    }
+
     if (showKanban) {
       await generatePedidosPdf(
         pipelineOrders.map(o => ({
@@ -497,7 +515,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <>
               <button
                 type="button"
-                onClick={handleExportPdf}
+                onClick={() => handleExportPdf()}
                 className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium hover:bg-muted/80 transition-all text-left"
               >
                 <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -732,7 +750,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
         <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
           <div className="flex flex-1 gap-2">
-            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => handleExportPdf()}>
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => handleExportPdf(viewOrderId || undefined)}>
               <FileDown className="h-4 w-4 mr-2" /> PDF
             </Button>
           </div>
