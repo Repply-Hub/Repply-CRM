@@ -44,6 +44,7 @@ const ClienteDetalhe = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [enderecoOpen, setEnderecoOpen] = useState(true);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
+  const [addContatoOpen, setAddContatoOpen] = useState(false);
 
   const copyInfo = async (label: string, value?: string | null) => {
     if (!value?.trim()) return;
