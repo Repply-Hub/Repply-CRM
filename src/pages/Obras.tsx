@@ -389,6 +389,97 @@ export default function Obras() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Cadastrar Nova Obra</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="nome_obra">Nome da Obra *</Label>
+              <Input
+                id="nome_obra"
+                value={newObra.nome_obra}
+                onChange={(e) => setNewObra({ ...newObra, nome_obra: e.target.value })}
+                placeholder="Ex: Edifício Horizonte"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Cliente *</Label>
+              <EmpresaSelector 
+                value={newObra.cliente_id} 
+                onValueChange={(id) => setNewObra({ ...newObra, cliente_id: id })} 
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="endereco">Endereço de Entrega</Label>
+              <Input
+                id="endereco"
+                value={newObra.endereco_entrega}
+                onChange={(e) => setNewObra({ ...newObra, endereco_entrega: e.target.value })}
+                placeholder="Rua, número, bairro..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select 
+                  value={newObra.status} 
+                  onValueChange={(v) => setNewObra({ ...newObra, status: v })}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativa">Ativa</SelectItem>
+                    <SelectItem value="em_andamento">Em andamento</SelectItem>
+                    <SelectItem value="parada">Parada</SelectItem>
+                    <SelectItem value="concluida">Concluída</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="spe_cnpj">CNPJ / SPE</Label>
+                <Input
+                  id="spe_cnpj"
+                  value={newObra.spe_cnpj}
+                  onChange={(e) => setNewObra({ ...newObra, spe_cnpj: e.target.value })}
+                  placeholder="00.000.000/0000-00"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button 
+              disabled={createObra.isPending}
+              onClick={async () => {
+                if (!newObra.nome_obra || !newObra.cliente_id) {
+                  toast.error('Nome da obra e Cliente são obrigatórios');
+                  return;
+                }
+                try {
+                  await createObra.mutateAsync(newObra);
+                  toast.success('Obra cadastrada com sucesso!');
+                  setDialogOpen(false);
+                  setNewObra({
+                    nome_obra: '',
+                    cliente_id: '',
+                    endereco_entrega: '',
+                    status: 'ativa',
+                    spe_cnpj: '',
+                  });
+                } catch (error: any) {
+                  toast.error('Erro ao cadastrar obra: ' + error.message);
+                }
+              }}
+            >
+              {createObra.isPending ? 'Salvando...' : 'Cadastrar Obra'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
