@@ -449,7 +449,7 @@ const ClienteDetalhe = () => {
         {/* Contatos extras (apenas para empresas, não pessoa física) */}
         {cliente.tipo !== 'pessoa_fisica' && (
           <Card className="border-border/40">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-base flex items-center gap-2">
                 <Users className="h-4 w-4 text-primary" />
                 Contatos Adicionais
@@ -457,6 +457,10 @@ const ClienteDetalhe = () => {
                   <Badge variant="secondary" className="ml-1">{contatosExtras.length}</Badge>
                 )}
               </CardTitle>
+              <Button size="sm" onClick={() => setAddContatoOpen(true)} className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                Adicionar
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-border overflow-hidden mb-4">
