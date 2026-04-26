@@ -4,14 +4,14 @@ import { AppLayout } from '@/components/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { usePedidos } from '@/hooks/use-pedidos';
-import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra } from '@/hooks/use-mutations';
+import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown, Users, X, HardHat } from 'lucide-react';
@@ -47,6 +47,9 @@ const ClienteDetalhe = () => {
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const [addContatoOpen, setAddContatoOpen] = useState(false);
   const [addObraOpen, setAddObraOpen] = useState(false);
+  const [vincularContatoOpen, setVincularContatoOpen] = useState(false);
+  const [selectedContatoId, setSelectedContatoId] = useState('');
+  const updateContato = useUpdateContato();
   const createObra = useCreateObra();
   const [novaObra, setNovaObra] = useState({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
   const [pedidosPage, setPedidosPage] = useState(1);
@@ -559,6 +562,10 @@ const ClienteDetalhe = () => {
                 <Plus className="h-4 w-4" />
                 Adicionar
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setVincularContatoOpen(true)} className="gap-1.5 ml-2">
+                <Users className="h-4 w-4" />
+                Vincular Existente
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-border overflow-hidden mb-4">
@@ -660,6 +667,55 @@ const ClienteDetalhe = () => {
                       </Button>
                     </div>
                   </form>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={vincularContatoOpen} onOpenChange={setVincularContatoOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Vincular Contato Existente</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Selecione o Contato</Label>
+                      <Select value={selectedContatoId} onValueChange={setSelectedContatoId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Escolha um contato..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contatos?.filter(c => c.empresa !== cliente.empresa).map(c => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.nome_contato} {c.empresa ? `(${c.empresa})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setVincularContatoOpen(false)}>Cancelar</Button>
+                    <Button 
+                      onClick={async () => {
+                        const contact = contatos?.find(c => c.id === selectedContatoId);
+                        if (contact && id) {
+                          try {
+                            await updateContato.mutateAsync({
+                              id: selectedContatoId,
+                              empresa: cliente.empresa
+                            });
+                            toast.success('Contato vinculado com sucesso!');
+                            setVincularContatoOpen(false);
+                            setSelectedContatoId('');
+                          } catch (err: any) {
+                            toast.error('Erro ao vincular: ' + err.message);
+                          }
+                        }
+                      }}
+                      disabled={!selectedContatoId || updateContato.isPending}
+                    >
+                      {updateContato.isPending ? 'Vinculando...' : 'Vincular ao Cliente'}
+                    </Button>
+                  </DialogFooter>
                 </DialogContent>
               </Dialog>
             </CardContent>
