@@ -463,6 +463,83 @@ const ClienteDetalhe = () => {
                   </div>
                 ))}
               </div>
+
+              <Dialog open={addObraOpen} onOpenChange={setAddObraOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Adicionar Nova Obra</DialogTitle>
+                  </DialogHeader>
+                  <form 
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!novaObra.nome_obra.trim()) {
+                        toast.error('O nome da obra é obrigatório');
+                        return;
+                      }
+                      try {
+                        await createObra.mutateAsync({
+                          ...novaObra,
+                          cliente_id: id!
+                        });
+                        toast.success('Obra cadastrada com sucesso!');
+                        setNovaObra({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
+                        setAddObraOpen(false);
+                      } catch (err: any) {
+                        toast.error('Erro ao cadastrar obra: ' + err.message);
+                      }
+                    }} 
+                    className="space-y-4 pt-4"
+                  >
+                    <div className="space-y-2">
+                      <Label>Nome da Obra *</Label>
+                      <Input
+                        value={novaObra.nome_obra}
+                        onChange={e => setNovaObra(o => ({ ...o, nome_obra: e.target.value }))}
+                        placeholder="Ex: Edifício Horizonte"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Endereço de Entrega</Label>
+                      <Input
+                        value={novaObra.endereco_entrega}
+                        onChange={e => setNovaObra(o => ({ ...o, endereco_entrega: e.target.value }))}
+                        placeholder="Rua, número, bairro..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select value={novaObra.status} onValueChange={v => setNovaObra(o => ({ ...o, status: v }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ativa">Ativa</SelectItem>
+                          <SelectItem value="em_andamento">Em andamento</SelectItem>
+                          <SelectItem value="parada">Parada</SelectItem>
+                          <SelectItem value="concluida">Concluída</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>CNPJ / SPE</Label>
+                      <Input
+                        value={novaObra.spe_cnpj}
+                        onChange={e => setNovaObra(o => ({ ...o, spe_cnpj: e.target.value }))}
+                        placeholder="00.000.000/0000-00"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button type="button" variant="outline" onClick={() => setAddObraOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button type="submit" disabled={createObra.isPending}>
+                        {createObra.isPending ? 'Cadastrando...' : 'Adicionar Obra'}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         )}
