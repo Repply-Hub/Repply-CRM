@@ -514,45 +514,56 @@ const ClienteDetalhe = () => {
                 </div>
                 </div>
 
-              <form onSubmit={handleAddContato} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 items-end pt-2 border-t border-border">
-                <div className="lg:col-span-1">
-                  <Label className="text-xs">Nome do contato *</Label>
-                  <Input
-                    value={novoContato.nome_contato}
-                    onChange={e => setNovoContato(c => ({ ...c, nome_contato: e.target.value }))}
-                    placeholder="Ex: João Silva"
-                  />
-                </div>
-                <div className="lg:col-span-1">
-                  <Label className="text-xs">Tipo / Cargo</Label>
-                  <Input
-                    value={novoContato.cargo}
-                    onChange={e => setNovoContato(c => ({ ...c, cargo: e.target.value }))}
-                    placeholder="Ex: Comprador, Engenheiro"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Email</Label>
-                  <Input
-                    type="email"
-                    value={novoContato.email}
-                    onChange={e => setNovoContato(c => ({ ...c, email: e.target.value }))}
-                    placeholder="email@exemplo.com"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Telefone</Label>
-                  <Input
-                    value={novoContato.telefone}
-                    onChange={e => setNovoContato(c => ({ ...c, telefone: e.target.value }))}
-                    placeholder="(00) 00000-0000"
-                  />
-                </div>
-                <Button type="submit" disabled={createContato.isPending} className="w-full lg:w-auto inline-flex items-center justify-center gap-2">
-                  <Plus className="h-4 w-4 shrink-0" />
-                  {createContato.isPending ? 'Adicionando...' : 'Adicionar'}
-                </Button>
-              </form>
+              <Dialog open={addContatoOpen} onOpenChange={setAddContatoOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Adicionar Novo Contato</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleAddContato} className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Nome do contato *</Label>
+                      <Input
+                        value={novoContato.nome_contato}
+                        onChange={e => setNovoContato(c => ({ ...c, nome_contato: e.target.value }))}
+                        placeholder="Ex: João Silva"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tipo / Cargo</Label>
+                      <Input
+                        value={novoContato.cargo}
+                        onChange={e => setNovoContato(c => ({ ...c, cargo: e.target.value }))}
+                        placeholder="Ex: Comprador, Engenheiro"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input
+                        type="email"
+                        value={novoContato.email}
+                        onChange={e => setNovoContato(c => ({ ...c, email: e.target.value }))}
+                        placeholder="email@exemplo.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Telefone</Label>
+                      <Input
+                        value={novoContato.telefone}
+                        onChange={e => setNovoContato(c => ({ ...c, telefone: e.target.value }))}
+                        placeholder="(00) 00000-0000"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button type="button" variant="outline" onClick={() => setAddContatoOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button type="submit" disabled={createContato.isPending}>
+                        {createContato.isPending ? 'Adicionando...' : 'Adicionar Contato'}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         )}
