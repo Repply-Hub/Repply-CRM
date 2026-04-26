@@ -35,8 +35,18 @@ export function usePedidos(empresaId?: string) {
         `);
 
       if (empresaId) {
-        query = query.eq('usuario_id', empresaId); // Or should it be filtering by the user's company? 
-        // Let's check how users are linked to companies.
+        // First get all user IDs for this company
+        const { data: companyUsers } = await supabase
+          .from('usuarios')
+          .select('id')
+          .eq('empresa_id', empresaId);
+        
+        if (companyUsers && companyUsers.length > 0) {
+          query = query.in('usuario_id', companyUsers.map(u => u.id));
+        } else {
+          // If no users found for the company, return empty
+          return [];
+        }
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
