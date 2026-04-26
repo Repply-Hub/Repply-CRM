@@ -92,8 +92,11 @@ const Dashboard = () => {
   const fechados = filteredPedidos.filter(p => p.status === 'fechamento').length;
   const taxaConversao = totalPedidos > 0 ? ((fechados / totalPedidos) * 100).toFixed(0) : '0';
 
-  const totalFaturamento = filteredFaturamento.reduce((sum, f) => sum + (f.faturamento_total ?? 0), 0);
-  const totalPedidosFechados = filteredFaturamento.reduce((sum, f) => sum + (f.qtd_pedidos_fechados ?? 0), 0);
+  const totalFaturamento = filteredPedidos
+    .filter(p => p.status === 'fechamento')
+    .reduce((sum, p) => sum + (p.valor_total ?? 0), 0);
+    
+  const totalPedidosFechados = filteredPedidos.filter(p => p.status === 'fechamento').length;
   const ticketMedioGeral = totalPedidosFechados > 0 ? totalFaturamento / totalPedidosFechados : 0;
 
   const kpis = [
