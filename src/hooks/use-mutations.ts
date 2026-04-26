@@ -161,27 +161,6 @@ export function useCreateObra() {
   });
 }
 
-export function useUpdateContato() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, ...data }: {
-      id: string;
-      nome_contato?: string;
-      email?: string;
-      telefone?: string;
-      cargo?: string;
-      empresa?: string;
-      vendedor_id?: string;
-    }) => {
-      const { error } = await supabase.from('contatos').update(data).eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['contatos'] });
-    },
-  });
-}
-
 export function useCreateFabricante() {
   const qc = useQueryClient();
   return useMutation({
