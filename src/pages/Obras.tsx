@@ -45,6 +45,7 @@ type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
 
 export default function Obras() {
   const { data: obras, isLoading } = useObras();
+  const createObra = useCreateObra();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
@@ -52,6 +53,16 @@ export default function Obras() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
     const saved = localStorage.getItem('obras_view_mode');
     return (saved as any) || 'cards';
+  });
+
+  // Modal state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [newObra, setNewObra] = useState({
+    nome_obra: '',
+    cliente_id: '',
+    endereco_entrega: '',
+    status: 'ativa',
+    spe_cnpj: '',
   });
 
   const {
