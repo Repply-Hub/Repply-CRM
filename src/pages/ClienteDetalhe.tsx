@@ -46,6 +46,9 @@ const ClienteDetalhe = () => {
   const [enderecoOpen, setEnderecoOpen] = useState(true);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const [addContatoOpen, setAddContatoOpen] = useState(false);
+  const [addObraOpen, setAddObraOpen] = useState(false);
+  const createObra = useCreateObra();
+  const [novaObra, setNovaObra] = useState({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
   const [pedidosPage, setPedidosPage] = useState(1);
   const PEDIDOS_PAGE_SIZE = 5;
 
