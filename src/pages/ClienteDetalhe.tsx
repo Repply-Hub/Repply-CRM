@@ -411,8 +411,8 @@ const ClienteDetalhe = () => {
                           <TableCell onClick={e => e.stopPropagation()}>
                             {c.cargo ? <Badge variant="outline">{c.cargo}</Badge> : <span className="text-muted-foreground text-xs">-</span>}
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{c.email || '-'}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{c.telefone || '-'}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>{c.email || '-'}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>{c.telefone || '-'}</TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
