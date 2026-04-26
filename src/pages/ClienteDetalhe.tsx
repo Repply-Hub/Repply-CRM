@@ -436,8 +436,18 @@ const ClienteDetalhe = () => {
         {/* Obras */}
         {cliente.obras && cliente.obras.length > 0 && (
           <Card className="border-border/40">
-            <CardHeader>
-              <CardTitle className="text-base">Obras Vinculadas</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-base flex items-center gap-2">
+                <HardHat className="h-4 w-4 text-primary" />
+                Obras Vinculadas
+                {cliente.obras && cliente.obras.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">{cliente.obras.length}</Badge>
+                )}
+              </CardTitle>
+              <Button size="sm" onClick={() => setAddObraOpen(true)} className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                Nova Obra
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2">
