@@ -32,6 +32,8 @@ const ContatoDetalhe = () => {
 
   const contato = contatos?.find(c => c.id === id);
   const clienteVinculado = clientes?.find(c => c.empresa === contato?.empresa);
+  const [vincularOpen, setVincularOpen] = useState(false);
+  const [selectedEmpresaId, setSelectedEmpresaId] = useState('');
 
   const pedidosRelacionados = todosPedidos?.filter(p => p.cliente_id === clienteVinculado?.id) || [];
   const { data: historico } = useHistoricoContatos(null); // Just for structure, we might need a specific filter or mock if no direct link exists yet.
