@@ -173,13 +173,23 @@ const ContatoDetalhe = () => {
               <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
                 <p className="text-xs text-muted-foreground mb-1">Empresa</p>
                 <p className="text-base font-bold text-foreground truncate">{contato.empresa || 'Não informada'}</p>
-                {clienteVinculado && (
+                {clienteVinculado ? (
                   <Button 
                     variant="link" 
                     className="p-0 h-auto text-xs text-primary font-semibold mt-2 hover:no-underline"
                     onClick={() => navigate(`/clientes/${clienteVinculado.id}`)}
                   >
                     Ver perfil da empresa →
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2 w-full text-xs gap-1.5"
+                    onClick={() => setVincularOpen(true)}
+                  >
+                    <Plus className="h-3 w-3" />
+                    Vincular Empresa
                   </Button>
                 )}
               </div>
