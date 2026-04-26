@@ -10,6 +10,9 @@ import {
 import { TrendingUp, DollarSign, Target, Clock, Loader2, Factory } from 'lucide-react';
 import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante } from '@/hooks/use-dashboard';
 import { usePedidos } from '@/hooks/use-pedidos';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
 import { DateRangePicker, type DateRange } from '@/components/DateRangePicker';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/ChartTooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -38,10 +41,27 @@ const Dashboard = () => {
   });
   const [fabricaSort, setFabricaSort] = useState<'maior' | 'menor'>('maior');
 
-  const { data: faturamento, isLoading: loadFat } = useFaturamentoMensal();
-  const { data: vendedores } = useIndicadoresVendedor();
-  const { data: velocidade } = useVelocidadeFabricante();
-  const { data: pedidos } = usePedidos();
+  const { user } = useAuth();
+  const { data: userData } = useQuery({
+    queryKey: ['usuario_perfil', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  const empresaId = userData?.empresa_id;
+
+  const { data: faturamento, isLoading: loadFat } = useFaturamentoMensal(empresaId);
+  const { data: vendedores } = useIndicadoresVendedor(empresaId);
+  const { data: velocidade } = useVelocidadeFabricante(empresaId);
+  const { data: pedidos } = usePedidos(empresaId);
 
   const isLoading = loadFat;
 
