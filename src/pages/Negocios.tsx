@@ -400,15 +400,30 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = async (specificPedidoId?: string) => {
+    if (specificPedidoId) {
+      const p = pedidos?.find(p => p.id === specificPedidoId);
+      if (!p) return;
+      await generatePedidosPdf(
+        [{
+          cliente: p.cliente?.empresa ?? '-',
+          obra: p.obra?.nome_obra ?? '-',
+          fabricante: p.fabricante?.nome ?? '-',
+          vendedor: p.vendedor?.nome ?? '-',
+          valor: p.valor_total ?? 0,
+          etapa: stageLabel(p.status),
+          data: p.data_pedido,
+        }],
+        `Negócio - ${p.cliente?.empresa ?? p.id}`
+      );
+      return;
+    }
+
     if (showKanban) {
       await generatePedidosPdf(
         pipelineOrders.map(o => ({
           cliente: o.clientName,
-          obra: o.obra,
-          fabricante: o.fabricante,
-          vendedor: o.vendedor,
-          valor: o.valor,
+...
           etapa: stageLabel(o.stage),
           data: o.createdAt,
         })),
