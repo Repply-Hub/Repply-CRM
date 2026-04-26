@@ -3,13 +3,22 @@ import { AppLayout } from '@/components/AppLayout';
 import { useObras } from '@/hooks/use-obras';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { 
+  Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, 
+  LayoutGrid, Table as TableIcon, Plus 
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { EmpresaSelector } from '@/components/EmpresaSelector';
+import { useCreateObra } from '@/hooks/use-mutations';
+import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { ListPagination } from '@/components/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
@@ -36,6 +45,7 @@ type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
 
 export default function Obras() {
   const { data: obras, isLoading } = useObras();
+  const createObra = useCreateObra();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
@@ -43,6 +53,16 @@ export default function Obras() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
     const saved = localStorage.getItem('obras_view_mode');
     return (saved as any) || 'cards';
+  });
+
+  // Modal state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [newObra, setNewObra] = useState({
+    nome_obra: '',
+    cliente_id: '',
+    endereco_entrega: '',
+    status: 'ativa',
+    spe_cnpj: '',
   });
 
   const {
@@ -124,7 +144,18 @@ export default function Obras() {
   );
 
   return (
-    <AppLayout title="Obras" subtitle="Gerencie e acompanhe todas as obras cadastradas.">
+    <AppLayout 
+      title="Obras" 
+      subtitle="Gerencie e acompanhe todas as obras cadastradas."
+      headerContent={
+        <div className="flex items-center justify-end flex-1">
+          <Button onClick={() => setDialogOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nova Obra
+          </Button>
+        </div>
+      }
+    >
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
           <TabsList>
@@ -358,6 +389,97 @@ export default function Obras() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Cadastrar Nova Obra</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="nome_obra">Nome da Obra *</Label>
+              <Input
+                id="nome_obra"
+                value={newObra.nome_obra}
+                onChange={(e) => setNewObra({ ...newObra, nome_obra: e.target.value })}
+                placeholder="Ex: Edifício Horizonte"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Cliente *</Label>
+              <EmpresaSelector 
+                value={newObra.cliente_id} 
+                onValueChange={(id) => setNewObra({ ...newObra, cliente_id: id })} 
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="endereco">Endereço de Entrega</Label>
+              <Input
+                id="endereco"
+                value={newObra.endereco_entrega}
+                onChange={(e) => setNewObra({ ...newObra, endereco_entrega: e.target.value })}
+                placeholder="Rua, número, bairro..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select 
+                  value={newObra.status} 
+                  onValueChange={(v) => setNewObra({ ...newObra, status: v })}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativa">Ativa</SelectItem>
+                    <SelectItem value="em_andamento">Em andamento</SelectItem>
+                    <SelectItem value="parada">Parada</SelectItem>
+                    <SelectItem value="concluida">Concluída</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="spe_cnpj">CNPJ / SPE</Label>
+                <Input
+                  id="spe_cnpj"
+                  value={newObra.spe_cnpj}
+                  onChange={(e) => setNewObra({ ...newObra, spe_cnpj: e.target.value })}
+                  placeholder="00.000.000/0000-00"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button 
+              disabled={createObra.isPending}
+              onClick={async () => {
+                if (!newObra.nome_obra || !newObra.cliente_id) {
+                  toast.error('Nome da obra e Cliente são obrigatórios');
+                  return;
+                }
+                try {
+                  await createObra.mutateAsync(newObra);
+                  toast.success('Obra cadastrada com sucesso!');
+                  setDialogOpen(false);
+                  setNewObra({
+                    nome_obra: '',
+                    cliente_id: '',
+                    endereco_entrega: '',
+                    status: 'ativa',
+                    spe_cnpj: '',
+                  });
+                } catch (error: any) {
+                  toast.error('Erro ao cadastrar obra: ' + error.message);
+                }
+              }}
+            >
+              {createObra.isPending ? 'Salvando...' : 'Cadastrar Obra'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
