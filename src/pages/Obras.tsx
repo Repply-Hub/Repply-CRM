@@ -156,7 +156,7 @@ export default function Obras() {
     >
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <TabsList>
               <TabsTrigger value="lista" className="gap-2">
                 <List className="h-4 w-4" /> Lista
@@ -166,7 +166,7 @@ export default function Obras() {
               </TabsTrigger>
             </TabsList>
 
-            <Button onClick={() => setDialogOpen(true)} className="gap-2">
+            <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />
               Nova Obra
             </Button>
