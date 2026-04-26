@@ -3,13 +3,22 @@ import { AppLayout } from '@/components/AppLayout';
 import { useObras } from '@/hooks/use-obras';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { 
+  Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, 
+  LayoutGrid, Table as TableIcon, Plus 
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { EmpresaSelector } from '@/components/EmpresaSelector';
+import { useCreateObra } from '@/hooks/use-mutations';
+import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { ListPagination } from '@/components/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
