@@ -223,7 +223,7 @@ export default function Login() {
                     </div>
                     <div>
                       <p className="font-semibold text-sm">Entrar como funcionário</p>
-                      <p className="text-xs text-muted-foreground">Use o código fornecido pelo seu gestor</p>
+                      <p className="text-xs text-muted-foreground">Use o código de uso único fornecido pelo seu gestor</p>
                     </div>
                   </button>
                 </div>
