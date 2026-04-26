@@ -15,7 +15,7 @@ export function useFaturamentoMensal(empresaId?: string) {
       
       const { data, error } = await query.order('mes', { ascending: true });
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 }
@@ -34,7 +34,7 @@ export function useIndicadoresVendedor(empresaId?: string) {
       
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 }
@@ -53,7 +53,7 @@ export function useVelocidadeFabricante(empresaId?: string) {
       
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 }
