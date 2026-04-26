@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { usePedidos } from '@/hooks/use-pedidos';
-import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato } from '@/hooks/use-mutations';
+import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra } from '@/hooks/use-mutations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown, Users, X } from 'lucide-react';
+import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown, Users, X, HardHat } from 'lucide-react';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { toast } from 'sonner';
 import { EnderecoForm } from '@/components/EnderecoForm';
@@ -46,6 +46,9 @@ const ClienteDetalhe = () => {
   const [enderecoOpen, setEnderecoOpen] = useState(true);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const [addContatoOpen, setAddContatoOpen] = useState(false);
+  const [addObraOpen, setAddObraOpen] = useState(false);
+  const createObra = useCreateObra();
+  const [novaObra, setNovaObra] = useState({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
   const [pedidosPage, setPedidosPage] = useState(1);
   const PEDIDOS_PAGE_SIZE = 5;
 
@@ -433,8 +436,18 @@ const ClienteDetalhe = () => {
         {/* Obras */}
         {cliente.obras && cliente.obras.length > 0 && (
           <Card className="border-border/40">
-            <CardHeader>
-              <CardTitle className="text-base">Obras Vinculadas</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-base flex items-center gap-2">
+                <HardHat className="h-4 w-4 text-primary" />
+                Obras Vinculadas
+                {cliente.obras && cliente.obras.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">{cliente.obras.length}</Badge>
+                )}
+              </CardTitle>
+              <Button size="sm" onClick={() => setAddObraOpen(true)} className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                Nova Obra
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -450,6 +463,83 @@ const ClienteDetalhe = () => {
                   </div>
                 ))}
               </div>
+
+              <Dialog open={addObraOpen} onOpenChange={setAddObraOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Adicionar Nova Obra</DialogTitle>
+                  </DialogHeader>
+                  <form 
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!novaObra.nome_obra.trim()) {
+                        toast.error('O nome da obra é obrigatório');
+                        return;
+                      }
+                      try {
+                        await createObra.mutateAsync({
+                          ...novaObra,
+                          cliente_id: id!
+                        });
+                        toast.success('Obra cadastrada com sucesso!');
+                        setNovaObra({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
+                        setAddObraOpen(false);
+                      } catch (err: any) {
+                        toast.error('Erro ao cadastrar obra: ' + err.message);
+                      }
+                    }} 
+                    className="space-y-4 pt-4"
+                  >
+                    <div className="space-y-2">
+                      <Label>Nome da Obra *</Label>
+                      <Input
+                        value={novaObra.nome_obra}
+                        onChange={e => setNovaObra(o => ({ ...o, nome_obra: e.target.value }))}
+                        placeholder="Ex: Edifício Horizonte"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Endereço de Entrega</Label>
+                      <Input
+                        value={novaObra.endereco_entrega}
+                        onChange={e => setNovaObra(o => ({ ...o, endereco_entrega: e.target.value }))}
+                        placeholder="Rua, número, bairro..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select value={novaObra.status} onValueChange={v => setNovaObra(o => ({ ...o, status: v }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ativa">Ativa</SelectItem>
+                          <SelectItem value="em_andamento">Em andamento</SelectItem>
+                          <SelectItem value="parada">Parada</SelectItem>
+                          <SelectItem value="concluida">Concluída</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>CNPJ / SPE</Label>
+                      <Input
+                        value={novaObra.spe_cnpj}
+                        onChange={e => setNovaObra(o => ({ ...o, spe_cnpj: e.target.value }))}
+                        placeholder="00.000.000/0000-00"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4">
+                      <Button type="button" variant="outline" onClick={() => setAddObraOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button type="submit" disabled={createObra.isPending}>
+                        {createObra.isPending ? 'Cadastrando...' : 'Adicionar Obra'}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         )}

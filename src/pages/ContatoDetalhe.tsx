@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { EmpresaSelector } from '@/components/EmpresaSelector';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { ArrowLeft, User, Mail, Phone, Loader2, Pencil, Trash2, Building2, Calendar, Clock, MessageSquare, History, Factory, DollarSign } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Loader2, Pencil, Trash2, Building2, Calendar, Clock, MessageSquare, History, Factory, DollarSign, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -31,6 +32,8 @@ const ContatoDetalhe = () => {
 
   const contato = contatos?.find(c => c.id === id);
   const clienteVinculado = clientes?.find(c => c.empresa === contato?.empresa);
+  const [vincularOpen, setVincularOpen] = useState(false);
+  const [selectedEmpresaId, setSelectedEmpresaId] = useState('');
 
   const pedidosRelacionados = todosPedidos?.filter(p => p.cliente_id === clienteVinculado?.id) || [];
   const { data: historico } = useHistoricoContatos(null); // Just for structure, we might need a specific filter or mock if no direct link exists yet.
@@ -170,13 +173,23 @@ const ContatoDetalhe = () => {
               <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
                 <p className="text-xs text-muted-foreground mb-1">Empresa</p>
                 <p className="text-base font-bold text-foreground truncate">{contato.empresa || 'Não informada'}</p>
-                {clienteVinculado && (
+                {clienteVinculado ? (
                   <Button 
                     variant="link" 
                     className="p-0 h-auto text-xs text-primary font-semibold mt-2 hover:no-underline"
                     onClick={() => navigate(`/clientes/${clienteVinculado.id}`)}
                   >
                     Ver perfil da empresa →
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2 w-full text-xs gap-1.5"
+                    onClick={() => setVincularOpen(true)}
+                  >
+                    <Plus className="h-3 w-3" />
+                    Vincular Empresa
                   </Button>
                 )}
               </div>
@@ -311,7 +324,47 @@ const ContatoDetalhe = () => {
                   onChange={e => setEditData(d => ({ ...d, nome_contato: e.target.value }))} 
                   required 
                 />
+        </div>
+
+        <Dialog open={vincularOpen} onOpenChange={setVincularOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Vincular Empresa</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Selecione a Empresa</Label>
+                <EmpresaSelector 
+                  value={selectedEmpresaId} 
+                  onValueChange={setSelectedEmpresaId} 
+                />
               </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setVincularOpen(false)}>Cancelar</Button>
+              <Button 
+                onClick={async () => {
+                  const emp = clientes?.find(c => c.id === selectedEmpresaId);
+                  if (emp && id) {
+                    try {
+                      await updateContato.mutateAsync({
+                        id,
+                        empresa: emp.empresa
+                      });
+                      toast.success('Empresa vinculada com sucesso!');
+                      setVincularOpen(false);
+                    } catch (err: any) {
+                      toast.error('Erro ao vincular: ' + err.message);
+                    }
+                  }
+                }}
+                disabled={!selectedEmpresaId || updateContato.isPending}
+              >
+                {updateContato.isPending ? 'Vinculando...' : 'Vincular'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
               <div>
                 <Label>E-mail</Label>
                 <Input 

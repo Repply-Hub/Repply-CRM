@@ -141,6 +141,26 @@ export function useCreateVendedor() {
   });
 }
 
+export function useCreateObra() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      nome_obra: string;
+      cliente_id: string;
+      endereco_entrega?: string;
+      status?: string;
+      spe_cnpj?: string;
+    }) => {
+      const { error } = await supabase.from('obras').insert(data);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obras'] });
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+    },
+  });
+}
+
 export function useCreateFabricante() {
   const qc = useQueryClient();
   return useMutation({
