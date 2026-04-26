@@ -45,6 +45,8 @@ const ClienteDetalhe = () => {
   const [enderecoOpen, setEnderecoOpen] = useState(true);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const [addContatoOpen, setAddContatoOpen] = useState(false);
+  const [pedidosPage, setPedidosPage] = useState(1);
+  const PEDIDOS_PAGE_SIZE = 5;
 
   const copyInfo = async (label: string, value?: string | null) => {
     if (!value?.trim()) return;
@@ -57,7 +59,12 @@ const ClienteDetalhe = () => {
   };
 
   const cliente = clientes?.find(c => c.id === id);
-  const pedidosCliente = (pedidos ?? []).filter(p => p.cliente_id === id);
+  const pedidosCliente = useMemo(() => (pedidos ?? []).filter(p => p.cliente_id === id), [pedidos, id]);
+  const totalPedidosPages = Math.max(1, Math.ceil(pedidosCliente.length / PEDIDOS_PAGE_SIZE));
+  const paginatedPedidos = useMemo(() => 
+    pedidosCliente.slice((pedidosPage - 1) * PEDIDOS_PAGE_SIZE, pedidosPage * PEDIDOS_PAGE_SIZE),
+    [pedidosCliente, pedidosPage]
+  );
   const contatosExtras = (contatos ?? []).filter((c: any) => cliente && c.empresa === cliente.empresa);
 
   // Edit form state
@@ -600,7 +607,7 @@ const ClienteDetalhe = () => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      pedidosCliente.map(p => (
+                      paginatedPedidos.map(p => (
                         <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setViewOrderId(p.id)}>
                           <TableCell className="font-medium">{(p as any).fabricante?.nome ?? '-'}</TableCell>
                           <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
@@ -614,6 +621,18 @@ const ClienteDetalhe = () => {
                   </TableBody>
                 </Table>
               </div>
+            )}
+            {pedidosCliente.length > PEDIDOS_PAGE_SIZE && (
+              <ListPagination
+                page={pedidosPage}
+                totalPages={totalPedidosPages}
+                totalItems={pedidosCliente.length}
+                pageSize={PEDIDOS_PAGE_SIZE}
+                onPageChange={setPedidosPage}
+                onPageSizeChange={() => {}}
+                itemLabel="pedido"
+                className="mt-4 border-t pt-4"
+              />
             )}
           </CardContent>
         </Card>
