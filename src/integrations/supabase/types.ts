@@ -1651,16 +1651,26 @@ export type Database = {
     Views: {
       vw_faturamento_mensal: {
         Row: {
+          empresa_id: string | null
           faturamento_total: number | null
           mes: string | null
           mes_ano: string | null
           qtd_pedidos_fechados: number | null
           ticket_medio: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendedores_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vw_indicadores_usuario: {
         Row: {
+          empresa_id: string | null
           qtd_elaborando: number | null
           qtd_enviado: number | null
           qtd_fechado: number | null
@@ -1674,10 +1684,19 @@ export type Database = {
           usuario_id: string | null
           usuario_nome: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendedores_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vw_indicadores_vendedor: {
         Row: {
+          empresa_id: string | null
           qtd_elaborando: number | null
           qtd_enviado: number | null
           qtd_fechado: number | null
@@ -1691,7 +1710,15 @@ export type Database = {
           vendedor_id: string | null
           vendedor_nome: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendedores_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vw_pedidos_inativos: {
         Row: {
@@ -1709,12 +1736,21 @@ export type Database = {
       }
       vw_velocidade_por_fabricante: {
         Row: {
+          empresa_id: string | null
           fabricante_id: string | null
           fabricante_nome: string | null
           tempo_medio_ate_orcamento_dias: number | null
           total_pedidos: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendedores_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {

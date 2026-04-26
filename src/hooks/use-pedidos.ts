@@ -19,26 +19,41 @@ export interface PedidoWithRelations {
   obra: { id: string; nome_obra: string } | null;
 }
 
-export function usePedidos() {
+export function usePedidos(empresaId?: string) {
   return useQuery({
-    queryKey: ['pedidos'],
+    queryKey: ['pedidos', empresaId],
     queryFn: async () => {
-      // Seleciona apenas as colunas usadas na UI (evita trafegar campos pesados como observacoes/endereco)
-      const { data, error } = await supabase
+      let query = supabase
         .from('pedidos')
         .select(`
           id, status, valor_total, data_pedido, created_at, observacoes,
           cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
-          vendedor:usuarios(id, nome),
+          vendedor:usuarios(id, nome, empresa_id),
           obra:obras(id, nome_obra)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+
+      if (empresaId) {
+        // First get all user IDs for this company
+        const { data: companyUsers } = await supabase
+          .from('usuarios')
+          .select('id')
+          .eq('empresa_id', empresaId);
+        
+        if (companyUsers && companyUsers.length > 0) {
+          query = query.in('usuario_id', companyUsers.map(u => u.id));
+        } else {
+          // If no users found for the company, return empty
+          return [];
+        }
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
-      return data as unknown as PedidoWithRelations[];
+      return (data || []) as unknown as PedidoWithRelations[];
     },
-    staleTime: 60_000, // 1min — evita refetch ao alternar entre páginas
+    staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
