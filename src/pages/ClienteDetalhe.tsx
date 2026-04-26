@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -43,6 +43,7 @@ const ClienteDetalhe = () => {
   const { data: contatos } = useContatos();
   const [editOpen, setEditOpen] = useState(false);
   const [enderecoOpen, setEnderecoOpen] = useState(true);
+  const [viewOrderId, setViewOrderId] = useState<string | null>(null);
 
   const copyInfo = async (label: string, value?: string | null) => {
     if (!value?.trim()) return;
@@ -152,6 +153,75 @@ const ClienteDetalhe = () => {
   const Icon = tipoIcons[cliente.tipo] ?? Building2;
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
 
+  const selectedViewOrder = useMemo(() => 
+    (pedidos ?? []).find(p => p.id === viewOrderId),
+  [pedidos, viewOrderId]);
+
+  const viewOrderSheet = (
+    <Dialog open={!!viewOrderId} onOpenChange={(open) => !open && setViewOrderId(null)}>
+      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-6 border-b">
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-1">
+              <DialogTitle className="text-xl font-bold">
+                {selectedViewOrder?.cliente?.empresa ?? 'Detalhes do Negócio'}
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {selectedViewOrder?.obra?.nome_obra ?? 'Sem obra vinculada'}
+              </p>
+            </div>
+          </div>
+        </DialogHeader>
+
+        {selectedViewOrder ? (
+          <div className="py-6 space-y-8">
+            <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Fabricante</p>
+                <p className="text-sm font-medium">{(selectedViewOrder as any).fabricante?.nome ?? '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Valor Total</p>
+                <p className="text-sm font-bold text-primary">
+                  {(selectedViewOrder.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Data do Pedido</p>
+                <p className="text-sm font-medium">
+                  {new Date(selectedViewOrder.data_pedido).toLocaleDateString('pt-BR')}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</p>
+                <Badge className={stageColors[selectedViewOrder.status] ?? ''}>
+                  {stageLabel(selectedViewOrder.status)}
+                </Badge>
+              </div>
+            </div>
+            
+            {selectedViewOrder.observacoes && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Observações</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap italic">"{selectedViewOrder.observacoes}"</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-6 border-t mt-4">
+          <Button variant="outline" onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
+            <Pencil className="h-4 w-4 mr-2" /> Editar Negócio
+          </Button>
+          <Button variant="secondary" onClick={() => setViewOrderId(null)}>Fechar</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
     <AppLayout
       headerContent={
@@ -178,6 +248,7 @@ const ClienteDetalhe = () => {
         </div>
       }
     >
+      {viewOrderSheet}
       <div className="p-6 space-y-6">
 
         {/* Edit Dialog */}
@@ -406,13 +477,13 @@ const ClienteDetalhe = () => {
                           </TableCell>
                         </TableRow>
                       ) : contatosExtras.map((c: any) => (
-                        <TableRow key={c.id}>
+                        <TableRow key={c.id} className="cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/contatos/${c.id}`)}>
                           <TableCell className="font-medium">{c.nome_contato || '-'}</TableCell>
-                          <TableCell>
+                          <TableCell onClick={e => e.stopPropagation()}>
                             {c.cargo ? <Badge variant="outline">{c.cargo}</Badge> : <span className="text-muted-foreground text-xs">-</span>}
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{c.email || '-'}</TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{c.telefone || '-'}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>{c.email || '-'}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>{c.telefone || '-'}</TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
@@ -513,7 +584,7 @@ const ClienteDetalhe = () => {
                       </TableRow>
                     ) : (
                       pedidosCliente.map(p => (
-                        <TableRow key={p.id}>
+                        <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setViewOrderId(p.id)}>
                           <TableCell className="font-medium">{(p as any).fabricante?.nome ?? '-'}</TableCell>
                           <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                           <TableCell>
