@@ -147,10 +147,16 @@ export default function Obras() {
     <AppLayout 
       title="Obras" 
       subtitle="Gerencie e acompanhe todas as obras cadastradas."
+      headerContent={
+        <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
+          <h1 className="text-base sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight truncate">Obras</h1>
+          <p className="text-[10px] sm:text-sm text-muted-foreground truncate">Gerencie e acompanhe todas as obras cadastradas.</p>
+        </div>
+      }
     >
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <TabsList>
               <TabsTrigger value="lista" className="gap-2">
                 <List className="h-4 w-4" /> Lista
@@ -160,7 +166,7 @@ export default function Obras() {
               </TabsTrigger>
             </TabsList>
 
-            <Button onClick={() => setDialogOpen(true)} className="gap-2">
+            <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />
               Nova Obra
             </Button>
