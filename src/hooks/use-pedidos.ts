@@ -51,7 +51,7 @@ export function usePedidos(empresaId?: string) {
 
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
-      return data as unknown as PedidoWithRelations[];
+      return (data || []) as unknown as PedidoWithRelations[];
     },
     staleTime: 60_000,
     gcTime: 5 * 60_000,
