@@ -562,6 +562,10 @@ const ClienteDetalhe = () => {
                 <Plus className="h-4 w-4" />
                 Adicionar
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setVincularContatoOpen(true)} className="gap-1.5 ml-2">
+                <Users className="h-4 w-4" />
+                Vincular Existente
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-border overflow-hidden mb-4">
