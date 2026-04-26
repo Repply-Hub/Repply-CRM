@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/use-auth';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,7 +63,24 @@ interface NegociosProps {
 const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: pedidos, isLoading } = usePedidos();
+  const { session } = useAuth();
+  
+  const { data: userData } = useQuery({
+    queryKey: ['usuario_perfil_negocios', session?.user?.id],
+    queryFn: async () => {
+      if (!session?.user?.id) return null;
+      const { data } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!session?.user?.id,
+  });
+
+  const empresaId = userData?.empresa_id;
+  const { data: pedidos, isLoading } = usePedidos(empresaId);
   const updateStatus = useUpdatePedidoStatus();
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
