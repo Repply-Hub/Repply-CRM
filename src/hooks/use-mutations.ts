@@ -88,6 +88,23 @@ export function useDeleteContato() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contatos'] }),
   });
 }
+export function useUpdateContato() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: {
+      id: string;
+      nome_contato?: string;
+      email?: string;
+      telefone?: string;
+      cargo?: string;
+      empresa?: string;
+    }) => {
+      const { error } = await supabase.from('contatos').update(data).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contatos'] }),
+  });
+}
 export function useCreatePedido() {
   const qc = useQueryClient();
   return useMutation({
