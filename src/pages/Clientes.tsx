@@ -985,7 +985,7 @@ const Clientes = () => {
 
                           if (colId === 'nome_contato') {
                             return (
-                              <td key={colId} className="py-2.5 px-4">
+                              <td key={colId} className="py-2.5 px-4" onClick={() => navigate(`/contatos/${contato.id}`)}>
                                 <div className="flex items-center gap-2.5">
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <User className="h-4 w-4 text-primary" />
@@ -997,7 +997,7 @@ const Clientes = () => {
                           }
 
                           return (
-                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]">
+                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]" onClick={() => navigate(`/contatos/${contato.id}`)}>
                               {value || '—'}
                             </td>
                           );
