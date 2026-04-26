@@ -13,6 +13,7 @@ export interface DateRange {
 }
 
 const presets = [
+  { label: 'Todos', range: () => ({ from: new Date(2000, 0, 1), to: new Date() }) },
   { label: 'Últimos 7 dias', range: () => ({ from: subDays(new Date(), 7), to: new Date() }) },
   { label: 'Últimos 30 dias', range: () => ({ from: subDays(new Date(), 30), to: new Date() }) },
   { label: 'Este mês', range: () => ({ from: startOfMonth(new Date()), to: new Date() }) },
