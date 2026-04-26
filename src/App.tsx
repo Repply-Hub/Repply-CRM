@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import Negocios from "./pages/Negocios";
 import Clientes from "./pages/Clientes";
 import ClienteDetalhe from "./pages/ClienteDetalhe";
+import ContatoDetalhe from "./pages/ContatoDetalhe";
 import NovoPedido from "./pages/NovoPedido";
 import Dashboard from "./pages/Dashboard";
 import Configuracoes from "./pages/Configuracoes";
@@ -48,6 +49,7 @@ const AppRoutes = () => (
     <Route path="/" element={<ProtectedRoute><Negocios defaultView="pipeline" /></ProtectedRoute>} />
     <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
     <Route path="/clientes/:id" element={<ProtectedRoute><ClienteDetalhe /></ProtectedRoute>} />
+    <Route path="/contatos/:id" element={<ProtectedRoute><ContatoDetalhe /></ProtectedRoute>} />
     <Route path="/pedidos" element={<Navigate to="/" replace />} />
     <Route path="/pedidos/novo" element={<ProtectedRoute><NovoPedido /></ProtectedRoute>} />
     <Route path="/pedidos/:id/editar" element={<ProtectedRoute><EditarPedido /></ProtectedRoute>} />
