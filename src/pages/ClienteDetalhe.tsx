@@ -669,6 +669,55 @@ const ClienteDetalhe = () => {
                   </form>
                 </DialogContent>
               </Dialog>
+
+              <Dialog open={vincularContatoOpen} onOpenChange={setVincularContatoOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Vincular Contato Existente</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Selecione o Contato</Label>
+                      <Select value={selectedContatoId} onValueChange={setSelectedContatoId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Escolha um contato..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contatos?.filter(c => c.empresa !== cliente.empresa).map(c => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.nome_contato} {c.empresa ? `(${c.empresa})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setVincularContatoOpen(false)}>Cancelar</Button>
+                    <Button 
+                      onClick={async () => {
+                        const contact = contatos?.find(c => c.id === selectedContatoId);
+                        if (contact && id) {
+                          try {
+                            await updateContato.mutateAsync({
+                              id: selectedContatoId,
+                              empresa: cliente.empresa
+                            });
+                            toast.success('Contato vinculado com sucesso!');
+                            setVincularContatoOpen(false);
+                            setSelectedContatoId('');
+                          } catch (err: any) {
+                            toast.error('Erro ao vincular: ' + err.message);
+                          }
+                        }
+                      }}
+                      disabled={!selectedContatoId || updateContato.isPending}
+                    >
+                      {updateContato.isPending ? 'Vinculando...' : 'Vincular ao Cliente'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         )}
