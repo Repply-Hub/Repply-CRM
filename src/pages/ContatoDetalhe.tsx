@@ -157,7 +157,7 @@ const ContatoDetalhe = () => {
         </div>
       }
     >
-      <div className="p-6 space-y-6 max-w-6xl">
+      <div className="p-4 sm:p-6 space-y-6 w-full max-w-[1600px] mx-auto">
         <div className="grid gap-6 md:grid-cols-3">
           {/* Card: Perfil e Empresa */}
           <Card className="md:col-span-1">
