@@ -406,9 +406,9 @@ const ClienteDetalhe = () => {
                           </TableCell>
                         </TableRow>
                       ) : contatosExtras.map((c: any) => (
-                        <TableRow key={c.id}>
+                        <TableRow key={c.id} className="cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/contatos/${c.id}`)}>
                           <TableCell className="font-medium">{c.nome_contato || '-'}</TableCell>
-                          <TableCell>
+                          <TableCell onClick={e => e.stopPropagation()}>
                             {c.cargo ? <Badge variant="outline">{c.cargo}</Badge> : <span className="text-muted-foreground text-xs">-</span>}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">{c.email || '-'}</TableCell>
