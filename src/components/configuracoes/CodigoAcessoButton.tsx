@@ -63,7 +63,7 @@ export function CodigoAcessoButton() {
               <Building2 className="h-5 w-5 text-primary" /> Código de Acesso
             </DialogTitle>
             <DialogDescription>
-              Compartilhe este código com seus funcionários para que eles possam se cadastrar na sua empresa.
+              Compartilhe este código com um funcionário para que ele possa se cadastrar. O código é de uso único e será alterado automaticamente após o uso.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
