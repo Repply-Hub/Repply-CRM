@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { usePedidos } from '@/hooks/use-pedidos';
-import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra } from '@/hooks/use-mutations';
+import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
