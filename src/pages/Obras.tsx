@@ -147,6 +147,12 @@ export default function Obras() {
     <AppLayout 
       title="Obras" 
       subtitle="Gerencie e acompanhe todas as obras cadastradas."
+      headerContent={
+        <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
+          <h1 className="text-base sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight truncate">Obras</h1>
+          <p className="text-[10px] sm:text-sm text-muted-foreground truncate">Gerencie e acompanhe todas as obras cadastradas.</p>
+        </div>
+      }
     >
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
