@@ -423,7 +423,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       await generatePedidosPdf(
         pipelineOrders.map(o => ({
           cliente: o.clientName,
-...
+          obra: o.obra,
+          fabricante: o.fabricante,
+          vendedor: o.vendedor,
+          valor: o.valor,
           etapa: stageLabel(o.stage),
           data: o.createdAt,
         })),
