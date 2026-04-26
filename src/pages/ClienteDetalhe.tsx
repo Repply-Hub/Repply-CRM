@@ -85,6 +85,7 @@ const ClienteDetalhe = () => {
       });
       toast.success('Contato adicionado!');
       setNovoContato({ nome_contato: '', cargo: '', email: '', telefone: '' });
+      setAddContatoOpen(false);
     } catch (err: any) {
       toast.error(err.message);
     }
