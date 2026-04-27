@@ -41,18 +41,8 @@ serve(async (req) => {
       );
     }
 
-    // Consultar domínio verificado do usuário
-    const { data: domainData } = await supabase
-      .from('user_domains')
-      .select('domain_name')
-      .eq('user_id', user.id)
-      .eq('status', 'verified')
-      .maybeSingle();
-
-    // Definir o remetente dinâmico
-    const fromEmail = domainData 
-      ? `contato@${domainData.domain_name}` 
-      : 'onboarding@resend.dev';
+    // Remetente fixo para o domínio verificado
+    const fromEmail = "Mederi <contato@mdrepresentacoes.grupoclimb.ai>";
 
     // Chamada para o Resend
     const res = await fetch('https://api.resend.com/emails', {
