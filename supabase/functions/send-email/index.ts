@@ -17,7 +17,20 @@ serve(async (req) => {
       throw new Error("A variável RESEND_API_KEY não foi encontrada no ambiente do Supabase.");
     }
 
-    // Chamada direta para o Resend
+    const { to, subject, html } = await req.json();
+
+    // Validação básica dos campos obrigatórios
+    if (!to || !subject || !html) {
+      return new Response(
+        JSON.stringify({ error: "Os campos 'to', 'subject' e 'html' são obrigatórios." }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+          status: 400 
+        }
+      );
+    }
+
+    // Chamada para o Resend com dados dinâmicos
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -26,15 +39,15 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         from: 'onboarding@resend.dev',
-        to: 'viniciusgodoy.pj@gmail.com',
-        subject: 'Teste de Conexão CRM',
-        html: '<p>A conexão Deno + Supabase + Resend foi um sucesso!</p>'
+        to: to,
+        subject: subject,
+        html: html
       })
     });
 
     const data = await res.json();
     
-    return new Response(JSON.stringify({ success: true, resend_data: data }), {
+    return new Response(JSON.stringify({ success: res.ok, resend_data: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: res.ok ? 200 : 400
     });
