@@ -29,6 +29,7 @@ serve(async (req) => {
       console.error("Authorization header ausente");
       throw new Error("Cabeçalho de autorização não encontrado");
     }
+
     console.log("Buscando usuário...");
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
 
@@ -37,6 +38,7 @@ serve(async (req) => {
     }
 
     console.log("Usuário autenticado:", user.id);
+
     // 1. Buscar se o usuário possui um domínio verificado
     console.log("Buscando domínios verificados...");
     const { data: domains, error: domainError } = await supabaseClient
@@ -51,29 +53,24 @@ serve(async (req) => {
     }
 
     console.log("Parsing body...");
-    const { to, subject, html } = await req.json();
+    const payload = await req.json();
+    const { to, subject, html } = payload;
     console.log("Destinatário:", to);
 
     // 2. Definir o remetente (from)
-    // Se tiver domínio verificado: contato@dominio.com
-    // Caso contrário: avisos@meucrm.com.br
     let fromEmail = "avisos@meucrm.com.br";
     if (domains && domains.length > 0) {
       fromEmail = `contato@${domains[0].domain_name}`;
     }
 
-    // 3. Usar a chave RESEND_API_KEY global dos Secrets
-    const apiKey = Deno.env.get("RESEND_API_KEY");
-    if (!apiKey) {
-      throw new Error("RESEND_API_KEY não configurada nos Secrets do Supabase");
-    }
-
     console.log("Enviando via Resend com de:", fromEmail);
+
+    // 3. Chamada para a API do Resend com log detalhado conforme solicitado
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
+        "Authorization": `Bearer ${Deno.env.get("RESEND_API_KEY")}`,
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         from: fromEmail,
@@ -83,27 +80,19 @@ serve(async (req) => {
       }),
     });
 
-    let responseData;
-    try {
-      responseData = await res.json();
-    } catch (e) {
-      console.error("Erro ao fazer parse da resposta do Resend:", e);
-      responseData = { error: "Resposta inválida do serviço de e-mail" };
-    }
-    console.log("Resposta do Resend:", responseData);
+    const responseText = await res.text();
+    console.log("Resposta da Resend:", responseText);
 
     if (!res.ok) {
-      return new Response(JSON.stringify(responseData), {
-        status: res.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      throw new Error(`Resend Error: ${responseText}`);
     }
 
-    return new Response(JSON.stringify(data), {
+    return new Response(responseText, {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
+    console.error("Erro na função send-email:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
