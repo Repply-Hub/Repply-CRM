@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
@@ -67,7 +68,7 @@ function ProfileTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, email, telefone, role, avatar_url')
+        .select('id, nome, email, telefone, role, avatar_url, assinatura_email')
         .eq('user_id', user!.id)
         .single();
       if (error) throw error;
@@ -77,7 +78,7 @@ function ProfileTab() {
   });
 
   const updatePerfil = useMutation({
-    mutationFn: async (dados: { nome?: string; telefone?: string; avatar_url?: string | null }) => {
+    mutationFn: async (dados: { nome?: string; telefone?: string; avatar_url?: string | null; assinatura_email?: string }) => {
       const { error } = await supabase.from('usuarios').update(dados).eq('user_id', user!.id);
       if (error) throw error;
     },
@@ -152,7 +153,11 @@ function ProfileTab() {
   const handleSalvarPerfil = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    updatePerfil.mutate({ nome: form.get('nome') as string, telefone: form.get('telefone') as string });
+    updatePerfil.mutate({ 
+      nome: form.get('nome') as string, 
+      telefone: form.get('telefone') as string,
+      assinatura_email: form.get('assinatura_email') as string
+    });
   };
 
   const handleSalvarEmail = (e: React.FormEvent<HTMLFormElement>) => {
@@ -183,7 +188,7 @@ function ProfileTab() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2"><UserCircle className="h-4 w-4 text-primary" /> Informações Pessoais</CardTitle>
-            <CardDescription>Atualize seu nome e telefone</CardDescription>
+            <CardDescription>Atualize seu nome, telefone e assinatura de e-mail</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4 mb-5">
@@ -211,6 +216,7 @@ function ProfileTab() {
             <form onSubmit={handleSalvarPerfil} className="space-y-3">
               <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" defaultValue={perfil.nome} placeholder="Seu nome completo" className="h-10" /></div>
               <div className="space-y-1.5"><Label>Telefone</Label><Input name="telefone" defaultValue={perfil.telefone ?? ''} placeholder="(00) 00000-0000" className="h-10" /></div>
+              <div className="space-y-1.5"><Label>Assinatura de E-mail</Label><Textarea name="assinatura_email" defaultValue={perfil.assinatura_email ?? ''} placeholder="Ex: Atenciosamente, Equipe MD" className="min-h-[100px]" /></div>
               <Button type="submit" size="sm" disabled={updatePerfil.isPending}>
                 {updatePerfil.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Salvar alterações
