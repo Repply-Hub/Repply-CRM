@@ -268,58 +268,58 @@ const Emails = () => {
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Escrever E-mail</DialogTitle>
-                <DialogDescription>
-                  Envie uma mensagem via Resend.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="to">Destinatário</Label>
-                  <Input
-                    id="to"
-                    placeholder="email@exemplo.com"
-                    value={formData.destinatario}
-                    onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="subject">Assunto</Label>
-                  <Input
-                    id="subject"
-                    placeholder="Assunto da mensagem"
-                    value={formData.assunto}
-                    onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="body">Mensagem</Label>
-                  <Textarea
-                    id="body"
-                    placeholder="Escreva sua mensagem aqui..."
-                    className="min-h-[200px]"
-                    value={formData.corpo}
-                    onChange={(e) => setFormData({ ...formData, corpo: e.target.value })}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsComposeOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={sendEmailMutation.isPending}>
-                    {sendEmailMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Send className="h-4 w-4 mr-2" />
-                    )}
-                    Enviar E-mail
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+                <DialogHeader>
+                  <DialogTitle>Escrever E-mail</DialogTitle>
+                  <DialogDescription>
+                    Envie uma mensagem via Resend.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="to">Destinatário</Label>
+                    <Input
+                      id="to"
+                      placeholder="email@exemplo.com"
+                      value={formData.destinatario}
+                      onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="subject">Assunto</Label>
+                    <Input
+                      id="subject"
+                      placeholder="Assunto da mensagem"
+                      value={formData.assunto}
+                      onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="body">Mensagem</Label>
+                    <Textarea
+                      id="body"
+                      placeholder="Escreva sua mensagem aqui..."
+                      className="min-h-[200px]"
+                      value={formData.corpo}
+                      onChange={(e) => setFormData({ ...formData, corpo: e.target.value })}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setIsComposeOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={sendEmailMutation.isPending}>
+                      {sendEmailMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      Enviar E-mail
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
 
         <Tabs defaultValue="sent">
           <TabsList className="mb-4">
