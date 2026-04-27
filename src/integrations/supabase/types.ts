@@ -1650,6 +1650,7 @@ export type Database = {
       }
       usuarios: {
         Row: {
+          assinatura_email: string | null
           avatar_url: string | null
           created_at: string
           email: string
@@ -1661,6 +1662,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          assinatura_email?: string | null
           avatar_url?: string | null
           created_at?: string
           email: string
@@ -1672,6 +1674,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          assinatura_email?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string
