@@ -40,6 +40,20 @@ const Emails = () => {
   const [formData, setFormData] = useState({ destinatario: "", assunto: "", corpo: "" });
   const queryClient = useQueryClient();
 
+  const { data: perfil } = useQuery({
+    queryKey: ["meu_perfil"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from("usuarios")
+        .select("nome, assinatura_email")
+        .eq("user_id", user.id)
+        .single();
+      return data;
+    },
+  });
+
   const { data: emails, isLoading } = useQuery({
     queryKey: ["emails", searchTerm],
     queryFn: async () => {
@@ -65,7 +79,18 @@ const Emails = () => {
         body: {
           to: [data.destinatario],
           subject: data.assunto,
-          html: `<div style="font-family: sans-serif;">${data.corpo.replace(/\n/g, '<br>')}</div>`,
+          html: `
+            <div style="font-family: sans-serif; color: #333;">
+              <div style="margin-bottom: 20px;">
+                ${data.corpo.replace(/\n/g, '<br>')}
+              </div>
+              <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px;">
+                <p style="margin: 0; font-weight: bold;">${perfil?.nome || "Equipe MD"}</p>
+                ${perfil?.assinatura_email ? `<p style="margin: 5px 0 15px 0; color: #666; font-size: 14px;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</p>` : ''}
+                <img src="https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" alt="MD Representações" style="height: 40px;" />
+              </div>
+            </div>
+          `,
         },
       });
 
