@@ -40,7 +40,12 @@ const Emails = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [formData, setFormData] = useState({ destinatario: "", assunto: "", corpo: "" });
+  const [formData, setFormData] = useState({ 
+    destinatario: "", 
+    assunto: "", 
+    corpo: "",
+    logoUrl: "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" 
+  });
   const [settingsData, setSettingsData] = useState({ resend_api_key: "", resend_from_email: "" });
   const queryClient = useQueryClient();
 
@@ -127,7 +132,7 @@ const Emails = () => {
   });
 
   const sendEmailMutation = useMutation({
-    mutationFn: async (data: { destinatario: string; assunto: string; corpo: string }) => {
+    mutationFn: async (data: { destinatario: string; assunto: string; corpo: string; logoUrl: string }) => {
       const { data: resData, error: resError } = await supabase.functions.invoke("send-email", {
         body: {
           to: data.destinatario,
@@ -145,7 +150,7 @@ const Emails = () => {
                       <p style="margin: 0; font-weight: bold; color: #333; font-size: 16px;">${perfil?.nome || "Equipe MD"}</p>
                       ${perfil?.assinatura_email ? `<p style="margin: 5px 0 15px 0; font-size: 14px; line-height: 1.5; color: #666;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</p>` : ''}
                       <div style="margin-top: 10px;">
-                        <img src="https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" alt="MD Representações" style="height: 45px; display: block;" />
+                        <img src="${data.logoUrl}" alt="Logo" style="height: 45px; display: block;" />
                       </div>
                     </td>
                   </tr>
@@ -191,7 +196,12 @@ const Emails = () => {
       const messageId = data?.id || "enviado";
       toast.success(`E-mail enviado com sucesso! ID: ${messageId}`);
       setIsComposeOpen(false);
-      setFormData({ destinatario: "", assunto: "", corpo: "" });
+      setFormData({ 
+        destinatario: "", 
+        assunto: "", 
+        corpo: "",
+        logoUrl: "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png"
+      });
       queryClient.invalidateQueries({ queryKey: ["emails"] });
     },
     onError: (error: any) => {
@@ -306,6 +316,16 @@ const Emails = () => {
                       value={formData.assunto}
                       onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="logo">URL do Logotipo da Assinatura</Label>
+                    <Input
+                      id="logo"
+                      placeholder="https://exemplo.com/logo.png"
+                      value={formData.logoUrl}
+                      onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Insira a URL de uma imagem para personalizar o logo na assinatura.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="body">Mensagem</Label>
