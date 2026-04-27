@@ -83,10 +83,17 @@ serve(async (req) => {
       }),
     });
 
-    const data = await res.json();
+    let responseData;
+    try {
+      responseData = await res.json();
+    } catch (e) {
+      console.error("Erro ao fazer parse da resposta do Resend:", e);
+      responseData = { error: "Resposta inválida do serviço de e-mail" };
+    }
+    console.log("Resposta do Resend:", responseData);
 
     if (!res.ok) {
-      return new Response(JSON.stringify(data), {
+      return new Response(JSON.stringify(responseData), {
         status: res.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
