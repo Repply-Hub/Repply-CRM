@@ -102,7 +102,15 @@ const Emails = () => {
         remetente: "contato@empresa.com.br", // Idealmente dinâmico do config
         assunto: data.assunto,
         corpo: data.corpo,
-        html: `<div style="font-family: sans-serif;">${data.corpo.replace(/\n/g, '<br>')}</div>`,
+        html: `
+          <div style="font-family: sans-serif;">
+            ${data.corpo.replace(/\n/g, '<br>')}
+            <br><br>
+            --<br>
+            <strong>${perfil?.nome || "Equipe MD"}</strong><br>
+            ${perfil?.assinatura_email || ""}
+          </div>
+        `,
         status: "sent",
         resend_id: resData?.id,
         user_id: (await supabase.auth.getUser()).data.user?.id,
