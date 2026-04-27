@@ -128,22 +128,28 @@ const Emails = () => {
 
   const sendEmailMutation = useMutation({
     mutationFn: async (data: { destinatario: string; assunto: string; corpo: string }) => {
-      // 1. Chamar a Edge Function para enviar via Resend
       const { data: resData, error: resError } = await supabase.functions.invoke("send-email", {
         body: {
           to: data.destinatario,
           subject: data.assunto,
+          senderName: perfil?.nome || "Equipe MD",
           html: `
             <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-              <div style="margin-bottom: 30px;">
+              <div style="margin-bottom: 30px; font-size: 16px; line-height: 1.6;">
                 ${data.corpo.replace(/\n/g, '<br>')}
               </div>
               <div style="border-top: 2px solid #f4f4f4; padding-top: 20px; margin-top: 20px; color: #666;">
-                <p style="margin: 0; font-weight: bold; color: #333;">${perfil?.nome || "Equipe MD"}</p>
-                ${perfil?.assinatura_email ? `<p style="margin: 5px 0 15px 0; font-size: 14px; line-height: 1.5;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</p>` : ''}
-                <div style="margin-top: 15px;">
-                  <img src="https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" alt="MD Representações" style="height: 35px;" />
-                </div>
+                <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
+                  <tr>
+                    <td style="vertical-align: top;">
+                      <p style="margin: 0; font-weight: bold; color: #333; font-size: 16px;">${perfil?.nome || "Equipe MD"}</p>
+                      ${perfil?.assinatura_email ? `<p style="margin: 5px 0 15px 0; font-size: 14px; line-height: 1.5; color: #666;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</p>` : ''}
+                      <div style="margin-top: 10px;">
+                        <img src="https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" alt="MD Representações" style="height: 45px; display: block;" />
+                      </div>
+                    </td>
+                  </tr>
+                </table>
               </div>
             </div>
           `,
