@@ -46,10 +46,22 @@ export function DominioTab() {
 
   const verifyStatus = useMutation({
     mutationFn: async (domainId: string) => {
-      // Aqui poderíamos chamar uma edge function para verificar o status no Resend
-      // Por enquanto, vamos simular ou apenas atualizar o estado local se necessário
-      toast.info('Verificando status no Resend...');
-      // Implementação futura: chamar a API do Resend via Edge Function
+      const { data, error } = await supabase.functions.invoke('verify-resend-domain', {
+        body: { resend_domain_id: domainId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['user_domains'] });
+      if (data.status === 'verified') {
+        toast.success('Domínio verificado com sucesso!');
+      } else {
+        toast.info(`Status atual: ${data.status}`);
+      }
+    },
+    onError: (error: any) => {
+      toast.error('Erro ao verificar status: ' + error.message);
     },
   });
 
