@@ -15,7 +15,9 @@ import {
   History,
   CheckCircle2,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Settings,
+  Save
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,7 +39,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 const Emails = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [formData, setFormData] = useState({ destinatario: "", assunto: "", corpo: "" });
+  const [settingsData, setSettingsData] = useState({ resend_api_key: "", resend_from_email: "" });
   const queryClient = useQueryClient();
 
   const { data: perfil } = useQuery({
@@ -51,6 +55,56 @@ const Emails = () => {
         .eq("user_id", user.id)
         .single();
       return data;
+    },
+  });
+
+  const { data: userIntegration } = useQuery({
+    queryKey: ["user_integration"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from("user_integrations")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      if (data) {
+        setSettingsData({
+          resend_api_key: data.resend_api_key || "",
+          resend_from_email: data.resend_from_email || "",
+        });
+      }
+      return data;
+    },
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (data: typeof settingsData) => {
+      if (!data.resend_api_key.startsWith("re_")) {
+        throw new Error("A chave de API deve começar com 're_'");
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { error } = await supabase
+        .from("user_integrations")
+        .upsert({
+          user_id: user.id,
+          resend_api_key: data.resend_api_key,
+          resend_from_email: data.resend_from_email,
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Configurações salvas com sucesso!");
+      setIsSettingsOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["user_integration"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao salvar configurações: " + error.message);
     },
   });
 
@@ -79,7 +133,6 @@ const Emails = () => {
         body: {
           to: [data.destinatario],
           subject: data.assunto,
-          from: "MD Representações <contato@mdrepresentacoes.com.br>", // Endereço verificado no Resend
           html: `
             <div style="font-family: sans-serif; color: #333;">
               <div style="margin-bottom: 20px;">
@@ -100,7 +153,7 @@ const Emails = () => {
       // 2. Registrar no banco de dados local
       const { error: dbError } = await supabase.from("emails").insert({
         destinatario: data.destinatario,
-        remetente: "contato@mdrepresentacoes.com.br",
+        remetente: userIntegration?.resend_from_email || "MD Representações",
         assunto: data.assunto,
         corpo: data.corpo,
         html: `
@@ -154,64 +207,118 @@ const Emails = () => {
             />
           </div>
 
-          <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" /> Novo E-mail
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Escrever E-mail</DialogTitle>
-                <DialogDescription>
-                  Envie uma mensagem via Resend.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="to">Destinatário</Label>
-                  <Input
-                    id="to"
-                    placeholder="email@exemplo.com"
-                    value={formData.destinatario}
-                    onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="subject">Assunto</Label>
-                  <Input
-                    id="subject"
-                    placeholder="Assunto da mensagem"
-                    value={formData.assunto}
-                    onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="body">Mensagem</Label>
-                  <Textarea
-                    id="body"
-                    placeholder="Escreva sua mensagem aqui..."
-                    className="min-h-[200px]"
-                    value={formData.corpo}
-                    onChange={(e) => setFormData({ ...formData, corpo: e.target.value })}
-                  />
+          <div className="flex gap-2 w-full md:w-auto">
+            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Settings className="h-4 w-4" /> Configurações
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Configurações de E-mail</DialogTitle>
+                  <DialogDescription>
+                    Configure sua integração pessoal com o Resend.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="api_key">Resend API Key</Label>
+                    <Input
+                      id="api_key"
+                      type="password"
+                      placeholder="re_..."
+                      value={settingsData.resend_api_key}
+                      onChange={(e) => setSettingsData({ ...settingsData, resend_api_key: e.target.value })}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Sua chave começa com "re_"</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="from_email">E-mail do Remetente</Label>
+                    <Input
+                      id="from_email"
+                      placeholder="seu@dominio.com"
+                      value={settingsData.resend_from_email}
+                      onChange={(e) => setSettingsData({ ...settingsData, resend_from_email: e.target.value })}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Deve ser um domínio verificado no seu painel do Resend.</p>
+                  </div>
                 </div>
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsComposeOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={sendEmailMutation.isPending}>
-                    {sendEmailMutation.isPending ? (
+                  <Button 
+                    onClick={() => updateSettingsMutation.mutate(settingsData)}
+                    disabled={updateSettingsMutation.isPending}
+                  >
+                    {updateSettingsMutation.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : (
-                      <Send className="h-4 w-4 mr-2" />
+                      <Save className="h-4 w-4 mr-2" />
                     )}
-                    Enviar E-mail
+                    Salvar Configurações
                   </Button>
                 </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" /> Novo E-mail
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle>Escrever E-mail</DialogTitle>
+                  <DialogDescription>
+                    Envie uma mensagem via Resend.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="to">Destinatário</Label>
+                    <Input
+                      id="to"
+                      placeholder="email@exemplo.com"
+                      value={formData.destinatario}
+                      onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="subject">Assunto</Label>
+                    <Input
+                      id="subject"
+                      placeholder="Assunto da mensagem"
+                      value={formData.assunto}
+                      onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="body">Mensagem</Label>
+                    <Textarea
+                      id="body"
+                      placeholder="Escreva sua mensagem aqui..."
+                      className="min-h-[200px]"
+                      value={formData.corpo}
+                      onChange={(e) => setFormData({ ...formData, corpo: e.target.value })}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setIsComposeOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={sendEmailMutation.isPending}>
+                      {sendEmailMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      Enviar E-mail
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <Tabs defaultValue="sent">

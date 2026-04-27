@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,9 +13,36 @@ serve(async (req) => {
   }
 
   try {
-    const { to, subject, html, from = "onboarding@resend.dev" } = await req.json();
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      {
+        auth: {
+          persistSession: false,
+        },
+      }
+    );
 
-    if (!RESEND_API_KEY) {
+    const authHeader = req.headers.get("Authorization")!;
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
+
+    if (userError || !user) {
+      throw new Error("Usuário não autenticado");
+    }
+
+    // Buscar as chaves personalizadas do usuário
+    const { data: integration } = await supabaseClient
+      .from("user_integrations")
+      .select("resend_api_key, resend_from_email")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const { to, subject, html, from: bodyFrom } = await req.json();
+
+    const apiKey = integration?.resend_api_key || Deno.env.get("RESEND_API_KEY");
+    const fromEmail = bodyFrom || integration?.resend_from_email || "onboarding@resend.dev";
+
+    if (!apiKey) {
       throw new Error("RESEND_API_KEY is not set");
     }
 
@@ -24,10 +50,10 @@ serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from,
+        from: fromEmail,
         to,
         subject,
         html,
