@@ -79,6 +79,7 @@ const Emails = () => {
         body: {
           to: [data.destinatario],
           subject: data.assunto,
+          from: "MD Representações <contato@mdrepresentacoes.com.br>", // Endereço verificado no Resend
           html: `
             <div style="font-family: sans-serif; color: #333;">
               <div style="margin-bottom: 20px;">
