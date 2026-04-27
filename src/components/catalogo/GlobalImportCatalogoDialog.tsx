@@ -1,14 +1,27 @@
-import { useState } from 'react';
-import * as XLSX from 'xlsx';
+import { useState, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { useBulkCreatePrecos } from '@/hooks/use-fabricantes';
 import { useFabricantes } from '@/hooks/use-clientes';
-import { Upload, Loader2, FileSpreadsheet, CheckCircle2, Factory } from 'lucide-react';
-import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
+import { MappingStep, sanitizeImportedRows, type FieldDef, detectFuzzyMapping } from '@/components/import/MappingStep';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const VISIBLE_FIELDS: FieldDef[] = [
+  { key: 'descricao_material', label: 'Descrição', required: true, type: 'text' },
+  { key: 'referencia', label: 'Referência', required: false, type: 'text' },
+  { key: 'categoria', label: 'Categoria', required: false, type: 'text' },
+  { key: 'preco_unitario', label: 'Preço unitário', required: true, type: 'number' },
+  { key: 'unidade', label: 'Unidade', required: false, type: 'text' },
+  { key: 'fabricante_nome', label: 'Fabricante', required: false, type: 'text' },
+];
 
 interface Props {
   open: boolean;
@@ -16,146 +29,127 @@ interface Props {
   onFabricanteChange?: (id: string) => void;
 }
 
-const TARGET_FIELDS = [
-  { key: 'descricao_material', label: 'Descrição *', required: true },
-  { key: 'referencia', label: 'Referência' },
-  { key: 'categoria', label: 'Categoria' },
-  { key: 'preco_unitario', label: 'Preço unitário *', required: true },
-  { key: 'unidade', label: 'Unidade' },
-  { key: 'fabricante_nome', label: 'Nome do Fabricante (para roteamento)' },
-] as const;
-
-type TargetKey = typeof TARGET_FIELDS[number]['key'];
-
-const SKIP = '__skip__';
-
-function autoMap(header: string): TargetKey | null {
-  const h = header.toLowerCase().trim();
-  if (/(desc|produto|material|item)/.test(h)) return 'descricao_material';
-  if (/(ref|cód|cod|sku)/.test(h)) return 'referencia';
-  if (/(categ|linha|grupo|famíl|famil)/.test(h)) return 'categoria';
-  if (/(preço|preco|valor)/.test(h)) return 'preco_unitario';
-  if (/(un|medida)/.test(h)) return 'unidade';
-  if (/(fab|marca|fornec)/.test(h)) return 'fabricante_nome';
-  return null;
-}
-
 export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteChange }: Props) {
-  const [file, setFile] = useState<File | null>(null);
+  const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<Record<string, any>[]>([]);
-  const [mapping, setMapping] = useState<Record<string, TargetKey | typeof SKIP>>({});
-  const [parsing, setParsing] = useState(false);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [extras, setExtras] = useState<Record<string, string>>({});
+  const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
+  const [fileName, setFileName] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const [selectedFabricanteId, setSelectedFabricanteId] = useState<string>('');
+  
+  const fileRef = useRef<HTMLInputElement>(null);
   const { data: fabricantes } = useFabricantes();
   const bulk = useBulkCreatePrecos();
+  const qc = useQueryClient();
 
   const reset = () => {
-    setFile(null); setHeaders([]); setRows([]); setMapping({}); setSelectedFabricanteId('');
+    setRawData([]);
+    setHeaders([]);
+    setMapping({});
+    setExtras({});
+    setCustomColumns({});
+    setFileName('');
+    setSelectedFabricanteId('');
+    setStep('upload');
+    if (fileRef.current) fileRef.current.value = '';
   };
 
-  const handleFile = async (f: File) => {
-    if (!validateFile(f, { allowedExtensions: ['.xlsx', '.xls', '.csv'] })) return;
-    setParsing(true);
+  const handleFile = async (file: File) => {
+    if (!validateFile(file, { allowedExtensions: ['.xlsx', '.xls', '.csv'] })) return;
+    setFileName(file.name);
     try {
-      const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+
       if (json.length === 0) {
-        toast.error('Planilha vazia');
+        toast.error('Arquivo vazio ou sem dados válidos');
         return;
       }
-      const hdrs = Object.keys(json[0]);
-      setHeaders(hdrs);
-      setRows(json);
-      const map: Record<string, TargetKey | typeof SKIP> = {};
-      hdrs.forEach(h => {
-        const t = autoMap(h);
-        map[h] = t ?? SKIP;
-      });
-      setMapping(map);
-      setFile(f);
+
+      const cols = Array.from(new Set(json.flatMap((row) => Object.keys(row))));
+      setRawData(json);
+      setHeaders(cols);
+
+      const autoMap = detectFuzzyMapping(cols, VISIBLE_FIELDS);
+      setMapping(autoMap);
+      setStep('mapping');
+      toast.success(`${json.length} linhas lidas. Confira o mapeamento.`);
     } catch (err: any) {
-      toast.error(err.message || 'Falha ao ler planilha');
-    } finally {
-      setParsing(false);
+      toast.error('Erro ao ler o arquivo: ' + (err.message || 'formato inválido'));
     }
   };
 
-  const handleImport = async () => {
-    const descCol = Object.entries(mapping).find(([, v]) => v === 'descricao_material')?.[0];
-    const precoCol = Object.entries(mapping).find(([, v]) => v === 'preco_unitario')?.[0];
-    const fabCol = Object.entries(mapping).find(([, v]) => v === 'fabricante_nome')?.[0];
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
 
-    if (!descCol || !precoCol) {
-      toast.error('Mapeie pelo menos Descrição e Preço unitário');
-      return;
-    }
+  const canProceedToPreview = Boolean(mapping.descricao_material && mapping.preco_unitario && (mapping.fabricante_nome || selectedFabricanteId));
 
-    if (!selectedFabricanteId && !fabCol) {
-      toast.error('Selecione um fabricante ou mapeie a coluna de Fabricante');
-      return;
-    }
-
+  const getMappedRows = () => {
+    const sanitized = sanitizeImportedRows({ 
+      rawData, 
+      fields: VISIBLE_FIELDS, 
+      mapping, 
+      extras, 
+      customColumns 
+    });
+    
     const recordsByFab: Record<string, any[]> = {};
 
-    rows.forEach(row => {
-      const get = (target: TargetKey) => {
-        const col = Object.entries(mapping).find(([, v]) => v === target)?.[0];
-        if (!col) return undefined;
-        const v = row[col];
-        return v === '' ? undefined : v;
-      };
-
-      const precoRaw = get('preco_unitario');
-      const preco = typeof precoRaw === 'number'
-        ? precoRaw
-        : parseFloat(String(precoRaw ?? '').replace(/\./g, '').replace(',', '.'));
-      
-      const fabNameFromRow = get('fabricante_nome');
+    sanitized.forEach(row => {
       let fabId = selectedFabricanteId;
+      const fabName = row.fabricante_nome ? String(row.fabricante_nome).toLowerCase().trim() : '';
 
-      if (fabNameFromRow && fabricantes) {
-        const matchedFab = fabricantes.find(f => 
-          f.nome.toLowerCase().trim() === String(fabNameFromRow).toLowerCase().trim()
-        );
-        if (matchedFab) {
-          fabId = matchedFab.id;
-        }
+      if (fabName && fabricantes) {
+        const matched = fabricantes.find(f => f.nome.toLowerCase().trim() === fabName);
+        if (matched) fabId = matched.id;
       }
 
       if (!fabId) return;
 
-      const descricao = String(get('descricao_material') ?? '').trim();
-      if (!descricao || isNaN(preco) || preco <= 0) return;
-
       if (!recordsByFab[fabId]) recordsByFab[fabId] = [];
-      
       recordsByFab[fabId].push({
         fabricante_id: fabId,
-        descricao_material: descricao,
-        referencia: get('referencia') ? String(get('referencia')).trim() : null,
-        categoria: get('categoria') ? String(get('categoria')).trim() : null,
-        unidade: get('unidade') ? String(get('unidade')).trim() : null,
-        preco_unitario: preco,
+        descricao_material: row.descricao_material,
+        referencia: row.referencia || null,
+        categoria: row.categoria || null,
+        unidade: row.unidade || null,
+        preco_unitario: Number(row.preco_unitario),
         vigente: true,
+        campos_extras: row.campos_extras || {},
       });
     });
 
-    const allRecords = Object.values(recordsByFab).flat();
+    return recordsByFab;
+  };
 
+  const previewData = useMemo(() => {
+    if (step !== 'preview') return { recordsByFab: {}, allRecords: [], uniqueFabIds: [] };
+    const recordsByFab = getMappedRows();
+    const allRecords = Object.values(recordsByFab).flat();
+    const uniqueFabIds = Object.keys(recordsByFab);
+    return { recordsByFab, allRecords, uniqueFabIds };
+  }, [step, mapping, rawData, extras, customColumns, selectedFabricanteId, fabricantes]);
+
+  const handleImport = async () => {
+    const { allRecords, uniqueFabIds } = previewData;
     if (allRecords.length === 0) {
-      toast.error('Nenhuma linha válida encontrada');
+      toast.error('Nenhum registro válido encontrado');
       return;
     }
 
+    setImporting(true);
     try {
       const { inserted } = await bulk.mutateAsync(allRecords);
-      toast.success(`${inserted} produto(s) importado(s)!`);
+      toast.success(`${inserted} produtos importados com sucesso!`);
       
-      // If we only imported for one fabricante, select it
-      const uniqueFabIds = Object.keys(recordsByFab);
       if (uniqueFabIds.length === 1 && onFabricanteChange) {
         onFabricanteChange(uniqueFabIds[0]);
       } else if (selectedFabricanteId && onFabricanteChange) {
@@ -165,54 +159,52 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
       reset();
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err.message || 'Falha na importação');
+      toast.error('Erro na importação: ' + (err.message || 'erro desconhecido'));
+    } finally {
+      setImporting(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto flex flex-col">
         <DialogHeader>
-          <DialogTitle>Importar Catálogo (Geral)</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5 text-primary" />
+            Importar Catálogo (Geral)
+          </DialogTitle>
           <DialogDescription>
-            Importe produtos e direcione para os fabricantes corretos.
+            Importe produtos e direcione para os fabricantes corretos usando mapeamento inteligente.
           </DialogDescription>
         </DialogHeader>
 
-        {!file ? (
-          <div className="border-2 border-dashed border-border rounded-xl p-8 text-center">
-            <FileSpreadsheet className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="text-sm font-medium mb-1">Selecione uma planilha (.xlsx, .xls ou .csv)</p>
-            <p className="text-xs text-muted-foreground mb-4">
-              Pode conter colunas de descrição, referência, categoria, preço, unidade e fabricante.
-            </p>
+        {step === 'upload' && (
+          <div
+            className="border-2 border-dashed border-border rounded-xl p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+            <p className="text-sm font-medium text-foreground mb-1">Arraste a planilha aqui ou clique para selecionar</p>
+            <p className="text-xs text-muted-foreground">Formatos aceitos: .xlsx, .xls, .csv</p>
             <input
-              id="global-catalogo-import-file"
+              ref={fileRef}
               type="file"
               accept=".xlsx,.xls,.csv"
               className="hidden"
               onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleFile(f);
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
               }}
             />
-            <Button asChild variant="outline" disabled={parsing}>
-              <label htmlFor="global-catalogo-import-file" className="cursor-pointer gap-2">
-                {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Escolher arquivo
-              </label>
-            </Button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm bg-muted/40 rounded-lg p-3">
-              <CheckCircle2 className="h-4 w-4 text-success" />
-              <span className="font-medium truncate">{file.name}</span>
-              <span className="text-muted-foreground ml-auto">{rows.length} linhas</span>
-            </div>
+        )}
 
+        {step === 'mapping' && (
+          <div className="flex flex-col gap-4">
             <div className="space-y-2">
-              <Label className="text-sm">Fabricante Padrão</Label>
+              <Label className="text-sm">Fabricante Padrão (Opcional)</Label>
               <p className="text-xs text-muted-foreground">
                 Usado para linhas onde o fabricante não for identificado na planilha.
               </p>
@@ -228,38 +220,86 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
               </Select>
             </div>
 
-            <div>
-              <Label className="text-sm">Mapeamento de colunas</Label>
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1 mt-2">
-                {headers.map(h => (
-                  <div key={h} className="grid grid-cols-2 gap-3 items-center">
-                    <div className="text-sm font-medium truncate" title={h}>{h}</div>
-                    <Select
-                      value={mapping[h] ?? SKIP}
-                      onValueChange={(v) => setMapping(prev => ({ ...prev, [h]: v as any }))}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={SKIP}>Ignorar</SelectItem>
-                        {TARGET_FIELDS.map(t => (
-                          <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
+            <MappingStep
+              fileName={fileName}
+              rawData={rawData}
+              headers={headers}
+              mapping={mapping}
+              setMapping={setMapping as any}
+              extras={extras}
+              setExtras={setExtras}
+              customColumns={customColumns}
+              setCustomColumns={setCustomColumns}
+              visibleFields={VISIBLE_FIELDS}
+              onReset={reset}
+              onAutoDetect={() => { setMapping(detectFuzzyMapping(headers, VISIBLE_FIELDS)); setExtras({}); }}
+              onClearAll={() => { setMapping({}); setExtras({}); setCustomColumns({}); }}
+              canProceed={canProceedToPreview}
+              onNext={() => setStep('preview')}
+            />
+          </div>
+        )}
+
+        {step === 'preview' && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="secondary" className="gap-1">
+                  <FileSpreadsheet className="h-3 w-3" />
+                  {fileName}
+                </Badge>
+                <Badge variant="outline">{previewData.allRecords.length} produtos válidos</Badge>
+                <Badge variant="outline">{previewData.uniqueFabIds.length} fabricantes identificados</Badge>
               </div>
+              <Button variant="ghost" size="sm" onClick={() => setStep('mapping')}>
+                <X className="h-4 w-4 mr-1" /> Voltar
+              </Button>
             </div>
 
-            <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={reset} disabled={bulk.isPending}>
-                Trocar arquivo
-              </Button>
-              <Button onClick={handleImport} disabled={bulk.isPending} className="gap-1.5">
-                {bulk.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Importar e Direcionar
+            <div className="border rounded-lg overflow-x-auto">
+              <Table className="min-w-[600px]">
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="text-xs">#</TableHead>
+                    <TableHead className="text-xs">Descrição</TableHead>
+                    <TableHead className="text-xs">Fabricante</TableHead>
+                    <TableHead className="text-xs">Preço</TableHead>
+                    <TableHead className="text-xs">Categoria</TableHead>
+                    <TableHead className="text-xs">Referência</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {previewData.allRecords.slice(0, 50).map((r, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="text-xs font-medium">{r.descricao_material}</TableCell>
+                      <TableCell className="text-xs">
+                        {fabricantes?.find(f => f.id === r.fabricante_id)?.nome || '-'}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {r.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </TableCell>
+                      <TableCell className="text-xs">{r.categoria || '-'}</TableCell>
+                      <TableCell className="text-xs">{r.referencia || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {previewData.allRecords.length > 50 && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Mostrando 50 de {previewData.allRecords.length} produtos
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setStep('mapping')}>Voltar</Button>
+              <Button onClick={handleImport} disabled={importing}>
+                {importing ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importando...</>
+                ) : (
+                  <><CheckCircle2 className="h-4 w-4 mr-1" /> Importar {previewData.allRecords.length} produtos</>
+                )}
               </Button>
             </div>
           </div>
