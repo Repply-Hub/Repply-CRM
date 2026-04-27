@@ -132,7 +132,7 @@ const Emails = () => {
   });
 
   const sendEmailMutation = useMutation({
-    mutationFn: async (data: { destinatario: string; assunto: string; corpo: string }) => {
+    mutationFn: async (data: { destinatario: string; assunto: string; corpo: string; logoUrl: string }) => {
       const { data: resData, error: resError } = await supabase.functions.invoke("send-email", {
         body: {
           to: data.destinatario,
@@ -150,7 +150,7 @@ const Emails = () => {
                       <p style="margin: 0; font-weight: bold; color: #333; font-size: 16px;">${perfil?.nome || "Equipe MD"}</p>
                       ${perfil?.assinatura_email ? `<p style="margin: 5px 0 15px 0; font-size: 14px; line-height: 1.5; color: #666;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</p>` : ''}
                       <div style="margin-top: 10px;">
-                        <img src="https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" alt="MD Representações" style="height: 45px; display: block;" />
+                        <img src="${data.logoUrl}" alt="Logo" style="height: 45px; display: block;" />
                       </div>
                     </td>
                   </tr>
