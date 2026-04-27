@@ -13,6 +13,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Iniciando send-email...");
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -23,14 +24,21 @@ serve(async (req) => {
       }
     );
 
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("Authorization header ausente");
+      throw new Error("Cabeçalho de autorização não encontrado");
+    }
+    console.log("Buscando usuário...");
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
 
     if (userError || !user) {
       throw new Error("Usuário não autenticado");
     }
 
+    console.log("Usuário autenticado:", user.id);
     // 1. Buscar se o usuário possui um domínio verificado
+    console.log("Buscando domínios verificados...");
     const { data: domains, error: domainError } = await supabaseClient
       .from("user_domains")
       .select("domain_name")
@@ -42,7 +50,9 @@ serve(async (req) => {
       console.error("Erro ao buscar domínios:", domainError);
     }
 
+    console.log("Parsing body...");
     const { to, subject, html } = await req.json();
+    console.log("Destinatário:", to);
 
     // 2. Definir o remetente (from)
     // Se tiver domínio verificado: contato@dominio.com
@@ -58,6 +68,7 @@ serve(async (req) => {
       throw new Error("RESEND_API_KEY não configurada nos Secrets do Supabase");
     }
 
+    console.log("Enviando via Resend com de:", fromEmail);
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
