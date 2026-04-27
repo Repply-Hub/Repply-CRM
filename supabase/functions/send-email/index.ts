@@ -68,6 +68,7 @@ serve(async (req) => {
       throw new Error("RESEND_API_KEY não configurada nos Secrets do Supabase");
     }
 
+    console.log("Enviando via Resend com de:", fromEmail);
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
