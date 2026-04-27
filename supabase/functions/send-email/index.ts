@@ -31,20 +31,31 @@ serve(async (req) => {
     }
 
     // Buscar as chaves personalizadas do usuário
-    const { data: integration } = await supabaseClient
+    const { data: integration, error: integrationError } = await supabaseClient
       .from("user_integrations")
       .select("resend_api_key, resend_from_email")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const { to, subject, html, from: bodyFrom } = await req.json();
-
-    const apiKey = integration?.resend_api_key || Deno.env.get("RESEND_API_KEY");
-    const fromEmail = bodyFrom || integration?.resend_from_email || "onboarding@resend.dev";
-
-    if (!apiKey) {
-      throw new Error("RESEND_API_KEY is not set");
+    if (integrationError) {
+      console.error("Erro ao buscar integração:", integrationError);
+      throw new Error("Erro ao carregar configurações de e-mail.");
     }
+
+    if (!integration?.resend_api_key || !integration?.resend_from_email) {
+      return new Response(
+        JSON.stringify({ error: "Configure sua chave do Resend nas definições" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const { to, subject, html } = await req.json();
+
+    const apiKey = integration.resend_api_key;
+    const fromEmail = integration.resend_from_email;
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
