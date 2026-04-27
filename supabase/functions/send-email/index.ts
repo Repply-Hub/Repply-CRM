@@ -24,7 +24,12 @@ serve(async (req) => {
       }
     );
 
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("Authorization header ausente");
+      throw new Error("Cabeçalho de autorização não encontrado");
+    }
+    console.log("Buscando usuário...");
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
 
     if (userError || !user) {
