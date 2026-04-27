@@ -1648,6 +1648,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_domains: {
+        Row: {
+          created_at: string
+          dns_records: Json | null
+          domain_name: string
+          id: string
+          resend_domain_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dns_records?: Json | null
+          domain_name: string
+          id?: string
+          resend_domain_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dns_records?: Json | null
+          domain_name?: string
+          id?: string
+          resend_domain_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_integrations: {
         Row: {
           created_at: string
