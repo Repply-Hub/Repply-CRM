@@ -39,7 +39,7 @@ serve(async (req) => {
 
     console.log("Usuário autenticado:", user.id);
 
-    // 1. Buscar se o usuário possui um domínio verificado
+    // 1. Buscar se o usuário possui um domínio verificado (Mantido para lógica futura, mas ignorado temporariamente)
     console.log("Buscando domínios verificados...");
     const { data: domains, error: domainError } = await supabaseClient
       .from("user_domains")
@@ -54,18 +54,20 @@ serve(async (req) => {
 
     console.log("Parsing body...");
     const payload = await req.json();
-    const { to, subject, html } = payload;
-    console.log("Destinatário:", to);
+    const { subject, html } = payload;
+    
+    // TEMPORÁRIO: O destinatário DEVE ser o e-mail da conta Resend para testes com onboarding@resend.dev
+    // Como não sabemos qual é o e-mail da conta Resend do usuário, vamos usar o e-mail do usuário logado
+    // assumindo que ele usou o mesmo e-mail para ambos, ou permitir que o frontend envie, 
+    // mas o Resend só aceita o e-mail da conta no modo sandbox.
+    const to = user.email; 
+    console.log("Destinatário (fixo para teste):", to);
 
-    // 2. Definir o remetente (from)
-    let fromEmail = "avisos@meucrm.com.br";
-    if (domains && domains.length > 0) {
-      fromEmail = `contato@${domains[0].domain_name}`;
-    }
-
+    // 2. Definir o remetente (from) - FIXO TEMPORARIAMENTE PARA TESTE
+    const fromEmail = "onboarding@resend.dev";
     console.log("Enviando via Resend com de:", fromEmail);
 
-    // 3. Chamada para a API do Resend com log detalhado conforme solicitado
+    // 3. Chamada para a API do Resend
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -74,9 +76,9 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         from: fromEmail,
-        to,
-        subject,
-        html,
+        to: [to], // Resend espera um array ou string
+        subject: subject,
+        html: html,
       }),
     });
 
