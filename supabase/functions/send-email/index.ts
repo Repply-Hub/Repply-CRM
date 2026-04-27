@@ -36,7 +36,9 @@ serve(async (req) => {
       throw new Error("Usuário não autenticado");
     }
 
+    console.log("Usuário autenticado:", user.id);
     // 1. Buscar se o usuário possui um domínio verificado
+    console.log("Buscando domínios verificados...");
     const { data: domains, error: domainError } = await supabaseClient
       .from("user_domains")
       .select("domain_name")
