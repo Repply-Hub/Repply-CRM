@@ -50,7 +50,9 @@ serve(async (req) => {
       console.error("Erro ao buscar domínios:", domainError);
     }
 
+    console.log("Parsing body...");
     const { to, subject, html } = await req.json();
+    console.log("Destinatário:", to);
 
     // 2. Definir o remetente (from)
     // Se tiver domínio verificado: contato@dominio.com
