@@ -31,7 +31,7 @@ serve(async (req) => {
       throw new Error("Usuário não autenticado.");
     }
 
-    const { to, subject, html } = await req.json();
+    const { to, subject, html, senderName } = await req.json();
 
     // Validação básica
     if (!to || !subject || !html) {
@@ -41,8 +41,9 @@ serve(async (req) => {
       );
     }
 
-    // Remetente fixo para o domínio verificado
-    const fromEmail = "Mederi <contato@mdrepresentacoes.grupoclimb.ai>";
+    // Remetente dinâmico com o domínio verificado
+    const name = senderName || 'Atendimento';
+    const fromEmail = `${name} <contato@mdrepresentacoes.grupoclimb.ai>`;
 
     // Chamada para o Resend
     const res = await fetch('https://api.resend.com/emails', {
