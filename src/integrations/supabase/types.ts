@@ -1648,6 +1648,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_integrations: {
+        Row: {
+          created_at: string
+          id: string
+          resend_api_key: string | null
+          resend_from_email: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          resend_api_key?: string | null
+          resend_from_email?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          resend_api_key?: string | null
+          resend_from_email?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       usuarios: {
         Row: {
           assinatura_email: string | null
