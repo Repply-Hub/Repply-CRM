@@ -177,16 +177,19 @@ const Emails = () => {
       });
 
       if (dbError) throw dbError;
+
+      // Retornar os dados da Resend para o feedback
       return resData;
     },
-    onSuccess: () => {
-      toast.success("E-mail enviado com sucesso!");
+    onSuccess: (data) => {
+      const messageId = data?.id || "enviado";
+      toast.success(`E-mail enviado com sucesso! ID: ${messageId}`);
       setIsComposeOpen(false);
       setFormData({ destinatario: "", assunto: "", corpo: "" });
       queryClient.invalidateQueries({ queryKey: ["emails"] });
     },
     onError: (error: any) => {
-      toast.error("Erro ao enviar e-mail: " + (error.message || "Verifique sua chave do Resend"));
+      toast.error("Erro ao enviar e-mail: " + (error.message || "Verifique as configurações do Resend"));
     },
   });
 
