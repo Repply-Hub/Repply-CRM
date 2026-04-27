@@ -573,6 +573,51 @@ export type Database = {
         }
         Relationships: []
       }
+      emails: {
+        Row: {
+          assunto: string
+          corpo: string | null
+          created_at: string
+          destinatario: string
+          html: string | null
+          id: string
+          metadata: Json | null
+          remetente: string
+          resend_id: string | null
+          status: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          assunto: string
+          corpo?: string | null
+          created_at?: string
+          destinatario: string
+          html?: string | null
+          id?: string
+          metadata?: Json | null
+          remetente: string
+          resend_id?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          assunto?: string
+          corpo?: string | null
+          created_at?: string
+          destinatario?: string
+          html?: string | null
+          id?: string
+          metadata?: Json | null
+          remetente?: string
+          resend_id?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       empresas: {
         Row: {
           banner_url: string | null

@@ -21,6 +21,7 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'calendario', path: '/calendario', label: 'Calendário', icon: 'CalendarDays', visible: true },
   { id: 'tarefas', path: '/tarefas', label: 'Tarefas', icon: 'ClipboardList', visible: true },
   { id: 'chat', path: '/chat', label: 'Chat', icon: 'MessageCircle', visible: true },
+  { id: 'emails', path: '/emails', label: 'E-mails', icon: 'Mail', visible: true },
   { id: 'configuracoes', path: '/configuracoes', label: 'Configurações', icon: 'Settings', visible: true },
 ];
 

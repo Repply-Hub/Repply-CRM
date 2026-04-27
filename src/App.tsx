@@ -19,6 +19,7 @@ import EditarPedido from "./pages/EditarPedido";
 import Calendario from "./pages/Calendario";
 import Tarefas from "./pages/Tarefas";
 import Chat from "./pages/Chat";
+import Emails from "./pages/Emails";
 
 import Login from "./pages/Login";
 import EsqueciSenha from "./pages/EsqueciSenha";
@@ -61,7 +62,8 @@ const AppRoutes = () => (
     <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
     <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-    
+    <Route path="/emails" element={<ProtectedRoute><Emails /></ProtectedRoute>} />
+
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
