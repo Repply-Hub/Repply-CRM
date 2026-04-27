@@ -360,6 +360,10 @@ const Configuracoes = () => {
             </TabsContent>
           )}
 
+          <TabsContent value="dominio" className="mt-4">
+            <DominioTab />
+          </TabsContent>
+
           {isGestor && (
             <TabsContent value="automacao" className="mt-4">
               <div className="grid gap-4">
