@@ -24,6 +24,7 @@ import {
 import { ListPagination } from '@/components/ListPagination';
 import { ProductImageUpload } from '@/components/catalogo/ProductImageUpload';
 import { ImportCatalogoDialog } from '@/components/catalogo/ImportCatalogoDialog';
+import { GlobalImportCatalogoDialog } from '@/components/catalogo/GlobalImportCatalogoDialog';
 import { cn } from '@/lib/utils';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
@@ -311,6 +312,7 @@ const Fabricantes = () => {
   const [editPreco, setEditPreco] = useState<any>(null);
   const [importDialog, setImportDialog] = useState(false);
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
+  const [globalImportOpen, setGlobalImportOpen] = useState(false);
   const [deleteAlert, setDeleteAlert] = useState<{ type: 'fab' | 'preco'; id: string } | null>(null);
 
   const {
@@ -407,9 +409,14 @@ const Fabricantes = () => {
                       {filtered.length} cadastrado{filtered.length !== 1 ? 's' : ''}
                     </CardDescription>
                   </div>
-                  <Button size="sm" onClick={() => { setEditFab(null); setFabDialog(true); }} className="gap-1.5 h-8">
-                    <Plus className="h-3.5 w-3.5" /> Novo
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setGlobalImportOpen(true)} className="gap-1.5 h-8">
+                      <Upload className="h-3.5 w-3.5" /> Importar
+                    </Button>
+                    <Button size="sm" onClick={() => { setEditFab(null); setFabDialog(true); }} className="gap-1.5 h-8">
+                      <Plus className="h-3.5 w-3.5" /> Novo
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
@@ -672,6 +679,15 @@ const Fabricantes = () => {
           fabricanteNome={selectedFab?.nome}
         />
       )}
+
+      <GlobalImportCatalogoDialog 
+        open={globalImportOpen} 
+        onOpenChange={setGlobalImportOpen} 
+        onFabricanteChange={(id) => {
+          setSelectedFabId(id);
+          setGlobalImportOpen(false);
+        }}
+      />
 
       <AlertDialog open={!!deleteAlert} onOpenChange={(o) => !o && setDeleteAlert(null)}>
         <AlertDialogContent>
