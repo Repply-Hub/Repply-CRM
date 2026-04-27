@@ -196,7 +196,12 @@ const Emails = () => {
       const messageId = data?.id || "enviado";
       toast.success(`E-mail enviado com sucesso! ID: ${messageId}`);
       setIsComposeOpen(false);
-      setFormData({ destinatario: "", assunto: "", corpo: "" });
+      setFormData({ 
+        destinatario: "", 
+        assunto: "", 
+        corpo: "",
+        logoUrl: "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png"
+      });
       queryClient.invalidateQueries({ queryKey: ["emails"] });
     },
     onError: (error: any) => {
