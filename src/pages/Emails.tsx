@@ -133,7 +133,6 @@ const Emails = () => {
         body: {
           to: [data.destinatario],
           subject: data.assunto,
-          from: "MD Representações <contato@mdrepresentacoes.com.br>", // Endereço verificado no Resend
           html: `
             <div style="font-family: sans-serif; color: #333;">
               <div style="margin-bottom: 20px;">
@@ -154,7 +153,7 @@ const Emails = () => {
       // 2. Registrar no banco de dados local
       const { error: dbError } = await supabase.from("emails").insert({
         destinatario: data.destinatario,
-        remetente: "contato@mdrepresentacoes.com.br",
+        remetente: userIntegration?.resend_from_email || "MD Representações",
         assunto: data.assunto,
         corpo: data.corpo,
         html: `
