@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Globe } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
+import { DominioTab } from '@/components/configuracoes/DominioTab';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -345,6 +346,7 @@ const Configuracoes = () => {
             {isGestor && (
               <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> Usuários</TabsTrigger>
             )}
+            <TabsTrigger value="dominio" className="gap-1.5"><Globe className="h-4 w-4" /> Domínio</TabsTrigger>
             {isGestor && (
               <TabsTrigger value="automacao">Automação</TabsTrigger>
             )}
@@ -357,6 +359,10 @@ const Configuracoes = () => {
               <UsuariosTab />
             </TabsContent>
           )}
+
+          <TabsContent value="dominio" className="mt-4">
+            <DominioTab />
+          </TabsContent>
 
           {isGestor && (
             <TabsContent value="automacao" className="mt-4">
