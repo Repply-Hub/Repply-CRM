@@ -40,7 +40,12 @@ const Emails = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [formData, setFormData] = useState({ destinatario: "", assunto: "", corpo: "" });
+  const [formData, setFormData] = useState({ 
+    destinatario: "", 
+    assunto: "", 
+    corpo: "",
+    logoUrl: "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" 
+  });
   const [settingsData, setSettingsData] = useState({ resend_api_key: "", resend_from_email: "" });
   const queryClient = useQueryClient();
 
