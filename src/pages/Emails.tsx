@@ -320,6 +320,7 @@ const Emails = () => {
               </DialogContent>
             </Dialog>
           </div>
+        </div>
 
         <Tabs defaultValue="sent">
           <TabsList className="mb-4">
