@@ -318,6 +318,16 @@ const Emails = () => {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="logo">URL do Logotipo da Assinatura</Label>
+                    <Input
+                      id="logo"
+                      placeholder="https://exemplo.com/logo.png"
+                      value={formData.logoUrl}
+                      onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Insira a URL de uma imagem para personalizar o logo na assinatura.</p>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="body">Mensagem</Label>
                     <Textarea
                       id="body"
