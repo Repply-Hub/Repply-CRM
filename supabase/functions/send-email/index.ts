@@ -30,32 +30,33 @@ serve(async (req) => {
       throw new Error("Usuário não autenticado");
     }
 
-    // Buscar as chaves personalizadas do usuário
-    const { data: integration, error: integrationError } = await supabaseClient
-      .from("user_integrations")
-      .select("resend_api_key, resend_from_email")
+    // 1. Buscar se o usuário possui um domínio verificado
+    const { data: domains, error: domainError } = await supabaseClient
+      .from("user_domains")
+      .select("domain_name")
       .eq("user_id", user.id)
-      .maybeSingle();
+      .eq("status", "verified")
+      .limit(1);
 
-    if (integrationError) {
-      console.error("Erro ao buscar integração:", integrationError);
-      throw new Error("Erro ao carregar configurações de e-mail.");
-    }
-
-    if (!integration?.resend_api_key || !integration?.resend_from_email) {
-      return new Response(
-        JSON.stringify({ error: "Configure sua chave do Resend nas definições" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    if (domainError) {
+      console.error("Erro ao buscar domínios:", domainError);
     }
 
     const { to, subject, html } = await req.json();
 
-    const apiKey = integration.resend_api_key;
-    const fromEmail = integration.resend_from_email;
+    // 2. Definir o remetente (from)
+    // Se tiver domínio verificado: contato@dominio.com
+    // Caso contrário: avisos@meucrm.com.br
+    let fromEmail = "avisos@meucrm.com.br";
+    if (domains && domains.length > 0) {
+      fromEmail = `contato@${domains[0].domain_name}`;
+    }
+
+    // 3. Usar a chave RESEND_API_KEY global dos Secrets
+    const apiKey = Deno.env.get("RESEND_API_KEY");
+    if (!apiKey) {
+      throw new Error("RESEND_API_KEY não configurada nos Secrets do Supabase");
+    }
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
