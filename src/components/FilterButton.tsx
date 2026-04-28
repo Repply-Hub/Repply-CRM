@@ -30,7 +30,7 @@ export function FilterButton({
         <Button 
           variant="outline" 
           size="sm"
-          className={cn("h-10 gap-2", hasFilters && "border-primary", className)}
+          className={cn("h-10 gap-2 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground", hasFilters && "border-primary", className)}
         >
           <Filter className="h-4 w-4" />
           Filtros
