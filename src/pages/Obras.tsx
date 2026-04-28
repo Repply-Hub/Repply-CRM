@@ -170,46 +170,38 @@ export default function Obras() {
     >
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <TabsList>
-                <TabsTrigger value="lista" className="gap-2">
-                  <List className="h-4 w-4" /> Lista
-                </TabsTrigger>
-                <TabsTrigger value="mapa" className="gap-2">
-                  <MapIcon className="h-4 w-4" /> Mapa
-                </TabsTrigger>
-              </TabsList>
+          <div className="flex flex-wrap items-center gap-3 md:gap-4">
+            <TabsList>
+              <TabsTrigger value="lista" className="gap-2">
+                <List className="h-4 w-4" /> Lista
+              </TabsTrigger>
+              <TabsTrigger value="mapa" className="gap-2">
+                <MapIcon className="h-4 w-4" /> Mapa
+              </TabsTrigger>
+            </TabsList>
 
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={() => setStatusDialogOpen(true)}
-                title="Configurar Status"
-              >
-                <Settings2 className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
-              <Plus className="h-4 w-4" />
-              Nova Obra
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => setStatusDialogOpen(true)}
+              title="Configurar Status"
+              className="shrink-0"
+            >
+              <Settings2 className="h-4 w-4" />
             </Button>
-          </div>
 
-          {/* Shared Filters */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nome, endereço ou cliente..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="pl-9 h-10"
               />
             </div>
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
+              <SelectTrigger className="w-fit max-w-[150px] shrink-0 whitespace-nowrap h-10">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -221,8 +213,9 @@ export default function Obras() {
                 ))}
               </SelectContent>
             </Select>
+
             <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-              <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
+              <SelectTrigger className="w-fit max-w-[150px] shrink-0 whitespace-nowrap h-10">
                 <SelectValue placeholder="Ordenar" />
               </SelectTrigger>
               <SelectContent>
@@ -232,6 +225,11 @@ export default function Obras() {
                 <SelectItem value="name_desc">Nome Z-A</SelectItem>
               </SelectContent>
             </Select>
+
+            <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0 h-10">
+              <Plus className="h-4 w-4" />
+              Nova Obra
+            </Button>
           </div>
 
           <TabsContent value="lista" className="space-y-6 mt-0">
