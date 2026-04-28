@@ -26,7 +26,7 @@ import { useTableSettings } from '@/hooks/use-table-settings';
 import { MapaObras } from '@/components/obras/MapaObras';
 import { StatusObrasDialog } from '@/components/obras/StatusObrasDialog';
 import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { FilterButton } from '@/components/FilterButton';
 
 
 const OBRA_FIELDS: ColumnDefinition[] = [
@@ -280,10 +280,9 @@ export default function Obras() {
                         <SelectItem value="name_desc">Nome Z-A</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
                 </div>
-              </PopoverContent>
-            </Popover>
+              </div>
+            </FilterButton>
 
             <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0 h-10">
               <Plus className="h-4 w-4" />
