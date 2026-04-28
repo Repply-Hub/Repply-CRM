@@ -612,13 +612,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             </ScrollArea>
           </div>
-          <div className="min-w-[160px] px-4">
+          <div className="min-w-[130px] px-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Período</p>
             <div className="space-y-2">
               <div className="relative group">
                 <Input
                   placeholder="De: DD/MM/AAAA"
-                  className="h-8 text-xs pl-8 group-hover:border-primary transition-colors"
+                  className="h-8 text-[11px] pl-8 w-28 group-hover:border-primary transition-colors"
                   defaultValue={dateFrom ? format(dateFrom, 'dd/MM/yyyy') : ''}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -645,7 +645,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <div className="relative group">
                 <Input
                   placeholder="Até: DD/MM/AAAA"
-                  className="h-8 text-xs pl-8 group-hover:border-primary transition-colors"
+                  className="h-8 text-[11px] pl-8 w-28 group-hover:border-primary transition-colors"
                   defaultValue={dateTo ? format(dateTo, 'dd/MM/yyyy') : ''}
                   onChange={(e) => {
                     const val = e.target.value;
