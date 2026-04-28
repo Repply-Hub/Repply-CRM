@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen, 
-  Paperclip, FileText, Image, X, Download, Users2, Info, Calendar
+  Paperclip, FileText, Image, X, Download, Users2, Info, Calendar, Eraser
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
