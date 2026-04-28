@@ -619,7 +619,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <Input
                   placeholder="De: DD/MM/AAAA"
                   className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
-                  value={dateFrom ? format(dateFrom, 'dd/MM/yyyy') : ''}
+                  value={dateFrom ? (typeof dateFrom === 'string' ? dateFrom : format(dateFrom, 'dd/MM/yyyy')) : ''}
                   onChange={(e) => {
                     let val = e.target.value.replace(/\D/g, '');
                     if (val.length > 8) val = val.slice(0, 8);
@@ -628,7 +628,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
                     if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
                     
-                    e.target.value = formatted;
+                    // We temporarily set it as a string to allow typing
+                    // @ts-ignore
+                    setDateFrom(formatted);
                     
                     if (formatted.length === 10) {
                       const d = parse(formatted, 'dd/MM/yyyy', new Date());
@@ -654,7 +656,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <Input
                   placeholder="Até: DD/MM/AAAA"
                   className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
-                  value={dateTo ? format(dateTo, 'dd/MM/yyyy') : ''}
+                  value={dateTo ? (typeof dateTo === 'string' ? dateTo : format(dateTo, 'dd/MM/yyyy')) : ''}
                   onChange={(e) => {
                     let val = e.target.value.replace(/\D/g, '');
                     if (val.length > 8) val = val.slice(0, 8);
@@ -663,7 +665,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
                     if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
                     
-                    e.target.value = formatted;
+                    // We temporarily set it as a string to allow typing
+                    // @ts-ignore
+                    setDateTo(formatted);
 
                     if (formatted.length === 10) {
                       const d = parse(formatted, 'dd/MM/yyyy', new Date());
