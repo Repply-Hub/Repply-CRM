@@ -566,7 +566,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       hasFilters={hasPipelineFilters}
       activeFilterCount={activeFilterCount}
       onClear={clearPipelineFilters}
-      align="start"
+      align="end"
       popoverClassName="w-auto min-w-[820px] max-w-[980px] p-4"
     >
       <div className="flex gap-0 divide-x divide-border">
