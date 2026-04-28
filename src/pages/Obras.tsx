@@ -215,10 +215,11 @@ export default function Obras() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os status</SelectItem>
-                  <SelectItem value="em_andamento">Em andamento</SelectItem>
-                  <SelectItem value="ativa">Ativa</SelectItem>
-                  <SelectItem value="concluida">Concluída</SelectItem>
-                  <SelectItem value="parada">Parada</SelectItem>
+                  {statusObras?.map(status => (
+                    <SelectItem key={status.slug} value={status.slug}>
+                      {status.nome}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
