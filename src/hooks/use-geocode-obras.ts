@@ -81,7 +81,8 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
         if (cancelado) break;
 
         if (coord) {
-          await supabase
+          console.log(`[useGeocodeObras] Endereço geocodificado para ${obra.nome_obra}:`, coord);
+          const { error: updateError } = await supabase
             .from('obras')
             .update({
               latitude: coord.lat,
@@ -90,12 +91,17 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
             })
             .eq('id', obra.id);
 
+          if (updateError) {
+            console.error('[useGeocodeObras] Erro ao atualizar obra no Supabase:', updateError);
+          }
+
           setItems((prev) =>
             prev.map((o) =>
               o.id === obra.id ? { ...o, latitude: coord.lat, longitude: coord.lng } : o
             )
           );
         } else {
+          console.warn(`[useGeocodeObras] Falha ao geocodificar ${obra.nome_obra}`);
           // Marca tentativa para evitar reprocessar (geocoded_at sem coords = "tentamos e falhou")
           await supabase
             .from('obras')
