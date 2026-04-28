@@ -566,7 +566,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       hasFilters={hasPipelineFilters}
       activeFilterCount={activeFilterCount}
       onClear={clearPipelineFilters}
-      align="start"
+      align="end"
       popoverClassName="w-auto min-w-[820px] max-w-[980px] p-4"
     >
       <div className="flex gap-0 divide-x divide-border">
@@ -878,7 +878,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <div className="relative flex-1 min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                className="pl-9 h-9"
+                className="pl-9 h-10"
                 placeholder="Buscar por cliente, obra ou fabricante..."
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
@@ -895,7 +895,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             )}
           </div>
           <div className="flex items-center gap-2 sm:justify-end">
-            <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate('/pedidos/novo')}>
+            <Button size="sm" className="w-full sm:w-auto h-10" onClick={() => navigate('/pedidos/novo')}>
               <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
             </Button>
           </div>
