@@ -346,7 +346,7 @@ const Fabricantes = () => {
   const [fabPageSize, setFabPageSize] = useState(10);
 
   const selectedFab = fabricantes?.find(f => f.id === selectedFabId);
-  const filtered = fabricantes?.filter(f => f.nome.toLowerCase().includes(search.toLowerCase())) ?? [];
+  const filtered = fabricantes?.filter(f => (f.nome || '').toLowerCase().includes(search.toLowerCase())) ?? [];
   const totalFabPages = Math.max(1, Math.ceil(filtered.length / fabPageSize));
   const paginatedFabs = filtered.slice((fabPage - 1) * fabPageSize, fabPage * fabPageSize);
 
