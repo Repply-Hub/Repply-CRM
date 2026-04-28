@@ -175,9 +175,9 @@ export default function Obras() {
     >
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
-          <div className="flex flex-wrap items-center gap-3 md:gap-4">
-            <div className="flex flex-1 items-center gap-2">
-              <TabsList>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <TabsList className="shrink-0">
                 <TabsTrigger value="lista" className="gap-2">
                   <List className="h-4 w-4" /> Lista
                 </TabsTrigger>
@@ -195,8 +195,10 @@ export default function Obras() {
               >
                 <Settings2 className="h-4 w-4" />
               </Button>
+            </div>
 
-              <div className="relative flex-1 min-w-[200px]">
+            <div className="flex flex-1 items-center gap-2 max-w-2xl">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por nome, endereço ou cliente..."
@@ -260,12 +262,12 @@ export default function Obras() {
                   </Select>
                 </div>
               </FilterButton>
-            </div>
 
-            <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0 h-10">
-              <Plus className="h-4 w-4" />
-              Nova Obra
-            </Button>
+              <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0 h-10 bg-[#F06A00] hover:bg-[#F06A00]/90">
+                <Plus className="h-4 w-4" />
+                Nova Obra
+              </Button>
+            </div>
           </div>
 
           <TabsContent value="lista" className="space-y-6 mt-0">
