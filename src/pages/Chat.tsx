@@ -242,9 +242,9 @@ const Chat = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeGrupoId = target.type === 'grupo' ? target.grupoId : null;
-  const activeRecipientId = target.type === 'dm' ? target.recipientId : null;
   const { data: messages, isLoading } = useChatMessages(activeGrupoId, activeRecipientId);
   const { send, sending } = useSendMessage();
+  const clearChat = useClearChat();
   const { data: grupos = [] } = useChatGrupos();
 
   const { data: myVendedor } = useQuery({
