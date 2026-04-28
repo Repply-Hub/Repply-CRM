@@ -355,7 +355,7 @@ export default function Obras() {
                       </thead>
                       <tbody>
                         {filtered.slice((page - 1) * pageSize, page * pageSize).map(obra => {
-                          const status = STATUS_MAP[obra.status] || { label: obra.status, variant: 'outline' as const };
+                          const status = getStatusInfo(obra.status);
                           const cliente = obra.clientes as any;
                           const camposExtras = (obra as any).campos_extras || {};
 
