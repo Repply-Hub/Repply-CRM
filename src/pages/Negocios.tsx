@@ -197,9 +197,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     if (value.trim() && showKanban) {
       const query = value.trim().toLowerCase();
       const firstMatch = pipelineOrders.find(o => 
-        o.clientName.toLowerCase().includes(query) || 
-        o.obra.toLowerCase().includes(query) || 
-        o.fabricante.toLowerCase().includes(query)
+        (o.clientName || '').toLowerCase().includes(query) || 
+        (o.obra || '').toLowerCase().includes(query) || 
+        (o.fabricante || '').toLowerCase().includes(query)
       );
       
       if (firstMatch) {
