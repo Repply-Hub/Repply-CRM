@@ -33,6 +33,20 @@ serve(async (req) => {
 
     const { to, subject, html, senderName } = await req.json();
 
+    // Buscar as configurações do Resend deste usuário específico no banco
+    const { data: integration, error: integrationError } = await supabase
+      .from('user_integrations')
+      .select('resend_api_key, resend_from_email')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (integrationError || !integration || !integration.resend_api_key) {
+      throw new Error("Configurações do Resend não encontradas para este usuário. Configure-as na página de E-mails.");
+    }
+
+    const userResendApiKey = integration.resend_api_key;
+    const userFromEmail = integration.resend_from_email || `contato@mdrepresentacoes.grupoclimb.ai`;
+
     // Validação básica
     if (!to || !subject || !html) {
       return new Response(
@@ -41,15 +55,15 @@ serve(async (req) => {
       );
     }
 
-    // Remetente dinâmico com o domínio verificado
+    // Remetente dinâmico usando as configurações do usuário
     const name = senderName || 'Atendimento';
-    const fromEmail = `${name} <contato@mdrepresentacoes.grupoclimb.ai>`;
+    const fromEmail = userFromEmail.includes('<') ? userFromEmail : `${name} <${userFromEmail}>`;
 
-    // Chamada para o Resend
+    // Chamada para o Resend usando a API KEY do usuário
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
+        'Authorization': `Bearer ${userResendApiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
