@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { useChatMessages, useSendMessage, useChatGrupos, ChatGrupo, ChatMessage } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, ChatGrupo, ChatMessage } from '@/hooks/use-chat';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen, 
-  Paperclip, FileText, Image, X, Download, Users2, Info, Calendar
+  Paperclip, FileText, Image, X, Download, Users2, Info, Calendar, Eraser
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -23,6 +23,17 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const CHAT_ALLOWED_EXT = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv', '.zip', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 const CHAT_ALLOWED_MIME = ['image/', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument', 'application/vnd.ms-excel', 'text/plain', 'text/csv', 'application/zip', 'application/x-zip-compressed'];
@@ -245,6 +256,7 @@ const Chat = () => {
   const activeRecipientId = target.type === 'dm' ? target.recipientId : null;
   const { data: messages, isLoading } = useChatMessages(activeGrupoId, activeRecipientId);
   const { send, sending } = useSendMessage();
+  const clearChat = useClearChat();
   const { data: grupos = [] } = useChatGrupos();
 
   const { data: myVendedor } = useQuery({
@@ -413,7 +425,32 @@ const Chat = () => {
               </>
             )}
             
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Limpar chat">
+                    <Eraser className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Limpar conversa?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Isso removerá permanentemente todas as mensagens deste chat para todos os participantes. Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={() => clearChat.mutate({ grupoId: activeGrupoId, recipientId: activeRecipientId })}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Limpar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
               <Sheet>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
