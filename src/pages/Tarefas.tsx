@@ -26,6 +26,7 @@ import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMult
 import { ProjetoSelect } from '@/components/tarefas/ProjetoSelect';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
+import { FilterButton } from '@/components/FilterButton';
 import { cn } from '@/lib/utils';
 
 const TAREFA_COLUMNS: ColumnDefinition[] = [
