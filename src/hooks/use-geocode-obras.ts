@@ -26,19 +26,28 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function geocodificar(endereco: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const query = encodeURIComponent(endereco);
+    // Adicionamos um User-Agent para seguir a política do Nominatim e aumentar a confiabilidade
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${query}`,
       {
         headers: {
           'Accept-Language': 'pt-BR',
+          'User-Agent': 'LovableCRM/1.0 (contact@lovable.dev)'
         },
       }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`Geocoding failed for ${endereco}:`, res.status, res.statusText);
+      return null;
+    }
     const data: NominatimResult[] = await res.json();
-    if (!data.length) return null;
+    if (!data.length) {
+      console.warn(`No geocoding results for address: ${endereco}`);
+      return null;
+    }
     return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  } catch {
+  } catch (err) {
+    console.error(`Geocoding error for ${endereco}:`, err);
     return null;
   }
 }
@@ -55,6 +64,8 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
     const pendentes = obras.filter(
       (o) => !!o.endereco_entrega && (o.latitude === null || o.longitude === null)
     );
+    
+    console.log('[useGeocodeObras] Obras pendentes:', pendentes.length);
 
     if (pendentes.length === 0) return;
 
@@ -70,7 +81,8 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
         if (cancelado) break;
 
         if (coord) {
-          await supabase
+          console.log(`[useGeocodeObras] Endereço geocodificado para ${obra.nome_obra}:`, coord);
+          const { error: updateError } = await supabase
             .from('obras')
             .update({
               latitude: coord.lat,
@@ -79,12 +91,17 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
             })
             .eq('id', obra.id);
 
+          if (updateError) {
+            console.error('[useGeocodeObras] Erro ao atualizar obra no Supabase:', updateError);
+          }
+
           setItems((prev) =>
             prev.map((o) =>
               o.id === obra.id ? { ...o, latitude: coord.lat, longitude: coord.lng } : o
             )
           );
         } else {
+          console.warn(`[useGeocodeObras] Falha ao geocodificar ${obra.nome_obra}`);
           // Marca tentativa para evitar reprocessar (geocoded_at sem coords = "tentamos e falhou")
           await supabase
             .from('obras')
