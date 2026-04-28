@@ -601,6 +601,11 @@ export default function Obras() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <StatusObrasDialog 
+        open={statusDialogOpen}
+        onOpenChange={setStatusDialogOpen}
+      />
     </AppLayout>
   );
 }
