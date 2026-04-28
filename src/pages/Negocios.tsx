@@ -222,7 +222,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setPage(1);
   };
 
-  const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
+  const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || (key || '');
 
   useEffect(() => {
     if (!visibleColumns.some(id => LEGACY_CARD_FIELDS.includes(id))) return;
