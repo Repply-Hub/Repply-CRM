@@ -144,7 +144,7 @@ export default function Obras() {
 
   const obrasParaMapa = useMemo(
     () =>
-      (obras ?? []).map((o: any) => ({
+      filtered.map((o: any) => ({
         id: o.id,
         nome_obra: o.nome_obra,
         endereco_entrega: o.endereco_entrega,
@@ -154,7 +154,7 @@ export default function Obras() {
         longitude: o.longitude ?? null,
         cliente_empresa: o.clientes?.empresa ?? null,
       })),
-    [obras]
+    [filtered]
   );
 
   return (
