@@ -282,7 +282,7 @@ export default function Obras() {
                 {viewMode === 'cards' ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filtered.slice((page - 1) * pageSize, page * pageSize).map((obra) => {
-                      const status = STATUS_MAP[obra.status] || { label: obra.status, variant: 'outline' as const };
+                      const status = getStatusInfo(obra.status);
                       const cliente = obra.clientes as any;
                       const camposExtras = (obra as any).campos_extras || {};
                       
