@@ -236,7 +236,7 @@ const Chat = () => {
   const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
   const [teamCollapsed, setTeamCollapsed] = useState(false);
   const [text, setText] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
