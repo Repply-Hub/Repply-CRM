@@ -866,28 +866,6 @@ export function UsuariosTab() {
 
         <div className="flex items-center gap-2">
           <CodigoAcessoButton />
-          <Dialog open={vendedorDialog} onOpenChange={setVendedorDialog}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-1.5 shadow-sm">
-                <UserPlus className="h-4 w-4" /> Novo Usuário
-              </Button>
-            </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Cadastrar Usuário</DialogTitle></DialogHeader>
-            <form onSubmit={handleCreateVendedor} className="space-y-4 mt-2">
-              <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" required placeholder="Nome completo" /></div>
-              <div className="space-y-1.5"><Label>Email</Label><Input name="email" type="email" required placeholder="email@exemplo.com" /></div>
-              <div className="space-y-1.5"><Label>Telefone</Label><Input name="telefone" placeholder="(00) 0000-0000" /></div>
-              <div className="space-y-1.5">
-                <Label>Perfil</Label>
-                <PerfilSelect name="role" defaultValue="vendedor" />
-              </div>
-              <Button type="submit" className="w-full" disabled={createVendedor.isPending}>
-                {createVendedor.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...</> : 'Cadastrar Usuário'}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
         </div>
       </div>
 
