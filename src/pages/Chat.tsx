@@ -236,7 +236,7 @@ const Chat = () => {
   const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
   const [teamCollapsed, setTeamCollapsed] = useState(false);
   const [text, setText] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -291,19 +291,23 @@ const Chat = () => {
 
   const handleSend = async () => {
     const trimmed = text.trim();
-    if (!trimmed && !selectedFile) return;
+    if (!trimmed && selectedFiles.length === 0) return;
     setText('');
-    const file = selectedFile;
-    setSelectedFile(null);
-    await send(trimmed, file ?? undefined, activeGrupoId, activeRecipientId);
+    const files = [...selectedFiles];
+    setSelectedFiles([]);
+    await send(trimmed, files, activeGrupoId, activeRecipientId);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
-    if (!file) return;
-    if (!validateFile(file, { allowedExtensions: CHAT_ALLOWED_EXT, allowedMimePrefixes: CHAT_ALLOWED_MIME })) return;
-    setSelectedFile(file);
+    if (files.length === 0) return;
+    
+    const validFiles = files.filter(file => 
+      validateFile(file, { allowedExtensions: CHAT_ALLOWED_EXT, allowedMimePrefixes: CHAT_ALLOWED_MIME })
+    );
+    
+    setSelectedFiles(prev => [...prev, ...validFiles]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -588,19 +592,25 @@ const Chat = () => {
             )}
           </ScrollArea>
 
-          {/* Input */}
           <div className="border-t border-border px-4 py-3">
-            {selectedFile && (
-              <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-muted rounded-lg text-sm">
-                {selectedFile.type.startsWith('image/') ? (
-                  <Image className="h-4 w-4 text-primary shrink-0" />
-                ) : (
-                  <FileText className="h-4 w-4 text-primary shrink-0" />
-                )}
-                <span className="truncate flex-1 text-xs text-foreground">{selectedFile.name}</span>
-                <button onClick={() => setSelectedFile(null)} className="p-0.5 hover:bg-background rounded">
-                  <X className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
+            {selectedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {selectedFiles.map((file, idx) => (
+                  <div key={`${file.name}-${idx}`} className="flex items-center gap-2 px-2 py-1.5 bg-muted rounded-lg text-sm max-w-[200px]">
+                    {file.type.startsWith('image/') ? (
+                      <Image className="h-4 w-4 text-primary shrink-0" />
+                    ) : (
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                    )}
+                    <span className="truncate flex-1 text-xs text-foreground">{file.name}</span>
+                    <button 
+                      onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))} 
+                      className="p-0.5 hover:bg-background rounded"
+                    >
+                      <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
             <div className="flex gap-2">
@@ -608,6 +618,7 @@ const Chat = () => {
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
+                multiple
                 onChange={handleFileSelect}
                 accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
               />
@@ -631,7 +642,7 @@ const Chat = () => {
                 disabled={sending}
                 autoFocus
               />
-              <Button onClick={handleSend} disabled={sending || (!text.trim() && !selectedFile)} size="icon">
+              <Button onClick={handleSend} disabled={sending || (!text.trim() && selectedFiles.length === 0)} size="icon">
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
