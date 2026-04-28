@@ -468,13 +468,14 @@ export default function Obras() {
                   onValueChange={(v) => setNewObra({ ...newObra, status: v })}
                 >
                   <SelectTrigger id="status">
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ativa">Ativa</SelectItem>
-                    <SelectItem value="em_andamento">Em andamento</SelectItem>
-                    <SelectItem value="parada">Parada</SelectItem>
-                    <SelectItem value="concluida">Concluída</SelectItem>
+                    {statusObras?.map(status => (
+                      <SelectItem key={status.slug} value={status.slug}>
+                        {status.nome}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
