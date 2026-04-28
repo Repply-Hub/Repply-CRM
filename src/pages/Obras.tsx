@@ -170,15 +170,26 @@ export default function Obras() {
     >
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <TabsList>
-              <TabsTrigger value="lista" className="gap-2">
-                <List className="h-4 w-4" /> Lista
-              </TabsTrigger>
-              <TabsTrigger value="mapa" className="gap-2">
-                <MapIcon className="h-4 w-4" /> Mapa
-              </TabsTrigger>
-            </TabsList>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <TabsList>
+                <TabsTrigger value="lista" className="gap-2">
+                  <List className="h-4 w-4" /> Lista
+                </TabsTrigger>
+                <TabsTrigger value="mapa" className="gap-2">
+                  <MapIcon className="h-4 w-4" /> Mapa
+                </TabsTrigger>
+              </TabsList>
+
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setStatusDialogOpen(true)}
+                title="Configurar Status"
+              >
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </div>
 
             <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />
