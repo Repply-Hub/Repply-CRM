@@ -592,19 +592,25 @@ const Chat = () => {
             )}
           </ScrollArea>
 
-          {/* Input */}
           <div className="border-t border-border px-4 py-3">
-            {selectedFile && (
-              <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-muted rounded-lg text-sm">
-                {selectedFile.type.startsWith('image/') ? (
-                  <Image className="h-4 w-4 text-primary shrink-0" />
-                ) : (
-                  <FileText className="h-4 w-4 text-primary shrink-0" />
-                )}
-                <span className="truncate flex-1 text-xs text-foreground">{selectedFile.name}</span>
-                <button onClick={() => setSelectedFile(null)} className="p-0.5 hover:bg-background rounded">
-                  <X className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
+            {selectedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {selectedFiles.map((file, idx) => (
+                  <div key={`${file.name}-${idx}`} className="flex items-center gap-2 px-2 py-1.5 bg-muted rounded-lg text-sm max-w-[200px]">
+                    {file.type.startsWith('image/') ? (
+                      <Image className="h-4 w-4 text-primary shrink-0" />
+                    ) : (
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                    )}
+                    <span className="truncate flex-1 text-xs text-foreground">{file.name}</span>
+                    <button 
+                      onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))} 
+                      className="p-0.5 hover:bg-background rounded"
+                    >
+                      <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
             <div className="flex gap-2">
@@ -612,6 +618,7 @@ const Chat = () => {
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
+                multiple
                 onChange={handleFileSelect}
                 accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
               />
