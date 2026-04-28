@@ -273,3 +273,38 @@ export function useSendMessage() {
 
   return { send, sending };
 }
+
+export function useClearChat() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ grupoId, recipientId }: { grupoId?: string | null, recipientId?: string | null }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Usuário não autenticado');
+
+      const { data: me } = await supabase.from('usuarios').select('id').eq('user_id', userData.user.id).single();
+      if (!me) throw new Error('Vendedor não encontrado');
+
+      let query = supabase.from('chat_mensagens').delete();
+
+      if (grupoId) {
+        query = query.eq('grupo_id', grupoId);
+      } else if (recipientId) {
+        query = query.or(`and(usuario_id.eq.${me.id},recipient_id.eq.${recipientId}),and(usuario_id.eq.${recipientId},recipient_id.eq.${me.id})`);
+      } else {
+        query = query.is('grupo_id', null).is('recipient_id', null);
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ['chat_mensagens', variables.grupoId, variables.recipientId] });
+      toast.success('Chat limpo com sucesso!');
+    },
+    onError: (err: any) => {
+      console.error('Erro ao limpar chat:', err);
+      toast.error(`Erro ao limpar chat: ${err.message}`);
+    }
+  });
+}
