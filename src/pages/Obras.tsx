@@ -536,8 +536,8 @@ export default function Obras() {
                   <h3 className="text-xl font-bold text-foreground">{selectedObra.nome_obra}</h3>
                   <p className="text-sm text-muted-foreground">ID: {selectedObra.id}</p>
                 </div>
-                <Badge variant={STATUS_MAP[selectedObra.status]?.variant || 'outline'}>
-                  {STATUS_MAP[selectedObra.status]?.label || selectedObra.status}
+                <Badge variant={getStatusInfo(selectedObra.status).variant}>
+                  {getStatusInfo(selectedObra.status).label}
                 </Badge>
               </div>
 
