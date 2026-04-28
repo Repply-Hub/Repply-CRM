@@ -291,19 +291,23 @@ const Chat = () => {
 
   const handleSend = async () => {
     const trimmed = text.trim();
-    if (!trimmed && !selectedFile) return;
+    if (!trimmed && selectedFiles.length === 0) return;
     setText('');
-    const file = selectedFile;
-    setSelectedFile(null);
-    await send(trimmed, file ?? undefined, activeGrupoId, activeRecipientId);
+    const files = [...selectedFiles];
+    setSelectedFiles([]);
+    await send(trimmed, files, activeGrupoId, activeRecipientId);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
-    if (!file) return;
-    if (!validateFile(file, { allowedExtensions: CHAT_ALLOWED_EXT, allowedMimePrefixes: CHAT_ALLOWED_MIME })) return;
-    setSelectedFile(file);
+    if (files.length === 0) return;
+    
+    const validFiles = files.filter(file => 
+      validateFile(file, { allowedExtensions: CHAT_ALLOWED_EXT, allowedMimePrefixes: CHAT_ALLOWED_MIME })
+    );
+    
+    setSelectedFiles(prev => [...prev, ...validFiles]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
