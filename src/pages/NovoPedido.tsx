@@ -72,8 +72,8 @@ const NovoPedido = () => {
 
   // Derived
   const selectedCliente = useMemo(() => clientes?.find(c => c.id === clienteId), [clientes, clienteId]);
-  const isConstrutora = selectedCliente?.tipo === 'construtora';
-  const { data: obras } = useObrasByCliente(isConstrutora ? clienteId : null);
+  const isConstrutora = selectedCliente?.tipo === 'construtora' || !clienteId;
+  const { data: obras } = useObrasByCliente(clienteId || null);
   const selectedObra = useMemo(() => obras?.find(o => o.id === obraId), [obras, obraId]);
   const { data: tabelaPrecos } = useTabelaPrecos(fabricanteId || null);
 
