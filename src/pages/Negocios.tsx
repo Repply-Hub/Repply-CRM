@@ -197,9 +197,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     if (value.trim() && showKanban) {
       const query = value.trim().toLowerCase();
       const firstMatch = pipelineOrders.find(o => 
-        o.clientName.toLowerCase().includes(query) || 
-        o.obra.toLowerCase().includes(query) || 
-        o.fabricante.toLowerCase().includes(query)
+        (o.clientName || '').toLowerCase().includes(query) || 
+        (o.obra || '').toLowerCase().includes(query) || 
+        (o.fabricante || '').toLowerCase().includes(query)
       );
       
       if (firstMatch) {
@@ -222,7 +222,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setPage(1);
   };
 
-  const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
+  const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || (key || '');
 
   useEffect(() => {
     if (!visibleColumns.some(id => LEGACY_CARD_FIELDS.includes(id))) return;
@@ -312,9 +312,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         if (new Date(o.createdAt) > end) return false;
       }
       if (q) {
-        const clientName = o.clientName.toLowerCase();
-        const obra = o.obra.toLowerCase();
-        const fabricante = o.fabricante.toLowerCase();
+        const clientName = (o.clientName || '').toLowerCase();
+        const obra = (o.obra || '').toLowerCase();
+        const fabricante = (o.fabricante || '').toLowerCase();
         if (!clientName.includes(q) && !obra.includes(q) && !fabricante.includes(q)) return false;
       }
       return true;
