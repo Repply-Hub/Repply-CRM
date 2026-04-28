@@ -642,7 +642,7 @@ const Chat = () => {
                 disabled={sending}
                 autoFocus
               />
-              <Button onClick={handleSend} disabled={sending || (!text.trim() && !selectedFile)} size="icon">
+              <Button onClick={handleSend} disabled={sending || (!text.trim() && selectedFiles.length === 0)} size="icon">
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
