@@ -25,9 +25,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  */
 async function geocodificar(endereco: string): Promise<{ lat: number; lng: number } | null> {
   try {
-    const query = encodeURIComponent(endereco);
-    // Adicionamos um User-Agent para seguir a política do Nominatim e aumentar a confiabilidade
-    const res = await fetch(
+    // Tenta primeiro o endereço completo
+    let query = encodeURIComponent(endereco);
+    let res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${query}`,
       {
         headers: {
@@ -36,11 +36,28 @@ async function geocodificar(endereco: string): Promise<{ lat: number; lng: numbe
         },
       }
     );
-    if (!res.ok) {
-      console.error(`Geocoding failed for ${endereco}:`, res.status, res.statusText);
-      return null;
+    
+    let data: NominatimResult[] = await res.json();
+    
+    // Se não encontrar, tenta simplificar o endereço (remove complementos após vírgula ou hífen)
+    if (!data.length) {
+      const enderecoSimplificado = endereco.split(/[,-]/)[0].trim();
+      if (enderecoSimplificado !== endereco) {
+        console.log(`[Geocoding] Tentando endereço simplificado: ${enderecoSimplificado}`);
+        query = encodeURIComponent(enderecoSimplificado);
+        res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${query}`,
+          {
+            headers: {
+              'Accept-Language': 'pt-BR',
+              'User-Agent': 'LovableCRM/1.0 (contact@lovable.dev)'
+            },
+          }
+        );
+        data = await res.json();
+      }
     }
-    const data: NominatimResult[] = await res.json();
+
     if (!data.length) {
       console.warn(`No geocoding results for address: ${endereco}`);
       return null;
