@@ -26,19 +26,28 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function geocodificar(endereco: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const query = encodeURIComponent(endereco);
+    // Adicionamos um User-Agent para seguir a política do Nominatim e aumentar a confiabilidade
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${query}`,
       {
         headers: {
           'Accept-Language': 'pt-BR',
+          'User-Agent': 'LovableCRM/1.0 (contact@lovable.dev)'
         },
       }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`Geocoding failed for ${endereco}:`, res.status, res.statusText);
+      return null;
+    }
     const data: NominatimResult[] = await res.json();
-    if (!data.length) return null;
+    if (!data.length) {
+      console.warn(`No geocoding results for address: ${endereco}`);
+      return null;
+    }
     return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  } catch {
+  } catch (err) {
+    console.error(`Geocoding error for ${endereco}:`, err);
     return null;
   }
 }
