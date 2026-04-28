@@ -522,90 +522,66 @@ const Clientes = () => {
         </Tabs>
 
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              className="pl-9"
-              placeholder={activeTab === 'empresas' ? 'Buscar empresas...' : 'Buscar contatos...'}
+              placeholder="Buscar..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              className="pl-9 h-10"
             />
           </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 shrink-0 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
-              >
-                <ListFilter className="h-4 w-4" />
-                <span className="hidden sm:inline">Filtros</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              className={activeTab === 'empresas' ? 'w-auto min-w-[420px] p-4' : 'w-auto min-w-[220px] p-4'}
-            >
-              <div className={activeTab === 'empresas' ? 'flex gap-0 divide-x divide-border' : ''}>
-                {activeTab === 'empresas' && (
-                  <div className="flex-1 min-w-[180px] pr-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tipo</p>
-                    <ScrollArea className="h-60">
-                      <div className="space-y-1 pr-3">
-                        {tipoFilterOptions.map(opt => (
-                          <label
-                            key={opt.value}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
-                          >
-                            <input
-                              type="radio"
-                              name="cliente-tipo"
-                              className="h-3.5 w-3.5 accent-primary"
-                              checked={tipoFilter === opt.value}
-                              onChange={() => { setTipoFilter(opt.value); setPage(1); }}
-                            />
-                            {opt.label}
-                          </label>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => { setNewTipoTarget('filter'); setNewTipoOpen(true); }}
-                          className="w-full text-left text-sm px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground text-primary font-medium"
-                        >
-                          + Criar novo tipo…
-                        </button>
-                      </div>
-                    </ScrollArea>
-                  </div>
-                )}
-                <div className={activeTab === 'empresas' ? 'flex-1 min-w-[180px] pl-4' : 'min-w-0'}>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 inline-flex items-center gap-1.5">
-                    <ArrowUpDown className="h-3 w-3" /> Ordenação
-                  </p>
-                  <div className="space-y-1">
-                    {[
-                      { value: 'asc', label: 'Nome (A → Z)' },
-                      { value: 'desc', label: 'Nome (Z → A)' },
-                    ].map(opt => (
-                      <label
-                        key={opt.value}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
-                      >
-                        <input
-                          type="radio"
-                          name="cliente-sort"
-                          className="h-3.5 w-3.5 accent-primary"
-                          checked={sortOrder === opt.value}
-                          onChange={() => { setSortOrder(opt.value as 'asc' | 'desc'); setPage(1); }}
-                        />
-                        {opt.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
+
+          <FilterButton
+            hasFilters={hasFilters}
+            activeFilterCount={activeFilterCount}
+            onClear={() => {
+              setTipoFilter('todos');
+              setSearch('');
+            }}
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs uppercase text-muted-foreground font-semibold">Tipo</Label>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 px-2 text-[10px] text-primary hover:text-primary hover:bg-primary/5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setNewTipoTarget('filter');
+                    setNewTipoOpen(true);
+                  }}
+                >
+                  Gerenciar
+                </Button>
               </div>
-            </PopoverContent>
-          </Popover>
+              <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1); }}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Todos os tipos" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tipoFilterOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 border-t pt-4">
+              <Label className="text-xs uppercase text-muted-foreground font-semibold">Ordenação</Label>
+              <Select value={sortOrder} onValueChange={(v: 'asc' | 'desc') => setSortOrder(v)}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Ordenar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Nome (A-Z)</SelectItem>
+                  <SelectItem value="desc">Nome (Z-A)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </FilterButton>
+
           <ColumnSettings
             columns={columns}
             visibleColumns={visibleColumns}
