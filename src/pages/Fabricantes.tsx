@@ -26,6 +26,8 @@ import { ProductImageUpload } from '@/components/catalogo/ProductImageUpload';
 import { ImportCatalogoDialog } from '@/components/catalogo/ImportCatalogoDialog';
 import { GlobalImportCatalogoDialog } from '@/components/catalogo/GlobalImportCatalogoDialog';
 import { cn } from '@/lib/utils';
+import { FilterButton } from '@/components/FilterButton';
+import { Filter } from 'lucide-react';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'imagem', label: 'Imagem', locked: false },
@@ -504,7 +506,7 @@ const Fabricantes = () => {
                           {precos?.length ?? 0} produto{(precos?.length ?? 0) !== 1 ? 's' : ''} cadastrado{(precos?.length ?? 0) !== 1 ? 's' : ''}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2 flex-wrap">
+                      <div className="flex gap-2 flex-wrap items-center">
                         {categoriasPreco.length > 0 && (
                           <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
                             <SelectTrigger className="h-8 text-xs w-40">
