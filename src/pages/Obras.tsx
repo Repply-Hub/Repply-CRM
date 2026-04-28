@@ -144,7 +144,7 @@ export default function Obras() {
 
   const obrasParaMapa = useMemo(
     () =>
-      (obras ?? []).map((o: any) => ({
+      filtered.map((o: any) => ({
         id: o.id,
         nome_obra: o.nome_obra,
         endereco_entrega: o.endereco_entrega,
@@ -154,7 +154,7 @@ export default function Obras() {
         longitude: o.longitude ?? null,
         cliente_empresa: o.clientes?.empresa ?? null,
       })),
-    [obras]
+    [filtered]
   );
 
   return (
@@ -197,42 +197,46 @@ export default function Obras() {
             </Button>
           </div>
 
+          {/* Shared Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome, endereço ou cliente..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os status</SelectItem>
+                {statusObras?.map(status => (
+                  <SelectItem key={status.slug} value={status.slug}>
+                    {status.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
+              <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
+                <SelectValue placeholder="Ordenar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent">Mais recentes</SelectItem>
+                <SelectItem value="oldest">Mais antigas</SelectItem>
+                <SelectItem value="name_asc">Nome A-Z</SelectItem>
+                <SelectItem value="name_desc">Nome Z-A</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <TabsContent value="lista" className="space-y-6 mt-0">
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome, endereço ou cliente..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os status</SelectItem>
-                  {statusObras?.map(status => (
-                    <SelectItem key={status.slug} value={status.slug}>
-                      {status.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-                <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
-                  <SelectValue placeholder="Ordenar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="recent">Mais recentes</SelectItem>
-                  <SelectItem value="oldest">Mais antigas</SelectItem>
-                  <SelectItem value="name_asc">Nome A-Z</SelectItem>
-                  <SelectItem value="name_desc">Nome Z-A</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* View specific controls */}
+            <div className="flex items-center justify-end gap-3">
               <div className="flex bg-muted p-1 rounded-md">
                 <button
                   onClick={() => setViewMode('cards')}
