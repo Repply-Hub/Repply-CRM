@@ -40,7 +40,7 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
       <div className="h-screen flex w-full overflow-hidden">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-[4.5rem] flex items-center justify-between px-2 sm:px-4 md:px-6 shrink-0 gap-1.5 sm:gap-2 border-b border-primary/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30 transition-all duration-300">
+          <header className="h-[6rem] flex items-center justify-between px-2 sm:px-4 md:px-6 shrink-0 gap-1.5 sm:gap-2 border-b border-primary/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30 transition-all duration-300">
             <div className="min-w-0 flex-1 flex items-center gap-1.5 sm:gap-2">
               <SidebarTrigger className="shrink-0 h-8 w-8 md:hidden" />
               {headerContent ?? (
