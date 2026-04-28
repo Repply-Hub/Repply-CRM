@@ -31,6 +31,8 @@ import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep'
 import { ListPagination } from '@/components/ListPagination';
 import { cn } from '@/lib/utils';
 import { ExportClientesButton } from '@/components/ExportClientesButton';
+import { FilterButton } from '@/components/FilterButton';
+
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'empresa', label: 'Empresa', locked: false },
@@ -313,6 +315,10 @@ const Clientes = () => {
   );
 
   const filtered = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
+  
+  const hasFilters = tipoFilter !== 'todos' || search !== '';
+  const activeFilterCount = (tipoFilter !== 'todos' ? 1 : 0);
+
   
   // Hook replaces currentColumns calculation
 

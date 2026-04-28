@@ -112,6 +112,10 @@ export default function Tarefas() {
     return list;
   }, [tarefas, statusFilter, search]);
 
+  const hasFilters = statusFilter !== 'todos' || search !== '';
+  const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0);
+
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
@@ -233,19 +237,35 @@ export default function Tarefas() {
       <div className="p-3 sm:p-4 md:p-6 max-w-[1400px] mx-auto space-y-4 md:space-y-6">
         {/* Filters & Actions */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar tarefas..." className="pl-9" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+            <Input placeholder="Buscar tarefas..." className="pl-9 h-10" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
           </div>
-          <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-fit max-w-full shrink-0"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os status</SelectItem>
-              <SelectItem value="pendente">Pendente</SelectItem>
-              <SelectItem value="em_andamento">Em andamento</SelectItem>
-              <SelectItem value="concluida">Concluída</SelectItem>
-            </SelectContent>
-          </Select>
+
+          <FilterButton 
+            hasFilters={hasFilters}
+            activeFilterCount={activeFilterCount}
+            onClear={() => {
+              setStatusFilter('todos');
+              setSearch('');
+            }}
+          >
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-muted-foreground font-semibold">Status</Label>
+              <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Todos os status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os status</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="em_andamento">Em andamento</SelectItem>
+                  <SelectItem value="concluida">Concluída</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </FilterButton>
+
           {someSelected && (
             <Button variant="destructive" size="sm" className="gap-2 shrink-0" onClick={() => setConfirmDeleteOpen(true)}>
               <Trash2 className="h-4 w-4" />

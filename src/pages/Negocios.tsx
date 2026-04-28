@@ -114,6 +114,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     defaultColumns: PEDIDOS_COLUMNS,
   });
 
+  const { FilterButton } = await import('@/components/FilterButton');
+
+
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
   const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
     const saved = localStorage.getItem('negocios_pipeline_view') as PipelineView | null;
