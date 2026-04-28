@@ -33,6 +33,7 @@ import { Label } from '@/components/ui/label';
 import { ImportPedidosDialog } from '@/components/ImportPedidosDialog';
 import { ListPagination } from '@/components/ListPagination';
 import { KanbanColumn } from '@/components/kanban/KanbanColumn';
+import { FilterButton } from '@/components/FilterButton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
