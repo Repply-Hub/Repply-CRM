@@ -192,6 +192,28 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setPage(1);
+    
+    if (value.trim() && showKanban) {
+      const query = value.trim().toLowerCase();
+      const firstMatch = pipelineOrders.find(o => 
+        o.clientName.toLowerCase().includes(query) || 
+        o.obra.toLowerCase().includes(query) || 
+        o.fabricante.toLowerCase().includes(query)
+      );
+      
+      if (firstMatch) {
+        setTimeout(() => {
+          const element = document.getElementById(`kanban-card-${firstMatch.id}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            element.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+            setTimeout(() => {
+              element.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+            }, 3000);
+          }
+        }, 100);
+      }
+    }
   };
 
   const handleStageFilterChange = (value: string) => {
