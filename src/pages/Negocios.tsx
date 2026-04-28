@@ -114,11 +114,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     defaultColumns: PEDIDOS_COLUMNS,
   });
 
-  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || stageFilter !== 'todos';
-
-
-
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
+
   const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
     const saved = localStorage.getItem('negocios_pipeline_view') as PipelineView | null;
     return saved === 'kanban' || saved === 'lista' ? saved : 'kanban';
