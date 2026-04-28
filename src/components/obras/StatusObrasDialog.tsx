@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, Loader2, ArrowUp, ArrowDown } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Pencil, Trash2, Loader2, GripVertical } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,14 @@ export function StatusObrasDialog({ open, onOpenChange }: Props) {
     const [excluindo, setExcluindo] = useState<StatusObra | null>(null);
     const [targetSlug, setTargetSlug] = useState<string>('');
 
+    const [localList, setLocalList] = useState<StatusObra[]>([]);
+
+    useEffect(() => {
+        if (statusList) {
+            setLocalList(statusList);
+        }
+    }, [statusList]);
+
     const handleCreate = async () => {
         if (!novoNome.trim()) return;
         await createMut.mutateAsync({ nome: novoNome, cor: novaCor });
@@ -84,23 +93,25 @@ export function StatusObrasDialog({ open, onOpenChange }: Props) {
         setTargetSlug('');
     };
 
-    const move = async (id: string, dir: -1 | 1) => {
-        const list = [...(statusList ?? [])];
-        const idx = list.findIndex(c => c.id === id);
-        if (idx < 0) return;
-        const novoIdx = idx + dir;
-        if (novoIdx < 0 || novoIdx >= list.length) return;
-        [list[idx], list[novoIdx]] = [list[novoIdx], list[idx]];
-        
+    const onDragEnd = async (result: DropResult) => {
+        if (!result.destination) return;
+
+        const items = Array.from(localList);
+        const [reorderedItem] = items.splice(result.source.index, 1);
+        items.splice(result.destination.index, 0, reorderedItem);
+
+        setLocalList(items);
+
         try {
             await Promise.all(
-                list.map((item, index) => 
+                items.map((item, index) => 
                     supabase.from('status_obras').update({ ordem: index }).eq('id', item.id)
                 )
             );
             qc.invalidateQueries({ queryKey: ['status_obras'] });
         } catch (err) {
             toast.error('Erro ao reordenar status');
+            setLocalList(statusList ?? []);
         }
     };
 
@@ -151,53 +162,63 @@ export function StatusObrasDialog({ open, onOpenChange }: Props) {
                             <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                             </div>
-                        ) : (statusList?.length ?? 0) === 0 ? (
+                        ) : (localList.length === 0) ? (
                             <p className="text-sm text-muted-foreground text-center py-6">Nenhum status cadastrado</p>
                         ) : (
-                            <div className="space-y-1.5">
-                                {statusList!.map((c, idx) => {
-                                    const corClass = STATUS_COR_OPCOES.find(x => x.value === c.cor)?.class ?? 'bg-primary';
-                                    return (
-                                        <div key={c.id} className="flex items-center gap-2 rounded-md border bg-card p-2">
-                                            <div className="flex flex-col">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => move(c.id, -1)}
-                                                    disabled={idx === 0}
-                                                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
-                                                >
-                                                    <ArrowUp className="h-3.5 w-3.5" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => move(c.id, 1)}
-                                                    disabled={idx === (statusList!.length - 1)}
-                                                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
-                                                >
-                                                    <ArrowDown className="h-3.5 w-3.5" />
-                                                </button>
-                                            </div>
-                                            <span className={cn('h-3 w-3 rounded-full shrink-0', corClass)} />
-                                            <span className="flex-1 text-sm font-medium">{c.nome}</span>
-                                            {c.is_sistema && (
-                                                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">PADRÃO</span>
-                                            )}
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(c)}>
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7 text-destructive hover:text-destructive"
-                                                onClick={() => startDelete(c)}
-                                                disabled={(statusList?.length ?? 0) <= 1}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                            <DragDropContext onDragEnd={onDragEnd}>
+                                <Droppable droppableId="status-list">
+                                    {(provided) => (
+                                        <div 
+                                            {...provided.droppableProps}
+                                            ref={provided.innerRef}
+                                            className="space-y-1.5 pb-4"
+                                        >
+                                            {localList.map((c, idx) => {
+                                                const corClass = STATUS_COR_OPCOES.find(x => x.value === c.cor)?.class ?? 'bg-primary';
+                                                return (
+                                                    <Draggable key={c.id} draggableId={c.id} index={idx}>
+                                                        {(provided, snapshot) => (
+                                                            <div 
+                                                                ref={provided.innerRef}
+                                                                {...provided.draggableProps}
+                                                                className={cn(
+                                                                    "flex items-center gap-2 rounded-md border bg-card p-2 transition-shadow",
+                                                                    snapshot.isDragging && "shadow-lg border-primary z-50 bg-accent"
+                                                                )}
+                                                            >
+                                                                <div 
+                                                                    {...provided.dragHandleProps}
+                                                                    className="text-muted-foreground hover:text-foreground p-1 cursor-grab active:cursor-grabbing"
+                                                                >
+                                                                    <GripVertical className="h-4 w-4" />
+                                                                </div>
+                                                                <span className={cn('h-3 w-3 rounded-full shrink-0', corClass)} />
+                                                                <span className="flex-1 text-sm font-medium">{c.nome}</span>
+                                                                {c.is_sistema && (
+                                                                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">PADRÃO</span>
+                                                                )}
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(c)}>
+                                                                    <Pencil className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                                                    onClick={() => startDelete(c)}
+                                                                    disabled={localList.length <= 1}
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                    </Draggable>
+                                                );
+                                            })}
+                                            {provided.placeholder}
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    )}
+                                </Droppable>
+                            </DragDropContext>
                         )}
                     </ScrollArea>
 
