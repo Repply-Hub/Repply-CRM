@@ -114,9 +114,9 @@ export default function Obras() {
       const q = search.toLowerCase();
       list = list.filter(
         (o) =>
-          o.nome_obra.toLowerCase().includes(q) ||
-          o.endereco_entrega?.toLowerCase().includes(q) ||
-          (o.clientes as any)?.empresa?.toLowerCase().includes(q)
+          (o.nome_obra || '').toLowerCase().includes(q) ||
+          (o.endereco_entrega || '').toLowerCase().includes(q) ||
+          ((o.clientes as any)?.empresa || '').toLowerCase().includes(q)
       );
     }
 
