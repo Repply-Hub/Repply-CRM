@@ -261,10 +261,14 @@ export default function Obras() {
                       const camposExtras = (obra as any).campos_extras || {};
                       
                       return (
-                        <Card key={obra.id} className="flex flex-col">
+                        <Card 
+                          key={obra.id} 
+                          className="flex flex-col cursor-pointer hover:border-primary/50 transition-colors group"
+                          onClick={() => toast.info(`Visualização da obra ${obra.nome_obra} em breve.`)}
+                        >
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between gap-2">
-                              <CardTitle className="text-base font-semibold leading-tight line-clamp-2">
+                              <CardTitle className="text-base font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors">
                                 {obra.nome_obra}
                               </CardTitle>
                               <Badge variant={status.variant} className="shrink-0 text-xs">
