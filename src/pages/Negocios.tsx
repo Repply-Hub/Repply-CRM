@@ -612,31 +612,62 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             </ScrollArea>
           </div>
-          <div className="min-w-[140px] px-4">
+          <div className="min-w-[160px] px-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Período</p>
             <div className="space-y-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("w-full justify-start text-left text-xs h-8", !dateFrom && "text-muted-foreground")}>
-                    <CalendarIcon className="h-3 w-3 mr-1.5" />
-                    {dateFrom ? format(dateFrom, 'dd/MM/yy', { locale: ptBR }) : 'De'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className="p-3 pointer-events-auto" />
-                </PopoverContent>
-              </Popover>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("w-full justify-start text-left text-xs h-8", !dateTo && "text-muted-foreground")}>
-                    <CalendarIcon className="h-3 w-3 mr-1.5" />
-                    {dateTo ? format(dateTo, 'dd/MM/yy', { locale: ptBR }) : 'Até'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className="p-3 pointer-events-auto" />
-                </PopoverContent>
-              </Popover>
+              <div className="relative group">
+                <Input
+                  placeholder="De: DD/MM/AAAA"
+                  className="h-8 text-xs pl-8 group-hover:border-primary transition-colors"
+                  defaultValue={dateFrom ? format(dateFrom, 'dd/MM/yyyy') : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.length === 10) {
+                      const d = parse(val, 'dd/MM/yyyy', new Date());
+                      if (isValid(d)) setDateFrom(d);
+                    } else if (val === '') {
+                      setDateFrom(undefined);
+                    }
+                  }}
+                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
+                      <CalendarIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className="p-3 pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="relative group">
+                <Input
+                  placeholder="Até: DD/MM/AAAA"
+                  className="h-8 text-xs pl-8 group-hover:border-primary transition-colors"
+                  defaultValue={dateTo ? format(dateTo, 'dd/MM/yyyy') : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.length === 10) {
+                      const d = parse(val, 'dd/MM/yyyy', new Date());
+                      if (isValid(d)) setDateTo(d);
+                    } else if (val === '') {
+                      setDateTo(undefined);
+                    }
+                  }}
+                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
+                      <CalendarIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className="p-3 pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           </div>
           <div className="flex flex-col justify-between min-w-[120px] pl-4">
