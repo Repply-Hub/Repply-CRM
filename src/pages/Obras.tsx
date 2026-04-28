@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useObras } from '@/hooks/use-obras';
+import { useStatusObras } from '@/hooks/use-status-obras';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { 
   Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, 
-  LayoutGrid, Table as TableIcon, Plus 
+  LayoutGrid, Table as TableIcon, Plus, Settings2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -23,6 +24,7 @@ import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettin
 import { ListPagination } from '@/components/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { MapaObras } from '@/components/obras/MapaObras';
+import { StatusObrasDialog } from '@/components/obras/StatusObrasDialog';
 import { cn } from '@/lib/utils';
 
 const OBRA_FIELDS: ColumnDefinition[] = [
@@ -33,13 +35,6 @@ const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'spe_cnpj', label: 'CNPJ/SPE', locked: false },
   { id: 'created_at', label: 'Data de Criação', locked: false },
 ];
-
-const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  em_andamento: { label: 'Em andamento', variant: 'default' },
-  ativa: { label: 'Ativa', variant: 'default' },
-  concluida: { label: 'Concluída', variant: 'secondary' },
-  parada: { label: 'Parada', variant: 'destructive' },
-};
 
 type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
 
