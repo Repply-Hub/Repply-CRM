@@ -1540,6 +1540,42 @@ export type Database = {
         }
         Relationships: []
       }
+      status_obras: {
+        Row: {
+          cor: string
+          created_at: string
+          empresa_id: string
+          id: string
+          is_sistema: boolean
+          nome: string
+          ordem: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          cor?: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_sistema?: boolean
+          nome: string
+          ordem?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          cor?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_sistema?: boolean
+          nome?: string
+          ordem?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tabela_precos: {
         Row: {
           categoria: string | null
@@ -1876,6 +1912,10 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_gestor: { Args: never; Returns: boolean }
+      seed_default_status_obras: {
+        Args: { target_empresa_id: string }
+        Returns: undefined
+      }
       usuario_in_my_empresa: { Args: { _usuario_id: string }; Returns: boolean }
       validar_codigo_empresa: { Args: { p_codigo: string }; Returns: Json }
       vendedor_in_my_empresa: {

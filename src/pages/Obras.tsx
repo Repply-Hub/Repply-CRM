@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useObras } from '@/hooks/use-obras';
+import { useStatusObras } from '@/hooks/use-status-obras';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { 
   Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, 
-  LayoutGrid, Table as TableIcon, Plus 
+  LayoutGrid, Table as TableIcon, Plus, Settings2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -23,6 +24,7 @@ import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettin
 import { ListPagination } from '@/components/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { MapaObras } from '@/components/obras/MapaObras';
+import { StatusObrasDialog } from '@/components/obras/StatusObrasDialog';
 import { cn } from '@/lib/utils';
 
 const OBRA_FIELDS: ColumnDefinition[] = [
@@ -33,13 +35,6 @@ const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'spe_cnpj', label: 'CNPJ/SPE', locked: false },
   { id: 'created_at', label: 'Data de Criação', locked: false },
 ];
-
-const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  em_andamento: { label: 'Em andamento', variant: 'default' },
-  ativa: { label: 'Ativa', variant: 'default' },
-  concluida: { label: 'Concluída', variant: 'secondary' },
-  parada: { label: 'Parada', variant: 'destructive' },
-};
 
 type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
 
@@ -58,13 +53,22 @@ export default function Obras() {
 
   // Modal state
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newObra, setNewObra] = useState({
     nome_obra: '',
     cliente_id: '',
     endereco_entrega: '',
-    status: 'ativa',
+    status: '',
     spe_cnpj: '',
   });
+
+  const { data: statusObras } = useStatusObras();
+
+  useEffect(() => {
+    if (statusObras?.length && !newObra.status) {
+      setNewObra(prev => ({ ...prev, status: statusObras[0].slug }));
+    }
+  }, [statusObras, newObra.status]);
 
   const {
     columns,
@@ -86,6 +90,15 @@ export default function Obras() {
     key: 'obras',
     defaultColumns: OBRA_FIELDS,
   });
+
+  const getStatusInfo = (slug: string) => {
+    const status = statusObras?.find(s => s.slug === slug);
+    if (!status) return { label: slug, variant: 'outline' as const };
+    return { 
+      label: status.nome, 
+      variant: 'default' as const 
+    };
+  };
 
   useEffect(() => {
     localStorage.setItem('obras_view_mode', viewMode);
@@ -157,15 +170,26 @@ export default function Obras() {
     >
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <TabsList>
-              <TabsTrigger value="lista" className="gap-2">
-                <List className="h-4 w-4" /> Lista
-              </TabsTrigger>
-              <TabsTrigger value="mapa" className="gap-2">
-                <MapIcon className="h-4 w-4" /> Mapa
-              </TabsTrigger>
-            </TabsList>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <TabsList>
+                <TabsTrigger value="lista" className="gap-2">
+                  <List className="h-4 w-4" /> Lista
+                </TabsTrigger>
+                <TabsTrigger value="mapa" className="gap-2">
+                  <MapIcon className="h-4 w-4" /> Mapa
+                </TabsTrigger>
+              </TabsList>
+
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setStatusDialogOpen(true)}
+                title="Configurar Status"
+              >
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </div>
 
             <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />
@@ -191,10 +215,11 @@ export default function Obras() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os status</SelectItem>
-                  <SelectItem value="em_andamento">Em andamento</SelectItem>
-                  <SelectItem value="ativa">Ativa</SelectItem>
-                  <SelectItem value="concluida">Concluída</SelectItem>
-                  <SelectItem value="parada">Parada</SelectItem>
+                  {statusObras?.map(status => (
+                    <SelectItem key={status.slug} value={status.slug}>
+                      {status.nome}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
@@ -257,7 +282,7 @@ export default function Obras() {
                 {viewMode === 'cards' ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filtered.slice((page - 1) * pageSize, page * pageSize).map((obra) => {
-                      const status = STATUS_MAP[obra.status] || { label: obra.status, variant: 'outline' as const };
+                      const status = getStatusInfo(obra.status);
                       const cliente = obra.clientes as any;
                       const camposExtras = (obra as any).campos_extras || {};
                       
@@ -330,7 +355,7 @@ export default function Obras() {
                       </thead>
                       <tbody>
                         {filtered.slice((page - 1) * pageSize, page * pageSize).map(obra => {
-                          const status = STATUS_MAP[obra.status] || { label: obra.status, variant: 'outline' as const };
+                          const status = getStatusInfo(obra.status);
                           const cliente = obra.clientes as any;
                           const camposExtras = (obra as any).campos_extras || {};
 
@@ -443,13 +468,14 @@ export default function Obras() {
                   onValueChange={(v) => setNewObra({ ...newObra, status: v })}
                 >
                   <SelectTrigger id="status">
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ativa">Ativa</SelectItem>
-                    <SelectItem value="em_andamento">Em andamento</SelectItem>
-                    <SelectItem value="parada">Parada</SelectItem>
-                    <SelectItem value="concluida">Concluída</SelectItem>
+                    {statusObras?.map(status => (
+                      <SelectItem key={status.slug} value={status.slug}>
+                        {status.nome}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -511,8 +537,8 @@ export default function Obras() {
                   <h3 className="text-xl font-bold text-foreground">{selectedObra.nome_obra}</h3>
                   <p className="text-sm text-muted-foreground">ID: {selectedObra.id}</p>
                 </div>
-                <Badge variant={STATUS_MAP[selectedObra.status]?.variant || 'outline'}>
-                  {STATUS_MAP[selectedObra.status]?.label || selectedObra.status}
+                <Badge variant={getStatusInfo(selectedObra.status).variant}>
+                  {getStatusInfo(selectedObra.status).label}
                 </Badge>
               </div>
 
@@ -576,6 +602,11 @@ export default function Obras() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <StatusObrasDialog 
+        open={statusDialogOpen}
+        onOpenChange={setStatusDialogOpen}
+      />
     </AppLayout>
   );
 }
