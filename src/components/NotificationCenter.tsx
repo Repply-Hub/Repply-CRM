@@ -146,23 +146,19 @@ export function NotificationCenter() {
                     )}
                   </button>
 
-                  {isFollowupType(n) && n.cliente_id && (
+                  {isFollowupType(n) && n.pedido_id && (
                     <div className="flex gap-1.5 mt-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-6 text-[11px] gap-1 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950/30"
-                        onClick={(e) => { e.stopPropagation(); openWhatsAppForNotification(n, 'cobranca'); }}
+                        className="h-7 w-full text-[11px] gap-1.5 hover:bg-primary/5 border-primary/20"
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          if (!n.lida) markRead.mutate(n.id);
+                          navigate(`/pedidos/${n.pedido_id}/editar`);
+                        }}
                       >
-                        <MessageCircle className="h-3 w-3" /> Cobrança
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 text-[11px] gap-1 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950/30"
-                        onClick={(e) => { e.stopPropagation(); openWhatsAppForNotification(n, 'relacionamento'); }}
-                      >
-                        <MessageCircle className="h-3 w-3" /> Relacionamento
+                        <MessageCircle className="h-3.5 w-3.5" /> Informações do pedido
                       </Button>
                     </div>
                   )}
