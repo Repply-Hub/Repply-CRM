@@ -312,9 +312,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         if (new Date(o.createdAt) > end) return false;
       }
       if (q) {
-        const clientName = o.clientName.toLowerCase();
-        const obra = o.obra.toLowerCase();
-        const fabricante = o.fabricante.toLowerCase();
+        const clientName = (o.clientName || '').toLowerCase();
+        const obra = (o.obra || '').toLowerCase();
+        const fabricante = (o.fabricante || '').toLowerCase();
         if (!clientName.includes(q) && !obra.includes(q) && !fabricante.includes(q)) return false;
       }
       return true;
