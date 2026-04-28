@@ -26,6 +26,8 @@ import { ProductImageUpload } from '@/components/catalogo/ProductImageUpload';
 import { ImportCatalogoDialog } from '@/components/catalogo/ImportCatalogoDialog';
 import { GlobalImportCatalogoDialog } from '@/components/catalogo/GlobalImportCatalogoDialog';
 import { cn } from '@/lib/utils';
+import { FilterButton } from '@/components/FilterButton';
+import { Filter } from 'lucide-react';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'imagem', label: 'Imagem', locked: false },
