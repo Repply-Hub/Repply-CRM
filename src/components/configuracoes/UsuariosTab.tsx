@@ -768,7 +768,7 @@ export function UsuariosTab() {
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(v => v.nome.toLowerCase().includes(q) || v.email.toLowerCase().includes(q));
+      result = result.filter(v => (v.nome || '').toLowerCase().includes(q) || (v.email || '').toLowerCase().includes(q));
     }
     return result;
   }, [vendedoresData, empresaFilter, roleFilter, searchQuery]);
