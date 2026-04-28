@@ -335,7 +335,11 @@ export default function Obras() {
                           const camposExtras = (obra as any).campos_extras || {};
 
                           return (
-                            <tr key={obra.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                            <tr 
+                              key={obra.id} 
+                              className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                              onClick={() => setSelectedObra(obra)}
+                            >
                               {visibleColumns.map(colId => {
                                 const isCustom = colId.startsWith('custom_');
                                 let value: any = isCustom ? camposExtras[colId] : (obra as any)[colId];
