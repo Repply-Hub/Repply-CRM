@@ -267,23 +267,25 @@ const NovoPedido = () => {
                   </div>
                 </div>
 
-                {/* Obra (conditional) */}
-                {isConstrutora && (
-                  <div className="space-y-2">
-                    <Label>Obra</Label>
-                    <Select value={obraId} onValueChange={handleObraChange}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar obra" /></SelectTrigger>
-                      <SelectContent>
-                        {(obras ?? []).map(o => (
-                          <SelectItem key={o.id} value={o.id}>{o.nome_obra}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedObra?.spe_cnpj && (
-                      <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
-                    )}
-                  </div>
-                )}
+                {/* Obra */}
+                <div className="space-y-2">
+                  <Label>Obra</Label>
+                  <Select 
+                    value={obraId} 
+                    onValueChange={handleObraChange}
+                    disabled={!clienteId}
+                  >
+                    <SelectTrigger><SelectValue placeholder={clienteId ? "Selecionar obra" : "Selecione um cliente primeiro"} /></SelectTrigger>
+                    <SelectContent>
+                      {(obras ?? []).map(o => (
+                        <SelectItem key={o.id} value={o.id}>{o.nome_obra}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedObra?.spe_cnpj && (
+                    <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Vendedor */}
