@@ -29,7 +29,7 @@ export function FilterButton({
       <PopoverTrigger asChild>
         <Button 
           variant="outline" 
-          className={cn("h-9 gap-2", hasFilters && "border-primary", className)}
+          className={cn("h-10 gap-2", hasFilters && "border-primary", className)}
         >
           <Filter className="h-4 w-4" />
           Filtros
