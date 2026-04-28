@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Emails = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [formData, setFormData] = useState({ 
@@ -139,18 +140,25 @@ const Emails = () => {
           subject: data.assunto,
           senderName: perfil?.nome || "Equipe MD",
           html: `
-            <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-              <div style="margin-bottom: 30px; font-size: 16px; line-height: 1.6;">
-                ${data.corpo.replace(/\n/g, '<br>')}
+            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 0; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+              <div style="background-color: #f8fafc; padding: 30px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+                <img src="${data.logoUrl}" alt="Logo MD Representações" style="max-height: 60px; width: auto; display: inline-block;" />
               </div>
-              <div style="border-top: 2px solid #f4f4f4; padding-top: 20px; margin-top: 20px; color: #666;">
+              
+              <div style="padding: 40px 30px; line-height: 1.6; font-size: 16px; color: #334155;">
+                <div style="margin-bottom: 25px;">
+                  ${data.corpo.replace(/\n/g, '<br>')}
+                </div>
+              </div>
+              
+              <div style="background-color: #f8fafc; padding: 30px; border-top: 1px solid #e2e8f0; color: #64748b;">
                 <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
                   <tr>
-                    <td style="vertical-align: top;">
-                      <p style="margin: 0; font-weight: bold; color: #333; font-size: 16px;">${perfil?.nome || "Equipe MD"}</p>
-                      ${perfil?.assinatura_email ? `<p style="margin: 5px 0 15px 0; font-size: 14px; line-height: 1.5; color: #666;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</p>` : ''}
-                      <div style="margin-top: 10px;">
-                        <img src="${data.logoUrl}" alt="Logo" style="height: 45px; display: block;" />
+                    <td style="vertical-align: middle;">
+                      <div style="font-weight: 700; color: #0f172a; font-size: 16px; margin-bottom: 4px;">${perfil?.nome || "Equipe MD"}</div>
+                      ${perfil?.assinatura_email ? `<div style="font-size: 14px; line-height: 1.5; color: #64748b; margin-bottom: 15px;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</div>` : ''}
+                      <div style="font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 15px;">
+                        Esta é uma mensagem enviada por MD Representações.
                       </div>
                     </td>
                   </tr>
@@ -381,11 +389,15 @@ const Emails = () => {
                 ) : (
                   <div className="divide-y divide-border">
                     {emails.map((email) => (
-                      <div key={email.id} className="p-4 hover:bg-muted/30 transition-colors group">
+                      <div 
+                        key={email.id} 
+                        className="p-4 hover:bg-muted/30 transition-colors group cursor-pointer"
+                        onClick={() => setSelectedEmail(email)}
+                      >
                         <div className="flex justify-between items-start mb-1">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">Para: {email.destinatario}</span>
-                            <Badge variant="outline" className="text-[10px] h-5">
+                            <Badge variant="outline" className="text-[10px] h-5 bg-background">
                               {email.status === 'sent' ? (
                                 <CheckCircle2 className="h-3 w-3 mr-1 text-green-500" />
                               ) : (
@@ -429,6 +441,38 @@ const Emails = () => {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={!!selectedEmail} onOpenChange={(open) => !open && setSelectedEmail(null)}>
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-primary" />
+                {selectedEmail?.assunto}
+              </DialogTitle>
+              <DialogDescription className="flex justify-between items-center">
+                <span>Para: {selectedEmail?.destinatario}</span>
+                <span>{selectedEmail && format(new Date(selectedEmail.created_at), "dd/MM/yyyy HH:mm")}</span>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto mt-4 p-4 bg-muted/30 rounded-lg border">
+              {selectedEmail?.html ? (
+                <div 
+                  className="bg-white rounded shadow-sm p-4 text-slate-800"
+                  dangerouslySetInnerHTML={{ __html: selectedEmail.html }} 
+                />
+              ) : (
+                <div className="whitespace-pre-wrap text-sm text-slate-700">
+                  {selectedEmail?.corpo}
+                </div>
+              )}
+            </div>
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setSelectedEmail(null)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
