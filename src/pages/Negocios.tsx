@@ -115,6 +115,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   });
 
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
+
   const [pipelineView, setPipelineView] = useState<PipelineView>(() => {
     const saved = localStorage.getItem('negocios_pipeline_view') as PipelineView | null;
     return saved === 'kanban' || saved === 'lista' ? saved : 'kanban';
