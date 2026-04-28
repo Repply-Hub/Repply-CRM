@@ -448,8 +448,9 @@ export default function Obras() {
                 )}
 
                 <ListPagination 
-                  currentPage={page}
+                  page={page}
                   totalPages={Math.ceil(filtered.length / pageSize)}
+                  totalItems={filtered.length}
                   onPageChange={setPage}
                   pageSize={pageSize}
                   onPageSizeChange={setPageSize}
