@@ -295,7 +295,7 @@ const Clientes = () => {
 
   const filteredEmpresas = sortByName(
     empresas.filter(c => {
-      const matchSearch = c.empresa.toLowerCase().includes(search.toLowerCase()) ||
+      const matchSearch = (c.empresa || '').toLowerCase().includes(search.toLowerCase()) ||
         (c.nome_contato && c.nome_contato.toLowerCase().includes(search.toLowerCase())) ||
         (c.email && c.email.toLowerCase().includes(search.toLowerCase()));
       const matchTipo = tipoFilter === 'todos' || c.tipo === tipoFilter;
