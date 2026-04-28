@@ -102,11 +102,15 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
           );
         } else {
           console.warn(`[useGeocodeObras] Falha ao geocodificar ${obra.nome_obra}`);
-          // Marca tentativa para evitar reprocessar (geocoded_at sem coords = "tentamos e falhou")
-          await supabase
+          // Se falhou mas o endereço parece válido, podemos tentar uma versão simplificada ou apenas marcar como processado
+          const { error: updateError } = await supabase
             .from('obras')
             .update({ geocoded_at: new Date().toISOString() })
             .eq('id', obra.id);
+            
+          if (updateError) {
+            console.error('[useGeocodeObras] Erro ao marcar falha de geocodificação:', updateError);
+          }
         }
 
         setProgresso({ atual: i + 1, total: pendentes.length });
