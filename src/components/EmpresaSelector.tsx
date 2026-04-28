@@ -109,23 +109,7 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
               value={searchTerm}
               onValueChange={setSearchTerm}
             />
-            <CommandList>
-              <CommandEmpty className="py-2 px-2">
-                <p className="text-xs text-muted-foreground mb-2 text-center">Nenhuma empresa encontrada.</p>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="w-full gap-2 text-xs"
-                  onClick={() => {
-                    setNewEmpresa(prev => ({ ...prev, empresa: searchTerm }));
-                    setDialogOpen(true);
-                    setOpen(false);
-                  }}
-                >
-                  <Plus className="h-3 w-3" />
-                  Cadastrar "{searchTerm}"
-                </Button>
-              </CommandEmpty>
+            <CommandList className="max-h-[300px]">
               <CommandGroup>
                 {filteredClientes.map((cliente) => (
                   <CommandItem
@@ -151,6 +135,22 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
                   </CommandItem>
                 ))}
               </CommandGroup>
+              <CommandEmpty className="py-2 px-2">
+                <p className="text-xs text-muted-foreground mb-2 text-center">Nenhuma empresa encontrada.</p>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="w-full gap-2 text-xs"
+                  onClick={() => {
+                    setNewEmpresa(prev => ({ ...prev, empresa: searchTerm }));
+                    setDialogOpen(true);
+                    setOpen(false);
+                  }}
+                >
+                  <Plus className="h-3 w-3" />
+                  Cadastrar "{searchTerm}"
+                </Button>
+              </CommandEmpty>
             </CommandList>
             {searchTerm && filteredClientes.length > 0 && (
               <div className="p-1 border-t">
