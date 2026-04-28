@@ -164,45 +164,45 @@ export default function Obras() {
 
   return (
     <AppLayout 
-      title=\"Obras\" 
-      subtitle=\"Gerencie e acompanhe todas as obras cadastradas.\"
+      title="Obras" 
+      subtitle="Gerencie e acompanhe todas as obras cadastradas."
       headerContent={
-        <div className=\"flex flex-col gap-0.5 sm:gap-1 min-w-0\">
-          <h1 className=\"text-base sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight truncate\">Obras</h1>
-          <p className=\"text-[10px] sm:text-sm text-muted-foreground truncate\">Gerencie e acompanhe todas as obras cadastradas.</p>
+        <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
+          <h1 className="text-base sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight truncate">Obras</h1>
+          <p className="text-[10px] sm:text-sm text-muted-foreground truncate">Gerencie e acompanhe todas as obras cadastradas.</p>
         </div>
       }
     >
-      <div className=\"p-4 md:p-6 space-y-6\">
-        <Tabs defaultValue=\"lista\" className=\"space-y-6\">
-          <div className=\"flex flex-wrap items-center gap-3 md:gap-4\">
-            <div className=\"flex flex-1 items-center gap-2\">
+      <div className="p-4 md:p-6 space-y-6">
+        <Tabs defaultValue="lista" className="space-y-6">
+          <div className="flex flex-wrap items-center gap-3 md:gap-4">
+            <div className="flex flex-1 items-center gap-2">
               <TabsList>
-                <TabsTrigger value=\"lista\" className=\"gap-2\">
-                  <List className=\"h-4 w-4\" /> Lista
+                <TabsTrigger value="lista" className="gap-2">
+                  <List className="h-4 w-4" /> Lista
                 </TabsTrigger>
-                <TabsTrigger value=\"mapa\" className=\"gap-2\">
-                  <MapIcon className=\"h-4 w-4\" /> Mapa
+                <TabsTrigger value="mapa" className="gap-2">
+                  <MapIcon className="h-4 w-4" /> Mapa
                 </TabsTrigger>
               </TabsList>
 
               <Button 
-                variant=\"outline\" 
-                size=\"icon\" 
+                variant="outline" 
+                size="icon" 
                 onClick={() => setStatusDialogOpen(true)}
-                title=\"Configurar Status\"
-                className=\"shrink-0 h-10 w-10\"
+                title="Configurar Status"
+                className="shrink-0 h-10 w-10"
               >
-                <Settings2 className=\"h-4 w-4\" />
+                <Settings2 className="h-4 w-4" />
               </Button>
 
-              <div className=\"relative flex-1 min-w-[200px]\">
-                <Search className=\"absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground\" />
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder=\"Buscar por nome, endereço ou cliente...\"
+                  placeholder="Buscar por nome, endereço ou cliente..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className=\"pl-9 h-10\"
+                  className="pl-9 h-10"
                 />
               </div>
 
@@ -213,16 +213,16 @@ export default function Obras() {
                   setStatusFilter('todos');
                   setSort('recent');
                 }}
-                popoverClassName=\"w-80\"
-                align=\"end\"
+                popoverClassName="w-80"
+                align="end"
               >
-                <div className=\"space-y-2\">
-                  <Label className=\"text-xs uppercase text-muted-foreground font-semibold\">Status</Label>
-                  <div className=\"space-y-1\">
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Status</Label>
+                  <div className="space-y-1">
                     <div 
                       className={cn(
-                        \"flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm\",
-                        statusFilter === 'todos' && \"bg-accent text-accent-foreground\"
+                        "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
+                        statusFilter === 'todos' && "bg-accent text-accent-foreground"
                       )}
                       onClick={() => setStatusFilter('todos')}
                     >
@@ -233,8 +233,8 @@ export default function Obras() {
                       <div 
                         key={status.slug} 
                         className={cn(
-                          \"flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm\",
-                          statusFilter === status.slug && \"bg-accent text-accent-foreground\"
+                          "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
+                          statusFilter === status.slug && "bg-accent text-accent-foreground"
                         )}
                         onClick={() => setStatusFilter(status.slug)}
                       >
@@ -245,46 +245,46 @@ export default function Obras() {
                   </div>
                 </div>
 
-                <div className=\"space-y-2 border-t pt-4\">
-                  <Label className=\"text-xs uppercase text-muted-foreground font-semibold\">Ordenação</Label>
+                <div className="space-y-2 border-t pt-4">
+                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Ordenação</Label>
                   <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-                    <SelectTrigger className=\"w-full h-9\">
-                      <SelectValue placeholder=\"Ordenar\" />
+                    <SelectTrigger className="w-full h-9">
+                      <SelectValue placeholder="Ordenar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value=\"recent\">Mais recentes</SelectItem>
-                      <SelectItem value=\"oldest\">Mais antigas</SelectItem>
-                      <SelectItem value=\"name_asc\">Nome A-Z</SelectItem>
-                      <SelectItem value=\"name_desc\">Nome Z-A</SelectItem>
+                      <SelectItem value="recent">Mais recentes</SelectItem>
+                      <SelectItem value="oldest">Mais antigas</SelectItem>
+                      <SelectItem value="name_asc">Nome A-Z</SelectItem>
+                      <SelectItem value="name_desc">Nome Z-A</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </FilterButton>
             </div>
 
-            <Button onClick={() => setDialogOpen(true)} className=\"gap-2 shrink-0 h-10\">
-              <Plus className=\"h-4 w-4\" />
+            <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0 h-10">
+              <Plus className="h-4 w-4" />
               Nova Obra
             </Button>
           </div>
 
-          <TabsContent value=\"lista\" className=\"space-y-6 mt-0\">
+          <TabsContent value="lista" className="space-y-6 mt-0">
             {/* View specific controls */}
-            <div className=\"flex items-center justify-end gap-3\">
-              <div className=\"flex bg-muted p-1 rounded-md\">
+            <div className="flex items-center justify-end gap-3">
+              <div className="flex bg-muted p-1 rounded-md">
                 <button
                   onClick={() => setViewMode('cards')}
-                  className={cn(\"p-1.5 rounded-sm transition-all\", viewMode === 'cards' ? \"bg-background shadow-sm text-primary\" : \"text-muted-foreground hover:text-foreground\")}
-                  title=\"Visualização em Cards\"
+                  className={cn("p-1.5 rounded-sm transition-all", viewMode === 'cards' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")}
+                  title="Visualização em Cards"
                 >
-                  <LayoutGrid className=\"h-4 w-4\" />
+                  <LayoutGrid className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('table')}
-                  className={cn(\"p-1.5 rounded-sm transition-all\", viewMode === 'table' ? \"bg-background shadow-sm text-primary\" : \"text-muted-foreground hover:text-foreground\")}
-                  title=\"Visualização em Tabela\"
+                  className={cn("p-1.5 rounded-sm transition-all", viewMode === 'table' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")}
+                  title="Visualização em Tabela"
                 >
-                  <TableIcon className=\"h-4 w-4\" />
+                  <TableIcon className="h-4 w-4" />
                 </button>
               </div>
               <ColumnSettings
@@ -304,21 +304,21 @@ export default function Obras() {
             </div>
 
             {isLoading ? (
-              <div className=\"flex items-center justify-center py-20\">
-                <Loader2 className=\"h-8 w-8 animate-spin text-muted-foreground\" />
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : filtered.length === 0 ? (
-              <div className=\"text-center py-20 text-muted-foreground\">
-                <HardHat className=\"h-12 w-12 mx-auto mb-3 opacity-40\" />
-                <p className=\"font-medium\">Nenhuma obra encontrada</p>
-                <p className=\"text-sm mt-1\">Ajuste os filtros ou cadastre uma nova obra.</p>
+              <div className="text-center py-20 text-muted-foreground">
+                <HardHat className="h-12 w-12 mx-auto mb-3 opacity-40" />
+                <p className="font-medium">Nenhuma obra encontrada</p>
+                <p className="text-sm mt-1">Ajuste os filtros ou cadastre uma nova obra.</p>
               </div>
             ) : (
               <>
-                <p className=\"text-sm text-muted-foreground\">{filtered.length} obra(s) encontrada(s)</p>
+                <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
                 
                 {viewMode === 'cards' ? (
-                  <div className=\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4\">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filtered.slice((page - 1) * pageSize, page * pageSize).map((obra) => {
                       const status = getStatusInfo(obra.status);
                       const cliente = obra.clientes as any;
@@ -327,50 +327,50 @@ export default function Obras() {
                       return (
                         <Card 
                           key={obra.id} 
-                          className=\"flex flex-col cursor-pointer hover:border-primary/50 transition-colors group\"
+                          className="flex flex-col cursor-pointer hover:border-primary/50 transition-colors group"
                           onClick={() => setSelectedObra(obra)}
                         >
-                          <CardHeader className=\"pb-3\">
-                            <div className=\"flex items-start justify-between gap-2\">
-                              <CardTitle className=\"text-base font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors\">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <CardTitle className="text-base font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors">
                                 {obra.nome_obra}
                               </CardTitle>
-                              <Badge variant={status.variant} className=\"shrink-0 text-xs\">
+                              <Badge variant={status.variant} className="shrink-0 text-xs">
                                 {status.label}
                               </Badge>
                             </div>
                           </CardHeader>
-                          <CardContent className=\"flex-1 space-y-2 text-sm text-muted-foreground\">
+                          <CardContent className="flex-1 space-y-2 text-sm text-muted-foreground">
                             {visibleColumns.includes('cliente') && cliente?.empresa && (
-                              <div className=\"flex items-center gap-2\">
-                                <Building2 className=\"h-3.5 w-3.5 shrink-0\" />
-                                <span className=\"truncate\">{cliente.empresa}</span>
+                              <div className="flex items-center gap-2">
+                                <Building2 className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{cliente.empresa}</span>
                               </div>
                             )}
                             {visibleColumns.includes('endereco') && obra.endereco_entrega && (
-                              <div className=\"flex items-center gap-2\">
-                                <MapPin className=\"h-3.5 w-3.5 shrink-0\" />
-                                <span className=\"truncate\">{obra.endereco_entrega}</span>
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{obra.endereco_entrega}</span>
                               </div>
                             )}
                             {visibleColumns.includes('spe_cnpj') && obra.spe_cnpj && (
-                              <div className=\"flex items-center gap-2\">
-                                <Building2 className=\"h-3.5 w-3.5 shrink-0\" />
-                                <span className=\"text-xs\">SPE: {obra.spe_cnpj}</span>
+                              <div className="flex items-center gap-2">
+                                <Building2 className="h-3.5 w-3.5 shrink-0" />
+                                <span className="text-xs">SPE: {obra.spe_cnpj}</span>
                               </div>
                             )}
                             {visibleColumns.includes('created_at') && (
-                              <div className=\"flex items-center gap-2 pt-1 border-t border-border/50\">
-                                <Calendar className=\"h-3.5 w-3.5 shrink-0\" />
-                                <span className=\"text-xs\">
-                                  Criada em {format(new Date(obra.created_at), \"dd 'de' MMM 'de' yyyy\", { locale: ptBR })}
+                              <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+                                <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                <span className="text-xs">
+                                  Criada em {format(new Date(obra.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
                                 </span>
                               </div>
                             )}
                             {/* Renderizar campos extras nos cards também? Ocuparia muito espaço. Talvez só se estiverem selecionados. */}
                             {visibleColumns.filter(id => id.startsWith('custom_')).map(colId => (
-                              <div key={colId} className=\"flex items-center gap-2 text-xs\">
-                                <span className=\"font-medium\">{getLabel(colId)}:</span>
+                              <div key={colId} className="flex items-center gap-2 text-xs">
+                                <span className="font-medium">{getLabel(colId)}:</span>
                                 <span>{camposExtras[colId] || '—'}</span>
                               </div>
                             ))}
@@ -380,12 +380,12 @@ export default function Obras() {
                     })}
                   </div>
                 ) : (
-                  <div className=\"rounded-lg border border-border/60 overflow-x-auto bg-card\">
-                    <table className=\"w-full text-sm\">
+                  <div className="rounded-lg border border-border/60 overflow-x-auto bg-card">
+                    <table className="w-full text-sm">
                       <thead>
-                        <tr className=\"border-b bg-muted/50\">
+                        <tr className="border-b bg-muted/50">
                           {visibleColumns.map(colId => (
-                            <th key={colId} className=\"text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap\">
+                            <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
                               {getLabel(colId)}
                             </th>
                           ))}
@@ -400,7 +400,7 @@ export default function Obras() {
                           return (
                             <tr 
                               key={obra.id} 
-                              className=\"border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer\"
+                              className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
                               onClick={() => setSelectedObra(obra)}
                             >
                               {visibleColumns.map(colId => {
@@ -409,8 +409,8 @@ export default function Obras() {
                                 
                                 if (colId === 'status') {
                                   return (
-                                    <td key={colId} className=\"py-3 px-4\">
-                                      <Badge variant={status.variant} className=\"text-[10px] h-5\">
+                                    <td key={colId} className="py-3 px-4">
+                                      <Badge variant={status.variant} className="text-[10px] h-5">
                                         {status.label}
                                       </Badge>
                                     </td>
@@ -419,7 +419,7 @@ export default function Obras() {
 
                                 if (colId === 'cliente') {
                                   return (
-                                    <td key={colId} className=\"py-3 px-4 text-muted-foreground max-w-[200px] truncate\">
+                                    <td key={colId} className="py-3 px-4 text-muted-foreground max-w-[200px] truncate">
                                       {cliente?.empresa || '—'}
                                     </td>
                                   );
@@ -427,14 +427,14 @@ export default function Obras() {
 
                                 if (colId === 'created_at') {
                                   return (
-                                    <td key={colId} className=\"py-3 px-4 text-muted-foreground whitespace-nowrap\">
-                                      {format(new Date(value), \"dd/MM/yyyy\", { locale: ptBR })}
+                                    <td key={colId} className="py-3 px-4 text-muted-foreground whitespace-nowrap">
+                                      {format(new Date(value), "dd/MM/yyyy", { locale: ptBR })}
                                     </td>
                                   );
                                 }
 
                                 return (
-                                  <td key={colId} className=\"py-3 px-4 text-muted-foreground max-w-[250px] truncate\">
+                                  <td key={colId} className="py-3 px-4 text-muted-foreground max-w-[250px] truncate">
                                     {value || '—'}
                                   </td>
                                 );
@@ -458,8 +458,8 @@ export default function Obras() {
             )}
           </TabsContent>
 
-          <TabsContent value=\"mapa\" className=\"mt-0\">
-            <div className=\"h-[600px] rounded-xl overflow-hidden border border-border/50 shadow-sm\">
+          <TabsContent value="mapa" className="mt-0">
+            <div className="h-[600px] rounded-xl overflow-hidden border border-border/50 shadow-sm">
               <MapaObras obras={obrasParaMapa} />
             </div>
           </TabsContent>
@@ -467,33 +467,33 @@ export default function Obras() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className=\"max-w-2xl\">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Cadastrar Nova Obra</DialogTitle>
           </DialogHeader>
-          <div className=\"grid grid-cols-2 gap-4 py-4\">
-            <div className=\"col-span-2 space-y-2\">
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="col-span-2 space-y-2">
               <Label>Nome da Obra</Label>
               <Input 
-                placeholder=\"Ex: Residencial Jardins\" 
+                placeholder="Ex: Residencial Jardins" 
                 value={newObra.nome_obra}
                 onChange={e => setNewObra(prev => ({ ...prev, nome_obra: e.target.value }))}
               />
             </div>
-            <div className=\"space-y-2\">
+            <div className="space-y-2">
               <Label>Cliente</Label>
               <EmpresaSelector 
                 onSelect={id => setNewObra(prev => ({ ...prev, cliente_id: id }))}
               />
             </div>
-            <div className=\"space-y-2\">
+            <div className="space-y-2">
               <Label>Status Inicial</Label>
               <Select 
                 value={newObra.status}
                 onValueChange={v => setNewObra(prev => ({ ...prev, status: v }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder=\"Selecione o status\" />
+                  <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>
                 <SelectContent>
                   {statusObras?.map(status => (
@@ -504,29 +504,29 @@ export default function Obras() {
                 </SelectContent>
               </Select>
             </div>
-            <div className=\"col-span-2 space-y-2\">
+            <div className="col-span-2 space-y-2">
               <Label>Endereço de Entrega</Label>
               <Input 
-                placeholder=\"Rua, número, bairro, cidade - UF\" 
+                placeholder="Rua, número, bairro, cidade - UF" 
                 value={newObra.endereco_entrega}
                 onChange={e => setNewObra(prev => ({ ...prev, endereco_entrega: e.target.value }))}
               />
             </div>
-            <div className=\"col-span-2 space-y-2\">
+            <div className="col-span-2 space-y-2">
               <Label>CNPJ / SPE (Opcional)</Label>
               <Input 
-                placeholder=\"00.000.000/0000-00\" 
+                placeholder="00.000.000/0000-00" 
                 value={newObra.spe_cnpj}
                 onChange={e => setNewObra(prev => ({ ...prev, spe_cnpj: e.target.value }))}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant=\"outline\" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button 
               onClick={() => {
                 if (!newObra.nome_obra || !newObra.cliente_id || !newObra.status) {
-                  toast.error(\"Preencha os campos obrigatórios\");
+                  toast.error("Preencha os campos obrigatórios");
                   return;
                 }
                 createObra.mutate(newObra, {
@@ -544,7 +544,7 @@ export default function Obras() {
               }}
               disabled={createObra.isPending}
             >
-              {createObra.isPending ? \"Cadastrando...\" : \"Cadastrar Obra\"}
+              {createObra.isPending ? "Cadastrando..." : "Cadastrar Obra"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -557,46 +557,46 @@ export default function Obras() {
 
       {selectedObra && (
         <Dialog open={!!selectedObra} onOpenChange={() => setSelectedObra(null)}>
-          <DialogContent className=\"max-w-4xl max-h-[90vh] overflow-y-auto\">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <div className=\"flex items-center justify-between\">
-                <DialogTitle className=\"text-2xl font-bold\">{selectedObra.nome_obra}</DialogTitle>
-                <Badge variant={getStatusInfo(selectedObra.status).variant} className=\"mr-6\">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-2xl font-bold">{selectedObra.nome_obra}</DialogTitle>
+                <Badge variant={getStatusInfo(selectedObra.status).variant} className="mr-6">
                   {getStatusInfo(selectedObra.status).label}
                 </Badge>
               </div>
             </DialogHeader>
             
-            <div className=\"grid grid-cols-1 md:grid-cols-2 gap-6 py-6\">
-              <div className=\"space-y-4\">
-                <div className=\"bg-muted/30 p-4 rounded-lg space-y-3\">
-                  <h3 className=\"font-semibold flex items-center gap-2 border-b pb-2\">
-                    <Building2 className=\"h-4 w-4 text-primary\" /> Informações Gerais
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
+              <div className="space-y-4">
+                <div className="bg-muted/30 p-4 rounded-lg space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
+                    <Building2 className="h-4 w-4 text-primary" /> Informações Gerais
                   </h3>
-                  <div className=\"grid grid-cols-1 gap-2 text-sm\">
+                  <div className="grid grid-cols-1 gap-2 text-sm">
                     <div>
-                      <span className=\"text-muted-foreground block text-xs uppercase\">Cliente</span>
-                      <p className=\"font-medium\">{(selectedObra.clientes as any)?.empresa || 'Não informado'}</p>
+                      <span className="text-muted-foreground block text-xs uppercase">Cliente</span>
+                      <p className="font-medium">{(selectedObra.clientes as any)?.empresa || 'Não informado'}</p>
                     </div>
                     <div>
-                      <span className=\"text-muted-foreground block text-xs uppercase\">CNPJ/SPE</span>
-                      <p className=\"font-medium font-mono\">{selectedObra.spe_cnpj || 'Não informado'}</p>
+                      <span className="text-muted-foreground block text-xs uppercase">CNPJ/SPE</span>
+                      <p className="font-medium font-mono">{selectedObra.spe_cnpj || 'Não informado'}</p>
                     </div>
                     <div>
-                      <span className=\"text-muted-foreground block text-xs uppercase\">Data de Criação</span>
-                      <p className=\"font-medium\">{format(new Date(selectedObra.created_at), \"dd/MM/yyyy HH:mm\", { locale: ptBR })}</p>
+                      <span className="text-muted-foreground block text-xs uppercase">Data de Criação</span>
+                      <p className="font-medium">{format(new Date(selectedObra.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className=\"bg-muted/30 p-4 rounded-lg space-y-3\">
-                  <h3 className=\"font-semibold flex items-center gap-2 border-b pb-2\">
-                    <MapPin className=\"h-4 w-4 text-primary\" /> Localização
+                <div className="bg-muted/30 p-4 rounded-lg space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
+                    <MapPin className="h-4 w-4 text-primary" /> Localização
                   </h3>
-                  <div className=\"text-sm\">
-                    <p className=\"font-medium\">{selectedObra.endereco_entrega || 'Endereço não cadastrado'}</p>
+                  <div className="text-sm">
+                    <p className="font-medium">{selectedObra.endereco_entrega || 'Endereço não cadastrado'}</p>
                     {(selectedObra.latitude && selectedObra.longitude) && (
-                      <p className=\"text-xs text-muted-foreground mt-2 italic\">
+                      <p className="text-xs text-muted-foreground mt-2 italic">
                         Coordenadas: {selectedObra.latitude}, {selectedObra.longitude}
                       </p>
                     )}
@@ -604,19 +604,19 @@ export default function Obras() {
                 </div>
               </div>
 
-              <div className=\"space-y-4\">
-                <div className=\"bg-muted/30 p-4 rounded-lg space-y-3\">
-                  <h3 className=\"font-semibold flex items-center gap-2 border-b pb-2\">
-                    <Settings2 className=\"h-4 w-4 text-primary\" /> Campos Personalizados
+              <div className="space-y-4">
+                <div className="bg-muted/30 p-4 rounded-lg space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
+                    <Settings2 className="h-4 w-4 text-primary" /> Campos Personalizados
                   </h3>
-                  <div className=\"grid grid-cols-1 gap-3 text-sm\">
+                  <div className="grid grid-cols-1 gap-3 text-sm">
                     {columns.filter(c => c.id.startsWith('custom_')).length === 0 ? (
-                      <p className=\"text-muted-foreground text-xs\">Nenhum campo personalizado definido.</p>
+                      <p className="text-muted-foreground text-xs">Nenhum campo personalizado definido.</p>
                     ) : (
                       columns.filter(c => c.id.startsWith('custom_')).map(col => (
                         <div key={col.id}>
-                          <span className=\"text-muted-foreground block text-xs uppercase\">{col.label}</span>
-                          <p className=\"font-medium\">{(selectedObra.campos_extras || {})[col.id] || '—'}</p>
+                          <span className="text-muted-foreground block text-xs uppercase">{col.label}</span>
+                          <p className="font-medium">{(selectedObra.campos_extras || {})[col.id] || '—'}</p>
                         </div>
                       ))
                     )}
@@ -625,10 +625,10 @@ export default function Obras() {
               </div>
             </div>
             
-            <DialogFooter className=\"mt-4 border-t pt-4\">
-              <Button variant=\"outline\" onClick={() => setSelectedObra(null)}>Fechar</Button>
+            <DialogFooter className="mt-4 border-t pt-4">
+              <Button variant="outline" onClick={() => setSelectedObra(null)}>Fechar</Button>
               <Button onClick={() => {
-                toast.info(\"Funcionalidade de edição em desenvolvimento\");
+                toast.info("Funcionalidade de edição em desenvolvimento");
               }}>Editar Obra</Button>
             </DialogFooter>
           </DialogContent>
