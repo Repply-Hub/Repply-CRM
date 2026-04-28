@@ -53,6 +53,14 @@ export function StatusObrasDialog({ open, onOpenChange }: Props) {
     const [excluindo, setExcluindo] = useState<StatusObra | null>(null);
     const [targetSlug, setTargetSlug] = useState<string>('');
 
+    const [localList, setLocalList] = useState<StatusObra[]>([]);
+
+    useEffect(() => {
+        if (statusList) {
+            setLocalList(statusList);
+        }
+    }, [statusList]);
+
     const handleCreate = async () => {
         if (!novoNome.trim()) return;
         await createMut.mutateAsync({ nome: novoNome, cor: novaCor });
@@ -85,23 +93,25 @@ export function StatusObrasDialog({ open, onOpenChange }: Props) {
         setTargetSlug('');
     };
 
-    const move = async (id: string, dir: -1 | 1) => {
-        const list = [...(statusList ?? [])];
-        const idx = list.findIndex(c => c.id === id);
-        if (idx < 0) return;
-        const novoIdx = idx + dir;
-        if (novoIdx < 0 || novoIdx >= list.length) return;
-        [list[idx], list[novoIdx]] = [list[novoIdx], list[idx]];
-        
+    const onDragEnd = async (result: DropResult) => {
+        if (!result.destination) return;
+
+        const items = Array.from(localList);
+        const [reorderedItem] = items.splice(result.source.index, 1);
+        items.splice(result.destination.index, 0, reorderedItem);
+
+        setLocalList(items);
+
         try {
             await Promise.all(
-                list.map((item, index) => 
+                items.map((item, index) => 
                     supabase.from('status_obras').update({ ordem: index }).eq('id', item.id)
                 )
             );
             qc.invalidateQueries({ queryKey: ['status_obras'] });
         } catch (err) {
             toast.error('Erro ao reordenar status');
+            setLocalList(statusList ?? []);
         }
     };
 
