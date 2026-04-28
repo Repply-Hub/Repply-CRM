@@ -22,6 +22,7 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick }: Ka
           <Tooltip>
             <TooltipTrigger asChild>
               <div
+                id={`kanban-card-${order.id}`}
                 ref={provided.innerRef}
                 {...provided.draggableProps}
                 role="listitem"
