@@ -618,7 +618,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <div className="relative group">
                 <Input
                   placeholder="De: DD/MM/AAAA"
-                  className="h-8 text-[11px] pl-8 w-28 group-hover:border-primary transition-colors"
+                  className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
                   value={dateFrom ? format(dateFrom, 'dd/MM/yyyy') : ''}
                   onChange={(e) => {
                     let val = e.target.value.replace(/\D/g, '');
@@ -653,7 +653,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <div className="relative group">
                 <Input
                   placeholder="Até: DD/MM/AAAA"
-                  className="h-8 text-[11px] pl-8 w-28 group-hover:border-primary transition-colors"
+                  className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
                   value={dateTo ? format(dateTo, 'dd/MM/yyyy') : ''}
                   onChange={(e) => {
                     let val = e.target.value.replace(/\D/g, '');
