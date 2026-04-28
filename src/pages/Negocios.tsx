@@ -692,7 +692,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
             <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
               <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
-              <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
               Atenção
             </label>
           </div>
