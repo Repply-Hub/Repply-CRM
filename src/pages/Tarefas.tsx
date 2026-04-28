@@ -103,10 +103,10 @@ export default function Tarefas() {
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(t =>
-        t.titulo.toLowerCase().includes(q) ||
-        t.responsavel?.toLowerCase().includes(q) ||
-        t.projeto?.toLowerCase().includes(q) ||
-        t.marcadores?.toLowerCase().includes(q)
+        (t.titulo || '').toLowerCase().includes(q) ||
+        (t.responsavel || '').toLowerCase().includes(q) ||
+        (t.projeto || '').toLowerCase().includes(q) ||
+        (t.marcadores || '').toLowerCase().includes(q)
       );
     }
     return list;
