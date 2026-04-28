@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Emails = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [formData, setFormData] = useState({ 
@@ -388,11 +389,15 @@ const Emails = () => {
                 ) : (
                   <div className="divide-y divide-border">
                     {emails.map((email) => (
-                      <div key={email.id} className="p-4 hover:bg-muted/30 transition-colors group">
+                      <div 
+                        key={email.id} 
+                        className="p-4 hover:bg-muted/30 transition-colors group cursor-pointer"
+                        onClick={() => setSelectedEmail(email)}
+                      >
                         <div className="flex justify-between items-start mb-1">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">Para: {email.destinatario}</span>
-                            <Badge variant="outline" className="text-[10px] h-5">
+                            <Badge variant="outline" className="text-[10px] h-5 bg-background">
                               {email.status === 'sent' ? (
                                 <CheckCircle2 className="h-3 w-3 mr-1 text-green-500" />
                               ) : (
@@ -436,6 +441,38 @@ const Emails = () => {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={!!selectedEmail} onOpenChange={(open) => !open && setSelectedEmail(null)}>
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-primary" />
+                {selectedEmail?.assunto}
+              </DialogTitle>
+              <DialogDescription className="flex justify-between items-center">
+                <span>Para: {selectedEmail?.destinatario}</span>
+                <span>{selectedEmail && format(new Date(selectedEmail.created_at), "dd/MM/yyyy HH:mm")}</span>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto mt-4 p-4 bg-muted/30 rounded-lg border">
+              {selectedEmail?.html ? (
+                <div 
+                  className="bg-white rounded shadow-sm p-4 text-slate-800"
+                  dangerouslySetInnerHTML={{ __html: selectedEmail.html }} 
+                />
+              ) : (
+                <div className="whitespace-pre-wrap text-sm text-slate-700">
+                  {selectedEmail?.corpo}
+                </div>
+              )}
+            </div>
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setSelectedEmail(null)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
