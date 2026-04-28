@@ -50,6 +50,7 @@ export default function Obras() {
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
   const [page, setPage] = useState(1);
+  const [selectedObra, setSelectedObra] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
     const saved = localStorage.getItem('obras_view_mode');
     return (saved as any) || 'cards';
