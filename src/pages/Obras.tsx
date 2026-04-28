@@ -535,7 +535,6 @@ export default function Obras() {
               <div className="flex justify-between items-start gap-4">
                 <div>
                   <h3 className="text-xl font-bold text-foreground">{selectedObra.nome_obra}</h3>
-                  <p className="text-sm text-muted-foreground">ID: {selectedObra.id}</p>
                 </div>
                 <Badge variant={getStatusInfo(selectedObra.status).variant}>
                   {getStatusInfo(selectedObra.status).label}
