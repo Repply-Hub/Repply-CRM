@@ -448,8 +448,9 @@ export default function Obras() {
                 )}
 
                 <ListPagination 
-                  currentPage={page}
+                  page={page}
                   totalPages={Math.ceil(filtered.length / pageSize)}
+                  totalItems={filtered.length}
                   onPageChange={setPage}
                   pageSize={pageSize}
                   onPageSizeChange={setPageSize}
@@ -460,7 +461,7 @@ export default function Obras() {
 
           <TabsContent value="mapa" className="mt-0">
             <div className="h-[600px] rounded-xl overflow-hidden border border-border/50 shadow-sm">
-              <MapaObras obras={obrasParaMapa} />
+              <MapaObras obras={obrasParaMapa} isLoading={isLoading} />
             </div>
           </TabsContent>
         </Tabs>
@@ -483,7 +484,8 @@ export default function Obras() {
             <div className="space-y-2">
               <Label>Cliente</Label>
               <EmpresaSelector 
-                onSelect={id => setNewObra(prev => ({ ...prev, cliente_id: id }))}
+                value={newObra.cliente_id || ''}
+                onValueChange={id => setNewObra(prev => ({ ...prev, cliente_id: id }))}
               />
             </div>
             <div className="space-y-2">
