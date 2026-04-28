@@ -494,6 +494,90 @@ export default function Obras() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!selectedObra} onOpenChange={(open) => !open && setSelectedObra(null)}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HardHat className="h-5 w-5 text-primary" />
+              Detalhes da Obra
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedObra && (
+            <div className="space-y-6 py-4">
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">{selectedObra.nome_obra}</h3>
+                  <p className="text-sm text-muted-foreground">ID: {selectedObra.id}</p>
+                </div>
+                <Badge variant={STATUS_MAP[selectedObra.status]?.variant || 'outline'}>
+                  {STATUS_MAP[selectedObra.status]?.label || selectedObra.status}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Cliente</Label>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Building2 className="h-4 w-4 text-primary" />
+                      <span>{selectedObra.clientes?.empresa || 'Não informado'}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Endereço de Entrega</Label>
+                    <div className="flex items-center gap-2 text-sm">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <span>{selectedObra.endereco_entrega || 'Não informado'}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">CNPJ / SPE</Label>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Building2 className="h-4 w-4 text-primary" />
+                      <span>{selectedObra.spe_cnpj || 'Não informado'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Data de Cadastro</Label>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4 text-primary" />
+                      <span>{format(new Date(selectedObra.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+                    </div>
+                  </div>
+
+                  {selectedObra.campos_extras && Object.keys(selectedObra.campos_extras).length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Campos Personalizados</Label>
+                      <div className="grid grid-cols-1 gap-2">
+                        {Object.entries(selectedObra.campos_extras).map(([key, value]) => (
+                          <div key={key} className="flex justify-between text-sm py-1 border-b border-border/50">
+                            <span className="text-muted-foreground">{getLabel(key)}:</span>
+                            <span className="font-medium">{(value as any) || '—'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedObra(null)}>Fechar</Button>
+            <Button onClick={() => toast.info("Edição de obras em breve")}>Editar Obra</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
