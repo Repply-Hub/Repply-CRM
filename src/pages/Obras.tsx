@@ -576,8 +576,6 @@ export default function Obras() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-        </DialogContent>
-      </Dialog>
     </AppLayout>
   );
 }
