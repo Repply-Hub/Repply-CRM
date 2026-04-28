@@ -265,7 +265,7 @@ export default function Obras() {
                         <Card 
                           key={obra.id} 
                           className="flex flex-col cursor-pointer hover:border-primary/50 transition-colors group"
-                          onClick={() => toast.info(`Visualização da obra ${obra.nome_obra} em breve.`)}
+                          onClick={() => setSelectedObra(obra)}
                         >
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between gap-2">
