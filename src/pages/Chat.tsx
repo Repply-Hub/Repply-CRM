@@ -414,7 +414,32 @@ const Chat = () => {
               </>
             )}
             
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Limpar chat">
+                    <Eraser className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Limpar conversa?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Isso removerá permanentemente todas as mensagens deste chat para todos os participantes. Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={() => clearChat.mutate({ grupoId: activeGrupoId, recipientId: activeRecipientId })}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Limpar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
               <Sheet>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
