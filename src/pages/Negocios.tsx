@@ -619,13 +619,21 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <Input
                   placeholder="De: DD/MM/AAAA"
                   className="h-8 text-[11px] pl-8 w-28 group-hover:border-primary transition-colors"
-                  defaultValue={dateFrom ? format(dateFrom, 'dd/MM/yyyy') : ''}
+                  value={dateFrom ? format(dateFrom, 'dd/MM/yyyy') : ''}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val.length === 10) {
-                      const d = parse(val, 'dd/MM/yyyy', new Date());
+                    let val = e.target.value.replace(/\D/g, '');
+                    if (val.length > 8) val = val.slice(0, 8);
+                    
+                    let formatted = val;
+                    if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
+                    if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
+                    
+                    e.target.value = formatted;
+                    
+                    if (formatted.length === 10) {
+                      const d = parse(formatted, 'dd/MM/yyyy', new Date());
                       if (isValid(d)) setDateFrom(d);
-                    } else if (val === '') {
+                    } else if (formatted === '') {
                       setDateFrom(undefined);
                     }
                   }}
@@ -646,13 +654,21 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <Input
                   placeholder="Até: DD/MM/AAAA"
                   className="h-8 text-[11px] pl-8 w-28 group-hover:border-primary transition-colors"
-                  defaultValue={dateTo ? format(dateTo, 'dd/MM/yyyy') : ''}
+                  value={dateTo ? format(dateTo, 'dd/MM/yyyy') : ''}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val.length === 10) {
-                      const d = parse(val, 'dd/MM/yyyy', new Date());
+                    let val = e.target.value.replace(/\D/g, '');
+                    if (val.length > 8) val = val.slice(0, 8);
+                    
+                    let formatted = val;
+                    if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
+                    if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
+                    
+                    e.target.value = formatted;
+
+                    if (formatted.length === 10) {
+                      const d = parse(formatted, 'dd/MM/yyyy', new Date());
                       if (isValid(d)) setDateTo(d);
-                    } else if (val === '') {
+                    } else if (formatted === '') {
                       setDateTo(undefined);
                     }
                   }}
