@@ -124,7 +124,7 @@ export function useSendMessage() {
   const [sending, setSending] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: async ({ conteudo, file, grupoId, recipientId }: { conteudo: string, file?: File, grupoId?: string | null, recipientId?: string | null }) => {
+    mutationFn: async ({ conteudo, files, grupoId, recipientId }: { conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Usuário não autenticado');
 
@@ -136,79 +136,118 @@ export function useSendMessage() {
       
       if (vErr || !vendedor) throw new Error('Vendedor não encontrado');
 
-      let arquivo_url: string | null = null;
-      let arquivo_nome: string | null = null;
-      let arquivo_tipo: string | null = null;
+      // Se não houver arquivos, envia apenas a mensagem de texto
+      if (!files || files.length === 0) {
+        const newMsg = {
+          conteudo: conteudo || '',
+          usuario_id: vendedor.id,
+          empresa_id: vendedor.empresa_id!,
+          grupo_id: grupoId || null,
+          recipient_id: recipientId || null,
+        };
 
-      if (file) {
+        const { data: savedMsg, error } = await supabase
+          .from('chat_mensagens')
+          .insert(newMsg)
+          .select('*, vendedor:usuarios!chat_mensagens_vendedor_id_fkey(id, nome, email, avatar_url)')
+          .single();
+
+        if (error) throw error;
+        return [savedMsg];
+      }
+
+      // Se houver arquivos, envia cada um como uma mensagem separada
+      // A primeira mensagem também leva o conteúdo de texto se houver
+      const results = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         const safeName = sanitizeFileName(file.name);
-        const path = `${userData.user.id}/${Date.now()}-${safeName}`;
+        const path = `${userData.user.id}/${Date.now()}-${i}-${safeName}`;
+        
         const { error: uploadError } = await supabase.storage
           .from('chat-files')
           .upload(path, file, { contentType: file.type || 'application/octet-stream' });
+        
         if (uploadError) throw uploadError;
+
         const { data: urlData } = supabase.storage
           .from('chat-files')
           .getPublicUrl(path);
-        arquivo_url = urlData.publicUrl;
-        arquivo_nome = file.name;
-        arquivo_tipo = file.type;
+
+        const newMsg = {
+          conteudo: i === 0 && conteudo ? conteudo : file.name,
+          usuario_id: vendedor.id,
+          empresa_id: vendedor.empresa_id!,
+          arquivo_url: urlData.publicUrl,
+          arquivo_nome: file.name,
+          arquivo_tipo: file.type,
+          grupo_id: grupoId || null,
+          recipient_id: recipientId || null,
+        };
+
+        const { data: savedMsg, error } = await supabase
+          .from('chat_mensagens')
+          .insert(newMsg)
+          .select('*, vendedor:usuarios!chat_mensagens_vendedor_id_fkey(id, nome, email, avatar_url)')
+          .single();
+
+        if (error) throw error;
+        results.push(savedMsg);
       }
-
-      const newMsg = {
-        conteudo: conteudo || (file ? file.name : ''),
-        usuario_id: vendedor.id,
-        empresa_id: vendedor.empresa_id!,
-        arquivo_url,
-        arquivo_nome,
-        arquivo_tipo,
-        grupo_id: grupoId || null,
-        recipient_id: recipientId || null,
-      };
-
-      const { data: savedMsg, error } = await supabase
-        .from('chat_mensagens')
-        .insert(newMsg)
-        .select('*, vendedor:usuarios!chat_mensagens_vendedor_id_fkey(id, nome, email, avatar_url)')
-        .single();
-
-      if (error) throw error;
-      return savedMsg;
+      return results;
     },
-    onMutate: async ({ conteudo, file, grupoId, recipientId }) => {
+    onMutate: async ({ conteudo, files, grupoId, recipientId }) => {
       await qc.cancelQueries({ queryKey: ['chat_mensagens', grupoId, recipientId] });
       const previousMessages = qc.getQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId]);
 
-      // Mock optimistic message
       const { data: userData } = await supabase.auth.getUser();
-      const optimisticId = `temp-${Date.now()}`;
-      
       if (previousMessages && userData.user) {
         const myVendedor = qc.getQueryData<any>(['meu_perfil', userData.user.id]);
         
-        const optimisticMsg: ChatMessage = {
-          id: optimisticId,
-          conteudo: conteudo || (file ? file.name : ''),
-          usuario_id: myVendedor?.id || 'me',
-          empresa_id: '',
-          created_at: new Date().toISOString(),
-          grupo_id: grupoId || null,
-          recipient_id: recipientId || null,
-          arquivo_url: file ? URL.createObjectURL(file) : null,
-          arquivo_nome: file?.name || null,
-          arquivo_tipo: file?.type || null,
-          vendedor: myVendedor ? {
-            id: myVendedor.id,
-            nome: myVendedor.nome,
-            email: myVendedor.email,
-            avatar_url: myVendedor.avatar_url
-          } : undefined
-        };
+        const optimisticMsgs: ChatMessage[] = [];
+        if (!files || files.length === 0) {
+          optimisticMsgs.push({
+            id: `temp-${Date.now()}`,
+            conteudo: conteudo || '',
+            usuario_id: myVendedor?.id || 'me',
+            empresa_id: '',
+            created_at: new Date().toISOString(),
+            grupo_id: grupoId || null,
+            recipient_id: recipientId || null,
+            vendedor: myVendedor ? {
+              id: myVendedor.id,
+              nome: myVendedor.nome,
+              email: myVendedor.email,
+              avatar_url: myVendedor.avatar_url
+            } : undefined
+          });
+        } else {
+          files.forEach((file, i) => {
+            optimisticMsgs.push({
+              id: `temp-${Date.now()}-${i}`,
+              conteudo: i === 0 && conteudo ? conteudo : file.name,
+              usuario_id: myVendedor?.id || 'me',
+              empresa_id: '',
+              created_at: new Date().toISOString(),
+              grupo_id: grupoId || null,
+              recipient_id: recipientId || null,
+              arquivo_url: URL.createObjectURL(file),
+              arquivo_nome: file.name,
+              arquivo_tipo: file.type,
+              vendedor: myVendedor ? {
+                id: myVendedor.id,
+                nome: myVendedor.nome,
+                email: myVendedor.email,
+                avatar_url: myVendedor.avatar_url
+              } : undefined
+            });
+          });
+        }
 
-        qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId], (old) => [...(old || []), optimisticMsg]);
+        qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId], (old) => [...(old || []), ...optimisticMsgs]);
       }
 
-      return { previousMessages, optimisticId, grupoId, recipientId };
+      return { previousMessages, grupoId, recipientId };
     },
     onError: (err: any, variables, context) => {
       qc.setQueryData(['chat_mensagens', variables.grupoId, variables.recipientId], context?.previousMessages);
@@ -218,15 +257,15 @@ export function useSendMessage() {
     onSuccess: (data, variables) => {
       qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId, variables.recipientId], (old) => {
         const filtered = (old || []).filter(m => !m.id.toString().startsWith('temp-'));
-        return [...filtered, data as any as ChatMessage];
+        return [...filtered, ...(data as any as ChatMessage[])];
       });
     }
   });
 
-  const send = useCallback(async (conteudo: string, file?: File, grupoId?: string | null, recipientId?: string | null) => {
+  const send = useCallback(async (conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null) => {
     setSending(true);
     try {
-      await mutation.mutateAsync({ conteudo, file, grupoId, recipientId });
+      await mutation.mutateAsync({ conteudo, files, grupoId, recipientId });
     } finally {
       setSending(false);
     }
