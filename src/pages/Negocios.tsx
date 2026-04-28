@@ -895,7 +895,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             )}
           </div>
           <div className="flex items-center gap-2 sm:justify-end">
-            <Button size="sm" className="w-full sm:w-auto" onClick={() => navigate('/pedidos/novo')}>
+            <Button size="sm" className="w-full sm:w-auto h-10" onClick={() => navigate('/pedidos/novo')}>
               <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
             </Button>
           </div>
