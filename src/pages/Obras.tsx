@@ -53,13 +53,22 @@ export default function Obras() {
 
   // Modal state
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newObra, setNewObra] = useState({
     nome_obra: '',
     cliente_id: '',
     endereco_entrega: '',
-    status: 'ativa',
+    status: '',
     spe_cnpj: '',
   });
+
+  const { data: statusObras } = useStatusObras();
+
+  useEffect(() => {
+    if (statusObras?.length && !newObra.status) {
+      setNewObra(prev => ({ ...prev, status: statusObras[0].slug }));
+    }
+  }, [statusObras, newObra.status]);
 
   const {
     columns,
@@ -81,6 +90,15 @@ export default function Obras() {
     key: 'obras',
     defaultColumns: OBRA_FIELDS,
   });
+
+  const getStatusInfo = (slug: string) => {
+    const status = statusObras?.find(s => s.slug === slug);
+    if (!status) return { label: slug, variant: 'outline' as const };
+    return { 
+      label: status.nome, 
+      variant: 'default' as const 
+    };
+  };
 
   useEffect(() => {
     localStorage.setItem('obras_view_mode', viewMode);
