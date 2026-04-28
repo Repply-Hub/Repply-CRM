@@ -159,6 +159,9 @@ export default function Obras() {
     [filtered]
   );
 
+  const hasFilters = statusFilter !== 'todos' || sort !== 'recent';
+  const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0) + (sort !== 'recent' ? 1 : 0);
+
   return (
     <AppLayout 
       title="Obras" 
@@ -202,31 +205,85 @@ export default function Obras() {
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-fit max-w-[150px] shrink-0 whitespace-nowrap h-10">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os status</SelectItem>
-                {statusObras?.map(status => (
-                  <SelectItem key={status.slug} value={status.slug}>
-                    {status.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("h-10 gap-2", hasFilters && "border-primary")}>
+                  <Filter className="h-4 w-4" />
+                  Filtros
+                  {hasFilters && (
+                    <Badge variant="secondary" className="ml-0.5 px-1.5 py-0 text-[10px] h-4">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-4" align="end">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium leading-none">Filtros</h4>
+                    {hasFilters && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          setStatusFilter('todos');
+                          setSort('recent');
+                        }}
+                        className="h-8 px-2 text-xs text-muted-foreground hover:text-primary"
+                      >
+                        Limpar
+                        <X className="ml-1 h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-xs uppercase text-muted-foreground font-semibold">Status</Label>
+                    <div className="space-y-1">
+                      <div 
+                        className={cn(
+                          "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
+                          statusFilter === 'todos' && "bg-accent text-accent-foreground"
+                        )}
+                        onClick={() => setStatusFilter('todos')}
+                      >
+                        <Checkbox checked={statusFilter === 'todos'} onCheckedChange={() => setStatusFilter('todos')} />
+                        Todos os status
+                      </div>
+                      {statusObras?.map(status => (
+                        <div 
+                          key={status.slug} 
+                          className={cn(
+                            "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
+                            statusFilter === status.slug && "bg-accent text-accent-foreground"
+                          )}
+                          onClick={() => setStatusFilter(status.slug)}
+                        >
+                          <Checkbox checked={statusFilter === status.slug} onCheckedChange={() => setStatusFilter(status.slug)} />
+                          {status.nome}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-            <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-              <SelectTrigger className="w-fit max-w-[150px] shrink-0 whitespace-nowrap h-10">
-                <SelectValue placeholder="Ordenar" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent">Mais recentes</SelectItem>
-                <SelectItem value="oldest">Mais antigas</SelectItem>
-                <SelectItem value="name_asc">Nome A-Z</SelectItem>
-                <SelectItem value="name_desc">Nome Z-A</SelectItem>
-              </SelectContent>
-            </Select>
+                  <div className="space-y-2 border-t pt-4">
+                    <Label className="text-xs uppercase text-muted-foreground font-semibold">Ordenação</Label>
+                    <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
+                      <SelectTrigger className="w-full h-9">
+                        <SelectValue placeholder="Ordenar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="recent">Mais recentes</SelectItem>
+                        <SelectItem value="oldest">Mais antigas</SelectItem>
+                        <SelectItem value="name_asc">Nome A-Z</SelectItem>
+                        <SelectItem value="name_desc">Nome Z-A</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
 
             <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0 h-10">
               <Plus className="h-4 w-4" />
