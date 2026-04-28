@@ -114,7 +114,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     defaultColumns: PEDIDOS_COLUMNS,
   });
 
-  const { FilterButton } = await import('@/components/FilterButton');
+  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || stageFilter !== 'todos';
+
 
 
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
