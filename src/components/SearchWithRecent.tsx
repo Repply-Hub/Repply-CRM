@@ -29,9 +29,14 @@ export function SearchWithRecent({
   placeholder = "Buscar...",
   storageKey,
   className,
+  showAddressSuggestions = false,
 }: SearchWithRecentProps) {
   const [open, setOpen] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<number | null>(null);
+  const skipNextRef = useRef(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
