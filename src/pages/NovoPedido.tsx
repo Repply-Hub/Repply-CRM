@@ -762,6 +762,26 @@ const NovoPedido = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={unidadeDialogOpen} onOpenChange={(o) => { setUnidadeDialogOpen(o); if (!o) setUnidadeDialogItemId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova unidade</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Nome da unidade</Label>
+            <Input
+              value={newUnidadeLabel}
+              onChange={(e) => setNewUnidadeLabel(e.target.value)}
+              placeholder="Ex.: Caixa, Saco, Rolo..."
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUnidade(); } }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setUnidadeDialogOpen(false); setNewUnidadeLabel(''); setUnidadeDialogItemId(null); }}>Cancelar</Button>
+            <Button onClick={handleAddUnidade}>Adicionar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };
