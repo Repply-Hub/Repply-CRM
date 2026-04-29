@@ -47,6 +47,7 @@ const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'endereco', label: 'Endereço', locked: false },
   { id: 'spe_cnpj', label: 'CNPJ/SPE', locked: false },
   { id: 'created_at', label: 'Data de Criação', locked: false },
+  { id: 'actions', label: 'Ações', locked: false },
 ];
 
 type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
