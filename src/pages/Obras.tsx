@@ -108,6 +108,9 @@ export default function Obras() {
     if (!obras) return [];
     let list = [...obras];
 
+    const pageSizeNumber = Number(pageSize);
+    const totalPages = Math.ceil(list.length / pageSizeNumber);
+
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
