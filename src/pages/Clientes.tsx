@@ -22,6 +22,7 @@ import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Us
 import { ImportClientesDialog } from '@/components/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/EmpresaSelector';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
@@ -534,15 +535,12 @@ const Clientes = () => {
         </Tabs>
 
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="pl-9 h-10"
-            />
-          </div>
+          <SearchWithRecent
+            placeholder="Buscar..."
+            value={search}
+            onValueChange={(val) => { setSearch(val); setPage(1); }}
+            storageKey="clientes_recent_searches"
+          />
 
           <FilterButton 
             hasFilters={hasFilters}

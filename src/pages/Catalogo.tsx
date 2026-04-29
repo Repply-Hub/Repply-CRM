@@ -14,6 +14,7 @@ import { useFabricantes } from '@/hooks/use-clientes';
 import { Search, Package, ImageIcon, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const Catalogo = () => {
   const { data: produtos, isLoading } = useCatalogoGlobal();
@@ -69,10 +70,12 @@ const Catalogo = () => {
       <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-4">
         <Card className="rounded-xl border-border/60">
           <CardContent className="p-4 flex flex-wrap gap-3 items-center">
-            <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar por descrição, referência ou fabricante..." value={busca} onChange={e => setBusca(e.target.value)} className="pl-9" />
-            </div>
+            <SearchWithRecent
+              placeholder="Buscar por descrição, referência ou fabricante..."
+              value={busca}
+              onValueChange={setBusca}
+              storageKey="catalogo_recent_searches"
+            />
             
             <SearchableSelect
               options={[

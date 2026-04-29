@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { FilterButton } from '@/components/FilterButton';
 import { Filter } from 'lucide-react';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'imagem', label: 'Imagem', locked: false },
@@ -427,15 +428,12 @@ const Fabricantes = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar fabricante..."
-                    value={search}
-                    onChange={e => handleSearchChange(e.target.value)}
-                    className="pl-9 h-9 text-sm"
-                  />
-                </div>
+                <SearchWithRecent
+                  placeholder="Buscar fabricante..."
+                  value={search}
+                  onValueChange={handleSearchChange}
+                  storageKey="fabricantes_recent_searches"
+                />
 
                 {isLoading ? (
                   <div className="flex justify-center py-12">

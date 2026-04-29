@@ -30,6 +30,7 @@ import { FilterButton } from '@/components/FilterButton';
 import { supabase } from '@/integrations/supabase/client';
 import { EmpresaSelector } from '@/components/EmpresaSelector';
 import { EnderecoAutocomplete } from '@/components/EnderecoAutocomplete';
+import { SearchWithRecent } from '@/components/SearchWithRecent';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -211,15 +212,12 @@ export default function Obras() {
                 </TabsTrigger>
               </TabsList>
 
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar obras..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 h-10"
-                />
-              </div>
+              <SearchWithRecent
+                placeholder="Buscar obras..."
+                value={search}
+                onValueChange={setSearch}
+                storageKey="obras_recent_searches"
+              />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
