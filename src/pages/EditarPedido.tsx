@@ -347,7 +347,7 @@ const EditarPedido = () => {
                       <SelectTrigger>
                         <SelectValue placeholder="Selecionar fase" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-[1200]">
                         {(kanbanColunas ?? []).length > 0 ? (
                           (kanbanColunas ?? []).map((col) => (
                             <SelectItem key={col.id} value={col.slug}>
@@ -408,7 +408,7 @@ const EditarPedido = () => {
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Selecionar origem" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-[1200]">
                         <div className="max-h-[200px] overflow-y-auto">
                           {origens.map(o => (
                             <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -566,7 +566,7 @@ const EditarPedido = () => {
                                   <SelectTrigger className="h-8 text-xs">
                                     <SelectValue placeholder="Un." />
                                   </SelectTrigger>
-                                  <SelectContent>
+                                  <SelectContent className="z-[1200]">
                                     <SelectItem value="Litro">Litro</SelectItem>
                                     <SelectItem value="Grama">Grama</SelectItem>
                                     <SelectItem value="Quilograma">Quilograma</SelectItem>
