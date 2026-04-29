@@ -82,6 +82,7 @@ const NovoPedido = () => {
   const [origemLead, setOrigemLead] = useState('');
   const [enderecoEntrega, setEnderecoEntrega] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [status, setStatus] = useState('novo_lead');
   const [isUploading, setIsUploading] = useState(false);
 
   // Step 2 fields
