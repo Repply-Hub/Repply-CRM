@@ -11,8 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
 import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCreatePedidoCompleto, useCreateFabricanteCompleto } from '@/hooks/use-novo-pedido';
+import { useCreateObra } from '@/hooks/use-mutations';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Check, ChevronsUpDown, FileText, Upload } from 'lucide-react';
@@ -47,9 +49,12 @@ const NovoPedido = () => {
   const { data: myVendedorId } = useMyVendedorId();
   const { data: isGestor } = useIsGestor();
   const createPedido = useCreatePedidoCompleto();
+  const createObraMutation = useCreateObra();
 
   const [clienteOpen, setClienteOpen] = useState(false);
   const [fabricanteOpen, setFabricanteOpen] = useState(false);
+  const [obraDialogOpen, setObraDialogOpen] = useState(false);
+  const [newObraNome, setNewObraNome] = useState('');
 
   const [step, setStep] = useState(1);
 
@@ -218,6 +223,29 @@ const NovoPedido = () => {
     }
   };
 
+  const handleCreateObra = async () => {
+    if (!clienteId) {
+      toast.error('Selecione um cliente primeiro');
+      return;
+    }
+    if (!newObraNome.trim()) {
+      toast.error('Informe o nome da obra');
+      return;
+    }
+
+    try {
+      await createObraMutation.mutateAsync({
+        nome_obra: newObraNome,
+        cliente_id: clienteId,
+      });
+      toast.success('Obra criada com sucesso!');
+      setObraDialogOpen(false);
+      setNewObraNome('');
+    } catch (err: any) {
+      toast.error('Erro ao criar obra: ' + err.message);
+    }
+  };
+
   return (
     <AppLayout
       headerContent={
@@ -270,7 +298,19 @@ const NovoPedido = () => {
 
                 {/* Obra */}
                 <div className="space-y-2">
-                  <Label>Obra</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Obra</Label>
+                    {clienteId && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 px-2 text-xs text-primary"
+                        onClick={() => setObraDialogOpen(true)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Nova Obra
+                      </Button>
+                    )}
+                  </div>
                   <SearchableSelect
                     options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
                     value={obraId}
@@ -549,6 +589,34 @@ const NovoPedido = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={obraDialogOpen} onOpenChange={setObraDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Obra</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome da Obra *</Label>
+              <Input 
+                value={newObraNome} 
+                onChange={(e) => setNewObraNome(e.target.value)}
+                placeholder="Ex: Edifício Horizonte"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Cliente</Label>
+              <p className="text-sm font-medium">{selectedCliente?.empresa || 'Cliente selecionado'}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setObraDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateObra} disabled={createObraMutation.isPending}>
+              {createObraMutation.isPending ? 'Criando...' : 'Criar Obra'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };
