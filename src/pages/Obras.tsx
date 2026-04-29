@@ -689,7 +689,36 @@ export default function Obras() {
                   value={newObra.spe_cnpj}
                   onChange={(e) => setNewObra(prev => ({ ...prev, spe_cnpj: e.target.value }))}
                 />
-              </div>
+        <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && setConfirmDeleteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Obra</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir esta obra? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  if (confirmDeleteId) {
+                    try {
+                      await deleteObra.mutateAsync(confirmDeleteId);
+                      toast.success("Obra excluída com sucesso!");
+                    } catch (error: any) {
+                      toast.error("Erro ao excluir obra: " + error.message);
+                    }
+                    setConfirmDeleteId(null);
+                  }
+                }}
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
