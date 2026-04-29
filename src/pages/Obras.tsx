@@ -14,11 +14,11 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { 
   Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, 
-  LayoutGrid, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X
+  LayoutGrid, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useCreateObra, useUpdateObra } from '@/hooks/use-mutations';
+import { useCreateObra, useUpdateObra, useDeleteObra } from '@/hooks/use-mutations';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { ListPagination } from '@/components/ListPagination';
@@ -29,6 +29,16 @@ import { cn } from '@/lib/utils';
 import { FilterButton } from '@/components/FilterButton';
 import { supabase } from '@/integrations/supabase/client';
 import { EmpresaSelector } from '@/components/EmpresaSelector';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'nome_obra', label: 'Nome da Obra', locked: false },
@@ -37,6 +47,7 @@ const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'endereco', label: 'Endereço', locked: false },
   { id: 'spe_cnpj', label: 'CNPJ/SPE', locked: false },
   { id: 'created_at', label: 'Data de Criação', locked: false },
+  { id: 'actions', label: 'Ações', locked: false },
 ];
 
 type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
@@ -46,6 +57,7 @@ export default function Obras() {
   const { data: clientes } = useClientes();
   const createObra = useCreateObra();
   const updateObra = useUpdateObra();
+  const deleteObra = useDeleteObra();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
@@ -59,6 +71,8 @@ export default function Obras() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const [newObra, setNewObra] = useState({
     nome_obra: '',
     cliente_id: '',
@@ -122,7 +136,6 @@ export default function Obras() {
     let list = [...obras];
 
     const pageSizeNumber = Number(pageSize);
-    const totalPages = Math.ceil(list.length / pageSizeNumber);
 
     if (search) {
       const q = search.toLowerCase();
@@ -342,9 +355,20 @@ export default function Obras() {
                       return (
                         <Card 
                           key={obra.id} 
-                          className="flex flex-col cursor-pointer hover:border-primary/50 transition-colors group"
+                          className="flex flex-col cursor-pointer hover:border-primary/50 transition-colors group relative"
                           onClick={() => setSelectedObra(obra)}
                         >
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDeleteId(obra.id);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between gap-2">
                               <CardTitle className="text-base font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors">
@@ -425,6 +449,19 @@ export default function Obras() {
                                   {colId === 'endereco' && (obra.endereco_entrega || '—')}
                                   {colId === 'spe_cnpj' && (obra.spe_cnpj || '—')}
                                   {colId === 'created_at' && format(new Date(obra.created_at), "dd/MM/yyyy")}
+                                  {colId === 'actions' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setConfirmDeleteId(obra.id);
+                                      }}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
                                   {colId.startsWith('custom_') && (camposExtras[colId] || '—')}
                                 </td>
                               ))}
@@ -689,6 +726,36 @@ export default function Obras() {
             </form>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && setConfirmDeleteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Obra</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir esta obra? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  if (confirmDeleteId) {
+                    try {
+                      await deleteObra.mutateAsync(confirmDeleteId);
+                      toast.success("Obra excluída com sucesso!");
+                    } catch (error: any) {
+                      toast.error("Erro ao excluir obra: " + error.message);
+                    }
+                    setConfirmDeleteId(null);
+                  }
+                }}
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
