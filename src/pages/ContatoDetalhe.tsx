@@ -23,7 +23,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 const ContatoDetalhe = () => {
   const { slug } = useParams<{ slug: string }>();
-  const id = slug?.includes('-') ? slug.split('-').reverse()[0] : slug;
+  const id = useMemo(() => {
+    if (!slug) return null;
+    const parts = slug.split('-');
+    const lastPart = parts[parts.length - 1];
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(lastPart)) return lastPart;
+    if (uuidRegex.test(slug)) return slug;
+    return slug;
+  }, [slug]);
   const navigate = useNavigate();
   const { data: contatos, isLoading } = useContatos();
   const { data: clientes } = useClientes();
