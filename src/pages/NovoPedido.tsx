@@ -55,6 +55,20 @@ const NovoPedido = () => {
   const [fabricanteOpen, setFabricanteOpen] = useState(false);
   const [obraDialogOpen, setObraDialogOpen] = useState(false);
   const [newObraNome, setNewObraNome] = useState('');
+  
+  const [origens, setOrigens] = useState(() => {
+    const saved = localStorage.getItem('custom_origens');
+    if (saved) {
+      try {
+        return [...DEFAULT_ORIGENS, ...JSON.parse(saved)];
+      } catch (e) {
+        return DEFAULT_ORIGENS;
+      }
+    }
+    return DEFAULT_ORIGENS;
+  });
+  const [origemDialogOpen, setOrigemDialogOpen] = useState(false);
+  const [newOrigemLabel, setNewOrigemLabel] = useState('');
 
   const [step, setStep] = useState(1);
 
