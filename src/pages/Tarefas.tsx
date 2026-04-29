@@ -29,6 +29,7 @@ import { useTableSettings } from '@/hooks/use-table-settings';
 import { FilterButton } from '@/components/FilterButton';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const TAREFA_COLUMNS: ColumnDefinition[] = [
   { id: 'titulo', label: 'Tarefa', locked: false },
