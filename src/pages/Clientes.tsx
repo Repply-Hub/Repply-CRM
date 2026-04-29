@@ -975,7 +975,7 @@ const Clientes = () => {
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <User className="h-4 w-4 text-primary" />
                                   </div>
-                                  <span className="font-medium truncate max-w-[200px]">{contato.nome_contato || 'Sem nome'}</span>
+                                  <span className="font-medium whitespace-nowrap">{contato.nome_contato || 'Sem nome'}</span>
                                 </div>
                               </td>
                             );
