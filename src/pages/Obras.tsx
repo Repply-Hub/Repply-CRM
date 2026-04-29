@@ -650,8 +650,9 @@ export default function Obras() {
                     <SelectValue placeholder="Selecione um cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* Aqui deveria carregar a lista de clientes, para simplificar vamos assumir que o usuário digita/busca */}
-                    <SelectItem value="1">Cliente Teste</SelectItem>
+                    {clientes?.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.empresa}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
