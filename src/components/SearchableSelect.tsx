@@ -60,7 +60,12 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <Command>
+        <Command 
+          filter={(value, search) => {
+            if (value.toLowerCase().includes(search.toLowerCase())) return 1;
+            return 0;
+          }}
+        >
           <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
           <CommandList>
             <CommandEmpty className="py-2 text-center text-sm">
@@ -71,7 +76,9 @@ export function SearchableSelect({
                     variant="ghost"
                     size="sm"
                     className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
-                    onClick={() => {
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       onActionClick();
                       setOpen(false);
                     }}
@@ -108,7 +115,9 @@ export function SearchableSelect({
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
-                  onClick={() => {
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     onActionClick();
                     setOpen(false);
                   }}
