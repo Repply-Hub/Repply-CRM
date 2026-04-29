@@ -355,6 +355,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             email: r.email || null,
             telefone: r.telefone || null,
             cargo: r.cargo || null,
+            logradouro: r.logradouro || null,
+            numero: r.numero || null,
+            complemento: r.complemento || null,
+            bairro: r.bairro || null,
+            cidade: r.cidade || null,
+            uf: r.uf || null,
+            cep: r.cep || null,
             classificacao: r.classificacao || null,
             data_criacao: r.data_criacao || null,
             campos_extras: r.campos_extras || {},
@@ -364,7 +371,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           const { data: saved, error } = await supabase
             .from('contatos')
             .insert(batch)
-            .select('id,empresa,nome_contato,email,telefone,cargo,classificacao,data_criacao,campos_extras');
+            .select('id,empresa,nome_contato,email,telefone,cargo,logradouro,numero,complemento,bairro,cidade,uf,cep,classificacao,data_criacao,campos_extras');
           if (error) throw error;
           console.debug('[ImportClientes] contatos salvos', saved?.slice(0, 5));
         } else {
@@ -394,7 +401,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           if (cnpjs.length > 0) {
             const { data: existingRows, error: existingError } = await supabase
               .from('clientes')
-              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras')
+              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras,usuario_id')
               .in('cnpj', cnpjs)
               .eq('usuario_id', vid);
             if (existingError) throw existingError;
