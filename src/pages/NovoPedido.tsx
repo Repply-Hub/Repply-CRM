@@ -390,7 +390,7 @@ const NovoPedido = () => {
                       </SelectContent>
                     </Select>
                   </div>
-
+                </div>
                 {/* Anexo PDF */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
