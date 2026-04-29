@@ -479,37 +479,41 @@ export function ColumnSettings({
                         </div>
                     )}
 
-                    <div className="p-1.5 bg-muted/20 border-t border-border/50">
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <button
-                                    type="button"
-                                    className="w-full text-center text-[11px] text-primary font-bold px-3 py-2 rounded-lg hover:bg-primary/10 transition-all active:scale-[0.98] uppercase tracking-wider"
-                                >
-                                    Restaurar padrão
-                                </button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Restaurar padrão?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Isso irá reexibir todas as colunas disponíveis para esta tabela.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => onChange(columns.map(c => c.id))}>
-                                        Confirmar
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
-                </div>
-                )}
+                            )}
+                        </div>
 
-                {children}
-            </PopoverContent>
+                        <div className="mt-auto p-1.5 bg-muted/20 border-t border-border/50 rounded-b-md">
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="w-full text-center text-[11px] text-primary font-bold px-3 py-2 rounded-lg hover:bg-primary/10 transition-all active:scale-[0.98] uppercase tracking-wider"
+                                    >
+                                        Restaurar padrão
+                                    </button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Restaurar padrão?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Isso irá reexibir todas as colunas disponíveis para esta tabela.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => onChange(columns.map(c => c.id))}>
+                                            Confirmar
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {children}
+        </PopoverContent>
         </Popover>
     );
 }
