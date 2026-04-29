@@ -85,7 +85,7 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   data_criacao: [/^data\s*criacao$/, /^criado$/, /^criado\s*em$/, /^data\s*cadastro$/],
 };
 
-function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
+function autoDetectMapping(headers: string[], fields: { key: FieldKey; label: string }[]): Record<FieldKey, string> {
   const result: Record<FieldKey, string> = {
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
     telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
@@ -93,9 +93,12 @@ function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
     nome_contato: '', sobrenome_contato: '', cargo: '',
     classificacao: '', data_criacao: '',
   };
+
   const used = new Set<string>();
-  // First pass: exact patterns
-  (Object.keys(AUTO_RULES) as FieldKey[]).forEach(field => {
+  
+  // Usar regras específicas primeiro para garantir precisão
+  fields.forEach(f => {
+    const field = f.key;
     for (const h of headers) {
       if (used.has(h)) continue;
       const norm = normalizeText(h);
@@ -106,6 +109,7 @@ function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
       }
     }
   });
+
   return result;
 }
 
@@ -193,7 +197,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       setRawData(json);
       setHeaders(cols);
 
-      const auto = autoDetectMapping(cols);
+      const auto = autoDetectMapping(cols, visibleFields);
       setMapping(auto);
       setExtras(autoDetectExtras(cols, Object.values(auto).filter(Boolean)));
       setCustomColumns({});
@@ -549,7 +553,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             visibleFields={visibleFields}
             onReset={reset}
             onAutoDetect={() => {
-              const auto = autoDetectMapping(headers);
+              const auto = autoDetectMapping(headers, visibleFields);
               setMapping(auto);
               setExtras(autoDetectExtras(headers, Object.values(auto).filter(Boolean)));
             }}
