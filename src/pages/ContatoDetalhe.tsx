@@ -239,8 +239,8 @@ const ContatoDetalhe = () => {
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-tight">Telefone / WhatsApp</p>
                     <p className="text-sm font-semibold text-foreground truncate">{contato.telefone || 'Não informado'}</p>
                     {contato.telefone && (
-                      <Button variant="link" className="p-0 h-auto text-[11px] mt-1" onClick={() => window.open(`https://wa.me/${contato.telefone.replace(/\D/g, '')}`, '_blank')}>
-                        Chamar no WhatsApp
+                      <Button variant="link" className="p-0 h-auto text-[11px] mt-1" onClick={() => copyInfo('Telefone', contato.telefone)}>
+                        Copiar número
                       </Button>
                     )}
                   </div>
