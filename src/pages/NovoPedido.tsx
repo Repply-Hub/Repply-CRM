@@ -618,12 +618,26 @@ const NovoPedido = () => {
                                     <SelectValue placeholder="Un." />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="Litro">Litro</SelectItem>
-                                    <SelectItem value="Grama">Grama</SelectItem>
-                                    <SelectItem value="Quilograma">Quilograma</SelectItem>
-                                    <SelectItem value="Peça">Peça</SelectItem>
-                                    <SelectItem value="Metro quadrado">Metro quadrado</SelectItem>
-                                    <SelectItem value="Balde">Balde</SelectItem>
+                                    {unidades.map(u => (
+                                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                                    ))}
+                                    <div className="border-t mt-1 pt-1">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10 h-8"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setUnidadeDialogItemId(item.id);
+                                          setUnidadeDialogOpen(true);
+                                        }}
+                                      >
+                                        <Plus className="mr-2 h-3 w-3" />
+                                        Nova unidade
+                                      </Button>
+                                    </div>
                                   </SelectContent>
                                 </Select>
                               </TableCell>
