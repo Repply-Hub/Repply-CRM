@@ -31,6 +31,7 @@ export interface UpdatePedidoPayload {
   fabricante_id: string;
   usuario_id: string;
   obra_id?: string;
+  status?: string;
   data_pedido: string;
   prazo_resposta?: string;
   origem_lead?: string;
@@ -58,6 +59,7 @@ export function useUpdatePedidoCompleto() {
           fabricante_id: payload.fabricante_id,
           usuario_id: payload.usuario_id,
           obra_id: payload.obra_id || null,
+          ...(payload.status ? { status: payload.status } : {}),
           data_pedido: payload.data_pedido,
           prazo_resposta: payload.prazo_resposta || null,
           origem_lead: payload.origem_lead || null,

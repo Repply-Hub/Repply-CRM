@@ -12,8 +12,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
-import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor } from '@/hooks/use-novo-pedido';
+import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
+import { useObrasByCliente, useTabelaPrecos, useIsGestor } from '@/hooks/use-novo-pedido';
+import { useCreateObra } from '@/hooks/use-mutations';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText } from 'lucide-react';
@@ -25,7 +28,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { SearchableSelect } from '@/components/SearchableSelect';
 
-const ORIGENS = [
+const DEFAULT_ORIGENS = [
   { value: 'recompra', label: 'Recompra' },
   { value: 'prospeccao_ativa', label: 'Prospecção Ativa' },
   { value: 'indicacao', label: 'Indicação' },
@@ -58,16 +61,36 @@ const EditarPedido = () => {
   const { data: fabricantes } = useFabricantes();
   const { data: vendedores } = useVendedores();
   const { data: isGestor } = useIsGestor();
+  const { data: kanbanColunas } = useKanbanColunas();
   const updatePedido = useUpdatePedidoCompleto();
+  const createObraMutation = useCreateObra();
 
   const [initialized, setInitialized] = useState(false);
   const [step, setStep] = useState(1);
+
+  const [obraDialogOpen, setObraDialogOpen] = useState(false);
+  const [newObraNome, setNewObraNome] = useState('');
+
+  const [origens, setOrigens] = useState(() => {
+    const saved = localStorage.getItem('custom_origens');
+    if (saved) {
+      try {
+        return [...DEFAULT_ORIGENS, ...JSON.parse(saved)];
+      } catch (e) {
+        return DEFAULT_ORIGENS;
+      }
+    }
+    return DEFAULT_ORIGENS;
+  });
+  const [origemDialogOpen, setOrigemDialogOpen] = useState(false);
+  const [newOrigemLabel, setNewOrigemLabel] = useState('');
 
   // Step 1 fields
   const [clienteId, setClienteId] = useState('');
   const [obraId, setObraId] = useState('');
   const [fabricanteId, setFabricanteId] = useState('');
   const [vendedorId, setVendedorId] = useState('');
+  const [status, setStatus] = useState('novo_lead');
   const [dataPedido, setDataPedido] = useState<Date>(new Date());
   const [prazoResposta, setPrazoResposta] = useState<Date | undefined>();
   const [origemLead, setOrigemLead] = useState('');
@@ -86,6 +109,7 @@ const EditarPedido = () => {
       setObraId(p.obra_id || '');
       setFabricanteId(p.fabricante_id);
       setVendedorId(p.usuario_id);
+      setStatus(p.status || 'novo_lead');
       setDataPedido(parseISO(p.data_pedido));
       setPrazoResposta(p.prazo_resposta ? parseISO(p.prazo_resposta) : undefined);
       setOrigemLead(p.origem_lead || '');
@@ -106,8 +130,7 @@ const EditarPedido = () => {
 
   // Derived
   const selectedCliente = useMemo(() => clientes?.find(c => c.id === clienteId), [clientes, clienteId]);
-  const isConstrutora = selectedCliente?.tipo === 'construtora';
-  const { data: obras } = useObrasByCliente(isConstrutora ? clienteId : null);
+  const { data: obras } = useObrasByCliente(clienteId || null);
   const selectedObra = useMemo(() => obras?.find(o => o.id === obraId), [obras, obraId]);
   const { data: tabelaPrecos } = useTabelaPrecos(fabricanteId || null);
 
@@ -161,19 +184,12 @@ const EditarPedido = () => {
 
   const validateStep1 = () => {
     if (!clienteId) { toast.error('Selecione um cliente'); return false; }
-    if (isConstrutora && !obraId) { toast.error('Selecione uma obra'); return false; }
     if (!fabricanteId) { toast.error('Selecione um fabricante'); return false; }
     if (!vendedorId) { toast.error('Selecione o responsável'); return false; }
     return true;
   };
 
   const validateStep2 = () => {
-    if (itens.length === 0) { toast.error('Adicione pelo menos 1 item'); return false; }
-    for (const item of itens) {
-      if (!item.descricao_material.trim()) { toast.error('Preencha a descrição de todos os itens'); return false; }
-      if (item.quantidade <= 0) { toast.error('Quantidade deve ser maior que 0'); return false; }
-      if (item.preco_unitario <= 0) { toast.error('Preço unitário deve ser maior que 0'); return false; }
-    }
     return true;
   };
 
@@ -191,12 +207,14 @@ const EditarPedido = () => {
         fabricante_id: fabricanteId,
         usuario_id: vendedorId,
         obra_id: obraId || undefined,
+        status: status,
         data_pedido: format(dataPedido, 'yyyy-MM-dd'),
         prazo_resposta: prazoResposta ? format(prazoResposta, 'yyyy-MM-dd') : undefined,
         origem_lead: origemLead || undefined,
         endereco_entrega: enderecoEntrega || undefined,
         observacoes: observacoes || undefined,
         itens: itens.map(i => ({
+          id: i.id,
           descricao_material: i.descricao_material,
           referencia_fabricante: i.referencia_fabricante || undefined,
           quantidade: i.quantidade,
@@ -209,6 +227,50 @@ const EditarPedido = () => {
     } catch (err: any) {
       toast.error(err.message);
     }
+  };
+
+  const handleCreateObra = async () => {
+    if (!clienteId) {
+      toast.error('Selecione um cliente primeiro');
+      return;
+    }
+    if (!newObraNome.trim()) {
+      toast.error('Informe o nome da obra');
+      return;
+    }
+
+    try {
+      await createObraMutation.mutateAsync({
+        nome_obra: newObraNome,
+        cliente_id: clienteId,
+      });
+      toast.success('Obra criada com sucesso!');
+      setObraDialogOpen(false);
+      setNewObraNome('');
+    } catch (err: any) {
+      toast.error('Erro ao criar obra: ' + err.message);
+    }
+  };
+
+  const handleCreateOrigem = () => {
+    if (!newOrigemLabel.trim()) {
+      toast.error('Informe o nome da origem');
+      return;
+    }
+
+    const newValue = newOrigemLabel.toLowerCase().replace(/\s+/g, '_');
+    const newOrigem = { value: newValue, label: newOrigemLabel };
+
+    const updatedOrigens = [...origens, newOrigem];
+    setOrigens(updatedOrigens);
+
+    const customOnly = updatedOrigens.filter(o => !DEFAULT_ORIGENS.some(d => d.value === o.value));
+    localStorage.setItem('custom_origens', JSON.stringify(customOnly));
+
+    setOrigemLead(newValue);
+    setOrigemDialogOpen(false);
+    setNewOrigemLabel('');
+    toast.success('Nova origem adicionada!');
   };
 
   if (loadingPedido) {
@@ -235,7 +297,7 @@ const EditarPedido = () => {
       <Button variant="ghost" size="icon" className="shrink-0 -ml-1 h-8 w-8" onClick={() => navigate('/pedidos')}>
         <ArrowLeft className="h-4 w-4" />
       </Button>
-      
+
       <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">Editar Pedido</h1>
       <Badge variant={isClosedStatus ? 'secondary' : 'default'} className="shrink-0">
         {STATUS_LABELS[pedidoStatus] || pedidoStatus}
@@ -273,34 +335,61 @@ const EditarPedido = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Cliente *</Label>
-                    <EmpresaSelector 
-                      value={clienteId} 
-                      onValueChange={handleClienteChange} 
+                    <EmpresaSelector
+                      value={clienteId}
+                      onValueChange={handleClienteChange}
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label>Fabricante *</Label>
-                    <FabricanteSelector 
-                      value={fabricanteId} 
-                      onValueChange={setFabricanteId} 
-                    />
+                    <Label>Fase do Pedido</Label>
+                    <Select value={status} onValueChange={setStatus}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar fase" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(kanbanColunas ?? []).length > 0 ? (
+                          (kanbanColunas ?? []).map((col) => (
+                            <SelectItem key={col.id} value={col.slug}>
+                              {col.nome}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="novo_lead">Novo Lead</SelectItem>
+                            <SelectItem value="negociacao">Negociação</SelectItem>
+                            <SelectItem value="fechamento">Fechamento</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
-                {isConstrutora && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Obra *</Label>
+                    <Label>Fabricante *</Label>
+                    <FabricanteSelector
+                      value={fabricanteId}
+                      onValueChange={setFabricanteId}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Obra</Label>
                     <SearchableSelect
                       options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
                       value={obraId}
                       onValueChange={handleObraChange}
                       placeholder="Selecionar obra"
+                      onActionClick={() => setObraDialogOpen(true)}
+                      actionLabel="Nova Obra"
                     />
                     {selectedObra?.spe_cnpj && (
                       <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
                     )}
                   </div>
-                )}
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -316,11 +405,29 @@ const EditarPedido = () => {
                   <div className="space-y-2">
                     <Label>Origem</Label>
                     <Select value={origemLead} onValueChange={setOrigemLead}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar origem" /></SelectTrigger>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecionar origem" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {ORIGENS.map(o => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                        ))}
+                        <div className="max-h-[200px] overflow-y-auto">
+                          {origens.map(o => (
+                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                          ))}
+                        </div>
+                        <div className="p-1 border-t mt-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10 h-8"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOrigemDialogOpen(true);
+                            }}
+                          >
+                            <Plus className="h-3 w-3 mr-2" /> Nova Origem
+                          </Button>
+                        </div>
                       </SelectContent>
                     </Select>
                   </div>
@@ -384,6 +491,11 @@ const EditarPedido = () => {
                   <Input value={enderecoEntrega} onChange={e => setEnderecoEntrega(e.target.value)} placeholder="Endereço de entrega" />
                 </div>
 
+                <div className="space-y-2">
+                  <Label>Descrição do Pedido</Label>
+                  <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações ou descrição geral do pedido" rows={3} />
+                </div>
+
                 {pdfUrl && (
                   <div className="space-y-2">
                     <Label>Arquivo PDF</Label>
@@ -428,9 +540,8 @@ const EditarPedido = () => {
                         <TableHeader>
                           <TableRow className="bg-muted/50">
                             <TableHead className="min-w-[200px]">Descrição do Material</TableHead>
-                            <TableHead className="w-28">Referência</TableHead>
+                            <TableHead className="w-32">Unidade</TableHead>
                             <TableHead className="w-20">Qtd</TableHead>
-                            <TableHead className="w-20">Unidade</TableHead>
                             <TableHead className="w-28">Preço Unit.</TableHead>
                             <TableHead className="w-28">Preço Total</TableHead>
                             <TableHead className="w-10"></TableHead>
@@ -448,13 +559,25 @@ const EditarPedido = () => {
                                 />
                               </TableCell>
                               <TableCell>
-                                <Input className="h-8 text-xs" value={item.referencia_fabricante} onChange={e => updateItem(item.id, 'referencia_fabricante', e.target.value)} />
+                                <Select
+                                  value={item.unidade}
+                                  onValueChange={(v) => updateItem(item.id, 'unidade', v)}
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Un." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Litro">Litro</SelectItem>
+                                    <SelectItem value="Grama">Grama</SelectItem>
+                                    <SelectItem value="Quilograma">Quilograma</SelectItem>
+                                    <SelectItem value="Peça">Peça</SelectItem>
+                                    <SelectItem value="Metro quadrado">Metro quadrado</SelectItem>
+                                    <SelectItem value="Balde">Balde</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </TableCell>
                               <TableCell>
                                 <Input className="h-8 text-xs" type="number" min="0" step="1" value={item.quantidade} onChange={e => updateItem(item.id, 'quantidade', parseFloat(e.target.value) || 0)} />
-                              </TableCell>
-                              <TableCell>
-                                <Input className="h-8 text-xs" value={item.unidade} onChange={e => updateItem(item.id, 'unidade', e.target.value)} />
                               </TableCell>
                               <TableCell>
                                 <Input className="h-8 text-xs" type="number" min="0" step="0.01" value={item.preco_unitario} onChange={e => updateItem(item.id, 'preco_unitario', parseFloat(e.target.value) || 0)} />
@@ -483,11 +606,6 @@ const EditarPedido = () => {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Observações</Label>
-                  <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações internas sobre o pedido" rows={3} />
-                </div>
-
                 <div className="flex justify-between pt-4">
                   <Button variant="outline" onClick={() => setStep(1)}>
                     <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
@@ -502,6 +620,58 @@ const EditarPedido = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={obraDialogOpen} onOpenChange={setObraDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Obra</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome da Obra *</Label>
+              <Input
+                value={newObraNome}
+                onChange={(e) => setNewObraNome(e.target.value)}
+                placeholder="Ex: Edifício Horizonte"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Cliente</Label>
+              <p className="text-sm font-medium">{selectedCliente?.empresa || 'Cliente selecionado'}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setObraDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateObra} disabled={createObraMutation.isPending}>
+              {createObraMutation.isPending ? 'Criando...' : 'Criar Obra'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={origemDialogOpen} onOpenChange={setOrigemDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Origem</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome da Origem *</Label>
+              <Input
+                value={newOrigemLabel}
+                onChange={(e) => setNewOrigemLabel(e.target.value)}
+                placeholder="Ex: Evento de Construção"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrigemDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateOrigem}>
+              Criar Origem
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };
@@ -528,18 +698,17 @@ function ItemDescricaoField({
   }, [value, tabelaPrecos]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Input
-          className="h-8 text-xs"
-          value={value}
-          onChange={e => { onChange(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          placeholder="Descrição..."
-        />
-      </PopoverTrigger>
-      {filtered.length > 0 && (
-        <PopoverContent className="w-72 p-0" align="start" onOpenAutoFocus={e => e.preventDefault()}>
+    <div className="relative">
+      <Input
+        className="h-8 text-xs"
+        value={value}
+        onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        placeholder="Descrição..."
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute top-full left-0 z-50 mt-1 w-72 rounded-md border bg-popover text-popover-foreground shadow-md">
           <Command>
             <CommandList>
               <CommandGroup>
@@ -565,9 +734,9 @@ function ItemDescricaoField({
               </CommandGroup>
             </CommandList>
           </Command>
-        </PopoverContent>
+        </div>
       )}
-    </Popover>
+    </div>
   );
 }
 
