@@ -49,6 +49,40 @@ export function SearchWithRecent({
     }
   }, [storageKey]);
 
+  useEffect(() => {
+    if (!showAddressSuggestions) return;
+    if (skipNextRef.current) {
+      skipNextRef.current = false;
+      return;
+    }
+    const query = value.trim();
+    if (query.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(async () => {
+      setSearching(true);
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=5&countrycodes=br&q=${encodeURIComponent(
+          query + ', Brasil',
+        )}`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
+        if (!res.ok) throw new Error('Falha');
+        const data: AddressSuggestion[] = await res.json();
+        setSuggestions(data);
+        if (data.length > 0) setOpen(true);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 450);
+    return () => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    };
+  }, [value, showAddressSuggestions]);
+
   const saveRecent = (term: string) => {
     if (!term.trim()) return;
     const termLower = term.trim().toLowerCase();
