@@ -361,53 +361,74 @@ export type Database = {
       }
       clientes: {
         Row: {
+          bairro: string | null
           campos_extras: Json
+          cep: string | null
+          cidade: string | null
           classificacao: string | null
           cnpj: string | null
+          complemento: string | null
           created_at: string
           data_criacao: string | null
           email: string | null
           empresa: string | null
           endereco: string | null
           id: string
+          logradouro: string | null
           nome_contato: string | null
+          numero: string | null
           razao_social: string | null
           telefone: string | null
           tipo: string
+          uf: string | null
           updated_at: string
           usuario_id: string | null
         }
         Insert: {
+          bairro?: string | null
           campos_extras?: Json
+          cep?: string | null
+          cidade?: string | null
           classificacao?: string | null
           cnpj?: string | null
+          complemento?: string | null
           created_at?: string
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
           endereco?: string | null
           id?: string
+          logradouro?: string | null
           nome_contato?: string | null
+          numero?: string | null
           razao_social?: string | null
           telefone?: string | null
           tipo: string
+          uf?: string | null
           updated_at?: string
           usuario_id?: string | null
         }
         Update: {
+          bairro?: string | null
           campos_extras?: Json
+          cep?: string | null
+          cidade?: string | null
           classificacao?: string | null
           cnpj?: string | null
+          complemento?: string | null
           created_at?: string
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
           endereco?: string | null
           id?: string
+          logradouro?: string | null
           nome_contato?: string | null
+          numero?: string | null
           razao_social?: string | null
           telefone?: string | null
           tipo?: string
+          uf?: string | null
           updated_at?: string
           usuario_id?: string | null
         }
@@ -512,44 +533,65 @@ export type Database = {
       }
       contatos: {
         Row: {
+          bairro: string | null
           campos_extras: Json
           cargo: string | null
+          cep: string | null
+          cidade: string | null
           classificacao: string | null
+          complemento: string | null
           created_at: string
           data_criacao: string | null
           email: string | null
           empresa: string | null
           id: string
+          logradouro: string | null
           nome_contato: string | null
+          numero: string | null
           telefone: string | null
+          uf: string | null
           updated_at: string
           usuario_id: string | null
         }
         Insert: {
+          bairro?: string | null
           campos_extras?: Json
           cargo?: string | null
+          cep?: string | null
+          cidade?: string | null
           classificacao?: string | null
+          complemento?: string | null
           created_at?: string
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
           id?: string
+          logradouro?: string | null
           nome_contato?: string | null
+          numero?: string | null
           telefone?: string | null
+          uf?: string | null
           updated_at?: string
           usuario_id?: string | null
         }
         Update: {
+          bairro?: string | null
           campos_extras?: Json
           cargo?: string | null
+          cep?: string | null
+          cidade?: string | null
           classificacao?: string | null
+          complemento?: string | null
           created_at?: string
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
           id?: string
+          logradouro?: string | null
           nome_contato?: string | null
+          numero?: string | null
           telefone?: string | null
+          uf?: string | null
           updated_at?: string
           usuario_id?: string | null
         }
