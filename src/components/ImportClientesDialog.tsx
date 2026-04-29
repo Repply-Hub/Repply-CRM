@@ -13,7 +13,7 @@ import { MappingStep, sanitizeImportedRows } from '@/components/import/MappingSt
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
-type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'endereco' | 'nome_contato' | 'sobrenome_contato' | 'cargo' | 'classificacao' | 'data_criacao';
+type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'uf' | 'cep' | 'nome_contato' | 'sobrenome_contato' | 'cargo' | 'classificacao' | 'data_criacao';
 
 const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: boolean }[] = [
   { key: 'empresa', label: 'Empresa', required: false },
@@ -24,7 +24,13 @@ const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: b
   { key: 'cnpj', label: 'CNPJ / CPF', required: false },
   { key: 'email', label: 'E-mail', required: false },
   { key: 'telefone', label: 'Telefone', required: false },
-  { key: 'endereco', label: 'Endereço', required: false },
+  { key: 'logradouro', label: 'Logradouro / Rua', required: false },
+  { key: 'numero', label: 'Número', required: false },
+  { key: 'complemento', label: 'Complemento', required: false },
+  { key: 'bairro', label: 'Bairro', required: false },
+  { key: 'cidade', label: 'Cidade', required: false },
+  { key: 'uf', label: 'UF', required: false },
+  { key: 'cep', label: 'CEP', required: false },
   { key: 'cargo', label: 'Cargo', required: false, forContatos: true },
   { key: 'classificacao', label: 'Classificação', required: false },
   { key: 'data_criacao', label: 'Data de Criação', required: false },
@@ -57,7 +63,13 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   cnpj: [/^cnpj$/, /^cpf$/, /cpf.*cnpj/, /cnpj/, /cpf/],
   email: [/^e-?mail$/, /mail/],
   telefone: [/^telefone$/, /^telefone\s*de\s*trabalho$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
-  endereco: [/^endereco$/, /endereco/, /address/],
+  logradouro: [/^logradouro$/, /^rua$/, /logradouro/, /rua/, /address/, /endereco/],
+  numero: [/^numero$/, /numero/, /number/, /num/],
+  complemento: [/^complemento$/, /complemento/],
+  bairro: [/^bairro$/, /bairro/, /neighborhood/, /suburb/],
+  cidade: [/^cidade$/, /cidade/, /city/],
+  uf: [/^uf$/, /^estado$/, /uf/, /estado/, /state/],
+  cep: [/^cep$/, /cep/, /zip/, /postcode/],
   nome_contato: [
     /^nome$/, /^nome\s*completo$/, /^primeiro\s*nome$/, /^first\s*name$/, /^full\s*name$/, /^nome\s*proprio$/,
     /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
@@ -76,7 +88,9 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
 function autoDetectMapping(headers: string[]): Record<FieldKey, string> {
   const result: Record<FieldKey, string> = {
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
-    telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+    telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
+    cidade: '', uf: '', cep: '',
+    nome_contato: '', sobrenome_contato: '', cargo: '',
     classificacao: '', data_criacao: '',
   };
   const used = new Set<string>();
@@ -122,7 +136,9 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, string>>({
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
-    telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+    telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
+    cidade: '', uf: '', cep: '',
+    nome_contato: '', sobrenome_contato: '', cargo: '',
     classificacao: '', data_criacao: '',
   });
   // extras: column name (planilha) -> nome no sistema (campos_extras)
@@ -146,7 +162,9 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     setHeaders([]);
     setMapping({
       empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
-      telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+      telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
+      cidade: '', uf: '', cep: '',
+      nome_contato: '', sobrenome_contato: '', cargo: '',
       classificacao: '', data_criacao: '',
     });
     setExtras({});
@@ -278,7 +296,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           cnpj: cnpj || undefined,
           email: get('email') || undefined,
           telefone: get('telefone') || undefined,
-          endereco: get('endereco') || undefined,
+          logradouro: get('logradouro') || undefined,
+          numero: get('numero') || undefined,
+          complemento: get('complemento') || undefined,
+          bairro: get('bairro') || undefined,
+          cidade: get('cidade') || undefined,
+          uf: get('uf') || undefined,
+          cep: get('cep') || undefined,
           nome_contato: nome_contato || undefined,
           cargo: get('cargo') || undefined,
           classificacao: get('classificacao') || undefined,
@@ -331,6 +355,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             email: r.email || null,
             telefone: r.telefone || null,
             cargo: r.cargo || null,
+            logradouro: r.logradouro || null,
+            numero: r.numero || null,
+            complemento: r.complemento || null,
+            bairro: r.bairro || null,
+            cidade: r.cidade || null,
+            uf: r.uf || null,
+            cep: r.cep || null,
             classificacao: r.classificacao || null,
             data_criacao: r.data_criacao || null,
             campos_extras: r.campos_extras || {},
@@ -340,7 +371,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           const { data: saved, error } = await supabase
             .from('contatos')
             .insert(batch)
-            .select('id,empresa,nome_contato,email,telefone,cargo,classificacao,data_criacao,campos_extras');
+            .select('id,empresa,nome_contato,email,telefone,cargo,logradouro,numero,complemento,bairro,cidade,uf,cep,classificacao,data_criacao,campos_extras');
           if (error) throw error;
           console.debug('[ImportClientes] contatos salvos', saved?.slice(0, 5));
         } else {
@@ -351,7 +382,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             razao_social: r.razao_social || null,
             email: r.email || null,
             telefone: r.telefone || null,
-            endereco: r.endereco || null,
+            logradouro: r.logradouro || null,
+            numero: r.numero || null,
+            complemento: r.complemento || null,
+            bairro: r.bairro || null,
+            cidade: r.cidade || null,
+            uf: r.uf || null,
+            cep: r.cep || null,
             nome_contato: r.nome_contato || null,
             classificacao: r.classificacao || null,
             data_criacao: r.data_criacao || null,
@@ -364,7 +401,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           if (cnpjs.length > 0) {
             const { data: existingRows, error: existingError } = await supabase
               .from('clientes')
-              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras,usuario_id')
+              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras,usuario_id')
               .in('cnpj', cnpjs)
               .eq('usuario_id', vid);
             if (existingError) throw existingError;
@@ -386,7 +423,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               razao_social: hasValue(incoming.razao_social) ? incoming.razao_social : existing.razao_social,
               email: hasValue(incoming.email) ? incoming.email : existing.email,
               telefone: hasValue(incoming.telefone) ? incoming.telefone : existing.telefone,
-              endereco: hasValue(incoming.endereco) ? incoming.endereco : existing.endereco,
+              logradouro: hasValue(incoming.logradouro) ? incoming.logradouro : existing.logradouro,
+              numero: hasValue(incoming.numero) ? incoming.numero : existing.numero,
+              complemento: hasValue(incoming.complemento) ? incoming.complemento : existing.complemento,
+              bairro: hasValue(incoming.bairro) ? incoming.bairro : existing.bairro,
+              cidade: hasValue(incoming.cidade) ? incoming.cidade : existing.cidade,
+              uf: hasValue(incoming.uf) ? incoming.uf : existing.uf,
+              cep: hasValue(incoming.cep) ? incoming.cep : existing.cep,
               nome_contato: hasValue(incoming.nome_contato) ? incoming.nome_contato : existing.nome_contato,
               classificacao: hasValue(incoming.classificacao) ? incoming.classificacao : existing.classificacao,
               data_criacao: hasValue(incoming.data_criacao) ? incoming.data_criacao : existing.data_criacao,
@@ -403,7 +446,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             const { data: saved, error: insertError } = await supabase
               .from('clientes')
               .insert(inserts)
-              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras');
+              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras');
             if (insertError) throw insertError;
             totalSaved = totalSaved.concat(saved || []);
             console.debug('[ImportClientes] clientes novos inseridos', saved?.slice(0, 3));
@@ -415,7 +458,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                 .from('clientes')
                 .update(updateData)
                 .eq('id', id)
-                .select('id,empresa,tipo,cnpj,razao_social,email,telefone,endereco,nome_contato,classificacao,data_criacao,campos_extras');
+                .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras');
               if (updateError) throw updateError;
               totalSaved = totalSaved.concat(saved || []);
             }
@@ -513,7 +556,9 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             onClearAll={() => {
               setMapping({
                 empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
-                telefone: '', endereco: '', nome_contato: '', sobrenome_contato: '', cargo: '',
+                telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
+                cidade: '', uf: '', cep: '',
+                nome_contato: '', sobrenome_contato: '', cargo: '',
                 classificacao: '', data_criacao: '',
               });
               setExtras({});
@@ -576,7 +621,10 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Telefone</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Classif.</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Criado</TableHead>
-                    {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Endereço</TableHead>}
+                    {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Logradouro</TableHead>}
+                    {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Bairro</TableHead>}
+                    {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Cidade</TableHead>}
+                    {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">UF</TableHead>}
                     {target === 'contatos' && <TableHead className="text-xs sticky top-0 bg-muted/50">Cargo</TableHead>}
                     {extraFieldNames.map(name => (
                       <TableHead key={name} className="text-xs sticky top-0 bg-muted/50">{name}</TableHead>
@@ -595,7 +643,10 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                       <TableCell className="text-xs whitespace-nowrap">{r.telefone || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{r.classificacao || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{r.data_criacao || '-'}</TableCell>
-                      {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap max-w-[200px] truncate">{r.endereco || '-'}</TableCell>}
+                      {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap max-w-[200px] truncate">{r.logradouro || '-'}</TableCell>}
+                      {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap">{r.bairro || '-'}</TableCell>}
+                      {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap">{r.cidade || '-'}</TableCell>}
+                      {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap">{r.uf || '-'}</TableCell>}
                       {target === 'contatos' && <TableCell className="text-xs whitespace-nowrap">{r.cargo || '-'}</TableCell>}
                       {extraFieldNames.map(name => (
                         <TableCell key={name} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
