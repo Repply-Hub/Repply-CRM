@@ -28,7 +28,7 @@ import { StatusObrasDialog } from '@/components/obras/StatusObrasDialog';
 import { cn } from '@/lib/utils';
 import { FilterButton } from '@/components/FilterButton';
 import { supabase } from '@/integrations/supabase/client';
-import { SearchableSelect } from '@/components/SearchableSelect';
+import { EmpresaSelector } from '@/components/EmpresaSelector';
 
 const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'nome_obra', label: 'Nome da Obra', locked: false },
