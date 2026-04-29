@@ -1,10 +1,10 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Loader2, MapPin, Building2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useGeocodeObras, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
+import { useGeocodeObras, geocodificar, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
 
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
   const map = useMap();
