@@ -511,12 +511,104 @@ export default function Obras() {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setSelectedObra(null)}>Fechar</Button>
                 <Button onClick={() => {
-                  toast.info("Funcionalidade de edição em desenvolvimento.");
+                  setEditObra({
+                    id: selectedObra.id,
+                    nome_obra: selectedObra.nome_obra,
+                    cliente_id: selectedObra.cliente_id,
+                    endereco_entrega: selectedObra.endereco_entrega || '',
+                    status: selectedObra.status,
+                    spe_cnpj: selectedObra.spe_cnpj || '',
+                  });
+                  setEditDialogOpen(true);
                   setSelectedObra(null);
                 }}>Editar Informações</Button>
               </DialogFooter>
             </DialogContent>
           )}
+        </Dialog>
+
+        {/* Edit Obra Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Obra</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              updateObra.mutate(editObra, {
+                onSuccess: () => {
+                  setEditDialogOpen(false);
+                  toast.success("Obra atualizada com sucesso!");
+                }
+              });
+            }} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nome da Obra</Label>
+                <Input 
+                  required
+                  value={editObra.nome_obra}
+                  onChange={(e) => setEditObra(prev => ({ ...prev, nome_obra: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Cliente Responsável</Label>
+                <Select 
+                  value={editObra.cliente_id} 
+                  onValueChange={(v) => setEditObra(prev => ({ ...prev, cliente_id: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientes?.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.empresa}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select 
+                  value={editObra.status} 
+                  onValueChange={(v) => setEditObra(prev => ({ ...prev, status: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusObras?.map(s => (
+                      <SelectItem key={s.slug} value={s.slug}>{s.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Endereço de Entrega</Label>
+                <Input 
+                  value={editObra.endereco_entrega}
+                  onChange={(e) => setEditObra(prev => ({ ...prev, endereco_entrega: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>SPE / CNPJ</Label>
+                <Input 
+                  value={editObra.spe_cnpj}
+                  onChange={(e) => setEditObra(prev => ({ ...prev, spe_cnpj: e.target.value }))}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+                <Button type="submit" disabled={updateObra.isPending}>
+                  {updateObra.isPending ? "Salvando..." : "Salvar Alterações"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
         </Dialog>
 
         {/* Create Obra Dialog */}
