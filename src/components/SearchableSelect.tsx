@@ -115,7 +115,9 @@ export function SearchableSelect({
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
-                  onClick={() => {
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     onActionClick();
                     setOpen(false);
                   }}
