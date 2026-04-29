@@ -558,14 +558,16 @@ const ClienteDetalhe = () => {
                   <Badge variant="secondary" className="ml-1">{contatosExtras.length}</Badge>
                 )}
               </CardTitle>
-              <Button size="sm" onClick={() => setAddContatoOpen(true)} className="gap-1.5">
-                <Plus className="h-4 w-4" />
-                Adicionar
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setVincularContatoOpen(true)} className="gap-1.5 ml-2">
-                <Users className="h-4 w-4" />
-                Vincular Existente
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setVincularContatoOpen(true)} className="gap-1.5">
+                  <Users className="h-4 w-4" />
+                  Vincular Existente
+                </Button>
+                <Button size="sm" onClick={() => setAddContatoOpen(true)} className="gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  Adicionar
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-border overflow-hidden mb-4">
