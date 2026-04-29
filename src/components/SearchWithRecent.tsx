@@ -8,12 +8,19 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
+interface AddressSuggestion {
+  display_name: string;
+  lat: string;
+  lon: string;
+}
+
 interface SearchWithRecentProps {
   value: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
   storageKey: string;
   className?: string;
+  showAddressSuggestions?: boolean;
 }
 
 export function SearchWithRecent({
