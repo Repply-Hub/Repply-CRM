@@ -275,7 +275,7 @@ const ClienteDetalhe = () => {
               <div>
                 <Label>Tipo</Label>
                 <Select value={editData.tipo} onValueChange={v => setEditData(d => ({ ...d, tipo: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="construtora">Construtora</SelectItem>
                     <SelectItem value="loja">Loja</SelectItem>
