@@ -267,6 +267,17 @@ export default function Obras() {
                         </div>
                       ))}
                     </div>
+                    <div className="pt-2 border-t mt-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full justify-start gap-2 h-8 text-xs font-medium text-muted-foreground hover:text-foreground"
+                        onClick={() => setStatusDialogOpen(true)}
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                        Gerenciar Status
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="w-[200px] p-4 space-y-2">
