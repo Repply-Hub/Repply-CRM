@@ -393,11 +393,12 @@ export function ColumnSettings({
                                 )}
                             </Droppable>
                         </DragDropContext>
-                    </div>
-                )}
+                    </ScrollArea>
+                </div>
+            )}
 
-                {(onSavePreset || presets.length > 0) && (
-                    <div className="w-[280px] p-2 bg-muted/5 flex flex-col">
+            {(onSavePreset || presets.length > 0) && (
+                <div className="w-[280px] p-2 bg-muted/5 flex flex-col">
                         <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Modelos</span>
                             {onSavePreset && !isSavingPreset && (
