@@ -126,7 +126,7 @@ const Emails = () => {
     },
   });
 
-  const { data: emails, isLoading } = useQuery({
+  const { data: emails, isLoading: isSentLoading } = useQuery({
     queryKey: ["emails", searchTerm],
     queryFn: async () => {
       let query = supabase
@@ -139,6 +139,19 @@ const Emails = () => {
       }
 
       const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: receivedEmails, isLoading: isReceivedLoading } = useQuery({
+    queryKey: ["received_emails"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("emails_recebidos")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
       if (error) throw error;
       return data;
     },
