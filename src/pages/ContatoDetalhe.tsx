@@ -23,7 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 const ContatoDetalhe = () => {
   const { slug } = useParams<{ slug: string }>();
-  const id = slug?.includes('-') ? slug.split('-').pop() : slug;
+  const id = slug?.includes('-') ? slug.split('-').reverse()[0] : slug;
   const navigate = useNavigate();
   const { data: contatos, isLoading } = useContatos();
   const { data: clientes } = useClientes();

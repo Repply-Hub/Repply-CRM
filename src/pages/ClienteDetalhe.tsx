@@ -35,7 +35,7 @@ const stageColors: Record<string, string> = {
 
 const ClienteDetalhe = () => {
   const { slug } = useParams<{ slug: string }>();
-  const id = slug?.includes('-') ? slug.split('-').pop() : slug;
+  const id = slug?.includes('-') ? slug.split('-').reverse()[0] : slug;
   const navigate = useNavigate();
   const { data: clientes, isLoading: loadingClientes } = useClientes();
   const { data: pedidos, isLoading: loadingPedidos } = usePedidos();
