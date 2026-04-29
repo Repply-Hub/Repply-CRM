@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { FilterButton } from '@/components/FilterButton';
 import { supabase } from '@/integrations/supabase/client';
 import { EmpresaSelector } from '@/components/EmpresaSelector';
+import { EnderecoAutocomplete } from '@/components/EnderecoAutocomplete';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -618,10 +619,9 @@ export default function Obras() {
 
               <div className="space-y-2">
                 <Label>Endereço de Entrega</Label>
-                <Input 
-                  placeholder="Rua, número, bairro, cidade"
+                <EnderecoAutocomplete
                   value={editObra.endereco_entrega}
-                  onChange={(e) => setEditObra(prev => ({ ...prev, endereco_entrega: e.target.value }))}
+                  onChange={(v) => setEditObra(prev => ({ ...prev, endereco_entrega: v }))}
                 />
               </div>
 
@@ -701,10 +701,9 @@ export default function Obras() {
 
               <div className="space-y-2">
                 <Label>Endereço de Entrega</Label>
-                <Input 
-                  placeholder="Rua, número, bairro, cidade"
+                <EnderecoAutocomplete
                   value={newObra.endereco_entrega}
-                  onChange={(e) => setNewObra(prev => ({ ...prev, endereco_entrega: e.target.value }))}
+                  onChange={(v) => setNewObra(prev => ({ ...prev, endereco_entrega: v }))}
                 />
               </div>
 
