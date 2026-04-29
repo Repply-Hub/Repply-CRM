@@ -39,16 +39,27 @@ const ClienteDetalhe = () => {
     if (!slug) return null;
     const parts = slug.split('-');
     const lastPart = parts[parts.length - 1];
-    // Se a última parte for um UUID (8-4-4-4-12 caracteres), usamos ela. 
-    // Caso contrário, assumimos que o próprio slug pode ser o ID.
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    // Se a última parte for um UUID, priorizamos ela
     if (uuidRegex.test(lastPart)) return lastPart;
+    // Se o slug inteiro for um UUID, usamos ele
     if (uuidRegex.test(slug)) return slug;
+    
     return slug;
   }, [slug]);
+
   const navigate = useNavigate();
   const { data: clientes, isLoading: loadingClientes } = useClientes();
   const { data: pedidos, isLoading: loadingPedidos } = usePedidos();
+  
+  // Debug log para ajudar a identificar o problema
+  console.log('ClienteDetalhe - slug:', slug, 'extracted id:', id);
+  if (clientes) {
+    console.log('ClienteDetalhe - total clientes:', clientes.length);
+    const found = clientes.find(c => c.id === id);
+    console.log('ClienteDetalhe - cliente encontrado:', !!found);
+  }
   const updateCliente = useUpdateCliente();
   const deleteCliente = useDeleteCliente();
   const createContato = useCreateContato();

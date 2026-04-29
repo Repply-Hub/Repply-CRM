@@ -28,12 +28,22 @@ const ContatoDetalhe = () => {
     const parts = slug.split('-');
     const lastPart = parts[parts.length - 1];
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
     if (uuidRegex.test(lastPart)) return lastPart;
     if (uuidRegex.test(slug)) return slug;
+    
     return slug;
   }, [slug]);
+
   const navigate = useNavigate();
   const { data: contatos, isLoading } = useContatos();
+
+  // Debug log
+  console.log('ContatoDetalhe - slug:', slug, 'extracted id:', id);
+  if (contatos) {
+    const found = contatos.find(c => c.id === id);
+    console.log('ContatoDetalhe - contato encontrado:', !!found);
+  }
   const { data: clientes } = useClientes();
   const { data: todosPedidos } = usePedidos();
   const updateContato = useUpdateContato();
