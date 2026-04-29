@@ -265,7 +265,7 @@ function ProfileTab() {
             </CardTitle>
             <CardDescription>Gerencie seu acesso e configurações de segurança</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col justify-between p-6">
+          <CardContent className="flex-1 flex flex-col justify-between p-6 pt-2">
             <div className="space-y-4 pb-6 border-b">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-primary" />
