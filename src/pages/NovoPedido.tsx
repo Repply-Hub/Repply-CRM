@@ -72,6 +72,36 @@ const NovoPedido = () => {
   const [origemDialogOpen, setOrigemDialogOpen] = useState(false);
   const [newOrigemLabel, setNewOrigemLabel] = useState('');
 
+  const DEFAULT_UNIDADES = ['Litro', 'Grama', 'Quilograma', 'Peça', 'Metro quadrado', 'Balde'];
+  const [unidades, setUnidades] = useState<string[]>(() => {
+    const saved = localStorage.getItem('custom_unidades');
+    if (saved) {
+      try { return [...DEFAULT_UNIDADES, ...JSON.parse(saved)]; } catch { return DEFAULT_UNIDADES; }
+    }
+    return DEFAULT_UNIDADES;
+  });
+  const [unidadeDialogOpen, setUnidadeDialogOpen] = useState(false);
+  const [unidadeDialogItemId, setUnidadeDialogItemId] = useState<string | null>(null);
+  const [newUnidadeLabel, setNewUnidadeLabel] = useState('');
+
+  const handleAddUnidade = () => {
+    const nome = newUnidadeLabel.trim();
+    if (!nome) { toast.error('Informe o nome da unidade'); return; }
+    if (unidades.some(u => u.toLowerCase() === nome.toLowerCase())) {
+      toast.error('Esta unidade já existe');
+      return;
+    }
+    const novas = [...unidades, nome];
+    setUnidades(novas);
+    const customs = novas.filter(u => !DEFAULT_UNIDADES.includes(u));
+    localStorage.setItem('custom_unidades', JSON.stringify(customs));
+    if (unidadeDialogItemId) updateItem(unidadeDialogItemId, 'unidade', nome);
+    setNewUnidadeLabel('');
+    setUnidadeDialogOpen(false);
+    setUnidadeDialogItemId(null);
+    toast.success('Unidade adicionada');
+  };
+
   const [step, setStep] = useState(1);
 
   // Step 1 fields
