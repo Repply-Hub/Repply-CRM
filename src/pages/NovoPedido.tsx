@@ -25,7 +25,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/SearchableSelect';
 
-const ORIGENS = [
+const DEFAULT_ORIGENS = [
   { value: 'recompra', label: 'Recompra' },
   { value: 'prospeccao_ativa', label: 'Prospecção Ativa' },
   { value: 'indicacao', label: 'Indicação' },
@@ -55,6 +55,20 @@ const NovoPedido = () => {
   const [fabricanteOpen, setFabricanteOpen] = useState(false);
   const [obraDialogOpen, setObraDialogOpen] = useState(false);
   const [newObraNome, setNewObraNome] = useState('');
+  
+  const [origens, setOrigens] = useState(() => {
+    const saved = localStorage.getItem('custom_origens');
+    if (saved) {
+      try {
+        return [...DEFAULT_ORIGENS, ...JSON.parse(saved)];
+      } catch (e) {
+        return DEFAULT_ORIGENS;
+      }
+    }
+    return DEFAULT_ORIGENS;
+  });
+  const [origemDialogOpen, setOrigemDialogOpen] = useState(false);
+  const [newOrigemLabel, setNewOrigemLabel] = useState('');
 
   const [step, setStep] = useState(1);
 
@@ -246,6 +260,27 @@ const NovoPedido = () => {
     }
   };
 
+  const handleCreateOrigem = () => {
+    if (!newOrigemLabel.trim()) {
+      toast.error('Informe o nome da origem');
+      return;
+    }
+
+    const newValue = newOrigemLabel.toLowerCase().replace(/\s+/g, '_');
+    const newOrigem = { value: newValue, label: newOrigemLabel };
+    
+    const updatedOrigens = [...origens, newOrigem];
+    setOrigens(updatedOrigens);
+    
+    const customOnly = updatedOrigens.filter(o => !DEFAULT_ORIGENS.some(d => d.value === o.value));
+    localStorage.setItem('custom_origens', JSON.stringify(customOnly));
+    
+    setOrigemLead(newValue);
+    setOrigemDialogOpen(false);
+    setNewOrigemLabel('');
+    toast.success('Nova origem adicionada!');
+  };
+
   return (
     <AppLayout
       headerContent={
@@ -337,11 +372,21 @@ const NovoPedido = () => {
 
                   {/* Origem */}
                   <div className="space-y-2">
-                    <Label>Origem</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Origem</Label>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 px-2 text-xs text-primary"
+                        onClick={() => setOrigemDialogOpen(true)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Nova Origem
+                      </Button>
+                    </div>
                     <Select value={origemLead} onValueChange={setOrigemLead}>
                       <SelectTrigger><SelectValue placeholder="Selecionar origem" /></SelectTrigger>
                       <SelectContent>
-                        {ORIGENS.map(o => (
+                        {origens.map(o => (
                           <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -613,6 +658,29 @@ const NovoPedido = () => {
             <Button variant="outline" onClick={() => setObraDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleCreateObra} disabled={createObraMutation.isPending}>
               {createObraMutation.isPending ? 'Criando...' : 'Criar Obra'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={origemDialogOpen} onOpenChange={setOrigemDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Origem</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome da Origem *</Label>
+              <Input 
+                value={newOrigemLabel} 
+                onChange={(e) => setNewOrigemLabel(e.target.value)}
+                placeholder="Ex: Evento de Construção"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrigemDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateOrigem}>
+              Criar Origem
             </Button>
           </DialogFooter>
         </DialogContent>
