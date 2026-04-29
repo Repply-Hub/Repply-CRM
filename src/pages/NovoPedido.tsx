@@ -271,18 +271,12 @@ const NovoPedido = () => {
                 {/* Obra */}
                 <div className="space-y-2">
                   <Label>Obra</Label>
-                  <Select 
-                    value={obraId} 
+                  <SearchableSelect
+                    options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
+                    value={obraId}
                     onValueChange={handleObraChange}
-                    disabled={!clienteId}
-                  >
-                    <SelectTrigger><SelectValue placeholder={clienteId ? "Selecionar obra" : "Selecione um cliente primeiro"} /></SelectTrigger>
-                    <SelectContent>
-                      {(obras ?? []).map(o => (
-                        <SelectItem key={o.id} value={o.id}>{o.nome_obra}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder={clienteId ? "Selecionar obra" : "Selecione um cliente primeiro"}
+                  />
                   {selectedObra?.spe_cnpj && (
                     <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
                   )}
