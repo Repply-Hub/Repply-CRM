@@ -555,19 +555,12 @@ export default function Obras() {
 
               <div className="space-y-2">
                 <Label>Cliente Responsável</Label>
-                <Select 
-                  value={editObra.cliente_id} 
+                <SearchableSelect
+                  options={clientes?.map(c => ({ value: c.id, label: c.empresa })) || []}
+                  value={editObra.cliente_id}
                   onValueChange={(v) => setEditObra(prev => ({ ...prev, cliente_id: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes?.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.empresa}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Selecione o cliente"
+                />
               </div>
 
               <div className="space-y-2">
