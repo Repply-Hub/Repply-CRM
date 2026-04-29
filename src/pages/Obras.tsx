@@ -57,7 +57,16 @@ export default function Obras() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [newObra, setNewObra] = useState({
+    nome_obra: '',
+    cliente_id: '',
+    endereco_entrega: '',
+    status: '',
+    spe_cnpj: '',
+  });
+  const [editObra, setEditObra] = useState({
+    id: '',
     nome_obra: '',
     cliente_id: '',
     endereco_entrega: '',
