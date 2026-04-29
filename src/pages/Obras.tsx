@@ -175,8 +175,8 @@ export default function Obras() {
     >
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-2">
               <TabsList className="shrink-0">
                 <TabsTrigger value="lista" className="gap-2">
                   <List className="h-4 w-4" /> Lista
@@ -195,9 +195,42 @@ export default function Obras() {
               >
                 <Settings2 className="h-4 w-4" />
               </Button>
+
+              <div className="flex bg-muted p-1 rounded-md">
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={cn("p-1.5 rounded-sm transition-all", viewMode === 'cards' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")}
+                  title="Visualização em Cards"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={cn("p-1.5 rounded-sm transition-all", viewMode === 'table' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")}
+                  title="Visualização em Tabela"
+                >
+                  <TableIcon className="h-4 w-4" />
+                </button>
+              </div>
+
+              <ColumnSettings
+                columns={columns}
+                visibleColumns={visibleColumns}
+                onChange={setVisibleColumns}
+                onRename={handleRename}
+                onTypeChange={handleTypeChange}
+                onReorder={handleReorder}
+                onAdd={handleAddColumn}
+                onRemove={handleRemoveColumn}
+                presets={presets}
+                onSavePreset={savePreset}
+                onLoadPreset={loadPreset}
+                onDeletePreset={deletePreset}
+                className="h-10"
+              />
             </div>
 
-            <div className="flex flex-1 items-center gap-2 max-w-2xl">
+            <div className="flex flex-1 items-center gap-2 max-w-full lg:max-w-2xl">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
