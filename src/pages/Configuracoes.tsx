@@ -265,8 +265,8 @@ function ProfileTab() {
             </CardTitle>
             <CardDescription>Gerencie seu acesso e configurações de segurança</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 space-y-8 flex flex-col">
-            <div className="space-y-4 flex-1">
+          <CardContent className="flex-1 flex flex-col justify-between p-6">
+            <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-primary" />
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">E-mail</h3>
@@ -285,7 +285,7 @@ function ProfileTab() {
               </form>
             </div>
 
-            <div className="space-y-4 pt-6 border-t">
+            <div className="space-y-4 py-8 border-y my-auto">
               <div className="flex items-center gap-2">
                 <Lock className="h-4 w-4 text-primary" />
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Alterar Senha</h3>
@@ -308,7 +308,7 @@ function ProfileTab() {
               </form>
             </div>
 
-            <div className="space-y-4 pt-6 border-t mt-auto">
+            <div className="space-y-4 pt-6">
               <div className="flex items-center gap-2 text-destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <h3 className="text-sm font-semibold uppercase tracking-wider">Zona de Perigo</h3>
