@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { FilterButton } from '@/components/FilterButton';
 import { Filter } from 'lucide-react';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'imagem', label: 'Imagem', locked: false },
