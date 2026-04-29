@@ -393,21 +393,23 @@ export function ColumnSettings({
                                 )}
                             </Droppable>
                         </DragDropContext>
-                    </ScrollArea>
+                    </div>
+                )}
 
-                    {(onSavePreset || presets.length > 0) && (
-                        <div className="p-3 border-t border-border/50 bg-muted/5 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Modelos</span>
-                                {onSavePreset && !isSavingPreset && (
-                                    <button
-                                        onClick={() => setIsSavingPreset(true)}
-                                        className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
-                                    >
-                                        <Save className="h-3 w-3" /> Salvar atual
-                                    </button>
-                                )}
-                            </div>
+                {(onSavePreset || presets.length > 0) && (
+                    <div className="w-[280px] p-2 bg-muted/5 flex flex-col">
+                        <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
+                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Modelos</span>
+                            {onSavePreset && !isSavingPreset && (
+                                <button
+                                    onClick={() => setIsSavingPreset(true)}
+                                    className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                >
+                                    <Save className="h-3 w-3" /> Salvar atual
+                                </button>
+                            )}
+                        </div>
+                        <div className="p-2 flex-1 overflow-hidden flex flex-col space-y-3">
 
                             {isSavingPreset && (
                                 <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
