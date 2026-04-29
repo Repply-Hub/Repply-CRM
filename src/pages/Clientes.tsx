@@ -532,53 +532,56 @@ const Clientes = () => {
             />
           </div>
 
-          <FilterButton
+          <FilterButton 
             hasFilters={hasFilters}
             activeFilterCount={activeFilterCount}
             onClear={() => {
               setTipoFilter('todos');
               setSearch('');
             }}
+            popoverClassName="w-auto p-0"
           >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs uppercase text-muted-foreground font-semibold">Tipo</Label>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 px-2 text-[10px] text-primary hover:text-primary hover:bg-primary/5"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNewTipoTarget('filter');
-                    setNewTipoOpen(true);
-                  }}
-                >
-                  Gerenciar
-                </Button>
+            <div className="flex divide-x divide-border/50">
+              <div className="w-[280px] p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Tipo</Label>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 px-2 text-[10px] text-primary hover:text-primary hover:bg-primary/5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNewTipoTarget('filter');
+                      setNewTipoOpen(true);
+                    }}
+                  >
+                    Gerenciar
+                  </Button>
+                </div>
+                <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1); }}>
+                  <SelectTrigger className="w-full h-9">
+                    <SelectValue placeholder="Todos os tipos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tipoFilterOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1); }}>
-                <SelectTrigger className="w-full h-9">
-                  <SelectValue placeholder="Todos os tipos" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tipoFilterOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
-            <div className="space-y-2 border-t pt-4">
-              <Label className="text-xs uppercase text-muted-foreground font-semibold">Ordenação</Label>
-              <Select value={sortOrder} onValueChange={(v: 'asc' | 'desc') => setSortOrder(v)}>
-                <SelectTrigger className="w-full h-9">
-                  <SelectValue placeholder="Ordenar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="asc">Nome (A-Z)</SelectItem>
-                  <SelectItem value="desc">Nome (Z-A)</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="w-[200px] p-4 space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground font-semibold">Ordenação</Label>
+                <Select value={sortOrder} onValueChange={(v: 'asc' | 'desc') => setSortOrder(v)}>
+                  <SelectTrigger className="w-full h-9">
+                    <SelectValue placeholder="Ordenar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="asc">Nome (A-Z)</SelectItem>
+                    <SelectItem value="desc">Nome (Z-A)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </FilterButton>
 
