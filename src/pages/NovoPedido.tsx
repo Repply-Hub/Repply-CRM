@@ -21,6 +21,7 @@ import { FabricanteSelector } from '@/components/FabricanteSelector';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 const ORIGENS = [
   { value: 'recompra', label: 'Recompra' },
