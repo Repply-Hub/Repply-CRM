@@ -57,6 +57,7 @@ export default function Obras() {
   const { data: clientes } = useClientes();
   const createObra = useCreateObra();
   const updateObra = useUpdateObra();
+  const deleteObra = useDeleteObra();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
@@ -70,6 +71,8 @@ export default function Obras() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const [newObra, setNewObra] = useState({
     nome_obra: '',
     cliente_id: '',
@@ -133,7 +136,6 @@ export default function Obras() {
     let list = [...obras];
 
     const pageSizeNumber = Number(pageSize);
-    const totalPages = Math.ceil(list.length / pageSizeNumber);
 
     if (search) {
       const q = search.toLowerCase();
@@ -353,9 +355,20 @@ export default function Obras() {
                       return (
                         <Card 
                           key={obra.id} 
-                          className="flex flex-col cursor-pointer hover:border-primary/50 transition-colors group"
+                          className="flex flex-col cursor-pointer hover:border-primary/50 transition-colors group relative"
                           onClick={() => setSelectedObra(obra)}
                         >
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDeleteId(obra.id);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between gap-2">
                               <CardTitle className="text-base font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors">
@@ -436,6 +449,19 @@ export default function Obras() {
                                   {colId === 'endereco' && (obra.endereco_entrega || '—')}
                                   {colId === 'spe_cnpj' && (obra.spe_cnpj || '—')}
                                   {colId === 'created_at' && format(new Date(obra.created_at), "dd/MM/yyyy")}
+                                  {colId === 'actions' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setConfirmDeleteId(obra.id);
+                                      }}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
                                   {colId.startsWith('custom_') && (camposExtras[colId] || '—')}
                                 </td>
                               ))}
@@ -689,6 +715,18 @@ export default function Obras() {
                   value={newObra.spe_cnpj}
                   onChange={(e) => setNewObra(prev => ({ ...prev, spe_cnpj: e.target.value }))}
                 />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+                <Button type="submit" disabled={createObra.isPending}>
+                  {createObra.isPending ? "Salvando..." : "Criar Obra"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && setConfirmDeleteId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -718,17 +756,6 @@ export default function Obras() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={createObra.isPending}>
-                  {createObra.isPending ? "Salvando..." : "Criar Obra"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
       </div>
     </AppLayout>
   );
