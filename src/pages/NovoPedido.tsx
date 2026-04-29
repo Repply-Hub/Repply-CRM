@@ -372,11 +372,21 @@ const NovoPedido = () => {
 
                   {/* Origem */}
                   <div className="space-y-2">
-                    <Label>Origem</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Origem</Label>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 px-2 text-xs text-primary"
+                        onClick={() => setOrigemDialogOpen(true)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Nova Origem
+                      </Button>
+                    </div>
                     <Select value={origemLead} onValueChange={setOrigemLead}>
                       <SelectTrigger><SelectValue placeholder="Selecionar origem" /></SelectTrigger>
                       <SelectContent>
-                        {ORIGENS.map(o => (
+                        {origens.map(o => (
                           <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                         ))}
                       </SelectContent>
