@@ -546,6 +546,7 @@ export default function Obras() {
                 <Label>Nome da Obra</Label>
                 <Input 
                   required
+                  placeholder="Ex: Edifício Horizonte"
                   value={editObra.nome_obra}
                   onChange={(e) => setEditObra(prev => ({ ...prev, nome_obra: e.target.value }))}
                 />
@@ -558,7 +559,7 @@ export default function Obras() {
                   onValueChange={(v) => setEditObra(prev => ({ ...prev, cliente_id: v }))}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione o cliente" />
                   </SelectTrigger>
                   <SelectContent>
                     {clientes?.map(c => (
@@ -575,7 +576,7 @@ export default function Obras() {
                   onValueChange={(v) => setEditObra(prev => ({ ...prev, status: v }))}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
                     {statusObras?.map(s => (
@@ -588,6 +589,7 @@ export default function Obras() {
               <div className="space-y-2">
                 <Label>Endereço de Entrega</Label>
                 <Input 
+                  placeholder="Rua, número, bairro, cidade"
                   value={editObra.endereco_entrega}
                   onChange={(e) => setEditObra(prev => ({ ...prev, endereco_entrega: e.target.value }))}
                 />
@@ -596,6 +598,7 @@ export default function Obras() {
               <div className="space-y-2">
                 <Label>SPE / CNPJ</Label>
                 <Input 
+                  placeholder="00.000.000/0000-00"
                   value={editObra.spe_cnpj}
                   onChange={(e) => setEditObra(prev => ({ ...prev, spe_cnpj: e.target.value }))}
                 />
