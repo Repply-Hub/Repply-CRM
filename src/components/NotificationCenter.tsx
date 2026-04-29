@@ -77,6 +77,7 @@ export function NotificationCenter() {
     if (now - lastToastTime.current < 10 * 60 * 1000) return;
 
     lastToastTime.current = now;
+    localStorage.setItem('last_notif_toast', now.toString());
     const followups = unread.filter(n => n.tipo === 'followup').length;
     const inativos = unread.filter(n => n.tipo === 'inatividade').length;
     const parts: string[] = [];
