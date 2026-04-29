@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
+import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCreatePedidoCompleto, useCreateFabricanteCompleto } from '@/hooks/use-novo-pedido';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { supabase } from '@/integrations/supabase/client';
