@@ -31,7 +31,7 @@ import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cn
 import { EnderecoForm } from '@/components/EnderecoForm';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/ListPagination';
-import { cn } from '@/lib/utils';
+import { cn, slugify } from '@/lib/utils';
 import { ExportClientesButton } from '@/components/ExportClientesButton';
 import { FilterButton } from '@/components/FilterButton';
 
@@ -883,9 +883,14 @@ const Clientes = () => {
                           const column = columns.find(col => col.id === colId);
                           let value: any = getColumnValue(client as any, column);
                           
+                          const navigateToDetail = () => {
+                            const slug = slugify(client.empresa || 'cliente');
+                            navigate(`/clientes/${slug}-${client.id}`);
+                          };
+
                           if (colId === 'empresa') {
                             return (
-                              <td key={colId} className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
+                              <td key={colId} className="py-2.5 px-4" onClick={navigateToDetail}>
                                 <div className="flex items-center gap-2.5">
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <Icon className="h-4 w-4 text-primary" />
@@ -898,7 +903,7 @@ const Clientes = () => {
 
                           if (colId === 'tipo') {
                             return (
-                              <td key={colId} className="py-2.5 px-4" onClick={() => navigate(`/clientes/${client.id}`)}>
+                              <td key={colId} className="py-2.5 px-4" onClick={navigateToDetail}>
                                 <Badge variant="secondary" className="text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
                               </td>
                             );
@@ -906,14 +911,14 @@ const Clientes = () => {
                           
                           if (colId === 'obras_count') {
                             return (
-                              <td key={colId} className="py-2.5 px-4 text-xs" onClick={() => navigate(`/clientes/${client.id}`)}>
+                              <td key={colId} className="py-2.5 px-4 text-xs" onClick={navigateToDetail}>
                                 {client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}
                               </td>
                             );
                           }
 
                           return (
-                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap" onClick={() => navigate(`/clientes/${client.id}`)}>
+                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap" onClick={navigateToDetail}>
                               {value || '—'}
                             </td>
                           );
@@ -979,8 +984,12 @@ const Clientes = () => {
                           const value: any = getColumnValue(contato as any, column);
 
                           if (colId === 'nome_contato') {
+                            const navigateToContatoDetail = () => {
+                              const slug = slugify(contato.nome_contato || 'contato');
+                              navigate(`/contatos/${slug}-${contato.id}`);
+                            };
                             return (
-                              <td key={colId} className="py-2.5 px-4" onClick={() => navigate(`/contatos/${contato.id}`)}>
+                              <td key={colId} className="py-2.5 px-4" onClick={navigateToContatoDetail}>
                                 <div className="flex items-center gap-2.5">
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <User className="h-4 w-4 text-primary" />
@@ -992,7 +1001,10 @@ const Clientes = () => {
                           }
 
                           return (
-                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap" onClick={() => navigate(`/contatos/${contato.id}`)}>
+                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap" onClick={() => {
+                              const slug = slugify(contato.nome_contato || 'contato');
+                              navigate(`/contatos/${slug}-${contato.id}`);
+                            }}>
                               {value || '—'}
                             </td>
                           );
