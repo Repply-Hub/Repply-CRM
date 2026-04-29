@@ -23,7 +23,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Geocodifica endereços usando Nominatim (OpenStreetMap) - gratuito, sem API key.
  * Respeita o rate limit de 1 req/seg e cacheia o resultado em obras.latitude/longitude.
  */
-async function geocodificar(endereco: string): Promise<{ lat: number; lng: number } | null> {
+export async function geocodificar(endereco: string): Promise<{ lat: number; lng: number } | null> {
   try {
     // Tenta primeiro o endereço completo
     let query = encodeURIComponent(endereco);
