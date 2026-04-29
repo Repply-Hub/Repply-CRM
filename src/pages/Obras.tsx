@@ -306,40 +306,7 @@ export default function Obras() {
           </div>
 
           <TabsContent value="lista" className="space-y-6 mt-0">
-            {/* View specific controls */}
-            <div className="flex items-center justify-end gap-3">
-              <div className="flex bg-muted p-1 rounded-md">
-                <button
-                  onClick={() => setViewMode('cards')}
-                  className={cn("p-1.5 rounded-sm transition-all", viewMode === 'cards' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")}
-                  title="Visualização em Cards"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={cn("p-1.5 rounded-sm transition-all", viewMode === 'table' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")}
-                  title="Visualização em Tabela"
-                >
-                  <TableIcon className="h-4 w-4" />
-                </button>
-              </div>
-              <ColumnSettings
-                columns={columns}
-                visibleColumns={visibleColumns}
-                onChange={setVisibleColumns}
-                onRename={handleRename}
-                onTypeChange={handleTypeChange}
-                onReorder={handleReorder}
-                onAdd={handleAddColumn}
-                onRemove={handleRemoveColumn}
-                presets={presets}
-                onSavePreset={savePreset}
-                onLoadPreset={loadPreset}
-                onDeletePreset={deletePreset}
-                className="h-10"
-              />
-            </div>
+            {/* View specific controls removed - integrated into header above */}
 
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
