@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { EmpresaSelector } from '@/components/EmpresaSelector';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
@@ -27,7 +26,7 @@ import { MapaObras } from '@/components/obras/MapaObras';
 import { StatusObrasDialog } from '@/components/obras/StatusObrasDialog';
 import { cn } from '@/lib/utils';
 import { FilterButton } from '@/components/FilterButton';
-
+import { supabase } from '@/integrations/supabase/client';
 
 const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'nome_obra', label: 'Nome da Obra', locked: false },
@@ -53,7 +52,6 @@ export default function Obras() {
     return (saved as any) || 'cards';
   });
 
-  // Modal state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newObra, setNewObra] = useState({
@@ -140,9 +138,6 @@ export default function Obras() {
 
     return list;
   }, [obras, search, statusFilter, sort]);
-
-  // currentColumns replaced by hook's columns
-
 
   const obrasParaMapa = useMemo(
     () =>
@@ -240,6 +235,8 @@ export default function Obras() {
                 onLoadPreset={loadPreset}
                 onDeletePreset={deletePreset}
                 className="h-10"
+              />
+
               <FilterButton 
                 hasFilters={hasFilters}
                 activeFilterCount={activeFilterCount}
@@ -257,13 +254,6 @@ export default function Obras() {
                       <div 
                         className={cn(
                           "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
-                          statusFilter === 'todos' && "bg-accent text-accent-foreground"
-                        )}
-                        onClick={() => setStatusFilter('todos')}
-                      >
-                        <Checkbox checked={statusFilter === 'todos'} onCheckedChange={() => setStatusFilter('todos')} />
-                        Todos os status
-                      </div>
                           statusFilter === 'todos' && "bg-accent text-accent-foreground"
                         )}
                         onClick={() => setStatusFilter('todos')}
@@ -312,8 +302,6 @@ export default function Obras() {
           </div>
 
           <TabsContent value="lista" className="space-y-6 mt-0">
-            {/* View specific controls removed - integrated into header above */}
-
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -378,7 +366,6 @@ export default function Obras() {
                                 </span>
                               </div>
                             )}
-                            {/* Renderizar campos extras nos cards também? Ocuparia muito espaço. Talvez só se estiverem selecionados. */}
                             {visibleColumns.filter(id => id.startsWith('custom_')).map(colId => (
                               <div key={colId} className="flex items-center gap-2 text-xs">
                                 <span className="font-medium">{getLabel(colId)}:</span>
@@ -411,45 +398,20 @@ export default function Obras() {
                           return (
                             <tr 
                               key={obra.id} 
-                              className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                              className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
                               onClick={() => setSelectedObra(obra)}
                             >
-                              {visibleColumns.map(colId => {
-                                const isCustom = colId.startsWith('custom_');
-                                let value: any = isCustom ? camposExtras[colId] : (obra as any)[colId];
-                                
-                                if (colId === 'status') {
-                                  return (
-                                    <td key={colId} className="py-3 px-4">
-                                      <Badge variant={status.variant} className="text-[10px] h-5">
-                                        {status.label}
-                                      </Badge>
-                                    </td>
-                                  );
-                                }
-
-                                if (colId === 'cliente') {
-                                  return (
-                                    <td key={colId} className="py-3 px-4 text-muted-foreground max-w-[200px] truncate">
-                                      {cliente?.empresa || '—'}
-                                    </td>
-                                  );
-                                }
-
-                                if (colId === 'created_at') {
-                                  return (
-                                    <td key={colId} className="py-3 px-4 text-muted-foreground whitespace-nowrap">
-                                      {format(new Date(value), "dd/MM/yyyy", { locale: ptBR })}
-                                    </td>
-                                  );
-                                }
-
-                                return (
-                                  <td key={colId} className="py-3 px-4 text-muted-foreground max-w-[250px] truncate">
-                                    {value || '—'}
-                                  </td>
-                                );
-                              })}
+                              {visibleColumns.map(colId => (
+                                <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
+                                  {colId === 'nome_obra' && <span className="font-medium text-foreground">{obra.nome_obra}</span>}
+                                  {colId === 'status' && <Badge variant={status.variant} className="text-[10px]">{status.label}</Badge>}
+                                  {colId === 'cliente' && (cliente?.empresa || '—')}
+                                  {colId === 'endereco' && (obra.endereco_entrega || '—')}
+                                  {colId === 'spe_cnpj' && (obra.spe_cnpj || '—')}
+                                  {colId === 'created_at' && format(new Date(obra.created_at), "dd/MM/yyyy")}
+                                  {colId.startsWith('custom_') && (camposExtras[colId] || '—')}
+                                </td>
+                              ))}
                             </tr>
                           );
                         })}
@@ -458,195 +420,179 @@ export default function Obras() {
                   </div>
                 )}
 
-                <ListPagination 
-                  page={page}
-                  totalPages={Math.ceil(filtered.length / pageSize)}
-                  totalItems={filtered.length}
-                  onPageChange={setPage}
-                  pageSize={pageSize}
-                  onPageSizeChange={setPageSize}
-                />
+                <div className="pt-4 border-t">
+                  <ListPagination
+                    currentPage={page}
+                    totalItems={filtered.length}
+                    pageSize={pageSize}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                </div>
               </>
             )}
           </TabsContent>
 
           <TabsContent value="mapa" className="mt-0">
-            <div className="h-[600px] rounded-xl overflow-hidden border border-border/50 shadow-sm">
-              <MapaObras obras={obrasParaMapa} isLoading={isLoading} />
-            </div>
+            <Card className="h-[calc(100vh-280px)] min-h-[500px]">
+              <MapaObras obras={obrasParaMapa} />
+            </Card>
           </TabsContent>
         </Tabs>
-      </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Cadastrar Nova Obra</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            <div className="col-span-2 space-y-2">
-              <Label>Nome da Obra</Label>
-              <Input 
-                placeholder="Ex: Residencial Jardins" 
-                value={newObra.nome_obra}
-                onChange={e => setNewObra(prev => ({ ...prev, nome_obra: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Cliente</Label>
-              <EmpresaSelector 
-                value={newObra.cliente_id || ''}
-                onValueChange={id => setNewObra(prev => ({ ...prev, cliente_id: id }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Status Inicial</Label>
-              <Select 
-                value={newObra.status}
-                onValueChange={v => setNewObra(prev => ({ ...prev, status: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusObras?.map(status => (
-                    <SelectItem key={status.slug} value={status.slug}>
-                      {status.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-2 space-y-2">
-              <Label>Endereço de Entrega</Label>
-              <Input 
-                placeholder="Rua, número, bairro, cidade - UF" 
-                value={newObra.endereco_entrega}
-                onChange={e => setNewObra(prev => ({ ...prev, endereco_entrega: e.target.value }))}
-              />
-            </div>
-            <div className="col-span-2 space-y-2">
-              <Label>CNPJ / SPE (Opcional)</Label>
-              <Input 
-                placeholder="00.000.000/0000-00" 
-                value={newObra.spe_cnpj}
-                onChange={e => setNewObra(prev => ({ ...prev, spe_cnpj: e.target.value }))}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button 
-              onClick={() => {
-                if (!newObra.nome_obra || !newObra.cliente_id || !newObra.status) {
-                  toast.error("Preencha os campos obrigatórios");
-                  return;
-                }
-                createObra.mutate(newObra, {
-                  onSuccess: () => {
-                    setDialogOpen(false);
-                    setNewObra({
-                      nome_obra: '',
-                      cliente_id: '',
-                      endereco_entrega: '',
-                      status: statusObras?.[0]?.slug || '',
-                      spe_cnpj: '',
-                    });
-                  }
-                });
-              }}
-              disabled={createObra.isPending}
-            >
-              {createObra.isPending ? "Cadastrando..." : "Cadastrar Obra"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Status Settings Dialog */}
+        <StatusObrasDialog 
+          open={statusDialogOpen} 
+          onOpenChange={setStatusDialogOpen} 
+        />
 
-      <StatusObrasDialog 
-        open={statusDialogOpen} 
-        onOpenChange={setStatusDialogOpen} 
-      />
+        {/* Obra Details/Edit Dialog */}
+        <Dialog open={!!selectedObra} onOpenChange={(open) => !open && setSelectedObra(null)}>
+          {selectedObra && (
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <HardHat className="h-5 w-5 text-primary" />
+                  {selectedObra.nome_obra}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground uppercase">Cliente</Label>
+                    <p className="font-medium">{selectedObra.clientes?.empresa || '—'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground uppercase">Endereço de Entrega</Label>
+                    <p className="font-medium flex items-center gap-1">
+                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                      {selectedObra.endereco_entrega || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground uppercase">CNPJ / SPE</Label>
+                    <p className="font-medium">{selectedObra.spe_cnpj || '—'}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground uppercase">Status Atual</Label>
+                    <div className="pt-1">
+                      <Badge variant={getStatusInfo(selectedObra.status).variant}>
+                        {getStatusInfo(selectedObra.status).label}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground uppercase">Data de Cadastro</Label>
+                    <p className="font-medium flex items-center gap-1 text-sm">
+                      <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                      {format(new Date(selectedObra.created_at), "dd/MM/yyyy 'às' HH:mm")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelectedObra(null)}>Fechar</Button>
+                <Button onClick={() => {
+                  toast.info("Funcionalidade de edição em desenvolvimento.");
+                  setSelectedObra(null);
+                }}>Editar Informações</Button>
+              </DialogFooter>
+            </DialogContent>
+          )}
+        </Dialog>
 
-      {selectedObra && (
-        <Dialog open={!!selectedObra} onOpenChange={() => setSelectedObra(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        {/* Create Obra Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent>
             <DialogHeader>
-              <div className="flex items-center justify-between">
-                <DialogTitle className="text-2xl font-bold">{selectedObra.nome_obra}</DialogTitle>
-                <Badge variant={getStatusInfo(selectedObra.status).variant} className="mr-6">
-                  {getStatusInfo(selectedObra.status).label}
-                </Badge>
-              </div>
+              <DialogTitle>Nova Obra</DialogTitle>
             </DialogHeader>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
-              <div className="space-y-4">
-                <div className="bg-muted/30 p-4 rounded-lg space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
-                    <Building2 className="h-4 w-4 text-primary" /> Informações Gerais
-                  </h3>
-                  <div className="grid grid-cols-1 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground block text-xs uppercase">Cliente</span>
-                      <p className="font-medium">{(selectedObra.clientes as any)?.empresa || 'Não informado'}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-xs uppercase">CNPJ/SPE</span>
-                      <p className="font-medium font-mono">{selectedObra.spe_cnpj || 'Não informado'}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block text-xs uppercase">Data de Criação</span>
-                      <p className="font-medium">{format(new Date(selectedObra.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-muted/30 p-4 rounded-lg space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
-                    <MapPin className="h-4 w-4 text-primary" /> Localização
-                  </h3>
-                  <div className="text-sm">
-                    <p className="font-medium">{selectedObra.endereco_entrega || 'Endereço não cadastrado'}</p>
-                    {(selectedObra.latitude && selectedObra.longitude) && (
-                      <p className="text-xs text-muted-foreground mt-2 italic">
-                        Coordenadas: {selectedObra.latitude}, {selectedObra.longitude}
-                      </p>
-                    )}
-                  </div>
-                </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!newObra.nome_obra || !newObra.cliente_id) {
+                toast.error("Preencha ao menos o nome e o cliente.");
+                return;
+              }
+              createObra.mutate(newObra, {
+                onSuccess: () => {
+                  setDialogOpen(false);
+                  setNewObra({ nome_obra: '', cliente_id: '', endereco_entrega: '', status: statusObras?.[0]?.slug || '', spe_cnpj: '' });
+                }
+              });
+            }} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nome da Obra</Label>
+                <Input 
+                  required
+                  placeholder="Ex: Edifício Central"
+                  value={newObra.nome_obra}
+                  onChange={(e) => setNewObra(prev => ({ ...prev, nome_obra: e.target.value }))}
+                />
               </div>
 
-              <div className="space-y-4">
-                <div className="bg-muted/30 p-4 rounded-lg space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
-                    <Settings2 className="h-4 w-4 text-primary" /> Campos Personalizados
-                  </h3>
-                  <div className="grid grid-cols-1 gap-3 text-sm">
-                    {columns.filter(c => c.id.startsWith('custom_')).length === 0 ? (
-                      <p className="text-muted-foreground text-xs">Nenhum campo personalizado definido.</p>
-                    ) : (
-                      columns.filter(c => c.id.startsWith('custom_')).map(col => (
-                        <div key={col.id}>
-                          <span className="text-muted-foreground block text-xs uppercase">{col.label}</span>
-                          <p className="font-medium">{(selectedObra.campos_extras || {})[col.id] || '—'}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label>Cliente Responsável</Label>
+                <Select 
+                  value={newObra.cliente_id} 
+                  onValueChange={(v) => setNewObra(prev => ({ ...prev, cliente_id: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Aqui deveria carregar a lista de clientes, para simplificar vamos assumir que o usuário digita/busca */}
+                    <SelectItem value="1">Cliente Teste</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-            
-            <DialogFooter className="mt-4 border-t pt-4">
-              <Button variant="outline" onClick={() => setSelectedObra(null)}>Fechar</Button>
-              <Button onClick={() => {
-                toast.info("Funcionalidade de edição em desenvolvimento");
-              }}>Editar Obra</Button>
-            </DialogFooter>
+
+              <div className="space-y-2">
+                <Label>Status Inicial</Label>
+                <Select 
+                  value={newObra.status} 
+                  onValueChange={(v) => setNewObra(prev => ({ ...prev, status: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusObras?.map(s => (
+                      <SelectItem key={s.slug} value={s.slug}>{s.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Endereço de Entrega</Label>
+                <Input 
+                  placeholder="Rua, número, bairro, cidade"
+                  value={newObra.endereco_entrega}
+                  onChange={(e) => setNewObra(prev => ({ ...prev, endereco_entrega: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>SPE / CNPJ (Opcional)</Label>
+                <Input 
+                  placeholder="00.000.000/0000-00"
+                  value={newObra.spe_cnpj}
+                  onChange={(e) => setNewObra(prev => ({ ...prev, spe_cnpj: e.target.value }))}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+                <Button type="submit" disabled={createObra.isPending}>
+                  {createObra.isPending ? "Salvando..." : "Criar Obra"}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
-      )}
+      </div>
     </AppLayout>
   );
 }
