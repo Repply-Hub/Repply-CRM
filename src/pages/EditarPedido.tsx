@@ -207,6 +207,7 @@ const EditarPedido = () => {
         fabricante_id: fabricanteId,
         usuario_id: vendedorId,
         obra_id: obraId || undefined,
+        status: status,
         data_pedido: format(dataPedido, 'yyyy-MM-dd'),
         prazo_resposta: prazoResposta ? format(prazoResposta, 'yyyy-MM-dd') : undefined,
         origem_lead: origemLead || undefined,
