@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen, Type, Hash, Calendar, ToggleLeft, DollarSign } from 'lucide-react';
+import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen, Type, Hash, Calendar, ToggleLeft, DollarSign, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
