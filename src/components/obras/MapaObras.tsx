@@ -124,11 +124,29 @@ const STATUS_LABEL: Record<string, string> = {
           scrollWheelZoom
           style={{ height: '100%', width: '100%' }}
         >
-          <ChangeView center={centro} zoom={searchTerm.trim().length > 0 ? 14 : (obrasComCoord.length > 0 ? 11 : 6)} />
+          <ChangeView center={centro} zoom={searchTerm.trim().length > 0 ? 16 : (obrasComCoord.length > 0 ? 11 : 6)} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          
+          {/* Marcador de pesquisa */}
+          {searchCoord && (
+            <Marker position={searchCoord} icon={new L.Icon({
+              iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+              shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41],
+            })}>
+              <Popup>
+                <div className="text-sm font-medium">Local pesquisado</div>
+                <div className="text-xs text-muted-foreground">{searchTerm}</div>
+              </Popup>
+            </Marker>
+          )}
+
           {obrasComCoord.map((obra) => (
             <Marker
               key={obra.id}
@@ -146,7 +164,7 @@ const STATUS_LABEL: Record<string, string> = {
                   )}
                   {obra.endereco_entrega && (
                     <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3 shrink-0 mt-0.5" />
+                      <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                       <span>{obra.endereco_entrega}</span>
                     </div>
                   )}
