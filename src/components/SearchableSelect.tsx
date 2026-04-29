@@ -60,41 +60,39 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <div className="flex flex-col h-full max-h-[300px]">
-          <Command 
-            className="flex-1 overflow-hidden"
-            filter={(value, search) => {
-              if (value.toLowerCase().includes(search.toLowerCase())) return 1;
-              return 0;
-            }}
-          >
-            <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
-            <CommandList className="max-h-none overflow-y-auto">
-              <CommandEmpty className="py-2 text-center text-sm">
-                {emptyMessage}
-              </CommandEmpty>
-              <CommandGroup>
-                {options.map((option) => (
-                  <CommandItem
-                    key={option.value}
-                    value={option.label}
-                    onSelect={() => {
-                      onValueChange(option.value);
-                      setOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        value === option.value ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    {option.label}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
+        <Command 
+          className="flex flex-col"
+          filter={(value, search) => {
+            if (value.toLowerCase().includes(search.toLowerCase())) return 1;
+            return 0;
+          }}
+        >
+          <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
+          <CommandList className="max-h-[250px] overflow-y-auto overflow-x-hidden">
+            <CommandEmpty className="py-2 text-center text-sm">
+              {emptyMessage}
+            </CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={option.label}
+                  onSelect={() => {
+                    onValueChange(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === option.value ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
           
           {onActionClick && actionLabel && (
             <div className="p-1 border-t mt-auto bg-popover">
@@ -114,7 +112,7 @@ export function SearchableSelect({
               </Button>
             </div>
           )}
-        </div>
+        </Command>
       </PopoverContent>
     </Popover>
   );
