@@ -60,8 +60,13 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <Command>
-          <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
+        <Command manualFiltering>
+          <CommandInput 
+            placeholder={`Buscar ${placeholder.toLowerCase()}...`} 
+            onValueChange={(v) => {
+              // Internal filter logic if needed, but shadcn/ui command usually handles it
+            }}
+          />
           <CommandList>
             <CommandEmpty className="py-2 text-center text-sm">
               {emptyMessage}
@@ -71,7 +76,9 @@ export function SearchableSelect({
                     variant="ghost"
                     size="sm"
                     className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
-                    onClick={() => {
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       onActionClick();
                       setOpen(false);
                     }}
