@@ -65,7 +65,7 @@ export function NotificationCenter() {
   const markRead = useMarkAsRead();
   const markAllRead = useMarkAllAsRead();
   const navigate = useNavigate();
-  const lastToastTime = useRef<number>(0);
+  const lastToastTime = useRef<number>(localStorage.getItem('last_notif_toast') ? parseInt(localStorage.getItem('last_notif_toast')!) : 0);
 
   useEffect(() => {
     if (!notificacoes) return;
@@ -77,6 +77,7 @@ export function NotificationCenter() {
     if (now - lastToastTime.current < 10 * 60 * 1000) return;
 
     lastToastTime.current = now;
+    localStorage.setItem('last_notif_toast', now.toString());
     const followups = unread.filter(n => n.tipo === 'followup').length;
     const inativos = unread.filter(n => n.tipo === 'inatividade').length;
     const parts: string[] = [];
