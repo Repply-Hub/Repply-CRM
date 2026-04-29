@@ -880,7 +880,7 @@ const Clientes = () => {
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <Icon className="h-4 w-4 text-primary" />
                                   </div>
-                                  <span className="font-medium truncate max-w-[200px]">{client.empresa}</span>
+                                  <span className="font-medium whitespace-nowrap">{client.empresa}</span>
                                 </div>
                               </td>
                             );
@@ -903,7 +903,7 @@ const Clientes = () => {
                           }
 
                           return (
-                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]" onClick={() => navigate(`/clientes/${client.id}`)}>
+                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap" onClick={() => navigate(`/clientes/${client.id}`)}>
                               {value || '—'}
                             </td>
                           );
@@ -975,14 +975,14 @@ const Clientes = () => {
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <User className="h-4 w-4 text-primary" />
                                   </div>
-                                  <span className="font-medium truncate max-w-[200px]">{contato.nome_contato || 'Sem nome'}</span>
+                                  <span className="font-medium whitespace-nowrap">{contato.nome_contato || 'Sem nome'}</span>
                                 </div>
                               </td>
                             );
                           }
 
                           return (
-                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]" onClick={() => navigate(`/contatos/${contato.id}`)}>
+                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap" onClick={() => navigate(`/contatos/${contato.id}`)}>
                               {value || '—'}
                             </td>
                           );
