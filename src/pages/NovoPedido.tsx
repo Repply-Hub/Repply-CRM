@@ -25,7 +25,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/SearchableSelect';
 
-const ORIGENS = [
+const DEFAULT_ORIGENS = [
   { value: 'recompra', label: 'Recompra' },
   { value: 'prospeccao_ativa', label: 'Prospecção Ativa' },
   { value: 'indicacao', label: 'Indicação' },
