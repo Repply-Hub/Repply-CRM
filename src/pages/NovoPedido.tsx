@@ -82,6 +82,7 @@ const NovoPedido = () => {
   const [origemLead, setOrigemLead] = useState('');
   const [enderecoEntrega, setEnderecoEntrega] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [status, setStatus] = useState('novo_lead');
   const [isUploading, setIsUploading] = useState(false);
 
   // Step 2 fields
@@ -213,6 +214,7 @@ const NovoPedido = () => {
         fabricante_id: fabricanteId,
         usuario_id: vendedorId,
         obra_id: obraId || undefined,
+        status: status,
         data_pedido: format(dataPedido, 'yyyy-MM-dd'),
         prazo_resposta: prazoResposta ? format(prazoResposta, 'yyyy-MM-dd') : undefined,
         origem_lead: origemLead || undefined,
@@ -321,6 +323,23 @@ const NovoPedido = () => {
                     />
                   </div>
 
+                  {/* Fase do Pedido */}
+                  <div className="space-y-2">
+                    <Label>Fase do Pedido *</Label>
+                    <Select value={status} onValueChange={setStatus}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar fase" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="novo_lead">Novo Lead</SelectItem>
+                        <SelectItem value="negociacao">Negociação</SelectItem>
+                        <SelectItem value="fechamento">Fechamento</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Fabricante */}
                   <div className="space-y-2">
                     <Label>Fabricante *</Label>
