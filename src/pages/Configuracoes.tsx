@@ -308,7 +308,7 @@ function ProfileTab() {
               </form>
             </div>
 
-            <div className="space-y-4 pt-6 border-t">
+            <div className="space-y-4 pt-6 border-t mt-auto">
               <div className="flex items-center gap-2 text-destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <h3 className="text-sm font-semibold uppercase tracking-wider">Zona de Perigo</h3>
