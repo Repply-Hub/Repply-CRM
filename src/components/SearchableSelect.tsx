@@ -60,13 +60,13 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <Command manualFiltering>
-          <CommandInput 
-            placeholder={`Buscar ${placeholder.toLowerCase()}...`} 
-            onValueChange={(v) => {
-              // Internal filter logic if needed, but shadcn/ui command usually handles it
-            }}
-          />
+        <Command 
+          filter={(value, search) => {
+            if (value.toLowerCase().includes(search.toLowerCase())) return 1;
+            return 0;
+          }}
+        >
+          <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
           <CommandList>
             <CommandEmpty className="py-2 text-center text-sm">
               {emptyMessage}
