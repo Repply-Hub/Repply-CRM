@@ -535,15 +535,12 @@ const Clientes = () => {
         </Tabs>
 
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="pl-9 h-10"
-            />
-          </div>
+          <SearchWithRecent
+            placeholder="Buscar..."
+            value={search}
+            onValueChange={(val) => { setSearch(val); setPage(1); }}
+            storageKey="clientes_recent_searches"
+          />
 
           <FilterButton 
             hasFilters={hasFilters}
