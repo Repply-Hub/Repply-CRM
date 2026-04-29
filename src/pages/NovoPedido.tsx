@@ -327,15 +327,25 @@ const NovoPedido = () => {
 
                   {/* Fase do Pedido */}
                   <div className="space-y-2">
-                    <Label>Fase do Pedido *</Label>
+                    <Label>Fase do Pedido</Label>
                     <Select value={status} onValueChange={setStatus}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecionar fase" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="novo_lead">Novo Lead</SelectItem>
-                        <SelectItem value="negociacao">Negociação</SelectItem>
-                        <SelectItem value="fechamento">Fechamento</SelectItem>
+                        {(kanbanColunas ?? []).length > 0 ? (
+                          (kanbanColunas ?? []).map((col) => (
+                            <SelectItem key={col.id} value={col.slug}>
+                              {col.nome}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="novo_lead">Novo Lead</SelectItem>
+                            <SelectItem value="negociacao">Negociação</SelectItem>
+                            <SelectItem value="fechamento">Fechamento</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
