@@ -1,10 +1,18 @@
-import { useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { useMemo, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Loader2, MapPin, Building2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useGeocodeObras, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
+
+function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, [center, zoom, map]);
+  return null;
+}
 
 // Fix dos ícones padrão do Leaflet (assets quebram com bundlers)
 const iconPadrao = new L.Icon({
@@ -29,7 +37,7 @@ const STATUS_LABEL: Record<string, string> = {
   parada: 'Parada',
 };
 
-export function MapaObras({ obras, isLoading }: MapaObrasProps) {
+export function MapaObras({ obras, isLoading, isSearching = false }: MapaObrasProps & { isSearching?: boolean }) {
   const { items, carregando, progresso } = useGeocodeObras(obras);
 
   const obrasComCoord = useMemo(
@@ -90,6 +98,7 @@ export function MapaObras({ obras, isLoading }: MapaObrasProps) {
           scrollWheelZoom
           style={{ height: '100%', width: '100%' }}
         >
+          <ChangeView center={centro} zoom={isSearching && obrasComCoord.length > 0 ? 14 : (obrasComCoord.length > 0 ? 11 : 6)} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
