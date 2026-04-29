@@ -28,6 +28,7 @@ const iconPadrao = new L.Icon({
 interface MapaObrasProps {
   obras: ObraComCoordenada[] | undefined;
   isLoading: boolean;
+  searchTerm?: string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
