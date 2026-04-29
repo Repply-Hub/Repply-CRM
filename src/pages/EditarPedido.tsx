@@ -708,7 +708,7 @@ function ItemDescricaoField({
         placeholder="Descrição..."
       />
       {open && filtered.length > 0 && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-72 rounded-md border bg-popover text-popover-foreground shadow-md">
+        <div className="absolute top-full left-0 z-[1200] mt-1 w-72 rounded-md border bg-popover text-popover-foreground shadow-md">
           <Command>
             <CommandList>
               <CommandGroup>
