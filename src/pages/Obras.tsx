@@ -490,7 +490,11 @@ export default function Obras() {
 
           <TabsContent value="mapa" className="mt-0">
             <Card className="h-[calc(100vh-280px)] min-h-[500px]">
-              <MapaObras obras={obrasParaMapa} isLoading={isLoading} />
+              <MapaObras 
+                obras={obrasParaMapa} 
+                isLoading={isLoading} 
+                isSearching={search.trim().length > 0} 
+              />
             </Card>
           </TabsContent>
         </Tabs>
