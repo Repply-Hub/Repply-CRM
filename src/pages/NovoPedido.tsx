@@ -662,6 +662,29 @@ const NovoPedido = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={origemDialogOpen} onOpenChange={setOrigemDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Origem</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome da Origem *</Label>
+              <Input 
+                value={newOrigemLabel} 
+                onChange={(e) => setNewOrigemLabel(e.target.value)}
+                placeholder="Ex: Evento de Construção"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrigemDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateOrigem}>
+              Criar Origem
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };
