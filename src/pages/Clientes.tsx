@@ -532,7 +532,13 @@ const Clientes = () => {
             />
           </div>
 
-          <FilterButton
+          <FilterButton 
+            hasFilters={hasFilters}
+            activeFilterCount={activeFilterCount}
+            onClear={() => {
+              setTipoFilter('todos');
+              setSearch('');
+            }}
             popoverClassName="w-auto p-0"
           >
             <div className="flex divide-x divide-border/50">
