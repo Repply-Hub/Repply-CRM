@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Clock, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
