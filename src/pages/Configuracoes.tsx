@@ -258,15 +258,15 @@ function ProfileTab() {
       </div>
 
       <div className="space-y-6">
-        <Card>
+        <Card className="h-full flex flex-col">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Lock className="h-4 w-4 text-primary" /> Conta e Segurança
             </CardTitle>
             <CardDescription>Gerencie seu acesso e configurações de segurança</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-8">
-            <div className="space-y-4">
+          <CardContent className="flex-1 space-y-8 flex flex-col">
+            <div className="space-y-4 flex-1">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-primary" />
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">E-mail</h3>
