@@ -14,6 +14,7 @@ import { EmpresaSelector } from '@/components/EmpresaSelector';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ArrowLeft, User, Mail, Phone, Loader2, Pencil, Trash2, Building2, Calendar, Clock, MessageSquare, History, Factory, DollarSign, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { slugify } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { usePedidos } from '@/hooks/use-pedidos';
@@ -21,7 +22,8 @@ import { useHistoricoContatos } from '@/hooks/use-pedidos';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const ContatoDetalhe = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
+  const id = slug?.split('-').pop();
   const navigate = useNavigate();
   const { data: contatos, isLoading } = useContatos();
   const { data: clientes } = useClientes();
@@ -187,7 +189,10 @@ const ContatoDetalhe = () => {
                   <Button 
                     variant="link" 
                     className="p-0 h-auto text-xs text-primary font-semibold mt-2 hover:no-underline"
-                    onClick={() => navigate(`/clientes/${clienteVinculado.id}`)}
+                    onClick={() => {
+                      const slug = slugify(clienteVinculado.empresa || 'cliente');
+                      navigate(`/clientes/${slug}-${clienteVinculado.id}`);
+                    }}
                   >
                     Ver perfil da empresa →
                   </Button>

@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { EnderecoForm } from '@/components/EnderecoForm';
 import { emptyEndereco, enderecoToString, stringToEndereco, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/ListPagination';
+import { slugify } from '@/lib/utils';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física', condominio: 'Condomínio', hospital: 'Hospital', distribuidor: 'Distribuidor', hotel: 'Hotel', escola: 'Escola', instalador: 'Instalador' };
@@ -33,7 +34,8 @@ const stageColors: Record<string, string> = {
 };
 
 const ClienteDetalhe = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
+  const id = slug?.split('-').pop();
   const navigate = useNavigate();
   const { data: clientes, isLoading: loadingClientes } = useClientes();
   const { data: pedidos, isLoading: loadingPedidos } = usePedidos();
@@ -603,7 +605,10 @@ const ClienteDetalhe = () => {
                           </TableCell>
                         </TableRow>
                       ) : contatosExtras.map((c: any) => (
-                        <TableRow key={c.id} className="cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/contatos/${c.id}`)}>
+                        <TableRow key={c.id} className="cursor-pointer hover:bg-muted/30" onClick={() => {
+                          const slug = slugify(c.nome_contato || 'contato');
+                          navigate(`/contatos/${slug}-${c.id}`);
+                        }}>
                           <TableCell className="font-medium">{c.nome_contato || '-'}</TableCell>
                           <TableCell onClick={e => e.stopPropagation()}>
                             {c.cargo ? <Badge variant="outline">{c.cargo}</Badge> : <span className="text-muted-foreground text-xs">-</span>}
