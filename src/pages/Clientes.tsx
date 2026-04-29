@@ -725,7 +725,7 @@ const Clientes = () => {
                           setTipo(v);
                         }}
                       >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                         <SelectContent>
                           {baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => (
                             <SelectItem key={v} value={v}>{tipoLabels[v]}</SelectItem>
