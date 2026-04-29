@@ -14,6 +14,7 @@ import { useFabricantes } from '@/hooks/use-clientes';
 import { Search, Package, ImageIcon, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const Catalogo = () => {
   const { data: produtos, isLoading } = useCatalogoGlobal();
