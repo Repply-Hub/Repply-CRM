@@ -213,10 +213,11 @@ export default function Obras() {
               </TabsList>
 
               <SearchWithRecent
-                placeholder="Buscar obras..."
+                placeholder="Buscar obras ou endereços..."
                 value={search}
                 onValueChange={setSearch}
                 storageKey="obras_recent_searches"
+                showAddressSuggestions={true}
               />
             </div>
 
