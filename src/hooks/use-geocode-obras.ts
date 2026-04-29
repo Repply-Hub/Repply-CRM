@@ -27,6 +27,7 @@ export async function geocodificar(endereco: string): Promise<{ lat: number; lng
   try {
     // Tenta primeiro o endereço completo
     let query = encodeURIComponent(endereco);
+    console.log(`[Geocoding] Tentando: ${endereco}`);
     let res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${query}`,
       {
@@ -41,10 +42,31 @@ export async function geocodificar(endereco: string): Promise<{ lat: number; lng
     
     // Se não encontrar, tenta simplificar o endereço (remove complementos após vírgula ou hífen)
     if (!data.length) {
-      const enderecoSimplificado = endereco.split(/[,-]/)[0].trim();
+      // Tenta remover "Condominio", "Residencial", "Edificio" etc do início se for o caso
+      const enderecoLimpo = endereco.replace(/^(condominio|residencial|edificio|ed\.|bloco)\s+/i, '');
+      const partes = enderecoLimpo.split(/[,-]/);
+      const enderecoSimplificado = partes[0].trim();
+      
       if (enderecoSimplificado !== endereco) {
-        console.log(`[Geocoding] Tentando endereço simplificado: ${enderecoSimplificado}`);
+        console.log(`[Geocoding] Tentando simplificado: ${enderecoSimplificado}`);
         query = encodeURIComponent(enderecoSimplificado);
+        res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${query}`,
+          {
+            headers: {
+              'Accept-Language': 'pt-BR',
+              'User-Agent': 'LovableCRM/1.0 (contact@lovable.dev)'
+            },
+          }
+        );
+        data = await res.json();
+      }
+      
+      // Se ainda não encontrar e houver cidade/estado, tenta apenas logradouro + cidade
+      if (!data.length && partes.length > 1) {
+        const ruaCidade = `${partes[0].trim()}, ${partes[partes.length - 1].trim()}`;
+        console.log(`[Geocoding] Tentando rua + cidade: ${ruaCidade}`);
+        query = encodeURIComponent(ruaCidade);
         res = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${query}`,
           {
