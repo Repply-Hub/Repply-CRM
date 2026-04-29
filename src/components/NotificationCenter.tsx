@@ -65,7 +65,7 @@ export function NotificationCenter() {
   const markRead = useMarkAsRead();
   const markAllRead = useMarkAllAsRead();
   const navigate = useNavigate();
-  const lastToastTime = useRef<number>(0);
+  const lastToastTime = useRef<number>(localStorage.getItem('last_notif_toast') ? parseInt(localStorage.getItem('last_notif_toast')!) : 0);
 
   useEffect(() => {
     if (!notificacoes) return;
