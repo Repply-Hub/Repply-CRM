@@ -437,35 +437,44 @@ const ClienteDetalhe = () => {
         </div>
 
         {/* Obras */}
-        {cliente.obras && cliente.obras.length > 0 && (
-          <Card className="border-border/40">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-base flex items-center gap-2">
-                <HardHat className="h-4 w-4 text-primary" />
-                Obras Vinculadas
-                {cliente.obras && cliente.obras.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">{cliente.obras.length}</Badge>
-                )}
-              </CardTitle>
-              <Button size="sm" onClick={() => setAddObraOpen(true)} className="gap-1.5">
-                <Plus className="h-4 w-4" />
-                Nova Obra
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {cliente.obras.map((obra: any) => (
-                  <div key={obra.id} className="rounded-lg border border-border p-3">
-                    <p className="text-sm font-medium text-foreground">{obra.nome_obra}</p>
-                    {obra.endereco_entrega && (
-                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                        <MapPin className="h-3 w-3" /> {obra.endereco_entrega}
-                      </p>
-                    )}
-                    <Badge variant="outline" className="mt-2 text-[10px]">{obra.status}</Badge>
-                  </div>
-                ))}
-              </div>
+        <Card className="border-border/40">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-base flex items-center gap-2">
+              <HardHat className="h-4 w-4 text-primary" />
+              Obras Vinculadas
+              {cliente.obras && cliente.obras.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{cliente.obras.length}</Badge>
+              )}
+            </CardTitle>
+            <Button size="sm" onClick={() => setAddObraOpen(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Nova Obra
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {cliente.obras && cliente.obras.map((obra: any) => (
+                <div key={obra.id} className="rounded-lg border border-border p-3">
+                  <p className="text-sm font-medium text-foreground">{obra.nome_obra}</p>
+                  {obra.endereco_entrega && (
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> {obra.endereco_entrega}
+                    </p>
+                  )}
+                  <Badge variant="outline" className="mt-2 text-[10px]">{obra.status}</Badge>
+                </div>
+              ))}
+              
+              <button
+                onClick={() => setAddObraOpen(true)}
+                className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border p-4 hover:border-primary/50 hover:bg-primary/5 transition-all group"
+              >
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Plus className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground group-hover:text-primary">Cadastrar Nova Obra</span>
+              </button>
+            </div>
 
               <Dialog open={addObraOpen} onOpenChange={setAddObraOpen}>
                 <DialogContent>
@@ -545,7 +554,7 @@ const ClienteDetalhe = () => {
               </Dialog>
             </CardContent>
           </Card>
-        )}
+        {/* Removed extra closing brace */}
 
         {/* Contatos extras (apenas para empresas, não pessoa física) */}
         {cliente.tipo !== 'pessoa_fisica' && (
