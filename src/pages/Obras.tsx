@@ -198,15 +198,6 @@ export default function Obras() {
             <div className="flex flex-wrap items-center gap-2">
               <Button 
                 variant="outline" 
-                size="sm"
-                onClick={() => setStatusDialogOpen(true)}
-                title="Configurar Status"
-                className="h-10 gap-2"
-              >
-                <Settings2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Gerenciar</span>
-              </Button>
-
               <div className="flex bg-muted p-1 rounded-md">
                 <button
                   onClick={() => setViewMode('cards')}
