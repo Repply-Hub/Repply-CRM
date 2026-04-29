@@ -299,10 +299,12 @@ function ProfileTab() {
                   <Label>Confirmar nova senha</Label>
                   <Input name="confirmar_senha" type="password" required minLength={6} placeholder="Repita a senha" className="h-10" />
                 </div>
-                <Button type="submit" size="sm" variant="outline" disabled={updateSenha.isPending}>
-                  {updateSenha.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Alterar senha
-                </Button>
+                <div className="flex justify-end pt-2">
+                  <Button type="submit" size="sm" variant="outline" disabled={updateSenha.isPending}>
+                    {updateSenha.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Alterar senha
+                  </Button>
+                </div>
               </form>
             </div>
 
