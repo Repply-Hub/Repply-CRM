@@ -273,8 +273,12 @@ function ProfileTab() {
               </div>
               <form onSubmit={handleSalvarEmail} className="space-y-3">
                 <div className="space-y-1.5">
+                  <Label>E-mail atual</Label>
+                  <Input readOnly disabled value={perfil.email} className="h-10 bg-muted/50 cursor-not-allowed" />
+                </div>
+                <div className="space-y-1.5">
                   <Label>Novo e-mail</Label>
-                  <Input name="email" type="email" required defaultValue={perfil.email} className="h-10" />
+                  <Input name="email" type="email" required placeholder="Digite o novo e-mail" className="h-10" />
                 </div>
                 <div className="flex justify-end pt-2">
                   <Button type="submit" size="sm" variant="outline" disabled={updateEmail.isPending}>
