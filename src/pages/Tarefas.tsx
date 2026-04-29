@@ -239,10 +239,13 @@ export default function Tarefas() {
       <div className="p-3 sm:p-4 md:p-6 max-w-[1400px] mx-auto space-y-4 md:space-y-6">
         {/* Filters & Actions */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar tarefas..." className="pl-9 h-10" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
-          </div>
+          <SearchWithRecent
+            placeholder="Buscar tarefas..."
+            value={search}
+            onValueChange={(val) => { setSearch(val); setPage(1); }}
+            storageKey="tarefas_recent_searches"
+            className="min-w-[200px]"
+          />
 
           <FilterButton 
             hasFilters={hasFilters}
