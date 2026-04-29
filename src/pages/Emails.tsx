@@ -36,7 +36,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import { useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+
 const Emails = () => {
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -47,6 +51,14 @@ const Emails = () => {
     corpo: "",
     logoUrl: "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" 
   });
+
+  useEffect(() => {
+    const to = searchParams.get("to");
+    if (to) {
+      setFormData(prev => ({ ...prev, destinatario: to }));
+      setIsComposeOpen(true);
+    }
+  }, [searchParams]);
   const [settingsData, setSettingsData] = useState({ resend_api_key: "", resend_from_email: "" });
   const queryClient = useQueryClient();
 
