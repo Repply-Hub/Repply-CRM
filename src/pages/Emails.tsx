@@ -472,29 +472,30 @@ const Emails = () => {
                         className="p-4 hover:bg-muted/30 transition-colors group cursor-pointer"
                         onClick={() => setSelectedEmail({
                           ...email,
-                          destinatario: email.para,
-                          remetente: email.de,
-                          corpo: email.corpo_texto,
-                          html: email.corpo_html
+                          destinatario: email.destinatarios?.[0] || "",
+                          remetente: email.remetente,
+                          corpo: "",
+                          html: email.corpo_html,
+                          created_at: email.criado_em
                         })}
                       >
                         <div className="flex justify-between items-start mb-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">De: {email.de}</span>
+                            <span className="font-medium text-sm">De: {email.remetente}</span>
                             <Badge variant="outline" className="text-[10px] h-5 bg-blue-50 text-blue-700 border-blue-200">
                               Recebido
                             </Badge>
                           </div>
                           <span className="text-xs text-muted-foreground">
-                            {format(new Date(email.created_at), "dd 'de' MMM, HH:mm", { locale: ptBR })}
+                            {email.criado_em && format(new Date(email.criado_em), "dd 'de' MMM, HH:mm", { locale: ptBR })}
                           </span>
                         </div>
                         <h4 className="text-sm font-semibold mb-1 group-hover:text-primary transition-colors">
                           {email.assunto}
                         </h4>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {email.corpo_texto}
-                        </p>
+                        <div className="text-sm text-muted-foreground line-clamp-2">
+                          {email.corpo_html ? "E-mail em formato HTML" : "Sem conteúdo"}
+                        </div>
                       </div>
                     ))}
                   </div>
