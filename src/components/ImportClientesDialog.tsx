@@ -553,7 +553,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             visibleFields={visibleFields}
             onReset={reset}
             onAutoDetect={() => {
-              const auto = autoDetectMapping(headers);
+              const auto = autoDetectMapping(headers, visibleFields);
               setMapping(auto);
               setExtras(autoDetectExtras(headers, Object.values(auto).filter(Boolean)));
             }}
