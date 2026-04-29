@@ -244,10 +244,12 @@ function ProfileTab() {
               <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" defaultValue={perfil.nome} placeholder="Seu nome completo" className="h-10" /></div>
               <div className="space-y-1.5"><Label>Telefone</Label><Input name="telefone" defaultValue={perfil.telefone ?? ''} placeholder="(00) 00000-0000" className="h-10" /></div>
               <div className="space-y-1.5"><Label>Assinatura de E-mail</Label><Textarea name="assinatura_email" defaultValue={perfil.assinatura_email ?? ''} placeholder="Ex: Atenciosamente, Equipe MD" className="min-h-[100px]" /></div>
-              <Button type="submit" size="sm" disabled={updatePerfil.isPending}>
-                {updatePerfil.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Salvar alterações
-              </Button>
+              <div className="flex justify-end pt-2">
+                <Button type="submit" size="sm" disabled={updatePerfil.isPending}>
+                  {updatePerfil.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Salvar alterações
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
