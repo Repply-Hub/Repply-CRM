@@ -176,7 +176,7 @@ export default function Obras() {
       <div className="p-4 md:p-6 space-y-6">
         <Tabs defaultValue="lista" className="space-y-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-1 items-center gap-3">
               <TabsList className="shrink-0">
                 <TabsTrigger value="lista" className="gap-2">
                   <List className="h-4 w-4" /> Lista
@@ -186,14 +186,27 @@ export default function Obras() {
                 </TabsTrigger>
               </TabsList>
 
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar obras..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 h-10"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
               <Button 
                 variant="outline" 
-                size="icon" 
+                size="sm"
                 onClick={() => setStatusDialogOpen(true)}
                 title="Configurar Status"
-                className="shrink-0 h-10 w-10"
+                className="h-10 gap-2"
               >
                 <Settings2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Gerenciar</span>
               </Button>
 
               <div className="flex bg-muted p-1 rounded-md">
@@ -228,7 +241,6 @@ export default function Obras() {
                 onDeletePreset={deletePreset}
                 className="h-10"
               />
-            </div>
 
             <div className="flex flex-1 items-center gap-2 max-w-full lg:max-w-2xl">
               <div className="relative flex-1">
