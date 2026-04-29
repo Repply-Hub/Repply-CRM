@@ -348,22 +348,22 @@ const NovoPedido = () => {
                       onValueChange={setFabricanteId} 
                     />
                   </div>
-                </div>
 
-                {/* Obra */}
-                <div className="space-y-2">
-                  <Label>Obra</Label>
-                  <SearchableSelect
-                    options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
-                    value={obraId}
-                    onValueChange={handleObraChange}
-                    placeholder={clienteId ? "Selecionar obra" : "Selecione um cliente primeiro"}
-                    onActionClick={clienteId ? () => setObraDialogOpen(true) : undefined}
-                    actionLabel="Nova Obra"
-                  />
-                  {selectedObra?.spe_cnpj && (
-                    <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
-                  )}
+                  {/* Obra */}
+                  <div className="space-y-2">
+                    <Label>Obra</Label>
+                    <SearchableSelect
+                      options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
+                      value={obraId}
+                      onValueChange={handleObraChange}
+                      placeholder={clienteId ? "Selecionar obra" : "Selecione um cliente primeiro"}
+                      onActionClick={clienteId ? () => setObraDialogOpen(true) : undefined}
+                      actionLabel="Nova Obra"
+                    />
+                    {selectedObra?.spe_cnpj && (
+                      <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
