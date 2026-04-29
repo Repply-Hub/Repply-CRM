@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Globe } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Globe, Mail } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -210,8 +210,8 @@ function ProfileTab() {
   const iniciais = (perfil.nome || 'Usuário').split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="space-y-4">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2"><UserCircle className="h-4 w-4 text-primary" /> Informações Pessoais</CardTitle>
@@ -252,75 +252,88 @@ function ProfileTab() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Email</CardTitle>
-            <CardDescription>Alterar o email requer confirmação no novo endereço</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSalvarEmail} className="space-y-3">
-              <div className="space-y-1.5"><Label>Novo email</Label><Input name="email" type="email" required defaultValue={perfil.email} className="h-10" /></div>
-              <Button type="submit" size="sm" variant="outline" disabled={updateEmail.isPending}>
-                {updateEmail.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Atualizar email
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        
+        <CustomizeTab />
       </div>
 
-      <div className="space-y-4">
-        <CustomizeTab />
-
+      <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2"><Lock className="h-4 w-4 text-primary" /> Segurança</CardTitle>
-            <CardDescription>Altere sua senha de acesso</CardDescription>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Lock className="h-4 w-4 text-primary" /> Conta e Segurança
+            </CardTitle>
+            <CardDescription>Gerencie seu acesso e configurações de segurança</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSalvarSenha} className="space-y-3">
-              <div className="space-y-1.5"><Label>Nova senha</Label><Input name="nova_senha" type="password" required minLength={6} placeholder="Mínimo 6 caracteres" className="h-10" /></div>
-              <div className="space-y-1.5"><Label>Confirmar nova senha</Label><Input name="confirmar_senha" type="password" required minLength={6} placeholder="Repita a senha" className="h-10" /></div>
-              <Button type="submit" size="sm" variant="outline" disabled={updateSenha.isPending}>
-                {updateSenha.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Alterar senha
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card className="border-destructive/40">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2 text-destructive"><AlertTriangle className="h-4 w-4" /> Zona de Perigo</CardTitle>
-            <CardDescription>Ações irreversíveis para a sua conta</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="text-sm font-medium">Excluir conta</p>
-                <p className="text-xs text-muted-foreground">Remove permanentemente seus dados e acesso ao sistema</p>
+          <CardContent className="space-y-8">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">E-mail</h3>
               </div>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm"><Trash2 className="h-4 w-4 mr-1" /> Excluir conta</Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Excluir sua conta?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Esta ação é <strong>permanente e irreversível</strong>. Todos os seus dados — clientes, pedidos e obras associados — serão perdidos.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => deletarConta.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deletarConta.isPending}>
-                      {deletarConta.isPending ? 'Excluindo...' : 'Sim, excluir minha conta'}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <form onSubmit={handleSalvarEmail} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Novo e-mail</Label>
+                  <Input name="email" type="email" required defaultValue={perfil.email} className="h-10" />
+                </div>
+                <Button type="submit" size="sm" variant="outline" disabled={updateEmail.isPending}>
+                  {updateEmail.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Atualizar e-mail
+                </Button>
+              </form>
+            </div>
+
+            <div className="space-y-4 pt-6 border-t">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Alterar Senha</h3>
+              </div>
+              <form onSubmit={handleSalvarSenha} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Nova senha</Label>
+                  <Input name="nova_senha" type="password" required minLength={6} placeholder="Mínimo 6 caracteres" className="h-10" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Confirmar nova senha</Label>
+                  <Input name="confirmar_senha" type="password" required minLength={6} placeholder="Repita a senha" className="h-10" />
+                </div>
+                <Button type="submit" size="sm" variant="outline" disabled={updateSenha.isPending}>
+                  {updateSenha.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Alterar senha
+                </Button>
+              </form>
+            </div>
+
+            <div className="space-y-4 pt-6 border-t">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <h3 className="text-sm font-semibold uppercase tracking-wider">Zona de Perigo</h3>
+              </div>
+              <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/20 bg-destructive/5">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Excluir conta</p>
+                  <p className="text-xs text-muted-foreground max-w-[200px]">Remove permanentemente seus dados e acesso</p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <Trash2 className="h-4 w-4 mr-1" /> Excluir
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir sua conta?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação é <strong>permanente e irreversível</strong>. Todos os seus dados — clientes, pedidos e obras associados — serão perdidos.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => deletarConta.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deletarConta.isPending}>
+                        {deletarConta.isPending ? 'Excluindo...' : 'Sim, excluir minha conta'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
           </CardContent>
         </Card>
