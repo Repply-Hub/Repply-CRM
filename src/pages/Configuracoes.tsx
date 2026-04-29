@@ -276,10 +276,12 @@ function ProfileTab() {
                   <Label>Novo e-mail</Label>
                   <Input name="email" type="email" required defaultValue={perfil.email} className="h-10" />
                 </div>
-                <Button type="submit" size="sm" variant="outline" disabled={updateEmail.isPending}>
-                  {updateEmail.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Atualizar e-mail
-                </Button>
+                <div className="flex justify-end pt-2">
+                  <Button type="submit" size="sm" variant="outline" disabled={updateEmail.isPending}>
+                    {updateEmail.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Atualizar e-mail
+                  </Button>
+                </div>
               </form>
             </div>
 
