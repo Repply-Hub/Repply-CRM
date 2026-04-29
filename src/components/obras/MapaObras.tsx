@@ -38,8 +38,24 @@ const STATUS_LABEL: Record<string, string> = {
   parada: 'Parada',
 };
 
-export function MapaObras({ obras, isLoading, isSearching = false }: MapaObrasProps & { isSearching?: boolean }) {
+  export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps) {
   const { items, carregando, progresso } = useGeocodeObras(obras);
+  const [searchCoord, setSearchCoord] = useState<[number, number] | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchTerm.trim().length > 3) {
+        const coord = await geocodificar(searchTerm);
+        if (coord) {
+          setSearchCoord([coord.lat, coord.lng]);
+        }
+      } else {
+        setSearchCoord(null);
+      }
+    }, 800); // Debounce
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const obrasComCoord = useMemo(
     () => items.filter((o) => o.latitude !== null && o.longitude !== null),
