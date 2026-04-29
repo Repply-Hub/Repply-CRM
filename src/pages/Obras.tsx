@@ -548,19 +548,34 @@ export default function Obras() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setSelectedObra(null)}>Fechar</Button>
-                <Button onClick={() => {
-                  setEditObra({
-                    id: selectedObra.id,
-                    nome_obra: selectedObra.nome_obra,
-                    cliente_id: selectedObra.cliente_id,
-                    endereco_entrega: selectedObra.endereco_entrega || '',
-                    status: selectedObra.status,
-                    spe_cnpj: selectedObra.spe_cnpj || '',
-                  });
-                  setEditDialogOpen(true);
-                  setSelectedObra(null);
-                }}>Editar Informações</Button>
+                <div className="flex w-full justify-between items-center">
+                  <Button 
+                    variant="ghost" 
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
+                    onClick={() => {
+                      setConfirmDeleteId(selectedObra.id);
+                      setSelectedObra(null);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Excluir Obra
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setSelectedObra(null)}>Fechar</Button>
+                    <Button onClick={() => {
+                      setEditObra({
+                        id: selectedObra.id,
+                        nome_obra: selectedObra.nome_obra,
+                        cliente_id: selectedObra.cliente_id,
+                        endereco_entrega: selectedObra.endereco_entrega || '',
+                        status: selectedObra.status,
+                        spe_cnpj: selectedObra.spe_cnpj || '',
+                      });
+                      setEditDialogOpen(true);
+                      setSelectedObra(null);
+                    }}>Editar Informações</Button>
+                  </div>
+                </div>
               </DialogFooter>
             </DialogContent>
           )}
