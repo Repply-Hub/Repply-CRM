@@ -37,7 +37,7 @@ const STATUS_LABEL: Record<string, string> = {
   parada: 'Parada',
 };
 
-export function MapaObras({ obras, isLoading }: MapaObrasProps) {
+export function MapaObras({ obras, isLoading, isSearching = false }: MapaObrasProps & { isSearching?: boolean }) {
   const { items, carregando, progresso } = useGeocodeObras(obras);
 
   const obrasComCoord = useMemo(
