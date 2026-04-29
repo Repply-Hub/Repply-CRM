@@ -22,6 +22,7 @@ import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Us
 import { ImportClientesDialog } from '@/components/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/EmpresaSelector';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
