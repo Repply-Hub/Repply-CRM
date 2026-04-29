@@ -42,7 +42,9 @@ type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
 
 export default function Obras() {
   const { data: obras, isLoading } = useObras();
+  const { data: clientes } = useClientes();
   const createObra = useCreateObra();
+  const updateObra = useUpdateObra();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
