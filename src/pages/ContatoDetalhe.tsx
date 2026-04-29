@@ -37,6 +37,16 @@ const ContatoDetalhe = () => {
 
   const pedidosRelacionados = todosPedidos?.filter(p => p.cliente_id === clienteVinculado?.id) || [];
   const { data: historico } = useHistoricoContatos(null); // Just for structure, we might need a specific filter or mock if no direct link exists yet.
+  
+  const copyInfo = async (label: string, value?: string | null) => {
+    if (!value?.trim()) return;
+    try {
+      await navigator.clipboard.writeText(value.trim());
+      toast.success(`${label} copiado!`);
+    } catch {
+      toast.error('Não foi possível copiar a informação.');
+    }
+  };
 
   const [editData, setEditData] = useState({
     nome_contato: '',
@@ -239,8 +249,8 @@ const ContatoDetalhe = () => {
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-tight">Telefone / WhatsApp</p>
                     <p className="text-sm font-semibold text-foreground truncate">{contato.telefone || 'Não informado'}</p>
                     {contato.telefone && (
-                      <Button variant="link" className="p-0 h-auto text-[11px] mt-1" onClick={() => window.open(`https://wa.me/${contato.telefone.replace(/\D/g, '')}`, '_blank')}>
-                        Chamar no WhatsApp
+                      <Button variant="link" className="p-0 h-auto text-[11px] mt-1" onClick={() => copyInfo('Telefone', contato.telefone)}>
+                        Copiar número
                       </Button>
                     )}
                   </div>
