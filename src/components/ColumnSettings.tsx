@@ -169,21 +169,22 @@ export function ColumnSettings({
                     </div>
                 </div>
                 <div className="flex divide-x divide-border/50">
-                {!hideColumns && (
-                    <div className="p-2">
-                        <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50">
-                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
-                            {onAdd && (
-                                <button
-                                    onClick={() => setIsAdding(!isAdding)}
-                                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 group"
-                                    title="Criar nova coluna"
-                                >
-                                    <Plus className="h-3.5 w-3.5" />
-                                    <span className="text-[10px] font-bold">Nova Coluna</span>
-                                </button>
-                            )}
-                        </div>
+                <div className="flex divide-x divide-border/50">
+                    {!hideColumns && (
+                        <div className="w-[320px] p-2">
+                            <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
+                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
+                                {onAdd && (
+                                    <button
+                                        onClick={() => setIsAdding(!isAdding)}
+                                        className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 group"
+                                        title="Criar nova coluna"
+                                    >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        <span className="text-[10px] font-bold">Nova Coluna</span>
+                                    </button>
+                                )}
+                            </div>
 
                         {isAdding && onAdd && (
                         <div className="px-2 py-2 mb-2 bg-muted/40 rounded-md space-y-2">
