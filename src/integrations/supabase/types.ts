@@ -660,6 +660,39 @@ export type Database = {
         }
         Relationships: []
       }
+      emails_recebidos: {
+        Row: {
+          assunto: string | null
+          corpo_html: string | null
+          criado_em: string | null
+          destinatarios: string[]
+          id: string
+          lido: boolean | null
+          remetente: string
+          resend_id: string
+        }
+        Insert: {
+          assunto?: string | null
+          corpo_html?: string | null
+          criado_em?: string | null
+          destinatarios: string[]
+          id?: string
+          lido?: boolean | null
+          remetente: string
+          resend_id: string
+        }
+        Update: {
+          assunto?: string | null
+          corpo_html?: string | null
+          criado_em?: string | null
+          destinatarios?: string[]
+          id?: string
+          lido?: boolean | null
+          remetente?: string
+          resend_id?: string
+        }
+        Relationships: []
+      }
       empresas: {
         Row: {
           banner_url: string | null
