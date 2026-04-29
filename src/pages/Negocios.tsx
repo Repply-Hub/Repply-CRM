@@ -130,7 +130,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const showKanban = mode === 'pipeline' && pipelineView === 'kanban';
   const isPipelineMode = mode === 'pipeline';
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => localStorage.getItem('negocios_search') || '');
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
@@ -281,6 +281,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     1,
     tableVisibleColumns.filter(id => id !== 'acoes').length + (tableVisibleColumns.includes('acoes') ? 2 : 0) + 1
   );
+
+  useEffect(() => {
+    localStorage.setItem('negocios_search', search);
+  }, [search]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
