@@ -196,17 +196,6 @@ export default function Obras() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setStatusDialogOpen(true)}
-                title="Configurar Status"
-                className="h-10 gap-2"
-              >
-                <Settings2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Gerenciar</span>
-              </Button>
-
               <div className="flex bg-muted p-1 rounded-md">
                 <button
                   onClick={() => setViewMode('cards')}
@@ -277,6 +266,17 @@ export default function Obras() {
                           {status.nome}
                         </div>
                       ))}
+                    </div>
+                    <div className="pt-2 border-t mt-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full justify-start gap-2 h-8 text-xs font-medium text-muted-foreground hover:text-foreground"
+                        onClick={() => setStatusDialogOpen(true)}
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                        Gerenciar Status
+                      </Button>
                     </div>
                   </div>
 
