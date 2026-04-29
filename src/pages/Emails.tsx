@@ -126,7 +126,7 @@ const Emails = () => {
     },
   });
 
-  const { data: emails, isLoading } = useQuery({
+  const { data: emails, isLoading: isSentLoading } = useQuery({
     queryKey: ["emails", searchTerm],
     queryFn: async () => {
       let query = supabase
@@ -139,6 +139,19 @@ const Emails = () => {
       }
 
       const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: receivedEmails, isLoading: isReceivedLoading } = useQuery({
+    queryKey: ["received_emails"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("emails_recebidos")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
       if (error) throw error;
       return data;
     },
@@ -389,14 +402,14 @@ const Emails = () => {
           <TabsContent value="sent">
             <Card>
               <CardContent className="p-0">
-                {isLoading ? (
+                {isSentLoading ? (
                   <div className="flex justify-center py-20">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
                 ) : !emails || emails.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                     <Mail className="h-12 w-12 mb-4 opacity-20" />
-                    <p>Nenhum e-mail encontrado</p>
+                    <p>Nenhum e-mail enviado encontrado</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-border">
@@ -438,17 +451,55 @@ const Emails = () => {
 
           <TabsContent value="received">
             <Card>
-              <CardContent className="p-10 flex flex-col items-center justify-center text-center">
-                <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                  <Inbox className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="font-semibold text-lg mb-2">Caixa de Entrada</h3>
-                <p className="text-muted-foreground max-w-sm mb-6">
-                  A recepção de e-mails via Webhook do Resend está sendo configurada.
-                </p>
-                <Button variant="outline" disabled>
-                  Configurar Webhook <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+              <CardContent className="p-0">
+                {isReceivedLoading ? (
+                  <div className="flex justify-center py-20">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : !receivedEmails || receivedEmails.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-center px-4">
+                    <Inbox className="h-12 w-12 mb-4 opacity-20" />
+                    <h3 className="font-semibold text-lg mb-2">Sua caixa de entrada está vazia</h3>
+                    <p className="max-w-sm">
+                      Quando você receber e-mails no seu domínio configurado no Resend, eles aparecerão aqui automaticamente.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {receivedEmails.map((email) => (
+                      <div 
+                        key={email.id} 
+                        className="p-4 hover:bg-muted/30 transition-colors group cursor-pointer"
+                        onClick={() => setSelectedEmail({
+                          ...email,
+                          destinatario: email.destinatarios?.[0] || "",
+                          remetente: email.remetente,
+                          corpo: "",
+                          html: email.corpo_html,
+                          created_at: email.criado_em
+                        })}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">De: {email.remetente}</span>
+                            <Badge variant="outline" className="text-[10px] h-5 bg-blue-50 text-blue-700 border-blue-200">
+                              Recebido
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {email.criado_em && format(new Date(email.criado_em), "dd 'de' MMM, HH:mm", { locale: ptBR })}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-semibold mb-1 group-hover:text-primary transition-colors">
+                          {email.assunto}
+                        </h4>
+                        <div className="text-sm text-muted-foreground line-clamp-2">
+                          {email.corpo_html ? "E-mail em formato HTML" : "Sem conteúdo"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
