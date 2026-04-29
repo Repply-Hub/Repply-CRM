@@ -27,32 +27,58 @@ const themeOptions = [
   { value: 'system' as const, label: 'Sistema', icon: Monitor, desc: 'Segue a preferência do SO' },
 ];
 
-function ThemeSelector() {
+function CustomizeTab() {
   const { theme, setTheme } = useTheme();
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Sun className="h-4 w-4 text-primary" /> Aparência
+        <CardTitle className="text-base flex items-center gap-2">
+          <Pencil className="h-4 w-4 text-primary" /> Personalizar
         </CardTitle>
+        <CardDescription>Gerencie a aparência e o menu lateral do sistema</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex bg-muted/30 p-1 rounded-md border border-border">
-          {themeOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setTheme(opt.value)}
-              className={cn(
-                'flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-sm text-xs font-medium transition-all',
-                theme === opt.value
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-              )}
+      <CardContent className="space-y-6">
+        <div className="space-y-3">
+          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <Sun className="h-3.5 w-3.5" /> Aparência
+          </Label>
+          <div className="flex bg-muted/30 p-1 rounded-md border border-border">
+            {themeOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setTheme(opt.value)}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-sm text-xs font-medium transition-all',
+                  theme === opt.value
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                )}
+              >
+                <opt.icon className={cn('h-3.5 w-3.5', theme === opt.value ? 'text-primary' : 'text-muted-foreground')} />
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3 pt-4 border-t">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Pencil className="h-3.5 w-3.5" /> Menu Lateral
+              </Label>
+              <p className="text-xs text-muted-foreground">Reorganize, oculte ou adicione itens à sidebar</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.dispatchEvent(new Event('sidebar-enter-edit'))}
+              className="gap-2 h-8"
             >
-              <opt.icon className={cn('h-3.5 w-3.5', theme === opt.value ? 'text-primary' : 'text-muted-foreground')} />
-              <span>{opt.label}</span>
-            </button>
-          ))}
+              <Pencil className="h-3.5 w-3.5" />
+              Editar
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
