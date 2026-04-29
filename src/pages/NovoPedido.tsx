@@ -49,6 +49,7 @@ const NovoPedido = () => {
   const { data: vendedores } = useVendedores();
   const { data: myVendedorId } = useMyVendedorId();
   const { data: isGestor } = useIsGestor();
+  const { data: kanbanColunas } = useKanbanColunas();
   const createPedido = useCreatePedidoCompleto();
   const createObraMutation = useCreateObra();
 
