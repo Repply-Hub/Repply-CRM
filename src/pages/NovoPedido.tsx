@@ -260,6 +260,27 @@ const NovoPedido = () => {
     }
   };
 
+  const handleCreateOrigem = () => {
+    if (!newOrigemLabel.trim()) {
+      toast.error('Informe o nome da origem');
+      return;
+    }
+
+    const newValue = newOrigemLabel.toLowerCase().replace(/\s+/g, '_');
+    const newOrigem = { value: newValue, label: newOrigemLabel };
+    
+    const updatedOrigens = [...origens, newOrigem];
+    setOrigens(updatedOrigens);
+    
+    const customOnly = updatedOrigens.filter(o => !DEFAULT_ORIGENS.some(d => d.value === o.value));
+    localStorage.setItem('custom_origens', JSON.stringify(customOnly));
+    
+    setOrigemLead(newValue);
+    setOrigemDialogOpen(false);
+    setNewOrigemLabel('');
+    toast.success('Nova origem adicionada!');
+  };
+
   return (
     <AppLayout
       headerContent={
