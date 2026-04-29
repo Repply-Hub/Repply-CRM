@@ -370,15 +370,30 @@ const NovoPedido = () => {
                         className="h-7 px-2 text-xs text-primary"
                         onClick={() => setOrigemDialogOpen(true)}
                       >
-                        <Plus className="h-3 w-3 mr-1" /> Nova Origem
-                      </Button>
-                    </div>
                     <Select value={origemLead} onValueChange={setOrigemLead}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar origem" /></SelectTrigger>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecionar origem" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {origens.map(o => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                        ))}
+                        <div className="max-h-[200px] overflow-y-auto">
+                          {origens.map(o => (
+                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                          ))}
+                        </div>
+                        <div className="p-1 border-t mt-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10 h-8"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOrigemDialogOpen(true);
+                            }}
+                          >
+                            <Plus className="h-3 w-3 mr-2" /> Nova Origem
+                          </Button>
+                        </div>
                       </SelectContent>
                     </Select>
                   </div>
