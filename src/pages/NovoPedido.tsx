@@ -333,24 +333,14 @@ const NovoPedido = () => {
 
                 {/* Obra */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Obra</Label>
-                    {clienteId && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 px-2 text-xs text-primary"
-                        onClick={() => setObraDialogOpen(true)}
-                      >
-                        <Plus className="h-3 w-3 mr-1" /> Nova Obra
-                      </Button>
-                    )}
-                  </div>
+                  <Label>Obra</Label>
                   <SearchableSelect
                     options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
                     value={obraId}
                     onValueChange={handleObraChange}
                     placeholder={clienteId ? "Selecionar obra" : "Selecione um cliente primeiro"}
+                    onActionClick={clienteId ? () => setObraDialogOpen(true) : undefined}
+                    actionLabel="Nova Obra"
                   />
                   {selectedObra?.spe_cnpj && (
                     <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
@@ -372,28 +362,35 @@ const NovoPedido = () => {
 
                   {/* Origem */}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Origem</Label>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 px-2 text-xs text-primary"
-                        onClick={() => setOrigemDialogOpen(true)}
-                      >
-                        <Plus className="h-3 w-3 mr-1" /> Nova Origem
-                      </Button>
-                    </div>
+                    <Label>Origem</Label>
                     <Select value={origemLead} onValueChange={setOrigemLead}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar origem" /></SelectTrigger>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecionar origem" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {origens.map(o => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                        ))}
+                        <div className="max-h-[200px] overflow-y-auto">
+                          {origens.map(o => (
+                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                          ))}
+                        </div>
+                        <div className="p-1 border-t mt-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10 h-8"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOrigemDialogOpen(true);
+                            }}
+                          >
+                            <Plus className="h-3 w-3 mr-2" /> Nova Origem
+                          </Button>
+                        </div>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
-
                 {/* Anexo PDF */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, ChevronsUpDown, Search } from "lucide-react";
+import { Check, ChevronsUpDown, Search, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +28,8 @@ interface SearchableSelectProps {
   placeholder?: string;
   emptyMessage?: string;
   className?: string;
+  onActionClick?: () => void;
+  actionLabel?: string;
 }
 
 export function SearchableSelect({
@@ -37,6 +39,8 @@ export function SearchableSelect({
   placeholder = "Selecione uma opção...",
   emptyMessage = "Nenhuma opção encontrada.",
   className,
+  onActionClick,
+  actionLabel,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -80,6 +84,22 @@ export function SearchableSelect({
                 </CommandItem>
               ))}
             </CommandGroup>
+            {onActionClick && actionLabel && (
+              <div className="p-1 border-t">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
+                  onClick={() => {
+                    onActionClick();
+                    setOpen(false);
+                  }}
+                >
+                  <Plus className="mr-2 h-3 w-3" />
+                  {actionLabel}
+                </Button>
+              </div>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
