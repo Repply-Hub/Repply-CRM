@@ -274,7 +274,7 @@ function ProfileTab() {
               <form onSubmit={handleSalvarEmail} className="space-y-3">
                 <div className="space-y-1.5">
                   <Label>E-mail atual</Label>
-                  <Input readOnly disabled value={perfil.email} className="h-10 bg-muted/50 cursor-not-allowed" />
+                  <Input readOnly disabled value={perfil.email || user?.email || ''} className="h-10 bg-muted/50 cursor-not-allowed" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Novo e-mail</Label>
