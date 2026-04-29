@@ -880,7 +880,7 @@ const Clientes = () => {
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <Icon className="h-4 w-4 text-primary" />
                                   </div>
-                                  <span className="font-medium truncate max-w-[200px]">{client.empresa}</span>
+                                  <span className="font-medium whitespace-nowrap">{client.empresa}</span>
                                 </div>
                               </td>
                             );
