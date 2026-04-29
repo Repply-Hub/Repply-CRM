@@ -302,6 +302,7 @@ export default function Obras() {
                 onSavePreset={savePreset}
                 onLoadPreset={loadPreset}
                 onDeletePreset={deletePreset}
+                className="h-10"
               />
             </div>
 
