@@ -41,13 +41,19 @@ const STATUS_LABEL: Record<string, string> = {
   export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps) {
   const { items, carregando, progresso } = useGeocodeObras(obras);
   const [searchCoord, setSearchCoord] = useState<[number, number] | null>(null);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (searchTerm.trim().length > 3) {
-        const coord = await geocodificar(searchTerm);
-        if (coord) {
-          setSearchCoord([coord.lat, coord.lng]);
+        setIsSearchingAddress(true);
+        try {
+          const coord = await geocodificar(searchTerm);
+          if (coord) {
+            setSearchCoord([coord.lat, coord.lng]);
+          }
+        } finally {
+          setIsSearchingAddress(false);
         }
       } else {
         setSearchCoord(null);
@@ -98,11 +104,13 @@ const STATUS_LABEL: Record<string, string> = {
         {obrasSemEndereco.length > 0 && (
           <span className="text-xs">• {obrasSemEndereco.length} sem endereço cadastrado</span>
         )}
-        {carregando && (
-          <div className="flex items-center gap-1.5 text-xs">
-            <Loader2 className="h-3 w-3 animate-spin" />
+        {(carregando || isSearchingAddress) && (
+          <div className="flex items-center gap-1.5 text-xs text-primary animate-pulse">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span>
-              Geocodificando endereços ({progresso.atual}/{progresso.total})…
+              {isSearchingAddress 
+                ? 'Localizando endereço no mapa...' 
+                : `Geocodificando endereços (${progresso.atual}/${progresso.total})…`}
             </span>
           </div>
         )}
