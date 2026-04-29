@@ -215,51 +215,53 @@ export default function Obras() {
                   setStatusFilter('todos');
                   setSort('recent');
                 }}
-                popoverClassName="w-80"
+                popoverClassName="w-auto p-0"
                 align="end"
               >
-                <div className="space-y-2">
-                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Status</Label>
-                  <div className="space-y-1">
-                    <div 
-                      className={cn(
-                        "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
-                        statusFilter === 'todos' && "bg-accent text-accent-foreground"
-                      )}
-                      onClick={() => setStatusFilter('todos')}
-                    >
-                      <Checkbox checked={statusFilter === 'todos'} onCheckedChange={() => setStatusFilter('todos')} />
-                      Todos os status
-                    </div>
-                    {statusObras?.map(status => (
+                <div className="flex divide-x divide-border/50">
+                  <div className="w-[280px] p-4 space-y-2">
+                    <Label className="text-xs uppercase text-muted-foreground font-semibold">Status</Label>
+                    <div className="space-y-1">
                       <div 
-                        key={status.slug} 
                         className={cn(
                           "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
-                          statusFilter === status.slug && "bg-accent text-accent-foreground"
+                          statusFilter === 'todos' && "bg-accent text-accent-foreground"
                         )}
-                        onClick={() => setStatusFilter(status.slug)}
+                        onClick={() => setStatusFilter('todos')}
                       >
-                        <Checkbox checked={statusFilter === status.slug} onCheckedChange={() => setStatusFilter(status.slug)} />
-                        {status.nome}
+                        <Checkbox checked={statusFilter === 'todos'} onCheckedChange={() => setStatusFilter('todos')} />
+                        Todos os status
                       </div>
-                    ))}
+                      {statusObras?.map(status => (
+                        <div 
+                          key={status.slug} 
+                          className={cn(
+                            "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
+                            statusFilter === status.slug && "bg-accent text-accent-foreground"
+                          )}
+                          onClick={() => setStatusFilter(status.slug)}
+                        >
+                          <Checkbox checked={statusFilter === status.slug} onCheckedChange={() => setStatusFilter(status.slug)} />
+                          {status.nome}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2 border-t pt-4">
-                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Ordenação</Label>
-                  <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-                    <SelectTrigger className="w-full h-9">
-                      <SelectValue placeholder="Ordenar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="recent">Mais recentes</SelectItem>
-                      <SelectItem value="oldest">Mais antigas</SelectItem>
-                      <SelectItem value="name_asc">Nome A-Z</SelectItem>
-                      <SelectItem value="name_desc">Nome Z-A</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="w-[200px] p-4 space-y-2">
+                    <Label className="text-xs uppercase text-muted-foreground font-semibold">Ordenação</Label>
+                    <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
+                      <SelectTrigger className="w-full h-9">
+                        <SelectValue placeholder="Ordenar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="recent">Mais recentes</SelectItem>
+                        <SelectItem value="oldest">Mais antigas</SelectItem>
+                        <SelectItem value="name_asc">Nome A-Z</SelectItem>
+                        <SelectItem value="name_desc">Nome Z-A</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </FilterButton>
 
