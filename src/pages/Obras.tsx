@@ -196,8 +196,6 @@ export default function Obras() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button 
-                variant="outline" 
               <div className="flex bg-muted p-1 rounded-md">
                 <button
                   onClick={() => setViewMode('cards')}
