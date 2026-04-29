@@ -164,12 +164,6 @@ const NovoPedido = () => {
   };
 
   const validateStep2 = () => {
-    if (itens.length === 0) { toast.error('Adicione pelo menos 1 item'); return false; }
-    for (const item of itens) {
-      if (!item.descricao_material.trim()) { toast.error('Preencha a descrição de todos os itens'); return false; }
-      if (item.quantidade <= 0) { toast.error('Quantidade deve ser maior que 0'); return false; }
-      if (item.preco_unitario <= 0) { toast.error('Preço unitário deve ser maior que 0'); return false; }
-    }
     return true;
   };
 
