@@ -240,19 +240,6 @@ export default function Obras() {
                 onLoadPreset={loadPreset}
                 onDeletePreset={deletePreset}
                 className="h-10"
-              />
-
-            <div className="flex flex-1 items-center gap-2 max-w-full lg:max-w-2xl">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome, endereço ou cliente..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 h-10"
-                />
-              </div>
-
               <FilterButton 
                 hasFilters={hasFilters}
                 activeFilterCount={activeFilterCount}
@@ -270,6 +257,13 @@ export default function Obras() {
                       <div 
                         className={cn(
                           "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
+                          statusFilter === 'todos' && "bg-accent text-accent-foreground"
+                        )}
+                        onClick={() => setStatusFilter('todos')}
+                      >
+                        <Checkbox checked={statusFilter === 'todos'} onCheckedChange={() => setStatusFilter('todos')} />
+                        Todos os status
+                      </div>
                           statusFilter === 'todos' && "bg-accent text-accent-foreground"
                         )}
                         onClick={() => setStatusFilter('todos')}
