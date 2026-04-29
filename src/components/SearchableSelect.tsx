@@ -59,11 +59,29 @@ export function SearchableSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command>
           <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
           <CommandList>
-            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandEmpty className="py-2 text-center text-sm">
+              {emptyMessage}
+              {onActionClick && actionLabel && (
+                <div className="mt-2 px-2 border-t pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
+                    onClick={() => {
+                      onActionClick();
+                      setOpen(false);
+                    }}
+                  >
+                    <Plus className="mr-2 h-3 w-3" />
+                    {actionLabel}
+                  </Button>
+                </div>
+              )}
+            </CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
