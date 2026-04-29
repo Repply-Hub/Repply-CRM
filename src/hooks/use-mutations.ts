@@ -161,6 +161,27 @@ export function useCreateObra() {
   });
 }
 
+export function useUpdateObra() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: {
+      id: string;
+      nome_obra?: string;
+      cliente_id?: string;
+      endereco_entrega?: string;
+      status?: string;
+      spe_cnpj?: string;
+    }) => {
+      const { error } = await supabase.from('obras').update(data).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obras'] });
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+    },
+  });
+}
+
 export function useCreateFabricante() {
   const qc = useQueryClient();
   return useMutation({
