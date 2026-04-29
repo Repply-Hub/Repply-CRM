@@ -23,6 +23,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 const ORIGENS = [
   { value: 'recompra', label: 'Recompra' },
