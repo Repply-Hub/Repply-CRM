@@ -362,14 +362,7 @@ const NovoPedido = () => {
 
                   {/* Origem */}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Origem</Label>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 px-2 text-xs text-primary"
-                        onClick={() => setOrigemDialogOpen(true)}
-                      >
+                    <Label>Origem</Label>
                     <Select value={origemLead} onValueChange={setOrigemLead}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Selecionar origem" />
@@ -397,7 +390,6 @@ const NovoPedido = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
                 {/* Anexo PDF */}
                 <div className="space-y-2">
