@@ -362,7 +362,7 @@ export default function Obras() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive transition-opacity z-10"
                             onClick={(e) => {
                               e.stopPropagation();
                               setConfirmDeleteId(obra.id);
