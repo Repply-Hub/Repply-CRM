@@ -333,24 +333,14 @@ const NovoPedido = () => {
 
                 {/* Obra */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Obra</Label>
-                    {clienteId && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 px-2 text-xs text-primary"
-                        onClick={() => setObraDialogOpen(true)}
-                      >
-                        <Plus className="h-3 w-3 mr-1" /> Nova Obra
-                      </Button>
-                    )}
-                  </div>
+                  <Label>Obra</Label>
                   <SearchableSelect
                     options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
                     value={obraId}
                     onValueChange={handleObraChange}
                     placeholder={clienteId ? "Selecionar obra" : "Selecione um cliente primeiro"}
+                    onActionClick={clienteId ? () => setObraDialogOpen(true) : undefined}
+                    actionLabel="Nova Obra"
                   />
                   {selectedObra?.spe_cnpj && (
                     <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
