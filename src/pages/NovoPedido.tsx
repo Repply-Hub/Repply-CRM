@@ -368,8 +368,8 @@ const NovoPedido = () => {
                       options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
                       value={obraId}
                       onValueChange={handleObraChange}
-                      placeholder={clienteId ? "Selecionar obra" : "Selecione um cliente primeiro"}
-                      onActionClick={clienteId ? () => setObraDialogOpen(true) : undefined}
+                      placeholder="Selecionar obra"
+                      onActionClick={() => setObraDialogOpen(true)}
                       actionLabel="Nova Obra"
                     />
                     {selectedObra?.spe_cnpj && (
