@@ -39,6 +39,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'negocio', label: 'Negócio', locked: false },
