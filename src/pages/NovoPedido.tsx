@@ -561,9 +561,8 @@ const NovoPedido = () => {
                         <TableHeader>
                           <TableRow className="bg-muted/50">
                             <TableHead className="min-w-[200px]">Descrição do Material</TableHead>
-                            <TableHead className="w-28">Referência</TableHead>
+                            <TableHead className="w-32">Unidade</TableHead>
                             <TableHead className="w-20">Qtd</TableHead>
-                            <TableHead className="w-20">Unidade</TableHead>
                             <TableHead className="w-28">Preço Unit.</TableHead>
                             <TableHead className="w-28">Preço Total</TableHead>
                             <TableHead className="w-10"></TableHead>
@@ -581,13 +580,25 @@ const NovoPedido = () => {
                                 />
                               </TableCell>
                               <TableCell>
-                                <Input className="h-8 text-xs" value={item.referencia_fabricante} onChange={e => updateItem(item.id, 'referencia_fabricante', e.target.value)} />
+                                <Select 
+                                  value={item.unidade} 
+                                  onValueChange={(v) => updateItem(item.id, 'unidade', v)}
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Un." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Litro">Litro</SelectItem>
+                                    <SelectItem value="Grama">Grama</SelectItem>
+                                    <SelectItem value="Quilograma">Quilograma</SelectItem>
+                                    <SelectItem value="Peça">Peça</SelectItem>
+                                    <SelectItem value="Metro quadrado">Metro quadrado</SelectItem>
+                                    <SelectItem value="Balde">Balde</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </TableCell>
                               <TableCell>
                                 <Input className="h-8 text-xs" type="number" min="0" step="1" value={item.quantidade} onChange={e => updateItem(item.id, 'quantidade', parseFloat(e.target.value) || 0)} />
-                              </TableCell>
-                              <TableCell>
-                                <Input className="h-8 text-xs" value={item.unidade} onChange={e => updateItem(item.id, 'unidade', e.target.value)} />
                               </TableCell>
                               <TableCell>
                                 <Input className="h-8 text-xs" type="number" min="0" step="0.01" value={item.preco_unitario} onChange={e => updateItem(item.id, 'preco_unitario', parseFloat(e.target.value) || 0)} />
