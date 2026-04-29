@@ -554,7 +554,7 @@ const ClienteDetalhe = () => {
               </Dialog>
             </CardContent>
           </Card>
-        )}
+        {/* Removed extra closing brace */}
 
         {/* Contatos extras (apenas para empresas, não pessoa física) */}
         {cliente.tipo !== 'pessoa_fisica' && (
