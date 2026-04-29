@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useObras } from '@/hooks/use-obras';
 import { useStatusObras } from '@/hooks/use-status-obras';
+import { useClientes } from '@/hooks/use-clientes';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
