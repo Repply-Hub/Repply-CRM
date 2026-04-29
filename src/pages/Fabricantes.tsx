@@ -28,6 +28,7 @@ import { GlobalImportCatalogoDialog } from '@/components/catalogo/GlobalImportCa
 import { cn } from '@/lib/utils';
 import { FilterButton } from '@/components/FilterButton';
 import { Filter } from 'lucide-react';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'imagem', label: 'Imagem', locked: false },
@@ -515,19 +516,18 @@ const Fabricantes = () => {
                           hasFilters={hasFilters}
                           activeFilterCount={activeFilterCount}
                           onClear={() => setFiltroCategoria('todas')}
-                          className="h-8"
                         >
                           <div className="space-y-2">
                             <Label className="text-xs uppercase text-muted-foreground font-semibold">Categoria</Label>
-                            <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-                              <SelectTrigger className="w-full h-9">
-                                <SelectValue placeholder="Categoria" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="todas">Todas categorias</SelectItem>
-                                {categoriasPreco.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                              options={[
+                                { value: "todas", label: "Todas categorias" },
+                                ...categoriasPreco.map(c => ({ value: c, label: c }))
+                              ]}
+                              value={filtroCategoria}
+                              onValueChange={setFiltroCategoria}
+                              placeholder="Filtrar por categoria"
+                            />
                           </div>
                         </FilterButton>
 

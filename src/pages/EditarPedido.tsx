@@ -23,6 +23,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 const ORIGENS = [
   { value: 'recompra', label: 'Recompra' },
@@ -289,14 +290,12 @@ const EditarPedido = () => {
                 {isConstrutora && (
                   <div className="space-y-2">
                     <Label>Obra *</Label>
-                    <Select value={obraId} onValueChange={handleObraChange}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar obra" /></SelectTrigger>
-                      <SelectContent>
-                        {(obras ?? []).map(o => (
-                          <SelectItem key={o.id} value={o.id}>{o.nome_obra}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
+                      value={obraId}
+                      onValueChange={handleObraChange}
+                      placeholder="Selecionar obra"
+                    />
                     {selectedObra?.spe_cnpj && (
                       <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
                     )}
@@ -306,14 +305,13 @@ const EditarPedido = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Responsável *</Label>
-                    <Select value={vendedorId} onValueChange={setVendedorId} disabled={!isGestor}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar vendedor" /></SelectTrigger>
-                      <SelectContent>
-                        {(vendedores ?? []).map(v => (
-                          <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={(vendedores ?? []).map(v => ({ value: v.id, label: v.nome }))}
+                      value={vendedorId}
+                      onValueChange={setVendedorId}
+                      placeholder="Selecionar responsável"
+                      className={!isGestor ? "opacity-50 pointer-events-none" : ""}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Origem</Label>

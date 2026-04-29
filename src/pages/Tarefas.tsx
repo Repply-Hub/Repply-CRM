@@ -28,6 +28,7 @@ import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettin
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { FilterButton } from '@/components/FilterButton';
 import { cn } from '@/lib/utils';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 const TAREFA_COLUMNS: ColumnDefinition[] = [
   { id: 'titulo', label: 'Tarefa', locked: false },
@@ -472,12 +473,12 @@ export default function Tarefas() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Responsável</Label>
-                <Select value={form.responsavel} onValueChange={v => setForm(f => ({ ...f, responsavel: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    {vendedores.map(v => <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={vendedores.map(v => ({ value: v.nome, label: v.nome }))}
+                  value={form.responsavel}
+                  onValueChange={v => setForm(f => ({ ...f, responsavel: v }))}
+                  placeholder="Selecione o responsável"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Projeto / Obra</Label>

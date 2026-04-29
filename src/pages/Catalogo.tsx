@@ -13,6 +13,7 @@ import { useCatalogoGlobal, useDeleteCategoria } from '@/hooks/use-fabricantes';
 import { useFabricantes } from '@/hooks/use-clientes';
 import { Search, Package, ImageIcon, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 const Catalogo = () => {
   const { data: produtos, isLoading } = useCatalogoGlobal();
@@ -72,21 +73,29 @@ const Catalogo = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Buscar por descrição, referência ou fabricante..." value={busca} onChange={e => setBusca(e.target.value)} className="pl-9" />
             </div>
-            <Select value={fabricanteId} onValueChange={setFabricanteId}>
-              <SelectTrigger className="w-52"><SelectValue placeholder="Fabricante" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos fabricantes</SelectItem>
-                {(fabricantes ?? []).map(f => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            
+            <SearchableSelect
+              options={[
+                { value: "todos", label: "Todos fabricantes" },
+                ...(fabricantes ?? []).map(f => ({ value: f.id, label: f.nome }))
+              ]}
+              value={fabricanteId}
+              onValueChange={setFabricanteId}
+              placeholder="Fabricante"
+              className="w-52"
+            />
+
             <div className="flex items-center gap-1">
-              <Select value={categoria} onValueChange={setCategoria}>
-                <SelectTrigger className="w-52"><SelectValue placeholder="Categoria" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas categorias</SelectItem>
-                  {categorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={[
+                  { value: "todas", label: "Todas categorias" },
+                  ...categorias.map(c => ({ value: c, label: c }))
+                ]}
+                value={categoria}
+                onValueChange={setCategoria}
+                placeholder="Categoria"
+                className="w-52"
+              />
               {categoria !== 'todas' && (
                 <Button
                   variant="ghost"

@@ -28,6 +28,7 @@ import { StatusObrasDialog } from '@/components/obras/StatusObrasDialog';
 import { cn } from '@/lib/utils';
 import { FilterButton } from '@/components/FilterButton';
 import { supabase } from '@/integrations/supabase/client';
+import { EmpresaSelector } from '@/components/EmpresaSelector';
 
 const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'nome_obra', label: 'Nome da Obra', locked: false },
@@ -554,19 +555,11 @@ export default function Obras() {
 
               <div className="space-y-2">
                 <Label>Cliente Responsável</Label>
-                <Select 
-                  value={editObra.cliente_id} 
+                <EmpresaSelector
+                  value={editObra.cliente_id}
                   onValueChange={(v) => setEditObra(prev => ({ ...prev, cliente_id: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes?.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.empresa}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Selecione o cliente"
+                />
               </div>
 
               <div className="space-y-2">
@@ -645,19 +638,11 @@ export default function Obras() {
 
               <div className="space-y-2">
                 <Label>Cliente Responsável</Label>
-                <Select 
-                  value={newObra.cliente_id} 
+                <EmpresaSelector
+                  value={newObra.cliente_id}
                   onValueChange={(v) => setNewObra(prev => ({ ...prev, cliente_id: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes?.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.empresa}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Selecione um cliente"
+                />
               </div>
 
               <div className="space-y-2">

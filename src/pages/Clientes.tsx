@@ -21,6 +21,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/EmpresaSelector';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
