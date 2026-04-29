@@ -37,15 +37,11 @@ const ClienteDetalhe = () => {
   const { slug } = useParams<{ slug: string }>();
   const id = useMemo(() => {
     if (!slug) return null;
-    const parts = slug.split('-');
-    const lastPart = parts[parts.length - 1];
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     
-    // Se a última parte for um UUID, priorizamos ela
-    if (uuidRegex.test(lastPart)) return lastPart;
-    // Se o slug inteiro for um UUID, usamos ele
-    if (uuidRegex.test(slug)) return slug;
+    const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+    const match = slug.match(uuidRegex);
     
+    if (match) return match[0];
     return slug;
   }, [slug]);
 
@@ -53,10 +49,9 @@ const ClienteDetalhe = () => {
   const { data: clientes, isLoading: loadingClientes } = useClientes();
   const { data: pedidos, isLoading: loadingPedidos } = usePedidos();
   
-  // Debug log para ajudar a identificar o problema
+  // Debug log
   console.log('ClienteDetalhe - slug:', slug, 'extracted id:', id);
   if (clientes) {
-    console.log('ClienteDetalhe - total clientes:', clientes.length);
     const found = clientes.find(c => c.id === id);
     console.log('ClienteDetalhe - cliente encontrado:', !!found);
   }

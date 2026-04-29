@@ -25,13 +25,11 @@ const ContatoDetalhe = () => {
   const { slug } = useParams<{ slug: string }>();
   const id = useMemo(() => {
     if (!slug) return null;
-    const parts = slug.split('-');
-    const lastPart = parts[parts.length - 1];
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     
-    if (uuidRegex.test(lastPart)) return lastPart;
-    if (uuidRegex.test(slug)) return slug;
+    const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+    const match = slug.match(uuidRegex);
     
+    if (match) return match[0];
     return slug;
   }, [slug]);
 
