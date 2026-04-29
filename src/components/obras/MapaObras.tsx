@@ -1,10 +1,10 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Loader2, MapPin, Building2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useGeocodeObras, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
+import { useGeocodeObras, geocodificar, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
 
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
   const map = useMap();
@@ -28,6 +28,7 @@ const iconPadrao = new L.Icon({
 interface MapaObrasProps {
   obras: ObraComCoordenada[] | undefined;
   isLoading: boolean;
+  searchTerm?: string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -37,8 +38,24 @@ const STATUS_LABEL: Record<string, string> = {
   parada: 'Parada',
 };
 
-export function MapaObras({ obras, isLoading, isSearching = false }: MapaObrasProps & { isSearching?: boolean }) {
+  export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps) {
   const { items, carregando, progresso } = useGeocodeObras(obras);
+  const [searchCoord, setSearchCoord] = useState<[number, number] | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchTerm.trim().length > 3) {
+        const coord = await geocodificar(searchTerm);
+        if (coord) {
+          setSearchCoord([coord.lat, coord.lng]);
+        }
+      } else {
+        setSearchCoord(null);
+      }
+    }, 800); // Debounce
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const obrasComCoord = useMemo(
     () => items.filter((o) => o.latitude !== null && o.longitude !== null),
@@ -50,15 +67,16 @@ export function MapaObras({ obras, isLoading, isSearching = false }: MapaObrasPr
     [items]
   );
 
-  // Centro do mapa: média das coordenadas, ou Natal/RN como fallback
+  // Centro do mapa: prioriza termo pesquisado, senão média das obras, senão Natal/RN
   const centro = useMemo<[number, number]>(() => {
+    if (searchCoord) return searchCoord;
     if (obrasComCoord.length === 0) return [-5.7945, -35.211]; // Natal/RN
     const lat =
       obrasComCoord.reduce((s, o) => s + (o.latitude ?? 0), 0) / obrasComCoord.length;
     const lng =
       obrasComCoord.reduce((s, o) => s + (o.longitude ?? 0), 0) / obrasComCoord.length;
     return [lat, lng];
-  }, [obrasComCoord]);
+  }, [obrasComCoord, searchCoord]);
 
   if (isLoading) {
     return (
@@ -98,7 +116,7 @@ export function MapaObras({ obras, isLoading, isSearching = false }: MapaObrasPr
           scrollWheelZoom
           style={{ height: '100%', width: '100%' }}
         >
-          <ChangeView center={centro} zoom={isSearching && obrasComCoord.length > 0 ? 14 : (obrasComCoord.length > 0 ? 11 : 6)} />
+          <ChangeView center={centro} zoom={searchTerm.trim().length > 0 ? 14 : (obrasComCoord.length > 0 ? 11 : 6)} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

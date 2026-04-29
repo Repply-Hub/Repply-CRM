@@ -493,7 +493,7 @@ export default function Obras() {
               <MapaObras 
                 obras={obrasParaMapa} 
                 isLoading={isLoading} 
-                isSearching={search.trim().length > 0} 
+                searchTerm={search} 
               />
             </Card>
           </TabsContent>
