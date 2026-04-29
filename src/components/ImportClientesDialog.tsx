@@ -197,7 +197,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       setRawData(json);
       setHeaders(cols);
 
-      const auto = autoDetectMapping(cols);
+      const auto = autoDetectMapping(cols, visibleFields);
       setMapping(auto);
       setExtras(autoDetectExtras(cols, Object.values(auto).filter(Boolean)));
       setCustomColumns({});
