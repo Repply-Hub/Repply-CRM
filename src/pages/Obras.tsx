@@ -555,8 +555,7 @@ export default function Obras() {
 
               <div className="space-y-2">
                 <Label>Cliente Responsável</Label>
-                <SearchableSelect
-                  options={clientes?.map(c => ({ value: c.id, label: c.empresa })) || []}
+                <EmpresaSelector
                   value={editObra.cliente_id}
                   onValueChange={(v) => setEditObra(prev => ({ ...prev, cliente_id: v }))}
                   placeholder="Selecione o cliente"
