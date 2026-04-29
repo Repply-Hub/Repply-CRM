@@ -30,6 +30,7 @@ import { FilterButton } from '@/components/FilterButton';
 import { supabase } from '@/integrations/supabase/client';
 import { EmpresaSelector } from '@/components/EmpresaSelector';
 import { EnderecoAutocomplete } from '@/components/EnderecoAutocomplete';
+import { SearchWithRecent } from '@/components/SearchWithRecent';
 import {
   AlertDialog,
   AlertDialogAction,
