@@ -982,7 +982,7 @@ const Clientes = () => {
                           }
 
                           return (
-                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground truncate max-w-[200px]" onClick={() => navigate(`/contatos/${contato.id}`)}>
+                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap" onClick={() => navigate(`/contatos/${contato.id}`)}>
                               {value || '—'}
                             </td>
                           );
