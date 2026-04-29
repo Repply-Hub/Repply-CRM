@@ -639,19 +639,12 @@ export default function Obras() {
 
               <div className="space-y-2">
                 <Label>Cliente Responsável</Label>
-                <Select 
-                  value={newObra.cliente_id} 
+                <SearchableSelect
+                  options={clientes?.map(c => ({ value: c.id, label: c.empresa })) || []}
+                  value={newObra.cliente_id}
                   onValueChange={(v) => setNewObra(prev => ({ ...prev, cliente_id: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes?.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.empresa}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Selecione um cliente"
+                />
               </div>
 
               <div className="space-y-2">
