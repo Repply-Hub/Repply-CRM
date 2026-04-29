@@ -72,6 +72,36 @@ const NovoPedido = () => {
   const [origemDialogOpen, setOrigemDialogOpen] = useState(false);
   const [newOrigemLabel, setNewOrigemLabel] = useState('');
 
+  const DEFAULT_UNIDADES = ['Litro', 'Grama', 'Quilograma', 'Peça', 'Metro quadrado', 'Balde'];
+  const [unidades, setUnidades] = useState<string[]>(() => {
+    const saved = localStorage.getItem('custom_unidades');
+    if (saved) {
+      try { return [...DEFAULT_UNIDADES, ...JSON.parse(saved)]; } catch { return DEFAULT_UNIDADES; }
+    }
+    return DEFAULT_UNIDADES;
+  });
+  const [unidadeDialogOpen, setUnidadeDialogOpen] = useState(false);
+  const [unidadeDialogItemId, setUnidadeDialogItemId] = useState<string | null>(null);
+  const [newUnidadeLabel, setNewUnidadeLabel] = useState('');
+
+  const handleAddUnidade = () => {
+    const nome = newUnidadeLabel.trim();
+    if (!nome) { toast.error('Informe o nome da unidade'); return; }
+    if (unidades.some(u => u.toLowerCase() === nome.toLowerCase())) {
+      toast.error('Esta unidade já existe');
+      return;
+    }
+    const novas = [...unidades, nome];
+    setUnidades(novas);
+    const customs = novas.filter(u => !DEFAULT_UNIDADES.includes(u));
+    localStorage.setItem('custom_unidades', JSON.stringify(customs));
+    if (unidadeDialogItemId) updateItem(unidadeDialogItemId, 'unidade', nome);
+    setNewUnidadeLabel('');
+    setUnidadeDialogOpen(false);
+    setUnidadeDialogItemId(null);
+    toast.success('Unidade adicionada');
+  };
+
   const [step, setStep] = useState(1);
 
   // Step 1 fields
@@ -588,12 +618,26 @@ const NovoPedido = () => {
                                     <SelectValue placeholder="Un." />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="Litro">Litro</SelectItem>
-                                    <SelectItem value="Grama">Grama</SelectItem>
-                                    <SelectItem value="Quilograma">Quilograma</SelectItem>
-                                    <SelectItem value="Peça">Peça</SelectItem>
-                                    <SelectItem value="Metro quadrado">Metro quadrado</SelectItem>
-                                    <SelectItem value="Balde">Balde</SelectItem>
+                                    {unidades.map(u => (
+                                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                                    ))}
+                                    <div className="border-t mt-1 pt-1">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10 h-8"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setUnidadeDialogItemId(item.id);
+                                          setUnidadeDialogOpen(true);
+                                        }}
+                                      >
+                                        <Plus className="mr-2 h-3 w-3" />
+                                        Nova unidade
+                                      </Button>
+                                    </div>
                                   </SelectContent>
                                 </Select>
                               </TableCell>
@@ -715,6 +759,26 @@ const NovoPedido = () => {
             <Button onClick={handleCreateOrigem}>
               Criar Origem
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={unidadeDialogOpen} onOpenChange={(o) => { setUnidadeDialogOpen(o); if (!o) setUnidadeDialogItemId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova unidade</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Nome da unidade</Label>
+            <Input
+              value={newUnidadeLabel}
+              onChange={(e) => setNewUnidadeLabel(e.target.value)}
+              placeholder="Ex.: Caixa, Saco, Rolo..."
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUnidade(); } }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setUnidadeDialogOpen(false); setNewUnidadeLabel(''); setUnidadeDialogItemId(null); }}>Cancelar</Button>
+            <Button onClick={handleAddUnidade}>Adicionar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
