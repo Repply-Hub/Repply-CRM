@@ -42,23 +42,28 @@ export function FilterButton({
           <ChevronDown className="h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className={cn("p-4", popoverClassName)} align={align}>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-medium leading-none">Filtros</h4>
+      <PopoverContent className={cn("p-0 w-auto shadow-2xl border-border/40 overflow-hidden", popoverClassName)} align={align}>
+        <div className="flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b border-border/50">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-primary" />
+              <h4 className="font-medium text-sm leading-none">Filtros</h4>
+            </div>
             {hasFilters && onClear && (
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={onClear}
-                className="h-8 px-2 text-xs text-muted-foreground hover:text-primary"
+                className="h-7 px-2 text-[11px] font-bold text-primary hover:bg-primary/10 transition-all uppercase tracking-wider"
               >
                 Limpar
-                <X className="ml-1 h-3 w-3" />
+                <X className="ml-1.5 h-3.5 w-3.5" />
               </Button>
             )}
           </div>
-          {children}
+          <div className="p-4">
+            {children}
+          </div>
         </div>
       </PopoverContent>
     </Popover>
