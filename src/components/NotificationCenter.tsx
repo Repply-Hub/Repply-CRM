@@ -65,14 +65,18 @@ export function NotificationCenter() {
   const markRead = useMarkAsRead();
   const markAllRead = useMarkAllAsRead();
   const navigate = useNavigate();
-  const toastShown = useRef(false);
+  const lastToastTime = useRef<number>(0);
 
   useEffect(() => {
-    if (toastShown.current || !notificacoes) return;
+    if (!notificacoes) return;
     const unread = notificacoes.filter(n => !n.lida);
     if (unread.length === 0) return;
 
-    toastShown.current = true;
+    // Apenas mostrar se passaram mais de 10 minutos desde o último toast
+    const now = Date.now();
+    if (now - lastToastTime.current < 10 * 60 * 1000) return;
+
+    lastToastTime.current = now;
     const followups = unread.filter(n => n.tipo === 'followup').length;
     const inativos = unread.filter(n => n.tipo === 'inatividade').length;
     const parts: string[] = [];
