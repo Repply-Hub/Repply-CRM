@@ -345,11 +345,15 @@ const ClienteDetalhe = () => {
             role={cliente.email ? 'button' : undefined}
             tabIndex={cliente.email ? 0 : undefined}
             className={`border-border/40 ${cliente.email ? 'cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : ''}`}
-            onClick={() => copyInfo('Email', cliente.email)}
+            onClick={() => {
+              if (cliente.email) {
+                navigate(`/emails?to=${encodeURIComponent(cliente.email)}`);
+              }
+            }}
             onKeyDown={e => {
               if (cliente.email && (e.key === 'Enter' || e.key === ' ')) {
                 e.preventDefault();
-                copyInfo('Email', cliente.email);
+                navigate(`/emails?to=${encodeURIComponent(cliente.email)}`);
               }
             }}
           >
