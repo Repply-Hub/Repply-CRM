@@ -67,15 +67,16 @@ const STATUS_LABEL: Record<string, string> = {
     [items]
   );
 
-  // Centro do mapa: média das coordenadas, ou Natal/RN como fallback
+  // Centro do mapa: prioriza termo pesquisado, senão média das obras, senão Natal/RN
   const centro = useMemo<[number, number]>(() => {
+    if (searchCoord) return searchCoord;
     if (obrasComCoord.length === 0) return [-5.7945, -35.211]; // Natal/RN
     const lat =
       obrasComCoord.reduce((s, o) => s + (o.latitude ?? 0), 0) / obrasComCoord.length;
     const lng =
       obrasComCoord.reduce((s, o) => s + (o.longitude ?? 0), 0) / obrasComCoord.length;
     return [lat, lng];
-  }, [obrasComCoord]);
+  }, [obrasComCoord, searchCoord]);
 
   if (isLoading) {
     return (
