@@ -152,10 +152,13 @@ const Clientes = () => {
   const createContato = useCreateContato();
   const deleteCliente = useDeleteCliente();
   const deleteContato = useDeleteContato();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => localStorage.getItem('clientes_search') || '');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [activeTab, setActiveTab] = useState<ViewTab>('empresas');
+  const [activeTab, setActiveTab] = useState<ViewTab>(() => {
+    const saved = localStorage.getItem('clientes_active_tab');
+    return (saved === 'empresas' || saved === 'contatos') ? saved : 'empresas';
+  });
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -327,6 +330,14 @@ const Clientes = () => {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginatedEmpresas = filteredEmpresas.slice((page - 1) * pageSize, page * pageSize);
   const paginatedContatos = filteredContatos.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    localStorage.setItem('clientes_active_tab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem('clientes_search', search);
+  }, [search]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
