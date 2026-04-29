@@ -286,14 +286,13 @@ const NovoPedido = () => {
                   {/* Vendedor */}
                   <div className="space-y-2">
                     <Label>Responsável *</Label>
-                    <Select value={vendedorId} onValueChange={setVendedorId} disabled={!isGestor}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar vendedor" /></SelectTrigger>
-                      <SelectContent>
-                        {(vendedores ?? []).map(v => (
-                          <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={(vendedores ?? []).map(v => ({ value: v.id, label: v.nome }))}
+                      value={vendedorId}
+                      onValueChange={setVendedorId}
+                      placeholder="Selecionar responsável"
+                      className={!isGestor ? "opacity-50 pointer-events-none" : ""}
+                    />
                   </div>
 
                   {/* Origem */}
