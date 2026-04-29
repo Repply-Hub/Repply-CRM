@@ -1,10 +1,18 @@
-import { useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { useMemo, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Loader2, MapPin, Building2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useGeocodeObras, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
+
+function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, [center, zoom, map]);
+  return null;
+}
 
 // Fix dos ícones padrão do Leaflet (assets quebram com bundlers)
 const iconPadrao = new L.Icon({
