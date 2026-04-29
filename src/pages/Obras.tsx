@@ -425,7 +425,8 @@ export default function Obras() {
 
                 <div className="pt-4 border-t">
                   <ListPagination
-                    currentPage={page}
+                    page={page}
+                    totalPages={Math.ceil(filtered.length / pageSize)}
                     totalItems={filtered.length}
                     pageSize={pageSize}
                     onPageChange={setPage}
