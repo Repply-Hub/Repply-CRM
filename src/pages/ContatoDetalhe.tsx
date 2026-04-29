@@ -235,7 +235,11 @@ const ContatoDetalhe = () => {
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-tight">E-mail Corporativo</p>
                     <p className="text-sm font-semibold text-foreground truncate">{contato.email || 'Não informado'}</p>
                     {contato.email && (
-                      <Button variant="link" className="p-0 h-auto text-[11px] mt-1" onClick={() => window.location.href = `mailto:${contato.email}`}>
+                      <Button 
+                        variant="link" 
+                        className="p-0 h-auto text-[11px] mt-1" 
+                        onClick={() => navigate(`/emails?to=${encodeURIComponent(contato.email)}`)}
+                      >
                         Enviar e-mail
                       </Button>
                     )}
