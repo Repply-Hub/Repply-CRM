@@ -63,7 +63,25 @@ export function SearchableSelect({
         <Command>
           <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
           <CommandList>
-            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandEmpty className="py-2 text-center text-sm">
+              {emptyMessage}
+              {onActionClick && actionLabel && (
+                <div className="mt-2 px-2 border-t pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10"
+                    onClick={() => {
+                      onActionClick();
+                      setOpen(false);
+                    }}
+                  >
+                    <Plus className="mr-2 h-3 w-3" />
+                    {actionLabel}
+                  </Button>
+                </div>
+              )}
+            </CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
