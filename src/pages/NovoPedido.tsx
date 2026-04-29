@@ -323,6 +323,23 @@ const NovoPedido = () => {
                     />
                   </div>
 
+                  {/* Fase do Pedido */}
+                  <div className="space-y-2">
+                    <Label>Fase do Pedido *</Label>
+                    <Select value={status} onValueChange={setStatus}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar fase" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="novo_lead">Novo Lead</SelectItem>
+                        <SelectItem value="negociacao">Negociação</SelectItem>
+                        <SelectItem value="fechamento">Fechamento</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Fabricante */}
                   <div className="space-y-2">
                     <Label>Fabricante *</Label>
