@@ -165,29 +165,6 @@ const Dashboard = () => {
     <AppLayout title="Dashboard" subtitle="Visão analítica do desempenho comercial">
       <ErrorBoundary>
       <div className="p-6 max-w-[1400px] mx-auto">
-        <div className="mb-8 flex flex-col sm:flex-row gap-4 justify-end items-end">
-          <div className="w-full sm:w-64">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Responsável</p>
-            <Select value={vendedorId} onValueChange={setVendedorId}>
-              <SelectTrigger className="h-10 bg-card border-border/60 shadow-sm">
-                <SelectValue placeholder="Selecione o responsável" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os responsáveis</SelectItem>
-                {(vendedores ?? []).map((v) => (
-                  <SelectItem key={v.usuario_id} value={v.usuario_id || ''}>
-                    {v.usuario_nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-full sm:w-auto">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Período</p>
-            <DateRangePicker value={dateRange} onChange={setDateRange} />
-          </div>
-        </div>
-
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {kpis.map((kpi) => (
@@ -211,6 +188,30 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Filtros */}
+        <div className="mb-8 flex flex-col sm:flex-row gap-4 justify-end items-end">
+          <div className="w-full sm:w-64">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Responsável</p>
+            <Select value={vendedorId} onValueChange={setVendedorId}>
+              <SelectTrigger className="h-10 bg-card border-border/60 shadow-sm">
+                <SelectValue placeholder="Selecione o responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os responsáveis</SelectItem>
+                {(vendedores ?? []).map((v) => (
+                  <SelectItem key={v.usuario_id} value={v.usuario_id || ''}>
+                    {v.usuario_nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full sm:w-auto">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Período</p>
+            <DateRangePicker value={dateRange} onChange={setDateRange} />
+          </div>
         </div>
 
         {/* Charts Row 1 */}
