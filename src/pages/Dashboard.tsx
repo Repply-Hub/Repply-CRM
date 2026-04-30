@@ -75,8 +75,10 @@ const Dashboard = () => {
       return (data as any[]) || [];
     },
     enabled: !!empresaId,
+    initialData: [],
   });
-  const fabricantes = useMemo(() => fabricantesData || [], [fabricantesData]);
+  const fabricantes = fabricantesData;
+
 
 
 
