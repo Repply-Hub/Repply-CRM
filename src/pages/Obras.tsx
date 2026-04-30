@@ -183,6 +183,7 @@ export default function Obras() {
         spe_cnpj: o.spe_cnpj,
         latitude: o.latitude ?? null,
         longitude: o.longitude ?? null,
+        geocoded_at: o.geocoded_at ?? null,
         cliente_empresa: o.clientes?.empresa ?? null,
       })),
     [filtered]
