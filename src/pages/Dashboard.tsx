@@ -41,6 +41,7 @@ const Dashboard = () => {
   });
   const [fabricaSort, setFabricaSort] = useState<'maior' | 'menor'>('maior');
   const [vendedorId, setVendedorId] = useState<string>('todos');
+  const [fabricanteId, setFabricanteId] = useState<string>('todos');
 
   const { user } = useAuth();
   const { data: userData } = useQuery({
