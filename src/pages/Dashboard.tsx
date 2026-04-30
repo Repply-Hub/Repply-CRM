@@ -63,6 +63,20 @@ const Dashboard = () => {
   const { data: faturamento, isLoading: loadFat } = useFaturamentoMensal(empresaId);
   const { data: vendedores } = useIndicadoresVendedor(empresaId);
   const { data: velocidade } = useVelocidadeFabricante(empresaId);
+  const { data: fabricantes } = useQuery({
+    queryKey: ['fabricantes_filtro', empresaId],
+    queryFn: async () => {
+      if (!empresaId) return [];
+      const { data, error } = await supabase
+        .from('fabricantes')
+        .select('id, nome')
+        .eq('empresa_id', empresaId)
+        .order('nome');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!empresaId,
+  });
   const { data: pedidos } = usePedidos(empresaId);
 
   const isLoading = loadFat;
