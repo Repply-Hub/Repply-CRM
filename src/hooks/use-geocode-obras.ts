@@ -9,6 +9,7 @@ export interface ObraComCoordenada {
   spe_cnpj: string | null;
   latitude: number | null;
   longitude: number | null;
+  geocoded_at?: string | null;
   cliente_empresa?: string | null;
 }
 
@@ -101,7 +102,7 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
     setItems(obras);
 
     const pendentes = obras.filter(
-      (o) => !!o.endereco_entrega && (o.latitude === null || o.longitude === null)
+      (o) => !!o.endereco_entrega && (o.latitude === null || o.longitude === null) && !o.geocoded_at
     );
     
     console.log('[useGeocodeObras] Obras pendentes:', pendentes.length);
