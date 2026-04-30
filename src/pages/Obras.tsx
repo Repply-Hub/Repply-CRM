@@ -68,10 +68,7 @@ export default function Obras() {
   const [page, setPage] = useState(1);
   const [selectedObra, setSelectedObra] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('lista');
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
-    const saved = localStorage.getItem('obras_view_mode');
-    return (saved as any) || 'cards';
-  });
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
@@ -226,23 +223,6 @@ export default function Obras() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex bg-muted p-1 rounded-md">
-                <button
-                  onClick={() => setViewMode('cards')}
-                  className={cn("p-1.5 rounded-sm transition-all", viewMode === 'cards' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")}
-                  title="Visualização em Cards"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={cn("p-1.5 rounded-sm transition-all", viewMode === 'table' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground")}
-                  title="Visualização em Tabela"
-                >
-                  <TableIcon className="h-4 w-4" />
-                </button>
-              </div>
-
               <ColumnSettings
                 columns={columns}
                 visibleColumns={visibleColumns}
@@ -349,7 +329,7 @@ export default function Obras() {
               <>
                 <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
                 
-                {viewMode === 'cards' ? (
+                {viewMode === 'table' ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filtered.slice((page - 1) * pageSize, page * pageSize).map((obra) => {
                       const status = getStatusInfo(obra.status);
