@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useObras } from '@/hooks/use-obras';
 import { useStatusObras } from '@/hooks/use-status-obras';
@@ -55,6 +56,7 @@ const OBRA_FIELDS: ColumnDefinition[] = [
 type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
 
 export default function Obras() {
+  const navigate = useNavigate();
   const { data: obras, isLoading } = useObras();
   const { data: clientes } = useClientes();
   const createObra = useCreateObra();
