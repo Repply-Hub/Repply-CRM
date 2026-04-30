@@ -76,8 +76,9 @@ const Dashboard = () => {
   const filteredFaturamento = useMemo(() => {
     if (!faturamento) return [];
     return faturamento.filter(f => {
-      if (!f.mes) return false;
-      const d = parseISO(f.mes);
+      if (!f.mes_ano) return false;
+      // Convert "YYYY-MM" to a Date at the start of that month
+      const d = parseISO(`${f.mes_ano}-01`);
       return isWithinInterval(d, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) });
     });
   }, [faturamento, dateRange]);
