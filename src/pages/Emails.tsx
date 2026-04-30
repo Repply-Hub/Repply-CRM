@@ -308,19 +308,19 @@ const Emails = () => {
               </DialogContent>
             </Dialog>
 
-            <Tabs defaultValue="sent" className="w-full flex flex-col md:flex-row h-full">
+            <Tabs defaultValue="received" className="w-full flex flex-col md:flex-row h-full">
               {/* Mobile Tab List */}
               <div className="md:hidden px-4 py-2 border-b bg-muted/20">
                 <TabsList className="w-full bg-transparent p-0 flex gap-2">
                   <TabsTrigger 
                     value="received" 
-                    className="flex-1 gap-2 rounded-full data-[state=active]:bg-[#d3e3fd] data-[state=active]:text-[#041e49]"
+                    className="flex-1 gap-2 rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
                   >
                     <Inbox className="h-4 w-4" /> Recebidos
                   </TabsTrigger>
                   <TabsTrigger 
                     value="sent" 
-                    className="flex-1 gap-2 rounded-full data-[state=active]:bg-[#d3e3fd] data-[state=active]:text-[#041e49]"
+                    className="flex-1 gap-2 rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
                   >
                     <Send className="h-4 w-4" /> Enviados
                   </TabsTrigger>
