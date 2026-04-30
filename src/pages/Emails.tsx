@@ -257,8 +257,7 @@ const Emails = () => {
                       <Input
                         id="subject"
                         placeholder="Assunto"
-                        variant="ghost"
-                        className="border-none focus-visible:ring-0 px-0 h-8 font-medium"
+                        className="border-none shadow-none focus-visible:ring-0 px-0 h-8 font-medium bg-transparent"
                         value={formData.assunto}
                         onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
                       />
