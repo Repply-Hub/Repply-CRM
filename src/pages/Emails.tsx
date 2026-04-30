@@ -400,13 +400,6 @@ const Emails = () => {
               />
             </div>
           </div>
-            <TabsTrigger value="sent" className="gap-2">
-              <History className="h-4 w-4" /> Enviados
-            </TabsTrigger>
-            <TabsTrigger value="received" className="gap-2">
-              <Inbox className="h-4 w-4" /> Recebidos
-            </TabsTrigger>
-          </TabsList>
 
           <TabsContent value="sent">
             <Card>
