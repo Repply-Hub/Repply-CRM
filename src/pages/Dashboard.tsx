@@ -68,12 +68,13 @@ const Dashboard = () => {
     queryKey: ['fabricantes_filtro', empresaId],
     queryFn: async () => {
       if (!empresaId) return [];
-      const { data } = await supabase.from('fabricantes').select('id, nome').eq('empresa_id', empresaId);
+      const { data } = await (supabase as any).from('fabricantes').select('id, nome').eq('empresa_id', empresaId);
       return data || [];
     },
     enabled: !!empresaId,
   });
   const fabricantes = useMemo(() => (fabricantesRaw || []) as any[], [fabricantesRaw]);
+
 
 
 
