@@ -305,8 +305,26 @@ const Emails = () => {
               </DialogContent>
             </Dialog>
 
-            <Tabs defaultValue="sent" className="w-full">
-              <TabsList className="flex flex-col h-auto bg-transparent border-none p-0 gap-1">
+            <Tabs defaultValue="sent" className="w-full flex flex-col md:flex-row h-full">
+              {/* Mobile Tab List */}
+              <div className="md:hidden px-4 py-2 border-b bg-muted/20">
+                <TabsList className="w-full bg-transparent p-0 flex gap-2">
+                  <TabsTrigger 
+                    value="received" 
+                    className="flex-1 gap-2 rounded-full data-[state=active]:bg-[#d3e3fd] data-[state=active]:text-[#041e49]"
+                  >
+                    <Inbox className="h-4 w-4" /> Recebidos
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="sent" 
+                    className="flex-1 gap-2 rounded-full data-[state=active]:bg-[#d3e3fd] data-[state=active]:text-[#041e49]"
+                  >
+                    <Send className="h-4 w-4" /> Enviados
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsList className="hidden md:flex flex-col h-auto bg-transparent border-none p-0 gap-1 w-64 shrink-0">
                 <TabsTrigger 
                   value="received" 
                   className="w-full justify-start gap-4 px-6 py-2 rounded-r-full data-[state=active]:bg-[#d3e3fd] data-[state=active]:text-[#041e49] border-none text-sm font-normal"
@@ -335,7 +353,7 @@ const Emails = () => {
               </TabsList>
 
               {/* Main Content Area */}
-              <div className="flex-1 overflow-hidden flex flex-col ml-4">
+              <div className="flex-1 overflow-hidden flex flex-col md:ml-4 mt-4 md:mt-0">
                 <TabsContent value="sent" className="m-0 h-full overflow-hidden">
                   <div className="bg-white rounded-2xl border shadow-sm h-full overflow-hidden flex flex-col">
                     <div className="p-3 border-b flex items-center gap-4">
