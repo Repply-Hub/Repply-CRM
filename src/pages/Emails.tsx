@@ -182,6 +182,40 @@ const Emails = () => {
         {/* Header with Search and Tab Actions */}
         <div className="px-4 py-3 flex items-center justify-between gap-4 border-b bg-background/95 sticky top-0 z-10">
           <div className="flex items-center gap-4 flex-1">
+            <TabsList className="bg-muted/50 p-1 h-10">
+              <TabsTrigger 
+                value="received" 
+                className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Inbox className="h-4 w-4" /> 
+                <span className="hidden sm:inline">Recebidos</span>
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
+                  {receivedEmails?.length || 0}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="sent" 
+                className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Send className="h-4 w-4" /> 
+                <span className="hidden sm:inline">Enviados</span>
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
+                  {emails?.length || 0}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="relative group flex-1 max-w-md hidden md:block">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Input
+                placeholder="Pesquisar e-mails..."
+                className="pl-10 h-10 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-1 transition-all"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
             <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
               <DialogTrigger asChild>
                 <Button className="h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm gap-2 text-sm font-bold px-4 transition-all">
@@ -265,40 +299,6 @@ const Emails = () => {
               </DialogContent>
             </Dialog>
 
-            <TabsList className="bg-muted/50 p-1 h-10">
-              <TabsTrigger 
-                value="received" 
-                className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
-              >
-                <Inbox className="h-4 w-4" /> 
-                <span className="hidden sm:inline">Recebidos</span>
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
-                  {receivedEmails?.length || 0}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="sent" 
-                className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
-              >
-                <Send className="h-4 w-4" /> 
-                <span className="hidden sm:inline">Enviados</span>
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
-                  {emails?.length || 0}
-                </Badge>
-              </TabsTrigger>
-            </TabsList>
-
-            <div className="relative group flex-1 max-w-md hidden md:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-              <Input
-                placeholder="Pesquisar e-mails..."
-                className="pl-10 h-10 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-1 transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex gap-1">
             <Button 
               variant="ghost" 
               size="icon"
