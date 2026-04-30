@@ -443,60 +443,65 @@ const Emails = () => {
             </Tabs>
           </div>
         </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">De: {email.remetente}</span>
-                            <Badge variant="outline" className="text-[10px] h-5 bg-blue-50 text-blue-700 border-blue-200">
-                              Recebido
-                            </Badge>
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {email.criado_em && format(new Date(email.criado_em), "dd 'de' MMM, HH:mm", { locale: ptBR })}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-semibold mb-1 group-hover:text-primary transition-colors">
-                          {email.assunto}
-                        </h4>
-                        <div className="text-sm text-muted-foreground line-clamp-2">
-                          {email.corpo_html ? "E-mail em formato HTML" : "Sem conteúdo"}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
 
         <Dialog open={!!selectedEmail} onOpenChange={(open) => !open && setSelectedEmail(null)}>
-          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5 text-primary" />
-                {selectedEmail?.assunto}
-              </DialogTitle>
-              <DialogDescription className="flex justify-between items-center">
-                <span>Para: {selectedEmail?.destinatario}</span>
-                <span>{selectedEmail && format(new Date(selectedEmail.created_at), "dd/MM/yyyy HH:mm")}</span>
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto mt-4 p-4 bg-muted/30 rounded-lg border">
-              {selectedEmail?.html ? (
-                <div 
-                  className="bg-white rounded shadow-sm p-4 text-slate-800"
-                  dangerouslySetInnerHTML={{ __html: selectedEmail.html }} 
-                />
-              ) : (
-                <div className="whitespace-pre-wrap text-sm text-slate-700">
-                  {selectedEmail?.corpo}
+          <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-2xl">
+            <div className="p-6 overflow-y-auto">
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                  <h2 className="text-2xl font-normal text-slate-900 mb-6">{selectedEmail?.assunto}</h2>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold uppercase">
+                      {(selectedEmail?.remetente || selectedEmail?.destinatario || "?")[0]}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm">{selectedEmail?.remetente || "Eu"}</span>
+                        <span className="text-xs text-muted-foreground">&lt;{selectedEmail?.remetente || connectedEmail}&gt;</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        para {selectedEmail?.destinatario}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+                <div className="text-xs text-muted-foreground">
+                  {selectedEmail && format(new Date(selectedEmail.created_at), "dd 'de' MMM. 'de' yyyy, HH:mm", { locale: ptBR })}
+                </div>
+              </div>
+
+              <div className="text-base text-slate-800 leading-relaxed min-h-[200px]">
+                {selectedEmail?.html ? (
+                  <div 
+                    className="prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: selectedEmail.html }} 
+                  />
+                ) : (
+                  <div className="whitespace-pre-wrap">
+                    {selectedEmail?.corpo}
+                  </div>
+                )}
+              </div>
             </div>
-            <DialogFooter className="mt-4">
-              <Button variant="outline" onClick={() => setSelectedEmail(null)}>
+            <div className="p-4 border-t bg-muted/5 flex justify-end gap-2">
+              <Button variant="outline" className="rounded-full px-6" onClick={() => setSelectedEmail(null)}>
                 Fechar
               </Button>
-            </DialogFooter>
+              <Button 
+                className="rounded-full px-6 gap-2"
+                onClick={() => {
+                  setFormData({
+                    ...formData,
+                    destinatario: selectedEmail?.remetente || selectedEmail?.destinatario,
+                    assunto: `Re: ${selectedEmail?.assunto}`
+                  });
+                  setSelectedEmail(null);
+                  setIsComposeOpen(true);
+                }}
+              >
+                <History className="h-4 w-4" /> Responder
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
