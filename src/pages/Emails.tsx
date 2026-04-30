@@ -219,7 +219,18 @@ const Emails = () => {
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* Mobile FAB for Compose */}
+          <div className="md:hidden fixed bottom-6 right-6 z-50">
+            <Button 
+              size="icon" 
+              className="h-14 w-14 rounded-2xl bg-white text-slate-700 shadow-xl border"
+              onClick={() => setIsComposeOpen(true)}
+            >
+              <Plus className="h-8 w-8 text-red-500" />
+            </Button>
+          </div>
+
           {/* Gmail-style Sidebar */}
           <div className="w-64 flex flex-col p-3 border-r bg-card/10 hidden md:flex">
             <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
