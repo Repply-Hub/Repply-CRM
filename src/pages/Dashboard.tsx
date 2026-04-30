@@ -99,17 +99,20 @@ const Dashboard = () => {
     if (!faturamento) return [];
     return faturamento.filter(f => {
       if (!f.mes_ano) return false;
-      // Convert "YYYY-MM" to a Date at the start of that month
       const d = parseISO(`${f.mes_ano}-01`);
-      return isWithinInterval(d, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) });
+      return isWithinInterval(d, { 
+        start: startOfDay(dateRange.from), 
+        end: endOfDay(dateRange.to) 
+      });
     });
-  }, [faturamento, dateRange]);
+  }, [faturamento, dateRange.from, dateRange.to]);
 
-  const lastMonth = filteredFaturamento.slice(-1)[0];
-  const prevMonth = filteredFaturamento.slice(-2, -1)[0];
+  const lastMonth = filteredFaturamento[filteredFaturamento.length - 1];
+  const prevMonth = filteredFaturamento[filteredFaturamento.length - 2];
   const faturamentoChange = lastMonth && prevMonth && prevMonth.faturamento_total && prevMonth.faturamento_total !== 0
     ? (((lastMonth.faturamento_total ?? 0) - prevMonth.faturamento_total) / prevMonth.faturamento_total * 100).toFixed(0)
     : '0';
+
 
   const totalPedidos = filteredPedidos.length;
   const fechados = filteredPedidos.filter(p => p.status === 'fechamento').length;
