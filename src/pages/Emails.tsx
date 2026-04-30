@@ -378,7 +378,7 @@ const Emails = () => {
                           {emails.map((email) => (
                             <div 
                               key={email.id} 
-                              className="px-4 py-2.5 hover:bg-slate-100 transition-colors group cursor-pointer flex items-center gap-4 border-b border-slate-50"
+                              className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 border-b border-border/50"
                               onClick={() => setSelectedEmail(email)}
                             >
                               <div className="flex items-center gap-3 shrink-0">
