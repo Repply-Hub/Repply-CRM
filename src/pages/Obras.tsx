@@ -67,6 +67,7 @@ export default function Obras() {
   const [sort, setSort] = useState<SortOption>('recent');
   const [page, setPage] = useState(1);
   const [selectedObra, setSelectedObra] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('lista');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
     const saved = localStorage.getItem('obras_view_mode');
     return (saved as any) || 'cards';
@@ -202,7 +203,7 @@ export default function Obras() {
       }
     >
       <div className="p-4 md:p-6 space-y-6">
-        <Tabs defaultValue="lista" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex flex-1 items-center gap-3">
               <TabsList className="shrink-0">
@@ -377,15 +378,8 @@ export default function Obras() {
                                 className="text-base font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setEditObra({
-                                    id: obra.id,
-                                    nome_obra: obra.nome_obra,
-                                    cliente_id: obra.cliente_id,
-                                    endereco_entrega: obra.endereco_entrega || '',
-                                    status: obra.status,
-                                    spe_cnpj: obra.spe_cnpj || '',
-                                  });
-                                  setEditDialogOpen(true);
+                                  setSearch(obra.nome_obra);
+                                  setActiveTab('mapa');
                                 }}
                               >
                                 {obra.nome_obra}
@@ -478,15 +472,8 @@ export default function Obras() {
                                       className="font-medium text-foreground hover:text-primary transition-colors"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setEditObra({
-                                          id: obra.id,
-                                          nome_obra: obra.nome_obra,
-                                          cliente_id: obra.cliente_id,
-                                          endereco_entrega: obra.endereco_entrega || '',
-                                          status: obra.status,
-                                          spe_cnpj: obra.spe_cnpj || '',
-                                        });
-                                        setEditDialogOpen(true);
+                                        setSearch(obra.nome_obra);
+                                        setActiveTab('mapa');
                                       }}
                                     >
                                       {obra.nome_obra}
