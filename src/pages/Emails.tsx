@@ -344,15 +344,6 @@ const Emails = () => {
                   <span className="flex-1 text-left">Enviados</span>
                   <span className="text-xs bg-primary/10 px-2 py-0.5 rounded-full">{emails?.length || 0}</span>
                 </TabsTrigger>
-                <div className="px-4 py-2.5 text-sm text-muted-foreground flex items-center gap-4 cursor-not-allowed opacity-60 hover:bg-muted rounded-lg transition-colors mt-2">
-                  <Star className="h-5 w-5" /> Estrelas
-                </div>
-                <div className="px-4 py-2.5 text-sm text-muted-foreground flex items-center gap-4 cursor-not-allowed opacity-60 hover:bg-muted rounded-lg transition-colors">
-                  <Clock className="h-5 w-5" /> Adiados
-                </div>
-                <div className="px-4 py-2.5 text-sm text-muted-foreground flex items-center gap-4 cursor-not-allowed opacity-60 hover:bg-muted rounded-lg transition-colors">
-                  <Archive className="h-5 w-5" /> Arquivados
-                </div>
               </TabsList>
 
               {/* Main Content Area */}
