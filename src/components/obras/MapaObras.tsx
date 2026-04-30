@@ -62,14 +62,28 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
   useEffect(() => {
     if (map && searchTerm && searchTerm.trim().length > 3) {
       const geocoder = new google.maps.Geocoder();
-      geocoder.geocode({ address: searchTerm }, (results, status) => {
+      // First try to find among existing obras
+      const obraMatch = obrasComCoord.find(o => 
+        o.nome_obra.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (o.endereco_entrega && o.endereco_entrega.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+
+      if (obraMatch) {
+        map.setCenter({ lat: obraMatch.latitude!, lng: obraMatch.longitude! });
+        map.setZoom(17);
+        setSelectedObra(obraMatch);
+        return;
+      }
+
+      // If no local match, use Google Geocoder
+      geocoder.geocode({ address: searchTerm + ', Brasil' }, (results, status) => {
         if (status === 'OK' && results && results[0]) {
           map.setCenter(results[0].geometry.location);
           map.setZoom(16);
         }
       });
     }
-  }, [map, searchTerm]);
+  }, [map, searchTerm, obrasComCoord]);
 
   if (isLoading || !isLoaded) {
     return (
