@@ -329,207 +329,102 @@ export default function Obras() {
               <>
                 <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
                 
-                {viewMode === 'table' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filtered.slice((page - 1) * pageSize, page * pageSize).map((obra) => {
-                      const status = getStatusInfo(obra.status);
-                      const cliente = obra.clientes as any;
-                      const camposExtras = (obra as any).campos_extras || {};
-                      
-                      return (
-                        <Card 
-                          key={obra.id} 
-                          className="flex flex-col cursor-pointer hover:border-primary/50 transition-colors group relative"
-                          onClick={() => {
-                            setEditObra({
-                              id: obra.id,
-                              nome_obra: obra.nome_obra,
-                              cliente_id: obra.cliente_id,
-                              endereco_entrega: obra.endereco_entrega || '',
-                              status: obra.status,
-                              spe_cnpj: obra.spe_cnpj || '',
-                            });
-                            setEditDialogOpen(true);
-                          }}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive transition-opacity z-10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setConfirmDeleteId(obra.id);
+                <div className="rounded-lg border border-border/60 overflow-x-auto bg-card">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        {visibleColumns.map(colId => (
+                          <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                            {getLabel(colId)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.slice((page - 1) * pageSize, page * pageSize).map(obra => {
+                        const status = getStatusInfo(obra.status);
+                        const cliente = obra.clientes as any;
+                        const camposExtras = (obra as any).campos_extras || {};
+
+                        return (
+                          <tr 
+                            key={obra.id} 
+                            className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                            onClick={() => {
+                              setEditObra({
+                                id: obra.id,
+                                nome_obra: obra.nome_obra,
+                                cliente_id: obra.cliente_id,
+                                endereco_entrega: obra.endereco_entrega || '',
+                                status: obra.status,
+                                spe_cnpj: obra.spe_cnpj || '',
+                              });
+                              setEditDialogOpen(true);
                             }}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                          <CardHeader className="pb-3">
-                            <div className="flex items-start justify-between gap-2">
-                              <CardTitle 
-                                className="text-base font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSearch(obra.nome_obra);
-                                  setActiveTab('mapa');
-                                }}
-                              >
-                                {obra.nome_obra}
-                              </CardTitle>
-                              <Badge variant={status.variant} className="shrink-0 text-xs">
-                                {status.label}
-                              </Badge>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="flex-1 space-y-2 text-sm text-muted-foreground">
-                            {visibleColumns.includes('cliente') && cliente?.empresa && (
-                              <div 
-                                className="flex items-center gap-2 hover:text-primary transition-colors cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/clientes/${cliente.id}`);
-                                }}
-                              >
-                                <Building2 className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate">{cliente.empresa}</span>
-                              </div>
-                            )}
-                            {visibleColumns.includes('endereco') && obra.endereco_entrega && (
-                              <div 
-                                className="flex items-center gap-2 hover:text-primary transition-colors cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (obra.endereco_entrega) {
-                                    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(obra.endereco_entrega)}`, '_blank');
-                                  }
-                                }}
-                              >
-                                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate">{obra.endereco_entrega}</span>
-                              </div>
-                            )}
-                            {visibleColumns.includes('spe_cnpj') && obra.spe_cnpj && (
-                              <div className="flex items-center gap-2">
-                                <Building2 className="h-3.5 w-3.5 shrink-0" />
-                                <span className="text-xs">SPE: {obra.spe_cnpj}</span>
-                              </div>
-                            )}
-                            {visibleColumns.includes('created_at') && (
-                              <div className="flex items-center gap-2 pt-1 border-t border-border/50">
-                                <Calendar className="h-3.5 w-3.5 shrink-0" />
-                                <span className="text-xs">
-                                  Criada em {format(new Date(obra.created_at), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
-                                </span>
-                              </div>
-                            )}
-                            {visibleColumns.filter(id => id.startsWith('custom_')).map(colId => (
-                              <div key={colId} className="flex items-center gap-2 text-xs">
-                                <span className="font-medium">{getLabel(colId)}:</span>
-                                <span>{camposExtras[colId] || '—'}</span>
-                              </div>
+                            {visibleColumns.map(colId => (
+                              <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
+                                {colId === 'nome_obra' && (
+                                  <span 
+                                    className="font-medium text-foreground hover:text-primary transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSearch(obra.nome_obra);
+                                      setActiveTab('mapa');
+                                    }}
+                                  >
+                                    {obra.nome_obra}
+                                  </span>
+                                )}
+                                {colId === 'status' && <Badge variant={status.variant} className="text-[10px]">{status.label}</Badge>}
+                                {colId === 'cliente' && (
+                                  <span 
+                                    className="hover:text-primary transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/clientes/${cliente.id}`);
+                                    }}
+                                  >
+                                    {cliente?.empresa || '—'}
+                                  </span>
+                                )}
+                                {colId === 'endereco' && (
+                                  <span 
+                                    className="hover:text-primary transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (obra.endereco_entrega) {
+                                        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(obra.endereco_entrega)}`, '_blank');
+                                      }
+                                    }}
+                                  >
+                                    {obra.endereco_entrega || '—'}
+                                  </span>
+                                )}
+                                {colId === 'spe_cnpj' && (obra.spe_cnpj || '—')}
+                                {colId === 'created_at' && format(new Date(obra.created_at), "dd/MM/yyyy")}
+                                {colId === 'actions' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setConfirmDeleteId(obra.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {colId.startsWith('custom_') && (camposExtras[colId] || '—')}
+                              </td>
                             ))}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-border/60 overflow-x-auto bg-card">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          {visibleColumns.map(colId => (
-                            <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
-                              {getLabel(colId)}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filtered.slice((page - 1) * pageSize, page * pageSize).map(obra => {
-                          const status = getStatusInfo(obra.status);
-                          const cliente = obra.clientes as any;
-                          const camposExtras = (obra as any).campos_extras || {};
-
-                          return (
-                            <tr 
-                              key={obra.id} 
-                              className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                              onClick={() => {
-                                setEditObra({
-                                  id: obra.id,
-                                  nome_obra: obra.nome_obra,
-                                  cliente_id: obra.cliente_id,
-                                  endereco_entrega: obra.endereco_entrega || '',
-                                  status: obra.status,
-                                  spe_cnpj: obra.spe_cnpj || '',
-                                });
-                                setEditDialogOpen(true);
-                              }}
-                            >
-                              {visibleColumns.map(colId => (
-                                <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
-                                  {colId === 'nome_obra' && (
-                                    <span 
-                                      className="font-medium text-foreground hover:text-primary transition-colors"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSearch(obra.nome_obra);
-                                        setActiveTab('mapa');
-                                      }}
-                                    >
-                                      {obra.nome_obra}
-                                    </span>
-                                  )}
-                                  {colId === 'status' && <Badge variant={status.variant} className="text-[10px]">{status.label}</Badge>}
-                                  {colId === 'cliente' && (
-                                    <span 
-                                      className="hover:text-primary transition-colors"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigate(`/clientes/${cliente.id}`);
-                                      }}
-                                    >
-                                      {cliente?.empresa || '—'}
-                                    </span>
-                                  )}
-                                  {colId === 'endereco' && (
-                                    <span 
-                                      className="hover:text-primary transition-colors"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (obra.endereco_entrega) {
-                                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(obra.endereco_entrega)}`, '_blank');
-                                        }
-                                      }}
-                                    >
-                                      {obra.endereco_entrega || '—'}
-                                    </span>
-                                  )}
-                                  {colId === 'spe_cnpj' && (obra.spe_cnpj || '—')}
-                                  {colId === 'created_at' && format(new Date(obra.created_at), "dd/MM/yyyy")}
-                                  {colId === 'actions' && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setConfirmDeleteId(obra.id);
-                                      }}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
-                                  {colId.startsWith('custom_') && (camposExtras[colId] || '—')}
-                                </td>
-                              ))}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
                 <div className="pt-4 border-t">
                   <ListPagination
