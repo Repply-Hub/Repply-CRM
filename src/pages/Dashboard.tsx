@@ -115,10 +115,18 @@ const Dashboard = () => {
     valor: f.faturamento_total ?? 0,
   }));
 
-  const conversaoVendedor = (vendedores ?? []).map(v => ({
-    nome: v.usuario_nome ?? '',
-    conversao: Number(v.taxa_fechamento ?? 0),
-  }));
+  const conversaoVendedor = useMemo(() => {
+    const data = (vendedores ?? []).map(v => ({
+      nome: v.usuario_nome ?? '',
+      conversao: Number(v.taxa_fechamento ?? 0),
+      id: v.usuario_id
+    }));
+
+    if (vendedorId !== 'todos') {
+      return data.filter(v => v.id === vendedorId);
+    }
+    return data;
+  }, [vendedores, vendedorId]);
 
   const velocidadeData = (velocidade ?? []).map(v => ({
     fabrica: v.fabricante_nome ?? '',
