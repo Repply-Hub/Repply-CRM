@@ -68,7 +68,8 @@ const Dashboard = () => {
     queryKey: ['fabricantes_filtro', empresaId],
     queryFn: async () => {
       if (!empresaId) return [];
-      const { data, error } = await supabase
+      // Usando uma abordagem mais simples para evitar erro de recursão de tipo no Supabase client
+      const { data, error } = await (supabase as any)
         .from('fabricantes')
         .select('id, nome')
         .eq('empresa_id', empresaId);
@@ -81,7 +82,7 @@ const Dashboard = () => {
     },
     enabled: !!empresaId,
   });
-  const fabricantes = useMemo(() => (fabricantesRaw || []) as any[], [fabricantesRaw]);
+  const fabricantes = useMemo(() => (fabricantesRaw || []) as { id: string; nome: string }[], [fabricantesRaw]);
 
 
 
