@@ -112,27 +112,32 @@ export function SearchWithRecent({
   return (
     <div className={cn("relative flex-1", className)}>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
         <Popover open={open && (recent.length > 0 || suggestions.length > 0 || searching)} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Input
-              placeholder={placeholder}
-              value={value}
-              onChange={(e) => {
-                onValueChange(e.target.value);
-                setOpen(true);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  saveRecent(value);
-                  setOpen(false);
-                }
-              }}
-              onFocus={() => {
-                setOpen(true);
-              }}
-              className="pl-9 h-10 w-full"
-            />
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+              <Input
+                placeholder={placeholder}
+                value={value}
+                onChange={(e) => {
+                  onValueChange(e.target.value);
+                  setOpen(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    saveRecent(value);
+                    setOpen(false);
+                  }
+                }}
+                onFocus={() => {
+                  setOpen(true);
+                }}
+                className="pl-9 pr-10 h-10 w-full"
+              />
+              {searching && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground z-10" />
+              )}
+            </div>
           </PopoverTrigger>
           <PopoverContent 
             className="p-1 w-[var(--radix-popover-trigger-width)] max-h-[350px] overflow-y-auto" 
@@ -150,7 +155,7 @@ export function SearchWithRecent({
                       key={`s-${idx}`}
                       onClick={() => {
                         selectSuggestion(s);
-                        // @ts-ignore - Accessing parent tab state if possible or triggering event
+                        // @ts-ignore
                         const event = new CustomEvent('select-address-map', { detail: s });
                         window.dispatchEvent(event);
                       }}
@@ -201,9 +206,6 @@ export function SearchWithRecent({
             )}
           </PopoverContent>
         </Popover>
-        {searching && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground z-10" />
-        )}
       </div>
     </div>
   );
