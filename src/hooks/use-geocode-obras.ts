@@ -9,6 +9,7 @@ export interface ObraComCoordenada {
   spe_cnpj: string | null;
   latitude: number | null;
   longitude: number | null;
+  geocoded_at?: string | null;
   cliente_empresa?: string | null;
 }
 
