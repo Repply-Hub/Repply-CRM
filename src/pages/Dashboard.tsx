@@ -176,14 +176,15 @@ const Dashboard = () => {
   const rendimentoVendedor = useMemo(() => {
     const map = new Map<string, number>();
     filteredPedidos.forEach(p => {
-      if (p.usuario?.nome && p.status === 'fechamento') {
-        map.set(p.usuario.nome, (map.get(p.usuario.nome) ?? 0) + (p.valor_total ?? 0));
+      if (p.vendedor?.nome && p.status === 'fechamento') {
+        map.set(p.vendedor.nome, (map.get(p.vendedor.nome) ?? 0) + (p.valor_total ?? 0));
       }
     });
     const arr = Array.from(map.entries()).map(([vendedor, valor]) => ({ vendedor, valor }));
     arr.sort((a, b) => b.valor - a.valor);
     return arr;
   }, [filteredPedidos]);
+
 
 
   const segmentacao = [
