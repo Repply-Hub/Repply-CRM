@@ -7,7 +7,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Tratamento de CORS para o frontend (Preflight)
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -15,11 +14,6 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-
-    if (!resendApiKey) {
-      throw new Error("A variável RESEND_API_KEY não foi encontrada.");
-    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
@@ -31,23 +25,8 @@ serve(async (req) => {
       throw new Error("Usuário não autenticado.");
     }
 
-    const { to, subject, html, senderName } = await req.json();
+    const { to, subject, html } = await req.json();
 
-    // Buscar as configurações do Resend deste usuário específico no banco
-    const { data: integration, error: integrationError } = await supabase
-      .from('user_integrations')
-      .select('resend_api_key, resend_from_email')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (integrationError || !integration || !integration.resend_api_key) {
-      throw new Error("Configurações do Resend não encontradas para este usuário. Configure-as na página de E-mails.");
-    }
-
-    const userResendApiKey = integration.resend_api_key;
-    const userFromEmail = integration.resend_from_email || `contato@mdrepresentacoes.grupoclimb.ai`;
-
-    // Validação básica
     if (!to || !subject || !html) {
       return new Response(
         JSON.stringify({ error: "Os campos 'to', 'subject' e 'html' são obrigatórios." }),
@@ -55,28 +34,26 @@ serve(async (req) => {
       );
     }
 
-    // Remetente dinâmico usando as configurações do usuário
-    const name = senderName || 'Atendimento';
-    const fromEmail = userFromEmail.includes('<') ? userFromEmail : `${name} <${userFromEmail}>`;
-
-    // Chamada para o Resend usando a API KEY do usuário
-    const res = await fetch('https://api.resend.com/emails', {
+    // Redireciona para a nova função de envio via Gmail
+    // Usamos internal invoke para manter o contexto se necessário, ou fetch direto
+    const res = await fetch(`${supabaseUrl}/functions/v1/gmail-send`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${userResendApiKey}`,
-        'Content-Type': 'application/json'
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+        'apikey': Deno.env.get('SUPABASE_ANON_KEY') || ''
       },
       body: JSON.stringify({
-        from: fromEmail,
+        userId: user.id,
         to: to,
         subject: subject,
-        html: html
+        body: html // gmail-send espera 'body'
       })
     });
 
     const data = await res.json();
     
-    return new Response(JSON.stringify({ success: res.ok, resend_data: data, from_used: fromEmail }), {
+    return new Response(JSON.stringify({ success: res.ok, gmail_data: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: res.ok ? 200 : 400
     });
