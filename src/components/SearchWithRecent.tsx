@@ -115,7 +115,8 @@ export function SearchWithRecent({
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
         <Popover open={open && (recent.length > 0 || suggestions.length > 0 || searching)} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Input
+            <div className="relative">
+              <Input
               placeholder={placeholder}
               value={value}
               onChange={(e) => {
@@ -131,8 +132,9 @@ export function SearchWithRecent({
               onFocus={() => {
                 setOpen(true);
               }}
-              className="pl-9 h-10 w-full"
-            />
+                className="pl-9 h-10 w-full"
+              />
+            </div>
           </PopoverTrigger>
           <PopoverContent 
             className="p-1 w-[var(--radix-popover-trigger-width)] max-h-[350px] overflow-y-auto" 
