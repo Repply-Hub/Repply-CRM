@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   ResponsiveContainer, PieChart, Pie, Cell,
-  LineChart, Line, Tooltip, Area, AreaChart,
+  Tooltip, Area, AreaChart,
 } from 'recharts';
 import { TrendingUp, DollarSign, Target, Clock, Loader2, Factory } from 'lucide-react';
 import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante } from '@/hooks/use-dashboard';
@@ -17,6 +17,7 @@ import { DateRangePicker, type DateRange } from '@/components/DateRangePicker';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/ChartTooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 const formatCurrency = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
