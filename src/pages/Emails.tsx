@@ -196,16 +196,18 @@ const Emails = () => {
   return (
     <AppLayout title="E-mail" subtitle="Interface Gmail" mainClassName="flex-1 overflow-hidden p-0">
       <div className="flex flex-col h-full bg-background overflow-hidden">
-        {/* Gmail Search Bar Style - Now following system layout more closely */}
-        <div className="px-4 py-3 flex items-center gap-4 border-b bg-background/95">
-          <div className="flex-1 max-w-3xl flex items-center bg-muted/50 rounded-full px-4 py-2 focus-within:bg-background focus-within:shadow-md transition-all border border-transparent focus-within:border-primary/20">
-            <Search className="h-5 w-5 text-muted-foreground mr-3" />
-            <input
-              placeholder="Pesquisar no correio"
-              className="bg-transparent border-none focus:outline-none w-full text-base placeholder:text-slate-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        {/* System Standard Search Bar */}
+        <div className="px-4 py-3 flex items-center justify-between gap-4 border-b bg-background/95">
+          <div className="flex-1 max-w-xl">
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Input
+                placeholder="Pesquisar e-mails..."
+                className="pl-10 h-10 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-1 transition-all"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
