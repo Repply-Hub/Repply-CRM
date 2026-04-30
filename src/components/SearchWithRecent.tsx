@@ -111,9 +111,9 @@ export function SearchWithRecent({
 
   return (
     <div className={cn("relative flex-1", className)}>
-      <Popover open={open && (recent.length > 0 || suggestions.length > 0 || searching)} onOpenChange={setOpen}>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+        <Popover open={open && (recent.length > 0 || suggestions.length > 0 || searching)} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Input
               placeholder={placeholder}
@@ -134,10 +134,12 @@ export function SearchWithRecent({
               className="pl-9 h-10 w-full"
             />
           </PopoverTrigger>
-          {searching && (
-            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-          )}
-        </div>
+          <PopoverContent 
+            className="p-1 w-[var(--radix-popover-trigger-width)] max-h-[350px] overflow-y-auto" 
+            align="start"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+            {/* ... o conteúdo do PopoverContent permanece o mesmo ... */}
         <PopoverContent 
           className="p-1 w-[var(--radix-popover-trigger-width)] max-h-[350px] overflow-y-auto" 
           align="start"
