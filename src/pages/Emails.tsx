@@ -254,143 +254,152 @@ const Emails = () => {
   return (
     <AppLayout title="E-mails" subtitle="Gerencie suas comunicações por e-mail">
       <div className="p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar e-mails..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+        <Tabs defaultValue="sent" className="w-full">
+          <div className="flex flex-col gap-6 mb-6">
+            <div className="flex justify-between items-center w-full">
+              <TabsList className="bg-muted/50 p-1">
+                <TabsTrigger value="received" className="gap-2">
+                  <Inbox className="h-4 w-4" /> Recebidos
+                </TabsTrigger>
+                <TabsTrigger value="sent" className="gap-2">
+                  <History className="h-4 w-4" /> Enviados
+                </TabsTrigger>
+              </TabsList>
 
-          <div className="flex gap-2 w-full md:w-auto">
-            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <Settings className="h-4 w-4" /> Configurações
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Configurações de E-mail</DialogTitle>
-                  <DialogDescription>
-                    Configure sua integração pessoal com o Resend.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="api_key">Resend API Key</Label>
-                    <Input
-                      id="api_key"
-                      type="password"
-                      placeholder="re_..."
-                      value={settingsData.resend_api_key}
-                      onChange={(e) => setSettingsData({ ...settingsData, resend_api_key: e.target.value })}
-                    />
-                    <p className="text-[10px] text-muted-foreground">Sua chave começa com "re_"</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="from_email">E-mail do Remetente</Label>
-                    <Input
-                      id="from_email"
-                      placeholder="seu@dominio.com"
-                      value={settingsData.resend_from_email}
-                      onChange={(e) => setSettingsData({ ...settingsData, resend_from_email: e.target.value })}
-                    />
-                    <p className="text-[10px] text-muted-foreground">Deve ser um domínio verificado no seu painel do Resend.</p>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button 
-                    onClick={() => updateSettingsMutation.mutate(settingsData)}
-                    disabled={updateSettingsMutation.isPending}
-                  >
-                    {updateSettingsMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Salvar Configurações
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" /> Novo E-mail
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
-                <DialogHeader>
-                  <DialogTitle>Escrever E-mail</DialogTitle>
-                  <DialogDescription>
-                    Envie uma mensagem via Resend.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="to">Destinatário</Label>
-                    <Input
-                      id="to"
-                      placeholder="email@exemplo.com"
-                      value={formData.destinatario}
-                      onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="subject">Assunto</Label>
-                    <Input
-                      id="subject"
-                      placeholder="Assunto da mensagem"
-                      value={formData.assunto}
-                      onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="logo">URL do Logotipo da Assinatura</Label>
-                    <Input
-                      id="logo"
-                      placeholder="https://exemplo.com/logo.png"
-                      value={formData.logoUrl}
-                      onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                    />
-                    <p className="text-[10px] text-muted-foreground">Insira a URL de uma imagem para personalizar o logo na assinatura.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="body">Mensagem</Label>
-                    <Textarea
-                      id="body"
-                      placeholder="Escreva sua mensagem aqui..."
-                      className="min-h-[200px]"
-                      value={formData.corpo}
-                      onChange={(e) => setFormData({ ...formData, corpo: e.target.value })}
-                    />
-                  </div>
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setIsComposeOpen(false)}>
-                      Cancelar
+              <div className="flex gap-2">
+                <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <Settings className="h-4 w-4" /> Configurações
                     </Button>
-                    <Button type="submit" disabled={sendEmailMutation.isPending}>
-                      {sendEmailMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Send className="h-4 w-4 mr-2" />
-                      )}
-                      Enviar E-mail
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Configurações de E-mail</DialogTitle>
+                      <DialogDescription>
+                        Configure sua integração pessoal com o Resend.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="api_key">Resend API Key</Label>
+                        <Input
+                          id="api_key"
+                          type="password"
+                          placeholder="re_..."
+                          value={settingsData.resend_api_key}
+                          onChange={(e) => setSettingsData({ ...settingsData, resend_api_key: e.target.value })}
+                        />
+                        <p className="text-[10px] text-muted-foreground">Sua chave começa com "re_"</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="from_email">E-mail do Remetente</Label>
+                        <Input
+                          id="from_email"
+                          placeholder="seu@dominio.com"
+                          value={settingsData.resend_from_email}
+                          onChange={(e) => setSettingsData({ ...settingsData, resend_from_email: e.target.value })}
+                        />
+                        <p className="text-[10px] text-muted-foreground">Deve ser um domínio verificado no seu painel do Resend.</p>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button 
+                        onClick={() => updateSettingsMutation.mutate(settingsData)}
+                        disabled={updateSettingsMutation.isPending}
+                      >
+                        {updateSettingsMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        Salvar Configurações
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
-        <Tabs defaultValue="sent">
-          <TabsList className="mb-4">
+                <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2">
+                      <Plus className="h-4 w-4" /> Novo E-mail
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                      <DialogTitle>Escrever E-mail</DialogTitle>
+                      <DialogDescription>
+                        Envie uma mensagem via Resend.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="to">Destinatário</Label>
+                        <Input
+                          id="to"
+                          placeholder="email@exemplo.com"
+                          value={formData.destinatario}
+                          onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="subject">Assunto</Label>
+                        <Input
+                          id="subject"
+                          placeholder="Assunto da mensagem"
+                          value={formData.assunto}
+                          onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="logo">URL do Logotipo da Assinatura</Label>
+                        <Input
+                          id="logo"
+                          placeholder="https://exemplo.com/logo.png"
+                          value={formData.logoUrl}
+                          onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                        />
+                        <p className="text-[10px] text-muted-foreground">Insira a URL de uma imagem para personalizar o logo na assinatura.</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="body">Mensagem</Label>
+                        <Textarea
+                          id="body"
+                          placeholder="Escreva sua mensagem aqui..."
+                          className="min-h-[200px]"
+                          value={formData.corpo}
+                          onChange={(e) => setFormData({ ...formData, corpo: e.target.value })}
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsComposeOpen(false)}>
+                          Cancelar
+                        </Button>
+                        <Button type="submit" disabled={sendEmailMutation.isPending}>
+                          {sendEmailMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Send className="h-4 w-4 mr-2" />
+                          )}
+                          Enviar E-mail
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+
+            <div className="relative w-full md:w-96">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar e-mails..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
             <TabsTrigger value="sent" className="gap-2">
               <History className="h-4 w-4" /> Enviados
             </TabsTrigger>
