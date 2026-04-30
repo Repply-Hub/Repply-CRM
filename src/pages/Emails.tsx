@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
+import { useGmail } from "@/hooks/useGmail";
 
 const Emails = () => {
   const [searchParams] = useSearchParams();
@@ -45,6 +46,7 @@ const Emails = () => {
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { isConnected, connectedEmail, connectGmail, disconnectGmail, sendEmail, isSending } = useGmail();
   const [formData, setFormData] = useState({ 
     destinatario: "", 
     assunto: "", 
@@ -159,62 +161,48 @@ const Emails = () => {
 
   const sendEmailMutation = useMutation({
     mutationFn: async (data: { destinatario: string; assunto: string; corpo: string; logoUrl: string }) => {
-      const { data: resData, error: resError } = await supabase.functions.invoke("send-email", {
-        body: {
-          to: data.destinatario,
-          subject: data.assunto,
-          senderName: perfil?.nome || "Equipe MD",
-          html: `
-            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 0; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-              <div style="background-color: #f8fafc; padding: 30px; border-bottom: 1px solid #e2e8f0; text-align: center;">
-                <img src="${data.logoUrl}" alt="Logo MD Representações" style="max-height: 60px; width: auto; display: inline-block;" />
-              </div>
-              
-              <div style="padding: 40px 30px; line-height: 1.6; font-size: 16px; color: #334155;">
-                <div style="margin-bottom: 25px;">
-                  ${data.corpo.replace(/\n/g, '<br>')}
-                </div>
-              </div>
-              
-              <div style="background-color: #f8fafc; padding: 30px; border-top: 1px solid #e2e8f0; color: #64748b;">
-                <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
-                  <tr>
-                    <td style="vertical-align: middle;">
-                      <div style="font-weight: 700; color: #0f172a; font-size: 16px; margin-bottom: 4px;">${perfil?.nome || "Equipe MD"}</div>
-                      ${perfil?.assinatura_email ? `<div style="font-size: 14px; line-height: 1.5; color: #64748b; margin-bottom: 15px;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</div>` : ''}
-                      <div style="font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 15px;">
-                        Esta é uma mensagem enviada por MD Representações.
-                      </div>
-                    </td>
-                  </tr>
-                </table>
-              </div>
-            </div>
-          `,
-        },
-      });
-
-      if (resError) {
-        console.error("Erro na Edge Function:", resError);
-        throw new Error(resError.message || "Erro ao processar envio do e-mail");
+      if (!isConnected) {
+        throw new Error("Conecte seu Gmail nas configurações para enviar e-mails.");
       }
 
+      const htmlBody = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 0; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          <div style="background-color: #f8fafc; padding: 30px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+            <img src="${data.logoUrl}" alt="Logo MD Representações" style="max-height: 60px; width: auto; display: inline-block;" />
+          </div>
+          
+          <div style="padding: 40px 30px; line-height: 1.6; font-size: 16px; color: #334155;">
+            <div style="margin-bottom: 25px;">
+              ${data.corpo.replace(/\n/g, '<br>')}
+            </div>
+          </div>
+          
+          <div style="background-color: #f8fafc; padding: 30px; border-top: 1px solid #e2e8f0; color: #64748b;">
+            <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
+              <tr>
+                <td style="vertical-align: middle;">
+                  <div style="font-weight: 700; color: #0f172a; font-size: 16px; margin-bottom: 4px;">${perfil?.nome || "Equipe MD"}</div>
+                  ${perfil?.assinatura_email ? `<div style="font-size: 14px; line-height: 1.5; color: #64748b; margin-bottom: 15px;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</div>` : ''}
+                  <div style="font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 15px;">
+                    Esta é uma mensagem enviada por MD Representações.
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      `;
 
-      // 2. Registrar no banco de dados local
+      // Envia via Gmail API
+      const resData = await sendEmail(data.destinatario, data.assunto, htmlBody);
+
+      // Registrar no banco de dados local
       const { error: dbError } = await supabase.from("emails").insert({
         destinatario: data.destinatario,
-        remetente: userIntegration?.resend_from_email || "MD Representações",
+        remetente: connectedEmail || "MD Representações",
         assunto: data.assunto,
         corpo: data.corpo,
-        html: `
-          <div style="font-family: sans-serif;">
-            ${data.corpo.replace(/\n/g, '<br>')}
-            <br><br>
-            --<br>
-            <strong>${perfil?.nome || "Equipe MD"}</strong><br>
-            ${perfil?.assinatura_email || ""}
-          </div>
-        `,
+        html: htmlBody,
         status: "sent",
         resend_id: resData?.id,
         user_id: (await supabase.auth.getUser()).data.user?.id,
@@ -222,12 +210,11 @@ const Emails = () => {
 
       if (dbError) throw dbError;
 
-      // Retornar os dados da Resend para o feedback
       return resData;
     },
     onSuccess: (data) => {
       const messageId = data?.id || "enviado";
-      toast.success(`E-mail enviado com sucesso! ID: ${messageId}`);
+      toast.success(`E-mail enviado com sucesso via Gmail!`);
       setIsComposeOpen(false);
       setFormData({ 
         destinatario: "", 
@@ -238,7 +225,7 @@ const Emails = () => {
       queryClient.invalidateQueries({ queryKey: ["emails"] });
     },
     onError: (error: any) => {
-      toast.error("Erro ao enviar e-mail: " + (error.message || "Verifique as configurações do Resend"));
+      toast.error("Erro ao enviar e-mail: " + (error.message || "Verifique sua conexão com o Gmail"));
     },
   });
 
@@ -279,57 +266,13 @@ const Emails = () => {
               </div>
 
               <div className="flex gap-2 w-full md:w-auto">
-                <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="gap-2">
-                      <Settings className="h-4 w-4" /> Configurações
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>Configurações de E-mail</DialogTitle>
-                      <DialogDescription>
-                        Configure sua integração pessoal com o Resend.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="api_key">Resend API Key</Label>
-                        <Input
-                          id="api_key"
-                          type="password"
-                          placeholder="re_..."
-                          value={settingsData.resend_api_key}
-                          onChange={(e) => setSettingsData({ ...settingsData, resend_api_key: e.target.value })}
-                        />
-                        <p className="text-[10px] text-muted-foreground">Sua chave começa com "re_"</p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="from_email">E-mail do Remetente</Label>
-                        <Input
-                          id="from_email"
-                          placeholder="seu@dominio.com"
-                          value={settingsData.resend_from_email}
-                          onChange={(e) => setSettingsData({ ...settingsData, resend_from_email: e.target.value })}
-                        />
-                        <p className="text-[10px] text-muted-foreground">Deve ser um domínio verificado no seu painel do Resend.</p>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button 
-                        onClick={() => updateSettingsMutation.mutate(settingsData)}
-                        disabled={updateSettingsMutation.isPending}
-                      >
-                        {updateSettingsMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Save className="h-4 w-4 mr-2" />
-                        )}
-                        Salvar Configurações
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  onClick={() => window.location.href = '/configuracoes?tab=perfil'}
+                >
+                  <Settings className="h-4 w-4" /> Configurações
+                </Button>
 
                 <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
                   <DialogTrigger asChild>
@@ -341,7 +284,7 @@ const Emails = () => {
                     <DialogHeader>
                       <DialogTitle>Escrever E-mail</DialogTitle>
                       <DialogDescription>
-                        Envie uma mensagem via Resend.
+                        Envie uma mensagem via Gmail.
                       </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-4 py-4">
@@ -387,13 +330,13 @@ const Emails = () => {
                         <Button type="button" variant="outline" onClick={() => setIsComposeOpen(false)}>
                           Cancelar
                         </Button>
-                        <Button type="submit" disabled={sendEmailMutation.isPending}>
+                        <Button type="submit" disabled={sendEmailMutation.isPending || !isConnected}>
                           {sendEmailMutation.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
                           ) : (
                             <Send className="h-4 w-4 mr-2" />
                           )}
-                          Enviar E-mail
+                          {isConnected ? "Enviar E-mail" : "Conecte o Gmail Primeiro"}
                         </Button>
                       </DialogFooter>
                     </form>
