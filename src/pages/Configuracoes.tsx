@@ -20,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
 import { DominioTab } from '@/components/configuracoes/DominioTab';
+import { GmailSettings } from '@/components/email/GmailSettings';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -255,6 +256,7 @@ function ProfileTab() {
         </Card>
 
         <CustomizeTab />
+        <GmailSettings />
       </div>
 
       <div className="space-y-6">
