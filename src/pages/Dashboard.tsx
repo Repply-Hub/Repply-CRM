@@ -63,7 +63,7 @@ const Dashboard = () => {
   const { data: faturamento, isLoading: loadFat } = useFaturamentoMensal(empresaId);
   const { data: vendedores } = useIndicadoresVendedor(empresaId);
   const { data: velocidade } = useVelocidadeFabricante(empresaId);
-  const { data: fabricantes } = useQuery({
+  const { data: fabricantesData } = useQuery({
     queryKey: ['fabricantes_filtro', empresaId],
     queryFn: async () => {
       if (!empresaId) return [];
@@ -76,6 +76,8 @@ const Dashboard = () => {
     },
     enabled: !!empresaId,
   });
+  const fabricantes = useMemo(() => fabricantesData || [], [fabricantesData]);
+
 
 
   const { data: pedidos } = usePedidos(empresaId);
