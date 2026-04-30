@@ -73,10 +73,11 @@ const Dashboard = () => {
         .eq('empresa_id', empresaId)
         .order('nome');
       if (error) throw error;
-      return data;
+      return (data as { id: string; nome: string }[]) || [];
     },
     enabled: !!empresaId,
   });
+
   const { data: pedidos } = usePedidos(empresaId);
 
   const isLoading = loadFat;
