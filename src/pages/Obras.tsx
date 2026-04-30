@@ -473,10 +473,50 @@ export default function Obras() {
                             >
                               {visibleColumns.map(colId => (
                                 <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
-                                  {colId === 'nome_obra' && <span className="font-medium text-foreground">{obra.nome_obra}</span>}
+                                  {colId === 'nome_obra' && (
+                                    <span 
+                                      className="font-medium text-foreground hover:text-primary transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditObra({
+                                          id: obra.id,
+                                          nome_obra: obra.nome_obra,
+                                          cliente_id: obra.cliente_id,
+                                          endereco_entrega: obra.endereco_entrega || '',
+                                          status: obra.status,
+                                          spe_cnpj: obra.spe_cnpj || '',
+                                        });
+                                        setEditDialogOpen(true);
+                                      }}
+                                    >
+                                      {obra.nome_obra}
+                                    </span>
+                                  )}
                                   {colId === 'status' && <Badge variant={status.variant} className="text-[10px]">{status.label}</Badge>}
-                                  {colId === 'cliente' && (cliente?.empresa || '—')}
-                                  {colId === 'endereco' && (obra.endereco_entrega || '—')}
+                                  {colId === 'cliente' && (
+                                    <span 
+                                      className="hover:text-primary transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/clientes/${cliente.id}`);
+                                      }}
+                                    >
+                                      {cliente?.empresa || '—'}
+                                    </span>
+                                  )}
+                                  {colId === 'endereco' && (
+                                    <span 
+                                      className="hover:text-primary transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (obra.endereco_entrega) {
+                                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(obra.endereco_entrega)}`, '_blank');
+                                        }
+                                      }}
+                                    >
+                                      {obra.endereco_entrega || '—'}
+                                    </span>
+                                  )}
                                   {colId === 'spe_cnpj' && (obra.spe_cnpj || '—')}
                                   {colId === 'created_at' && format(new Date(obra.created_at), "dd/MM/yyyy")}
                                   {colId === 'actions' && (
