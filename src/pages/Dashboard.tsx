@@ -65,14 +65,13 @@ const Dashboard = () => {
   const { data: vendedores } = useIndicadoresVendedor(empresaId);
   const { data: velocidade } = useVelocidadeFabricante(empresaId);
   const { data: fabricantesRaw } = useQuery({
-    queryKey: ['fabricantes_filtro', empresaId],
+    queryKey: ['fabricantes_filtro'],
     queryFn: async () => {
-      if (!empresaId) return [];
-      // Usando uma abordagem mais simples para evitar erro de recursão de tipo no Supabase client
+      // Removido filtro de empresa_id pois a coluna não existe na tabela fabricantes
       const { data, error } = await (supabase as any)
         .from('fabricantes')
         .select('id, nome')
-        .eq('empresa_id', empresaId);
+        .order('nome');
       
       if (error) {
         console.error('Erro ao buscar fabricantes:', error);
@@ -80,7 +79,6 @@ const Dashboard = () => {
       }
       return data || [];
     },
-    enabled: !!empresaId,
   });
   const fabricantes = useMemo(() => (fabricantesRaw || []) as { id: string; nome: string }[], [fabricantesRaw]);
 
