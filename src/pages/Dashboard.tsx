@@ -506,18 +506,11 @@ const Dashboard = () => {
             </Card>
           )}
         </div>
-
-                    background={{ fill: chartColors.primaryLight, radius: 8 }}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
       </div>
       </ErrorBoundary>
     </AppLayout>
   );
 };
+
 
 export default Dashboard;
