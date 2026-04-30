@@ -148,7 +148,12 @@ export function SearchWithRecent({
                   {suggestions.map((s, idx) => (
                     <button
                       key={`s-${idx}`}
-                      onClick={() => selectSuggestion(s)}
+                      onClick={() => {
+                        selectSuggestion(s);
+                        // @ts-ignore - Accessing parent tab state if possible or triggering event
+                        const event = new CustomEvent('select-address-map', { detail: s });
+                        window.dispatchEvent(event);
+                      }}
                       className="flex items-start gap-2 px-2 py-2 text-sm hover:bg-muted rounded-md transition-colors text-left"
                     >
                       <MapPin className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
