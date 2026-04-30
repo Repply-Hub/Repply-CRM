@@ -21,14 +21,37 @@ interface NominatimResult {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Geocodifica endereços usando Nominatim (OpenStreetMap) - gratuito, sem API key.
- * Respeita o rate limit de 1 req/seg e cacheia o resultado em obras.latitude/longitude.
+ * Geocodifica endereços usando a API do Google Maps (mais preciso) ou Nominatim (fallback).
  */
 export async function geocodificar(endereco: string): Promise<{ lat: number; lng: number } | null> {
+  // Primeiro tenta usar o Geocoder do Google se a chave estiver disponível
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  
+  if (apiKey) {
+    try {
+      console.log(`[Geocoding] Tentando Google Maps API para: ${endereco}`);
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(endereco)}&key=${apiKey}&language=pt-BR`;
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data.status === 'OK' && data.results && data.results[0]) {
+        const location = data.results[0].geometry.location;
+        console.log(`[Geocoding] Google encontrou:`, location);
+        return { lat: location.lat, lng: location.lng };
+      } else if (data.status === 'OVER_QUERY_LIMIT') {
+        console.warn('[Geocoding] Google API limit reached, falling back to Nominatim');
+      } else {
+        console.warn(`[Geocoding] Google API status: ${data.status} for ${endereco}`);
+      }
+    } catch (err) {
+      console.error('[Geocoding] Erro na API do Google:', err);
+    }
+  }
+
+  // Fallback para Nominatim (OpenStreetMap)
   try {
-    // Tenta primeiro o endereço completo
     let query = encodeURIComponent(endereco);
-    console.log(`[Geocoding] Tentando: ${endereco}`);
+    console.log(`[Geocoding] Tentando Nominatim: ${endereco}`);
     let res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${query}`,
       {
@@ -43,13 +66,12 @@ export async function geocodificar(endereco: string): Promise<{ lat: number; lng
     
     // Se não encontrar, tenta simplificar o endereço (remove complementos após vírgula ou hífen)
     if (!data.length) {
-      // Tenta remover "Condominio", "Residencial", "Edificio" etc do início se for o caso
       const enderecoLimpo = endereco.replace(/^(condominio|residencial|edificio|ed\.|bloco)\s+/i, '');
       const partes = enderecoLimpo.split(/[,-]/);
       const enderecoSimplificado = partes[0].trim();
       
       if (enderecoSimplificado !== endereco) {
-        console.log(`[Geocoding] Tentando simplificado: ${enderecoSimplificado}`);
+        console.log(`[Geocoding] Tentando Nominatim simplificado: ${enderecoSimplificado}`);
         query = encodeURIComponent(enderecoSimplificado);
         res = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${query}`,
@@ -63,10 +85,9 @@ export async function geocodificar(endereco: string): Promise<{ lat: number; lng
         data = await res.json();
       }
       
-      // Se ainda não encontrar e houver cidade/estado, tenta apenas logradouro + cidade
       if (!data.length && partes.length > 1) {
         const ruaCidade = `${partes[0].trim()}, ${partes[partes.length - 1].trim()}`;
-        console.log(`[Geocoding] Tentando rua + cidade: ${ruaCidade}`);
+        console.log(`[Geocoding] Tentando Nominatim rua + cidade: ${ruaCidade}`);
         query = encodeURIComponent(ruaCidade);
         res = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${query}`,
