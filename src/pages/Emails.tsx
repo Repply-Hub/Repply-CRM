@@ -61,72 +61,7 @@ const Emails = () => {
       setIsComposeOpen(true);
     }
   }, [searchParams]);
-  const [settingsData, setSettingsData] = useState({ resend_api_key: "", resend_from_email: "" });
   const queryClient = useQueryClient();
-
-  const { data: perfil } = useQuery({
-    queryKey: ["meu_perfil"],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data } = await supabase
-        .from("usuarios")
-        .select("nome, assinatura_email")
-        .eq("user_id", user.id)
-        .single();
-      return data;
-    },
-  });
-
-  const { data: userIntegration } = useQuery({
-    queryKey: ["user_integration"],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data, error } = await supabase
-        .from("user_integrations")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      
-      if (data) {
-        setSettingsData({
-          resend_api_key: data.resend_api_key || "",
-          resend_from_email: data.resend_from_email || "",
-        });
-      }
-      return data;
-    },
-  });
-
-  const updateSettingsMutation = useMutation({
-    mutationFn: async (data: typeof settingsData) => {
-      if (!data.resend_api_key.startsWith("re_")) {
-        throw new Error("A chave de API deve começar com 're_'");
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-
-      const { error } = await supabase
-        .from("user_integrations")
-        .upsert({
-          user_id: user.id,
-          resend_api_key: data.resend_api_key,
-          resend_from_email: data.resend_from_email,
-        });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Configurações salvas com sucesso!");
-      setIsSettingsOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["user_integration"] });
-    },
-    onError: (error: any) => {
-      toast.error("Erro ao salvar configurações: " + error.message);
-    },
-  });
 
   const { data: emails, isLoading: isSentLoading } = useQuery({
     queryKey: ["emails", searchTerm],
