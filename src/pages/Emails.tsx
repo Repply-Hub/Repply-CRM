@@ -63,6 +63,20 @@ const Emails = () => {
   }, [searchParams]);
   const queryClient = useQueryClient();
 
+  const { data: perfil } = useQuery({
+    queryKey: ["meu_perfil"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from("usuarios")
+        .select("nome, assinatura_email")
+        .eq("user_id", user.id)
+        .single();
+      return data;
+    },
+  });
+
   const { data: emails, isLoading: isSentLoading } = useQuery({
     queryKey: ["emails", searchTerm],
     queryFn: async () => {
