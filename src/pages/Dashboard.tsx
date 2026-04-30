@@ -85,11 +85,15 @@ const Dashboard = () => {
     if (!pedidos) return [];
     return pedidos.filter(p => {
       const d = parseISO(p.data_pedido);
-      const isWithinRange = isWithinInterval(d, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) });
+      const isWithinRange = isWithinInterval(d, { 
+        start: startOfDay(dateRange.from), 
+        end: endOfDay(dateRange.to) 
+      });
       const matchesVendedor = vendedorId === 'todos' || p.usuario_id === vendedorId;
-      return isWithinRange && matchesVendedor;
+      const matchesFabricante = fabricanteId === 'todos' || p.fabricante_id === fabricanteId;
+      return isWithinRange && matchesVendedor && matchesFabricante;
     });
-  }, [pedidos, dateRange, vendedorId]);
+  }, [pedidos, dateRange.from, dateRange.to, vendedorId, fabricanteId]);
 
   const filteredFaturamento = useMemo(() => {
     if (!faturamento) return [];
