@@ -205,14 +205,24 @@ const Emails = () => {
               </TabsTrigger>
             </TabsList>
 
-            <div className="relative group flex-1 max-w-md hidden md:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-              <Input
-                placeholder="Pesquisar e-mails..."
-                className="pl-10 h-10 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-1 transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            <div className="flex items-center gap-2 flex-1 max-w-md hidden md:flex">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                <Input
+                  placeholder="Pesquisar e-mails..."
+                  className="pl-10 h-10 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-1 transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="rounded-full hover:bg-muted shrink-0"
+                onClick={() => window.location.href = '/configuracoes?tab=perfil'}
+              >
+                <Settings className="h-5 w-5 text-muted-foreground" />
+              </Button>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -298,15 +308,6 @@ const Emails = () => {
                 </form>
               </DialogContent>
             </Dialog>
-
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="rounded-full hover:bg-muted"
-              onClick={() => window.location.href = '/configuracoes?tab=perfil'}
-            >
-              <Settings className="h-5 w-5 text-muted-foreground" />
-            </Button>
           </div>
         </div>
 
