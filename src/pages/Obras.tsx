@@ -359,7 +359,17 @@ export default function Obras() {
                         <Card 
                           key={obra.id} 
                           className="flex flex-col cursor-pointer hover:border-primary/50 transition-colors group relative"
-                          onClick={() => setSelectedObra(obra)}
+                          onClick={() => {
+                            setEditObra({
+                              id: obra.id,
+                              nome_obra: obra.nome_obra,
+                              cliente_id: obra.cliente_id,
+                              endereco_entrega: obra.endereco_entrega || '',
+                              status: obra.status,
+                              spe_cnpj: obra.spe_cnpj || '',
+                            });
+                            setEditDialogOpen(true);
+                          }}
                         >
                           <Button
                             variant="ghost"
@@ -463,7 +473,17 @@ export default function Obras() {
                             <tr 
                               key={obra.id} 
                               className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                              onClick={() => setSelectedObra(obra)}
+                              onClick={() => {
+                                setEditObra({
+                                  id: obra.id,
+                                  nome_obra: obra.nome_obra,
+                                  cliente_id: obra.cliente_id,
+                                  endereco_entrega: obra.endereco_entrega || '',
+                                  status: obra.status,
+                                  spe_cnpj: obra.spe_cnpj || '',
+                                });
+                                setEditDialogOpen(true);
+                              }}
                             >
                               {visibleColumns.map(colId => (
                                 <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
