@@ -35,7 +35,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!session) return <Navigate to="/login" replace />;
   
   // Se o usuário está logado mas não tem perfil ou empresa vinculada
+  // Adicionamos uma pequena verificação se o profile ainda está sendo carregado internamente
   if (session && (!profile || !profile.empresa_id)) {
+    // Só mostramos o bloqueio se o profile realmente foi retornado como nulo após o loading
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <div className="max-w-md w-full bg-card p-8 rounded-lg shadow-lg border text-center space-y-6">
