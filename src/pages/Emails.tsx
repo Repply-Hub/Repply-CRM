@@ -195,11 +195,117 @@ const Emails = () => {
 
   return (
     <AppLayout title="E-mail" subtitle="Interface Gmail" mainClassName="flex-1 overflow-hidden p-0">
-      <div className="flex flex-col h-full bg-background overflow-hidden">
-        {/* System Standard Search Bar */}
-        <div className="px-4 py-3 flex items-center justify-between gap-4 border-b bg-background/95">
-          <div className="flex-1 max-w-xl">
-            <div className="relative group">
+      <Tabs defaultValue="received" className="flex flex-col h-full bg-background overflow-hidden">
+        {/* System Standard Search Bar + Actions */}
+        <div className="px-4 py-3 flex items-center justify-between gap-4 border-b bg-background/95 sticky top-0 z-10">
+          <div className="flex items-center gap-4 flex-1">
+            <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
+              <DialogTrigger asChild>
+                <Button className="h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm gap-2 text-sm font-bold px-4 transition-all">
+                  <PenBox className="h-4 w-4" />
+                  Escrever
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-xl border-none shadow-2xl">
+                <div className="bg-[#404040] text-white px-4 py-2 flex justify-between items-center">
+                  <span className="text-sm font-medium">Nova mensagem</span>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-white hover:bg-white/10" onClick={() => setIsComposeOpen(false)}>
+                      <Plus className="h-4 w-4 rotate-45" />
+                    </Button>
+                  </div>
+                </div>
+                <form onSubmit={handleSubmit} className="p-0 space-y-0">
+                  <div className="px-4 border-b">
+                    <div className="flex items-center gap-2 py-2">
+                      <span className="text-sm text-muted-foreground min-w-[60px]">Para</span>
+                      <Input
+                        id="to"
+                        placeholder="email@exemplo.com"
+                        className="border-none shadow-none focus-visible:ring-0 px-0 h-8 bg-transparent"
+                        value={formData.destinatario}
+                        onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="px-4 border-b">
+                    <div className="flex items-center gap-2 py-2">
+                      <span className="text-sm text-muted-foreground min-w-[60px]">Assunto</span>
+                      <Input
+                        id="subject"
+                        placeholder="Assunto"
+                        className="border-none shadow-none focus-visible:ring-0 px-0 h-8 font-medium bg-transparent"
+                        value={formData.assunto}
+                        onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <Textarea
+                      id="body"
+                      placeholder="Escreva sua mensagem aqui..."
+                      className="min-h-[300px] border-none focus-visible:ring-0 p-0 resize-none text-base"
+                      value={formData.corpo}
+                      onChange={(e) => setFormData({ ...formData, corpo: e.target.value })}
+                    />
+                  </div>
+                  <div className="p-4 flex justify-between items-center bg-muted/10">
+                    <div className="flex gap-2 items-center">
+                      <Button type="submit" className="rounded-full px-6 bg-[#0b57d0] hover:bg-[#0842a0]" disabled={sendEmailMutation.isPending || !isConnected}>
+                        {sendEmailMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Send className="h-4 w-4 mr-2" />
+                        )}
+                        {isConnected ? "Enviar" : "Conectar Gmail"}
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" className="rounded-full">
+                        <Trash2 className="h-5 w-5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1 group">
+                        <Label htmlFor="logo" className="text-xs text-muted-foreground cursor-pointer group-hover:text-primary transition-colors flex items-center gap-1">
+                          <MoreVertical className="h-3 w-3" /> Logo
+                        </Label>
+                        <Input
+                          id="logo"
+                          className="w-32 h-7 text-[10px]"
+                          placeholder="URL do logo"
+                          value={formData.logoUrl}
+                          onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <TabsList className="bg-muted/50 p-1 h-10">
+              <TabsTrigger 
+                value="received" 
+                className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Inbox className="h-4 w-4" /> 
+                <span className="hidden sm:inline">Recebidos</span>
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
+                  {receivedEmails?.length || 0}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="sent" 
+                className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Send className="h-4 w-4" /> 
+                <span className="hidden sm:inline">Enviados</span>
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
+                  {emails?.length || 0}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="relative group flex-1 max-w-md hidden md:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
               <Input
                 placeholder="Pesquisar e-mails..."
