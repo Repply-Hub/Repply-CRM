@@ -382,17 +382,17 @@ const Emails = () => {
                               onClick={() => setSelectedEmail(email)}
                             >
                               <div className="flex items-center gap-3 shrink-0">
-                                <Plus className="h-4 w-4 text-slate-300 rotate-45 group-hover:text-slate-500" />
-                                <Star className="h-4 w-4 text-slate-300 group-hover:text-slate-500" />
+                                <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
+                                <Star className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
                               </div>
                               <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
-                                <span className="text-sm text-slate-700">Para: {email.destinatario}</span>
+                                <span className="text-sm text-foreground/80">Para: {email.destinatario}</span>
                               </div>
                               <div className="flex-1 truncate overflow-hidden">
-                                <span className="text-sm font-medium text-slate-900 mr-2 shrink-0">{email.assunto}</span>
-                                <span className="text-sm text-slate-500">- {email.corpo}</span>
+                                <span className="text-sm font-medium text-foreground mr-2 shrink-0">{email.assunto}</span>
+                                <span className="text-sm text-muted-foreground">- {email.corpo}</span>
                               </div>
-                              <div className="shrink-0 text-xs font-medium text-slate-600">
+                              <div className="shrink-0 text-xs font-medium text-muted-foreground">
                                 {format(new Date(email.created_at), "dd 'de' MMM", { locale: ptBR })}
                               </div>
                             </div>
@@ -429,7 +429,7 @@ const Emails = () => {
                           {receivedEmails.map((email) => (
                             <div 
                               key={email.id} 
-                              className="px-4 py-2.5 hover:bg-slate-100 transition-colors group cursor-pointer flex items-center gap-4 border-b border-slate-50"
+                              className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 border-b border-border/50"
                               onClick={() => setSelectedEmail({
                                 ...email,
                                 destinatario: email.destinatarios?.[0] || "",
@@ -440,17 +440,17 @@ const Emails = () => {
                               })}
                             >
                               <div className="flex items-center gap-3 shrink-0">
-                                <Plus className="h-4 w-4 text-slate-300 rotate-45 group-hover:text-slate-500" />
-                                <Star className="h-4 w-4 text-slate-300 group-hover:text-slate-500" />
+                                <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
+                                <Star className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
                               </div>
                               <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
-                                <span className="text-sm font-bold text-slate-900">{email.remetente}</span>
+                                <span className="text-sm font-bold text-foreground">{email.remetente}</span>
                               </div>
                               <div className="flex-1 truncate overflow-hidden">
-                                <span className="text-sm font-bold text-slate-900 mr-2 shrink-0">{email.assunto}</span>
-                                <span className="text-sm text-slate-500">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
+                                <span className="text-sm font-bold text-foreground mr-2 shrink-0">{email.assunto}</span>
+                                <span className="text-sm text-muted-foreground">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
                               </div>
-                              <div className="shrink-0 text-xs font-bold text-slate-900">
+                              <div className="shrink-0 text-xs font-bold text-foreground">
                                 {email.criado_em && format(new Date(email.criado_em), "HH:mm", { locale: ptBR })}
                               </div>
                             </div>
