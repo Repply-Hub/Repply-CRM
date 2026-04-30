@@ -256,7 +256,7 @@ const Emails = () => {
       <div className="p-6">
         <Tabs defaultValue="sent" className="w-full">
           <div className="flex flex-col gap-6 mb-6">
-            <div className="flex justify-between items-center w-full">
+            <div className="flex justify-start">
               <TabsList className="bg-muted/50 p-1">
                 <TabsTrigger value="received" className="gap-2">
                   <Inbox className="h-4 w-4" /> Recebidos
@@ -265,8 +265,20 @@ const Emails = () => {
                   <History className="h-4 w-4" /> Enviados
                 </TabsTrigger>
               </TabsList>
+            </div>
 
-              <div className="flex gap-2">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="relative w-full md:w-96">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar e-mails..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-2 w-full md:w-auto">
                 <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="gap-2">
@@ -388,16 +400,6 @@ const Emails = () => {
                   </DialogContent>
                 </Dialog>
               </div>
-            </div>
-
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar e-mails..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
             </div>
           </div>
 
