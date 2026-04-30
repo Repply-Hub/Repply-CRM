@@ -317,7 +317,7 @@ const Emails = () => {
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden relative">
+        <div className="flex-1 overflow-hidden relative">
           {/* Mobile FAB for Compose */}
           <div className="md:hidden fixed bottom-6 right-6 z-50">
             <Button 
@@ -329,240 +329,115 @@ const Emails = () => {
             </Button>
           </div>
 
-          {/* Gmail-style Sidebar */}
-          <div className="w-64 flex flex-col p-4 bg-background border-r hidden md:flex shrink-0">
-            <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
-              <DialogTrigger asChild>
-                <Button className="mb-6 mt-2 h-14 w-full rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg shadow-md border-none gap-3 text-sm font-bold transition-all group">
-                  <PenBox className="h-6 w-6" />
-                  Escrever
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-xl border-none shadow-2xl">
-                <div className="bg-[#404040] text-white px-4 py-2 flex justify-between items-center">
-                  <span className="text-sm font-medium">Nova mensagem</span>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-white hover:bg-white/10" onClick={() => setIsComposeOpen(false)}>
-                      <Plus className="h-4 w-4 rotate-45" />
-                    </Button>
+          <div className="flex-1 overflow-hidden flex flex-col bg-background h-full">
+            <TabsContent value="sent" className="m-0 h-full overflow-hidden">
+              <div className="h-full overflow-hidden flex flex-col">
+                <div className="p-2 flex items-center gap-2 border-b">
+                  <div className="flex items-center gap-1 ml-2">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><Plus className="h-4 w-4 rotate-45 text-muted-foreground" /></Button>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><MoreVertical className="h-4 w-4 text-muted-foreground" /></Button>
                   </div>
                 </div>
-                <form onSubmit={handleSubmit} className="p-0 space-y-0">
-                  <div className="px-4 border-b">
-                    <div className="flex items-center gap-2 py-2">
-                      <span className="text-sm text-muted-foreground min-w-[60px]">Para</span>
-                      <Input
-                        id="to"
-                        placeholder="email@exemplo.com"
-                        className="border-none shadow-none focus-visible:ring-0 px-0 h-8 bg-transparent"
-                        value={formData.destinatario}
-                        onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
-                      />
+                <div className="flex-1 overflow-y-auto">
+                  {isSentLoading ? (
+                    <div className="flex justify-center py-20">
+                      <Loader2 className="h-8 w-8 animate-spin text-[#0b57d0]" />
                     </div>
-                  </div>
-                  <div className="px-4 border-b">
-                    <div className="flex items-center gap-2 py-2">
-                      <span className="text-sm text-muted-foreground min-w-[60px]">Assunto</span>
-                      <Input
-                        id="subject"
-                        placeholder="Assunto"
-                        className="border-none shadow-none focus-visible:ring-0 px-0 h-8 font-medium bg-transparent"
-                        value={formData.assunto}
-                        onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
-                      />
+                  ) : !emails || emails.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                      <Mail className="h-16 w-16 mb-4 opacity-10" />
+                      <p className="text-lg">Nenhum e-mail enviado</p>
                     </div>
-                  </div>
-                  <div className="p-4">
-                    <Textarea
-                      id="body"
-                      placeholder="Escreva sua mensagem aqui..."
-                      className="min-h-[300px] border-none focus-visible:ring-0 p-0 resize-none text-base"
-                      value={formData.corpo}
-                      onChange={(e) => setFormData({ ...formData, corpo: e.target.value })}
-                    />
-                  </div>
-                  <div className="p-4 flex justify-between items-center bg-muted/10">
-                    <div className="flex gap-2 items-center">
-                      <Button type="submit" className="rounded-full px-6 bg-[#0b57d0] hover:bg-[#0842a0]" disabled={sendEmailMutation.isPending || !isConnected}>
-                        {sendEmailMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Send className="h-4 w-4 mr-2" />
-                        )}
-                        {isConnected ? "Enviar" : "Conectar Gmail"}
-                      </Button>
-                      <Button type="button" variant="ghost" size="icon" className="rounded-full">
-                        <Trash2 className="h-5 w-5 text-muted-foreground" />
-                      </Button>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {emails.map((email) => (
+                        <div 
+                          key={email.id} 
+                          className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 border-b border-border/50"
+                          onClick={() => setSelectedEmail(email)}
+                        >
+                          <div className="flex items-center gap-3 shrink-0">
+                            <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
+                            <Star className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
+                          </div>
+                          <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
+                            <span className="text-sm text-foreground/80">Para: {email.destinatario}</span>
+                          </div>
+                          <div className="flex-1 truncate overflow-hidden">
+                            <span className="text-sm font-medium text-foreground mr-2 shrink-0">{email.assunto}</span>
+                            <span className="text-sm text-muted-foreground">- {email.corpo}</span>
+                          </div>
+                          <div className="shrink-0 text-xs font-medium text-muted-foreground">
+                            {format(new Date(email.created_at), "dd 'de' MMM", { locale: ptBR })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1 group">
-                        <Label htmlFor="logo" className="text-xs text-muted-foreground cursor-pointer group-hover:text-primary transition-colors flex items-center gap-1">
-                          <MoreVertical className="h-3 w-3" /> Logo
-                        </Label>
-                        <Input
-                          id="logo"
-                          className="w-32 h-7 text-[10px]"
-                          placeholder="URL do logo"
-                          value={formData.logoUrl}
-                          onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            <Tabs defaultValue="received" className="w-full flex flex-col md:flex-row h-full">
-              {/* Mobile Tab List */}
-              <div className="md:hidden px-4 py-2 border-b bg-muted/20">
-                <TabsList className="w-full bg-transparent p-0 flex gap-2">
-                  <TabsTrigger 
-                    value="received" 
-                    className="flex-1 gap-2 rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-                  >
-                    <Inbox className="h-4 w-4" /> Recebidos
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="sent" 
-                    className="flex-1 gap-2 rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-                  >
-                    <Send className="h-4 w-4" /> Enviados
-                  </TabsTrigger>
-                </TabsList>
+                  )}
+                </div>
               </div>
+            </TabsContent>
 
-              <TabsList className="hidden md:flex flex-col h-auto bg-transparent border-none p-0 gap-1 w-full shrink-0">
-                <TabsTrigger 
-                  value="received" 
-                  className="w-full justify-start gap-4 px-4 py-2.5 rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-bold border-none text-sm font-medium transition-colors hover:bg-muted"
-                >
-                  <Inbox className="h-5 w-5" /> 
-                  <span className="flex-1 text-left">Recebidos</span>
-                  <span className="text-xs bg-primary/10 px-2 py-0.5 rounded-full">{receivedEmails?.length || 0}</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="sent" 
-                  className="w-full justify-start gap-4 px-4 py-2.5 rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-bold border-none text-sm font-medium transition-colors hover:bg-muted"
-                >
-                  <Send className="h-5 w-5" /> 
-                  <span className="flex-1 text-left">Enviados</span>
-                  <span className="text-xs bg-primary/10 px-2 py-0.5 rounded-full">{emails?.length || 0}</span>
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Main Content Area */}
-              <div className="flex-1 overflow-hidden flex flex-col bg-background">
-                <TabsContent value="sent" className="m-0 h-full overflow-hidden">
-                  <div className="h-full overflow-hidden flex flex-col">
-                    <div className="p-2 flex items-center gap-2 border-b">
-                      <div className="flex items-center gap-1 ml-2">
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><Plus className="h-4 w-4 rotate-45 text-muted-foreground" /></Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><MoreVertical className="h-4 w-4 text-muted-foreground" /></Button>
-                      </div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                      {isSentLoading ? (
-                        <div className="flex justify-center py-20">
-                          <Loader2 className="h-8 w-8 animate-spin text-[#0b57d0]" />
-                        </div>
-                      ) : !emails || emails.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                          <Mail className="h-16 w-16 mb-4 opacity-10" />
-                          <p className="text-lg">Nenhum e-mail enviado</p>
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-slate-100">
-                          {emails.map((email) => (
-                            <div 
-                              key={email.id} 
-                              className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 border-b border-border/50"
-                              onClick={() => setSelectedEmail(email)}
-                            >
-                              <div className="flex items-center gap-3 shrink-0">
-                                <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
-                                <Star className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
-                              </div>
-                              <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
-                                <span className="text-sm text-foreground/80">Para: {email.destinatario}</span>
-                              </div>
-                              <div className="flex-1 truncate overflow-hidden">
-                                <span className="text-sm font-medium text-foreground mr-2 shrink-0">{email.assunto}</span>
-                                <span className="text-sm text-muted-foreground">- {email.corpo}</span>
-                              </div>
-                              <div className="shrink-0 text-xs font-medium text-muted-foreground">
-                                {format(new Date(email.created_at), "dd 'de' MMM", { locale: ptBR })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+            <TabsContent value="received" className="m-0 h-full overflow-hidden">
+              <div className="h-full overflow-hidden flex flex-col">
+                <div className="p-2 flex items-center gap-2 border-b">
+                  <div className="flex items-center gap-1 ml-2">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><Plus className="h-4 w-4 rotate-45 text-muted-foreground" /></Button>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><MoreVertical className="h-4 w-4 text-muted-foreground" /></Button>
                   </div>
-                </TabsContent>
-
-                <TabsContent value="received" className="m-0 h-full overflow-hidden">
-                  <div className="bg-white rounded-2xl h-full overflow-hidden flex flex-col">
-                    <div className="p-2 flex items-center gap-2">
-                      <div className="flex items-center gap-1 ml-2">
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><Plus className="h-4 w-4 rotate-45 text-slate-500" /></Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><MoreVertical className="h-4 w-4 text-slate-500" /></Button>
-                      </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {isReceivedLoading ? (
+                    <div className="flex justify-center py-20">
+                      <Loader2 className="h-8 w-8 animate-spin text-[#0b57d0]" />
                     </div>
-                    <div className="flex-1 overflow-y-auto">
-                      {isReceivedLoading ? (
-                        <div className="flex justify-center py-20">
-                          <Loader2 className="h-8 w-8 animate-spin text-[#0b57d0]" />
-                        </div>
-                      ) : !receivedEmails || receivedEmails.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-center px-4">
-                          <Inbox className="h-16 w-16 mb-4 opacity-10" />
-                          <h3 className="font-medium text-lg mb-1">Sua caixa de entrada está limpa</h3>
-                          <p className="max-w-xs text-sm opacity-60">
-                            E-mails recebidos na sua conta Gmail aparecerão aqui automaticamente.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-slate-100">
-                          {receivedEmails.map((email) => (
-                            <div 
-                              key={email.id} 
-                              className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 border-b border-border/50"
-                              onClick={() => setSelectedEmail({
-                                ...email,
-                                destinatario: email.destinatarios?.[0] || "",
-                                remetente: email.remetente,
-                                corpo: "",
-                                html: email.corpo_html,
-                                created_at: email.criado_em
-                              })}
-                            >
-                              <div className="flex items-center gap-3 shrink-0">
-                                <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
-                                <Star className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
-                              </div>
-                              <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
-                                <span className="text-sm font-bold text-foreground">{email.remetente}</span>
-                              </div>
-                              <div className="flex-1 truncate overflow-hidden">
-                                <span className="text-sm font-bold text-foreground mr-2 shrink-0">{email.assunto}</span>
-                                <span className="text-sm text-muted-foreground">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
-                              </div>
-                              <div className="shrink-0 text-xs font-bold text-foreground">
-                                {email.criado_em && format(new Date(email.criado_em), "HH:mm", { locale: ptBR })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                  ) : !receivedEmails || receivedEmails.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-center px-4">
+                      <Inbox className="h-16 w-16 mb-4 opacity-10" />
+                      <h3 className="font-medium text-lg mb-1">Sua caixa de entrada está limpa</h3>
+                      <p className="max-w-xs text-sm opacity-60">
+                        E-mails recebidos na sua conta Gmail aparecerão aqui automaticamente.
+                      </p>
                     </div>
-                  </div>
-                </TabsContent>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {receivedEmails.map((email) => (
+                        <div 
+                          key={email.id} 
+                          className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 border-b border-border/50"
+                          onClick={() => setSelectedEmail({
+                            ...email,
+                            destinatario: email.destinatarios?.[0] || "",
+                            remetente: email.remetente,
+                            corpo: "",
+                            html: email.corpo_html,
+                            created_at: email.criado_em
+                          })}
+                        >
+                          <div className="flex items-center gap-3 shrink-0">
+                            <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
+                            <Star className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
+                          </div>
+                          <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
+                            <span className="text-sm font-bold text-foreground">{email.remetente}</span>
+                          </div>
+                          <div className="flex-1 truncate overflow-hidden">
+                            <span className="text-sm font-bold text-foreground mr-2 shrink-0">{email.assunto}</span>
+                            <span className="text-sm text-muted-foreground">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
+                          </div>
+                          <div className="shrink-0 text-xs font-bold text-foreground">
+                            {email.criado_em && format(new Date(email.criado_em), "HH:mm", { locale: ptBR })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </Tabs>
+            </TabsContent>
           </div>
         </div>
+      </Tabs>
 
         <Dialog open={!!selectedEmail} onOpenChange={(open) => !open && setSelectedEmail(null)}>
           <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col p-0 border shadow-2xl rounded-2xl bg-card">
