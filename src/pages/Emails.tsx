@@ -245,8 +245,7 @@ const Emails = () => {
                       <Input
                         id="to"
                         placeholder="email@exemplo.com"
-                        variant="ghost"
-                        className="border-none focus-visible:ring-0 px-0 h-8"
+                        className="border-none shadow-none focus-visible:ring-0 px-0 h-8 bg-transparent"
                         value={formData.destinatario}
                         onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
                       />
