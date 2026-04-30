@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useObras } from '@/hooks/use-obras';
 import { useStatusObras } from '@/hooks/use-status-obras';
@@ -55,6 +56,7 @@ const OBRA_FIELDS: ColumnDefinition[] = [
 type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
 
 export default function Obras() {
+  const navigate = useNavigate();
   const { data: obras, isLoading } = useObras();
   const { data: clientes } = useClientes();
   const createObra = useCreateObra();
@@ -371,7 +373,21 @@ export default function Obras() {
                           </Button>
                           <CardHeader className="pb-3">
                             <div className="flex items-start justify-between gap-2">
-                              <CardTitle className="text-base font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+                              <CardTitle 
+                                className="text-base font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditObra({
+                                    id: obra.id,
+                                    nome_obra: obra.nome_obra,
+                                    cliente_id: obra.cliente_id,
+                                    endereco_entrega: obra.endereco_entrega || '',
+                                    status: obra.status,
+                                    spe_cnpj: obra.spe_cnpj || '',
+                                  });
+                                  setEditDialogOpen(true);
+                                }}
+                              >
                                 {obra.nome_obra}
                               </CardTitle>
                               <Badge variant={status.variant} className="shrink-0 text-xs">
@@ -381,13 +397,27 @@ export default function Obras() {
                           </CardHeader>
                           <CardContent className="flex-1 space-y-2 text-sm text-muted-foreground">
                             {visibleColumns.includes('cliente') && cliente?.empresa && (
-                              <div className="flex items-center gap-2">
+                              <div 
+                                className="flex items-center gap-2 hover:text-primary transition-colors cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/clientes/${cliente.id}`);
+                                }}
+                              >
                                 <Building2 className="h-3.5 w-3.5 shrink-0" />
                                 <span className="truncate">{cliente.empresa}</span>
                               </div>
                             )}
                             {visibleColumns.includes('endereco') && obra.endereco_entrega && (
-                              <div className="flex items-center gap-2">
+                              <div 
+                                className="flex items-center gap-2 hover:text-primary transition-colors cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (obra.endereco_entrega) {
+                                    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(obra.endereco_entrega)}`, '_blank');
+                                  }
+                                }}
+                              >
                                 <MapPin className="h-3.5 w-3.5 shrink-0" />
                                 <span className="truncate">{obra.endereco_entrega}</span>
                               </div>
@@ -443,10 +473,50 @@ export default function Obras() {
                             >
                               {visibleColumns.map(colId => (
                                 <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
-                                  {colId === 'nome_obra' && <span className="font-medium text-foreground">{obra.nome_obra}</span>}
+                                  {colId === 'nome_obra' && (
+                                    <span 
+                                      className="font-medium text-foreground hover:text-primary transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditObra({
+                                          id: obra.id,
+                                          nome_obra: obra.nome_obra,
+                                          cliente_id: obra.cliente_id,
+                                          endereco_entrega: obra.endereco_entrega || '',
+                                          status: obra.status,
+                                          spe_cnpj: obra.spe_cnpj || '',
+                                        });
+                                        setEditDialogOpen(true);
+                                      }}
+                                    >
+                                      {obra.nome_obra}
+                                    </span>
+                                  )}
                                   {colId === 'status' && <Badge variant={status.variant} className="text-[10px]">{status.label}</Badge>}
-                                  {colId === 'cliente' && (cliente?.empresa || '—')}
-                                  {colId === 'endereco' && (obra.endereco_entrega || '—')}
+                                  {colId === 'cliente' && (
+                                    <span 
+                                      className="hover:text-primary transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/clientes/${cliente.id}`);
+                                      }}
+                                    >
+                                      {cliente?.empresa || '—'}
+                                    </span>
+                                  )}
+                                  {colId === 'endereco' && (
+                                    <span 
+                                      className="hover:text-primary transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (obra.endereco_entrega) {
+                                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(obra.endereco_entrega)}`, '_blank');
+                                        }
+                                      }}
+                                    >
+                                      {obra.endereco_entrega || '—'}
+                                    </span>
+                                  )}
                                   {colId === 'spe_cnpj' && (obra.spe_cnpj || '—')}
                                   {colId === 'created_at' && format(new Date(obra.created_at), "dd/MM/yyyy")}
                                   {colId === 'actions' && (
@@ -518,11 +588,23 @@ export default function Obras() {
                 <div className="space-y-4">
                   <div>
                     <Label className="text-xs text-muted-foreground uppercase">Cliente</Label>
-                    <p className="font-medium">{selectedObra.clientes?.empresa || '—'}</p>
+                    <p 
+                      className="font-medium hover:text-primary transition-colors cursor-pointer"
+                      onClick={() => navigate(`/clientes/${selectedObra.cliente_id}`)}
+                    >
+                      {selectedObra.clientes?.empresa || '—'}
+                    </p>
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground uppercase">Endereço de Entrega</Label>
-                    <p className="font-medium flex items-center gap-1">
+                    <p 
+                      className="font-medium flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+                      onClick={() => {
+                        if (selectedObra.endereco_entrega) {
+                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedObra.endereco_entrega)}`, '_blank');
+                        }
+                      }}
+                    >
                       <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
                       {selectedObra.endereco_entrega || '—'}
                     </p>
