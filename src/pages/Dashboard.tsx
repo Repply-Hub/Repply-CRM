@@ -173,6 +173,19 @@ const Dashboard = () => {
     return arr;
   }, [filteredPedidos, fabricaSort]);
 
+  const rendimentoVendedor = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredPedidos.forEach(p => {
+      if (p.usuario?.nome && p.status === 'fechamento') {
+        map.set(p.usuario.nome, (map.get(p.usuario.nome) ?? 0) + (p.valor_total ?? 0));
+      }
+    });
+    const arr = Array.from(map.entries()).map(([vendedor, valor]) => ({ vendedor, valor }));
+    arr.sort((a, b) => b.valor - a.valor);
+    return arr;
+  }, [filteredPedidos]);
+
+
   const segmentacao = [
     { name: 'Alto (>100k)', value: filteredPedidos.filter(p => (p.valor_total ?? 0) > 100000).length, color: 'hsl(24, 100%, 47%)' },
     { name: 'Médio (30-100k)', value: filteredPedidos.filter(p => (p.valor_total ?? 0) >= 30000 && (p.valor_total ?? 0) <= 100000).length, color: 'hsl(42, 95%, 52%)' },
