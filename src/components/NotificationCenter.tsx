@@ -86,9 +86,8 @@ export function NotificationCenter() {
     const summary = parts.join(' · ') || `${unread.length} pendência${unread.length > 1 ? 's' : ''}`;
 
     toast.info(`📋 ${summary}`, {
-      description: 'Clique para ver suas tarefas',
+      description: 'Clique para ver as notificações',
       duration: 6000,
-      action: { label: 'Ver Tarefas', onClick: () => navigate('/') },
     });
   }, [notificacoes, navigate]);
 
