@@ -133,6 +133,14 @@ export default function Obras() {
     localStorage.setItem('obras_view_mode', viewMode);
   }, [viewMode]);
 
+  useEffect(() => {
+    const handleSelectAddress = () => {
+      setActiveTab('mapa');
+    };
+    window.addEventListener('select-address-map', handleSelectAddress);
+    return () => window.removeEventListener('select-address-map', handleSelectAddress);
+  }, []);
+
   const filtered = useMemo(() => {
     if (!obras) return [];
     let list = [...obras];
