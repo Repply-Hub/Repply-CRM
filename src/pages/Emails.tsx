@@ -313,12 +313,6 @@ const Emails = () => {
         <div className="flex-1 overflow-hidden relative">
           <TabsContent value="sent" className="m-0 h-full overflow-hidden">
             <div className="h-full overflow-hidden flex flex-col bg-background">
-              <div className="p-2 flex items-center gap-2 border-b">
-                <div className="flex items-center gap-1 ml-2">
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><Plus className="h-4 w-4 rotate-45 text-muted-foreground" /></Button>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><MoreVertical className="h-4 w-4 text-muted-foreground" /></Button>
-                </div>
-              </div>
               <div className="flex-1 overflow-y-auto">
                 {isSentLoading ? (
                   <div className="flex justify-center py-20">
@@ -361,12 +355,6 @@ const Emails = () => {
 
           <TabsContent value="received" className="m-0 h-full overflow-hidden">
             <div className="h-full overflow-hidden flex flex-col bg-background">
-              <div className="p-2 flex items-center gap-2 border-b">
-                <div className="flex items-center gap-1 ml-2">
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><Plus className="h-4 w-4 rotate-45 text-muted-foreground" /></Button>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><MoreVertical className="h-4 w-4 text-muted-foreground" /></Button>
-                </div>
-              </div>
               <div className="flex-1 overflow-y-auto">
                 {isReceivedLoading ? (
                   <div className="flex justify-center py-20">
