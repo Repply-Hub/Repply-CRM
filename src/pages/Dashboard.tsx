@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   ResponsiveContainer, PieChart, Pie, Cell,
-  LineChart, Line, Tooltip, Area, AreaChart,
+  Tooltip, Area, AreaChart,
 } from 'recharts';
 import { TrendingUp, DollarSign, Target, Clock, Loader2, Factory } from 'lucide-react';
 import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante } from '@/hooks/use-dashboard';
@@ -17,6 +17,7 @@ import { DateRangePicker, type DateRange } from '@/components/DateRangePicker';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/ChartTooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 const formatCurrency = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -41,6 +42,7 @@ const Dashboard = () => {
   });
   const [fabricaSort, setFabricaSort] = useState<'maior' | 'menor'>('maior');
   const [vendedorId, setVendedorId] = useState<string>('todos');
+  const [fabricanteId, setFabricanteId] = useState<string>('todos');
 
   const { user } = useAuth();
   const { data: userData } = useQuery({
@@ -62,35 +64,61 @@ const Dashboard = () => {
   const { data: faturamento, isLoading: loadFat } = useFaturamentoMensal(empresaId);
   const { data: vendedores } = useIndicadoresVendedor(empresaId);
   const { data: velocidade } = useVelocidadeFabricante(empresaId);
+  const { data: fabricantesRaw } = useQuery({
+    queryKey: ['fabricantes_filtro', empresaId],
+    queryFn: async () => {
+      if (!empresaId) return [];
+      const { data } = await (supabase as any).from('fabricantes').select('id, nome').eq('empresa_id', empresaId);
+      return data || [];
+    },
+    enabled: !!empresaId,
+  });
+  const fabricantes = useMemo(() => (fabricantesRaw || []) as any[], [fabricantesRaw]);
+
+
+
+
+
+
+
+
   const { data: pedidos } = usePedidos(empresaId);
 
   const isLoading = loadFat;
 
   const filteredPedidos = useMemo(() => {
-    if (!pedidos) return [];
-    return pedidos.filter(p => {
+    const list = pedidos || [];
+    const from = startOfDay(dateRange.from);
+    const to = endOfDay(dateRange.to);
+    
+    return list.filter(p => {
       const d = parseISO(p.data_pedido);
-      const isWithinRange = isWithinInterval(d, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) });
+      const isWithinRange = isWithinInterval(d, { start: from, end: to });
       const matchesVendedor = vendedorId === 'todos' || p.usuario_id === vendedorId;
-      return isWithinRange && matchesVendedor;
+      const matchesFabricante = fabricanteId === 'todos' || p.fabricante_id === fabricanteId;
+      return isWithinRange && matchesVendedor && matchesFabricante;
     });
-  }, [pedidos, dateRange, vendedorId]);
+  }, [pedidos, dateRange.from, dateRange.to, vendedorId, fabricanteId]);
+
 
   const filteredFaturamento = useMemo(() => {
     if (!faturamento) return [];
     return faturamento.filter(f => {
       if (!f.mes_ano) return false;
-      // Convert "YYYY-MM" to a Date at the start of that month
       const d = parseISO(`${f.mes_ano}-01`);
-      return isWithinInterval(d, { start: startOfDay(dateRange.from), end: endOfDay(dateRange.to) });
+      return isWithinInterval(d, { 
+        start: startOfDay(dateRange.from), 
+        end: endOfDay(dateRange.to) 
+      });
     });
-  }, [faturamento, dateRange]);
+  }, [faturamento, dateRange.from, dateRange.to]);
 
-  const lastMonth = filteredFaturamento.slice(-1)[0];
-  const prevMonth = filteredFaturamento.slice(-2, -1)[0];
+  const lastMonth = filteredFaturamento[filteredFaturamento.length - 1];
+  const prevMonth = filteredFaturamento[filteredFaturamento.length - 2];
   const faturamentoChange = lastMonth && prevMonth && prevMonth.faturamento_total && prevMonth.faturamento_total !== 0
     ? (((lastMonth.faturamento_total ?? 0) - prevMonth.faturamento_total) / prevMonth.faturamento_total * 100).toFixed(0)
     : '0';
+
 
   const totalPedidos = filteredPedidos.length;
   const fechados = filteredPedidos.filter(p => p.status === 'fechamento').length;
@@ -145,6 +173,20 @@ const Dashboard = () => {
     return arr;
   }, [filteredPedidos, fabricaSort]);
 
+  const rendimentoVendedor = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredPedidos.forEach(p => {
+      if (p.vendedor?.nome && p.status === 'fechamento') {
+        map.set(p.vendedor.nome, (map.get(p.vendedor.nome) ?? 0) + (p.valor_total ?? 0));
+      }
+    });
+    const arr = Array.from(map.entries()).map(([vendedor, valor]) => ({ vendedor, valor }));
+    arr.sort((a, b) => b.valor - a.valor);
+    return arr;
+  }, [filteredPedidos]);
+
+
+
   const segmentacao = [
     { name: 'Alto (>100k)', value: filteredPedidos.filter(p => (p.valor_total ?? 0) > 100000).length, color: 'hsl(24, 100%, 47%)' },
     { name: 'Médio (30-100k)', value: filteredPedidos.filter(p => (p.valor_total ?? 0) >= 30000 && (p.valor_total ?? 0) <= 100000).length, color: 'hsl(42, 95%, 52%)' },
@@ -191,15 +233,31 @@ const Dashboard = () => {
         </div>
 
         {/* Filtros */}
-        <div className="mb-8 flex flex-col sm:flex-row gap-4 justify-end items-end">
-          <div className="w-full sm:w-64">
+        <div className="mb-8 flex flex-col sm:flex-row flex-wrap gap-4 justify-end items-end">
+          <div className="w-full sm:w-48">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Fabricante</p>
+            <Select value={fabricanteId} onValueChange={setFabricanteId}>
+              <SelectTrigger className="h-10 bg-card border-border/60 shadow-sm">
+                <SelectValue placeholder="Fabricante" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {fabricantes.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full sm:w-48">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Responsável</p>
             <Select value={vendedorId} onValueChange={setVendedorId}>
               <SelectTrigger className="h-10 bg-card border-border/60 shadow-sm">
-                <SelectValue placeholder="Selecione o responsável" />
+                <SelectValue placeholder="Responsável" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos os responsáveis</SelectItem>
+                <SelectItem value="todos">Todos</SelectItem>
                 {(vendedores ?? []).map((v) => (
                   <SelectItem key={v.usuario_id} value={v.usuario_id || ''}>
                     {v.usuario_nome}
@@ -213,6 +271,8 @@ const Dashboard = () => {
             <DateRangePicker value={dateRange} onChange={setDateRange} />
           </div>
         </div>
+
+
 
         {/* Charts Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
@@ -359,59 +419,98 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Rendimento por Fábrica */}
-        {rendimentoFabrica.length > 0 && (
-          <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300 mt-5">
-            <CardHeader className="pb-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Factory className="h-4 w-4 text-primary" /> Rendimento por Fábrica
-                  </CardTitle>
-                  <CardDescription className="text-xs">Faturamento fechado por fabricante no período</CardDescription>
+        {/* Rendimento Gráficos */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+          {/* Rendimento por Fábrica */}
+          {rendimentoFabrica.length > 0 && (
+            <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+              <CardHeader className="pb-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <Factory className="h-4 w-4 text-primary" /> Rendimento por Fábrica
+                    </CardTitle>
+                    <CardDescription className="text-xs">Faturamento fechado por fabricante</CardDescription>
+                  </div>
+                  <Select value={fabricaSort} onValueChange={(v) => setFabricaSort(v as 'maior' | 'menor')}>
+                    <SelectTrigger className="h-8 w-fit max-w-full shrink-0 whitespace-nowrap text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="maior">Maior</SelectItem>
+                      <SelectItem value="menor">Menor</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select value={fabricaSort} onValueChange={(v) => setFabricaSort(v as 'maior' | 'menor')}>
-                  <SelectTrigger className="h-8 w-fit max-w-full shrink-0 whitespace-nowrap text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="maior">Maior rendimento</SelectItem>
-                    <SelectItem value="menor">Menor rendimento</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-2">
-              <ResponsiveContainer width="100%" height={Math.max(220, rendimentoFabrica.length * 40)}>
-                <BarChart data={rendimentoFabrica} layout="vertical" barCategoryGap="20%">
-                  <defs>
-                    <linearGradient id="gradientRendimento" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor={chartColors.primary} stopOpacity={0.7} />
-                      <stop offset="100%" stopColor={chartColors.primary} stopOpacity={1} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid {...commonGridProps} vertical horizontal={false} />
-                  <XAxis type="number" {...commonAxisProps} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
-                  <YAxis dataKey="fabrica" type="category" {...commonAxisProps} width={120} />
-                  <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
-                  <Bar
-                    dataKey="valor"
-                    name="Rendimento"
-                    fill="url(#gradientRendimento)"
-                    radius={[0, 8, 8, 0]}
-                    animationDuration={1000}
-                    animationEasing="ease-out"
-                    background={{ fill: chartColors.primaryLight, radius: 8 }}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
+              </CardHeader>
+              <CardContent className="pt-2">
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={rendimentoFabrica} layout="vertical" barCategoryGap="20%">
+                    <defs>
+                      <linearGradient id="gradientRendimento" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor={chartColors.primary} stopOpacity={0.7} />
+                        <stop offset="100%" stopColor={chartColors.primary} stopOpacity={1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid {...commonGridProps} vertical horizontal={false} />
+                    <XAxis type="number" {...commonAxisProps} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                    <YAxis dataKey="fabrica" type="category" {...commonAxisProps} width={100} />
+                    <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
+                    <Bar
+                      dataKey="valor"
+                      name="Rendimento"
+                      fill="url(#gradientRendimento)"
+                      radius={[0, 8, 8, 0]}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Rendimento por Responsável */}
+          {rendimentoVendedor.length > 0 && (
+            <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+              <CardHeader className="pb-1">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" /> Rendimento por Responsável
+                </CardTitle>
+                <CardDescription className="text-xs">Faturamento fechado por responsável</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={rendimentoVendedor} layout="vertical" barCategoryGap="20%">
+                    <defs>
+                      <linearGradient id="gradientRendimentoVendedor" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor={chartColors.success} stopOpacity={0.7} />
+                        <stop offset="100%" stopColor={chartColors.success} stopOpacity={1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid {...commonGridProps} vertical horizontal={false} />
+                    <XAxis type="number" {...commonAxisProps} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                    <YAxis dataKey="vendedor" type="category" {...commonAxisProps} width={100} />
+                    <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
+                    <Bar
+                      dataKey="valor"
+                      name="Rendimento"
+                      fill="url(#gradientRendimentoVendedor)"
+                      radius={[0, 8, 8, 0]}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
       </ErrorBoundary>
     </AppLayout>
   );
 };
+
 
 export default Dashboard;
