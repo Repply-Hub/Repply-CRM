@@ -195,26 +195,26 @@ const Emails = () => {
 
   return (
     <AppLayout title="E-mail" subtitle="Interface Gmail">
-      <div className="flex flex-col h-full bg-background overflow-hidden">
+      <div className="flex flex-col h-full bg-[#f6f8fc] overflow-hidden">
         {/* Gmail Search Bar Style */}
-        <div className="px-6 py-4 flex items-center justify-between border-b bg-card/30">
-          <div className="relative w-full max-w-2xl mx-auto">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
+        <div className="px-4 py-2 flex items-center gap-4 bg-[#f6f8fc]">
+          <div className="flex-1 max-w-3xl flex items-center bg-[#eaf1fb] rounded-full px-4 py-2 focus-within:bg-white focus-within:shadow-md transition-all">
+            <Search className="h-5 w-5 text-slate-500 mr-3" />
+            <input
               placeholder="Pesquisar no correio"
-              className="pl-12 h-12 bg-muted/40 border-none focus-visible:ring-1 focus-visible:ring-primary/20 rounded-2xl w-full text-base"
+              className="bg-transparent border-none focus:outline-none w-full text-base placeholder:text-slate-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex gap-2 ml-4">
+          <div className="flex gap-1">
             <Button 
               variant="ghost" 
               size="icon"
-              className="rounded-full"
+              className="rounded-full hover:bg-slate-200"
               onClick={() => window.location.href = '/configuracoes?tab=perfil'}
             >
-              <Settings className="h-5 w-5" />
+              <Settings className="h-5 w-5 text-slate-600" />
             </Button>
           </div>
         </div>
@@ -232,11 +232,11 @@ const Emails = () => {
           </div>
 
           {/* Gmail-style Sidebar */}
-          <div className="w-64 flex flex-col p-3 border-r bg-card/10 hidden md:flex">
+          <div className="w-64 flex flex-col p-2 bg-[#f6f8fc] hidden md:flex shrink-0">
             <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
               <DialogTrigger asChild>
-                <Button className="mb-6 h-14 px-6 rounded-2xl bg-white text-slate-700 hover:bg-slate-50 shadow-md border gap-3 text-base font-medium transition-all group">
-                  <Plus className="h-6 w-6 text-red-500 group-hover:scale-110 transition-transform" />
+                <Button className="mb-4 mt-2 h-14 w-fit px-6 rounded-2xl bg-[#c2e7ff] text-[#001d35] hover:bg-[#b3d7ef] hover:shadow-md shadow-sm border-none gap-3 text-sm font-medium transition-all group">
+                  <PenBox className="h-6 w-6" />
                   Escrever
                 </Button>
               </DialogTrigger>
@@ -335,41 +335,43 @@ const Emails = () => {
                 </TabsList>
               </div>
 
-              <TabsList className="hidden md:flex flex-col h-auto bg-transparent border-none p-0 gap-1 w-64 shrink-0">
+              <TabsList className="hidden md:flex flex-col h-auto bg-transparent border-none p-0 gap-0.5 w-60 shrink-0">
                 <TabsTrigger 
                   value="received" 
-                  className="w-full justify-start gap-4 px-6 py-2 rounded-r-full data-[state=active]:bg-[#d3e3fd] data-[state=active]:text-[#041e49] border-none text-sm font-normal"
+                  className="w-full justify-start gap-4 px-6 py-1.5 rounded-r-full data-[state=active]:bg-[#d3e3fd] data-[state=active]:text-[#041e49] data-[state=active]:font-bold border-none text-sm font-medium transition-colors hover:bg-slate-200/50"
                 >
                   <Inbox className="h-5 w-5" /> 
                   <span className="flex-1 text-left">Recebidos</span>
-                  <span className="text-xs font-semibold">{receivedEmails?.length || 0}</span>
+                  <span className="text-xs">{receivedEmails?.length || 0}</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="sent" 
-                  className="w-full justify-start gap-4 px-6 py-2 rounded-r-full data-[state=active]:bg-[#d3e3fd] data-[state=active]:text-[#041e49] border-none text-sm font-normal"
+                  className="w-full justify-start gap-4 px-6 py-1.5 rounded-r-full data-[state=active]:bg-[#d3e3fd] data-[state=active]:text-[#041e49] data-[state=active]:font-bold border-none text-sm font-medium transition-colors hover:bg-slate-200/50"
                 >
                   <Send className="h-5 w-5" /> 
                   <span className="flex-1 text-left">Enviados</span>
-                  <span className="text-xs font-semibold">{emails?.length || 0}</span>
+                  <span className="text-xs">{emails?.length || 0}</span>
                 </TabsTrigger>
-                <div className="px-6 py-2 text-sm text-muted-foreground mt-4 flex items-center gap-4 cursor-not-allowed opacity-50">
+                <div className="px-6 py-2 text-sm text-slate-700 flex items-center gap-4 cursor-not-allowed opacity-60 hover:bg-slate-200/50 rounded-r-full transition-colors mt-1">
                   <Star className="h-5 w-5" /> Estrelas
                 </div>
-                <div className="px-6 py-2 text-sm text-muted-foreground flex items-center gap-4 cursor-not-allowed opacity-50">
+                <div className="px-6 py-2 text-sm text-slate-700 flex items-center gap-4 cursor-not-allowed opacity-60 hover:bg-slate-200/50 rounded-r-full transition-colors">
                   <Clock className="h-5 w-5" /> Adiados
                 </div>
-                <div className="px-6 py-2 text-sm text-muted-foreground flex items-center gap-4 cursor-not-allowed opacity-50">
+                <div className="px-6 py-2 text-sm text-slate-700 flex items-center gap-4 cursor-not-allowed opacity-60 hover:bg-slate-200/50 rounded-r-full transition-colors">
                   <Archive className="h-5 w-5" /> Arquivados
                 </div>
               </TabsList>
 
               {/* Main Content Area */}
-              <div className="flex-1 overflow-hidden flex flex-col md:ml-4 mt-4 md:mt-0">
+              <div className="flex-1 overflow-hidden flex flex-col md:mr-4">
                 <TabsContent value="sent" className="m-0 h-full overflow-hidden">
-                  <div className="bg-white rounded-2xl border shadow-sm h-full overflow-hidden flex flex-col">
-                    <div className="p-3 border-b flex items-center gap-4">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><Plus className="h-4 w-4 rotate-45" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreVertical className="h-4 w-4" /></Button>
+                  <div className="bg-white rounded-2xl h-full overflow-hidden flex flex-col">
+                    <div className="p-2 flex items-center gap-2">
+                      <div className="flex items-center gap-1 ml-2">
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><Plus className="h-4 w-4 rotate-45 text-slate-500" /></Button>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><MoreVertical className="h-4 w-4 text-slate-500" /></Button>
+                      </div>
                     </div>
                     <div className="flex-1 overflow-y-auto">
                       {isSentLoading ? (
@@ -386,21 +388,21 @@ const Emails = () => {
                           {emails.map((email) => (
                             <div 
                               key={email.id} 
-                              className="px-4 py-3 hover:bg-slate-50 transition-colors group cursor-pointer flex items-center gap-4 border-l-4 border-transparent hover:border-l-primary/30"
+                              className="px-4 py-2.5 hover:bg-slate-100 transition-colors group cursor-pointer flex items-center gap-4 border-b border-slate-50"
                               onClick={() => setSelectedEmail(email)}
                             >
                               <div className="flex items-center gap-3 shrink-0">
-                                <Plus className="h-4 w-4 text-slate-300 rotate-45" />
-                                <Star className="h-4 w-4 text-slate-300" />
+                                <Plus className="h-4 w-4 text-slate-300 rotate-45 group-hover:text-slate-500" />
+                                <Star className="h-4 w-4 text-slate-300 group-hover:text-slate-500" />
                               </div>
-                              <div className="min-w-[150px] max-w-[200px] truncate">
-                                <span className="font-semibold text-sm">Para: {email.destinatario}</span>
+                              <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
+                                <span className="text-sm text-slate-700">Para: {email.destinatario}</span>
                               </div>
-                              <div className="flex-1 truncate">
-                                <span className="font-semibold text-sm mr-2">{email.assunto}</span>
-                                <span className="text-sm text-muted-foreground">- {email.corpo}</span>
+                              <div className="flex-1 truncate overflow-hidden">
+                                <span className="text-sm font-medium text-slate-900 mr-2 shrink-0">{email.assunto}</span>
+                                <span className="text-sm text-slate-500">- {email.corpo}</span>
                               </div>
-                              <div className="shrink-0 text-xs font-semibold text-slate-500">
+                              <div className="shrink-0 text-xs font-medium text-slate-600">
                                 {format(new Date(email.created_at), "dd 'de' MMM", { locale: ptBR })}
                               </div>
                             </div>
@@ -412,10 +414,12 @@ const Emails = () => {
                 </TabsContent>
 
                 <TabsContent value="received" className="m-0 h-full overflow-hidden">
-                  <div className="bg-white rounded-2xl border shadow-sm h-full overflow-hidden flex flex-col">
-                    <div className="p-3 border-b flex items-center gap-4">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><Plus className="h-4 w-4 rotate-45" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreVertical className="h-4 w-4" /></Button>
+                  <div className="bg-white rounded-2xl h-full overflow-hidden flex flex-col">
+                    <div className="p-2 flex items-center gap-2">
+                      <div className="flex items-center gap-1 ml-2">
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><Plus className="h-4 w-4 rotate-45 text-slate-500" /></Button>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><MoreVertical className="h-4 w-4 text-slate-500" /></Button>
+                      </div>
                     </div>
                     <div className="flex-1 overflow-y-auto">
                       {isReceivedLoading ? (
@@ -435,7 +439,7 @@ const Emails = () => {
                           {receivedEmails.map((email) => (
                             <div 
                               key={email.id} 
-                              className="px-4 py-3 hover:bg-slate-50 transition-colors group cursor-pointer flex items-center gap-4 border-l-4 border-transparent hover:border-l-blue-500"
+                              className="px-4 py-2.5 hover:bg-slate-100 transition-colors group cursor-pointer flex items-center gap-4 border-b border-slate-50"
                               onClick={() => setSelectedEmail({
                                 ...email,
                                 destinatario: email.destinatarios?.[0] || "",
@@ -446,15 +450,15 @@ const Emails = () => {
                               })}
                             >
                               <div className="flex items-center gap-3 shrink-0">
-                                <Plus className="h-4 w-4 text-slate-300 rotate-45" />
-                                <Star className="h-4 w-4 text-slate-300" />
+                                <Plus className="h-4 w-4 text-slate-300 rotate-45 group-hover:text-slate-500" />
+                                <Star className="h-4 w-4 text-slate-300 group-hover:text-slate-500" />
                               </div>
-                              <div className="min-w-[150px] max-w-[200px] truncate">
-                                <span className="font-bold text-sm">{email.remetente}</span>
+                              <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
+                                <span className="text-sm font-bold text-slate-900">{email.remetente}</span>
                               </div>
-                              <div className="flex-1 truncate">
-                                <span className="font-bold text-sm mr-2">{email.assunto}</span>
-                                <span className="text-sm text-muted-foreground">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
+                              <div className="flex-1 truncate overflow-hidden">
+                                <span className="text-sm font-bold text-slate-900 mr-2 shrink-0">{email.assunto}</span>
+                                <span className="text-sm text-slate-500">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
                               </div>
                               <div className="shrink-0 text-xs font-bold text-slate-900">
                                 {email.criado_em && format(new Date(email.criado_em), "HH:mm", { locale: ptBR })}
