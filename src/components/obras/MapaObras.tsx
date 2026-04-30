@@ -31,7 +31,7 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
   // or use a public one if available.
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: "", // User will need to provide this in Settings/Secrets later
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "", 
   });
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
