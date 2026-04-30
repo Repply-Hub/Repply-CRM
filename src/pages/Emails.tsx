@@ -195,11 +195,11 @@ const Emails = () => {
 
   return (
     <AppLayout title="E-mail" subtitle="Interface Gmail" mainClassName="flex-1 overflow-hidden p-0">
-      <div className="flex flex-col h-full bg-[#f6f8fc] overflow-hidden">
+      <div className="flex flex-col h-full bg-background overflow-hidden">
         {/* Gmail Search Bar Style - Now following system layout more closely */}
         <div className="px-4 py-3 flex items-center gap-4 border-b bg-background/95">
-          <div className="flex-1 max-w-3xl flex items-center bg-[#eaf1fb] rounded-full px-4 py-2 focus-within:bg-white focus-within:shadow-md transition-all border border-transparent focus-within:border-primary/20">
-            <Search className="h-5 w-5 text-slate-500 mr-3" />
+          <div className="flex-1 max-w-3xl flex items-center bg-muted/50 rounded-full px-4 py-2 focus-within:bg-background focus-within:shadow-md transition-all border border-transparent focus-within:border-primary/20">
+            <Search className="h-5 w-5 text-muted-foreground mr-3" />
             <input
               placeholder="Pesquisar no correio"
               className="bg-transparent border-none focus:outline-none w-full text-base placeholder:text-slate-500"
