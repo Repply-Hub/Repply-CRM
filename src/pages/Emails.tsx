@@ -437,7 +437,7 @@ const Emails = () => {
             </TabsContent>
           </div>
         </div>
-      </Tabs>
+      </div>
 
         <Dialog open={!!selectedEmail} onOpenChange={(open) => !open && setSelectedEmail(null)}>
           <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col p-0 border shadow-2xl rounded-2xl bg-card">
