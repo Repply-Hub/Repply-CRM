@@ -70,13 +70,13 @@ const Dashboard = () => {
       const { data, error } = await supabase
         .from('fabricantes')
         .select('id, nome')
-        .eq('empresa_id', empresaId)
-        .order('nome');
+        .eq('empresa_id', empresaId);
       if (error) throw error;
-      return (data as { id: string; nome: string }[]) || [];
+      return (data as any[]) || [];
     },
     enabled: !!empresaId,
   });
+
 
   const { data: pedidos } = usePedidos(empresaId);
 
