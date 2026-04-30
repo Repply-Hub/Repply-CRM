@@ -466,18 +466,18 @@ const Emails = () => {
         </div>
 
         <Dialog open={!!selectedEmail} onOpenChange={(open) => !open && setSelectedEmail(null)}>
-          <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-2xl">
+          <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col p-0 border shadow-2xl rounded-2xl bg-card">
             <div className="p-6 overflow-y-auto">
               <div className="flex justify-between items-start mb-8">
                 <div>
-                  <h2 className="text-2xl font-normal text-slate-900 mb-6">{selectedEmail?.assunto}</h2>
+                  <h2 className="text-2xl font-normal text-foreground mb-6">{selectedEmail?.assunto}</h2>
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold uppercase">
+                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-bold uppercase">
                       {(selectedEmail?.remetente || selectedEmail?.destinatario || "?")[0]}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm">{selectedEmail?.remetente || "Eu"}</span>
+                        <span className="font-bold text-sm text-foreground">{selectedEmail?.remetente || "Eu"}</span>
                         <span className="text-xs text-muted-foreground">&lt;{selectedEmail?.remetente || connectedEmail}&gt;</span>
                       </div>
                       <div className="text-xs text-muted-foreground">
@@ -487,14 +487,14 @@ const Emails = () => {
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {selectedEmail && format(new Date(selectedEmail.created_at), "dd 'de' MMM. 'de' yyyy, HH:mm", { locale: ptBR })}
+                  {selectedEmail && format(new Date(selectedEmail.created_at || selectedEmail.criado_em), "dd 'de' MMM. 'de' yyyy, HH:mm", { locale: ptBR })}
                 </div>
               </div>
 
-              <div className="text-base text-slate-800 leading-relaxed min-h-[200px]">
+              <div className="text-base text-foreground/90 leading-relaxed min-h-[200px]">
                 {selectedEmail?.html ? (
                   <div 
-                    className="prose prose-sm max-w-none"
+                    className="prose prose-sm max-w-none dark:prose-invert"
                     dangerouslySetInnerHTML={{ __html: selectedEmail.html }} 
                   />
                 ) : (
