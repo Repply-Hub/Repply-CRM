@@ -499,7 +499,7 @@ const Emails = () => {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </Tabs>
     </AppLayout>
   );
 };
