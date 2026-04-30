@@ -63,7 +63,7 @@ const Dashboard = () => {
   const { data: faturamento, isLoading: loadFat } = useFaturamentoMensal(empresaId);
   const { data: vendedores } = useIndicadoresVendedor(empresaId);
   const { data: velocidade } = useVelocidadeFabricante(empresaId);
-  const { data: fabricantesData } = useQuery({
+  const { data: fabricantesRaw } = useQuery({
     queryKey: ['fabricantes_filtro', empresaId],
     queryFn: async () => {
       if (!empresaId) return [];
@@ -72,12 +72,12 @@ const Dashboard = () => {
         .select('id, nome')
         .eq('empresa_id', empresaId);
       if (error) throw error;
-      return (data as any[]) || [];
+      return data || [];
     },
     enabled: !!empresaId,
-    initialData: [],
   });
-  const fabricantes = fabricantesData;
+  const fabricantes = useMemo(() => (fabricantesRaw || []) as {id: string, nome: string}[], [fabricantesRaw]);
+
 
 
 
