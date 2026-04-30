@@ -1,35 +1,13 @@
-import { useMemo, useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useMemo, useEffect, useState, useCallback } from 'react';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { Loader2, MapPin, Building2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useGeocodeObras, geocodificar, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
+import { useGeocodeObras, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
 
-function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, zoom);
-  }, [center, zoom, map]);
-  return null;
-}
-
-// Fix dos ícones padrão do Leaflet (assets quebram com bundlers)
-const iconPadrao = new L.Icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-interface MapaObrasProps {
-  obras: ObraComCoordenada[] | undefined;
-  isLoading: boolean;
-  searchTerm?: string;
-}
+const containerStyle = {
+  width: '100%',
+  height: '100%'
+};
 
 const STATUS_LABEL: Record<string, string> = {
   em_andamento: 'Em andamento',
@@ -38,30 +16,25 @@ const STATUS_LABEL: Record<string, string> = {
   parada: 'Parada',
 };
 
-  export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps) {
+interface MapaObrasProps {
+  obras: ObraComCoordenada[] | undefined;
+  isLoading: boolean;
+  searchTerm?: string;
+}
+
+export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps) {
   const { items, carregando, progresso } = useGeocodeObras(obras);
-  const [searchCoord, setSearchCoord] = useState<[number, number] | null>(null);
-  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [selectedObra, setSelectedObra] = useState<ObraComCoordenada | null>(null);
+  
+  // Note: For a production app, the API key should be in an environment variable
+  // but for the preview to work, we'll try to load without a key (will show development watermark)
+  // or use a public one if available.
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: "", // User will need to provide this in Settings/Secrets later
+  });
 
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (searchTerm.trim().length > 3) {
-        setIsSearchingAddress(true);
-        try {
-          const coord = await geocodificar(searchTerm);
-          if (coord) {
-            setSearchCoord([coord.lat, coord.lng]);
-          }
-        } finally {
-          setIsSearchingAddress(false);
-        }
-      } else {
-        setSearchCoord(null);
-      }
-    }, 800); // Debounce
-
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
 
   const obrasComCoord = useMemo(
     () => items.filter((o) => o.latitude !== null && o.longitude !== null),
@@ -73,18 +46,32 @@ const STATUS_LABEL: Record<string, string> = {
     [items]
   );
 
-  // Centro do mapa: prioriza termo pesquisado, senão média das obras, senão Natal/RN
-  const centro = useMemo<[number, number]>(() => {
-    if (searchCoord) return searchCoord;
-    if (obrasComCoord.length === 0) return [-5.7945, -35.211]; // Natal/RN
+  const centro = useMemo(() => {
+    if (obrasComCoord.length === 0) return { lat: -5.7945, lng: -35.211 }; // Natal/RN
     const lat =
       obrasComCoord.reduce((s, o) => s + (o.latitude ?? 0), 0) / obrasComCoord.length;
     const lng =
       obrasComCoord.reduce((s, o) => s + (o.longitude ?? 0), 0) / obrasComCoord.length;
-    return [lat, lng];
-  }, [obrasComCoord, searchCoord]);
+    return { lat, lng };
+  }, [obrasComCoord]);
 
-  if (isLoading) {
+  const onUnmount = useCallback(function callback(map: google.maps.Map) {
+    setMap(null);
+  }, []);
+
+  useEffect(() => {
+    if (map && searchTerm && searchTerm.trim().length > 3) {
+      const geocoder = new google.maps.Geocoder();
+      geocoder.geocode({ address: searchTerm }, (results, status) => {
+        if (status === 'OK' && results && results[0]) {
+          map.setCenter(results[0].geometry.location);
+          map.setZoom(16);
+        }
+      });
+    }
+  }, [map, searchTerm]);
+
+  if (isLoading || !isLoaded) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -94,7 +81,6 @@ const STATUS_LABEL: Record<string, string> = {
 
   return (
     <div className="space-y-3">
-      {/* Status bar */}
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <MapPin className="h-4 w-4 text-primary" />
@@ -104,78 +90,63 @@ const STATUS_LABEL: Record<string, string> = {
         {obrasSemEndereco.length > 0 && (
           <span className="text-xs">• {obrasSemEndereco.length} sem endereço cadastrado</span>
         )}
-        {(carregando || isSearchingAddress) && (
+        {carregando && (
           <div className="flex items-center gap-1.5 text-xs text-primary animate-pulse">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>
-              {isSearchingAddress 
-                ? 'Localizando endereço no mapa...' 
-                : `Geocodificando endereços (${progresso.atual}/${progresso.total})…`}
-            </span>
+            <span>Geocodificando endereços ({progresso.atual}/${progresso.total})…</span>
           </div>
         )}
       </div>
 
-      {/* Mapa */}
       <div className="rounded-lg overflow-hidden border border-border shadow-card" style={{ height: '70vh', minHeight: 480 }}>
-        <MapContainer
+        <GoogleMap
+          mapContainerStyle={containerStyle}
           center={centro}
           zoom={obrasComCoord.length > 0 ? 11 : 6}
-          scrollWheelZoom
-          style={{ height: '100%', width: '100%' }}
+          onLoad={setMap}
+          onUnmount={onUnmount}
+          options={{
+            streetViewControl: false,
+            mapTypeControl: false,
+            fullscreenControl: true,
+          }}
         >
-          <ChangeView center={centro} zoom={searchTerm.trim().length > 0 ? 16 : (obrasComCoord.length > 0 ? 11 : 6)} />
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          
-          {/* Marcador de pesquisa */}
-          {searchCoord && (
-            <Marker position={searchCoord} icon={new L.Icon({
-              iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-              shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-              iconSize: [25, 41],
-              iconAnchor: [12, 41],
-              popupAnchor: [1, -34],
-              shadowSize: [41, 41],
-            })}>
-              <Popup>
-                <div className="text-sm font-medium">Local pesquisado</div>
-                <div className="text-xs text-muted-foreground">{searchTerm}</div>
-              </Popup>
-            </Marker>
-          )}
-
           {obrasComCoord.map((obra) => (
             <Marker
               key={obra.id}
-              position={[obra.latitude!, obra.longitude!]}
-              icon={iconPadrao}
+              position={{ lat: obra.latitude!, lng: obra.longitude! }}
+              onClick={() => setSelectedObra(obra)}
+            />
+          ))}
+
+          {selectedObra && (
+            <InfoWindow
+              position={{ lat: selectedObra.latitude!, lng: selectedObra.longitude! }}
+              onCloseClick={() => setSelectedObra(null)}
             >
-              <Popup>
-                <div className="space-y-1.5 min-w-[200px]">
-                  <p className="font-semibold text-sm leading-tight">{obra.nome_obra}</p>
-                  {obra.cliente_empresa && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Building2 className="h-3 w-3 shrink-0" />
-                      <span>{obra.cliente_empresa}</span>
-                    </div>
-                  )}
-                  {obra.endereco_entrega && (
-                    <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                      <span>{obra.endereco_entrega}</span>
-                    </div>
-                  )}
-                  <Badge variant="outline" className="text-[10px] mt-1">
-                    {STATUS_LABEL[obra.status] ?? obra.status}
+              <div className="p-1 space-y-1.5 min-w-[180px] max-w-[250px] text-foreground">
+                <p className="font-bold text-sm leading-tight">{selectedObra.nome_obra}</p>
+                {selectedObra.cliente_empresa && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Building2 className="h-3 w-3 shrink-0" />
+                    <span>{selectedObra.cliente_empresa}</span>
+                  </div>
+                )}
+                {selectedObra.endereco_entrega && (
+                  <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span className="break-words">{selectedObra.endereco_entrega}</span>
+                  </div>
+                )}
+                <div className="mt-1">
+                  <Badge variant="outline" className="text-[10px] py-0 h-4">
+                    {STATUS_LABEL[selectedObra.status] ?? selectedObra.status}
                   </Badge>
                 </div>
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
+              </div>
+            </InfoWindow>
+          )}
+        </GoogleMap>
       </div>
 
       {obrasComCoord.length === 0 && !carregando && (
