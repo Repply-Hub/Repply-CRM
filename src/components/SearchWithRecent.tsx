@@ -139,69 +139,67 @@ export function SearchWithRecent({
             align="start"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
-            {/* ... o conteúdo do PopoverContent permanece o mesmo ... */}
-        <PopoverContent 
-          className="p-1 w-[var(--radix-popover-trigger-width)] max-h-[350px] overflow-y-auto" 
-          align="start"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          {suggestions.length > 0 && (
-            <div className="mb-2">
-              <div className="text-[10px] font-bold text-muted-foreground px-2 py-1.5 uppercase tracking-wider">
-                Sugestões de endereços
+            {suggestions.length > 0 && (
+              <div className="mb-2">
+                <div className="text-[10px] font-bold text-muted-foreground px-2 py-1.5 uppercase tracking-wider">
+                  Sugestões de endereços
+                </div>
+                <div className="flex flex-col">
+                  {suggestions.map((s, idx) => (
+                    <button
+                      key={`s-${idx}`}
+                      onClick={() => selectSuggestion(s)}
+                      className="flex items-start gap-2 px-2 py-2 text-sm hover:bg-muted rounded-md transition-colors text-left"
+                    >
+                      <MapPin className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
+                      <span className="truncate leading-tight">{s.display_name}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-col">
-                {suggestions.map((s, idx) => (
-                  <button
-                    key={`s-${idx}`}
-                    onClick={() => selectSuggestion(s)}
-                    className="flex items-start gap-2 px-2 py-2 text-sm hover:bg-muted rounded-md transition-colors text-left"
-                  >
-                    <MapPin className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
-                    <span className="truncate leading-tight">{s.display_name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {recent.length > 0 && (
-            <div>
-              <div className="text-[10px] font-bold text-muted-foreground px-2 py-1.5 uppercase tracking-wider">
-                Buscas recentes
+            {recent.length > 0 && (
+              <div>
+                <div className="text-[10px] font-bold text-muted-foreground px-2 py-1.5 uppercase tracking-wider">
+                  Buscas recentes
+                </div>
+                <div className="flex flex-col">
+                  {recent.map((term, i) => (
+                    <button
+                      key={`r-${i}`}
+                      onClick={() => {
+                        onValueChange(term);
+                        saveRecent(term);
+                        setOpen(false);
+                      }}
+                      className="flex items-center justify-between gap-2 px-2 py-2 text-sm hover:bg-muted rounded-md transition-colors text-left group"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="truncate">{term}</span>
+                      </div>
+                      <X 
+                        className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground transition-all shrink-0" 
+                        onClick={(e) => removeRecent(e, term)}
+                      />
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-col">
-                {recent.map((term, i) => (
-                  <button
-                    key={`r-${i}`}
-                    onClick={() => {
-                      onValueChange(term);
-                      saveRecent(term);
-                      setOpen(false);
-                    }}
-                    className="flex items-center justify-between gap-2 px-2 py-2 text-sm hover:bg-muted rounded-md transition-colors text-left group"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="truncate">{term}</span>
-                    </div>
-                    <X 
-                      className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground transition-all shrink-0" 
-                      onClick={(e) => removeRecent(e, term)}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {!searching && suggestions.length === 0 && recent.length === 0 && (
-             <div className="px-2 py-3 text-xs text-muted-foreground text-center italic">
-               Nenhuma sugestão ou busca recente
-             </div>
-          )}
-        </PopoverContent>
-      </Popover>
+            {!searching && suggestions.length === 0 && recent.length === 0 && (
+               <div className="px-2 py-3 text-xs text-muted-foreground text-center italic">
+                 Nenhuma sugestão ou busca recente
+               </div>
+            )}
+          </PopoverContent>
+        </Popover>
+        {searching && (
+          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground z-10" />
+        )}
+      </div>
     </div>
   );
 }
