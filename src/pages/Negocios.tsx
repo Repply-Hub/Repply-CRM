@@ -337,7 +337,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     return map;
   }, [pipelineOrders, KANBAN_STAGES]);
 
-  const totalPipeline = useMemo(() => pipelineOrders.reduce((acc, o) => acc + (typeof o.valor === 'number' ? o.valor : 0), 0), [pipelineOrders]);
+  const totalPipeline = useMemo(() => pipelineOrders.reduce((acc, o) => acc + (Number(o.valor) || 0), 0), [pipelineOrders]);
   const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || stageFilter !== 'todos';
   const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (stageFilter !== 'todos' ? 1 : 0);
 
