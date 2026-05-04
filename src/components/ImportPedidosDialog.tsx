@@ -171,18 +171,17 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       fieldLabels 
     });
     
-    // Convert generic sanitization output back to the specific format expected by getImportedPedidosRows
-    const remappedRows = sanitized.map(item => {
+    const remappedRows = (sanitized as any[]).map(item => {
       const { campos_extras, ...rest } = item;
       return {
         ...rest,
-        ...campos_extras
+        ...(campos_extras || {})
       };
     });
 
     return getImportedPedidosRows(
       remappedRows,
-      Object.fromEntries(VISIBLE_FIELDS.map((field) => [field.key, field.key])) as Record<FieldKey, string>,
+      Object.fromEntries(VISIBLE_FIELDS.map((field) => [field.key, field.key])) as Record<FieldKey, any>,
       extras,
       customColumns
     );
