@@ -36,6 +36,9 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   const [extras, setExtras] = useState<Record<string, string>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
+    return localStorage.getItem('import_catalogo_autosave') === 'true';
+  });
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
