@@ -176,17 +176,32 @@ export function sanitizeImportedRows(params: {
   extras?: Record<string, string>;
   customColumns?: Record<string, string>;
   fieldDefaultValues?: Record<string, string>;
+  fieldLabels?: Record<string, string>;
 }) {
-  const { rawData, fields, mapping, extras = {}, customColumns = {}, fieldDefaultValues = {} } = params;
+  const { rawData, fields, mapping, extras = {}, customColumns = {}, fieldDefaultValues = {}, fieldLabels = {} } = params;
   return rawData.map((row) => {
     const payload: Record<string, unknown> = {};
     fields.forEach((field) => {
       const header = mapping[field.key];
+      const customLabel = fieldLabels[field.key];
       const defaultValue = fieldDefaultValues[field.key];
       
-      let rawValue = header ? row[header] : undefined;
+      let rawValue = undefined;
       
-      // Se não tem valor da planilha ou o cabeçalho não foi mapeado, usa o valor padrão se existir
+      // Tenta encontrar o valor pelo mapeamento direto
+      if (header && row[header] !== undefined) {
+        rawValue = row[header];
+      } 
+      // Se não mapeado explicitamente, tenta encontrar por nome customizado (label)
+      else if (customLabel && row[customLabel] !== undefined) {
+        rawValue = row[customLabel];
+      }
+      // Se não mapeado nem por label, tenta encontrar pela label padrão
+      else if (field.label && row[field.label] !== undefined) {
+        rawValue = row[field.label];
+      }
+      
+      // Se ainda não tem valor da planilha, usa o valor padrão se existir
       if ((rawValue === undefined || rawValue === null || rawValue === '') && defaultValue !== undefined) {
         rawValue = defaultValue;
       }
@@ -326,7 +341,7 @@ export function MappingStep({
   };
 
   const handleContinue = () => {
-    const payload = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues });
+    const payload = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues, fieldLabels });
     onNext(payload);
   };
 

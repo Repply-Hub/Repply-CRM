@@ -161,7 +161,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const canProceedToPreview = Boolean(mapping.cliente || mapping.fabricante);
 
   const getMappedRows = () => getImportedPedidosRows(
-    sanitizeImportedRows({ rawData, fields: VISIBLE_FIELDS, mapping, extras, customColumns, fieldDefaultValues }),
+    sanitizeImportedRows({ rawData, fields: VISIBLE_FIELDS, mapping, extras, customColumns, fieldDefaultValues, fieldLabels }),
     Object.fromEntries(VISIBLE_FIELDS.map((field) => [field.key, field.key])) as Record<FieldKey, string>,
   );
 
