@@ -287,7 +287,7 @@ export function ColumnSettings({
                                                                                     : 'bg-background border-border/60 group-hover/btn:border-primary/40'
                                                                             )}
                                                                         >
-                                                                            {checked && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                                                                            {checked && <Check className={cn("h-2.5 w-2.5 text-primary-foreground", disabled && "opacity-50")} />}
                                                                         </div>
                                                                         {isEditing ? (
                                                                             <div className="flex-1 flex flex-col gap-1.5" onClick={e => e.stopPropagation()}>
