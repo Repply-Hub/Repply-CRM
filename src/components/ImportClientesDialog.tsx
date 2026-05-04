@@ -138,7 +138,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
-  const [mapping, setMapping] = useState<Record<FieldKey, string>>({
+  const [mapping, setMapping] = useState<Record<FieldKey, string | string[]>>({
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
     telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
     cidade: '', uf: '', cep: '',
@@ -586,7 +586,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             rawData={rawData}
             headers={headers}
             mapping={mapping}
-            setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
+            setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>}
             fieldDefaultValues={fieldDefaultValues}
             setFieldDefaultValues={setFieldDefaultValues}
             extras={extras}
