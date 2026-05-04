@@ -479,12 +479,16 @@ export function MappingStep({
               <div className="px-4 py-2.5 space-y-2 animate-in fade-in slide-in-from-top-1">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Campos Extras Ativos</div>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(extras).map(([header, name]) => (
+                  {Object.entries(extras).map(([header, value]) => {
+                    const name = getExtraDisplayName(header, value);
+                    const extraHeaders = getExtraHeaders(header, value);
+                    return (
                     <Badge key={header} variant="secondary" className="pl-1.5 pr-2 py-0.5 h-6 flex items-center gap-1.5 bg-accent/10 border-accent/20 text-accent-foreground">
                       <Sparkles className="h-3 w-3 text-accent" />
-                      <span className="text-[10px] font-medium max-w-[150px] truncate" title={`${header} -> ${name}`}>{name || header}</span>
+                      <span className="text-[10px] font-medium max-w-[150px] truncate" title={`${extraHeaders.join(' + ')} -> ${name}`}>{name}</span>
                     </Badge>
-                  ))}
+                    );
+                  })}
                   {Object.entries(customColumns).map(([name, value]) => (
                     <Badge key={name} variant="secondary" className="pl-1.5 pr-2 py-0.5 h-6 flex items-center gap-1.5 bg-primary/5 border-primary/20 text-primary">
                       <Plus className="h-3 w-3" />
@@ -677,8 +681,8 @@ export function MappingStep({
 
             {/* Campos extras dinâmicos (cabeçalhos selecionados da planilha) */}
             {Object.entries(extras).map(([key, value]) => {
-              const extraHeaders = Array.isArray(value) ? value : [key];
-              const extraName = Array.isArray(value) ? key : (value as string);
+              const extraHeaders = getExtraHeaders(key, value);
+              const extraName = getExtraDisplayName(key, value);
               const rawSample = sample(extraHeaders);
               const sanitizedSample = sanitizeFieldValue(rawSample, 'text');
               
