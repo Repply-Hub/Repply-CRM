@@ -160,10 +160,33 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   const canProceedToPreview = Boolean(mapping.cliente || mapping.fabricante);
 
-  const getMappedRows = () => getImportedPedidosRows(
-    sanitizeImportedRows({ rawData, fields: VISIBLE_FIELDS, mapping, extras, customColumns, fieldDefaultValues, fieldLabels }),
-    Object.fromEntries(VISIBLE_FIELDS.map((field) => [field.key, field.key])) as Record<FieldKey, string>,
-  );
+  const getMappedRows = () => {
+    const sanitized = sanitizeImportedRows({ 
+      rawData, 
+      fields: VISIBLE_FIELDS, 
+      mapping, 
+      extras, 
+      customColumns, 
+      fieldDefaultValues, 
+      fieldLabels 
+    });
+    
+    // Convert generic sanitization output back to the specific format expected by getImportedPedidosRows
+    const remappedRows = sanitized.map(item => {
+      const { campos_extras, ...rest } = item;
+      return {
+        ...rest,
+        ...campos_extras
+      };
+    });
+
+    return getImportedPedidosRows(
+      remappedRows,
+      Object.fromEntries(VISIBLE_FIELDS.map((field) => [field.key, field.key])) as Record<FieldKey, string>,
+      extras,
+      customColumns
+    );
+  };
 
   const previewRows = useMemo(
     () => (step === 'preview' ? getMappedRows() : []),
