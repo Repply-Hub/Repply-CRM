@@ -255,6 +255,8 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
               headers={headers}
               mapping={mapping}
               setMapping={setMapping as any}
+              fieldDefaultValues={fieldDefaultValues}
+              setFieldDefaultValues={setFieldDefaultValues}
               extras={extras}
               setExtras={setExtras}
               customColumns={customColumns}
@@ -262,7 +264,8 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
               visibleFields={VISIBLE_FIELDS}
               onReset={reset}
               onAutoDetect={() => { setMapping(detectFuzzyMapping(headers, VISIBLE_FIELDS)); setExtras({}); }}
-              onClearAll={() => { setMapping({}); setExtras({}); setCustomColumns({}); }}
+              onClearAll={() => { setMapping({}); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
+              onSaveAsDefault={saveAsDefault}
               canProceed={canProceedToPreview}
               onNext={() => setStep('preview')}
             />
