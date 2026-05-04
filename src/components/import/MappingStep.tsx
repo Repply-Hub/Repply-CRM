@@ -25,6 +25,16 @@ export interface FieldDef {
 
 const NONE = '__none__';
 
+export type ExtraMappingValue = string | string[];
+
+export function getExtraHeaders(key: string, value: ExtraMappingValue): string[] {
+  return (Array.isArray(value) ? value : [key]).filter((header): header is string => typeof header === 'string' && header.length > 0);
+}
+
+export function getExtraDisplayName(key: string, value: ExtraMappingValue): string {
+  return Array.isArray(value) ? key : String(value || key);
+}
+
 const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: string; synonyms?: string[]; type?: SupabaseFieldType }> = {
   empresa: { desc: 'Nome principal da empresa.', example: 'Engecomp Soluções LTDA', storage: 'clientes.empresa', synonyms: ['empresa', 'nome fantasia', 'cliente', 'companhia'] },
   razao_social: { desc: 'Razão social completa registrada.', example: 'ENGECOMP SOLUÇÕES EM ENGENHARIA LTDA', storage: 'clientes.razao_social', synonyms: ['razao social', 'razão social', 'social reason'] },
@@ -173,7 +183,7 @@ export function sanitizeImportedRows(params: {
   rawData: Record<string, unknown>[];
   fields: FieldDef[];
   mapping: Record<string, string | string[]>;
-  extras?: Record<string, string | string[]>;
+  extras?: Record<string, ExtraMappingValue>;
   customColumns?: Record<string, string>;
   fieldDefaultValues?: Record<string, string>;
   fieldLabels?: Record<string, string>;
@@ -226,8 +236,8 @@ export function sanitizeImportedRows(params: {
 
     const campos_extras: Record<string, string> = {};
     Object.entries(extras).forEach(([key, value]) => {
-      const headers = Array.isArray(value) ? value : [key];
-      const displayName = Array.isArray(value) ? key : (value || key);
+      const headers = getExtraHeaders(key, value);
+      const displayName = getExtraDisplayName(key, value);
       
       const values = headers
         .map(h => row[h])
@@ -276,8 +286,8 @@ interface Props {
   setMapping: React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>;
   fieldDefaultValues?: Record<string, string>;
   setFieldDefaultValues?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  extras: Record<string, string | string[]>;
-  setExtras: React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>;
+  extras: Record<string, ExtraMappingValue>;
+  setExtras: React.Dispatch<React.SetStateAction<Record<string, ExtraMappingValue>>>;
   customColumns?: Record<string, string>;
   setCustomColumns?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   fieldLabels?: Record<string, string>;
@@ -430,6 +440,19 @@ export function MappingStep({
     });
   };
 
+  const updateExtraName = (oldKey: string, nextName: string) => {
+    setExtras((prev) => {
+      const current = prev[oldKey];
+      if (Array.isArray(current)) {
+        const next = { ...prev };
+        delete next[oldKey];
+        next[nextName || oldKey] = current;
+        return next;
+      }
+      return { ...prev, [oldKey]: nextName };
+    });
+  };
+
   const handleContinue = () => {
     const payload = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues, fieldLabels });
     onNext(payload);
@@ -469,12 +492,16 @@ export function MappingStep({
               <div className="px-4 py-2.5 space-y-2 animate-in fade-in slide-in-from-top-1">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Campos Extras Ativos</div>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(extras).map(([header, name]) => (
+                  {Object.entries(extras).map(([header, value]) => {
+                    const name = getExtraDisplayName(header, value);
+                    const extraHeaders = getExtraHeaders(header, value);
+                    return (
                     <Badge key={header} variant="secondary" className="pl-1.5 pr-2 py-0.5 h-6 flex items-center gap-1.5 bg-accent/10 border-accent/20 text-accent-foreground">
                       <Sparkles className="h-3 w-3 text-accent" />
-                      <span className="text-[10px] font-medium max-w-[150px] truncate" title={`${header} -> ${name}`}>{name || header}</span>
+                      <span className="text-[10px] font-medium max-w-[150px] truncate" title={`${extraHeaders.join(' + ')} -> ${name}`}>{name}</span>
                     </Badge>
-                  ))}
+                    );
+                  })}
                   {Object.entries(customColumns).map(([name, value]) => (
                     <Badge key={name} variant="secondary" className="pl-1.5 pr-2 py-0.5 h-6 flex items-center gap-1.5 bg-primary/5 border-primary/20 text-primary">
                       <Plus className="h-3 w-3" />
@@ -667,8 +694,8 @@ export function MappingStep({
 
             {/* Campos extras dinâmicos (cabeçalhos selecionados da planilha) */}
             {Object.entries(extras).map(([key, value]) => {
-              const extraHeaders = Array.isArray(value) ? value : [key];
-              const extraName = Array.isArray(value) ? key : (value as string);
+              const extraHeaders = getExtraHeaders(key, value);
+              const extraName = getExtraDisplayName(key, value);
               const rawSample = sample(extraHeaders);
               const sanitizedSample = sanitizeFieldValue(rawSample, 'text');
               
@@ -678,11 +705,7 @@ export function MappingStep({
                     <div className="flex items-center gap-2 min-w-0">
                       <Input
                         value={extraName}
-                        onChange={(e) => setExtras(prev => {
-                          const next = { ...prev };
-                          next[key] = e.target.value;
-                          return next;
-                        })}
+                        onChange={(e) => updateExtraName(key, e.target.value)}
                         className="h-7 text-sm font-semibold text-foreground bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                       <Badge variant="outline" className="text-[9px] font-bold h-4 px-1.5 border-accent/30 text-accent uppercase">Extra</Badge>
@@ -849,11 +872,14 @@ export function MappingStep({
                   Personalizar Nomes das Colunas Extras
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.entries(extras).map(([header, name]) => (
+                  {Object.entries(extras).map(([header, value]) => {
+                    const name = getExtraDisplayName(header, value);
+                    const extraHeaders = getExtraHeaders(header, value);
+                    return (
                     <div key={header} className="flex flex-col gap-1.5 p-3 rounded-lg border bg-accent/5 border-accent/20">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[10px] font-mono text-muted-foreground truncate" title={`Origem: ${header}`}>
-                          Origem: {header}
+                          Origem: {extraHeaders.join(' + ')}
                         </span>
                         <button 
                           onClick={() => removeExtra(header)}
@@ -865,11 +891,12 @@ export function MappingStep({
                       <Input
                         value={name}
                         placeholder="Nome na visualização..."
-                        onChange={(e) => setExtras(prev => ({ ...prev, [header]: e.target.value }))}
+                        onChange={(e) => updateExtraName(header, e.target.value)}
                         className="h-8 text-xs bg-background"
                       />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

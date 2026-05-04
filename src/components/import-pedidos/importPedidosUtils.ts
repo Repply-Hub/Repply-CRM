@@ -1,3 +1,5 @@
+import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
+
 export type FieldKey = 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status' | 'data_pedido';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
@@ -226,7 +228,7 @@ export function detectImportPedidosMapping(
 export function getImportedPedidosRows(
   rows: Record<string, unknown>[],
   mapping: Record<FieldKey, string>,
-  extras: Record<string, string> = {},
+  extras: Record<string, ExtraMappingValue> = {},
   customColumns: Record<string, string> = {}
 ) {
   return rows
@@ -239,9 +241,12 @@ export function getImportedPedidosRows(
       const data_pedido = mapping.data_pedido ? row[mapping.data_pedido]?.toString().trim() : undefined;
 
       const campos_extras: Record<string, string> = {};
-      Object.entries(extras).forEach(([col, name]) => {
-        const v = (row[col] ?? '').toString().trim();
-        if (v !== '') campos_extras[name || col] = v;
+      Object.entries(extras).forEach(([key, value]) => {
+        const name = getExtraDisplayName(key, value);
+        const directValue = row[name] ?? row[key];
+        const mergedValue = getExtraHeaders(key, value).map((header) => row[header]).filter((item) => String(item ?? '').trim() !== '').join(' ');
+        const v = String(directValue ?? mergedValue ?? '').trim();
+        if (v !== '') campos_extras[name] = v;
       });
       // Colunas criadas do zero (valor padrão aplicado a todas as linhas)
       Object.entries(customColumns).forEach(([name, value]) => {
