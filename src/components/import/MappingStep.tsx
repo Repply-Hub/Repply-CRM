@@ -353,7 +353,7 @@ export function MappingStep({
         </div>
 
         <div className="rounded-xl border bg-card overflow-hidden">
-          <div className="grid grid-cols-[minmax(180px,1fr)_minmax(220px,320px)_minmax(140px,1fr)] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             <span>Campo do schema</span>
             <span>Cabeçalho da planilha</span>
             <span>Valor padrão</span>
