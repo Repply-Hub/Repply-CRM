@@ -34,7 +34,7 @@ export function usePedidos(empresaId?: string) {
           .from('pedidos')
           .select(`
             id, status, valor_total, data_pedido, created_at, observacoes,
-            cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega,
+            cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras,
             cliente:clientes(id, empresa),
             fabricante:fabricantes(id, nome),
             vendedor:usuarios(id, nome, empresa_id),
