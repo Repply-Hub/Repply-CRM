@@ -375,34 +375,20 @@ export function MappingStep({
               {extraCount > 0 && <Badge className="bg-accent text-accent-foreground hover:bg-accent font-medium">+{extraCount} extras</Badge>}
             </div>
             
-            {(Object.keys(extras).length > 0 || Object.keys(customColumns).length > 0) && (
+            {extraCount > 0 && (
               <div className="px-4 py-2.5 space-y-2 animate-in fade-in slide-in-from-top-1">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Campos Extras Ativos</div>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(extras).map(([header, name]) => (
-                    <Badge key={header} variant="secondary" className="pl-1.5 pr-1 py-0.5 h-6 flex items-center gap-1.5 bg-accent/10 border-accent/20 text-accent-foreground group hover:bg-accent/20 transition-colors">
+                    <Badge key={header} variant="secondary" className="pl-1.5 pr-2 py-0.5 h-6 flex items-center gap-1.5 bg-accent/10 border-accent/20 text-accent-foreground">
                       <Sparkles className="h-3 w-3 text-accent" />
                       <span className="text-[10px] font-medium max-w-[150px] truncate" title={`${header} -> ${name}`}>{name || header}</span>
-                      <button 
-                        onClick={() => removeExtra(header)}
-                        className="h-4 w-4 rounded-full flex items-center justify-center hover:bg-accent/30 transition-colors"
-                        title="Remover"
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </button>
                     </Badge>
                   ))}
                   {Object.entries(customColumns).map(([name, value]) => (
-                    <Badge key={name} variant="secondary" className="pl-1.5 pr-1 py-0.5 h-6 flex items-center gap-1.5 bg-primary/5 border-primary/20 text-primary group hover:bg-primary/10 transition-colors">
+                    <Badge key={name} variant="secondary" className="pl-1.5 pr-2 py-0.5 h-6 flex items-center gap-1.5 bg-primary/5 border-primary/20 text-primary">
                       <Plus className="h-3 w-3" />
                       <span className="text-[10px] font-medium max-w-[150px] truncate" title={`${name}: ${value}`}>{name}</span>
-                      <button 
-                        onClick={() => setCustomColumns?.((prev) => { const next = { ...prev }; delete next[name]; return next; })}
-                        className="h-4 w-4 rounded-full flex items-center justify-center hover:bg-primary/20 transition-colors"
-                        title="Remover"
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </button>
                     </Badge>
                   ))}
                 </div>
