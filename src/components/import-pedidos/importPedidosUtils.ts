@@ -162,10 +162,18 @@ export function parseNumber(value: unknown): number {
   }
 
   if (raw.includes(',')) {
-    return parseFloat(raw.replace(/\./g, '').replace(',', '.')) || 0;
+    // If there's a comma, we check if it's potentially a decimal separator or thousands separator
+    // For Brazilian Portuguese format: 1.234,56 -> 1234.56
+    // If it ends with ,XX it's likely a decimal
+    const parts = raw.split(',');
+    if (parts.length === 2 && parts[1].length <= 2) {
+      return parseFloat(raw.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    // Otherwise treat as thousands separator (less common for comma, but possible in some formats)
+    return parseFloat(raw.replace(/,/g, '')) || 0;
   }
 
-  return parseFloat(raw.replace(/,/g, '')) || 0;
+  return parseFloat(raw) || 0;
 }
 
 export function resolveImportedPedidoStatus(value: unknown): string {
