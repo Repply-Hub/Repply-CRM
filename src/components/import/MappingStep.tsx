@@ -410,7 +410,6 @@ export function MappingStep({
   const handleExtraHeaderChange = (oldKey: string, newHeader: string, isMulti: boolean = false) => {
     if (oldKey === newHeader && !isMulti) return;
     setExtras(prev => {
-      console.log('setExtras prev:', prev, 'oldKey:', oldKey, 'newHeader:', newHeader, 'isMulti:', isMulti);
       const next = { ...prev };
       const currentVal = next[oldKey];
       
@@ -420,23 +419,33 @@ export function MappingStep({
       }
 
       if (isMulti) {
-        const currentHeaders = Array.isArray(currentVal) ? currentVal : (typeof currentVal === 'string' ? [oldKey] : []);
+        // Se já for um array, usa ele. Se for string, inicia um array com a chave original (que é o header inicial)
+        const currentHeaders = Array.isArray(currentVal) ? [...currentVal] : [oldKey];
+        
         if (currentHeaders.includes(newHeader)) {
+          // Remove se já estiver lá
           const filtered = currentHeaders.filter(h => h !== newHeader);
-          if (filtered.length === 0) {
-            delete next[oldKey];
+          if (filtered.length <= 1) {
+            // Se sobrar apenas 1, volta a ser string simples
+            next[oldKey] = filtered[0] || oldKey;
           } else {
             next[oldKey] = filtered;
           }
         } else {
+          // Adiciona se não estiver lá
           next[oldKey] = [...currentHeaders, newHeader];
+          // Remove o novo header da raiz dos extras se ele existir lá como chave individual
+          if (next[newHeader] !== undefined) {
+            delete next[newHeader];
+          }
         }
         return next;
       }
 
       const val = next[oldKey];
       delete next[oldKey];
-      next[newHeader] = typeof val === 'string' ? val : (Array.isArray(val) ? val[0] : newHeader);
+      // Ao mudar o header principal de um extra, mantemos o mapeamento (seja string ou array)
+      next[newHeader] = val !== undefined ? val : newHeader;
       return next;
     });
   };
