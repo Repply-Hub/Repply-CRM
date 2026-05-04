@@ -502,7 +502,7 @@ export function MappingStep({
               const sanitizedSample = sanitizeFieldValue(rawSample, 'text');
               
               return (
-                <div key={header} className="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-3 md:gap-4 px-4 py-3 hover:bg-accent/5 transition-colors bg-accent/5 animate-in fade-in slide-in-from-top-1 border-t border-accent/10">
+                <div key={header} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-4 px-4 py-3 hover:bg-accent/5 transition-colors bg-accent/5 animate-in fade-in slide-in-from-top-1 border-t border-accent/10">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <Input
