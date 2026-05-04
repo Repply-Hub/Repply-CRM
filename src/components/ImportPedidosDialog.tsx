@@ -12,6 +12,7 @@ import { validateFile } from '@/lib/file-validation';
 import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
+const safeText = (value: unknown) => String(value ?? '').trim();
 import {
   FIELDS,
   createEmptyMapping,
@@ -194,8 +195,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   const extraFieldNames = useMemo(
     () => Array.from(new Set([
-      ...Object.entries(extras).map(([col, value]) => getExtraDisplayName(col, value).trim()),
-      ...Object.keys(customColumns).map(n => n.trim()),
+      ...Object.entries(extras).map(([col, value]) => safeText(getExtraDisplayName(col, value))),
+      ...Object.keys(customColumns).map(safeText),
     ].filter(Boolean))),
     [extras, customColumns]
   );
@@ -227,8 +228,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
       // Adicionar/Atualizar campos extras
       const extraMappings = [
-        ...Object.entries(extras).map(([col, value]) => getExtraDisplayName(col, value).trim()),
-        ...Object.keys(customColumns).map(name => name.trim())
+        ...Object.entries(extras).map(([col, value]) => safeText(getExtraDisplayName(col, value))),
+        ...Object.keys(customColumns).map(safeText)
       ].filter(Boolean);
 
       extraMappings.forEach(name => {
