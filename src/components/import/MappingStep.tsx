@@ -231,6 +231,8 @@ interface Props {
   headers: string[];
   mapping: Record<string, string>;
   setMapping: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  fieldDefaultValues?: Record<string, string>;
+  setFieldDefaultValues?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   extras: Record<string, string>;
   setExtras: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   customColumns?: Record<string, string>;
@@ -239,14 +241,15 @@ interface Props {
   onReset: () => void;
   onAutoDetect: () => void;
   onClearAll: () => void;
+  onSaveAsDefault?: () => void;
   canProceed: boolean;
   onNext: (payload?: Record<string, unknown>[]) => void;
 }
 
 export function MappingStep({
-  fileName, rawData, headers, mapping, setMapping, extras, setExtras,
+  fileName, rawData, headers, mapping, setMapping, fieldDefaultValues = {}, setFieldDefaultValues, extras, setExtras,
   customColumns = {}, setCustomColumns, visibleFields,
-  onReset, onAutoDetect, onClearAll, canProceed, onNext,
+  onReset, onAutoDetect, onClearAll, onSaveAsDefault, canProceed, onNext,
 }: Props) {
   const [search, setSearch] = useState('');
 
