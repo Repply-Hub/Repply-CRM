@@ -83,6 +83,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
     if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
     if (savedLabels) setFieldLabels(JSON.parse(savedLabels));
+    
+    // Sincronizar labels com as configurações globais da tabela se existirem
+    const globalLabels = localStorage.getItem('pedidos_custom_labels');
+    if (globalLabels) {
+      const parsedGlobal = JSON.parse(globalLabels);
+      setFieldLabels(prev => ({ ...prev, ...parsedGlobal }));
+    }
   };
 
   const handleFile = async (file: File) => {
@@ -130,6 +137,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
       if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
       if (savedLabels) setFieldLabels(JSON.parse(savedLabels));
+
+      // Sincronizar labels com as configurações globais da tabela se existirem
+      const globalLabels = localStorage.getItem('pedidos_custom_labels');
+      if (globalLabels) {
+        const parsedGlobal = JSON.parse(globalLabels);
+        setFieldLabels(prev => ({ ...prev, ...parsedGlobal }));
+      }
 
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
