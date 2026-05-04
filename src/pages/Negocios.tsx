@@ -147,7 +147,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     return visibleColumns.filter(id => defaultIds.includes(id));
   }, [visibleColumns]);
 
-  const allAvailableColumns = columns;
+  const allAvailableColumns = useMemo(() => {
+    const defaultIds = PEDIDOS_COLUMNS.map(c => c.id);
+    return columns.filter(c => defaultIds.includes(c.id));
+  }, [columns]);
 
   // Sincronização automática de colunas removida para evitar criação de colunas indesejadas (ex: endereço obra_1).
   // Os usuários podem adicionar colunas extras manualmente através das configurações de colunas.
