@@ -136,6 +136,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     });
 
     extraKeys.forEach(key => {
+      // Evita duplicar colunas que já existem (base ou customizadas salvas)
       if (!baseColumns.find(c => c.id === key)) {
         baseColumns.push({
           id: key,
@@ -149,6 +150,33 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
     return baseColumns;
   }, [columns, pedidos]);
+
+  // Sincroniza as colunas descobertas com o estado persistente do hook
+  useEffect(() => {
+    if (!pedidos || pedidos.length === 0) return;
+    
+    const extraKeys = new Set<string>();
+    pedidos.forEach(p => {
+      if (p.campos_extras) {
+        Object.keys(p.campos_extras).forEach(key => extraKeys.add(key));
+      }
+    });
+
+    let hasNew = false;
+    extraKeys.forEach(key => {
+      if (!columns.find(c => c.id === key)) {
+        hasNew = true;
+      }
+    });
+
+    if (hasNew) {
+      extraKeys.forEach(key => {
+        if (!columns.find(c => c.id === key)) {
+          handleAddColumn(key, 'text');
+        }
+      });
+    }
+  }, [pedidos, columns, handleAddColumn]);
 
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
 
