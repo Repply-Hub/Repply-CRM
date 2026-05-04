@@ -550,6 +550,7 @@ export function MappingStep({
             })}
           </div>
         </div>
+      </div>
 
         {unmappedHeaders.length > 0 && (
           <div className="rounded-xl border bg-card overflow-hidden">
