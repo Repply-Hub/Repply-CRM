@@ -43,13 +43,17 @@ import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'negocio', label: 'Negócio', locked: true },
+  { id: 'cliente', label: 'Cliente' },
+  { id: 'obra', label: 'Obra' },
+  { id: 'fabricante', label: 'Fabricante' },
+  { id: 'valor', label: 'Valor' },
   { id: 'etapa', label: 'Etapa', locked: true },
   { id: 'vendedor', label: 'Vendedor', locked: true },
   { id: 'acoes', label: 'Ações', locked: true },
 ];
 
 const PAGE_SIZE = 10;
-const LEGACY_CARD_FIELDS = ['cliente', 'obra', 'fabricante', 'valor'];
+// Constante LEGACY_CARD_FIELDS removida pois as colunas agora são independentes.
 
 const getStageBadgeClass = (corToken: string) => `bg-${corToken} text-white`;
 
@@ -227,16 +231,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || (key || '');
 
-  useEffect(() => {
-    if (!visibleColumns.some(id => LEGACY_CARD_FIELDS.includes(id))) return;
-    setVisibleColumns(prev => {
-      const firstLegacyIndex = prev.findIndex(id => LEGACY_CARD_FIELDS.includes(id));
-      const withoutLegacy = prev.filter(id => !LEGACY_CARD_FIELDS.includes(id) && id !== 'negocio');
-      const next = [...withoutLegacy];
-      next.splice(Math.max(firstLegacyIndex, 0), 0, 'negocio');
-      return next;
-    });
-  }, [visibleColumns, setVisibleColumns]);
+  // Removido useEffect que forçava a substituição das colunas individuais pela coluna "negocio"
+  // para permitir que o usuário escolha ver as colunas separadamente.
 
   const baseListPedidos = useMemo(() => {
     const all = pedidos ?? [];
@@ -275,8 +271,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     [filtered, page, pageSize]
   );
   const tableVisibleColumns = useMemo(() => {
-    const withoutLegacy = visibleColumns.filter(id => !LEGACY_CARD_FIELDS.includes(id));
-    return withoutLegacy.includes('negocio') ? withoutLegacy : ['negocio', ...withoutLegacy];
+    return visibleColumns;
   }, [visibleColumns]);
   const visibleColumnCount = Math.max(
     1,
