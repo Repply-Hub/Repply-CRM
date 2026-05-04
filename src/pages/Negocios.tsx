@@ -502,7 +502,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const optionsPopover = (
     <ColumnSettings
-      columns={columns}
+      columns={allAvailableColumns}
       visibleColumns={visibleColumns}
       onChange={setVisibleColumns}
       onRename={handleRename}
