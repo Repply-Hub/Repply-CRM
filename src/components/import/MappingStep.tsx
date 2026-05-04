@@ -477,14 +477,12 @@ export function MappingStep({
         </div>
 
         {unmappedHeaders.length > 0 && (
-          <div className="rounded-xl border border-dashed bg-card p-3 space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold text-foreground">Cabeçalhos não usados</div>
-                <div className="text-[11px] text-muted-foreground">Marque apenas o que deve ir para campos_extras.</div>
-              </div>
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <div className="px-4 py-2 bg-muted/40 border-b">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Cabeçalhos não usados</div>
+              <div className="text-[11px] text-muted-foreground">Clique para adicionar como campo extra.</div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="p-3 flex flex-wrap gap-2">
               {unmappedHeaders.map((header) => {
                 const active = header in extras;
                 return (
