@@ -25,6 +25,16 @@ export interface FieldDef {
 
 const NONE = '__none__';
 
+export type ExtraMappingValue = string | string[];
+
+export function getExtraHeaders(key: string, value: ExtraMappingValue): string[] {
+  return (Array.isArray(value) ? value : [key]).filter((header): header is string => typeof header === 'string' && header.length > 0);
+}
+
+export function getExtraDisplayName(key: string, value: ExtraMappingValue): string {
+  return Array.isArray(value) ? key : String(value || key);
+}
+
 const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: string; synonyms?: string[]; type?: SupabaseFieldType }> = {
   empresa: { desc: 'Nome principal da empresa.', example: 'Engecomp Soluções LTDA', storage: 'clientes.empresa', synonyms: ['empresa', 'nome fantasia', 'cliente', 'companhia'] },
   razao_social: { desc: 'Razão social completa registrada.', example: 'ENGECOMP SOLUÇÕES EM ENGENHARIA LTDA', storage: 'clientes.razao_social', synonyms: ['razao social', 'razão social', 'social reason'] },
