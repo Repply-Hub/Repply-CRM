@@ -447,10 +447,8 @@ export function MappingStep({
                   <div className="min-w-0">
                       <div className="flex items-center gap-2 min-w-0">
                         <Input
-                          value={field.label}
-                          onChange={(e) => {
-                            // Edição visual mantida conforme solicitado
-                          }}
+                          value={fieldLabels[field.key] || field.label}
+                          onChange={(e) => setFieldLabels?.(prev => ({ ...prev, [field.key]: e.target.value }))}
                           className="h-7 text-sm font-semibold text-foreground bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 truncate"
                         />
                         {field.required && <span className="text-destructive text-sm">*</span>}
