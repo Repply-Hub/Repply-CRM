@@ -550,7 +550,8 @@ export function MappingStep({
               );
             })}
           </div>
-        </div>
+        </ScrollArea>
+      </div>
 
         {unmappedHeaders.length > 0 && (
           <div className="rounded-xl border bg-card overflow-hidden">
