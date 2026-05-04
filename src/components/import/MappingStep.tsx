@@ -300,12 +300,29 @@ export function MappingStep({
     setMapping((prev) => ({ ...prev, [fieldKey]: value === NONE ? '' : value }));
   };
 
-  const addExtra = (header: string) => setExtras((prev) => ({ ...prev, [header]: prev[header] || header }));
+  const addExtra = (header: string) => {
+    setExtras((prev) => ({ ...prev, [header]: prev[header] || header }));
+    // Quando adicionado como extra, podemos definir se deve ser padrão nas configurações globais
+    // Mas aqui apenas garantimos que o mapeamento ocorra
+  };
   const removeExtra = (header: string) => setExtras((prev) => {
     const next = { ...prev };
     delete next[header];
     return next;
   });
+
+  const toggleAllExtras = () => {
+    if (unmappedHeaders.length === 0) {
+      // Se não há nenhum unmapped, talvez o usuário queira remover todos os extras
+      setExtras({});
+    } else {
+      const nextExtras = { ...extras };
+      unmappedHeaders.forEach(h => {
+        nextExtras[h] = h;
+      });
+      setExtras(nextExtras);
+    }
+  };
 
   const handleContinue = () => {
     const payload = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues });
