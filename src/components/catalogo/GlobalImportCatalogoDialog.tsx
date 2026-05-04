@@ -50,12 +50,20 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
     setRawData([]);
     setHeaders([]);
     setMapping({});
+    setFieldDefaultValues({});
     setExtras({});
     setCustomColumns({});
     setFileName('');
     setSelectedFabricanteId('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const saveAsDefault = () => {
+    localStorage.setItem('import_catalogo_mapping', JSON.stringify(mapping));
+    localStorage.setItem('import_catalogo_defaults', JSON.stringify(fieldDefaultValues));
+    localStorage.setItem('import_catalogo_custom', JSON.stringify(customColumns));
+    toast.success('Configurações de importação salvas como padrão!');
   };
 
   const handleFile = async (file: File) => {
