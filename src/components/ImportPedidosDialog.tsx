@@ -45,11 +45,29 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setRawData([]);
     setHeaders([]);
     setMapping(createEmptyMapping());
+    setFieldDefaultValues({});
     setExtras({});
     setCustomColumns({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const saveAsDefault = () => {
+    localStorage.setItem('import_pedidos_mapping', JSON.stringify(mapping));
+    localStorage.setItem('import_pedidos_defaults', JSON.stringify(fieldDefaultValues));
+    localStorage.setItem('import_pedidos_custom', JSON.stringify(customColumns));
+    toast.success('Mapeamento e valores padrões salvos para futuras importações!');
+  };
+
+  const loadDefaults = () => {
+    const savedMapping = localStorage.getItem('import_pedidos_mapping');
+    const savedDefaults = localStorage.getItem('import_pedidos_defaults');
+    const savedCustom = localStorage.getItem('import_pedidos_custom');
+    
+    if (savedMapping) setMapping(JSON.parse(savedMapping));
+    if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
+    if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
   };
 
   const handleFile = async (file: File) => {
