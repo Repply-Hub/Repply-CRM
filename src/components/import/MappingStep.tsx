@@ -705,11 +705,7 @@ export function MappingStep({
                     <div className="flex items-center gap-2 min-w-0">
                       <Input
                         value={extraName}
-                        onChange={(e) => setExtras(prev => {
-                          const next = { ...prev };
-                          next[key] = e.target.value;
-                          return next;
-                        })}
+                        onChange={(e) => updateExtraName(key, e.target.value)}
                         className="h-7 text-sm font-semibold text-foreground bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                       <Badge variant="outline" className="text-[9px] font-bold h-4 px-1.5 border-accent/30 text-accent uppercase">Extra</Badge>
@@ -895,7 +891,7 @@ export function MappingStep({
                       <Input
                         value={name}
                         placeholder="Nome na visualização..."
-                        onChange={(e) => setExtras(prev => ({ ...prev, [header]: e.target.value }))}
+                        onChange={(e) => updateExtraName(header, e.target.value)}
                         className="h-8 text-xs bg-background"
                       />
                     </div>
