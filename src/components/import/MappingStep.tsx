@@ -193,7 +193,7 @@ export function sanitizeImportedRows(params: {
       if (headers.length > 0) {
         const values = headers
           .map(h => row[h])
-          .filter(v => v !== undefined && v !== null && String(v).trim() !== '');
+          .filter(v => v !== undefined && v !== null && String(v ?? '').trim() !== '');
         
         if (values.length > 0) {
           // Para campos de texto, une com espaço. Para outros, pega o primeiro valor não vazio
@@ -231,10 +231,10 @@ export function sanitizeImportedRows(params: {
       
       const values = headers
         .map(h => row[h])
-        .filter(v => v !== undefined && v !== null && String(v).trim() !== '');
+        .filter(v => v !== undefined && v !== null && String(v ?? '').trim() !== '');
 
       if (values.length > 0) {
-        const sanitizedKey = String(displayName).trim();
+        const sanitizedKey = String(displayName ?? '').trim();
         if (sanitizedKey) {
           campos_extras[sanitizedKey] = values.join(' ');
         }
@@ -357,7 +357,7 @@ export function MappingStep({
     for (const row of rawData) {
       const values = headersToSample
         .map(h => row[h])
-        .filter(v => v !== undefined && v !== null && v !== '');
+        .filter(v => v !== undefined && v !== null && String(v ?? '').trim() !== '');
       
       if (values.length > 0) {
         return values.join(' ');
