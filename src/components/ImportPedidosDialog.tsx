@@ -31,7 +31,7 @@ interface ImportPedidosDialogProps {
 export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogProps) {
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
-  const [mapping, setMapping] = useState<Record<FieldKey, string>>(createEmptyMapping());
+  const [mapping, setMapping] = useState<Record<FieldKey, string | string[]>>(createEmptyMapping());
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   const [extras, setExtras] = useState<Record<string, ExtraMappingValue>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
@@ -354,7 +354,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             rawData={rawData}
             headers={headers}
             mapping={mapping}
-            setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
+            setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>}
             fieldDefaultValues={fieldDefaultValues}
             setFieldDefaultValues={setFieldDefaultValues}
             extras={extras}
