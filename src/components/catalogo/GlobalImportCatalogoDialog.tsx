@@ -36,6 +36,9 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   const [extras, setExtras] = useState<Record<string, string>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
+    return localStorage.getItem('import_catalogo_autosave') === 'true';
+  });
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
@@ -59,11 +62,18 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const saveAsDefault = () => {
-    localStorage.setItem('import_catalogo_mapping', JSON.stringify(mapping));
-    localStorage.setItem('import_catalogo_defaults', JSON.stringify(fieldDefaultValues));
-    localStorage.setItem('import_catalogo_custom', JSON.stringify(customColumns));
-    toast.success('Configurações de importação salvas como padrão!');
+  const saveAsDefault = (active: boolean) => {
+    setIsAutoSaveEnabled(active);
+    localStorage.setItem('import_catalogo_autosave', String(active));
+    
+    if (active) {
+      localStorage.setItem('import_catalogo_mapping', JSON.stringify(mapping));
+      localStorage.setItem('import_catalogo_defaults', JSON.stringify(fieldDefaultValues));
+      localStorage.setItem('import_catalogo_custom', JSON.stringify(customColumns));
+      toast.success('Mapeamento e valores padrões serão salvos automaticamente.');
+    } else {
+      toast.info('Alterações não serão salvas como padrão.');
+    }
   };
 
   const handleFile = async (file: File) => {
@@ -266,6 +276,7 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
               onAutoDetect={() => { setMapping(detectFuzzyMapping(headers, VISIBLE_FIELDS)); setExtras({}); }}
               onClearAll={() => { setMapping({}); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
               onSaveAsDefault={saveAsDefault}
+              isAutoSaveEnabled={isAutoSaveEnabled}
               canProceed={canProceedToPreview}
               onNext={() => setStep('preview')}
             />

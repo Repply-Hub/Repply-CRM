@@ -150,6 +150,9 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const [extras, setExtras] = useState<Record<string, string>>({});
   // customColumns: nome → valor padrão (colunas criadas do zero, não vêm da planilha)
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
+    return localStorage.getItem(`import_clientes_${target}_autosave`) === 'true';
+  });
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
@@ -181,12 +184,19 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const saveAsDefault = () => {
+  const saveAsDefault = (active: boolean) => {
+    setIsAutoSaveEnabled(active);
     const key = `import_clientes_${target}_`;
-    localStorage.setItem(`${key}mapping`, JSON.stringify(mapping));
-    localStorage.setItem(`${key}defaults`, JSON.stringify(fieldDefaultValues));
-    localStorage.setItem(`${key}custom`, JSON.stringify(customColumns));
-    toast.success('Mapeamento e valores padrões salvos para futuras importações!');
+    localStorage.setItem(`${key}autosave`, String(active));
+    
+    if (active) {
+      localStorage.setItem(`${key}mapping`, JSON.stringify(mapping));
+      localStorage.setItem(`${key}defaults`, JSON.stringify(fieldDefaultValues));
+      localStorage.setItem(`${key}custom`, JSON.stringify(customColumns));
+      toast.success('Mapeamento e valores padrões serão salvos automaticamente.');
+    } else {
+      toast.info('Alterações não serão salvas como padrão.');
+    }
   };
 
   const handleFile = async (file: File) => {
@@ -603,6 +613,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               setFieldDefaultValues({});
             }}
             onSaveAsDefault={saveAsDefault}
+            isAutoSaveEnabled={isAutoSaveEnabled}
             canProceed={canProceed}
             onNext={(payload) => {
               const mapped = getMappedRows(payload);

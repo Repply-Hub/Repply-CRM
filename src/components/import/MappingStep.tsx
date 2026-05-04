@@ -4,7 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertCircle, ArrowRight, CheckCircle2, EyeOff, FileSpreadsheet, Info, Plus, Search, Sparkles, X } from 'lucide-react';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { AlertCircle, ArrowRight, CheckCircle2, EyeOff, FileSpreadsheet, Info, Plus, Search, Sparkles, X, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type SupabaseFieldType = 'text' | 'cnpj' | 'phone' | 'email' | 'date' | 'number' | 'status';
@@ -241,7 +247,8 @@ interface Props {
   onReset: () => void;
   onAutoDetect: () => void;
   onClearAll: () => void;
-  onSaveAsDefault?: () => void;
+  onSaveAsDefault?: (active: boolean) => void;
+  isAutoSaveEnabled?: boolean;
   canProceed: boolean;
   onNext: (payload?: Record<string, unknown>[]) => void;
 }
@@ -249,7 +256,7 @@ interface Props {
 export function MappingStep({
   fileName, rawData, headers, mapping, setMapping, fieldDefaultValues = {}, setFieldDefaultValues, extras, setExtras,
   customColumns = {}, setCustomColumns, visibleFields,
-  onReset, onAutoDetect, onClearAll, onSaveAsDefault, canProceed, onNext,
+  onReset, onAutoDetect, onClearAll, onSaveAsDefault, isAutoSaveEnabled = false, canProceed, onNext,
 }: Props) {
   const [search, setSearch] = useState('');
 
@@ -324,9 +331,23 @@ export function MappingStep({
             <div className="flex items-center gap-1">
               <Button variant="outline" size="sm" onClick={onAutoDetect} className="gap-1.5 h-8"><Sparkles className="h-3.5 w-3.5" /> Auto</Button>
               {onSaveAsDefault && (
-                <Button variant="outline" size="sm" onClick={onSaveAsDefault} className="gap-1.5 h-8 bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Salvar como padrão
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("gap-1.5 h-8", isAutoSaveEnabled ? "bg-primary/5 text-primary border-primary/20" : "")}>
+                      <Settings className="h-3.5 w-3.5" /> Salvar padrão: {isAutoSaveEnabled ? "Sim" : "Não"}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onSaveAsDefault(true)} className="gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <span>Sim, salvar alterações</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onSaveAsDefault(false)} className="gap-2 text-muted-foreground">
+                      <X className="h-4 w-4" />
+                      <span>Não, apenas desta vez</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               <Button variant="ghost" size="sm" onClick={onClearAll} className="h-8 px-2">Limpar</Button>
               <Button variant="ghost" size="sm" onClick={onReset} className="h-8 px-2"><X className="h-3.5 w-3.5 mr-1" /> Trocar arquivo</Button>
