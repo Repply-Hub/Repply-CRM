@@ -486,16 +486,52 @@ export function MappingStep({
         } else {
           // Adiciona se não estiver lá
           next[oldKey] = [...currentHeaders, newHeader];
+          
           // Remove o novo header da raiz dos extras se ele existir lá como chave individual
           if (next[newHeader] !== undefined) {
             delete next[newHeader];
           }
+
+          // TAMBÉM remove de qualquer mapeamento do schema
+          setMapping(prevMapping => {
+            let mappingChanged = false;
+            const nextMapping = { ...prevMapping };
+            Object.entries(nextMapping).forEach(([key, val]) => {
+              if (Array.isArray(val) && val.includes(newHeader)) {
+                const filtered = val.filter(h => h !== newHeader);
+                nextMapping[key] = filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? '' : filtered);
+                mappingChanged = true;
+              } else if (val === newHeader) {
+                nextMapping[key] = '';
+                mappingChanged = true;
+              }
+            });
+            return mappingChanged ? nextMapping : prevMapping;
+          });
         }
         return next;
       }
 
       const val = next[oldKey];
       delete next[oldKey];
+      
+      // Ao mudar o header principal de um extra, remove do mapping do schema se necessário
+      setMapping(prevMapping => {
+        let mappingChanged = false;
+        const nextMapping = { ...prevMapping };
+        Object.entries(nextMapping).forEach(([key, v]) => {
+          if (Array.isArray(v) && v.includes(newHeader)) {
+            const filtered = v.filter(h => h !== newHeader);
+            nextMapping[key] = filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? '' : filtered);
+            mappingChanged = true;
+          } else if (v === newHeader) {
+            nextMapping[key] = '';
+            mappingChanged = true;
+          }
+        });
+        return mappingChanged ? nextMapping : prevMapping;
+      });
+
       // Ao mudar o header principal de um extra, mantemos o mapeamento (seja string ou array)
       next[newHeader] = val !== undefined ? val : newHeader;
       return next;
