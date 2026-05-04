@@ -289,6 +289,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
             onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
             onSaveAsDefault={saveAsDefault}
+            isAutoSaveEnabled={isAutoSaveEnabled}
             canProceed={canProceedToPreview}
             onNext={() => {
               const mapped = getMappedRows();
