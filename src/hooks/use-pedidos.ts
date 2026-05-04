@@ -13,6 +13,7 @@ export interface PedidoWithRelations {
   usuario_id: string;
   obra_id: string | null;
   endereco_entrega: string | null;
+  campos_extras: Record<string, any> | null;
   cliente: { id: string; empresa: string } | null;
   fabricante: { id: string; nome: string } | null;
   vendedor: { id: string; nome: string } | null;
