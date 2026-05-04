@@ -4,7 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertCircle, ArrowRight, CheckCircle2, EyeOff, FileSpreadsheet, Info, Plus, Search, Sparkles, X } from 'lucide-react';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { AlertCircle, ArrowRight, CheckCircle2, EyeOff, FileSpreadsheet, Info, Plus, Search, Sparkles, X, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type SupabaseFieldType = 'text' | 'cnpj' | 'phone' | 'email' | 'date' | 'number' | 'status';
