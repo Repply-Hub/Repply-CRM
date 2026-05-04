@@ -446,7 +446,19 @@ export function MappingStep({
                       <SelectValue placeholder="Não importar" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[320px]" position="popper">
-                      <SelectItem value={NONE} className="text-muted-foreground"><span className="flex items-center gap-1.5"><EyeOff className="h-3 w-3" /> Não importar</span></SelectItem>
+                      <SelectItem 
+                        value={NONE} 
+                        className="text-muted-foreground"
+                        disabled={['cliente', 'obra', 'fabricante', 'valor'].includes(field.key)}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <EyeOff className="h-3 w-3" /> 
+                          Não importar 
+                          {['cliente', 'obra', 'fabricante', 'valor'].includes(field.key) && (
+                            <span className="text-[10px] text-destructive italic shrink-0 ml-1">obrigatório</span>
+                          )}
+                        </span>
+                      </SelectItem>
                       {headers.map((header) => {
                         const inUseByOther = usedHeaders.has(header) && selectedHeader !== header;
                         return (
