@@ -173,7 +173,7 @@ export function sanitizeImportedRows(params: {
   rawData: Record<string, unknown>[];
   fields: FieldDef[];
   mapping: Record<string, string | string[]>;
-  extras?: Record<string, string>;
+  extras?: Record<string, string | string[]>;
   customColumns?: Record<string, string>;
   fieldDefaultValues?: Record<string, string>;
   fieldLabels?: Record<string, string>;
@@ -225,11 +225,19 @@ export function sanitizeImportedRows(params: {
     });
 
     const campos_extras: Record<string, string> = {};
-    Object.entries(extras).forEach(([header, name]) => {
-      const sanitized = sanitizeFieldValue(row[header], 'text');
-      if (sanitized !== undefined && String(sanitized).trim()) {
-        const key = (name || header).trim();
-        if (key) campos_extras[key] = String(sanitized);
+    Object.entries(extras).forEach(([key, value]) => {
+      const headers = Array.isArray(value) ? value : [key];
+      const displayName = Array.isArray(value) ? key : (value || key);
+      
+      const values = headers
+        .map(h => row[h])
+        .filter(v => v !== undefined && v !== null && String(v).trim() !== '');
+
+      if (values.length > 0) {
+        const sanitizedKey = String(displayName).trim();
+        if (sanitizedKey) {
+          campos_extras[sanitizedKey] = values.join(' ');
+        }
       }
     });
     Object.entries(customColumns).forEach(([name, value]) => {
