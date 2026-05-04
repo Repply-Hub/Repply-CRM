@@ -59,13 +59,6 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "audit_permissoes_vendedor_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
         ]
@@ -105,13 +98,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "automation_logs_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
-            referencedColumns: ["cliente_id"]
           },
           {
             foreignKeyName: "automation_logs_pedido_id_fkey"
@@ -175,13 +161,6 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "chat_grupo_membros_vendedor_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
         ]
@@ -231,13 +210,6 @@ export type Database = {
             columns: ["criado_por"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "chat_grupos_criado_por_fkey"
-            columns: ["criado_por"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
           {
@@ -320,13 +292,6 @@ export type Database = {
             columns: ["recipient_id"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "chat_mensagens_recipient_id_fkey"
-            columns: ["recipient_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
           {
@@ -348,13 +313,6 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "chat_mensagens_vendedor_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
         ]
@@ -372,6 +330,7 @@ export type Database = {
           data_criacao: string | null
           email: string | null
           empresa: string | null
+          empresa_id: string | null
           endereco: string | null
           id: string
           logradouro: string | null
@@ -396,6 +355,7 @@ export type Database = {
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
+          empresa_id?: string | null
           endereco?: string | null
           id?: string
           logradouro?: string | null
@@ -420,6 +380,7 @@ export type Database = {
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
+          empresa_id?: string | null
           endereco?: string | null
           id?: string
           logradouro?: string | null
@@ -433,6 +394,13 @@ export type Database = {
           usuario_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "clientes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clientes_vendedor_id_fkey"
             columns: ["usuario_id"]
@@ -452,13 +420,6 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "clientes_vendedor_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
         ]
@@ -902,13 +863,6 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "historico_contatos_vendedor_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
         ]
@@ -1211,13 +1165,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "mensagens_whatsapp_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
-            referencedColumns: ["cliente_id"]
-          },
-          {
             foreignKeyName: "mensagens_whatsapp_pedido_id_fkey"
             columns: ["pedido_id"]
             isOneToOne: false
@@ -1250,13 +1197,6 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "mensagens_whatsapp_vendedor_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
         ]
@@ -1304,13 +1244,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "notificacoes_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
-            referencedColumns: ["cliente_id"]
-          },
-          {
             foreignKeyName: "notificacoes_pedido_id_fkey"
             columns: ["pedido_id"]
             isOneToOne: false
@@ -1343,13 +1276,6 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "notificacoes_vendedor_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
         ]
@@ -1401,13 +1327,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "obras_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
-            referencedColumns: ["cliente_id"]
           },
         ]
       }
@@ -1475,13 +1394,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pedidos_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
-            referencedColumns: ["cliente_id"]
-          },
-          {
             foreignKeyName: "pedidos_fabricante_id_fkey"
             columns: ["fabricante_id"]
             isOneToOne: false
@@ -1521,13 +1433,6 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "pedidos_vendedor_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
         ]
@@ -1610,13 +1515,6 @@ export type Database = {
             columns: ["usuario_id"]
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "permissoes_vendedor_vendedor_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pedidos_inativos"
             referencedColumns: ["usuario_id"]
           },
         ]
@@ -1926,8 +1824,6 @@ export type Database = {
           qtd_negociacao: number | null
           qtd_novo_lead: number | null
           qtd_perdido: number | null
-          taxa_fechamento: number | null
-          tempo_medio_ate_orcamento_dias: number | null
           ticket_medio_fechado: number | null
           total_pedidos: number | null
           usuario_id: string | null
@@ -1952,12 +1848,10 @@ export type Database = {
           qtd_negociacao: number | null
           qtd_novo_lead: number | null
           qtd_perdido: number | null
-          taxa_fechamento: number | null
-          tempo_medio_ate_orcamento_dias: number | null
           ticket_medio_fechado: number | null
           total_pedidos: number | null
-          vendedor_id: string | null
-          vendedor_nome: string | null
+          usuario_id: string | null
+          usuario_nome: string | null
         }
         Relationships: [
           {
@@ -1971,14 +1865,11 @@ export type Database = {
       }
       vw_pedidos_inativos: {
         Row: {
-          cliente_id: string | null
           cliente_nome: string | null
-          dias_limite: string | null
           dias_parado: number | null
           pedido_id: string | null
           status: string | null
           ultima_atualizacao: string | null
-          usuario_id: string | null
           usuario_nome: string | null
         }
         Relationships: []
@@ -1988,7 +1879,6 @@ export type Database = {
           empresa_id: string | null
           fabricante_id: string | null
           fabricante_nome: string | null
-          tempo_medio_ate_orcamento_dias: number | null
           total_pedidos: number | null
         }
         Relationships: [
