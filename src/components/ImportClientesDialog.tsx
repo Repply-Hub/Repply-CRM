@@ -577,6 +577,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             headers={headers}
             mapping={mapping}
             setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
+            fieldDefaultValues={fieldDefaultValues}
+            setFieldDefaultValues={setFieldDefaultValues}
             extras={extras}
             setExtras={setExtras}
             customColumns={customColumns}
@@ -598,7 +600,9 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               });
               setExtras({});
               setCustomColumns({});
+              setFieldDefaultValues({});
             }}
+            onSaveAsDefault={saveAsDefault}
             canProceed={canProceed}
             onNext={(payload) => {
               const mapped = getMappedRows(payload);
