@@ -302,7 +302,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     return result;
   };
 
-  const getMappedRowsBase = (sanitizedRows = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns })) => {
+  const getMappedRowsBase = (sanitizedRows = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues })) => {
     return sanitizedRows
       .map(row => {
         const get = (k: FieldKey) => (row[k] ?? '').toString().trim();
