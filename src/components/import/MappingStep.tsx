@@ -590,7 +590,7 @@ export function MappingStep({
                           <span className="flex items-center gap-1.5">
                             <EyeOff className="h-3 w-3" /> 
                             Não importar 
-                            {['cliente', 'obra', 'fabricante', 'valor'].includes(field.key) && (
+                            {['cliente', 'fabricante', 'valor'].includes(field.key) && (
                               <span className="text-[10px] text-destructive italic shrink-0 ml-1">obrigatório</span>
                             )}
                           </span>
