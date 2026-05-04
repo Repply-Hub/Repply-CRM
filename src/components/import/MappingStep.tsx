@@ -324,11 +324,16 @@ export function MappingStep({
   const usedHeaders = useMemo(() => {
     const used = new Set<string>();
     Object.values(mapping).forEach(v => {
-      if (Array.isArray(v)) v.forEach(h => used.add(h));
-      else if (v) used.add(v);
+      if (Array.isArray(v)) v.forEach(h => { if (typeof h === 'string') used.add(h); });
+      else if (typeof v === 'string' && v) used.add(v);
+    });
+    Object.keys(extras).forEach(k => {
+      const v = extras[k];
+      if (Array.isArray(v)) v.forEach(h => { if (typeof h === 'string') used.add(h); });
+      else if (typeof k === 'string') used.add(k);
     });
     return used;
-  }, [mapping]);
+  }, [mapping, extras]);
 
   const requiredMissing = visibleFields.filter((field) => field.required && (!mapping[field.key] || (Array.isArray(mapping[field.key]) && (mapping[field.key] as string[]).length === 0)));
   const mappedCount = visibleFields.filter((field) => {
