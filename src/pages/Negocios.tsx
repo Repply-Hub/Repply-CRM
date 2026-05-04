@@ -120,6 +120,28 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     defaultColumns: PEDIDOS_COLUMNS,
   });
 
+  // Limpa colunas extras e garante que apenas as colunas padrão estejam visíveis
+  useEffect(() => {
+    const defaultIds = PEDIDOS_COLUMNS.map(c => c.id);
+    const needsReset = columns.some(c => !defaultIds.includes(c.id)) || 
+                      visibleColumns.some(id => !defaultIds.includes(id));
+    
+    if (needsReset) {
+      console.log('Limpando colunas extras e redefinindo para o padrão');
+      // Redefine as colunas gerais para serem apenas as padrão
+      // Isso afetará o estado interno do hook via referência de memória se não tivermos cuidado,
+      // mas aqui estamos apenas disparando os setters do hook.
+      // O hook useTableSettings precisaria exportar setters para columns e visibleColumns individualmente
+      // ou ter uma função de reset. Como ele exporta setVisibleColumns, vamos usá-lo.
+      
+      setVisibleColumns(defaultIds);
+      
+      // Para remover permanentemente as colunas customizadas do columns, precisaríamos que o hook permitisse isso.
+      // Uma alternativa é limpar o localStorage e recarregar, mas é drástico.
+      // Vamos tentar forçar a visibilidade apenas das colunas permitidas.
+    }
+  }, [columns, visibleColumns, setVisibleColumns]);
+
   const tableVisibleColumns = useMemo(() => {
     return visibleColumns;
   }, [visibleColumns]);
