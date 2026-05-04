@@ -32,6 +32,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, string>>(createEmptyMapping());
+  const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   const [extras, setExtras] = useState<Record<string, string>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
