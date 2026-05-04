@@ -338,6 +338,23 @@ export function MappingStep({
             <Badge variant="secondary">{headers.length - usedHeaders.size} cabeçalhos livres</Badge>
             {extraCount > 0 && <Badge className="bg-accent text-accent-foreground hover:bg-accent">+{extraCount} extras</Badge>}
           </div>
+          
+          {Object.keys(extras).length > 0 && (
+            <div className="px-4 pb-3 flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-1">
+              {Object.entries(extras).map(([header, name]) => (
+                <Badge key={header} variant="secondary" className="pl-1.5 pr-1 py-0.5 h-6 flex items-center gap-1.5 bg-accent/10 border-accent/20 text-accent-foreground group">
+                  <CheckCircle2 className="h-3 w-3 text-accent" />
+                  <span className="text-[10px] font-medium max-w-[120px] truncate">{header}</span>
+                  <button 
+                    onClick={() => removeExtra(header)}
+                    className="h-4 w-4 rounded-full flex items-center justify-center hover:bg-accent/20 transition-colors"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
         {requiredMissing.length > 0 && (
