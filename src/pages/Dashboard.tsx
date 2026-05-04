@@ -153,7 +153,7 @@ const Dashboard = () => {
   const conversaoVendedor = useMemo(() => {
     const data = (vendedores ?? []).map(v => ({
       nome: v.usuario_nome ?? '',
-      conversao: Number(v.taxa_fechamento ?? 0),
+      conversao: v.total_pedidos ? (Number(v.qtd_fechado ?? 0) / Number(v.total_pedidos)) * 100 : 0,
       id: v.usuario_id
     }));
 
