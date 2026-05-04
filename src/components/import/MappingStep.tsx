@@ -494,6 +494,59 @@ export function MappingStep({
                 </div>
               );
             })}
+
+            {/* Campos extras dinâmicos (cabeçalhos selecionados da planilha) */}
+            {Object.entries(extras).map(([header, name]) => {
+              const rawSample = sample(header);
+              const sanitizedSample = sanitizeFieldValue(rawSample, 'text');
+              
+              return (
+                <div key={header} className="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-3 md:gap-4 px-4 py-3 hover:bg-accent/5 transition-colors bg-accent/5 animate-in fade-in slide-in-from-top-1 border-t border-accent/10">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Input
+                        value={name}
+                        onChange={(e) => setExtras(prev => ({ ...prev, [header]: e.target.value }))}
+                        className="h-7 text-sm font-semibold text-foreground bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                      />
+                      <Badge variant="outline" className="text-[9px] font-bold h-4 px-1.5 border-accent/30 text-accent uppercase">Extra</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+                      <span className="font-mono text-[10px]">header: {header}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center h-9 px-3 rounded-md border border-accent/20 bg-accent/10 text-xs text-accent-foreground font-medium">
+                    <Sparkles className="h-3.5 w-3.5 mr-2 opacity-70" />
+                    <span className="truncate">{header}</span>
+                  </div>
+
+                  <div className="flex items-center h-9 text-xs text-muted-foreground italic px-3">
+                    Dinâmico
+                  </div>
+
+                  <div className="min-w-0 rounded-md border border-accent/20 bg-accent/5 px-3 py-2 text-xs relative">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5 text-accent">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-tight">Mapeado</span>
+                      </div>
+                      <button 
+                        onClick={() => removeExtra(header)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        title="Remover mapeamento"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="truncate" title={String(sanitizedSample ?? '')}>
+                      <span className="text-muted-foreground">Valor:</span>{' '}
+                      <span className="font-mono text-foreground">{sanitizedSample === undefined ? '-' : String(sanitizedSample)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
