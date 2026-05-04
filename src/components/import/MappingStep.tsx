@@ -351,6 +351,7 @@ export function MappingStep({
           <div className="grid grid-cols-[minmax(180px,1fr)_minmax(220px,320px)_minmax(140px,1fr)] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             <span>Campo do schema</span>
             <span>Cabeçalho da planilha</span>
+            <span>Valor padrão</span>
             <span>Prévia sanitizada</span>
           </div>
           <div className="divide-y">
