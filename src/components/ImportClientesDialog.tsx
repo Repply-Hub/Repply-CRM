@@ -211,6 +211,27 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       setMapping(auto);
       setExtras(autoDetectExtras(cols, Object.values(auto).filter(Boolean)));
       setCustomColumns({});
+      setFieldDefaultValues({});
+
+      const key = `import_clientes_${target}_`;
+      const savedMapping = localStorage.getItem(`${key}mapping`);
+      const savedDefaults = localStorage.getItem(`${key}defaults`);
+      const savedCustom = localStorage.getItem(`${key}custom`);
+
+      if (savedMapping) {
+        const parsed = JSON.parse(savedMapping);
+        const mergedMapping = { ...auto };
+        Object.entries(parsed).forEach(([k, v]) => {
+          if (v && cols.includes(v as string)) {
+            mergedMapping[k as FieldKey] = v as string;
+          }
+        });
+        setMapping(mergedMapping);
+      }
+
+      if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
+      if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
+
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
