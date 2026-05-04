@@ -225,19 +225,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         }
       });
 
-      // Adicionar/Atualizar campos extras
-      const extraMappings = [
-        ...Object.entries(extras).map(([col, value]) => getExtraDisplayName(col, value).trim()),
-        ...Object.keys(customColumns).map(name => name.trim())
-      ].filter(Boolean);
+      // A funcionalidade de adicionar automaticamente colunas extras foi removida
+      // para evitar a criação de colunas indesejadas (ex: endereço obra_1).
+      // Os usuários podem adicionar colunas manualmente se necessário nas configurações de colunas.
 
-      extraMappings.forEach(name => {
-        if (!currentColumns.find((c: any) => c.label === name || c.id === name)) {
-          const id = `custom_${name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
-          currentColumns.push({ id, label: name, isCustom: true, type: 'text' });
-          hasChanges = true;
-        }
-      });
 
       if (hasChanges) {
         localStorage.setItem('pedidos_all_columns', JSON.stringify(currentColumns));
