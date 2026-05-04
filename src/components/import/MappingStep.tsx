@@ -376,18 +376,6 @@ export function MappingStep({
           </div>
         </div>
 
-        {requiredMissing.length > 0 && (
-          <div className="flex items-start gap-2.5 text-xs bg-warning/10 border border-warning/30 rounded-lg px-3 py-2.5">
-            <AlertCircle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
-            <div className="text-warning-foreground"><span className="font-semibold">Campo obrigatório pendente: </span>{requiredMissing.map((f) => f.label).join(', ')}</div>
-          </div>
-        )}
-
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar campo do schema..." value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9 h-9" />
-        </div>
-
         <div className="rounded-xl border bg-card overflow-hidden">
           <div className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             <span>Campo do schema</span>
