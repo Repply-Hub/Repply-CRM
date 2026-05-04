@@ -477,14 +477,12 @@ export function MappingStep({
         </div>
 
         {unmappedHeaders.length > 0 && (
-          <div className="rounded-xl border border-dashed bg-card p-3 space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold text-foreground">Cabeçalhos não usados</div>
-                <div className="text-[11px] text-muted-foreground">Marque apenas o que deve ir para campos_extras.</div>
-              </div>
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <div className="px-4 py-2 bg-muted/40 border-b">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Cabeçalhos não usados</div>
+              <div className="text-[11px] text-muted-foreground">Clique para adicionar como campo extra.</div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="p-3 flex flex-wrap gap-2">
               {unmappedHeaders.map((header) => {
                 const active = header in extras;
                 return (
@@ -504,33 +502,37 @@ export function MappingStep({
         )}
 
         {setCustomColumns && (
-          <div className="rounded-xl border bg-card p-3 space-y-2">
-            <div className="text-xs font-semibold text-foreground">Campos extras manuais</div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Nome do campo extra"
-                className="h-9 text-xs"
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return;
-                  event.preventDefault();
-                  const value = event.currentTarget.value.trim();
-                  if (!value) return;
-                  setCustomColumns((prev) => ({ ...prev, [value]: prev[value] ?? '' }));
-                  event.currentTarget.value = '';
-                }}
-              />
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <div className="px-4 py-2 bg-muted/40 border-b">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Campos extras manuais</div>
             </div>
-            {Object.keys(customColumns).length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {Object.entries(customColumns).map(([name, value]) => (
-                  <div key={name} className="flex items-center gap-2">
-                    <span className="text-xs font-mono min-w-0 flex-1 truncate">{name}</span>
-                    <Input value={value} onChange={(event) => setCustomColumns((prev) => ({ ...prev, [name]: event.target.value }))} className="h-8 text-xs w-36" placeholder="Valor padrão" />
-                    <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setCustomColumns((prev) => { const next = { ...prev }; delete next[name]; return next; })}><X className="h-3.5 w-3.5" /></Button>
-                  </div>
-                ))}
+            <div className="p-3 space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nome do campo extra..."
+                  className="h-9 text-xs"
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    const value = event.currentTarget.value.trim();
+                    if (!value) return;
+                    setCustomColumns((prev) => ({ ...prev, [value]: prev[value] ?? '' }));
+                    event.currentTarget.value = '';
+                  }}
+                />
               </div>
-            )}
+              {Object.keys(customColumns).length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {Object.entries(customColumns).map(([name, value]) => (
+                    <div key={name} className="flex items-center gap-2 bg-muted/30 p-1.5 rounded-lg border border-border/50">
+                      <span className="text-xs font-mono min-w-0 flex-1 truncate pl-1">{name}</span>
+                      <Input value={value} onChange={(event) => setCustomColumns((prev) => ({ ...prev, [name]: event.target.value }))} className="h-7 text-xs w-28 bg-background" placeholder="Valor" />
+                      <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive" onClick={() => setCustomColumns((prev) => { const next = { ...prev }; delete next[name]; return next; })}><X className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
