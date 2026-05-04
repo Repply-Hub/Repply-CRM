@@ -392,15 +392,35 @@ export function MappingStep({
     return next;
   });
 
-  const handleExtraHeaderChange = (oldHeader: string, newHeader: string) => {
-    if (oldHeader === newHeader) return;
+  const handleExtraHeaderChange = (oldKey: string, newHeader: string, isMulti: boolean = false) => {
+    if (oldKey === newHeader && !isMulti) return;
     setExtras(prev => {
       const next = { ...prev };
-      const currentName = next[oldHeader];
-      delete next[oldHeader];
-      if (newHeader !== NONE) {
-        next[newHeader] = currentName;
+      const currentVal = next[oldKey];
+      
+      if (newHeader === NONE && !isMulti) {
+        delete next[oldKey];
+        return next;
       }
+
+      if (isMulti) {
+        const currentHeaders = Array.isArray(currentVal) ? currentVal : (typeof currentVal === 'string' ? [oldKey] : []);
+        if (currentHeaders.includes(newHeader)) {
+          const filtered = currentHeaders.filter(h => h !== newHeader);
+          if (filtered.length === 0) {
+            delete next[oldKey];
+          } else {
+            next[oldKey] = filtered;
+          }
+        } else {
+          next[oldKey] = [...currentHeaders, newHeader];
+        }
+        return next;
+      }
+
+      const val = next[oldKey];
+      delete next[oldKey];
+      next[newHeader] = typeof val === 'string' ? val : (Array.isArray(val) ? val[0] : newHeader);
       return next;
     });
   };
