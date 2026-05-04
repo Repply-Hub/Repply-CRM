@@ -440,6 +440,19 @@ export function MappingStep({
     });
   };
 
+  const updateExtraName = (oldKey: string, nextName: string) => {
+    setExtras((prev) => {
+      const current = prev[oldKey];
+      if (Array.isArray(current)) {
+        const next = { ...prev };
+        delete next[oldKey];
+        next[nextName || oldKey] = current;
+        return next;
+      }
+      return { ...prev, [oldKey]: nextName };
+    });
+  };
+
   const handleContinue = () => {
     const payload = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues, fieldLabels });
     onNext(payload);
