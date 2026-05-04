@@ -243,8 +243,6 @@ interface Props {
   setExtras: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   customColumns?: Record<string, string>;
   setCustomColumns?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  customColumns?: Record<string, string>;
-  setCustomColumns?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   fieldLabels?: Record<string, string>;
   setFieldLabels?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   visibleFields: FieldDef[];
