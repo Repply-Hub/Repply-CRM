@@ -31,7 +31,7 @@ interface ListPaginationProps {
 }
 
 const MAX_VISIBLE_PAGES = 7;
-const DEFAULT_PAGE_SIZE_OPTIONS = [10, 50, 100, 200];
+const DEFAULT_PAGE_SIZE_OPTIONS = [10, 50, 100, 200, 500, 1000];
 
 function getPageTokens(currentPage: number, totalPages: number): PageToken[] {
   if (totalPages <= MAX_VISIBLE_PAGES) {
