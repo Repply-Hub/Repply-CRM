@@ -35,6 +35,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   const [extras, setExtras] = useState<Record<string, string>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
+  const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
   const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
     return localStorage.getItem('import_pedidos_autosave') === 'true';
   });
@@ -51,6 +52,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setFieldDefaultValues({});
     setExtras({});
     setCustomColumns({});
+    setFieldLabels({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
@@ -64,6 +66,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       localStorage.setItem('import_pedidos_mapping', JSON.stringify(mapping));
       localStorage.setItem('import_pedidos_defaults', JSON.stringify(fieldDefaultValues));
       localStorage.setItem('import_pedidos_custom', JSON.stringify(customColumns));
+      localStorage.setItem('import_pedidos_labels', JSON.stringify(fieldLabels));
       toast.success('Mapeamento e valores padrões serão salvos automaticamente.');
     } else {
       toast.info('Alterações não serão salvas como padrão.');
@@ -74,10 +77,12 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     const savedMapping = localStorage.getItem('import_pedidos_mapping');
     const savedDefaults = localStorage.getItem('import_pedidos_defaults');
     const savedCustom = localStorage.getItem('import_pedidos_custom');
+    const savedLabels = localStorage.getItem('import_pedidos_labels');
     
     if (savedMapping) setMapping(JSON.parse(savedMapping));
     if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
     if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
+    if (savedLabels) setFieldLabels(JSON.parse(savedLabels));
   };
 
   const handleFile = async (file: File) => {
@@ -108,6 +113,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const savedMapping = localStorage.getItem('import_pedidos_mapping');
       const savedDefaults = localStorage.getItem('import_pedidos_defaults');
       const savedCustom = localStorage.getItem('import_pedidos_custom');
+      const savedLabels = localStorage.getItem('import_pedidos_labels');
       
       if (savedMapping) {
         const parsed = JSON.parse(savedMapping);
@@ -123,6 +129,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       
       if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
       if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
+      if (savedLabels) setFieldLabels(JSON.parse(savedLabels));
 
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
