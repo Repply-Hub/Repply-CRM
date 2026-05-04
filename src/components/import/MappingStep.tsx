@@ -549,6 +549,7 @@ export function MappingStep({
                 </div>
               );
             })}
+            </div>
           </div>
         </ScrollArea>
       </div>
