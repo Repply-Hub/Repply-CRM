@@ -337,7 +337,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     return map;
   }, [pipelineOrders, KANBAN_STAGES]);
 
-  const totalPipeline = pipelineOrders.reduce((acc, o) => acc + o.valor, 0);
+  const totalPipeline = useMemo(() => pipelineOrders.reduce((acc, o) => acc + (typeof o.valor === 'number' ? o.valor : 0), 0), [pipelineOrders]);
   const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || stageFilter !== 'todos';
   const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (stageFilter !== 'todos' ? 1 : 0);
 
@@ -848,8 +848,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
 
   const subtitle = isPipelineMode
-    ? `${pipelineOrders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-    : `${filtered.length} pedidos · Total: ${filtered.reduce((acc, p) => acc + (p.valor_total || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+    ? `${pipelineOrders.length} negócios · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+    : `${filtered.length} negócios · Total: ${filtered.reduce((acc, p) => acc + (typeof p.valor_total === 'number' ? p.valor_total : 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
 
   return (
     <AppLayout title="Negócios" subtitle={subtitle}>
