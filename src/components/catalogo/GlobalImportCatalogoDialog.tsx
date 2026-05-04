@@ -276,6 +276,7 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
               onAutoDetect={() => { setMapping(detectFuzzyMapping(headers, VISIBLE_FIELDS)); setExtras({}); }}
               onClearAll={() => { setMapping({}); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
               onSaveAsDefault={saveAsDefault}
+              isAutoSaveEnabled={isAutoSaveEnabled}
               canProceed={canProceedToPreview}
               onNext={() => setStep('preview')}
             />
