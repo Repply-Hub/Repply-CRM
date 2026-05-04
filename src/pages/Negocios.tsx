@@ -120,11 +120,37 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     defaultColumns: PEDIDOS_COLUMNS,
   });
 
+  // Limpa colunas extras e garante que apenas as colunas padrão estejam visíveis
+  useEffect(() => {
+    const defaultIds = PEDIDOS_COLUMNS.map(c => c.id);
+    const needsReset = columns.some(c => !defaultIds.includes(c.id)) || 
+                      visibleColumns.some(id => !defaultIds.includes(id));
+    
+    if (needsReset) {
+      console.log('Limpando colunas extras e redefinindo para o padrão');
+      // Redefine as colunas gerais para serem apenas as padrão
+      // Isso afetará o estado interno do hook via referência de memória se não tivermos cuidado,
+      // mas aqui estamos apenas disparando os setters do hook.
+      // O hook useTableSettings precisaria exportar setters para columns e visibleColumns individualmente
+      // ou ter uma função de reset. Como ele exporta setVisibleColumns, vamos usá-lo.
+      
+      setVisibleColumns(defaultIds);
+      
+      // Para remover permanentemente as colunas customizadas do columns, precisaríamos que o hook permitisse isso.
+      // Uma alternativa é limpar o localStorage e recarregar, mas é drástico.
+      // Vamos tentar forçar a visibilidade apenas das colunas permitidas.
+    }
+  }, [columns, visibleColumns, setVisibleColumns]);
+
   const tableVisibleColumns = useMemo(() => {
-    return visibleColumns;
+    const defaultIds = PEDIDOS_COLUMNS.map(c => c.id);
+    return visibleColumns.filter(id => defaultIds.includes(id));
   }, [visibleColumns]);
 
-  const allAvailableColumns = columns;
+  const allAvailableColumns = useMemo(() => {
+    const defaultIds = PEDIDOS_COLUMNS.map(c => c.id);
+    return columns.filter(c => defaultIds.includes(c.id));
+  }, [columns]);
 
   // Sincronização automática de colunas removida para evitar criação de colunas indesejadas (ex: endereço obra_1).
   // Os usuários podem adicionar colunas extras manualmente através das configurações de colunas.
@@ -1142,6 +1168,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </AlertDialog>
 
       <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
+      
+      {/* Botão temporário para limpar colunas indesejadas do localStorage se o useEffect não for suficiente */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="text-[10px] h-8 opacity-20 hover:opacity-100"
+          onClick={() => {
+            localStorage.removeItem('pedidos_all_columns');
+            localStorage.removeItem('pedidos_visible_columns');
+            window.location.reload();
+          }}
+        >
+          Resetar Colunas
+        </Button>
+      </div>
       <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} />
       {viewOrderSheet}
     </AppLayout>
