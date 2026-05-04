@@ -126,7 +126,8 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
       fields: VISIBLE_FIELDS, 
       mapping, 
       extras, 
-      customColumns 
+      customColumns,
+      fieldDefaultValues
     });
     
     const recordsByFab: Record<string, any[]> = {};
