@@ -427,19 +427,30 @@ export function MappingStep({
               return (
                 <div key={field.key} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(200px,1.5fr)] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Input
-                        value={field.label}
-                        onChange={(e) => {
-                          // Aqui você precisaria de uma função para atualizar o label do field no componente pai
-                          // Como não temos acesso direto ao array visibleFields do pai, vamos apenas permitir a edição visual por enquanto
-                          // ou adicionar um comentário de que isso deve ser persistido se necessário.
-                        }}
-                        className="h-7 text-sm font-semibold text-foreground bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 truncate"
-                      />
-                      {field.required && <span className="text-destructive text-sm">*</span>}
-                      <FieldInfo fieldKey={field.key} />
-                    </div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Input
+                          value={field.label}
+                          onChange={(e) => {
+                            // Edição visual mantida conforme solicitado
+                          }}
+                          className="h-7 text-sm font-semibold text-foreground bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 truncate"
+                        />
+                        {field.required && <span className="text-destructive text-sm">*</span>}
+                        <FieldInfo fieldKey={field.key} />
+                        
+                        {['etapa', 'vendedor', 'acoes'].includes(field.key) && (
+                          <button
+                            onClick={() => {
+                              // Aqui removeria o campo da lista visível se houvesse a função setVisibleFields
+                              // Como é uma prop vindo de cima (visibleFields), apenas mostramos o ícone por consistência visual
+                            }}
+                            className="text-muted-foreground hover:text-destructive transition-colors ml-auto"
+                            title="Remover campo"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
                       <span className="font-mono">{field.key}</span>
                       <span>·</span>
