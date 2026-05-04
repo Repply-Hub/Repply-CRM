@@ -42,10 +42,10 @@ import { cn } from '@/lib/utils';
 import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
-  { id: 'negocio', label: 'Negócio', locked: false },
-  { id: 'etapa', label: 'Etapa', locked: false },
-  { id: 'vendedor', label: 'Vendedor', locked: false },
-  { id: 'acoes', label: 'Ações', locked: false },
+  { id: 'negocio', label: 'Negócio', locked: true },
+  { id: 'etapa', label: 'Etapa', locked: true },
+  { id: 'vendedor', label: 'Vendedor', locked: true },
+  { id: 'acoes', label: 'Ações', locked: true },
 ];
 
 const PAGE_SIZE = 10;
