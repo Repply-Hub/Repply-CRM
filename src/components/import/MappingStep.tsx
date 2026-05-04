@@ -462,12 +462,18 @@ export function MappingStep({
                   </Select>
 
                   <div>
-                    <Input 
-                      placeholder="Padrão" 
-                      value={defaultValue} 
-                      onChange={(e) => setFieldDefaultValues?.(prev => ({ ...prev, [field.key]: e.target.value }))}
-                      className="h-9 text-xs"
-                    />
+                    <Select 
+                      value={defaultValue === 'Sim' || defaultValue === 'Não' ? defaultValue : ''} 
+                      onValueChange={(value) => setFieldDefaultValues?.(prev => ({ ...prev, [field.key]: value }))}
+                    >
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Padrão" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Sim">Sim</SelectItem>
+                        <SelectItem value="Não">Não</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="min-w-0 rounded-md border bg-background px-3 py-2 text-xs">
