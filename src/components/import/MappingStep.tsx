@@ -641,53 +641,102 @@ export function MappingStep({
             })}
 
             {/* Campos extras dinâmicos (cabeçalhos selecionados da planilha) */}
-            {Object.entries(extras).map(([header, name]) => {
-              const rawSample = sample(header);
+            {Object.entries(extras).map(([key, value]) => {
+              const extraHeaders = Array.isArray(value) ? value : [key];
+              const extraName = Array.isArray(value) ? key : (value as string);
+              const rawSample = sample(extraHeaders);
               const sanitizedSample = sanitizeFieldValue(rawSample, 'text');
               
               return (
-                <div key={header} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(200px,1.5fr)] gap-4 px-4 py-3 hover:bg-accent/5 transition-colors bg-accent/5 animate-in fade-in slide-in-from-top-1 border-t border-accent/10">
+                <div key={key} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(200px,1.5fr)] gap-4 px-4 py-3 hover:bg-accent/5 transition-colors bg-accent/5 animate-in fade-in slide-in-from-top-1 border-t border-accent/10">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <Input
-                        value={name}
-                        onChange={(e) => setExtras(prev => ({ ...prev, [header]: e.target.value }))}
+                        value={extraName}
+                        onChange={(e) => setExtras(prev => {
+                          const next = { ...prev };
+                          next[key] = e.target.value;
+                          return next;
+                        })}
                         className="h-7 text-sm font-semibold text-foreground bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                       <Badge variant="outline" className="text-[9px] font-bold h-4 px-1.5 border-accent/30 text-accent uppercase">Extra</Badge>
                     </div>
                     <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
-                      <span className="font-mono text-[10px]">header: {header}</span>
+                      <span className="font-mono text-[10px]">
+                        {Array.isArray(value) ? `${value.length} colunas` : `header: ${key}`}
+                      </span>
                     </div>
                   </div>
 
-                  <Select 
-                    value={header || NONE} 
-                    onValueChange={(value) => handleExtraHeaderChange(header, value)}
-                  >
-                    <SelectTrigger className={cn('h-9 text-xs border-accent/40 bg-accent/5')}>
-                      <SelectValue placeholder="Selecione o cabeçalho" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[320px]" position="popper">
-                      <SelectItem value={NONE} className="text-muted-foreground">
-                        <span className="flex items-center gap-1.5">
-                          <EyeOff className="h-3 w-3" /> 
-                          Não importar
-                        </span>
-                      </SelectItem>
-                      {headers.map((h) => {
-                        const inUseByOther = (usedHeaders.has(h) || Object.keys(extras).includes(h)) && header !== h;
-                        return (
-                          <SelectItem key={h} value={h}>
-                            <span className="flex items-center gap-2 max-w-[280px]">
-                              <span className="truncate">{h}</span>
-                              {inUseByOther && <span className="text-[10px] text-muted-foreground italic shrink-0">em uso</span>}
+                  <div className="flex flex-col gap-1.5">
+                    <Select 
+                      value={Array.isArray(value) ? 'MULTIPLE' : key} 
+                      onValueChange={(val) => handleExtraHeaderChange(key, val)}
+                    >
+                      <SelectTrigger className={cn('h-9 text-xs border-accent/40 bg-accent/5')}>
+                        <SelectValue placeholder="Selecione o cabeçalho" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[320px]" position="popper">
+                        <SelectItem value={NONE} className="text-muted-foreground">
+                          <span className="flex items-center gap-1.5">
+                            <EyeOff className="h-3 w-3" /> 
+                            Não importar
+                          </span>
+                        </SelectItem>
+                        {Array.isArray(value) && (
+                          <SelectItem value="MULTIPLE" className="font-semibold text-accent">
+                            <span className="flex items-center gap-1.5">
+                              <Sparkles className="h-3 w-3" />
+                              {value.length} colunas unificadas
                             </span>
                           </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
+                        )}
+                        {headers.map((h) => {
+                          const isSelected = extraHeaders.includes(h);
+                          const inUseByOther = (usedHeaders.has(h) || Object.keys(extras).includes(h)) && !isSelected;
+                          return (
+                            <SelectItem key={h} value={h}>
+                              <div className="flex items-center justify-between w-full min-w-[200px]">
+                                <span className="flex items-center gap-2">
+                                  <span className="truncate max-w-[150px]">{h}</span>
+                                  {inUseByOther && <span className="text-[10px] text-muted-foreground italic shrink-0">em uso</span>}
+                                </span>
+                                {isSelected && <CheckCircle2 className="h-3 w-3 text-accent shrink-0" />}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] font-medium text-muted-foreground hover:text-accent gap-1 self-start">
+                          <Plus className="h-3 w-3" /> Unificar colunas
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-[240px] max-h-[300px] overflow-y-auto">
+                        <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Unificar com este campo extra</div>
+                        {headers.map((h) => {
+                          const isSelected = extraHeaders.includes(h);
+                          return (
+                            <DropdownMenuItem 
+                              key={h} 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleExtraHeaderChange(key, h, true);
+                              }}
+                              className="flex items-center justify-between text-xs"
+                            >
+                              <span className="truncate mr-2">{h}</span>
+                              {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-accent shrink-0" />}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
 
                   <div>
                     <Select value="Padrão" disabled>
@@ -704,10 +753,12 @@ export function MappingStep({
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-1.5 text-accent">
                         <CheckCircle2 className="h-3.5 w-3.5" />
-                        <span className="text-[10px] font-bold uppercase tracking-tight">Mapeado</span>
+                        <span className="text-[10px] font-bold uppercase tracking-tight">
+                          {Array.isArray(value) ? 'Unificado' : 'Mapeado'}
+                        </span>
                       </div>
                       <button 
-                        onClick={() => removeExtra(header)}
+                        onClick={() => removeExtra(key)}
                         className="text-muted-foreground hover:text-destructive transition-colors"
                         title="Remover mapeamento"
                       >
