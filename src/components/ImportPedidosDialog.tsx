@@ -35,6 +35,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   const [extras, setExtras] = useState<Record<string, string>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
+  const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
   const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
     return localStorage.getItem('import_pedidos_autosave') === 'true';
   });
@@ -51,6 +52,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setFieldDefaultValues({});
     setExtras({});
     setCustomColumns({});
+    setFieldLabels({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
@@ -64,6 +66,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       localStorage.setItem('import_pedidos_mapping', JSON.stringify(mapping));
       localStorage.setItem('import_pedidos_defaults', JSON.stringify(fieldDefaultValues));
       localStorage.setItem('import_pedidos_custom', JSON.stringify(customColumns));
+      localStorage.setItem('import_pedidos_labels', JSON.stringify(fieldLabels));
       toast.success('Mapeamento e valores padrões serão salvos automaticamente.');
     } else {
       toast.info('Alterações não serão salvas como padrão.');
@@ -74,10 +77,12 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     const savedMapping = localStorage.getItem('import_pedidos_mapping');
     const savedDefaults = localStorage.getItem('import_pedidos_defaults');
     const savedCustom = localStorage.getItem('import_pedidos_custom');
+    const savedLabels = localStorage.getItem('import_pedidos_labels');
     
     if (savedMapping) setMapping(JSON.parse(savedMapping));
     if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
     if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
+    if (savedLabels) setFieldLabels(JSON.parse(savedLabels));
   };
 
   const handleFile = async (file: File) => {
@@ -108,6 +113,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const savedMapping = localStorage.getItem('import_pedidos_mapping');
       const savedDefaults = localStorage.getItem('import_pedidos_defaults');
       const savedCustom = localStorage.getItem('import_pedidos_custom');
+      const savedLabels = localStorage.getItem('import_pedidos_labels');
       
       if (savedMapping) {
         const parsed = JSON.parse(savedMapping);
@@ -123,6 +129,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       
       if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
       if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
+      if (savedLabels) setFieldLabels(JSON.parse(savedLabels));
 
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
@@ -168,28 +175,38 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       if (!vid) throw new Error('Vendedor não encontrado');
 
-      // Identificar colunas que serão campos extras para salvar como colunas padrão na página de Negócios
-      const extraColumnNames = [
+      // Atualizar nomes das colunas (padrão e extras) para salvar como colunas na página de Negócios
+      const savedAllColumns = localStorage.getItem('pedidos_all_columns');
+      let currentColumns = savedAllColumns ? JSON.parse(savedAllColumns) : [...VISIBLE_FIELDS.map(f => ({ id: f.key, label: f.label, type: 'text' }))];
+      let hasChanges = false;
+
+      // Atualizar labels dos campos padrão que foram renomeados
+      Object.entries(fieldLabels).forEach(([key, label]) => {
+        const col = currentColumns.find((c: any) => c.id === key);
+        if (col && col.label !== label) {
+          col.label = label;
+          hasChanges = true;
+        }
+      });
+
+      // Adicionar/Atualizar campos extras
+      const extraMappings = [
         ...Object.entries(extras).map(([_, name]) => name.trim()),
         ...Object.keys(customColumns).map(name => name.trim())
       ].filter(Boolean);
 
-      if (extraColumnNames.length > 0) {
-        const savedAllColumns = localStorage.getItem('pedidos_all_columns');
-        let currentColumns = savedAllColumns ? JSON.parse(savedAllColumns) : [];
-        let hasChanges = false;
-
-        extraColumnNames.forEach(name => {
-          if (!currentColumns.find((c: any) => c.label === name || c.id === name)) {
-            const id = `custom_${name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
-            currentColumns.push({ id, label: name, isCustom: true, type: 'text' });
-            hasChanges = true;
-          }
-        });
-
-        if (hasChanges) {
-          localStorage.setItem('pedidos_all_columns', JSON.stringify(currentColumns));
+      extraMappings.forEach(name => {
+        if (!currentColumns.find((c: any) => c.label === name || c.id === name)) {
+          const id = `custom_${name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+          currentColumns.push({ id, label: name, isCustom: true, type: 'text' });
+          hasChanges = true;
         }
+      });
+
+      if (hasChanges) {
+        localStorage.setItem('pedidos_all_columns', JSON.stringify(currentColumns));
+        // Forçar atualização na página de Negócios se o hook useTableSettings estiver ouvindo
+        window.dispatchEvent(new Event('storage'));
       }
 
       const { data: clientes } = await supabase.from('clientes').select('id, empresa');
@@ -308,6 +325,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             setExtras={setExtras}
             customColumns={customColumns}
             setCustomColumns={setCustomColumns}
+            fieldLabels={fieldLabels}
+            setFieldLabels={setFieldLabels}
             visibleFields={VISIBLE_FIELDS}
             onReset={reset}
             onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
