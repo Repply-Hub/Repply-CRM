@@ -173,7 +173,7 @@ export function sanitizeImportedRows(params: {
   rawData: Record<string, unknown>[];
   fields: FieldDef[];
   mapping: Record<string, string | string[]>;
-  extras?: Record<string, string>;
+  extras?: Record<string, string | string[]>;
   customColumns?: Record<string, string>;
   fieldDefaultValues?: Record<string, string>;
   fieldLabels?: Record<string, string>;
