@@ -86,6 +86,25 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
 
       const autoMap = detectFuzzyMapping(cols, VISIBLE_FIELDS);
       setMapping(autoMap);
+      setFieldDefaultValues({});
+      setExtras({});
+      setCustomColumns({});
+
+      const savedMapping = localStorage.getItem('import_catalogo_mapping');
+      const savedDefaults = localStorage.getItem('import_catalogo_defaults');
+      const savedCustom = localStorage.getItem('import_catalogo_custom');
+
+      if (savedMapping) {
+        const parsed = JSON.parse(savedMapping);
+        const mergedMapping = { ...autoMap };
+        Object.entries(parsed).forEach(([k, v]) => {
+          if (v && cols.includes(v as string)) mergedMapping[k] = v as string;
+        });
+        setMapping(mergedMapping);
+      }
+      if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
+      if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
+
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento.`);
     } catch (err: any) {
