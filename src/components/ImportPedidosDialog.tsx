@@ -92,6 +92,28 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       setMapping(autoMap);
       setExtras({});
       setCustomColumns({});
+      setFieldDefaultValues({});
+      
+      // Carregar padrões salvos se existirem
+      const savedMapping = localStorage.getItem('import_pedidos_mapping');
+      const savedDefaults = localStorage.getItem('import_pedidos_defaults');
+      const savedCustom = localStorage.getItem('import_pedidos_custom');
+      
+      if (savedMapping) {
+        const parsed = JSON.parse(savedMapping);
+        // Só aplica se as colunas existirem no arquivo atual
+        const mergedMapping = { ...autoMap };
+        Object.entries(parsed).forEach(([key, val]) => {
+          if (val && cols.includes(val as string)) {
+            mergedMapping[key as FieldKey] = val as string;
+          }
+        });
+        setMapping(mergedMapping);
+      }
+      
+      if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
+      if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
+
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
