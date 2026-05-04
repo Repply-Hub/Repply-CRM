@@ -23,35 +23,51 @@ export function usePedidos(empresaId?: string) {
   return useQuery({
     queryKey: ['pedidos', empresaId],
     queryFn: async () => {
-      let query = supabase
-        .from('pedidos')
-        .select(`
-          id, status, valor_total, data_pedido, created_at, observacoes,
-          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega,
-          cliente:clientes(id, empresa),
-          fabricante:fabricantes(id, nome),
-          vendedor:usuarios(id, nome, empresa_id),
-          obra:obras(id, nome_obra)
-        `);
+      const allData: PedidoWithRelations[] = [];
+      const pageSize = 1000;
+      let from = 0;
+      let hasMore = true;
 
-      if (empresaId) {
-        // First get all user IDs for this company
-        const { data: companyUsers } = await supabase
-          .from('usuarios')
-          .select('id')
-          .eq('empresa_id', empresaId);
+      while (hasMore) {
+        let query = supabase
+          .from('pedidos')
+          .select(`
+            id, status, valor_total, data_pedido, created_at, observacoes,
+            cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega,
+            cliente:clientes(id, empresa),
+            fabricante:fabricantes(id, nome),
+            vendedor:usuarios(id, nome, empresa_id),
+            obra:obras(id, nome_obra)
+          `)
+          .order('created_at', { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (empresaId) {
+          const { data: companyUsers } = await supabase
+            .from('usuarios')
+            .select('id')
+            .eq('empresa_id', empresaId);
+          
+          if (companyUsers && companyUsers.length > 0) {
+            query = query.in('usuario_id', companyUsers.map(u => u.id));
+          } else {
+            return [];
+          }
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
         
-        if (companyUsers && companyUsers.length > 0) {
-          query = query.in('usuario_id', companyUsers.map(u => u.id));
+        if (data && data.length > 0) {
+          allData.push(...(data as unknown as PedidoWithRelations[]));
+          from += pageSize;
+          hasMore = data.length === pageSize && allData.length < 10000;
         } else {
-          // If no users found for the company, return empty
-          return [];
+          hasMore = false;
         }
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false }).limit(10000);
-      if (error) throw error;
-      return (data || []) as unknown as PedidoWithRelations[];
+      return allData;
     },
     staleTime: 60_000,
     gcTime: 5 * 60_000,
