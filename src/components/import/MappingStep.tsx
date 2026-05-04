@@ -172,7 +172,7 @@ export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): str
 export function sanitizeImportedRows(params: {
   rawData: Record<string, unknown>[];
   fields: FieldDef[];
-  mapping: Record<string, string>;
+  mapping: Record<string, string | string[]>;
   extras?: Record<string, string>;
   customColumns?: Record<string, string>;
   fieldDefaultValues?: Record<string, string>;
@@ -182,22 +182,36 @@ export function sanitizeImportedRows(params: {
   return rawData.map((row) => {
     const payload: Record<string, unknown> = {};
     fields.forEach((field) => {
-      const header = mapping[field.key];
+      const mappingValue = mapping[field.key];
+      const headers = Array.isArray(mappingValue) ? mappingValue : (mappingValue ? [mappingValue] : []);
       const customLabel = fieldLabels[field.key];
       const defaultValue = fieldDefaultValues[field.key];
       
-      let rawValue = undefined;
+      let rawValue: any = undefined;
       
-      // Tenta encontrar o valor pelo mapeamento direto
-      if (header && row[header] !== undefined) {
-        rawValue = row[header];
+      // Se houver múltiplos cabeçalhos mapeados, unifica-os
+      if (headers.length > 0) {
+        const values = headers
+          .map(h => row[h])
+          .filter(v => v !== undefined && v !== null && String(v).trim() !== '');
+        
+        if (values.length > 0) {
+          // Para campos de texto, une com espaço. Para outros, pega o primeiro valor não vazio
+          const type = getFieldType(field);
+          if (type === 'text') {
+            rawValue = values.join(' ');
+          } else {
+            rawValue = values[0];
+          }
+        }
       } 
-      // Se não mapeado explicitamente, tenta encontrar por nome customizado (label)
-      else if (customLabel && row[customLabel] !== undefined) {
+      
+      // Se não mapeado explicitamente ou não encontrou valor, tenta encontrar por nome customizado (label)
+      if ((rawValue === undefined || rawValue === null || rawValue === '') && customLabel && row[customLabel] !== undefined) {
         rawValue = row[customLabel];
       }
       // Se não mapeado nem por label, tenta encontrar pela label padrão
-      else if (field.label && row[field.label] !== undefined) {
+      else if ((rawValue === undefined || rawValue === null || rawValue === '') && field.label && row[field.label] !== undefined) {
         rawValue = row[field.label];
       }
       
@@ -250,8 +264,8 @@ interface Props {
   fileName: string;
   rawData: Record<string, any>[];
   headers: string[];
-  mapping: Record<string, string>;
-  setMapping: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  mapping: Record<string, string | string[]>;
+  setMapping: React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>;
   fieldDefaultValues?: Record<string, string>;
   setFieldDefaultValues?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   extras: Record<string, string>;
@@ -281,7 +295,12 @@ export function MappingStep({
     if (headers.length === 0 || visibleFields.length === 0) return;
     setMapping((prev) => {
       const fuzzy = detectFuzzyMapping(headers, visibleFields);
-      const used = new Set(Object.values(prev).filter(Boolean));
+      const used = new Set<string>();
+      Object.values(prev).forEach(v => {
+        if (Array.isArray(v)) v.forEach(h => used.add(h));
+        else if (v) used.add(v);
+      });
+
       let changed = false;
       const next = { ...prev };
       visibleFields.forEach((field) => {
@@ -294,9 +313,20 @@ export function MappingStep({
     });
   }, [headers, visibleFields, setMapping]);
 
-  const usedHeaders = useMemo(() => new Set(Object.values(mapping).filter(Boolean)), [mapping]);
-  const requiredMissing = visibleFields.filter((field) => field.required && !mapping[field.key]);
-  const mappedCount = visibleFields.filter((field) => Boolean(mapping[field.key])).length;
+  const usedHeaders = useMemo(() => {
+    const used = new Set<string>();
+    Object.values(mapping).forEach(v => {
+      if (Array.isArray(v)) v.forEach(h => used.add(h));
+      else if (v) used.add(v);
+    });
+    return used;
+  }, [mapping]);
+
+  const requiredMissing = visibleFields.filter((field) => field.required && (!mapping[field.key] || (Array.isArray(mapping[field.key]) && (mapping[field.key] as string[]).length === 0)));
+  const mappedCount = visibleFields.filter((field) => {
+    const val = mapping[field.key];
+    return Array.isArray(val) ? val.length > 0 : Boolean(val);
+  }).length;
   const extraCount = Object.keys(extras).length + Object.keys(customColumns).length;
   const filteredFields = useMemo(() => {
     const q = normalizeText(search);
@@ -304,17 +334,44 @@ export function MappingStep({
     return visibleFields.filter((field) => normalizeText(`${field.label} ${field.key}`).includes(q));
   }, [search, visibleFields]);
 
-  const sample = (header?: string) => {
-    if (!header) return '';
+  const sample = (headerOrHeaders?: string | string[]) => {
+    if (!headerOrHeaders) return '';
+    const headersToSample = Array.isArray(headerOrHeaders) ? headerOrHeaders : [headerOrHeaders];
+    
+    if (headersToSample.length === 0) return '';
+
+    // Tenta encontrar uma linha onde pelo menos um dos cabeçalhos tenha valor
     for (const row of rawData) {
-      const value = row[header];
-      if (value !== undefined && value !== null && value !== '') return String(value);
+      const values = headersToSample
+        .map(h => row[h])
+        .filter(v => v !== undefined && v !== null && v !== '');
+      
+      if (values.length > 0) {
+        return values.join(' ');
+      }
     }
     return '';
   };
 
-  const setFieldHeader = (fieldKey: string, value: string) => {
-    setMapping((prev) => ({ ...prev, [fieldKey]: value === NONE ? '' : value }));
+  const setFieldHeader = (fieldKey: string, header: string, isMulti: boolean = false) => {
+    setMapping((prev) => {
+      const current = prev[fieldKey];
+      if (header === NONE) return { ...prev, [fieldKey]: '' };
+      
+      if (isMulti) {
+        const currentHeaders = Array.isArray(current) ? [...current] : (current ? [current] : []);
+        if (currentHeaders.includes(header)) {
+          // Remove se já estiver lá
+          const filtered = currentHeaders.filter(h => h !== header);
+          return { ...prev, [fieldKey]: filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? '' : filtered) };
+        } else {
+          // Adiciona se não estiver lá
+          return { ...prev, [fieldKey]: [...currentHeaders, header] };
+        }
+      }
+      
+      return { ...prev, [fieldKey]: header };
+    });
   };
 
   const addExtra = (header: string) => {
@@ -419,12 +476,13 @@ export function MappingStep({
             </div>
             <div className="divide-y">
             {filteredFields.map((field) => {
-              const selectedHeader = mapping[field.key] || '';
+              const mappingValue = mapping[field.key] || '';
+              const selectedHeaders = Array.isArray(mappingValue) ? mappingValue : (mappingValue ? [mappingValue] : []);
               const defaultValue = fieldDefaultValues[field.key] || '';
-              const rawSample = sample(selectedHeader);
+              const rawSample = sample(selectedHeaders);
               const effectiveRawSample = (rawSample !== undefined && rawSample !== null && rawSample !== '') ? rawSample : defaultValue;
               const sanitizedSample = sanitizeFieldValue(effectiveRawSample, getFieldType(field));
-              const score = selectedHeader ? fuzzyScore(field, selectedHeader) : 0;
+              const score = selectedHeaders.length > 0 ? Math.max(...selectedHeaders.map(h => fuzzyScore(field, h))) : 0;
               
               return (
                 <div key={field.key} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(200px,1.5fr)] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
@@ -458,37 +516,80 @@ export function MappingStep({
                     </div>
                   </div>
 
-                  <Select value={selectedHeader || NONE} onValueChange={(value) => setFieldHeader(field.key, value)}>
-                    <SelectTrigger className={cn('h-9 text-xs', selectedHeader && 'border-primary/40')}>
-                      <SelectValue placeholder="Não importar" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[320px]" position="popper">
-                      <SelectItem 
-                        value={NONE} 
-                        className="text-muted-foreground"
-                        disabled={['cliente', 'obra', 'fabricante', 'valor'].includes(field.key)}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <EyeOff className="h-3 w-3" /> 
-                          Não importar 
-                          {['cliente', 'obra', 'fabricante', 'valor'].includes(field.key) && (
-                            <span className="text-[10px] text-destructive italic shrink-0 ml-1">obrigatório</span>
-                          )}
-                        </span>
-                      </SelectItem>
-                      {headers.map((header) => {
-                        const inUseByOther = usedHeaders.has(header) && selectedHeader !== header;
-                        return (
-                          <SelectItem key={header} value={header}>
-                            <span className="flex items-center gap-2 max-w-[280px]">
-                              <span className="truncate">{header}</span>
-                              {inUseByOther && <span className="text-[10px] text-muted-foreground italic shrink-0">em uso</span>}
+                  <div className="flex flex-col gap-1.5">
+                    <Select value={(selectedHeaders.length === 1 ? selectedHeaders[0] : (selectedHeaders.length > 1 ? 'MULTIPLE' : NONE))} onValueChange={(value) => setFieldHeader(field.key, value)}>
+                      <SelectTrigger className={cn('h-9 text-xs', selectedHeaders.length > 0 && 'border-primary/40')}>
+                        <SelectValue placeholder="Não importar" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[320px]" position="popper">
+                        <SelectItem 
+                          value={NONE} 
+                          className="text-muted-foreground"
+                          disabled={['cliente', 'obra', 'fabricante', 'valor'].includes(field.key)}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <EyeOff className="h-3 w-3" /> 
+                            Não importar 
+                            {['cliente', 'obra', 'fabricante', 'valor'].includes(field.key) && (
+                              <span className="text-[10px] text-destructive italic shrink-0 ml-1">obrigatório</span>
+                            )}
+                          </span>
+                        </SelectItem>
+                        {selectedHeaders.length > 1 && (
+                          <SelectItem value="MULTIPLE" className="font-semibold text-primary">
+                            <span className="flex items-center gap-1.5">
+                              <Sparkles className="h-3 w-3" />
+                              {selectedHeaders.length} colunas unificadas
                             </span>
                           </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
+                        )}
+                        {headers.map((header) => {
+                          const isSelected = selectedHeaders.includes(header);
+                          const inUseByOther = usedHeaders.has(header) && !isSelected;
+                          return (
+                            <SelectItem key={header} value={header}>
+                              <div className="flex items-center justify-between w-full min-w-[200px]">
+                                <span className="flex items-center gap-2">
+                                  <span className="truncate max-w-[150px]">{header}</span>
+                                  {inUseByOther && <span className="text-[10px] text-muted-foreground italic shrink-0">em uso</span>}
+                                </span>
+                                {isSelected && <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    
+                    {headers.length > 0 && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-6 text-[10px] font-medium text-muted-foreground hover:text-primary gap-1 self-start">
+                            <Plus className="h-3 w-3" /> Unificar colunas
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-[240px] max-h-[300px] overflow-y-auto">
+                          <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Selecionar colunas para unificar</div>
+                          {headers.map((header) => {
+                            const isSelected = selectedHeaders.includes(header);
+                            return (
+                              <DropdownMenuItem 
+                                key={header} 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setFieldHeader(field.key, header, true);
+                                }}
+                                className="flex items-center justify-between text-xs"
+                              >
+                                <span className="truncate mr-2">{header}</span>
+                                {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
 
                   <div>
                     <Select 
@@ -506,13 +607,13 @@ export function MappingStep({
                   </div>
 
                   <div className="min-w-0 rounded-md border bg-background px-3 py-2 text-xs">
-                    {(selectedHeader || defaultValue) ? (
+                    {(selectedHeaders.length > 0 || defaultValue) ? (
                       <>
                         <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                          {selectedHeader ? (
+                          {selectedHeaders.length > 0 ? (
                             <>
                               <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-                              <span>Fuzzy {score}%</span>
+                              <span>{selectedHeaders.length > 1 ? 'Múltiplos' : `Fuzzy ${score}%`}</span>
                             </>
                           ) : (
                             <span className="text-[10px] bg-accent/20 text-accent-foreground px-1.5 py-0.5 rounded">Usando padrão</span>
