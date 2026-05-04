@@ -363,23 +363,6 @@ export function MappingStep({
             </div>
             <div className="flex items-center gap-1">
               <Button variant="outline" size="sm" onClick={onAutoDetect} className="gap-1.5 h-8"><Sparkles className="h-3.5 w-3.5" /> Auto</Button>
-              {onSaveAsDefault && (
-                <div className="flex items-center gap-2">
-                  <Select 
-                    value={isAutoSaveEnabled ? "Sim" : "Não"} 
-                    onValueChange={(val) => onSaveAsDefault(val === "Sim")}
-                  >
-                    <SelectTrigger className={cn("gap-1.5 h-8 w-[140px] text-xs", isAutoSaveEnabled ? "bg-primary/5 text-primary border-primary/20" : "")}>
-                      <Settings className="h-3.5 w-3.5" />
-                      <SelectValue placeholder="Salvar padrão" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Sim">Salvar padrão: Sim</SelectItem>
-                      <SelectItem value="Não">Salvar padrão: Não</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
               <Button variant="ghost" size="sm" onClick={onClearAll} className="h-8 px-2">Limpar</Button>
               <Button variant="ghost" size="sm" onClick={onReset} className="h-8 px-2"><X className="h-3.5 w-3.5 mr-1" /> Trocar arquivo</Button>
             </div>
