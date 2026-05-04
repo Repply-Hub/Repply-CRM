@@ -410,6 +410,7 @@ export function MappingStep({
   const handleExtraHeaderChange = (oldKey: string, newHeader: string, isMulti: boolean = false) => {
     if (oldKey === newHeader && !isMulti) return;
     setExtras(prev => {
+      console.log('setExtras prev:', prev, 'oldKey:', oldKey, 'newHeader:', newHeader, 'isMulti:', isMulti);
       const next = { ...prev };
       const currentVal = next[oldKey];
       
