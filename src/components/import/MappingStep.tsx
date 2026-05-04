@@ -309,27 +309,8 @@ export function MappingStep({
 }: Props) {
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    if (headers.length === 0 || visibleFields.length === 0) return;
-    setMapping((prev) => {
-      const fuzzy = detectFuzzyMapping(headers, visibleFields);
-      const used = new Set<string>();
-      Object.values(prev).forEach(v => {
-        if (Array.isArray(v)) v.forEach(h => used.add(h));
-        else if (v) used.add(v);
-      });
-
-      let changed = false;
-      const next = { ...prev };
-      visibleFields.forEach((field) => {
-        if (next[field.key] || !fuzzy[field.key] || used.has(fuzzy[field.key])) return;
-        next[field.key] = fuzzy[field.key];
-        used.add(fuzzy[field.key]);
-        changed = true;
-      });
-      return changed ? next : prev;
-    });
-  }, [headers, visibleFields, setMapping]);
+  // Removido useEffect que causava mapeamento automático infinito e duplicado
+  // O mapeamento inicial agora é controlado apenas no upload do arquivo ou via botão 'Auto'
 
   const usedHeaders = useMemo(() => {
     const used = new Set<string>();
