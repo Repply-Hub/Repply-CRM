@@ -143,7 +143,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [columns, visibleColumns, setVisibleColumns]);
 
   const tableVisibleColumns = useMemo(() => {
-    return visibleColumns;
+    const defaultIds = PEDIDOS_COLUMNS.map(c => c.id);
+    return visibleColumns.filter(id => defaultIds.includes(id));
   }, [visibleColumns]);
 
   const allAvailableColumns = columns;
