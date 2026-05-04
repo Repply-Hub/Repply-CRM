@@ -427,7 +427,7 @@ export function MappingStep({
               const score = selectedHeader ? fuzzyScore(field, selectedHeader) : 0;
               
               return (
-                <div key={field.key} className="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-3 md:gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
+                <div key={field.key} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm font-semibold text-foreground truncate">{field.label}</span>
