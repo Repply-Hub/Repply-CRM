@@ -276,8 +276,8 @@ interface Props {
   setMapping: React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>;
   fieldDefaultValues?: Record<string, string>;
   setFieldDefaultValues?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  extras: Record<string, string>;
-  setExtras: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  extras: Record<string, string | string[]>;
+  setExtras: React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>;
   customColumns?: Record<string, string>;
   setCustomColumns?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   fieldLabels?: Record<string, string>;
