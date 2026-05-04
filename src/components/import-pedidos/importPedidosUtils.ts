@@ -42,7 +42,10 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
   ],
   valor: [
     { pattern: /^valor$/, score: 100 },
+    { pattern: /^renda$/, score: 100 },
+    { pattern: /^faturamento$/, score: 95 },
     { pattern: /valor/, score: 85 },
+    { pattern: /renda/, score: 85 },
     { pattern: /total/, score: 76 },
     { pattern: /preco/, score: 76 },
     { pattern: /orcamento/, score: 68 },
@@ -68,12 +71,14 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /date/, score: 85 },
   ],
   observacoes: [
+    { pattern: /^nome\s+do\s+negocio$/, score: 100 },
+    { pattern: /^titulo\s+do\s+negocio$/, score: 95 },
     { pattern: /observa/, score: 95 },
     { pattern: /obs/, score: 92 },
     { pattern: /nota/, score: 88 },
     { pattern: /descri/, score: 78 },
     { pattern: /detalhe/, score: 76 },
-    { pattern: /nome do negocio/, score: 74 },
+    { pattern: /nome\s+do\s+negocio/, score: 90 },
     { pattern: /titulo/, score: 68 },
   ],
 };
