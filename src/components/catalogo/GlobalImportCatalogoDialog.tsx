@@ -10,7 +10,7 @@ import { useFabricantes } from '@/hooks/use-clientes';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
-import { MappingStep, sanitizeImportedRows, type FieldDef, detectFuzzyMapping } from '@/components/import/MappingStep';
+import { MappingStep, sanitizeImportedRows, type ExtraMappingValue, type FieldDef, detectFuzzyMapping } from '@/components/import/MappingStep';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -34,7 +34,7 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
-  const [extras, setExtras] = useState<Record<string, string>>({});
+  const [extras, setExtras] = useState<Record<string, ExtraMappingValue>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
   const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
     return localStorage.getItem('import_catalogo_autosave') === 'true';
