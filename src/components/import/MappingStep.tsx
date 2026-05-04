@@ -300,10 +300,6 @@ export function MappingStep({
     setMapping((prev) => ({ ...prev, [fieldKey]: value === NONE ? '' : value }));
   };
 
-  const setFieldHeader = (fieldKey: string, value: string) => {
-    setMapping((prev) => ({ ...prev, [fieldKey]: value === NONE ? '' : value }));
-  };
-
   const addExtra = (header: string) => {
     setExtras((prev) => ({ ...prev, [header]: header }));
   };
