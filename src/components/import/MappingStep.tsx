@@ -435,6 +435,22 @@ export function MappingStep({
 
   const addExtra = (header: string) => {
     setExtras((prev) => ({ ...prev, [header]: header }));
+    // Remove o cabeçalho de qualquer mapeamento de campo do schema
+    setMapping(prevMapping => {
+      let mappingChanged = false;
+      const nextMapping = { ...prevMapping };
+      Object.entries(nextMapping).forEach(([key, val]) => {
+        if (Array.isArray(val) && val.includes(header)) {
+          const filtered = val.filter(h => h !== header);
+          nextMapping[key] = filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? '' : filtered);
+          mappingChanged = true;
+        } else if (val === header) {
+          nextMapping[key] = '';
+          mappingChanged = true;
+        }
+      });
+      return mappingChanged ? nextMapping : prevMapping;
+    });
   };
 
   const removeExtra = (header: string) => setExtras((prev) => {
