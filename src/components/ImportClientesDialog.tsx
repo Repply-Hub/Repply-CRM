@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
-import { MappingStep, sanitizeImportedRows } from '@/components/import/MappingStep';
+import { MappingStep, sanitizeImportedRows, type ExtraMappingValue } from '@/components/import/MappingStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
@@ -147,7 +147,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   });
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   // extras: column name (planilha) -> nome no sistema (campos_extras)
-  const [extras, setExtras] = useState<Record<string, string>>({});
+  const [extras, setExtras] = useState<Record<string, ExtraMappingValue>>({});
   // customColumns: nome → valor padrão (colunas criadas do zero, não vêm da planilha)
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
   const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
