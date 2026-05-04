@@ -300,28 +300,31 @@ export function MappingStep({
     setMapping((prev) => ({ ...prev, [fieldKey]: value === NONE ? '' : value }));
   };
 
-  const addExtra = (header: string) => {
-    setExtras((prev) => ({ ...prev, [header]: prev[header] || header }));
-    // Quando adicionado como extra, podemos definir se deve ser padrão nas configurações globais
-    // Mas aqui apenas garantimos que o mapeamento ocorra
+  const setFieldHeader = (fieldKey: string, value: string) => {
+    setMapping((prev) => ({ ...prev, [fieldKey]: value === NONE ? '' : value }));
   };
+
+  const addExtra = (header: string) => {
+    setExtras((prev) => ({ ...prev, [header]: header }));
+  };
+
   const removeExtra = (header: string) => setExtras((prev) => {
     const next = { ...prev };
     delete next[header];
     return next;
   });
 
-  const toggleAllExtras = () => {
-    if (unmappedHeaders.length === 0) {
-      // Se não há nenhum unmapped, talvez o usuário queira remover todos os extras
-      setExtras({});
-    } else {
-      const nextExtras = { ...extras };
-      unmappedHeaders.forEach(h => {
-        nextExtras[h] = h;
-      });
-      setExtras(nextExtras);
-    }
+  const handleExtraHeaderChange = (oldHeader: string, newHeader: string) => {
+    if (oldHeader === newHeader) return;
+    setExtras(prev => {
+      const next = { ...prev };
+      const currentName = next[oldHeader];
+      delete next[oldHeader];
+      if (newHeader !== NONE) {
+        next[newHeader] = currentName;
+      }
+      return next;
+    });
   };
 
   const handleContinue = () => {
@@ -569,13 +572,43 @@ export function MappingStep({
                     </div>
                   </div>
 
-                  <div className="flex items-center h-9 px-3 rounded-md border border-accent/20 bg-accent/10 text-xs text-accent-foreground font-medium">
-                    <Sparkles className="h-3.5 w-3.5 mr-2 opacity-70" />
-                    <span className="truncate">{header}</span>
-                  </div>
+                  <Select 
+                    value={header || NONE} 
+                    onValueChange={(value) => handleExtraHeaderChange(header, value)}
+                  >
+                    <SelectTrigger className={cn('h-9 text-xs border-accent/40 bg-accent/5')}>
+                      <SelectValue placeholder="Selecione o cabeçalho" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[320px]" position="popper">
+                      <SelectItem value={NONE} className="text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <EyeOff className="h-3 w-3" /> 
+                          Não importar
+                        </span>
+                      </SelectItem>
+                      {headers.map((h) => {
+                        const inUseByOther = (usedHeaders.has(h) || Object.keys(extras).includes(h)) && header !== h;
+                        return (
+                          <SelectItem key={h} value={h}>
+                            <span className="flex items-center gap-2 max-w-[280px]">
+                              <span className="truncate">{h}</span>
+                              {inUseByOther && <span className="text-[10px] text-muted-foreground italic shrink-0">em uso</span>}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
 
-                  <div className="flex items-center h-9 text-xs text-muted-foreground italic px-3">
-                    Dinâmico
+                  <div>
+                    <Select value="Padrão" disabled>
+                      <SelectTrigger className="h-9 text-xs bg-muted/20">
+                        <SelectValue placeholder="Padrão" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Padrão">Padrão</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="min-w-0 rounded-md border border-accent/20 bg-accent/5 px-3 py-2 text-xs relative">
@@ -608,14 +641,20 @@ export function MappingStep({
           <div className="px-4 py-2 bg-muted/40 border-b flex items-center justify-between">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Cabeçalhos da Planilha</div>
-              <div className="text-[11px] text-muted-foreground">Adicione como campo extra ou renomeie os já mapeados.</div>
+              <div className="text-[11px] text-muted-foreground">Adicione como campo extra para importar dados adicionais.</div>
             </div>
             {unmappedHeaders.length > 0 && (
               <Button 
                 variant="ghost" 
                 size="sm" 
                 className="h-7 text-[10px] font-bold uppercase"
-                onClick={toggleAllExtras}
+                onClick={() => {
+                  const nextExtras = { ...extras };
+                  unmappedHeaders.forEach(h => {
+                    nextExtras[h] = h;
+                  });
+                  setExtras(nextExtras);
+                }}
               >
                 Mapear todos como extras
               </Button>
