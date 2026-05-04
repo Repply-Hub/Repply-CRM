@@ -271,8 +271,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     [filtered, page, pageSize]
   );
   const tableVisibleColumns = useMemo(() => {
-    const withoutLegacy = visibleColumns.filter(id => !LEGACY_CARD_FIELDS.includes(id));
-    return withoutLegacy.includes('negocio') ? withoutLegacy : ['negocio', ...withoutLegacy];
+    return visibleColumns;
   }, [visibleColumns]);
   const visibleColumnCount = Math.max(
     1,
