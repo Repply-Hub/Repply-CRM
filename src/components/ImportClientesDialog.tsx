@@ -184,12 +184,19 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const saveAsDefault = () => {
+  const saveAsDefault = (active: boolean) => {
+    setIsAutoSaveEnabled(active);
     const key = `import_clientes_${target}_`;
-    localStorage.setItem(`${key}mapping`, JSON.stringify(mapping));
-    localStorage.setItem(`${key}defaults`, JSON.stringify(fieldDefaultValues));
-    localStorage.setItem(`${key}custom`, JSON.stringify(customColumns));
-    toast.success('Mapeamento e valores padrões salvos para futuras importações!');
+    localStorage.setItem(`${key}autosave`, String(active));
+    
+    if (active) {
+      localStorage.setItem(`${key}mapping`, JSON.stringify(mapping));
+      localStorage.setItem(`${key}defaults`, JSON.stringify(fieldDefaultValues));
+      localStorage.setItem(`${key}custom`, JSON.stringify(customColumns));
+      toast.success('Mapeamento e valores padrões serão salvos automaticamente.');
+    } else {
+      toast.info('Alterações não serão salvas como padrão.');
+    }
   };
 
   const handleFile = async (file: File) => {
