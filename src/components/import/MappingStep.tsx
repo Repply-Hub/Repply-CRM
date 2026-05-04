@@ -863,11 +863,14 @@ export function MappingStep({
                   Personalizar Nomes das Colunas Extras
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.entries(extras).map(([header, name]) => (
+                  {Object.entries(extras).map(([header, value]) => {
+                    const name = getExtraDisplayName(header, value);
+                    const extraHeaders = getExtraHeaders(header, value);
+                    return (
                     <div key={header} className="flex flex-col gap-1.5 p-3 rounded-lg border bg-accent/5 border-accent/20">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[10px] font-mono text-muted-foreground truncate" title={`Origem: ${header}`}>
-                          Origem: {header}
+                          Origem: {extraHeaders.join(' + ')}
                         </span>
                         <button 
                           onClick={() => removeExtra(header)}
@@ -883,7 +886,8 @@ export function MappingStep({
                         className="h-8 text-xs bg-background"
                       />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
