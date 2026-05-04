@@ -300,12 +300,29 @@ export function MappingStep({
     setMapping((prev) => ({ ...prev, [fieldKey]: value === NONE ? '' : value }));
   };
 
-  const addExtra = (header: string) => setExtras((prev) => ({ ...prev, [header]: prev[header] || header }));
+  const addExtra = (header: string) => {
+    setExtras((prev) => ({ ...prev, [header]: prev[header] || header }));
+    // Quando adicionado como extra, podemos definir se deve ser padrão nas configurações globais
+    // Mas aqui apenas garantimos que o mapeamento ocorra
+  };
   const removeExtra = (header: string) => setExtras((prev) => {
     const next = { ...prev };
     delete next[header];
     return next;
   });
+
+  const toggleAllExtras = () => {
+    if (unmappedHeaders.length === 0) {
+      // Se não há nenhum unmapped, talvez o usuário queira remover todos os extras
+      setExtras({});
+    } else {
+      const nextExtras = { ...extras };
+      unmappedHeaders.forEach(h => {
+        nextExtras[h] = h;
+      });
+      setExtras(nextExtras);
+    }
+  };
 
   const handleContinue = () => {
     const payload = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues });
@@ -589,9 +606,19 @@ export function MappingStep({
 
         {unmappedHeaders.length > 0 && (
           <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="px-4 py-2 bg-muted/40 border-b">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Cabeçalhos não usados</div>
-              <div className="text-[11px] text-muted-foreground">Clique para adicionar como campo extra.</div>
+            <div className="px-4 py-2 bg-muted/40 border-b flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Cabeçalhos não usados</div>
+                <div className="text-[11px] text-muted-foreground">Clique para adicionar como campo extra (será visível na página de Negócios).</div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 text-[10px] font-bold uppercase"
+                onClick={toggleAllExtras}
+              >
+                {unmappedHeaders.length > 0 ? "Mapear todos como extras" : "Remover todos os extras"}
+              </Button>
             </div>
             <div className="p-3 flex flex-wrap gap-2">
               {unmappedHeaders.map((header) => {
