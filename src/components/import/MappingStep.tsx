@@ -550,6 +550,7 @@ export function MappingStep({
                 </div>
               );
             })}
+              </div>
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
