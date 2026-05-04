@@ -243,6 +243,10 @@ interface Props {
   setExtras: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   customColumns?: Record<string, string>;
   setCustomColumns?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  customColumns?: Record<string, string>;
+  setCustomColumns?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  fieldLabels?: Record<string, string>;
+  setFieldLabels?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   visibleFields: FieldDef[];
   onReset: () => void;
   onAutoDetect: () => void;
@@ -255,7 +259,7 @@ interface Props {
 
 export function MappingStep({
   fileName, rawData, headers, mapping, setMapping, fieldDefaultValues = {}, setFieldDefaultValues, extras, setExtras,
-  customColumns = {}, setCustomColumns, visibleFields,
+  customColumns = {}, setCustomColumns, fieldLabels = {}, setFieldLabels, visibleFields,
   onReset, onAutoDetect, onClearAll, onSaveAsDefault, isAutoSaveEnabled = false, canProceed, onNext,
 }: Props) {
   const [search, setSearch] = useState('');
