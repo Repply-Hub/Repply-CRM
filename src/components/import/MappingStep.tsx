@@ -338,9 +338,9 @@ export function MappingStep({
       else if (typeof v === 'string' && v) used.add(v);
     });
     Object.keys(extras).forEach(k => {
+      if (typeof k === 'string' && k) used.add(k);
       const v = extras[k];
       if (Array.isArray(v)) v.forEach(h => { if (typeof h === 'string') used.add(h); });
-      else if (typeof k === 'string') used.add(k);
     });
     return used;
   }, [mapping, extras]);
@@ -384,14 +384,50 @@ export function MappingStep({
       if (isMulti) {
         const currentHeaders = Array.isArray(current) ? [...current] : (current ? [current] : []);
         if (currentHeaders.includes(header)) {
-          // Remove se já estiver lá
+          // Remove if already there
           const filtered = currentHeaders.filter(h => h !== header);
           return { ...prev, [fieldKey]: filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? '' : filtered) };
         } else {
-          // Adiciona se não estiver lá
-          return { ...prev, [fieldKey]: [...currentHeaders, header] };
+          // Add if not there
+          const nextMapping = { ...prev, [fieldKey]: [...currentHeaders, header] };
+          
+          // Se o cabeçalho estiver nos extras, remove de lá para evitar duplicidade
+          setExtras(prevExtras => {
+            if (prevExtras[header] !== undefined) {
+              const nextExtras = { ...prevExtras };
+              delete nextExtras[header];
+              return nextExtras;
+            }
+            // Também verifica se o cabeçalho está dentro de um array de outro extra
+            let extraChanged = false;
+            const nextExtras = { ...prevExtras };
+            Object.entries(nextExtras).forEach(([key, val]) => {
+              if (Array.isArray(val) && val.includes(header)) {
+                const filtered = val.filter(h => h !== header);
+                if (filtered.length <= 1) {
+                  nextExtras[key] = filtered[0] || key;
+                } else {
+                  nextExtras[key] = filtered;
+                }
+                extraChanged = true;
+              }
+            });
+            return extraChanged ? nextExtras : prevExtras;
+          });
+          
+          return nextMapping;
         }
       }
+      
+      // Mapeamento simples: remove do extras se existir
+      setExtras(prevExtras => {
+        if (prevExtras[header] !== undefined) {
+          const nextExtras = { ...prevExtras };
+          delete nextExtras[header];
+          return nextExtras;
+        }
+        return prevExtras;
+      });
       
       return { ...prev, [fieldKey]: header };
     });
@@ -399,6 +435,22 @@ export function MappingStep({
 
   const addExtra = (header: string) => {
     setExtras((prev) => ({ ...prev, [header]: header }));
+    // Remove o cabeçalho de qualquer mapeamento de campo do schema
+    setMapping(prevMapping => {
+      let mappingChanged = false;
+      const nextMapping = { ...prevMapping };
+      Object.entries(nextMapping).forEach(([key, val]) => {
+        if (Array.isArray(val) && val.includes(header)) {
+          const filtered = val.filter(h => h !== header);
+          nextMapping[key] = filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? '' : filtered);
+          mappingChanged = true;
+        } else if (val === header) {
+          nextMapping[key] = '';
+          mappingChanged = true;
+        }
+      });
+      return mappingChanged ? nextMapping : prevMapping;
+    });
   };
 
   const removeExtra = (header: string) => setExtras((prev) => {
@@ -419,23 +471,69 @@ export function MappingStep({
       }
 
       if (isMulti) {
-        const currentHeaders = Array.isArray(currentVal) ? currentVal : (typeof currentVal === 'string' ? [oldKey] : []);
+        // Se já for um array, usa ele. Se for string, inicia um array com a chave original (que é o header inicial)
+        const currentHeaders = Array.isArray(currentVal) ? [...currentVal] : [oldKey];
+        
         if (currentHeaders.includes(newHeader)) {
+          // Remove se já estiver lá
           const filtered = currentHeaders.filter(h => h !== newHeader);
-          if (filtered.length === 0) {
-            delete next[oldKey];
+          if (filtered.length <= 1) {
+            // Se sobrar apenas 1, volta a ser string simples
+            next[oldKey] = filtered[0] || oldKey;
           } else {
             next[oldKey] = filtered;
           }
         } else {
+          // Adiciona se não estiver lá
           next[oldKey] = [...currentHeaders, newHeader];
+          
+          // Remove o novo header da raiz dos extras se ele existir lá como chave individual
+          if (next[newHeader] !== undefined) {
+            delete next[newHeader];
+          }
+
+          // TAMBÉM remove de qualquer mapeamento do schema
+          setMapping(prevMapping => {
+            let mappingChanged = false;
+            const nextMapping = { ...prevMapping };
+            Object.entries(nextMapping).forEach(([key, val]) => {
+              if (Array.isArray(val) && val.includes(newHeader)) {
+                const filtered = val.filter(h => h !== newHeader);
+                nextMapping[key] = filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? '' : filtered);
+                mappingChanged = true;
+              } else if (val === newHeader) {
+                nextMapping[key] = '';
+                mappingChanged = true;
+              }
+            });
+            return mappingChanged ? nextMapping : prevMapping;
+          });
         }
         return next;
       }
 
       const val = next[oldKey];
       delete next[oldKey];
-      next[newHeader] = typeof val === 'string' ? val : (Array.isArray(val) ? val[0] : newHeader);
+      
+      // Ao mudar o header principal de um extra, remove do mapping do schema se necessário
+      setMapping(prevMapping => {
+        let mappingChanged = false;
+        const nextMapping = { ...prevMapping };
+        Object.entries(nextMapping).forEach(([key, v]) => {
+          if (Array.isArray(v) && v.includes(newHeader)) {
+            const filtered = v.filter(h => h !== newHeader);
+            nextMapping[key] = filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? '' : filtered);
+            mappingChanged = true;
+          } else if (v === newHeader) {
+            nextMapping[key] = '';
+            mappingChanged = true;
+          }
+        });
+        return mappingChanged ? nextMapping : prevMapping;
+      });
+
+      // Ao mudar o header principal de um extra, mantemos o mapeamento (seja string ou array)
+      next[newHeader] = val !== undefined ? val : newHeader;
       return next;
     });
   };
