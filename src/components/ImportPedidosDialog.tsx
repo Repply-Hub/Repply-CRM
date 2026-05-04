@@ -268,6 +268,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             headers={headers}
             mapping={mapping}
             setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
+            fieldDefaultValues={fieldDefaultValues}
+            setFieldDefaultValues={setFieldDefaultValues}
             extras={extras}
             setExtras={setExtras}
             customColumns={customColumns}
@@ -275,7 +277,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             visibleFields={VISIBLE_FIELDS}
             onReset={reset}
             onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
-            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); }}
+            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
+            onSaveAsDefault={saveAsDefault}
             canProceed={canProceedToPreview}
             onNext={() => {
               const mapped = getMappedRows();
