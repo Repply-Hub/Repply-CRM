@@ -33,6 +33,7 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   const [extras, setExtras] = useState<Record<string, string>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
@@ -49,12 +50,20 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
     setRawData([]);
     setHeaders([]);
     setMapping({});
+    setFieldDefaultValues({});
     setExtras({});
     setCustomColumns({});
     setFileName('');
     setSelectedFabricanteId('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const saveAsDefault = () => {
+    localStorage.setItem('import_catalogo_mapping', JSON.stringify(mapping));
+    localStorage.setItem('import_catalogo_defaults', JSON.stringify(fieldDefaultValues));
+    localStorage.setItem('import_catalogo_custom', JSON.stringify(customColumns));
+    toast.success('Configurações de importação salvas como padrão!');
   };
 
   const handleFile = async (file: File) => {
@@ -77,6 +86,25 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
 
       const autoMap = detectFuzzyMapping(cols, VISIBLE_FIELDS);
       setMapping(autoMap);
+      setFieldDefaultValues({});
+      setExtras({});
+      setCustomColumns({});
+
+      const savedMapping = localStorage.getItem('import_catalogo_mapping');
+      const savedDefaults = localStorage.getItem('import_catalogo_defaults');
+      const savedCustom = localStorage.getItem('import_catalogo_custom');
+
+      if (savedMapping) {
+        const parsed = JSON.parse(savedMapping);
+        const mergedMapping = { ...autoMap };
+        Object.entries(parsed).forEach(([k, v]) => {
+          if (v && cols.includes(v as string)) mergedMapping[k] = v as string;
+        });
+        setMapping(mergedMapping);
+      }
+      if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
+      if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
+
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento.`);
     } catch (err: any) {
@@ -98,7 +126,8 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
       fields: VISIBLE_FIELDS, 
       mapping, 
       extras, 
-      customColumns 
+      customColumns,
+      fieldDefaultValues
     });
     
     const recordsByFab: Record<string, any[]> = {};
@@ -226,6 +255,8 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
               headers={headers}
               mapping={mapping}
               setMapping={setMapping as any}
+              fieldDefaultValues={fieldDefaultValues}
+              setFieldDefaultValues={setFieldDefaultValues}
               extras={extras}
               setExtras={setExtras}
               customColumns={customColumns}
@@ -233,7 +264,8 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
               visibleFields={VISIBLE_FIELDS}
               onReset={reset}
               onAutoDetect={() => { setMapping(detectFuzzyMapping(headers, VISIBLE_FIELDS)); setExtras({}); }}
-              onClearAll={() => { setMapping({}); setExtras({}); setCustomColumns({}); }}
+              onClearAll={() => { setMapping({}); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
+              onSaveAsDefault={saveAsDefault}
               canProceed={canProceedToPreview}
               onNext={() => setStep('preview')}
             />

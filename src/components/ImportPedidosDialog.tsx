@@ -32,6 +32,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, string>>(createEmptyMapping());
+  const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   const [extras, setExtras] = useState<Record<string, string>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
   const [fileName, setFileName] = useState('');
@@ -44,11 +45,29 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setRawData([]);
     setHeaders([]);
     setMapping(createEmptyMapping());
+    setFieldDefaultValues({});
     setExtras({});
     setCustomColumns({});
     setFileName('');
     setStep('upload');
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const saveAsDefault = () => {
+    localStorage.setItem('import_pedidos_mapping', JSON.stringify(mapping));
+    localStorage.setItem('import_pedidos_defaults', JSON.stringify(fieldDefaultValues));
+    localStorage.setItem('import_pedidos_custom', JSON.stringify(customColumns));
+    toast.success('Mapeamento e valores padrões salvos para futuras importações!');
+  };
+
+  const loadDefaults = () => {
+    const savedMapping = localStorage.getItem('import_pedidos_mapping');
+    const savedDefaults = localStorage.getItem('import_pedidos_defaults');
+    const savedCustom = localStorage.getItem('import_pedidos_custom');
+    
+    if (savedMapping) setMapping(JSON.parse(savedMapping));
+    if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
+    if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
   };
 
   const handleFile = async (file: File) => {
@@ -73,6 +92,28 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       setMapping(autoMap);
       setExtras({});
       setCustomColumns({});
+      setFieldDefaultValues({});
+      
+      // Carregar padrões salvos se existirem
+      const savedMapping = localStorage.getItem('import_pedidos_mapping');
+      const savedDefaults = localStorage.getItem('import_pedidos_defaults');
+      const savedCustom = localStorage.getItem('import_pedidos_custom');
+      
+      if (savedMapping) {
+        const parsed = JSON.parse(savedMapping);
+        // Só aplica se as colunas existirem no arquivo atual
+        const mergedMapping = { ...autoMap };
+        Object.entries(parsed).forEach(([key, val]) => {
+          if (val && cols.includes(val as string)) {
+            mergedMapping[key as FieldKey] = val as string;
+          }
+        });
+        setMapping(mergedMapping);
+      }
+      
+      if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
+      if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
+
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
@@ -89,7 +130,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const canProceedToPreview = Boolean(mapping.cliente || mapping.fabricante);
 
   const getMappedRows = () => getImportedPedidosRows(
-    sanitizeImportedRows({ rawData, fields: VISIBLE_FIELDS, mapping, extras, customColumns }),
+    sanitizeImportedRows({ rawData, fields: VISIBLE_FIELDS, mapping, extras, customColumns, fieldDefaultValues }),
     Object.fromEntries(VISIBLE_FIELDS.map((field) => [field.key, field.key])) as Record<FieldKey, string>,
   );
 
@@ -227,6 +268,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             headers={headers}
             mapping={mapping}
             setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
+            fieldDefaultValues={fieldDefaultValues}
+            setFieldDefaultValues={setFieldDefaultValues}
             extras={extras}
             setExtras={setExtras}
             customColumns={customColumns}
@@ -234,7 +277,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             visibleFields={VISIBLE_FIELDS}
             onReset={reset}
             onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
-            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); }}
+            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
+            onSaveAsDefault={saveAsDefault}
             canProceed={canProceedToPreview}
             onNext={() => {
               const mapped = getMappedRows();

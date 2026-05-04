@@ -145,6 +145,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     nome_contato: '', sobrenome_contato: '', cargo: '',
     classificacao: '', data_criacao: '',
   });
+  const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   // extras: column name (planilha) -> nome no sistema (campos_extras)
   const [extras, setExtras] = useState<Record<string, string>>({});
   // customColumns: nome → valor padrão (colunas criadas do zero, não vêm da planilha)
@@ -171,12 +172,21 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       nome_contato: '', sobrenome_contato: '', cargo: '',
       classificacao: '', data_criacao: '',
     });
+    setFieldDefaultValues({});
     setExtras({});
     setCustomColumns({});
     setFileName('');
     setStep('upload');
     setPreviewRowsSnapshot([]);
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const saveAsDefault = () => {
+    const key = `import_clientes_${target}_`;
+    localStorage.setItem(`${key}mapping`, JSON.stringify(mapping));
+    localStorage.setItem(`${key}defaults`, JSON.stringify(fieldDefaultValues));
+    localStorage.setItem(`${key}custom`, JSON.stringify(customColumns));
+    toast.success('Mapeamento e valores padrões salvos para futuras importações!');
   };
 
   const handleFile = async (file: File) => {
@@ -201,6 +211,27 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       setMapping(auto);
       setExtras(autoDetectExtras(cols, Object.values(auto).filter(Boolean)));
       setCustomColumns({});
+      setFieldDefaultValues({});
+
+      const key = `import_clientes_${target}_`;
+      const savedMapping = localStorage.getItem(`${key}mapping`);
+      const savedDefaults = localStorage.getItem(`${key}defaults`);
+      const savedCustom = localStorage.getItem(`${key}custom`);
+
+      if (savedMapping) {
+        const parsed = JSON.parse(savedMapping);
+        const mergedMapping = { ...auto };
+        Object.entries(parsed).forEach(([k, v]) => {
+          if (v && cols.includes(v as string)) {
+            mergedMapping[k as FieldKey] = v as string;
+          }
+        });
+        setMapping(mergedMapping);
+      }
+
+      if (savedDefaults) setFieldDefaultValues(JSON.parse(savedDefaults));
+      if (savedCustom) setCustomColumns(JSON.parse(savedCustom));
+
       setStep('mapping');
       toast.success(`${json.length} linhas lidas. Confira o mapeamento de colunas.`);
     } catch (err: any) {
@@ -271,7 +302,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     return result;
   };
 
-  const getMappedRowsBase = (sanitizedRows = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns })) => {
+  const getMappedRowsBase = (sanitizedRows = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues })) => {
     return sanitizedRows
       .map(row => {
         const get = (k: FieldKey) => (row[k] ?? '').toString().trim();
@@ -546,6 +577,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             headers={headers}
             mapping={mapping}
             setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string>>>}
+            fieldDefaultValues={fieldDefaultValues}
+            setFieldDefaultValues={setFieldDefaultValues}
             extras={extras}
             setExtras={setExtras}
             customColumns={customColumns}
@@ -567,7 +600,9 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               });
               setExtras({});
               setCustomColumns({});
+              setFieldDefaultValues({});
             }}
+            onSaveAsDefault={saveAsDefault}
             canProceed={canProceed}
             onNext={(payload) => {
               const mapped = getMappedRows(payload);
