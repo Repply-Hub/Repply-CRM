@@ -338,9 +338,9 @@ export function MappingStep({
       else if (typeof v === 'string' && v) used.add(v);
     });
     Object.keys(extras).forEach(k => {
+      if (typeof k === 'string' && k) used.add(k);
       const v = extras[k];
       if (Array.isArray(v)) v.forEach(h => { if (typeof h === 'string') used.add(h); });
-      else if (typeof k === 'string') used.add(k);
     });
     return used;
   }, [mapping, extras]);
