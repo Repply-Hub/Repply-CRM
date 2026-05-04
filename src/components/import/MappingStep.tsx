@@ -384,14 +384,50 @@ export function MappingStep({
       if (isMulti) {
         const currentHeaders = Array.isArray(current) ? [...current] : (current ? [current] : []);
         if (currentHeaders.includes(header)) {
-          // Remove se já estiver lá
+          // Remove if already there
           const filtered = currentHeaders.filter(h => h !== header);
           return { ...prev, [fieldKey]: filtered.length === 1 ? filtered[0] : (filtered.length === 0 ? '' : filtered) };
         } else {
-          // Adiciona se não estiver lá
-          return { ...prev, [fieldKey]: [...currentHeaders, header] };
+          // Add if not there
+          const nextMapping = { ...prev, [fieldKey]: [...currentHeaders, header] };
+          
+          // Se o cabeçalho estiver nos extras, remove de lá para evitar duplicidade
+          setExtras(prevExtras => {
+            if (prevExtras[header] !== undefined) {
+              const nextExtras = { ...prevExtras };
+              delete nextExtras[header];
+              return nextExtras;
+            }
+            // Também verifica se o cabeçalho está dentro de um array de outro extra
+            let extraChanged = false;
+            const nextExtras = { ...prevExtras };
+            Object.entries(nextExtras).forEach(([key, val]) => {
+              if (Array.isArray(val) && val.includes(header)) {
+                const filtered = val.filter(h => h !== header);
+                if (filtered.length <= 1) {
+                  nextExtras[key] = filtered[0] || key;
+                } else {
+                  nextExtras[key] = filtered;
+                }
+                extraChanged = true;
+              }
+            });
+            return extraChanged ? nextExtras : prevExtras;
+          });
+          
+          return nextMapping;
         }
       }
+      
+      // Mapeamento simples: remove do extras se existir
+      setExtras(prevExtras => {
+        if (prevExtras[header] !== undefined) {
+          const nextExtras = { ...prevExtras };
+          delete nextExtras[header];
+          return nextExtras;
+        }
+        return prevExtras;
+      });
       
       return { ...prev, [fieldKey]: header };
     });
