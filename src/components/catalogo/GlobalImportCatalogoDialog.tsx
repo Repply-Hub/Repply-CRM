@@ -32,7 +32,7 @@ interface Props {
 export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteChange }: Props) {
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
-  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [mapping, setMapping] = useState<Record<string, string | string[]>>({});
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   const [extras, setExtras] = useState<Record<string, ExtraMappingValue>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
