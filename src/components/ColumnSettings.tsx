@@ -104,6 +104,9 @@ export function ColumnSettings({
     const [isSavingPreset, setIsSavingPreset] = React.useState(false);
 
     const toggleColumn = (columnId: string) => {
+        const column = columns.find(c => c.id === columnId);
+        if (column?.locked) return;
+
         if (visibleColumns.includes(columnId)) {
             if (visibleColumns.length > 1) {
                 onChange(visibleColumns.filter(id => id !== columnId));
