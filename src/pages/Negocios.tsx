@@ -124,32 +124,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     return visibleColumns;
   }, [visibleColumns]);
 
-  const allAvailableColumns = useMemo(() => {
-    const baseColumns = [...columns];
-    
-    // Add columns from campos_extras if they exist in any order
-    const extraKeys = new Set<string>();
-    pedidos?.forEach(p => {
-      if (p.campos_extras) {
-        Object.keys(p.campos_extras).forEach(key => extraKeys.add(key));
-      }
-    });
-
-    extraKeys.forEach(key => {
-      // Evita duplicar colunas que já existem (base ou customizadas salvas)
-      if (!baseColumns.find(c => c.id === key)) {
-        baseColumns.push({
-          id: key,
-          label: key,
-          isCustom: true,
-          type: 'text',
-          customLabel: key
-        });
-      }
-    });
-
-    return baseColumns;
-  }, [columns, pedidos]);
+  const allAvailableColumns = columns;
 
   // Sincronização automática de colunas removida para evitar criação de colunas indesejadas (ex: endereço obra_1).
   // Os usuários podem adicionar colunas extras manualmente através das configurações de colunas.
