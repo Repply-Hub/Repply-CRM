@@ -168,6 +168,30 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       if (!vid) throw new Error('Vendedor não encontrado');
 
+      // Identificar colunas que serão campos extras para salvar como colunas padrão na página de Negócios
+      const extraColumnNames = [
+        ...Object.entries(extras).map(([_, name]) => name.trim()),
+        ...Object.keys(customColumns).map(name => name.trim())
+      ].filter(Boolean);
+
+      if (extraColumnNames.length > 0) {
+        const savedAllColumns = localStorage.getItem('pedidos_all_columns');
+        let currentColumns = savedAllColumns ? JSON.parse(savedAllColumns) : [];
+        let hasChanges = false;
+
+        extraColumnNames.forEach(name => {
+          if (!currentColumns.find((c: any) => c.label === name || c.id === name)) {
+            const id = `custom_${name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+            currentColumns.push({ id, label: name, isCustom: true, type: 'text' });
+            hasChanges = true;
+          }
+        });
+
+        if (hasChanges) {
+          localStorage.setItem('pedidos_all_columns', JSON.stringify(currentColumns));
+        }
+      }
+
       const { data: clientes } = await supabase.from('clientes').select('id, empresa');
       const { data: fabricantes } = await supabase.from('fabricantes').select('id, nome');
 
