@@ -585,7 +585,7 @@ export function MappingStep({
                         <SelectItem 
                           value={NONE} 
                           className="text-muted-foreground"
-                          disabled={['cliente', 'obra', 'fabricante', 'valor'].includes(field.key)}
+                          disabled={['cliente', 'fabricante', 'valor'].includes(field.key)}
                         >
                           <span className="flex items-center gap-1.5">
                             <EyeOff className="h-3 w-3" /> 
