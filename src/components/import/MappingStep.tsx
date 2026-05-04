@@ -609,7 +609,7 @@ export function MappingStep({
             <div className="px-4 py-2 bg-muted/40 border-b flex items-center justify-between">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Cabeçalhos não usados</div>
-                <div className="text-[11px] text-muted-foreground">Clique para adicionar como campo extra (será visível na página de Negócios).</div>
+                <div className="text-[11px] text-muted-foreground">Clique para adicionar como campo extra ou renomeie abaixo se já estiver mapeado.</div>
               </div>
               <Button 
                 variant="ghost" 
@@ -620,21 +620,52 @@ export function MappingStep({
                 {unmappedHeaders.length > 0 ? "Mapear todos como extras" : "Remover todos os extras"}
               </Button>
             </div>
-            <div className="p-3 flex flex-wrap gap-2">
-              {unmappedHeaders.map((header) => {
-                const active = header in extras;
-                return (
+            <div className="p-4 flex flex-col gap-4">
+              <div className="flex flex-wrap gap-2">
+                {unmappedHeaders.map((header) => (
                   <button
                     key={header}
                     type="button"
-                    onClick={() => active ? removeExtra(header) : addExtra(header)}
-                    className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors', active ? 'bg-accent text-accent-foreground border-accent' : 'bg-background text-muted-foreground border-border hover:bg-muted')}
+                    onClick={() => addExtra(header)}
+                    className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs bg-background text-muted-foreground border-border hover:bg-muted transition-colors"
                   >
-                    {active ? <CheckCircle2 className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                    <Plus className="h-3 w-3" />
                     {header}
                   </button>
-                );
-              })}
+                ))}
+              </div>
+
+              {Object.keys(extras).length > 0 && (
+                <div className="space-y-3 pt-2 border-t border-border/40">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-accent flex items-center gap-1.5">
+                    <Sparkles className="h-3 w-3" />
+                    Personalizar Nomes das Colunas Extras
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Object.entries(extras).map(([header, name]) => (
+                      <div key={header} className="flex flex-col gap-1.5 p-3 rounded-lg border bg-accent/5 border-accent/20">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-mono text-muted-foreground truncate" title={`Origem: ${header}`}>
+                            Origem: {header}
+                          </span>
+                          <button 
+                            onClick={() => removeExtra(header)}
+                            className="text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <Input
+                          value={name}
+                          placeholder="Nome na visualização..."
+                          onChange={(e) => setExtras(prev => ({ ...prev, [header]: e.target.value }))}
+                          className="h-8 text-xs bg-background"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
