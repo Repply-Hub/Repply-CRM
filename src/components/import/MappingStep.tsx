@@ -409,14 +409,15 @@ export function MappingStep({
           <Input placeholder="Buscar campo do schema..." value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9 h-9" />
         </div>
 
-        <div className="rounded-xl border bg-card overflow-hidden">
-          <div className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>Campo do schema</span>
-            <span>Cabeçalho da planilha</span>
-            <span>Valor padrão</span>
-            <span>Prévia sanitizada</span>
-          </div>
-          <div className="divide-y">
+        <div className="rounded-xl border bg-card overflow-x-auto">
+          <div className="min-w-[800px]">
+            <div className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span>Campo do schema</span>
+              <span>Cabeçalho da planilha</span>
+              <span>Valor padrão</span>
+              <span>Prévia sanitizada</span>
+            </div>
+            <div className="divide-y">
             {filteredFields.map((field) => {
               const selectedHeader = mapping[field.key] || '';
               const defaultValue = fieldDefaultValues[field.key] || '';
@@ -426,7 +427,7 @@ export function MappingStep({
               const score = selectedHeader ? fuzzyScore(field, selectedHeader) : 0;
               
               return (
-                <div key={field.key} className="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-3 md:gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
+                <div key={field.key} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm font-semibold text-foreground truncate">{field.label}</span>
@@ -501,7 +502,7 @@ export function MappingStep({
               const sanitizedSample = sanitizeFieldValue(rawSample, 'text');
               
               return (
-                <div key={header} className="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-3 md:gap-4 px-4 py-3 hover:bg-accent/5 transition-colors bg-accent/5 animate-in fade-in slide-in-from-top-1 border-t border-accent/10">
+                <div key={header} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-4 px-4 py-3 hover:bg-accent/5 transition-colors bg-accent/5 animate-in fade-in slide-in-from-top-1 border-t border-accent/10">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <Input
@@ -549,6 +550,7 @@ export function MappingStep({
             })}
           </div>
         </div>
+      </div>
 
         {unmappedHeaders.length > 0 && (
           <div className="rounded-xl border bg-card overflow-hidden">
