@@ -241,7 +241,8 @@ interface Props {
   onReset: () => void;
   onAutoDetect: () => void;
   onClearAll: () => void;
-  onSaveAsDefault?: () => void;
+  onSaveAsDefault?: (active: boolean) => void;
+  isAutoSaveEnabled?: boolean;
   canProceed: boolean;
   onNext: (payload?: Record<string, unknown>[]) => void;
 }
@@ -249,7 +250,7 @@ interface Props {
 export function MappingStep({
   fileName, rawData, headers, mapping, setMapping, fieldDefaultValues = {}, setFieldDefaultValues, extras, setExtras,
   customColumns = {}, setCustomColumns, visibleFields,
-  onReset, onAutoDetect, onClearAll, onSaveAsDefault, canProceed, onNext,
+  onReset, onAutoDetect, onClearAll, onSaveAsDefault, isAutoSaveEnabled = false, canProceed, onNext,
 }: Props) {
   const [search, setSearch] = useState('');
 
