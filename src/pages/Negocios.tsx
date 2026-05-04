@@ -273,6 +273,32 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const tableVisibleColumns = useMemo(() => {
     return visibleColumns;
   }, [visibleColumns]);
+
+  const allAvailableColumns = useMemo(() => {
+    const baseColumns = [...columns];
+    
+    // Add columns from campos_extras if they exist in any order
+    const extraKeys = new Set<string>();
+    pedidos?.forEach(p => {
+      if (p.campos_extras) {
+        Object.keys(p.campos_extras).forEach(key => extraKeys.add(key));
+      }
+    });
+
+    extraKeys.forEach(key => {
+      if (!baseColumns.find(c => c.id === key)) {
+        baseColumns.push({
+          id: key,
+          label: key,
+          isCustom: true,
+          type: 'text'
+        });
+      }
+    });
+
+    return baseColumns;
+  }, [columns, pedidos]);
+
   const visibleColumnCount = Math.max(
     1,
     tableVisibleColumns.filter(id => id !== 'acoes').length + (tableVisibleColumns.includes('acoes') ? 2 : 0) + 1
