@@ -613,6 +613,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               setFieldDefaultValues({});
             }}
             onSaveAsDefault={saveAsDefault}
+            isAutoSaveEnabled={isAutoSaveEnabled}
             canProceed={canProceed}
             onNext={(payload) => {
               const mapped = getMappedRows(payload);
