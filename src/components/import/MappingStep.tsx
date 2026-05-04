@@ -169,14 +169,23 @@ export function sanitizeImportedRows(params: {
   mapping: Record<string, string>;
   extras?: Record<string, string>;
   customColumns?: Record<string, string>;
+  fieldDefaultValues?: Record<string, string>;
 }) {
-  const { rawData, fields, mapping, extras = {}, customColumns = {} } = params;
+  const { rawData, fields, mapping, extras = {}, customColumns = {}, fieldDefaultValues = {} } = params;
   return rawData.map((row) => {
     const payload: Record<string, unknown> = {};
     fields.forEach((field) => {
       const header = mapping[field.key];
-      if (!header) return;
-      const sanitized = sanitizeFieldValue(row[header], getFieldType(field));
+      const defaultValue = fieldDefaultValues[field.key];
+      
+      let rawValue = header ? row[header] : undefined;
+      
+      // Se não tem valor da planilha ou o cabeçalho não foi mapeado, usa o valor padrão se existir
+      if ((rawValue === undefined || rawValue === null || rawValue === '') && defaultValue !== undefined) {
+        rawValue = defaultValue;
+      }
+
+      const sanitized = sanitizeFieldValue(rawValue, getFieldType(field));
       if (sanitized !== undefined && sanitized !== '') payload[field.key] = sanitized;
     });
 
