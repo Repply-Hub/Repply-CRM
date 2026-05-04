@@ -151,32 +151,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     return baseColumns;
   }, [columns, pedidos]);
 
-  // Sincroniza as colunas descobertas com o estado persistente do hook
-  useEffect(() => {
-    if (!pedidos || pedidos.length === 0) return;
-    
-    const extraKeys = new Set<string>();
-    pedidos.forEach(p => {
-      if (p.campos_extras) {
-        Object.keys(p.campos_extras).forEach(key => extraKeys.add(key));
-      }
-    });
-
-    let hasNew = false;
-    extraKeys.forEach(key => {
-      if (!columns.find(c => c.id === key)) {
-        hasNew = true;
-      }
-    });
-
-    if (hasNew) {
-      extraKeys.forEach(key => {
-        if (!columns.find(c => c.id === key)) {
-          handleAddColumn(key, 'text');
-        }
-      });
-    }
-  }, [pedidos, columns, handleAddColumn]);
+  // Sincronização automática de colunas removida para evitar criação de colunas indesejadas (ex: endereço obra_1).
+  // Os usuários podem adicionar colunas extras manualmente através das configurações de colunas.
 
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
 
