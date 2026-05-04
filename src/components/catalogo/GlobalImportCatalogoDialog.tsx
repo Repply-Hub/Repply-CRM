@@ -62,11 +62,18 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const saveAsDefault = () => {
-    localStorage.setItem('import_catalogo_mapping', JSON.stringify(mapping));
-    localStorage.setItem('import_catalogo_defaults', JSON.stringify(fieldDefaultValues));
-    localStorage.setItem('import_catalogo_custom', JSON.stringify(customColumns));
-    toast.success('Configurações de importação salvas como padrão!');
+  const saveAsDefault = (active: boolean) => {
+    setIsAutoSaveEnabled(active);
+    localStorage.setItem('import_catalogo_autosave', String(active));
+    
+    if (active) {
+      localStorage.setItem('import_catalogo_mapping', JSON.stringify(mapping));
+      localStorage.setItem('import_catalogo_defaults', JSON.stringify(fieldDefaultValues));
+      localStorage.setItem('import_catalogo_custom', JSON.stringify(customColumns));
+      toast.success('Mapeamento e valores padrões serão salvos automaticamente.');
+    } else {
+      toast.info('Alterações não serão salvas como padrão.');
+    }
   };
 
   const handleFile = async (file: File) => {
