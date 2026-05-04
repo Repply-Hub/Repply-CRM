@@ -183,7 +183,7 @@ export function sanitizeImportedRows(params: {
   rawData: Record<string, unknown>[];
   fields: FieldDef[];
   mapping: Record<string, string | string[]>;
-  extras?: Record<string, string | string[]>;
+  extras?: Record<string, ExtraMappingValue>;
   customColumns?: Record<string, string>;
   fieldDefaultValues?: Record<string, string>;
   fieldLabels?: Record<string, string>;
@@ -236,8 +236,8 @@ export function sanitizeImportedRows(params: {
 
     const campos_extras: Record<string, string> = {};
     Object.entries(extras).forEach(([key, value]) => {
-      const headers = Array.isArray(value) ? value : [key];
-      const displayName = Array.isArray(value) ? key : (value || key);
+      const headers = getExtraHeaders(key, value);
+      const displayName = getExtraDisplayName(key, value);
       
       const values = headers
         .map(h => row[h])
@@ -286,8 +286,8 @@ interface Props {
   setMapping: React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>;
   fieldDefaultValues?: Record<string, string>;
   setFieldDefaultValues?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  extras: Record<string, string | string[]>;
-  setExtras: React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>;
+  extras: Record<string, ExtraMappingValue>;
+  setExtras: React.Dispatch<React.SetStateAction<Record<string, ExtraMappingValue>>>;
   customColumns?: Record<string, string>;
   setCustomColumns?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   fieldLabels?: Record<string, string>;
