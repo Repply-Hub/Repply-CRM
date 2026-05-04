@@ -49,7 +49,7 @@ export function usePedidos(empresaId?: string) {
         }
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(10000);
       if (error) throw error;
       return (data || []) as unknown as PedidoWithRelations[];
     },
