@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
-import { MappingStep, sanitizeImportedRows, type FieldDef } from '@/components/import/MappingStep';
+import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 import {
@@ -33,7 +33,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, string>>(createEmptyMapping());
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
-  const [extras, setExtras] = useState<Record<string, string>>({});
+  const [extras, setExtras] = useState<Record<string, ExtraMappingValue>>({});
   const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
   const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
@@ -194,7 +194,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   const extraFieldNames = useMemo(
     () => Array.from(new Set([
-      ...Object.entries(extras).map(([col, name]) => (name || col).trim()),
+      ...Object.entries(extras).map(([col, value]) => getExtraDisplayName(col, value).trim()),
       ...Object.keys(customColumns).map(n => n.trim()),
     ].filter(Boolean))),
     [extras, customColumns]
@@ -227,7 +227,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
       // Adicionar/Atualizar campos extras
       const extraMappings = [
-        ...Object.entries(extras).map(([_, name]) => name.trim()),
+        ...Object.entries(extras).map(([col, value]) => getExtraDisplayName(col, value).trim()),
         ...Object.keys(customColumns).map(name => name.trim())
       ].filter(Boolean);
 
