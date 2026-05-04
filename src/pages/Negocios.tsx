@@ -291,7 +291,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           id: key,
           label: key,
           isCustom: true,
-          type: 'text'
+          type: 'text',
+          customLabel: key
         });
       }
     });
