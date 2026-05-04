@@ -172,12 +172,21 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       nome_contato: '', sobrenome_contato: '', cargo: '',
       classificacao: '', data_criacao: '',
     });
+    setFieldDefaultValues({});
     setExtras({});
     setCustomColumns({});
     setFileName('');
     setStep('upload');
     setPreviewRowsSnapshot([]);
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const saveAsDefault = () => {
+    const key = `import_clientes_${target}_`;
+    localStorage.setItem(`${key}mapping`, JSON.stringify(mapping));
+    localStorage.setItem(`${key}defaults`, JSON.stringify(fieldDefaultValues));
+    localStorage.setItem(`${key}custom`, JSON.stringify(customColumns));
+    toast.success('Mapeamento e valores padrões salvos para futuras importações!');
   };
 
   const handleFile = async (file: File) => {
