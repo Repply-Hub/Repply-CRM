@@ -145,6 +145,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     nome_contato: '', sobrenome_contato: '', cargo: '',
     classificacao: '', data_criacao: '',
   });
+  const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   // extras: column name (planilha) -> nome no sistema (campos_extras)
   const [extras, setExtras] = useState<Record<string, string>>({});
   // customColumns: nome → valor padrão (colunas criadas do zero, não vêm da planilha)
