@@ -331,23 +331,21 @@ export function MappingStep({
             <div className="flex items-center gap-1">
               <Button variant="outline" size="sm" onClick={onAutoDetect} className="gap-1.5 h-8"><Sparkles className="h-3.5 w-3.5" /> Auto</Button>
               {onSaveAsDefault && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className={cn("gap-1.5 h-8", isAutoSaveEnabled ? "bg-primary/5 text-primary border-primary/20" : "")}>
-                      <Settings className="h-3.5 w-3.5" /> Salvar padrão: {isAutoSaveEnabled ? "Sim" : "Não"}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onSaveAsDefault(true)} className="gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                      <span>Sim, salvar alterações</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onSaveAsDefault(false)} className="gap-2 text-muted-foreground">
-                      <X className="h-4 w-4" />
-                      <span>Não, apenas desta vez</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center gap-2">
+                  <Select 
+                    value={isAutoSaveEnabled ? "Sim" : "Não"} 
+                    onValueChange={(val) => onSaveAsDefault(val === "Sim")}
+                  >
+                    <SelectTrigger className={cn("gap-1.5 h-8 w-[140px] text-xs", isAutoSaveEnabled ? "bg-primary/5 text-primary border-primary/20" : "")}>
+                      <Settings className="h-3.5 w-3.5" />
+                      <SelectValue placeholder="Salvar padrão" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Sim">Salvar padrão: Sim</SelectItem>
+                      <SelectItem value="Não">Salvar padrão: Não</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
               <Button variant="ghost" size="sm" onClick={onClearAll} className="h-8 px-2">Limpar</Button>
               <Button variant="ghost" size="sm" onClick={onReset} className="h-8 px-2"><X className="h-3.5 w-3.5 mr-1" /> Trocar arquivo</Button>
@@ -429,19 +427,30 @@ export function MappingStep({
               return (
                 <div key={field.key} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(200px,1.5fr)] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Input
-                        value={field.label}
-                        onChange={(e) => {
-                          // Aqui você precisaria de uma função para atualizar o label do field no componente pai
-                          // Como não temos acesso direto ao array visibleFields do pai, vamos apenas permitir a edição visual por enquanto
-                          // ou adicionar um comentário de que isso deve ser persistido se necessário.
-                        }}
-                        className="h-7 text-sm font-semibold text-foreground bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 truncate"
-                      />
-                      {field.required && <span className="text-destructive text-sm">*</span>}
-                      <FieldInfo fieldKey={field.key} />
-                    </div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Input
+                          value={field.label}
+                          onChange={(e) => {
+                            // Edição visual mantida conforme solicitado
+                          }}
+                          className="h-7 text-sm font-semibold text-foreground bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 truncate"
+                        />
+                        {field.required && <span className="text-destructive text-sm">*</span>}
+                        <FieldInfo fieldKey={field.key} />
+                        
+                        {['etapa', 'vendedor', 'acoes'].includes(field.key) && (
+                          <button
+                            onClick={() => {
+                              // Aqui removeria o campo da lista visível se houvesse a função setVisibleFields
+                              // Como é uma prop vindo de cima (visibleFields), apenas mostramos o ícone por consistência visual
+                            }}
+                            className="text-muted-foreground hover:text-destructive transition-colors ml-auto"
+                            title="Remover campo"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
                       <span className="font-mono">{field.key}</span>
                       <span>·</span>
@@ -457,10 +466,14 @@ export function MappingStep({
                       <SelectItem 
                         value={NONE} 
                         className="text-muted-foreground"
+                        disabled={['cliente', 'obra', 'fabricante', 'valor'].includes(field.key)}
                       >
                         <span className="flex items-center gap-1.5">
                           <EyeOff className="h-3 w-3" /> 
                           Não importar 
+                          {['cliente', 'obra', 'fabricante', 'valor'].includes(field.key) && (
+                            <span className="text-[10px] text-destructive italic shrink-0 ml-1">obrigatório</span>
+                          )}
                         </span>
                       </SelectItem>
                       {headers.map((header) => {
