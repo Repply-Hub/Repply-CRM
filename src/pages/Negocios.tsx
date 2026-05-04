@@ -1168,6 +1168,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </AlertDialog>
 
       <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
+      
+      {/* Botão temporário para limpar colunas indesejadas do localStorage se o useEffect não for suficiente */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="text-[10px] h-8 opacity-20 hover:opacity-100"
+          onClick={() => {
+            localStorage.removeItem('pedidos_all_columns');
+            localStorage.removeItem('pedidos_visible_columns');
+            window.location.reload();
+          }}
+        >
+          Resetar Colunas
+        </Button>
+      </div>
       <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} />
       {viewOrderSheet}
     </AppLayout>
