@@ -11,8 +11,6 @@ import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
 import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
 
-const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
-const safeText = (value: unknown) => String(value ?? '').trim();
 import {
   FIELDS,
   createEmptyMapping,
@@ -21,6 +19,9 @@ import {
   getSheetHeaders,
   type FieldKey,
 } from '@/components/import-pedidos/importPedidosUtils';
+
+const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
+const safeText = (value: unknown) => String(value ?? '').trim();
 
 const VISIBLE_FIELDS: FieldDef[] = FIELDS.map(f => ({ key: f.key, label: f.label, required: f.required }));
 
