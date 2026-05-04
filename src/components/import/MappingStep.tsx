@@ -323,6 +323,11 @@ export function MappingStep({
             </div>
             <div className="flex items-center gap-1">
               <Button variant="outline" size="sm" onClick={onAutoDetect} className="gap-1.5 h-8"><Sparkles className="h-3.5 w-3.5" /> Auto</Button>
+              {onSaveAsDefault && (
+                <Button variant="outline" size="sm" onClick={onSaveAsDefault} className="gap-1.5 h-8 bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Salvar como padrão
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={onClearAll} className="h-8 px-2">Limpar</Button>
               <Button variant="ghost" size="sm" onClick={onReset} className="h-8 px-2"><X className="h-3.5 w-3.5 mr-1" /> Trocar arquivo</Button>
             </div>
