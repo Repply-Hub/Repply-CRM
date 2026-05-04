@@ -13,6 +13,7 @@ export interface PedidoWithRelations {
   usuario_id: string;
   obra_id: string | null;
   endereco_entrega: string | null;
+  campos_extras: Record<string, any> | null;
   cliente: { id: string; empresa: string } | null;
   fabricante: { id: string; nome: string } | null;
   vendedor: { id: string; nome: string } | null;
@@ -33,7 +34,7 @@ export function usePedidos(empresaId?: string) {
           .from('pedidos')
           .select(`
             id, status, valor_total, data_pedido, created_at, observacoes,
-            cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega,
+            cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras,
             cliente:clientes(id, empresa),
             fabricante:fabricantes(id, nome),
             vendedor:usuarios(id, nome, empresa_id),
