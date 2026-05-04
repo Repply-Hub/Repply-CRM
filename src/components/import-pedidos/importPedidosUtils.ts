@@ -1,10 +1,4 @@
-import type { ExtraMappingValue } from '@/components/import/MappingStep';
-
-const getExtraHeaders = (key: string, value: ExtraMappingValue) => (
-  Array.isArray(value) ? value : [key]
-).filter((header): header is string => typeof header === 'string' && header.length > 0);
-
-const getExtraDisplayName = (key: string, value: ExtraMappingValue) => Array.isArray(value) ? key : String(value || key);
+import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
 
 export type FieldKey = 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status' | 'data_pedido';
 
@@ -249,9 +243,9 @@ export function getImportedPedidosRows(
       const campos_extras: Record<string, string> = {};
       Object.entries(extras).forEach(([key, value]) => {
         const name = getExtraDisplayName(key, value);
-        const mergedValue = getExtraHeaders(key, value).map((header) => row[header]).filter((item) => String(item ?? '').trim() !== '').join(' ');
         const directValue = row[name] ?? row[key];
-        const v = String(Array.isArray(value) ? mergedValue : (directValue ?? mergedValue) ?? '').trim();
+        const mergedValue = getExtraHeaders(key, value).map((header) => row[header]).filter((item) => String(item ?? '').trim() !== '').join(' ');
+        const v = String(directValue ?? mergedValue ?? '').trim();
         if (v !== '') campos_extras[name] = v;
       });
       // Colunas criadas do zero (valor padrão aplicado a todas as linhas)
