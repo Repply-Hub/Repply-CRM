@@ -411,7 +411,7 @@ export function MappingStep({
 
         <div className="rounded-xl border bg-card overflow-x-auto">
           <div className="min-w-[800px]">
-            <div className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(200px,1.5fr)] items-center gap-4 px-4 py-2 border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               <span>Campo do schema</span>
               <span>Cabeçalho da planilha</span>
               <span>Valor padrão</span>
@@ -427,7 +427,7 @@ export function MappingStep({
               const score = selectedHeader ? fuzzyScore(field, selectedHeader) : 0;
               
               return (
-                <div key={field.key} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
+                <div key={field.key} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(200px,1.5fr)] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm font-semibold text-foreground truncate">{field.label}</span>
@@ -489,7 +489,7 @@ export function MappingStep({
                             <span className="text-[10px] bg-accent/20 text-accent-foreground px-1.5 py-0.5 rounded">Usando padrão</span>
                           )}
                         </div>
-                        <div className="truncate" title={String(sanitizedSample ?? '')}>
+                        <div className="break-all" title={String(sanitizedSample ?? '')}>
                           <span className="text-muted-foreground">Valor:</span>{' '}
                           <span className="font-mono text-foreground">{sanitizedSample === undefined ? '-' : String(sanitizedSample)}</span>
                         </div>
@@ -508,7 +508,7 @@ export function MappingStep({
               const sanitizedSample = sanitizeFieldValue(rawSample, 'text');
               
               return (
-                <div key={header} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(140px,1fr)] gap-4 px-4 py-3 hover:bg-accent/5 transition-colors bg-accent/5 animate-in fade-in slide-in-from-top-1 border-t border-accent/10">
+                <div key={header} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(200px,1.5fr)] gap-4 px-4 py-3 hover:bg-accent/5 transition-colors bg-accent/5 animate-in fade-in slide-in-from-top-1 border-t border-accent/10">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <Input
@@ -546,7 +546,7 @@ export function MappingStep({
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <div className="truncate" title={String(sanitizedSample ?? '')}>
+                    <div className="break-all" title={String(sanitizedSample ?? '')}>
                       <span className="text-muted-foreground">Valor:</span>{' '}
                       <span className="font-mono text-foreground">{sanitizedSample === undefined ? '-' : String(sanitizedSample)}</span>
                     </div>
