@@ -849,7 +849,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const subtitle = isPipelineMode
     ? `${pipelineOrders.length} pedidos · Total: ${totalPipeline.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-    : `${pedidos?.length ?? 0} pedidos`;
+    : `${filtered.length} pedidos · Total: ${filtered.reduce((acc, p) => acc + (p.valor_total || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
 
   return (
     <AppLayout title="Negócios" subtitle={subtitle}>
