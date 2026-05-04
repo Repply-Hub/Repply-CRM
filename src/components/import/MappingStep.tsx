@@ -606,9 +606,19 @@ export function MappingStep({
 
         {unmappedHeaders.length > 0 && (
           <div className="rounded-xl border bg-card overflow-hidden">
-            <div className="px-4 py-2 bg-muted/40 border-b">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Cabeçalhos não usados</div>
-              <div className="text-[11px] text-muted-foreground">Clique para adicionar como campo extra.</div>
+            <div className="px-4 py-2 bg-muted/40 border-b flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Cabeçalhos não usados</div>
+                <div className="text-[11px] text-muted-foreground">Clique para adicionar como campo extra (será visível na página de Negócios).</div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 text-[10px] font-bold uppercase"
+                onClick={toggleAllExtras}
+              >
+                {unmappedHeaders.length > 0 ? "Mapear todos como extras" : "Remover todos os extras"}
+              </Button>
             </div>
             <div className="p-3 flex flex-wrap gap-2">
               {unmappedHeaders.map((header) => {
