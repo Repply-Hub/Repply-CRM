@@ -449,18 +449,11 @@ export function MappingStep({
                       <SelectItem value={NONE} className="text-muted-foreground"><span className="flex items-center gap-1.5"><EyeOff className="h-3 w-3" /> Não importar</span></SelectItem>
                       {headers.map((header) => {
                         const inUseByOther = usedHeaders.has(header) && selectedHeader !== header;
-                        const isLockedField = ['cliente', 'obra', 'fabricante', 'valor'].includes(field.key);
-                        const isNoneOption = !selectedHeader && header === NONE;
-                        
-                        // Bloqueia a alteração se for um campo obrigatório do sistema
-                        const isDisabled = isLockedField && selectedHeader === header;
-
                         return (
-                          <SelectItem key={header} value={header} disabled={isDisabled}>
+                          <SelectItem key={header} value={header}>
                             <span className="flex items-center gap-2 max-w-[280px]">
                               <span className="truncate">{header}</span>
                               {inUseByOther && <span className="text-[10px] text-muted-foreground italic shrink-0">em uso</span>}
-                              {isDisabled && <span className="text-[10px] text-destructive italic shrink-0">obrigatório</span>}
                             </span>
                           </SelectItem>
                         );
