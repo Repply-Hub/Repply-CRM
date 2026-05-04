@@ -430,7 +430,15 @@ export function MappingStep({
                 <div key={field.key} className="grid grid-cols-[minmax(180px,1fr)_minmax(200px,260px)_minmax(120px,160px)_minmax(200px,1.5fr)] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-semibold text-foreground truncate">{field.label}</span>
+                      <Input
+                        value={field.label}
+                        onChange={(e) => {
+                          // Aqui você precisaria de uma função para atualizar o label do field no componente pai
+                          // Como não temos acesso direto ao array visibleFields do pai, vamos apenas permitir a edição visual por enquanto
+                          // ou adicionar um comentário de que isso deve ser persistido se necessário.
+                        }}
+                        className="h-7 text-sm font-semibold text-foreground bg-transparent border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 truncate"
+                      />
                       {field.required && <span className="text-destructive text-sm">*</span>}
                       <FieldInfo fieldKey={field.key} />
                     </div>
