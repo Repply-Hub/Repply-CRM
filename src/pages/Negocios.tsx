@@ -53,7 +53,7 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
 ];
 
 const PAGE_SIZE = 10;
-const LEGACY_CARD_FIELDS = ['cliente', 'obra', 'fabricante', 'valor'];
+// Constante LEGACY_CARD_FIELDS removida pois as colunas agora são independentes.
 
 const getStageBadgeClass = (corToken: string) => `bg-${corToken} text-white`;
 
