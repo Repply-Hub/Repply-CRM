@@ -301,7 +301,7 @@ export function MappingStep({
   });
 
   const handleContinue = () => {
-    const payload = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns });
+    const payload = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues });
     onNext(payload);
   };
 
