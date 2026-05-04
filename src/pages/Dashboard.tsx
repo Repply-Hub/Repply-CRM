@@ -165,7 +165,7 @@ const Dashboard = () => {
 
   const velocidadeData = (velocidade ?? []).map(v => ({
     fabrica: v.fabricante_nome ?? '',
-    dias: Number(v.tempo_medio_ate_orcamento_dias ?? 0),
+    dias: 0, // A coluna tempo_medio_ate_orcamento_dias não existe na view atual
   }));
 
   const rendimentoFabrica = useMemo(() => {
