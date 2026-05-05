@@ -944,6 +944,26 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <div className="grid grid-cols-2 gap-x-8 gap-y-6">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="h-3 w-3" /> Negócio
+                </p>
+                <p className="text-sm font-medium">
+                  {selectedViewOrder.campos_extras?.['Negócio'] || selectedViewOrder.cliente?.empresa || 'Sem nome'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="h-3 w-3" /> Cliente
+                </p>
+                <p className="text-sm font-medium">{selectedViewOrder.cliente?.empresa ?? '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="h-3 w-3" /> Obra
+                </p>
+                <p className="text-sm font-medium">{selectedViewOrder.obra?.nome_obra ?? '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Factory className="h-3 w-3" /> Fabricante
                 </p>
                 <p className="text-sm font-medium">{selectedViewOrder.fabricante?.nome ?? '-'}</p>
@@ -977,9 +997,26 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   <Clock className="h-3 w-3" /> Data do Pedido
                 </p>
                 <p className="text-sm font-medium">
-                  {format(new Date(selectedViewOrder.data_pedido), 'dd/MM/yyyy', { locale: ptBR })}
+                  {selectedViewOrder.data_pedido ? format(new Date(selectedViewOrder.data_pedido), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                 </p>
               </div>
+              {/* Renderização de Campos Extras dinâmicos */}
+              {tableVisibleColumns.map(colId => {
+                const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);
+                if (isDefault || colId === 'acoes') return null;
+                
+                const value = selectedViewOrder.campos_extras?.[colId] ?? selectedViewOrder.campos_extras?.[getLabel(colId)];
+                if (!value) return null;
+
+                return (
+                  <div key={colId} className="space-y-1">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <FileText className="h-3 w-3" /> {getLabel(colId)}
+                    </p>
+                    <p className="text-sm font-medium">{value}</p>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Endereço */}
