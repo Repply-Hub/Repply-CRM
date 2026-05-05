@@ -418,6 +418,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             fieldLabels={fieldLabels}
             setFieldLabels={setFieldLabels}
             visibleFields={VISIBLE_FIELDS}
+            existingColumns={existingColumns}
             onReset={reset}
             onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
             onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
