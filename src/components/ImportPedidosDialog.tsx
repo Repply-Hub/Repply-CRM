@@ -43,6 +43,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
+  const [ignoredColumns, setIgnoredColumns] = useState<string[]>([]);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
@@ -71,6 +72,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setFileName('');
     setStep('upload');
     setImportProgress(0);
+    setIgnoredColumns([]);
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -207,8 +209,27 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   };
 
   const previewRows = useMemo(
-    () => (step === 'preview' ? getMappedRows() : []),
-    [step, mapping, rawData, extras, customColumns, fieldDefaultValues, fieldLabels]
+    () => {
+      if (step !== 'preview') return [];
+      
+      const rows = getMappedRows();
+      
+      // Identificar colunas ignoradas
+      const mappedColumns = new Set<string>();
+      Object.values(mapping).forEach(val => {
+        if (typeof val === 'string' && val) mappedColumns.add(val);
+        else if (Array.isArray(val)) val.forEach(v => mappedColumns.add(v));
+      });
+      Object.values(extras).forEach(val => {
+        if (typeof val === 'string' && val) mappedColumns.add(val);
+      });
+      
+      const ignored = headers.filter(h => h && !mappedColumns.has(h));
+      setIgnoredColumns(ignored);
+      
+      return rows;
+    },
+    [step, mapping, rawData, extras, customColumns, fieldDefaultValues, fieldLabels, headers]
   );
 
   const extraFieldInfos = useMemo(
@@ -531,11 +552,28 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               </Button>
             </div>
 
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-              Clientes e fabricantes não encontrados serão criados automaticamente.
-              {extraFieldInfos.length > 0 && (
-                <span>Extras: {extraFieldInfos.map(info => info.label).join(', ')}.</span>
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                Clientes e fabricantes não encontrados serão criados automaticamente.
+                {extraFieldInfos.length > 0 && (
+                  <span>Extras: {extraFieldInfos.map(info => info.label).join(', ')}.</span>
+                )}
+              </div>
+
+              {ignoredColumns.length > 0 && (
+                <div className="bg-muted/50 rounded-lg p-3 border border-border/50">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <X className="h-3 w-3" /> Colunas ignoradas (não mapeadas)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ignoredColumns.map(col => (
+                      <Badge key={col} variant="outline" className="text-[10px] font-normal py-0 h-5 bg-background">
+                        {col}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
