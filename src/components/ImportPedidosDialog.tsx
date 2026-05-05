@@ -239,6 +239,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       // Adicionar colunas extras (de mapeamento extra e colunas customizadas)
       extraFieldNames.forEach((name) => {
         const id = `extra_${name}`;
+        // Verificação rigorosa para evitar duplicatas por ID
         if (!currentColumns.some(c => c.id === id)) {
           currentColumns.push({ id, label: name, type: 'text', isCustom: true });
           hasChanges = true;
@@ -250,10 +251,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       });
 
       if (hasChanges) {
-        localStorage.setItem('pedidos_all_columns', JSON.stringify(currentColumns));
+        // Remove duplicatas físicas se existirem por erro anterior antes de salvar
+        const uniqueColumns = Array.from(new Map(currentColumns.map(c => [c.id, c])).values());
+        localStorage.setItem('pedidos_all_columns', JSON.stringify(uniqueColumns));
       }
       if (visibleChanged) {
-        localStorage.setItem('pedidos_visible_columns', JSON.stringify(currentVisible));
+        const uniqueVisible = Array.from(new Set(currentVisible));
+        localStorage.setItem('pedidos_visible_columns', JSON.stringify(uniqueVisible));
       }
       if (hasChanges || visibleChanged) {
         window.dispatchEvent(new Event('storage'));

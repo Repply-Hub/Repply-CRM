@@ -24,15 +24,13 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as ColumnDefinition[];
-        // Garantir que a propriedade 'locked' dos defaultColumns seja respeitada
-        // mesmo que existam dados antigos no localStorage
-        return parsed.map(col => {
+        // Remover duplicatas por ID que podem ter sido salvas anteriormente
+        const unique = Array.from(new Map(parsed.map(c => [c.id, c])).values());
+        
+        return unique.map(col => {
           const defaultCol = defaultColumns.find(d => d.id === col.id);
           return {
             ...col,
-            // Use explicitly defined locked value from default columns if available,
-            // otherwise default to false for columns found in defaults.
-            // Custom columns retain their saved locked state.
             locked: defaultCol ? (defaultCol.locked ?? false) : col.locked
           };
         });
@@ -45,7 +43,9 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem(`${key}_visible_columns`);
-    return saved ? JSON.parse(saved) : defaultColumns.map(c => c.id);
+    const initial = saved ? JSON.parse(saved) : defaultColumns.map(c => c.id);
+    // Garantir que as colunas visíveis são únicas
+    return Array.from(new Set(initial));
   });
 
   const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
