@@ -72,6 +72,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setFileName('');
     setStep('upload');
     setImportProgress(0);
+    setIgnoredColumns([]);
     if (fileRef.current) fileRef.current.value = '';
   };
 
