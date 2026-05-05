@@ -331,7 +331,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         }
 
         if (finalId && !currentVisible.includes(finalId)) {
-          currentVisible.push(finalId);
+          // Inserir após a coluna de etapa (status) se for nova
+          const statusIdx = currentVisible.indexOf('etapa');
+          if (statusIdx !== -1) {
+            currentVisible.splice(statusIdx + 1, 0, finalId);
+          } else {
+            currentVisible.push(finalId);
+          }
           visibleChanged = true;
         }
       });
@@ -416,8 +422,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           }
           
           // Salva o título do negócio se ele for diferente do nome do cliente
-          if (r.negocio && r.negocio !== r.cliente) {
+          // Se não houver título na planilha, usamos o nome da obra ou o nome do cliente como padrão
+          if (r.negocio) {
             finalCamposExtras['Negócio'] = r.negocio;
+          } else if (r.obra) {
+            finalCamposExtras['Negócio'] = r.obra;
+          } else {
+            finalCamposExtras['Negócio'] = r.cliente;
           }
 
           return {
@@ -430,7 +441,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             observacoes: r.observacoes || null,
             campos_extras: finalCamposExtras,
             data_pedido: r.data_pedido || new Date().toISOString().split('T')[0],
-            created_at: r.data_pedido ? `${r.data_pedido}T12:00:00Z` : new Date().toISOString(),
+            created_at: r.data_pedido ? `${r.data_pedido}T12:00:00.000Z` : new Date().toISOString(),
+            prazo_resposta: r.status === 'fechamento' ? (r.data_pedido || new Date().toISOString().split('T')[0]) : null,
           };
         });
         const { error } = await supabase.from('pedidos').insert(batch);
