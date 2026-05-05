@@ -367,9 +367,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             campos_extras: finalCamposExtras,
           data_pedido: (() => {
             if (!r.data_pedido) return new Date().toISOString().split('T')[0];
-            const d = new Date(r.data_pedido);
-            return isNaN(d.getTime()) ? new Date().toISOString().split('T')[0] : d.toISOString().split('T')[0];
+            // Tenta converter o valor da planilha em uma data ISO válida (YYYY-MM-DD)
+            // r.data_pedido já deve vir formatado como YYYY-MM-DD da função getImportedPedidosRows
+            return r.data_pedido;
           })(),
+          created_at: r.data_pedido ? `${r.data_pedido}T12:00:00Z` : new Date().toISOString(),
           };
         });
         const { error } = await supabase.from('pedidos').insert(batch);
