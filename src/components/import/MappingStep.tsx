@@ -339,8 +339,14 @@ export function MappingStep({
     const used = new Set<string>();
     Object.values(mapping).forEach(v => {
       if (Array.isArray(v)) {
-        // Na unificação, todos os cabeçalhos são considerados "usados" e, portanto, "invisíveis" no seletor
-        v.forEach(h => { if (typeof h === 'string') used.add(h); });
+        // Agora, se houver unificação (Array), apenas o PRIMEIRO cabeçalho da lista é considerado "usado" (Coluna A).
+        // Os demais (Coluna B, C...) ficam inativos na importação e podem ser ocultados ou apenas ignorados.
+        // O usuário quer que o conteúdo fique na "Coluna A" e a "B" fique inativa.
+        if (v.length > 0 && typeof v[0] === 'string') {
+          used.add(v[0]);
+        }
+        // Os outros cabeçalhos da lista (1...) também devem ser marcados como usados para não aparecerem em outros seletores
+        v.slice(1).forEach(h => { if (typeof h === 'string') used.add(h); });
       }
       else if (typeof v === 'string' && v) used.add(v);
     });
