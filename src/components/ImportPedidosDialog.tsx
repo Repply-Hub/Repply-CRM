@@ -209,8 +209,27 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   };
 
   const previewRows = useMemo(
-    () => (step === 'preview' ? getMappedRows() : []),
-    [step, mapping, rawData, extras, customColumns, fieldDefaultValues, fieldLabels]
+    () => {
+      if (step !== 'preview') return [];
+      
+      const rows = getMappedRows();
+      
+      // Identificar colunas ignoradas
+      const mappedColumns = new Set<string>();
+      Object.values(mapping).forEach(val => {
+        if (typeof val === 'string' && val) mappedColumns.add(val);
+        else if (Array.isArray(val)) val.forEach(v => mappedColumns.add(v));
+      });
+      Object.values(extras).forEach(val => {
+        if (typeof val === 'string' && val) mappedColumns.add(val);
+      });
+      
+      const ignored = headers.filter(h => h && !mappedColumns.has(h));
+      setIgnoredColumns(ignored);
+      
+      return rows;
+    },
+    [step, mapping, rawData, extras, customColumns, fieldDefaultValues, fieldLabels, headers]
   );
 
   const extraFieldInfos = useMemo(
