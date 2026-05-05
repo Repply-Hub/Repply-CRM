@@ -280,9 +280,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
       const { data: clientes } = await supabase.from('clientes').select('id, empresa');
       const { data: fabricantes } = await supabase.from('fabricantes').select('id, nome');
+      const { data: todosVendedores } = await supabase.from('usuarios').select('id, nome');
 
       const clienteMap = new Map((clientes ?? []).map(c => [c.empresa.toLowerCase().trim(), c.id]));
       const fabricanteMap = new Map((fabricantes ?? []).map(f => [f.nome.toLowerCase().trim(), f.id]));
+      const vendedorMap = new Map((todosVendedores ?? []).map(v => [v.nome?.toLowerCase().trim() || '', v.id]));
 
       const missingClientes = [...new Set(rows.map(r => r.cliente))].filter(c => !clienteMap.has(c.toLowerCase().trim()));
       if (missingClientes.length > 0) {
@@ -305,12 +307,14 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const BATCH = 200;
       let imported = 0;
       for (let i = 0; i < rows.length; i += BATCH) {
-        const batch = rows.slice(i, i + BATCH).map(r => ({
-          cliente_id: clienteMap.get(r.cliente.toLowerCase().trim())!,
-          fabricante_id: fabricanteMap.get(r.fabricante.toLowerCase().trim())!,
-          usuario_id: vid,
-          status: r.status,
-          valor_total: r.valor || null,
+        const batch = rows.slice(i, i + BATCH).map(r => {
+          const importedVendedorId = r.vendedor ? vendedorMap.get(r.vendedor.toLowerCase().trim()) : null;
+          return {
+            cliente_id: clienteMap.get(r.cliente.toLowerCase().trim())!,
+            fabricante_id: fabricanteMap.get(r.fabricante.toLowerCase().trim())!,
+            usuario_id: importedVendedorId || vid,
+            status: r.status,
+            valor_total: r.valor || null,
           observacoes: r.observacoes || null,
           campos_extras: r.campos_extras || {},
           data_pedido: (() => {
@@ -318,7 +322,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             const d = new Date(r.data_pedido);
             return isNaN(d.getTime()) ? new Date().toISOString().split('T')[0] : d.toISOString().split('T')[0];
           })(),
-        }));
+          };
+        });
         const { error } = await supabase.from('pedidos').insert(batch);
         if (error) throw error;
         imported += batch.length;
