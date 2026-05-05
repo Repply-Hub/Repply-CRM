@@ -244,9 +244,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         const mainName = name.includes(', ') ? name.split(', ')[0] : name;
         const lowerMainName = mainName.toLowerCase().trim();
 
-        // Procurar se já existe uma coluna com o mesmo nome principal
+        // Procurar se já existe uma coluna com o mesmo nome principal OU o mesmo ID
         const existingCol = currentColumns.find(c => 
           c.label.toLowerCase().trim() === lowerMainName || 
+          c.id.toLowerCase().trim() === lowerMainName ||
           c.id === mainName
         );
 

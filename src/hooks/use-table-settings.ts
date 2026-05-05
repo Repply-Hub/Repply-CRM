@@ -96,12 +96,28 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
   }, []);
 
   const handleAddColumn = useCallback((label: string, type: ColumnDataType = 'text') => {
+    const lowerLabel = label.toLowerCase().trim();
+    const existing = columns.find(c => 
+      c.label.toLowerCase().trim() === lowerLabel || 
+      c.id.toLowerCase().trim() === lowerLabel
+    );
+
+    if (existing) {
+      if (!visibleColumns.includes(existing.id)) {
+        setVisibleColumns(prev => [...prev, existing.id]);
+        toast.info(`A coluna "${label}" já existe e foi ativada`);
+      } else {
+        toast.error(`A coluna "${label}" já existe`);
+      }
+      return;
+    }
+
     const id = `custom_${label.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
     const newCol: ColumnDefinition = { id, label, isCustom: true, type };
     setColumns(prev => [...prev, newCol]);
     setVisibleColumns(prev => [...prev, id]);
     toast.success(`Coluna "${label}" adicionada`);
-  }, []);
+  }, [columns, visibleColumns]);
 
   const handleRemoveColumn = useCallback((columnId: string) => {
     setColumns(prev => prev.filter(c => c.id !== columnId));
