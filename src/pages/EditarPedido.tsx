@@ -447,7 +447,12 @@ const EditarPedido = () => {
                         <Calendar
                           mode="single"
                           selected={dataPedido}
-                          onSelect={(d) => d && setDataPedido(d)}
+                          onSelect={(d) => {
+                            if (d) {
+                              const localDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60 * 1000));
+                              setDataPedido(localDate);
+                            }
+                          }}
                           locale={ptBR}
                           initialFocus
                           className={cn("p-3 pointer-events-auto")}
