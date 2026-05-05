@@ -238,14 +238,24 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
       // Adicionar colunas extras (de mapeamento extra e colunas customizadas)
       extraFieldNames.forEach((name) => {
-        const id = `extra_${name}`;
-        // Verificação rigorosa para evitar duplicatas por ID
-        if (!currentColumns.some(c => c.id === id)) {
-          currentColumns.push({ id, label: name, type: 'text', isCustom: true });
+        const lowerName = name.toLowerCase().trim();
+        // Procurar se já existe uma coluna com o mesmo nome (mesmo que o ID seja diferente)
+        // ou se já existe o ID de extra correspondente
+        const existingCol = currentColumns.find(c => 
+          c.label.toLowerCase().trim() === lowerName || 
+          c.id === `extra_${name}`
+        );
+
+        let finalId = existingCol?.id;
+        
+        if (!existingCol) {
+          finalId = `extra_${name}`;
+          currentColumns.push({ id: finalId, label: name, type: 'text', isCustom: true });
           hasChanges = true;
         }
-        if (!currentVisible.includes(id)) {
-          currentVisible.push(id);
+
+        if (finalId && !currentVisible.includes(finalId)) {
+          currentVisible.push(finalId);
           visibleChanged = true;
         }
       });
