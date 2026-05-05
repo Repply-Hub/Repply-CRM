@@ -211,12 +211,15 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       if (!vid) throw new Error('Vendedor não encontrado');
 
-      // Atualizar nomes das colunas (padrão e extras) para salvar como colunas na página de Negócios
+      // Garantir que a visualização da página de Negócios permaneça apenas com as colunas padrão
+      const defaultIds = VISIBLE_FIELDS.map(f => f.key);
+      localStorage.setItem('pedidos_visible_columns', JSON.stringify(defaultIds));
+      
       const savedAllColumns = localStorage.getItem('pedidos_all_columns');
       let currentColumns = savedAllColumns ? JSON.parse(savedAllColumns) : [...VISIBLE_FIELDS.map(f => ({ id: f.key, label: f.label, type: 'text' }))];
       let hasChanges = false;
 
-      // Atualizar labels dos campos padrão que foram renomeados
+      // Atualiza apenas as definições das colunas padrão se houver renomeação (labels)
       Object.entries(fieldLabels).forEach(([key, label]) => {
         const col = currentColumns.find((c: any) => c.id === key);
         if (col && col.label !== label) {
@@ -224,15 +227,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           hasChanges = true;
         }
       });
-
-      // A funcionalidade de adicionar automaticamente colunas extras foi removida
-      // para evitar a criação de colunas indesejadas (ex: endereço obra_1).
-      // Os usuários podem adicionar colunas manualmente se necessário nas configurações de colunas.
-
-
+      
       if (hasChanges) {
         localStorage.setItem('pedidos_all_columns', JSON.stringify(currentColumns));
-        // Forçar atualização na página de Negócios se o hook useTableSettings estiver ouvindo
         window.dispatchEvent(new Event('storage'));
       }
 
