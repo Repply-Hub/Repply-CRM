@@ -181,7 +181,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       extras, 
       customColumns, 
       fieldDefaultValues, 
-      fieldLabels 
+      fieldLabels,
+      existingColumns
     });
     
     const remappedRows = (sanitized as any[]).map(item => {
