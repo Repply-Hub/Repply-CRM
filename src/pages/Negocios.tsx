@@ -122,9 +122,7 @@ const PedidoRow = memo(({
                     </div>
                   )}
                   <p className="text-sm font-semibold leading-snug text-card-foreground">
-                    {pedido.observacoes && pedido.observacoes.trim() !== '' 
-                      ? pedido.observacoes 
-                      : (pedido.cliente?.empresa ?? 'Sem nome')}
+                    {pedido.cliente?.empresa ?? 'Sem nome'}
                   </p>
                 </div>
               </TableCell>
