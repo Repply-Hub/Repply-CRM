@@ -205,11 +205,35 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     [step, mapping, rawData, extras, customColumns]
   );
 
-  const extraFieldNames = useMemo(
-    () => Array.from(new Set([
-      ...Object.entries(extras).map(([col, value]) => getExtraDisplayName(col, value).trim()),
-      ...Object.keys(customColumns).map(n => n.trim()),
-    ].filter(Boolean))),
+  const extraFieldInfos = useMemo(
+    () => {
+      const infos: Array<{ id: string; label: string }> = [];
+      
+      Object.entries(extras).forEach(([col, value]) => {
+        const label = getExtraDisplayName(col, value).trim();
+        // Tenta encontrar se já existe um ID mapeado (via Label::ID)
+        const id = (typeof value === 'string' && value.includes('::')) 
+          ? value.split('::')[1] 
+          : label;
+        
+        if (label) infos.push({ id, label });
+      });
+
+      Object.keys(customColumns).forEach(name => {
+        if (name.trim()) infos.push({ id: name.trim(), label: name.trim() });
+      });
+
+      // Remover duplicatas de ID
+      const unique: Array<{ id: string; label: string }> = [];
+      const usedIds = new Set<string>();
+      infos.forEach(info => {
+        if (!usedIds.has(info.id)) {
+          unique.push(info);
+          usedIds.add(info.id);
+        }
+      });
+      return unique;
+    },
     [extras, customColumns]
   );
 
