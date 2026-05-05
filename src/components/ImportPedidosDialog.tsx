@@ -185,25 +185,27 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       existingColumns
     });
     
-    const remappedRows = (sanitized as any[]).map(item => {
+    // Garantir que os campos básicos existam no objeto de retorno para o preview/import
+    return (sanitized as any[]).map(item => {
       const { campos_extras, ...rest } = item;
       return {
-        ...rest,
-        ...(campos_extras || {})
+        cliente: rest.cliente || '',
+        fabricante: rest.fabricante || '',
+        obra: rest.obra || '',
+        negocio: rest.negocio || '',
+        valor: typeof rest.valor === 'number' ? rest.valor : 0,
+        vendedor: rest.vendedor || '',
+        status: rest.status || 'novo_lead',
+        data_pedido: rest.data_pedido || undefined,
+        observacoes: rest.observacoes || '',
+        campos_extras: campos_extras || {}
       };
     });
-
-    return getImportedPedidosRows(
-      remappedRows,
-      Object.fromEntries(VISIBLE_FIELDS.map((field) => [field.key, field.key])) as Record<FieldKey, any>,
-      extras,
-      customColumns
-    );
   };
 
   const previewRows = useMemo(
     () => (step === 'preview' ? getMappedRows() : []),
-    [step, mapping, rawData, extras, customColumns]
+    [step, mapping, rawData, extras, customColumns, fieldDefaultValues, fieldLabels]
   );
 
   const extraFieldInfos = useMemo(
