@@ -215,16 +215,20 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const defaultIds = VISIBLE_FIELDS.map(f => f.key);
       localStorage.setItem('pedidos_visible_columns', JSON.stringify(defaultIds));
       
+      const savedAllColumns = localStorage.getItem('pedidos_all_columns');
+      let currentColumns = savedAllColumns ? JSON.parse(savedAllColumns) : [...VISIBLE_FIELDS.map(f => ({ id: f.key, label: f.label, type: 'text' }))];
+      let hasChanges = false;
+
+      // Atualiza apenas as definições das colunas padrão se houver renomeação (labels)
+      Object.entries(fieldLabels).forEach(([key, label]) => {
+        const col = currentColumns.find((c: any) => c.id === key);
+        if (col && col.label !== label) {
+          col.label = label;
+          hasChanges = true;
+        }
+      });
+      
       if (hasChanges) {
-        // Atualiza apenas as definições das colunas padrão se houver renomeação (labels)
-        const savedAllColumns = localStorage.getItem('pedidos_all_columns');
-        let currentColumns = savedAllColumns ? JSON.parse(savedAllColumns) : [...VISIBLE_FIELDS.map(f => ({ id: f.key, label: f.label, type: 'text' }))];
-        
-        Object.entries(fieldLabels).forEach(([key, label]) => {
-          const col = currentColumns.find((c: any) => c.id === key);
-          if (col && col.label !== label) col.label = label;
-        });
-        
         localStorage.setItem('pedidos_all_columns', JSON.stringify(currentColumns));
         window.dispatchEvent(new Event('storage'));
       }
