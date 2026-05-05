@@ -212,6 +212,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
   
   // O efeito de limpeza total foi removido para permitir que novas colunas importadas apareçam nas opções.
+  // No entanto, vamos garantir que colunas duplicadas sejam limpas se detectadas.
+  useEffect(() => {
+    const savedAll = localStorage.getItem('pedidos_all_columns');
+    if (savedAll) {
+      try {
+        const parsed = JSON.parse(savedAll);
+        const unique = Array.from(new Map(parsed.map((c: any) => [c.id, c])).values());
+        if (unique.length !== parsed.length) {
+          localStorage.setItem('pedidos_all_columns', JSON.stringify(unique));
+          window.dispatchEvent(new Event('storage'));
+        }
+      } catch (e) {}
+    }
+  }, []);
 
 
   const {
@@ -693,15 +707,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <button
             type="button"
             onClick={() => {
-              localStorage.removeItem('pedidos_all_columns');
-              localStorage.removeItem('pedidos_visible_columns');
-              localStorage.removeItem('pedidos_custom_labels');
-              window.location.reload();
+              if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
+                localStorage.removeItem('pedidos_all_columns');
+                localStorage.removeItem('pedidos_visible_columns');
+                localStorage.removeItem('pedidos_custom_labels');
+                window.location.reload();
+              }
             }}
             className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium text-destructive hover:bg-destructive/10 transition-all text-left"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            <span>Resetar para Padrão</span>
+            <span>Limpar todas as colunas</span>
           </button>
         </div>
       </div>

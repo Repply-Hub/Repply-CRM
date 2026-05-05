@@ -268,6 +268,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       if (hasChanges) {
         // Remove duplicatas físicas se existirem por erro anterior antes de salvar
         const uniqueColumns = Array.from(new Map(currentColumns.map(c => [c.id, c])).values());
+        // Filtrar possíveis colunas repetidas indesejadas (ex: Contato repetido muitas vezes)
+        // Se houver muitas colunas com o mesmo nome base ou IDs muito similares, podemos limpar.
+        // Mas por enquanto vamos focar em garantir que o ID seja único.
         localStorage.setItem('pedidos_all_columns', JSON.stringify(uniqueColumns));
       }
       if (visibleChanged) {
