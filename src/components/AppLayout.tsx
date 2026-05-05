@@ -1,4 +1,5 @@
 import { AppSidebar } from './AppSidebar';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { useQuery } from '@tanstack/react-query';
@@ -37,6 +38,7 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
 
   return (
     <SidebarProvider defaultOpen={false}>
+      <TooltipProvider delayDuration={400}>
       <div className="h-screen flex w-full overflow-hidden">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
@@ -67,6 +69,7 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
           </main>
         </div>
       </div>
+      </TooltipProvider>
     </SidebarProvider>
   );
 }

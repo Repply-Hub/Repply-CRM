@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Building2, Factory, DollarSign, GripVertical } from 'lucide-react';
 import { Order } from '@/types';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface KanbanCardProps {
   order: Order;
@@ -18,7 +18,7 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick }: Ka
   return (
     <Draggable draggableId={order.id} index={index}>
       {(provided, snapshot) => (
-        <TooltipProvider delayDuration={600}>
+        <>
           <Tooltip>
             <TooltipTrigger asChild>
               <div
@@ -94,7 +94,7 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick }: Ka
               Arraste para mover entre etapas
             </TooltipContent>
           </Tooltip>
-        </TooltipProvider>
+        </>
       )}
     </Draggable>
   );
