@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useDeferredValue } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parse, isValid } from 'date-fns';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
@@ -151,6 +151,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const isPipelineMode = mode === 'pipeline';
 
   const [search, setSearch] = useState(() => localStorage.getItem('negocios_search') || '');
+  const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
   const [stageFilter, setStageFilter] = useState('todos');
@@ -270,7 +271,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [pedidos, isPipelineMode, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
     return baseListPedidos.filter(p => {
       if (stageFilter !== 'todos' && p.status !== stageFilter) return false;
       if (!q) return true;
@@ -278,7 +279,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       const fab = (p.fabricante?.nome ?? '').toLowerCase();
       return empresa.includes(q) || fab.includes(q);
     });
-  }, [baseListPedidos, search, stageFilter]);
+  }, [baseListPedidos, deferredSearch, stageFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(
@@ -314,7 +315,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   })), [pedidos]);
 
   const pipelineOrders = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
     return allOrders.filter(o => {
       if (selectedVendedores.length > 0 && !selectedVendedores.includes(o.vendedorId)) return false;
       if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(o.fabricanteId)) return false;
@@ -333,7 +334,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       }
       return true;
     });
-  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo, search]);
+  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo, deferredSearch]);
 
   const ordersByStage = useMemo(() => {
     const map: Record<string, typeof pipelineOrders> = {};
