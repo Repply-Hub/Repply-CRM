@@ -240,16 +240,15 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       extraFieldNames.forEach((name) => {
         const lowerName = name.toLowerCase().trim();
         // Procurar se já existe uma coluna com o mesmo nome (mesmo que o ID seja diferente)
-        // ou se já existe o ID de extra correspondente
         const existingCol = currentColumns.find(c => 
           c.label.toLowerCase().trim() === lowerName || 
-          c.id === `extra_${name}`
+          c.id === name
         );
 
         let finalId = existingCol?.id;
         
         if (!existingCol) {
-          finalId = `extra_${name}`;
+          finalId = name;
           currentColumns.push({ id: finalId, label: name, type: 'text', isCustom: true });
           hasChanges = true;
         }
