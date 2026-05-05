@@ -105,7 +105,7 @@ const PedidoRow = memo(({
           // Busca o valor em camposExtras usando o ID da coluna ou o label (fallback)
           const value = camposExtras[colId] ?? camposExtras[getLabel(colId)];
           return (
-            <TableCell key={colId} className="text-xs text-muted-foreground">
+            <TableCell key={colId} className="text-xs text-muted-foreground whitespace-nowrap px-4">
               {value || '—'}
             </TableCell>
           );
@@ -114,7 +114,7 @@ const PedidoRow = memo(({
         switch (colId) {
           case 'negocio':
             return (
-              <TableCell key={colId} className="min-w-[200px]">
+              <TableCell key={colId} className="min-w-[250px] px-4">
                 <div className="space-y-1">
                   {isAlert && (
                     <div className="flex w-fit items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
@@ -129,38 +129,38 @@ const PedidoRow = memo(({
               </TableCell>
             );
           case 'cliente':
-            return <TableCell key={colId} className="font-medium">{pedido.cliente?.empresa ?? '-'}</TableCell>;
+            return <TableCell key={colId} className="font-medium whitespace-nowrap px-4">{pedido.cliente?.empresa ?? '-'}</TableCell>;
           case 'obra':
-            return <TableCell key={colId}>{pedido.obra?.nome_obra ?? pedido.endereco_entrega ?? '-'}</TableCell>;
+            return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.obra?.nome_obra ?? pedido.endereco_entrega ?? '-'}</TableCell>;
           case 'fabricante':
-            return <TableCell key={colId}>{pedido.fabricante?.nome ?? '-'}</TableCell>;
+            return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.fabricante?.nome ?? '-'}</TableCell>;
           case 'valor':
-            return <TableCell key={colId}>{(pedido.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>;
+            return <TableCell key={colId} className="whitespace-nowrap px-4">{(pedido.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>;
           case 'etapa':
             const stage = KANBAN_STAGES.find(s => s.key === pedido.status);
             return (
-              <TableCell key={colId}>
+              <TableCell key={colId} className="whitespace-nowrap px-4">
                 <Badge className={`bg-${stage?.color || 'muted-foreground'} text-white`}>
                   {stageLabel(pedido.status)}
                 </Badge>
               </TableCell>
             );
           case 'vendedor':
-            return <TableCell key={colId}>{pedido.vendedor?.nome ?? '-'}</TableCell>;
+            return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.vendedor?.nome ?? '-'}</TableCell>;
           case 'data_pedido':
             return (
-              <TableCell key={colId}>
+              <TableCell key={colId} className="whitespace-nowrap px-4">
                 {pedido.data_pedido 
                   ? format(parse(pedido.data_pedido, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR }) 
                   : '—'}
               </TableCell>
             );
           case 'observacoes':
-            return <TableCell key={colId} className="max-w-[200px] truncate" title={pedido.observacoes}>{pedido.observacoes || '—'}</TableCell>;
+            return <TableCell key={colId} className="max-w-[300px] truncate px-4" title={pedido.observacoes}>{pedido.observacoes || '—'}</TableCell>;
           case 'acoes':
             return (
-              <TableCell key={colId}>
-                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+              <TableCell key={colId} className="px-4 text-center">
+                <div className="flex justify-center gap-1" onClick={e => e.stopPropagation()}>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClick} title="Visualizar e Editar">
                     <Eye className="h-4 w-4 text-primary" />
                   </Button>
@@ -1163,7 +1163,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                         <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
                       {tableVisibleColumns.map(colId => (
-                        <TableHead key={colId} className={cn(colId === 'acoes' && "w-[100px]")}>
+                        <TableHead key={colId} className={cn(
+                          "whitespace-nowrap px-4 py-3 text-xs font-semibold",
+                          colId === 'acoes' ? "w-[80px] text-center" : "min-w-[150px]"
+                        )}>
                           {getLabel(colId)}
                         </TableHead>
                       ))}
