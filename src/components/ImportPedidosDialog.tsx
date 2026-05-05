@@ -416,8 +416,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           }
           
           // Salva o título do negócio se ele for diferente do nome do cliente
-          if (r.negocio && r.negocio !== r.cliente) {
+          // Se não houver título na planilha, usamos o nome da obra ou o nome do cliente como padrão
+          if (r.negocio) {
             finalCamposExtras['Negócio'] = r.negocio;
+          } else if (r.obra) {
+            finalCamposExtras['Negócio'] = r.obra;
+          } else {
+            finalCamposExtras['Negócio'] = r.cliente;
           }
 
           return {
