@@ -211,16 +211,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
   
-  // Efeito para limpar colunas extras se o usuário quiser resetar manualmente via código ou se necessário
-  // Como o usuário pediu para "remover as colunas, deixando apenas as padrões", vou resetar o localStorage
+  // Efeito para forçar o reset das colunas para os padrões e limpar o localStorage
   useEffect(() => {
-    const hasBeenReset = localStorage.getItem('pedidos_columns_reset_v1');
+    const resetKey = 'pedidos_force_reset_defaults_v2';
+    const hasBeenReset = localStorage.getItem(resetKey);
+    
     if (!hasBeenReset) {
-      localStorage.setItem('pedidos_all_columns', JSON.stringify(PEDIDOS_COLUMNS));
-      localStorage.setItem('pedidos_visible_columns', JSON.stringify(PEDIDOS_COLUMNS.map(c => c.id)));
-      localStorage.setItem('pedidos_columns_reset_v1', 'true');
-      window.dispatchEvent(new Event('storage'));
-      // Recarregar a página para garantir que o hook useTableSettings pegue os novos valores
+      console.log('Forçando reset das colunas para os padrões...');
+      localStorage.removeItem('pedidos_all_columns');
+      localStorage.removeItem('pedidos_visible_columns');
+      localStorage.removeItem('pedidos_custom_labels');
+      localStorage.setItem(resetKey, 'true');
       window.location.reload();
     }
   }, []);
@@ -700,6 +701,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </button>
             </>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem('pedidos_all_columns');
+              localStorage.removeItem('pedidos_visible_columns');
+              localStorage.removeItem('pedidos_custom_labels');
+              window.location.reload();
+            }}
+            className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium text-destructive hover:bg-destructive/10 transition-all text-left"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>Resetar para Padrão</span>
+          </button>
         </div>
       </div>
     </ColumnSettings>

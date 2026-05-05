@@ -172,6 +172,13 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     customLabel: customLabels[col.id]
   })), [columns, customLabels]);
 
+  const resetToDefaults = useCallback(() => {
+    setColumns(defaultColumns);
+    setVisibleColumns(defaultColumns.map(c => c.id));
+    setCustomLabels({});
+    toast.success('Configurações restauradas para o padrão');
+  }, [defaultColumns]);
+
   return {
     columns: currentColumns,
     visibleColumns,
@@ -188,5 +195,6 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     savePreset,
     loadPreset,
     deletePreset,
+    resetToDefaults
   };
 }
