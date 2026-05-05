@@ -52,6 +52,7 @@ describe('importPedidosUtils', () => {
       {
         negocio: 'Repav Rosário Edificações',
         cliente: 'Repav Rosário Edificações e Pavimentação',
+        obra: '',
         fabricante: 'Portobello',
         valor: 10500,
         vendedor: '',
@@ -63,6 +64,7 @@ describe('importPedidosUtils', () => {
       {
         negocio: 'Obra Torre Sul',
         cliente: 'Construtora ABC',
+        obra: '',
         fabricante: 'Eliane',
         valor: 2000,
         vendedor: '',
