@@ -374,7 +374,7 @@ export function MappingStep({
         .filter(v => v !== undefined && v !== null && String(v ?? '').trim() !== '');
       
       if (values.length > 0) {
-        return values.join(' ');
+        return values.join(', ');
       }
     }
     return '';
