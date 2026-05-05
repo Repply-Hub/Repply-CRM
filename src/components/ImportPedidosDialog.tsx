@@ -552,11 +552,28 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               </Button>
             </div>
 
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-              Clientes e fabricantes não encontrados serão criados automaticamente.
-              {extraFieldInfos.length > 0 && (
-                <span>Extras: {extraFieldInfos.map(info => info.label).join(', ')}.</span>
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                Clientes e fabricantes não encontrados serão criados automaticamente.
+                {extraFieldInfos.length > 0 && (
+                  <span>Extras: {extraFieldInfos.map(info => info.label).join(', ')}.</span>
+                )}
+              </div>
+
+              {ignoredColumns.length > 0 && (
+                <div className="bg-muted/50 rounded-lg p-3 border border-border/50">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <X className="h-3 w-3" /> Colunas ignoradas (não mapeadas)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ignoredColumns.map(col => (
+                      <Badge key={col} variant="outline" className="text-[10px] font-normal py-0 h-5 bg-background">
+                        {col}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
