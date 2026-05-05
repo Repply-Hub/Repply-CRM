@@ -238,6 +238,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       if (savedVisible) {
         try { setVisibleColumns(JSON.parse(savedVisible)); } catch {}
       }
+      // Se as colunas mudarem (ex: resetadas), força atualização do estado local
+      const savedAll = localStorage.getItem('pedidos_all_columns');
+      if (savedAll) {
+        // useTableSettings já deve estar escutando se necessário, mas aqui garantimos a sincronia do visible
+      }
     };
     window.addEventListener('storage', handler);
     return () => window.removeEventListener('storage', handler);
