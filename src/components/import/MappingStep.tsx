@@ -200,8 +200,9 @@ export function sanitizeImportedRows(params: {
   customColumns?: Record<string, string>;
   fieldDefaultValues?: Record<string, string>;
   fieldLabels?: Record<string, string>;
+  existingColumns?: Array<{ id: string; label: string }>;
 }) {
-  const { rawData, fields, mapping, extras = {}, customColumns = {}, fieldDefaultValues = {}, fieldLabels = {} } = params;
+  const { rawData, fields, mapping, extras = {}, customColumns = {}, fieldDefaultValues = {}, fieldLabels = {}, existingColumns = [] } = params;
   return rawData.map((row) => {
     const payload: Record<string, unknown> = {};
     fields.forEach((field) => {
