@@ -1009,6 +1009,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   {selectedViewOrder.data_pedido ? format(new Date(selectedViewOrder.data_pedido), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                 </p>
               </div>
+              {selectedViewOrder.prazo_resposta && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <CalendarIcon className="h-3 w-3" /> Data de Fechamento
+                  </p>
+                  <p className="text-sm font-medium">
+                    {format(parse(selectedViewOrder.prazo_resposta, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR })}
+                  </p>
+                </div>
+              )}
               {/* Renderização de Campos Extras dinâmicos */}
               {tableVisibleColumns.map(colId => {
                 const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);
