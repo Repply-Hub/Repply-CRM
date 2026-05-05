@@ -214,7 +214,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       // Atualizar nomes das colunas (padrão e extras) para salvar como colunas na página de Negócios
       const savedAllColumns = localStorage.getItem('pedidos_all_columns');
       let currentColumns = savedAllColumns ? JSON.parse(savedAllColumns) : [...VISIBLE_FIELDS.map(f => ({ id: f.key, label: f.label, type: 'text' }))];
+      const savedVisible = localStorage.getItem('pedidos_visible_columns');
+      let currentVisible: string[] = savedVisible ? JSON.parse(savedVisible) : currentColumns.map((c: any) => c.id);
       let hasChanges = false;
+      let visibleChanged = false;
 
       // Atualizar labels dos campos padrão que foram renomeados
       Object.entries(fieldLabels).forEach(([key, label]) => {
@@ -225,14 +228,27 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         }
       });
 
-      // A funcionalidade de adicionar automaticamente colunas extras foi removida
-      // para evitar a criação de colunas indesejadas (ex: endereço obra_1).
-      // Os usuários podem adicionar colunas manualmente se necessário nas configurações de colunas.
-
+      // Adicionar colunas extras (de mapeamento extra e colunas customizadas) para que apareçam
+      // na lista de Negócios e no botão de Opções de colunas.
+      extraFieldNames.forEach((name) => {
+        const id = `extra_${name}`;
+        if (!currentColumns.find((c: any) => c.id === id)) {
+          currentColumns.push({ id, label: name, type: 'text', isCustom: true });
+          hasChanges = true;
+        }
+        if (!currentVisible.includes(id)) {
+          currentVisible.push(id);
+          visibleChanged = true;
+        }
+      });
 
       if (hasChanges) {
         localStorage.setItem('pedidos_all_columns', JSON.stringify(currentColumns));
-        // Forçar atualização na página de Negócios se o hook useTableSettings estiver ouvindo
+      }
+      if (visibleChanged) {
+        localStorage.setItem('pedidos_visible_columns', JSON.stringify(currentVisible));
+      }
+      if (hasChanges || visibleChanged) {
         window.dispatchEvent(new Event('storage'));
       }
 

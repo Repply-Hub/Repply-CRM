@@ -120,40 +120,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     defaultColumns: PEDIDOS_COLUMNS,
   });
 
-  // Limpa colunas extras e garante que apenas as colunas padrão estejam visíveis
+  // Reage a mudanças no localStorage (ex.: importação adicionou novas colunas extras)
   useEffect(() => {
-    const defaultIds = PEDIDOS_COLUMNS.map(c => c.id);
-    const needsReset = columns.some(c => !defaultIds.includes(c.id)) || 
-                      visibleColumns.some(id => !defaultIds.includes(id));
-    
-    if (needsReset) {
-      console.log('Limpando colunas extras e redefinindo para o padrão');
-      // Redefine as colunas gerais para serem apenas as padrão
-      // Isso afetará o estado interno do hook via referência de memória se não tivermos cuidado,
-      // mas aqui estamos apenas disparando os setters do hook.
-      // O hook useTableSettings precisaria exportar setters para columns e visibleColumns individualmente
-      // ou ter uma função de reset. Como ele exporta setVisibleColumns, vamos usá-lo.
-      
-      setVisibleColumns(defaultIds);
-      
-      // Para remover permanentemente as colunas customizadas do columns, precisaríamos que o hook permitisse isso.
-      // Uma alternativa é limpar o localStorage e recarregar, mas é drástico.
-      // Vamos tentar forçar a visibilidade apenas das colunas permitidas.
-    }
-  }, [columns, visibleColumns, setVisibleColumns]);
+    const handler = () => {
+      const savedVisible = localStorage.getItem('pedidos_visible_columns');
+      if (savedVisible) {
+        try { setVisibleColumns(JSON.parse(savedVisible)); } catch {}
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, [setVisibleColumns]);
 
-  const tableVisibleColumns = useMemo(() => {
-    const defaultIds = PEDIDOS_COLUMNS.map(c => c.id);
-    return visibleColumns.filter(id => defaultIds.includes(id));
-  }, [visibleColumns]);
-
-  const allAvailableColumns = useMemo(() => {
-    const defaultIds = PEDIDOS_COLUMNS.map(c => c.id);
-    return columns.filter(c => defaultIds.includes(c.id));
-  }, [columns]);
-
-  // Sincronização automática de colunas removida para evitar criação de colunas indesejadas (ex: endereço obra_1).
-  // Os usuários podem adicionar colunas extras manualmente através das configurações de colunas.
+  const tableVisibleColumns = visibleColumns;
+  const allAvailableColumns = columns;
 
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
 
@@ -1001,13 +981,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                               <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} aria-label={`Selecionar ${p.cliente?.empresa}`} />
                             </TableCell>
                             {tableVisibleColumns.map(colId => {
-                              const isCustom = colId.startsWith('custom_');
+                              const isCustom = colId.startsWith('custom_') || colId.startsWith('extra_');
                               const daysInStage = Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000);
                               const isAlert = daysInStage >= 7;
                               if (isCustom) {
+                                const extraName = colId.startsWith('extra_') ? colId.slice(6) : colId;
+                                const value = camposExtras[extraName] ?? camposExtras[colId] ?? camposExtras[getLabel(colId)];
                                 return (
                                   <TableCell key={colId} className="text-xs text-muted-foreground">
-                                    {camposExtras[colId] || '—'}
+                                    {value || '—'}
                                   </TableCell>
                                 );
                               }
