@@ -266,9 +266,9 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                         tabIndex={0}
                                                                         onClick={() => !disabled && !isEditing && toggleColumn(column.id)}
                                                                         onKeyDown={e => {
-                                                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                                            if (!isEditing && (e.key === 'Enter' || e.key === ' ')) {
                                                                                 e.preventDefault();
-                                                                                if (!disabled && !isEditing) toggleColumn(column.id);
+                                                                                if (!disabled) toggleColumn(column.id);
                                                                             }
                                                                         }}
                                                                         className={cn(
