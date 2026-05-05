@@ -1154,8 +1154,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 )}
               </div>
 
-              <div className="w-full rounded-xl border border-border overflow-x-auto">
-                <Table>
+              <div className="w-full rounded-xl border border-border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="w-10">
