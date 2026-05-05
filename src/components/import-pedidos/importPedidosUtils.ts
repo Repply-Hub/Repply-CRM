@@ -1,9 +1,10 @@
 import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
 import * as XLSX from 'xlsx';
 
-export type FieldKey = 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status' | 'data_pedido';
+export type FieldKey = 'negocio' | 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status' | 'data_pedido';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
+  { key: 'negocio', label: 'Negócio', required: false },
   { key: 'cliente', label: 'Cliente', required: false },
   { key: 'fabricante', label: 'Fabricante', required: false },
   { key: 'valor', label: 'Valor', required: false },
@@ -13,6 +14,7 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
 ];
 
 const EMPTY_MAPPING: Record<FieldKey, string> = {
+  negocio: '',
   cliente: '',
   fabricante: '',
   valor: '',
@@ -24,6 +26,14 @@ const EMPTY_MAPPING: Record<FieldKey, string> = {
 const FIELD_KEYS = Object.keys(EMPTY_MAPPING) as FieldKey[];
 
 const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> = {
+  negocio: [
+    { pattern: /^negocio$/, score: 100 },
+    { pattern: /^titulo$/, score: 95 },
+    { pattern: /^nome\s+do\s+negocio$/, score: 100 },
+    { pattern: /^titulo\s+do\s+negocio$/, score: 95 },
+    { pattern: /negocio/, score: 85 },
+    { pattern: /titulo/, score: 80 },
+  ],
   cliente: [
     { pattern: /^cliente$/, score: 100 },
     { pattern: /^empresa$/, score: 100 },
@@ -91,6 +101,7 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
 };
 
 const MIN_SCORE: Record<FieldKey, number> = {
+  negocio: 70,
   cliente: 70,
   fabricante: 70,
   valor: 66,
@@ -238,6 +249,7 @@ export function getImportedPedidosRows(
 ) {
   return rows
     .map((row) => {
+      const negocio = mapping.negocio ? row[mapping.negocio]?.toString().trim() || '' : '';
       const cliente = mapping.cliente ? row[mapping.cliente]?.toString().trim() || '' : '';
       const fabricante = mapping.fabricante ? row[mapping.fabricante]?.toString().trim() || '' : '';
       const valor = mapping.valor ? parseNumber(row[mapping.valor]) : 0;
@@ -278,7 +290,7 @@ export function getImportedPedidosRows(
         if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
-      return { cliente, fabricante, valor, observacoes, status, data_pedido, campos_extras };
+      return { negocio, cliente, fabricante, valor, observacoes, status, data_pedido, campos_extras };
     })
     .filter((row) => row.cliente && row.fabricante);
 }
