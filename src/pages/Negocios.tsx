@@ -51,7 +51,7 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'vendedor', label: 'Responsável/Vendedor', locked: false },
   { id: 'data_pedido', label: 'Data', locked: false },
   { id: 'observacoes', label: 'Observações', locked: false },
-  { id: 'acoes', label: 'Ações', locked: true },
+  { id: 'acoes', label: 'Ações', locked: false },
 ];
 
 const PAGE_SIZE = 10;
