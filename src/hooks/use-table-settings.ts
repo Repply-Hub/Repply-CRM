@@ -24,10 +24,17 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as ColumnDefinition[];
-        // Remover duplicatas por ID que podem ter sido salvas anteriormente
-        const unique = Array.from(new Map(parsed.map(c => [c.id, c])).values());
+        // Filtra para manter APENAS colunas que existem nos padrões (remove extras)
+        const onlyDefaults = parsed.filter(col => 
+          defaultColumns.some(d => d.id === col.id)
+        );
         
-        return unique.map(col => {
+        // Se após filtrar não sobrou nada ou mudou o tamanho, volta para o padrão original
+        if (onlyDefaults.length === 0 || onlyDefaults.length !== defaultColumns.length) {
+          return defaultColumns;
+        }
+
+        return onlyDefaults.map(col => {
           const defaultCol = defaultColumns.find(d => d.id === col.id);
           return {
             ...col,
