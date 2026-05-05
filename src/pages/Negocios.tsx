@@ -49,6 +49,7 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'valor', label: 'Valor', locked: false },
   { id: 'etapa', label: 'Etapa', locked: false },
   { id: 'vendedor', label: 'Responsável/Vendedor', locked: false },
+  { id: 'observacoes', label: 'Observações', locked: false },
   { id: 'acoes', label: 'Ações', locked: true },
 ];
 
@@ -147,6 +148,8 @@ const PedidoRow = memo(({
             );
           case 'vendedor':
             return <TableCell key={colId}>{pedido.vendedor?.nome ?? '-'}</TableCell>;
+          case 'observacoes':
+            return <TableCell key={colId} className="max-w-[200px] truncate" title={pedido.observacoes}>{pedido.observacoes || '—'}</TableCell>;
           case 'acoes':
             return (
               <TableCell key={colId}>
