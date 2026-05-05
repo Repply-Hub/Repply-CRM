@@ -39,6 +39,7 @@ describe('importPedidosUtils', () => {
     const mapping = {
       negocio: 'Nome do negócio',
       cliente: 'Empresa',
+      obra: '',
       fabricante: 'Pipeline',
       valor: 'Valor total',
       vendedor: '',
