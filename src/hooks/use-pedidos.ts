@@ -71,9 +71,9 @@ export function usePedidos(empresaId?: string) {
 
       return allData;
     },
-    staleTime: 60_000,
+    staleTime: 0,
     gcTime: 5 * 60_000,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
   });
 }
 
