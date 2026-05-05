@@ -268,7 +268,25 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [setVisibleColumns]);
 
   const tableVisibleColumns = visibleColumns;
-  const allAvailableColumns = columns;
+  
+  // Filtrar colunas duplicadas que podem ter vindo de importações antigas
+  // Prioriza as colunas padrão do sistema se houver conflito de label
+  const allAvailableColumns = useMemo(() => {
+    const seen = new Set<string>();
+    return columns.filter(col => {
+      const label = (getLabel(col.id) || '').toLowerCase().trim();
+      const isDefault = PEDIDOS_COLUMNS.some(d => d.id === col.id);
+      
+      if (isDefault) {
+        seen.add(label);
+        return true;
+      }
+      
+      if (seen.has(label)) return false;
+      seen.add(label);
+      return true;
+    });
+  }, [columns, getLabel]);
 
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
 
