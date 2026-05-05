@@ -249,7 +249,8 @@ export function sanitizeImportedRows(params: {
       if (values.length > 0) {
         const sanitizedKey = String(displayName ?? '').trim();
         if (sanitizedKey) {
-          campos_extras[sanitizedKey] = values.join(' ');
+          // Segue a mesma regra de unificação com vírgula para campos extras
+          campos_extras[sanitizedKey] = values.join(', ');
         }
       }
     });
