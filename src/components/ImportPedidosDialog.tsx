@@ -41,6 +41,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   });
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
