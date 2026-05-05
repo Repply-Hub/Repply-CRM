@@ -517,4 +517,4 @@ export const ColumnSettings = memo(function ColumnSettings({
             </PopoverContent>
         </Popover>
     );
-}
+});
