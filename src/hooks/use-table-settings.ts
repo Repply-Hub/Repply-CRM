@@ -303,7 +303,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
   }, [defaultColumns]);
 
   return {
-    columns: currentColumns,
+    columns: currentColumns.map(c => ({ ...c, locked: false })), // Forçar desbloqueio de todas as colunas no retorno
     visibleColumns,
     setVisibleColumns,
     pageSize,
