@@ -24,7 +24,8 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as ColumnDefinition[];
-        // Remover duplicatas por ID
+        // Filter out any unwanted duplicated/wrong columns if necessary, 
+        // but here we just ensure uniqueness by ID.
         const unique = Array.from(new Map(parsed.map(c => [c.id, c])).values());
         
         return unique.map(col => {
