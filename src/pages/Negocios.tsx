@@ -211,17 +211,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
   
-  // Efeito para forçar o reset das colunas para os padrões e limpar o localStorage
+  // Efeito para forçar o reset total das colunas e limpar qualquer resquício de importações
   useEffect(() => {
-    const resetKey = 'pedidos_force_reset_defaults_v3';
+    const resetKey = 'pedidos_force_clean_v4';
     const hasBeenReset = localStorage.getItem(resetKey);
     
     if (!hasBeenReset) {
-      console.log('Forçando reset total das colunas para os padrões...');
-      localStorage.removeItem('pedidos_all_columns');
-      localStorage.removeItem('pedidos_visible_columns');
-      localStorage.removeItem('pedidos_custom_labels');
-      localStorage.removeItem('pedidos_presets');
+      console.log('Limpando completamente todas as configurações de colunas...');
+      // Remove todas as chaves relacionadas a configurações de tabela de pedidos
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('pedidos_')) {
+          localStorage.removeItem(key);
+        }
+      });
       localStorage.setItem(resetKey, 'true');
       window.location.reload();
     }
