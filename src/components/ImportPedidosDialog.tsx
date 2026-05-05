@@ -616,8 +616,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                 )}
               </Button>
             </div>
-              </Button>
-            </div>
           </div>
         )}
       </DialogContent>
