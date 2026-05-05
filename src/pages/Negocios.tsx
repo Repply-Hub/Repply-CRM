@@ -148,6 +148,8 @@ const PedidoRow = memo(({
             );
           case 'vendedor':
             return <TableCell key={colId}>{pedido.vendedor?.nome ?? '-'}</TableCell>;
+          case 'observacoes':
+            return <TableCell key={colId} className="max-w-[200px] truncate" title={pedido.observacoes}>{pedido.observacoes || '—'}</TableCell>;
           case 'acoes':
             return (
               <TableCell key={colId}>
