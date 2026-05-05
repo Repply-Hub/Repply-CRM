@@ -981,13 +981,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                               <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} aria-label={`Selecionar ${p.cliente?.empresa}`} />
                             </TableCell>
                             {tableVisibleColumns.map(colId => {
-                              const isCustom = colId.startsWith('custom_');
+                              const isCustom = colId.startsWith('custom_') || colId.startsWith('extra_');
                               const daysInStage = Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000);
                               const isAlert = daysInStage >= 7;
                               if (isCustom) {
+                                const extraName = colId.startsWith('extra_') ? colId.slice(6) : colId;
+                                const value = camposExtras[extraName] ?? camposExtras[colId] ?? camposExtras[getLabel(colId)];
                                 return (
                                   <TableCell key={colId} className="text-xs text-muted-foreground">
-                                    {camposExtras[colId] || '—'}
+                                    {value || '—'}
                                   </TableCell>
                                 );
                               }
