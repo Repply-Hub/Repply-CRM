@@ -707,15 +707,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <button
             type="button"
             onClick={() => {
-              localStorage.removeItem('pedidos_all_columns');
-              localStorage.removeItem('pedidos_visible_columns');
-              localStorage.removeItem('pedidos_custom_labels');
-              window.location.reload();
+              if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
+                localStorage.removeItem('pedidos_all_columns');
+                localStorage.removeItem('pedidos_visible_columns');
+                localStorage.removeItem('pedidos_custom_labels');
+                window.location.reload();
+              }
             }}
             className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium text-destructive hover:bg-destructive/10 transition-all text-left"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            <span>Resetar para Padrão</span>
+            <span>Limpar todas as colunas</span>
           </button>
         </div>
       </div>
