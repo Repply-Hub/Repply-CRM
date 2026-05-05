@@ -485,7 +485,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
-  const optionsPopover = (
+  const optionsPopover = useMemo(() => (
     <ColumnSettings
       columns={allAvailableColumns}
       visibleColumns={visibleColumns}
@@ -571,13 +571,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </div>
       </div>
     </ColumnSettings>
-  );
+  ), [allAvailableColumns, visibleColumns, setVisibleColumns, handleRename, handleTypeChange, handleReorder, handleAddColumn, handleRemoveColumn, showKanban, KANBAN_STAGES, visibleKanbanStages, toggleKanbanStage, handleKanbanStagesChange, setColunasDialogOpen, handleExportPdf, setImportOpen]);
 
-  const filtrosPopover = (
+  const filtrosPopover = useMemo(() => (
     <FilterButton
       hasFilters={hasPipelineFilters}
       activeFilterCount={activeFilterCount}
       onClear={clearPipelineFilters}
+
       align="end"
       popoverClassName="w-auto min-w-[820px] max-w-[980px] p-4"
     >
