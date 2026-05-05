@@ -548,7 +548,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{stageLabel(r.status)}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
-                        {r.data_pedido ? new Date(r.data_pedido).toLocaleDateString('pt-BR') : '-'}
+                        {r.data_pedido ? r.data_pedido.split('-').reverse().join('/') : '-'}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap max-w-[150px] truncate">{r.observacoes || '-'}</TableCell>
                       {extraFieldInfos.map(info => (
