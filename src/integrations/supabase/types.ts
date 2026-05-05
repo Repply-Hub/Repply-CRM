@@ -492,6 +492,53 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracoes_tabelas: {
+        Row: {
+          colunas: Json
+          colunas_visiveis: Json
+          created_at: string
+          empresa_id: string
+          id: string
+          labels_personalizados: Json
+          modelos: Json
+          tabela_key: string
+          tamanho_pagina: number
+          updated_at: string
+        }
+        Insert: {
+          colunas?: Json
+          colunas_visiveis?: Json
+          created_at?: string
+          empresa_id: string
+          id?: string
+          labels_personalizados?: Json
+          modelos?: Json
+          tabela_key: string
+          tamanho_pagina?: number
+          updated_at?: string
+        }
+        Update: {
+          colunas?: Json
+          colunas_visiveis?: Json
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          labels_personalizados?: Json
+          modelos?: Json
+          tabela_key?: string
+          tamanho_pagina?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configuracoes_tabelas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contatos: {
         Row: {
           bairro: string | null
