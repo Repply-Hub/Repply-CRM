@@ -64,6 +64,7 @@ const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: st
   complemento: { desc: 'Complemento do endereço.', example: 'Sala 101', storage: 'clientes.complemento', synonyms: ['complemento'] },
   data_criacao: { desc: 'Data de criação original, convertida para formato ISO quando possível.', example: '2024-01-31', storage: 'clientes.data_criacao', synonyms: ['data criacao', 'data criação', 'criado', 'criado em', 'data cadastro'], type: 'date' },
   cliente: { desc: 'Nome da empresa cliente.', example: 'Engecomp Soluções LTDA', storage: 'pedidos.cliente_id', synonyms: ['cliente', 'empresa', 'construtora'] },
+  obra: { desc: 'Nome ou endereço da obra.', example: 'Edifício Blue Tower', storage: 'pedidos.obra_id', synonyms: ['obra', 'endereco da obra', 'endereço da obra', 'local da obra'] },
   fabricante: { desc: 'Nome do fabricante.', example: 'Tigre', storage: 'pedidos.fabricante_id', synonyms: ['fabricante', 'fornecedor', 'marca', 'pipeline'] },
   valor: { desc: 'Valor total convertido para número.', example: '15420.75', storage: 'pedidos.valor_total', synonyms: ['valor', 'total', 'preco', 'preço', 'orcamento'], type: 'number' },
   observacoes: { desc: 'Notas livres sobre o registro.', example: 'Entrega prevista para 15/12', storage: 'pedidos.observacoes', synonyms: ['observacoes', 'observações', 'obs', 'nota', 'descricao'] },
