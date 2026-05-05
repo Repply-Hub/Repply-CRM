@@ -254,13 +254,14 @@ export function sanitizeImportedRows(params: {
     Object.entries(extras).forEach(([key, value]) => {
       const headers = getExtraHeaders(key, value);
       const displayName = getExtraDisplayName(key, value);
+      const storageKey = getExtraID(key, value);
       
       const values = headers
         .map(h => row[h])
         .filter(v => v !== undefined && v !== null && String(v ?? '').trim() !== '');
 
       if (values.length > 0) {
-        const sanitizedKey = String(displayName ?? '').trim();
+        const sanitizedKey = String(storageKey ?? displayName ?? '').trim();
         if (sanitizedKey) {
           // Segue a mesma regra de unificação com vírgula para campos extras
           campos_extras[sanitizedKey] = values.join(', ');
