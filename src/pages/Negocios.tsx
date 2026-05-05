@@ -156,6 +156,14 @@ const PedidoRow = memo(({
                   : '—'}
               </TableCell>
             );
+          case 'prazo_resposta':
+            return (
+              <TableCell key={colId} className="whitespace-nowrap px-4">
+                {pedido.prazo_resposta 
+                  ? format(parse(pedido.prazo_resposta, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR }) 
+                  : '—'}
+              </TableCell>
+            );
           case 'observacoes':
             return <TableCell key={colId} className="max-w-[300px] truncate px-4" title={pedido.observacoes}>{pedido.observacoes || '—'}</TableCell>;
           case 'acoes':
