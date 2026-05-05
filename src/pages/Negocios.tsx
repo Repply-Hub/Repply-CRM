@@ -151,7 +151,7 @@ const PedidoRow = memo(({
             return (
               <TableCell key={colId}>
                 {pedido.data_pedido 
-                  ? format(new Date(pedido.data_pedido), 'dd/MM/yyyy', { locale: ptBR }) 
+                  ? format(parse(pedido.data_pedido, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR }) 
                   : '—'}
               </TableCell>
             );
