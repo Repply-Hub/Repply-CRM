@@ -273,6 +273,18 @@ export function sanitizeImportedRows(params: {
       const sanitized = sanitizeFieldValue(value, 'text');
       if (sanitized !== undefined && String(sanitized).trim() && name.trim()) campos_extras[name.trim()] = String(sanitized);
     });
+
+    // Se houver cabeçalhos na planilha que coincidem com colunas existentes mas não foram mapeados, puxa-os automaticamente
+    existingColumns.forEach(col => {
+      // Só tenta se ainda não estiver preenchido por extras ou customColumns
+      if (campos_extras[col.id] || campos_extras[col.label]) return;
+      
+      const spreadsheetValue = row[col.label] ?? row[col.id];
+      if (spreadsheetValue !== undefined && spreadsheetValue !== null && String(spreadsheetValue).trim() !== '') {
+        campos_extras[col.id] = String(spreadsheetValue).trim();
+      }
+    });
+
     payload.campos_extras = campos_extras;
     return payload;
   });
