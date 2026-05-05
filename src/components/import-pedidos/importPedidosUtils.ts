@@ -8,7 +8,7 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'cliente', label: 'Cliente', required: false },
   { key: 'fabricante', label: 'Fabricante', required: false },
   { key: 'valor', label: 'Valor', required: false },
-  { key: 'status', label: 'Etapa/Status', required: false },
+  { key: 'status', label: 'Etapa', required: false },
   { key: 'data_pedido', label: 'Data', required: false },
   { key: 'observacoes', label: 'Observações', required: false },
 ];
