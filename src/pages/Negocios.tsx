@@ -570,23 +570,55 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   const handleBulkDelete = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) {
+      setConfirmDeleteOpen(false);
+      return;
+    }
+
     setIsDeleting(true);
+    let successCount = 0;
+    let failCount = 0;
+    
     try {
-      const ids = Array.from(selected);
-      const BATCH_SIZE = 500;
+      // Diminuímos o lote para 100 para melhor controle e evitar timeouts
+      const BATCH_SIZE = 100;
+      
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
+        
+        // Deletar o pedido principal - as relações possuem CASCADE no banco
+        // Mas deletamos explicitamente os itens e histórico para garantir integridade
         await supabase.from('itens_pedido').delete().in('pedido_id', batch);
         await supabase.from('historico_contatos').delete().in('pedido_id', batch);
-        await supabase.from('pedidos').delete().in('id', batch);
+        
+        const { error: pedidosError } = await supabase.from('pedidos').delete().in('id', batch);
+        
+        if (pedidosError) {
+          console.error('[bulk-delete batch error]', pedidosError);
+          failCount += batch.length;
+          toast.error(`Erro ao remover um lote de negócios: ${pedidosError.message}`);
+        } else {
+          successCount += batch.length;
+        }
       }
+      
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
-      toast.success(`${ids.length} negócio(s) removido(s)!`);
-      setSelected(new Set());
-      setConfirmDeleteOpen(false);
+      
+      if (failCount === 0) {
+        toast.success(`${successCount} negócio(s) removido(s) com sucesso!`);
+        setSelected(new Set());
+        setConfirmDeleteOpen(false);
+      } else if (successCount > 0) {
+        toast.warning(`${successCount} removidos, mas ${failCount} falharam. Isso pode ocorrer por falta de permissão em alguns registros.`);
+        setSelected(new Set());
+        setConfirmDeleteOpen(false);
+      } else {
+        toast.error(`Não foi possível remover os negócios. Verifique suas permissões de acesso.`);
+      }
     } catch (err: any) {
       console.error('[bulk-delete pedidos]', err);
-      toast.error(err?.message || 'Erro ao remover negócios');
+      toast.error(err?.message || 'Erro inesperado ao remover negócios');
     } finally {
       setIsDeleting(false);
     }

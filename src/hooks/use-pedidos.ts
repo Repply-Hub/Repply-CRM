@@ -62,7 +62,8 @@ export function usePedidos(empresaId?: string) {
         if (data && data.length > 0) {
           allData.push(...(data as unknown as PedidoWithRelations[]));
           from += pageSize;
-          hasMore = data.length === pageSize && allData.length < 10000;
+          // Aumentado o limite para 50.000 para evitar que negócios "fiquem para trás" em grandes bases
+          hasMore = data.length === pageSize && allData.length < 50000;
         } else {
           hasMore = false;
         }
