@@ -147,6 +147,14 @@ const PedidoRow = memo(({
             );
           case 'vendedor':
             return <TableCell key={colId}>{pedido.vendedor?.nome ?? '-'}</TableCell>;
+          case 'data_pedido':
+            return (
+              <TableCell key={colId}>
+                {pedido.data_pedido 
+                  ? format(new Date(pedido.data_pedido), 'dd/MM/yyyy', { locale: ptBR }) 
+                  : '—'}
+              </TableCell>
+            );
           case 'observacoes':
             return <TableCell key={colId} className="max-w-[200px] truncate" title={pedido.observacoes}>{pedido.observacoes || '—'}</TableCell>;
           case 'acoes':
