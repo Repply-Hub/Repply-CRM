@@ -570,32 +570,34 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   const handleBulkDelete = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) {
+      setConfirmDeleteOpen(false);
+      return;
+    }
+
     setIsDeleting(true);
     let successCount = 0;
     let failCount = 0;
     
     try {
-      const ids = Array.from(selected);
-      // Diminuímos o lote para 100 para melhor controle e evitar timeouts se houver muitos registros vinculados
+      // Diminuímos o lote para 100 para melhor controle e evitar timeouts
       const BATCH_SIZE = 100;
       
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
         
         // Deletar o pedido principal - as relações possuem CASCADE no banco
-        // Mas deletamos explicitamente os itens e histórico para garantir e evitar conflitos de RLS se as relações forem mais restritas
-        const { error: itemsError } = await supabase.from('itens_pedido').delete().in('pedido_id', batch);
-        if (itemsError) console.warn('Erro ao deletar itens:', itemsError);
-
-        const { error: contactsError } = await supabase.from('historico_contatos').delete().in('pedido_id', batch);
-        if (contactsError) console.warn('Erro ao deletar historico:', contactsError);
-
+        // Mas deletamos explicitamente os itens e histórico para garantir integridade
+        await supabase.from('itens_pedido').delete().in('pedido_id', batch);
+        await supabase.from('historico_contatos').delete().in('pedido_id', batch);
+        
         const { error: pedidosError } = await supabase.from('pedidos').delete().in('id', batch);
         
         if (pedidosError) {
           console.error('[bulk-delete batch error]', pedidosError);
           failCount += batch.length;
-          toast.error(`Erro ao remover lote de ${batch.length} negócios: ${pedidosError.message}`);
+          toast.error(`Erro ao remover um lote de negócios: ${pedidosError.message}`);
         } else {
           successCount += batch.length;
         }
@@ -608,15 +610,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         setSelected(new Set());
         setConfirmDeleteOpen(false);
       } else if (successCount > 0) {
-        toast.warning(`${successCount} removidos, mas ${failCount} falharam. Verifique suas permissões.`);
-        // Mantém selecionado apenas o que falhou
-        // Como não sabemos exatamente qual ID falhou no lote (o Postgres falha o lote todo), 
-        // em um cenário ideal deveríamos tentar um por um em caso de erro no lote.
-        // Por simplicidade, vamos limpar a seleção se algum sucesso ocorreu, mas avisar o usuário.
+        toast.warning(`${successCount} removidos, mas ${failCount} falharam. Isso pode ocorrer por falta de permissão em alguns registros.`);
         setSelected(new Set());
         setConfirmDeleteOpen(false);
       } else {
-        toast.error(`Falha ao remover os negócios selecionados. Verifique se você tem permissão.`);
+        toast.error(`Não foi possível remover os negócios. Verifique suas permissões de acesso.`);
       }
     } catch (err: any) {
       console.error('[bulk-delete pedidos]', err);
