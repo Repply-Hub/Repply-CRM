@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen, Type, Hash, Calendar, ToggleLeft, DollarSign, Filter } from 'lucide-react';
+import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen, Type, Hash, Calendar, ToggleLeft, DollarSign, Filter, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -281,13 +281,17 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                     >
                                                                         <div
                                                                             className={cn(
-                                                                                'h-3.5 w-3.5 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
+                                                                                'h-7 w-7 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
                                                                                 checked 
-                                                                                    ? 'bg-primary border-primary shadow-[0_2px_4px_rgba(var(--primary),0.3)]' 
-                                                                                    : 'bg-background border-border/60 group-hover/btn:border-primary/40'
+                                                                                    ? 'bg-primary/10 border-primary/20 text-primary shadow-sm' 
+                                                                                    : 'bg-background border-border/60 group-hover/btn:border-primary/40 text-muted-foreground'
                                                                             )}
                                                                         >
-                                                                            {checked && <Check className={cn("h-2.5 w-2.5 text-primary-foreground", disabled && "opacity-50")} />}
+                                                                            {checked ? (
+                                                                                <Eye className={cn("h-4 w-4", disabled && "opacity-50")} />
+                                                                            ) : (
+                                                                                <EyeOff className="h-4 w-4 opacity-40" />
+                                                                            )}
                                                                         </div>
                                                                         {isEditing ? (
                                                                             <div className="flex-1 flex flex-col gap-1.5" onClick={e => e.stopPropagation()}>
