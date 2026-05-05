@@ -239,17 +239,22 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       // Adicionar colunas extras (de mapeamento extra e colunas customizadas)
       extraFieldNames.forEach((name) => {
         const lowerName = name.toLowerCase().trim();
-        // Procurar se já existe uma coluna com o mesmo nome (mesmo que o ID seja diferente)
+        // Se o nome contém ", ", significa que veio de uma unificação. 
+        // Devemos usar apenas a primeira parte como ID/Label da coluna principal.
+        const mainName = name.includes(', ') ? name.split(', ')[0] : name;
+        const lowerMainName = mainName.toLowerCase().trim();
+
+        // Procurar se já existe uma coluna com o mesmo nome principal
         const existingCol = currentColumns.find(c => 
-          c.label.toLowerCase().trim() === lowerName || 
-          c.id === name
+          c.label.toLowerCase().trim() === lowerMainName || 
+          c.id === mainName
         );
 
         let finalId = existingCol?.id;
         
         if (!existingCol) {
-          finalId = name;
-          currentColumns.push({ id: finalId, label: name, type: 'text', isCustom: true });
+          finalId = mainName;
+          currentColumns.push({ id: finalId, label: mainName, type: 'text', isCustom: true });
           hasChanges = true;
         }
 
