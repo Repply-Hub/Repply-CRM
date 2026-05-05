@@ -133,6 +133,38 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
   }, [empresaId, key, columns, visibleColumns, customLabels, pageSize]);
 
   // 3. Persistence (LocalStorage as fallback/cache)
+  // Listen for storage changes (e.g. from ImportPedidosDialog)
+  useEffect(() => {
+    const handler = () => {
+      const savedAll = localStorage.getItem(`${key}_all_columns`);
+      if (savedAll) {
+        try {
+          const parsed = JSON.parse(savedAll) as ColumnDefinition[];
+          setColumns(parsed);
+        } catch {}
+      }
+      
+      const savedVisible = localStorage.getItem(`${key}_visible_columns`);
+      if (savedVisible) {
+        try {
+          const parsed = JSON.parse(savedVisible) as string[];
+          setVisibleColumns(parsed);
+        } catch {}
+      }
+
+      const savedLabels = localStorage.getItem(`${key}_custom_labels`);
+      if (savedLabels) {
+        try {
+          const parsed = JSON.parse(savedLabels) as Record<string, string>;
+          setCustomLabels(parsed);
+        } catch {}
+      }
+    };
+
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, [key]);
+
   useEffect(() => {
     localStorage.setItem(`${key}_all_columns`, JSON.stringify(columns));
   }, [key, columns]);
