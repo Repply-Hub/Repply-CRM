@@ -469,9 +469,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                   {fileName}
                 </Badge>
                 <Badge variant="outline">{previewRows.length} registros válidos</Badge>
-                {extraFieldNames.length > 0 && (
+                {extraFieldInfos.length > 0 && (
                   <Badge className="bg-accent text-accent-foreground border-accent">
-                    +{extraFieldNames.length} extra{extraFieldNames.length === 1 ? '' : 's'}
+                    +{extraFieldInfos.length} extra{extraFieldInfos.length === 1 ? '' : 's'}
                   </Badge>
                 )}
               </div>
@@ -483,8 +483,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 text-warning" />
               Clientes e fabricantes não encontrados serão criados automaticamente.
-              {extraFieldNames.length > 0 && (
-                <span>Extras: {extraFieldNames.join(', ')}.</span>
+              {extraFieldInfos.length > 0 && (
+                <span>Extras: {extraFieldInfos.map(info => info.label).join(', ')}.</span>
               )}
             </div>
 
