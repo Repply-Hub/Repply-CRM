@@ -532,6 +532,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     <TableHead className="text-xs sticky top-0 bg-muted/50">#</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Cliente</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Fabricante</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Obra</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Valor</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Etapa</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Data</TableHead>
