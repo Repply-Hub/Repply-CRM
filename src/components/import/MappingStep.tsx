@@ -476,15 +476,22 @@ export function MappingStep({
   };
 
   const updateExtraName = (oldKey: string, nextName: string) => {
+    // Se o nome digitado corresponder a uma coluna existente, vinculamos o ID
+    const existing = existingColumns.find(c => 
+      c.label.toLowerCase().trim() === nextName.toLowerCase().trim()
+    );
+
     setExtras((prev) => {
       const current = prev[oldKey];
+      const finalValue = existing ? `${existing.label}::${existing.id}` : nextName;
+      
       if (Array.isArray(current)) {
         const next = { ...prev };
         delete next[oldKey];
         next[nextName || oldKey] = current;
         return next;
       }
-      return { ...prev, [oldKey]: nextName };
+      return { ...prev, [oldKey]: finalValue };
     });
   };
 
