@@ -185,25 +185,27 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       existingColumns
     });
     
-    const remappedRows = (sanitized as any[]).map(item => {
+    // Garantir que os campos básicos existam no objeto de retorno para o preview/import
+    return (sanitized as any[]).map(item => {
       const { campos_extras, ...rest } = item;
       return {
-        ...rest,
-        ...(campos_extras || {})
+        cliente: rest.cliente || '',
+        fabricante: rest.fabricante || '',
+        obra: rest.obra || '',
+        negocio: rest.negocio || '',
+        valor: typeof rest.valor === 'number' ? rest.valor : 0,
+        vendedor: rest.vendedor || '',
+        status: rest.status || 'novo_lead',
+        data_pedido: rest.data_pedido || undefined,
+        observacoes: rest.observacoes || '',
+        campos_extras: campos_extras || {}
       };
     });
-
-    return getImportedPedidosRows(
-      remappedRows,
-      Object.fromEntries(VISIBLE_FIELDS.map((field) => [field.key, field.key])) as Record<FieldKey, any>,
-      extras,
-      customColumns
-    );
   };
 
   const previewRows = useMemo(
     () => (step === 'preview' ? getMappedRows() : []),
-    [step, mapping, rawData, extras, customColumns]
+    [step, mapping, rawData, extras, customColumns, fieldDefaultValues, fieldLabels]
   );
 
   const extraFieldInfos = useMemo(
@@ -239,10 +241,16 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   );
 
   const handleImport = async () => {
-    const rows = getMappedRows();
+    const allRows = getMappedRows();
+    const rows = allRows.filter(r => r.cliente && r.fabricante);
+    
     if (rows.length === 0) {
-      toast.error('Nenhum registro válido após o mapeamento');
+      toast.error('Nenhum registro válido para importar. Verifique se as colunas de Cliente e Fabricante estão mapeadas e preenchidas.');
       return;
+    }
+    
+    if (rows.length < allRows.length) {
+      toast.info(`${allRows.length - rows.length} linhas foram ignoradas por não possuírem Cliente ou Fabricante.`);
     }
     setImporting(true);
     try {
@@ -524,6 +532,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     <TableHead className="text-xs sticky top-0 bg-muted/50">#</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Cliente</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Fabricante</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Negócio</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Obra</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Vendedor</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Valor</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Etapa</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Data</TableHead>
@@ -541,12 +552,15 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                       <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="text-xs font-medium whitespace-nowrap">{r.cliente}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{r.fabricante}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap max-w-[120px] truncate">{r.negocio || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap max-w-[120px] truncate">{r.obra || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap max-w-[100px] truncate">{r.vendedor || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
                         {r.valor ? r.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{stageLabel(r.status)}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
-                        {r.data_pedido ? new Date(r.data_pedido).toLocaleDateString('pt-BR') : '-'}
+                        {r.data_pedido ? r.data_pedido.split('-').reverse().join('/') : '-'}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap max-w-[150px] truncate">{r.observacoes || '-'}</TableCell>
                       {extraFieldInfos.map(info => (
