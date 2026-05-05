@@ -33,10 +33,9 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
         const unique = Array.from(new Map(parsed.map(c => [c.id, c])).values());
         
         return unique.map(col => {
-          const defaultCol = defaultColumns.find(d => d.id === col.id);
           return {
             ...col,
-            locked: false // As colunas nunca devem estar travadas para edição/ocultação
+            locked: false // Garantir que nenhuma coluna esteja travada para edição
           };
         });
       } catch (e) {
