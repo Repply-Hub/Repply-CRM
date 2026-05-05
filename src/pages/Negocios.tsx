@@ -631,8 +631,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       onTypeChange={handleTypeChange}
       onReorder={handleReorder}
       onAdd={handleAddColumn}
+      onOpenChange={(open) => {
+        if (!open) {
+          // Quando fechar o popover, podemos forçar uma pequena limpeza se houver duplicatas de IDs
+          // Isso ajuda a manter a UI limpa.
+        }
+      }}
       onRemove={handleRemoveColumn}
-      hideColumns={showKanban}
+      hideColumns={false}
       label="Colunas"
     >
       <div className={cn("p-1", !showKanban && "border-t border-border/50")}>
