@@ -310,6 +310,7 @@ interface Props {
   fieldLabels?: Record<string, string>;
   setFieldLabels?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   visibleFields: FieldDef[];
+  existingColumns?: Array<{ id: string; label: string; isCustom?: boolean }>;
   onReset: () => void;
   onAutoDetect: () => void;
   onClearAll: () => void;
@@ -321,7 +322,7 @@ interface Props {
 
 export function MappingStep({
   fileName, rawData, headers, mapping, setMapping, fieldDefaultValues = {}, setFieldDefaultValues, extras, setExtras,
-  customColumns = {}, setCustomColumns, fieldLabels = {}, setFieldLabels, visibleFields,
+  customColumns = {}, setCustomColumns, fieldLabels = {}, setFieldLabels, visibleFields, existingColumns = [],
   onReset, onAutoDetect, onClearAll, onSaveAsDefault, isAutoSaveEnabled = false, canProceed, onNext,
 }: Props) {
   const [search, setSearch] = useState('');
