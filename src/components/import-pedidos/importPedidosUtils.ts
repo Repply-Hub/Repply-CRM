@@ -1,4 +1,5 @@
 import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
+import * as XLSX from 'xlsx';
 
 export type FieldKey = 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status' | 'data_pedido';
 
