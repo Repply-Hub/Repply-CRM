@@ -424,7 +424,16 @@ export function MappingStep({
   };
 
   const addExtra = (header: string) => {
-    setExtras((prev) => ({ ...prev, [header]: header }));
+    // Tenta encontrar uma coluna existente com o mesmo nome para reutilizar
+    const existing = existingColumns.find(c => 
+      c.label.toLowerCase().trim() === header.toLowerCase().trim()
+    );
+    
+    if (existing) {
+      setExtras((prev) => ({ ...prev, [header]: `${existing.label}::${existing.id}` }));
+    } else {
+      setExtras((prev) => ({ ...prev, [header]: header }));
+    }
   };
 
   const removeExtra = (header: string) => setExtras((prev) => {
