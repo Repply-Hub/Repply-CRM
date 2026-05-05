@@ -211,23 +211,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
   
-  // Efeito para forçar o reset total das colunas e limpar qualquer resquício de importações
-  useEffect(() => {
-    const resetKey = 'pedidos_force_clean_v4';
-    const hasBeenReset = localStorage.getItem(resetKey);
-    
-    if (!hasBeenReset) {
-      console.log('Limpando completamente todas as configurações de colunas...');
-      // Remove todas as chaves relacionadas a configurações de tabela de pedidos
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('pedidos_')) {
-          localStorage.removeItem(key);
-        }
-      });
-      localStorage.setItem(resetKey, 'true');
-      window.location.reload();
-    }
-  }, []);
+  // O efeito de limpeza total foi removido para permitir que novas colunas importadas apareçam nas opções.
+
 
   const {
     columns,
@@ -257,10 +242,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       if (savedVisible) {
         try { setVisibleColumns(JSON.parse(savedVisible)); } catch {}
       }
-      // Se as colunas mudarem (ex: resetadas), força atualização do estado local
+      
       const savedAll = localStorage.getItem('pedidos_all_columns');
       if (savedAll) {
-        // useTableSettings já deve estar escutando se necessário, mas aqui garantimos a sincronia do visible
+        // O hook useTableSettings já deve estar atualizando o estado 'columns' 
+        // mas este handler ajuda a manter a sincronia em diferentes abas ou disparos de eventos.
       }
     };
     window.addEventListener('storage', handler);
