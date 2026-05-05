@@ -67,6 +67,117 @@ interface NegociosProps {
   defaultView?: LegacyView;
 }
 
+const PedidoRow = memo(({ 
+  pedido, 
+  selected, 
+  onToggle, 
+  onClick, 
+  visibleColumns, 
+  KANBAN_STAGES, 
+  getLabel, 
+  stageLabel 
+}: { 
+  pedido: any, 
+  selected: boolean, 
+  onToggle: () => void, 
+  onClick: () => void, 
+  visibleColumns: string[],
+  KANBAN_STAGES: any[],
+  getLabel: (id: string) => string,
+  stageLabel: (status: string) => string
+}) => {
+  const camposExtras = pedido.campos_extras || {};
+  const daysInStage = Math.floor((Date.now() - new Date(pedido.created_at).getTime()) / 86400000);
+  const isAlert = daysInStage >= 7;
+
+  return (
+    <TableRow className={`cursor-pointer hover:bg-muted/30 ${selected ? 'bg-primary/5' : ''}`} onClick={onClick}>
+      <TableCell className="w-10" onClick={e => e.stopPropagation()}>
+        <Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Selecionar ${pedido.cliente?.empresa}`} />
+      </TableCell>
+      {visibleColumns.map(colId => {
+        const isCustom = colId.startsWith('custom_') || colId.startsWith('extra_');
+        if (isCustom) {
+          const extraName = colId.startsWith('extra_') ? colId.slice(6) : colId;
+          const value = camposExtras[extraName] ?? camposExtras[colId] ?? camposExtras[getLabel(colId)];
+          return (
+            <TableCell key={colId} className="text-xs text-muted-foreground">
+              {value || '—'}
+            </TableCell>
+          );
+        }
+
+        switch (colId) {
+          case 'negocio':
+            return (
+              <TableCell key={colId} className="min-w-[300px]">
+                <div className="space-y-2">
+                  {isAlert && (
+                    <div className="flex w-fit items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-1 text-[11px] font-semibold text-destructive">
+                      <AlertTriangle className="h-3 w-3" />
+                      {daysInStage} dias nesta etapa
+                    </div>
+                  )}
+                  <p className="pr-4 text-sm font-semibold leading-snug text-card-foreground">
+                    {pedido.cliente?.empresa ?? 'Sem cliente'}
+                  </p>
+                  <div className="grid gap-1.5 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+                      <span className="truncate">{pedido.obra?.nome_obra ?? '-'}</span>
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Factory className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+                      <span className="truncate">{pedido.fabricante?.nome ?? '-'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-card-foreground">
+                      <DollarSign className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                      {(pedido.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </div>
+                  </div>
+                </div>
+              </TableCell>
+            );
+          case 'cliente':
+            return <TableCell key={colId} className="font-medium">{pedido.cliente?.empresa ?? '-'}</TableCell>;
+          case 'obra':
+            return <TableCell key={colId}>{pedido.obra?.nome_obra ?? '-'}</TableCell>;
+          case 'fabricante':
+            return <TableCell key={colId}>{pedido.fabricante?.nome ?? '-'}</TableCell>;
+          case 'valor':
+            return <TableCell key={colId}>{(pedido.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>;
+          case 'etapa':
+            const stage = KANBAN_STAGES.find(s => s.key === pedido.status);
+            return (
+              <TableCell key={colId}>
+                <Badge className={`bg-${stage?.color || 'muted-foreground'} text-white`}>
+                  {stageLabel(pedido.status)}
+                </Badge>
+              </TableCell>
+            );
+          case 'vendedor':
+            return <TableCell key={colId}>{pedido.vendedor?.nome ?? '-'}</TableCell>;
+          case 'acoes':
+            return (
+              <TableCell key={colId}>
+                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClick} title="Visualizar e Editar">
+                    <Eye className="h-4 w-4 text-primary" />
+                  </Button>
+                </div>
+              </TableCell>
+            );
+          default:
+            return <TableCell key={colId}>—</TableCell>;
+        }
+      })}
+    </TableRow>
+  );
+});
+
+PedidoRow.displayName = 'PedidoRow';
+
+
 const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
