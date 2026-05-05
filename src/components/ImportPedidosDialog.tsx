@@ -259,7 +259,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           visibleChanged = true;
         }
       });
-      });
 
       if (hasChanges) {
         // Remove duplicatas físicas se existirem por erro anterior antes de salvar
