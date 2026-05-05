@@ -219,9 +219,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       let hasChanges = false;
       let visibleChanged = false;
 
-      // Garantir que as colunas padrão existem no currentColumns
+      // Garantir que as colunas padrão existem no currentColumns (sem duplicar)
       VISIBLE_FIELDS.forEach(f => {
-        if (!currentColumns.find(c => c.id === f.key)) {
+        if (!currentColumns.some(c => c.id === f.key)) {
           currentColumns.push({ id: f.key, label: f.label, type: 'text' });
           hasChanges = true;
         }
@@ -239,7 +239,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       // Adicionar colunas extras (de mapeamento extra e colunas customizadas)
       extraFieldNames.forEach((name) => {
         const id = `extra_${name}`;
-        if (!currentColumns.find((c: any) => c.id === id)) {
+        if (!currentColumns.some(c => c.id === id)) {
           currentColumns.push({ id, label: name, type: 'text', isCustom: true });
           hasChanges = true;
         }
