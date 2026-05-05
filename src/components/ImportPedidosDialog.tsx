@@ -311,7 +311,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           usuario_id: vid,
           status: r.status,
           valor_total: r.valor || null,
-          observacoes: r.observacoes || null,
+          observacoes: r.negocio || r.observacoes || null,
           campos_extras: r.campos_extras || {},
           data_pedido: (() => {
             if (!r.data_pedido) return new Date().toISOString().split('T')[0];
