@@ -111,7 +111,7 @@ const EditarPedido = () => {
       setVendedorId(p.usuario_id);
       setStatus(p.status || 'novo_lead');
       setDataPedido(parseISO(p.data_pedido));
-      setPrazoResposta(p.prazo_resposta ? parseISO(p.prazo_resposta) : undefined);
+      setPrazoResposta(p.prazo_resposta ? new Date(p.prazo_resposta + 'T12:00:00') : undefined);
       setOrigemLead(p.origem_lead || '');
       setEnderecoEntrega(p.endereco_entrega || '');
       setObservacoes(p.observacoes || '');
