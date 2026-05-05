@@ -33,10 +33,9 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
         const unique = Array.from(new Map(parsed.map(c => [c.id, c])).values());
         
         return unique.map(col => {
-          const defaultCol = defaultColumns.find(d => d.id === col.id);
           return {
             ...col,
-            locked: defaultCol ? (defaultCol.locked ?? false) : col.locked
+            locked: false // Garantir que nenhuma coluna esteja travada para edição
           };
         });
       } catch (e) {
@@ -304,7 +303,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
   }, [defaultColumns]);
 
   return {
-    columns: currentColumns,
+    columns: currentColumns.map(c => ({ ...c, locked: false })), // Forçar desbloqueio de todas as colunas no retorno
     visibleColumns,
     setVisibleColumns,
     pageSize,
