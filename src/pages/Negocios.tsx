@@ -989,20 +989,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                         />
                       ))
 
-                                      <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewOrderId(p.id)} title="Visualizar e Editar">
-                                          <Eye className="h-4 w-4 text-primary" />
-                                        </Button>
-                                      </div>
-                                    </TableCell>
-                                  );
-                                default:
-                                  return <TableCell key={colId}>—</TableCell>;
-                              }
-                            })}
-                          </TableRow>
-                        );
-                      })
                     )}
                   </TableBody>
                 </Table>
