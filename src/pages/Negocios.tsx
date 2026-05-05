@@ -48,7 +48,7 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'fabricante', label: 'Fabricante' },
   { id: 'valor', label: 'Valor' },
   { id: 'etapa', label: 'Etapa', locked: true },
-  { id: 'vendedor', label: 'Vendedor', locked: true },
+  { id: 'vendedor', label: 'Responsável/Vendedor', locked: true },
   { id: 'acoes', label: 'Ações', locked: true },
 ];
 
