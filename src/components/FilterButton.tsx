@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -15,7 +15,7 @@ interface FilterButtonProps {
   align?: 'start' | 'center' | 'end';
 }
 
-export function FilterButton({
+export const FilterButton = memo(function FilterButton({
   hasFilters,
   activeFilterCount,
   onClear,
@@ -68,4 +68,4 @@ export function FilterButton({
       </PopoverContent>
     </Popover>
   );
-}
+});

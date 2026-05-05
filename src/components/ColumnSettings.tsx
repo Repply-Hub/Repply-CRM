@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen, Type, Hash, Calendar, ToggleLeft, DollarSign, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,7 @@ const DATA_TYPES: { value: ColumnDataType; label: string; icon: any }[] = [
     { value: 'currency', label: 'Moeda', icon: DollarSign },
 ];
 
-export function ColumnSettings({
+export const ColumnSettings = memo(function ColumnSettings({
     columns,
     visibleColumns,
     onChange,
@@ -269,7 +269,7 @@ export function ColumnSettings({
                                                                             if (e.key === 'Enter' || e.key === ' ') {
                                                                                 e.preventDefault();
                                                                                 if (!disabled && !isEditing) toggleColumn(column.id);
-                                                                            }
+});
                                                                         }}
                                                                         className={cn(
                                                                             'flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left group/btn',
