@@ -1,6 +1,8 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ColumnDefinition, ColumnDataType } from '@/components/ColumnSettings';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
 
 interface TablePreset {
   id: string;
@@ -18,14 +20,16 @@ interface TableSettingsOptions {
 }
 
 export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: TableSettingsOptions) {
+  const { profile } = useAuth();
+  const empresaId = profile?.empresa_id;
+  const isInitialMount = useRef(true);
+
   // 1. Initial State from LocalStorage or Defaults
   const [columns, setColumns] = useState<ColumnDefinition[]>(() => {
     const saved = localStorage.getItem(`${key}_all_columns`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as ColumnDefinition[];
-        // Filter out any unwanted duplicated/wrong columns if necessary, 
-        // but here we just ensure uniqueness by ID.
         const unique = Array.from(new Map(parsed.map(c => [c.id, c])).values());
         
         return unique.map(col => {
@@ -63,7 +67,72 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     return saved ? JSON.parse(saved) : [];
   });
 
-  // 2. Persistence
+  // 2. Database Sync
+  // Load from DB
+  useEffect(() => {
+    if (!empresaId) return;
+
+    const loadSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('configuracoes_tabelas')
+          .select('*')
+          .eq('empresa_id', empresaId)
+          .eq('tabela_key', key)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          if (data.colunas) setColumns(data.colunas as any);
+          if (data.colunas_visiveis) setVisibleColumns(data.colunas_visiveis as any);
+          if (data.labels_personalizados) setCustomLabels(data.labels_personalizados as any);
+          if (data.tamanho_pagina) setPageSize(data.tamanho_pagina);
+          // If you decide to add presets to DB later:
+          // if (data.modelos) setPresets(data.modelos as any);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar configurações da tabela:', err);
+      }
+    };
+
+    loadSettings();
+  }, [empresaId, key]);
+
+  // Save to DB (debounced)
+  useEffect(() => {
+    if (!empresaId) return;
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const saveTimeout = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from('configuracoes_tabelas')
+          .upsert({
+            empresa_id: empresaId,
+            tabela_key: key,
+            colunas: columns,
+            colunas_visiveis: visibleColumns,
+            labels_personalizados: customLabels,
+            tamanho_pagina: pageSize,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'empresa_id, tabela_key'
+          });
+
+        if (error) throw error;
+      } catch (err) {
+        console.error('Erro ao salvar configurações da tabela:', err);
+      }
+    }, 1000);
+
+    return () => clearTimeout(saveTimeout);
+  }, [empresaId, key, columns, visibleColumns, customLabels, pageSize]);
+
+  // 3. Persistence (LocalStorage as fallback/cache)
   useEffect(() => {
     localStorage.setItem(`${key}_all_columns`, JSON.stringify(columns));
   }, [key, columns]);
@@ -84,7 +153,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     localStorage.setItem(`${key}_presets`, JSON.stringify(presets));
   }, [key, presets]);
 
-  // 3. Actions
+  // 4. Actions
   const handleRename = useCallback((columnId: string, newLabel: string) => {
     setCustomLabels(prev => ({ ...prev, [columnId]: newLabel }));
   }, []);
@@ -136,7 +205,6 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
       const [removed] = result.splice(startIndex, 1);
       result.splice(endIndex, 0, removed);
       
-      // Sincroniza a ordem das colunas visíveis com a nova ordem geral
       setVisibleColumns(currentVisible => {
         const sortedVisible = result
           .filter(col => currentVisible.includes(col.id))
