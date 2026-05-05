@@ -112,31 +112,19 @@ const PedidoRow = memo(({
         switch (colId) {
           case 'negocio':
             return (
-              <TableCell key={colId} className="min-w-[300px]">
-                <div className="space-y-2">
+              <TableCell key={colId} className="min-w-[200px]">
+                <div className="space-y-1">
                   {isAlert && (
-                    <div className="flex w-fit items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-1 text-[11px] font-semibold text-destructive">
+                    <div className="flex w-fit items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
                       <AlertTriangle className="h-3 w-3" />
                       {daysInStage} dias nesta etapa
                     </div>
                   )}
-                  <p className="pr-4 text-sm font-semibold leading-snug text-card-foreground">
-                    {pedido.cliente?.empresa ?? 'Sem cliente'}
+                  <p className="text-sm font-semibold leading-snug text-card-foreground">
+                    {pedido.observacoes && pedido.observacoes.trim() !== '' 
+                      ? pedido.observacoes 
+                      : (pedido.cliente?.empresa ?? 'Sem nome')}
                   </p>
-                  <div className="grid gap-1.5 text-xs text-muted-foreground sm:grid-cols-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
-                      <span className="truncate">{pedido.obra?.nome_obra ?? '-'}</span>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Factory className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
-                      <span className="truncate">{pedido.fabricante?.nome ?? '-'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-card-foreground">
-                      <DollarSign className="h-3.5 w-3.5 shrink-0 text-primary/70" />
-                      {(pedido.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </div>
-                  </div>
                 </div>
               </TableCell>
             );
