@@ -50,6 +50,7 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'etapa', label: 'Etapa', locked: false },
   { id: 'vendedor', label: 'Responsável/Vendedor', locked: false },
   { id: 'data_pedido', label: 'Data', locked: false },
+  { id: 'prazo_resposta', label: 'Fechamento', locked: false },
   { id: 'observacoes', label: 'Observações', locked: false },
   { id: 'acoes', label: 'Ações', locked: false },
 ];
