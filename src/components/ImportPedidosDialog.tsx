@@ -414,7 +414,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         const { error } = await supabase.from('pedidos').insert(batch);
         if (error) throw error;
         imported += batch.length;
+        setImportProgress(Math.min(95, 10 + Math.floor((imported / rows.length) * 85)));
       }
+
+      setImportProgress(100);
 
       qc.invalidateQueries({ queryKey: ['pedidos'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
