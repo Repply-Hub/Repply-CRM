@@ -42,13 +42,13 @@ import { cn } from '@/lib/utils';
 import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
-  { id: 'negocio', label: 'Negócio', locked: true },
-  { id: 'cliente', label: 'Cliente' },
-  { id: 'obra', label: 'Obra' },
-  { id: 'fabricante', label: 'Fabricante' },
-  { id: 'valor', label: 'Valor' },
-  { id: 'etapa', label: 'Etapa', locked: true },
-  { id: 'vendedor', label: 'Responsável/Vendedor', locked: true },
+  { id: 'negocio', label: 'Negócio', locked: false },
+  { id: 'cliente', label: 'Cliente', locked: false },
+  { id: 'obra', label: 'Obra', locked: false },
+  { id: 'fabricante', label: 'Fabricante', locked: false },
+  { id: 'valor', label: 'Valor', locked: false },
+  { id: 'etapa', label: 'Etapa', locked: false },
+  { id: 'vendedor', label: 'Responsável/Vendedor', locked: false },
   { id: 'acoes', label: 'Ações', locked: true },
 ];
 
