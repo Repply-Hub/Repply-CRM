@@ -37,29 +37,32 @@ describe('importPedidosUtils', () => {
 
   it('converte as linhas para o formato interno sem exigir mapeamento manual', () => {
     const mapping = {
+      negocio: 'Nome do negócio',
       cliente: 'Empresa',
       fabricante: 'Pipeline',
       valor: 'Valor total',
-      observacoes: 'Nome do negócio',
+      observacoes: '',
       status: 'Fase',
       data_pedido: '',
     };
 
     expect(getImportedPedidosRows(rows, mapping)).toEqual([
       {
+        negocio: 'Repav Rosário Edificações',
         cliente: 'Repav Rosário Edificações e Pavimentação',
         fabricante: 'Portobello',
         valor: 10500,
-        observacoes: 'Repav Rosário Edificações',
+        observacoes: '',
         status: 'negociacao',
         data_pedido: undefined,
         campos_extras: {},
       },
       {
+        negocio: 'Obra Torre Sul',
         cliente: 'Construtora ABC',
         fabricante: 'Eliane',
         valor: 2000,
-        observacoes: 'Obra Torre Sul',
+        observacoes: '',
         status: 'enviado',
         data_pedido: undefined,
         campos_extras: {},
