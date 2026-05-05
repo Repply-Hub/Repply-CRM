@@ -105,7 +105,7 @@ const PedidoRow = memo(({
           // Busca o valor em camposExtras usando o ID da coluna ou o label (fallback)
           const value = camposExtras[colId] ?? camposExtras[getLabel(colId)];
           return (
-            <TableCell key={colId} className="text-xs text-muted-foreground">
+            <TableCell key={colId} className="text-xs text-muted-foreground whitespace-nowrap px-4">
               {value || '—'}
             </TableCell>
           );
