@@ -173,7 +173,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                     </div>
                 </div>
                 
-                <div className="flex divide-x divide-border/50">
+                <div className="flex divide-x divide-border/50 overflow-visible">
                     {!hideColumns && (
                         <div className="w-[320px] p-2">
                             <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
