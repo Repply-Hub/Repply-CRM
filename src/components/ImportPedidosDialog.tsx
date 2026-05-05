@@ -241,10 +241,16 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   );
 
   const handleImport = async () => {
-    const rows = getMappedRows();
+    const allRows = getMappedRows();
+    const rows = allRows.filter(r => r.cliente && r.fabricante);
+    
     if (rows.length === 0) {
-      toast.error('Nenhum registro válido após o mapeamento');
+      toast.error('Nenhum registro válido para importar. Verifique se as colunas de Cliente e Fabricante estão mapeadas e preenchidas.');
       return;
+    }
+    
+    if (rows.length < allRows.length) {
+      toast.info(`${allRows.length - rows.length} linhas foram ignoradas por não possuírem Cliente ou Fabricante.`);
     }
     setImporting(true);
     try {
