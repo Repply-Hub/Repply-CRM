@@ -379,6 +379,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
       const BATCH = 200;
       let imported = 0;
+      setImportProgress(10); // Iniciando processamento
+
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH).map(r => {
           const clientId = clienteMap.get(r.cliente.toLowerCase().trim())!;
