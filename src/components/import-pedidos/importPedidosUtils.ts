@@ -1,4 +1,5 @@
 import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
+import * as XLSX from 'xlsx';
 
 export type FieldKey = 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status' | 'data_pedido';
 
@@ -242,7 +243,26 @@ export function getImportedPedidosRows(
       const valor = mapping.valor ? parseNumber(row[mapping.valor]) : 0;
       const observacoes = mapping.observacoes ? row[mapping.observacoes]?.toString().trim() || '' : '';
       const status = mapping.status ? resolveImportedPedidoStatus(row[mapping.status]) : 'novo_lead';
-      const data_pedido = mapping.data_pedido ? row[mapping.data_pedido]?.toString().trim() : undefined;
+      
+      let data_pedido = undefined;
+      if (mapping.data_pedido && row[mapping.data_pedido]) {
+        const rawDate = row[mapping.data_pedido];
+        if (typeof rawDate === 'number') {
+          // Handle Excel numeric date format
+          const date = XLSX.SSF.parse_date_code(rawDate);
+          data_pedido = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+        } else {
+          // Attempt to parse string date correctly ignoring timezone offsets
+          const d = new Date(rawDate.toString().trim());
+          if (!isNaN(d.getTime())) {
+            // Use UTC methods or manual parsing to avoid "one day off" timezone issues
+            const year = d.getUTCFullYear();
+            const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(d.getUTCDate()).padStart(2, '0');
+            data_pedido = `${year}-${month}-${day}`;
+          }
+        }
+      }
 
       const campos_extras: Record<string, string> = {};
       Object.entries(extras).forEach(([key, value]) => {
