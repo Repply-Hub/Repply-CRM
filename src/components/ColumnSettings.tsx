@@ -269,7 +269,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                             if (e.key === 'Enter' || e.key === ' ') {
                                                                                 e.preventDefault();
                                                                                 if (!disabled && !isEditing) toggleColumn(column.id);
-});
+                                                                            }
                                                                         }}
                                                                         className={cn(
                                                                             'flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left group/btn',
