@@ -159,6 +159,14 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
           setCustomLabels(parsed);
         } catch {}
       }
+
+      const savedPresets = localStorage.getItem(`${key}_presets`);
+      if (savedPresets) {
+        try {
+          const parsed = JSON.parse(savedPresets) as TablePreset[];
+          setPresets(parsed);
+        } catch {}
+      }
     };
 
     window.addEventListener('storage', handler);
