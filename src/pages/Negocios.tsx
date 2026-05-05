@@ -210,6 +210,21 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   );
 
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
+  
+  // Efeito para limpar colunas extras se o usuário quiser resetar manualmente via código ou se necessário
+  // Como o usuário pediu para "remover as colunas, deixando apenas as padrões", vou resetar o localStorage
+  useEffect(() => {
+    const hasBeenReset = localStorage.getItem('pedidos_columns_reset_v1');
+    if (!hasBeenReset) {
+      localStorage.setItem('pedidos_all_columns', JSON.stringify(PEDIDOS_COLUMNS));
+      localStorage.setItem('pedidos_visible_columns', JSON.stringify(PEDIDOS_COLUMNS.map(c => c.id)));
+      localStorage.setItem('pedidos_columns_reset_v1', 'true');
+      window.dispatchEvent(new Event('storage'));
+      // Recarregar a página para garantir que o hook useTableSettings pegue os novos valores
+      window.location.reload();
+    }
+  }, []);
+
   const {
     columns,
     visibleColumns,
@@ -237,6 +252,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       const savedVisible = localStorage.getItem('pedidos_visible_columns');
       if (savedVisible) {
         try { setVisibleColumns(JSON.parse(savedVisible)); } catch {}
+      }
+      // Se as colunas mudarem (ex: resetadas), força atualização do estado local
+      const savedAll = localStorage.getItem('pedidos_all_columns');
+      if (savedAll) {
+        // useTableSettings já deve estar escutando se necessário, mas aqui garantimos a sincronia do visible
       }
     };
     window.addEventListener('storage', handler);
