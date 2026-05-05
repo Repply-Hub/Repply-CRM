@@ -1193,7 +1193,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
                     )}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
                 <ListPagination
                   page={page}
                   totalPages={totalPages}
