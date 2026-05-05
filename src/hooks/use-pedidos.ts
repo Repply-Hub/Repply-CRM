@@ -83,7 +83,10 @@ export function useUpdatePedidoStatus() {
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const updateData: Record<string, unknown> = { status };
       if (status === 'fechamento') {
-        updateData.prazo_resposta = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const offset = now.getTimezoneOffset();
+        const localDate = new Date(now.getTime() - (offset * 60 * 1000));
+        updateData.prazo_resposta = localDate.toISOString().split('T')[0];
       }
       const { error } = await supabase.from('pedidos').update(updateData).eq('id', id);
       if (error) throw error;
