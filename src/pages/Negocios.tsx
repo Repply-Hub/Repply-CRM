@@ -1078,6 +1078,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   colorClass={stage.color}
                   orders={ordersByStage[stage.key] ?? []}
                   onCardClick={setViewOrderId}
+                  visibleColumns={visibleColumns}
                 />
               ))}
               <button
