@@ -338,13 +338,15 @@ export function MappingStep({
   const usedHeaders = useMemo(() => {
     const used = new Set<string>();
     Object.values(mapping).forEach(v => {
-      if (Array.isArray(v)) v.forEach(h => { if (typeof h === 'string') used.add(h); });
+      if (Array.isArray(v)) {
+        // Na unificação, todos os cabeçalhos são considerados "usados" e, portanto, "invisíveis" no seletor
+        v.forEach(h => { if (typeof h === 'string') used.add(h); });
+      }
       else if (typeof v === 'string' && v) used.add(v);
     });
-    Object.keys(extras).forEach(k => {
-      const v = extras[k];
-      if (Array.isArray(v)) v.forEach(h => { if (typeof h === 'string') used.add(h); });
-      else if (typeof k === 'string') used.add(k);
+    Object.entries(extras).forEach(([k, v]) => {
+      const headers = getExtraHeaders(k, v);
+      headers.forEach(h => used.add(h));
     });
     return used;
   }, [mapping, extras]);
