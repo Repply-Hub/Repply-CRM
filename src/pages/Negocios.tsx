@@ -96,10 +96,12 @@ const PedidoRow = memo(({
         <Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Selecionar ${pedido.cliente?.empresa}`} />
       </TableCell>
       {visibleColumns.map(colId => {
-        const isCustom = colId.startsWith('custom_') || colId.startsWith('extra_');
-        if (isCustom) {
-          const extraName = colId.startsWith('extra_') ? colId.slice(6) : colId;
-          const value = camposExtras[extraName] ?? camposExtras[colId] ?? camposExtras[getLabel(colId)];
+        // Colunas padrão do sistema
+        const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);
+        
+        if (!isDefault) {
+          // Busca o valor em camposExtras usando o ID da coluna ou o label (fallback)
+          const value = camposExtras[colId] ?? camposExtras[getLabel(colId)];
           return (
             <TableCell key={colId} className="text-xs text-muted-foreground">
               {value || '—'}
