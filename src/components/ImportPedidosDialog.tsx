@@ -387,6 +387,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           if (r.vendedor && !importedVendedorId) {
             finalCamposExtras['Vendedor Original'] = r.vendedor;
           }
+          
+          // Salva o título do negócio se ele for diferente do nome do cliente
+          if (r.negocio && r.negocio !== r.cliente) {
+            finalCamposExtras['Negócio'] = r.negocio;
+          }
 
           return {
             cliente_id: clientId,

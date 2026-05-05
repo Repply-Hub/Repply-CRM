@@ -123,7 +123,7 @@ const PedidoRow = memo(({
                     </div>
                   )}
                   <p className="text-sm font-semibold leading-snug text-card-foreground">
-                    {pedido.cliente?.empresa ?? 'Sem nome'}
+                    {camposExtras['Negócio'] || pedido.cliente?.empresa || 'Sem nome'}
                   </p>
                 </div>
               </TableCell>
