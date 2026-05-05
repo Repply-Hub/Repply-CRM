@@ -69,6 +69,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setFieldLabels({});
     setFileName('');
     setStep('upload');
+    setImportProgress(0);
     if (fileRef.current) fileRef.current.value = '';
   };
 
