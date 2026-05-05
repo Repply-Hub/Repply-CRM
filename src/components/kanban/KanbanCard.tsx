@@ -9,9 +9,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 interface KanbanCardProps {
   order: Order;
   index: number;
+  visibleColumns?: string[];
 }
 
-export const KanbanCard = memo(function KanbanCard({ order, index, onClick }: KanbanCardProps & { onClick?: (id: string) => void }) {
+export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visibleColumns }: KanbanCardProps & { onClick?: (id: string) => void }) {
   const navigate = useNavigate();
   const isAlert = order.daysInStage >= order.alertDays;
 
