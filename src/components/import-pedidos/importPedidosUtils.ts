@@ -75,6 +75,10 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
   observacoes: [
     { pattern: /^nome\s+do\s+negocio$/, score: 100 },
     { pattern: /^titulo\s+do\s+negocio$/, score: 95 },
+    { pattern: /^vendedor$/, score: 90 },
+    { pattern: /^responsavel$/, score: 90 },
+    { pattern: /vendedor/, score: 85 },
+    { pattern: /responsavel/, score: 85 },
     { pattern: /observa/, score: 95 },
     { pattern: /obs/, score: 92 },
     { pattern: /nota/, score: 88 },
