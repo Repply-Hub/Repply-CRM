@@ -129,6 +129,8 @@ export function useCreatePedidoCompleto() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pedidos'] });
+      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
+      qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
     },
   });
 }
