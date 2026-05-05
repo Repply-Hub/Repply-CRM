@@ -51,7 +51,7 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'vendedor', label: 'Responsável/Vendedor', locked: false },
   { id: 'data_pedido', label: 'Data', locked: false },
   { id: 'observacoes', label: 'Observações', locked: false },
-  { id: 'acoes', label: 'Ações', locked: true },
+  { id: 'acoes', label: 'Ações', locked: false },
 ];
 
 const PAGE_SIZE = 10;
@@ -268,7 +268,25 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [setVisibleColumns]);
 
   const tableVisibleColumns = visibleColumns;
-  const allAvailableColumns = columns;
+  
+  // Filtrar colunas duplicadas que podem ter vindo de importações antigas
+  // Prioriza as colunas padrão do sistema se houver conflito de label
+  const allAvailableColumns = useMemo(() => {
+    const seen = new Set<string>();
+    return columns.filter(col => {
+      const label = (getLabel(col.id) || '').toLowerCase().trim();
+      const isDefault = PEDIDOS_COLUMNS.some(d => d.id === col.id);
+      
+      if (isDefault) {
+        seen.add(label);
+        return true;
+      }
+      
+      if (seen.has(label)) return false;
+      seen.add(label);
+      return true;
+    });
+  }, [columns, getLabel]);
 
   const mode: PageMode = defaultView === 'lista' ? 'negocios' : 'pipeline';
 
@@ -447,6 +465,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     vendedor: p.vendedor?.nome ?? '-',
     vendedorId: p.usuario_id,
     createdAt: p.data_pedido,
+    campos_extras: p.campos_extras || {},
   })), [pedidos]);
 
   const pipelineOrders = useMemo(() => {
@@ -630,8 +649,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       onTypeChange={handleTypeChange}
       onReorder={handleReorder}
       onAdd={handleAddColumn}
+      onOpenChange={(open) => {
+        if (!open) {
+          // Quando fechar o popover, podemos forçar uma pequena limpeza se houver duplicatas de IDs
+          // Isso ajuda a manter a UI limpa.
+        }
+      }}
       onRemove={handleRemoveColumn}
-      hideColumns={showKanban}
+      hideColumns={false}
       label="Colunas"
     >
       <div className={cn("p-1", !showKanban && "border-t border-border/50")}>
@@ -1077,6 +1102,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   colorClass={stage.color}
                   orders={ordersByStage[stage.key] ?? []}
                   onCardClick={setViewOrderId}
+                  visibleColumns={visibleColumns}
                 />
               ))}
               <button

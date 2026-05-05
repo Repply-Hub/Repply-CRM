@@ -11,6 +11,7 @@ export interface Order {
   alertDays: number;
   vendedor: string;
   createdAt: string;
+  campos_extras?: Record<string, any>;
 }
 
 export interface Client {
