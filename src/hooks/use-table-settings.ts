@@ -109,8 +109,8 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
 
     const saveTimeout = setTimeout(async () => {
       try {
-        const { error } = await supabase
-          .from('configuracoes_tabelas')
+        const { error } = await (supabase
+          .from('configuracoes_tabelas') as any)
           .upsert({
             empresa_id: empresaId,
             tabela_key: key,
