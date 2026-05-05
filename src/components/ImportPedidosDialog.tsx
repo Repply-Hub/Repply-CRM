@@ -499,9 +499,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Etapa</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Data</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Obs</TableHead>
-                    {extraFieldNames.map(name => (
-                      <TableHead key={name} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
-                        {name} <span className="text-[10px] opacity-70">(extra)</span>
+                    {extraFieldInfos.map(info => (
+                      <TableHead key={info.id} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
+                        {info.label} <span className="text-[10px] opacity-70">(extra)</span>
                       </TableHead>
                     ))}
                   </TableRow>
@@ -520,9 +520,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                         {r.data_pedido ? new Date(r.data_pedido).toLocaleDateString('pt-BR') : '-'}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap max-w-[150px] truncate">{r.observacoes || '-'}</TableCell>
-                      {extraFieldNames.map(name => (
-                        <TableCell key={name} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
-                          {r.campos_extras?.[name] || '-'}
+                      {extraFieldInfos.map(info => (
+                        <TableCell key={info.id} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
+                          {r.campos_extras?.[info.id] || r.campos_extras?.[info.label] || '-'}
                         </TableCell>
                       ))}
                     </TableRow>
