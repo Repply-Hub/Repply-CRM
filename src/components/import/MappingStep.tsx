@@ -206,10 +206,13 @@ export function sanitizeImportedRows(params: {
           .filter(v => v !== undefined && v !== null && String(v ?? '').trim() !== '');
         
         if (values.length > 0) {
-          // Para campos de texto, une com espaço. Para outros, pega o primeiro valor não vazio
+          // Para campos de texto, une com vírgula e espaço seguindo a regra:
+          // A: 1, B: 2 -> "1, 2"
+          // A: empty, B: 2 -> "2"
+          // A: 1, B: empty -> "1"
           const type = getFieldType(field);
           if (type === 'text') {
-            rawValue = values.join(' ');
+            rawValue = values.join(', ');
           } else {
             rawValue = values[0];
           }
