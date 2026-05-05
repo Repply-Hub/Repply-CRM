@@ -447,6 +447,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     vendedor: p.vendedor?.nome ?? '-',
     vendedorId: p.usuario_id,
     createdAt: p.data_pedido,
+    campos_extras: p.campos_extras || {},
   })), [pedidos]);
 
   const pipelineOrders = useMemo(() => {
