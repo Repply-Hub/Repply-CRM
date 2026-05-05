@@ -131,7 +131,7 @@ const PedidoRow = memo(({
           case 'cliente':
             return <TableCell key={colId} className="font-medium">{pedido.cliente?.empresa ?? '-'}</TableCell>;
           case 'obra':
-            return <TableCell key={colId}>{pedido.obra?.nome_obra ?? '-'}</TableCell>;
+            return <TableCell key={colId}>{pedido.obra?.nome_obra ?? pedido.endereco_entrega ?? '-'}</TableCell>;
           case 'fabricante':
             return <TableCell key={colId}>{pedido.fabricante?.nome ?? '-'}</TableCell>;
           case 'valor':
@@ -151,7 +151,7 @@ const PedidoRow = memo(({
             return (
               <TableCell key={colId}>
                 {pedido.data_pedido 
-                  ? format(new Date(pedido.data_pedido), 'dd/MM/yyyy', { locale: ptBR }) 
+                  ? format(parse(pedido.data_pedido, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR }) 
                   : '—'}
               </TableCell>
             );

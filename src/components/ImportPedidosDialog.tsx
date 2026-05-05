@@ -322,10 +322,12 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const { data: clientes } = await supabase.from('clientes').select('id, empresa');
       const { data: fabricantes } = await supabase.from('fabricantes').select('id, nome');
       const { data: todosVendedores } = await supabase.from('usuarios').select('id, nome');
+      const { data: obras } = await supabase.from('obras').select('id, nome_obra, cliente_id');
 
       const clienteMap = new Map((clientes ?? []).map(c => [c.empresa.toLowerCase().trim(), c.id]));
       const fabricanteMap = new Map((fabricantes ?? []).map(f => [f.nome.toLowerCase().trim(), f.id]));
       const vendedorMap = new Map((todosVendedores ?? []).map(v => [v.nome?.toLowerCase().trim() || '', v.id]));
+      const obraMap = new Map((obras ?? []).map(o => [`${o.cliente_id}|${o.nome_obra?.toLowerCase().trim()}`, o.id]));
 
       const missingClientes = [...new Set(rows.map(r => r.cliente))].filter(c => !clienteMap.has(c.toLowerCase().trim()));
       if (missingClientes.length > 0) {
@@ -345,10 +347,31 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         newFabs?.forEach(f => fabricanteMap.set(f.nome.toLowerCase().trim(), f.id));
       }
 
+      // Processar obras faltantes
+      const obraRows = rows.filter(r => r.obra && r.obra.trim() !== '');
+      const missingObras = obraRows.filter(r => {
+        const clientId = clienteMap.get(r.cliente.toLowerCase().trim());
+        if (!clientId) return false;
+        return !obraMap.has(`${clientId}|${r.obra.toLowerCase().trim()}`);
+      });
+
+      if (missingObras.length > 0) {
+        const uniqueMissingObras = Array.from(new Map(missingObras.map(r => {
+          const clientId = clienteMap.get(r.cliente.toLowerCase().trim());
+          return [`${clientId}|${r.obra.toLowerCase().trim()}`, { nome_obra: r.obra, cliente_id: clientId }];
+        })).values());
+
+        const { data: newObras, error } = await supabase.from('obras').insert(uniqueMissingObras).select('id, nome_obra, cliente_id');
+        if (error) throw error;
+        newObras?.forEach(o => obraMap.set(`${o.cliente_id}|${o.nome_obra?.toLowerCase().trim()}`, o.id));
+      }
+
       const BATCH = 200;
       let imported = 0;
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH).map(r => {
+          const clientId = clienteMap.get(r.cliente.toLowerCase().trim())!;
+          const obraId = r.obra ? obraMap.get(`${clientId}|${r.obra.toLowerCase().trim()}`) : null;
           const importedVendedorId = r.vendedor ? vendedorMap.get(r.vendedor.toLowerCase().trim()) : null;
           
           // Se o vendedor da planilha não existir no sistema, salvamos o nome dele como um campo extra
@@ -358,20 +381,16 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           }
 
           return {
-            cliente_id: clienteMap.get(r.cliente.toLowerCase().trim())!,
+            cliente_id: clientId,
+            obra_id: obraId,
             fabricante_id: fabricanteMap.get(r.fabricante.toLowerCase().trim())!,
             usuario_id: importedVendedorId || vid,
             status: r.status,
             valor_total: r.valor || null,
             observacoes: r.observacoes || null,
             campos_extras: finalCamposExtras,
-          data_pedido: (() => {
-            if (!r.data_pedido) return new Date().toISOString().split('T')[0];
-            // Tenta converter o valor da planilha em uma data ISO válida (YYYY-MM-DD)
-            // r.data_pedido já deve vir formatado como YYYY-MM-DD da função getImportedPedidosRows
-            return r.data_pedido;
-          })(),
-          created_at: r.data_pedido ? `${r.data_pedido}T12:00:00Z` : new Date().toISOString(),
+            data_pedido: r.data_pedido || new Date().toISOString().split('T')[0],
+            created_at: r.data_pedido ? `${r.data_pedido}T12:00:00Z` : new Date().toISOString(),
           };
         });
         const { error } = await supabase.from('pedidos').insert(batch);

@@ -1,11 +1,12 @@
 import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
 import * as XLSX from 'xlsx';
 
-export type FieldKey = 'negocio' | 'cliente' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'data_pedido';
+export type FieldKey = 'negocio' | 'cliente' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'data_pedido';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'negocio', label: 'Negócio', required: false },
   { key: 'cliente', label: 'Cliente', required: false },
+  { key: 'obra', label: 'Obra/Endereço', required: false },
   { key: 'fabricante', label: 'Fabricante', required: false },
   { key: 'valor', label: 'Valor', required: false },
   { key: 'vendedor', label: 'Responsável/Vendedor', required: false },
@@ -17,6 +18,7 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
 const EMPTY_MAPPING: Record<FieldKey, string> = {
   negocio: '',
   cliente: '',
+  obra: '',
   fabricante: '',
   valor: '',
   vendedor: '',
@@ -44,6 +46,14 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /razao/, score: 75 },
     { pattern: /construtora/, score: 75 },
     { pattern: /nome.*cliente/, score: 70 },
+  ],
+  obra: [
+    { pattern: /^obra$/, score: 100 },
+    { pattern: /^endereco$/, score: 95 },
+    { pattern: /^endereco\s+da\s+obra$/, score: 100 },
+    { pattern: /obra/, score: 85 },
+    { pattern: /endereco/, score: 85 },
+    { pattern: /local/, score: 75 },
   ],
   fabricante: [
     { pattern: /^fabricante$/, score: 100 },
@@ -107,6 +117,7 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
 const MIN_SCORE: Record<FieldKey, number> = {
   negocio: 70,
   cliente: 70,
+  obra: 70,
   fabricante: 70,
   valor: 66,
   vendedor: 70,
@@ -256,6 +267,7 @@ export function getImportedPedidosRows(
     .map((row) => {
       const negocio = mapping.negocio ? row[mapping.negocio]?.toString().trim() || '' : '';
       const cliente = mapping.cliente ? row[mapping.cliente]?.toString().trim() || '' : '';
+      const obra = mapping.obra ? row[mapping.obra]?.toString().trim() || '' : '';
       const fabricante = mapping.fabricante ? row[mapping.fabricante]?.toString().trim() || '' : '';
       const valor = mapping.valor ? parseNumber(row[mapping.valor]) : 0;
       const vendedor = mapping.vendedor ? row[mapping.vendedor]?.toString().trim() || '' : '';
@@ -266,18 +278,31 @@ export function getImportedPedidosRows(
       if (mapping.data_pedido && row[mapping.data_pedido]) {
         const rawDate = row[mapping.data_pedido];
         if (typeof rawDate === 'number') {
-          // Handle Excel numeric date format
+          // Handle Excel numeric date format - Excel starts from 1899-12-30
+          // Use UTC to avoid timezone issues during conversion
           const date = XLSX.SSF.parse_date_code(rawDate);
           data_pedido = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
         } else {
-          // Attempt to parse string date correctly ignoring timezone offsets
-          const d = new Date(rawDate.toString().trim());
-          if (!isNaN(d.getTime())) {
-            // Use UTC methods or manual parsing to avoid "one day off" timezone issues
-            const year = d.getUTCFullYear();
-            const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(d.getUTCDate()).padStart(2, '0');
+          const dateStr = rawDate.toString().trim();
+          
+          // Tenta detectar formato DD/MM/YYYY ou DD-MM-YYYY
+          const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+          if (ddmmyyyyMatch) {
+            const day = ddmmyyyyMatch[1].padStart(2, '0');
+            const month = ddmmyyyyMatch[2].padStart(2, '0');
+            const year = ddmmyyyyMatch[3];
             data_pedido = `${year}-${month}-${day}`;
+          } else {
+            // Tenta converter qualquer string de data para o início do dia em UTC
+            const d = new Date(dateStr);
+            if (!isNaN(d.getTime())) {
+              // Se a string contiver apenas data (sem hora), o JS pode interpretar como UTC ou Local
+              // Para garantir consistência, extraímos os componentes
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              data_pedido = `${year}-${month}-${day}`;
+            }
           }
         }
       }
@@ -296,7 +321,7 @@ export function getImportedPedidosRows(
         if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
-      return { negocio, cliente, fabricante, valor, vendedor, observacoes, status, data_pedido, campos_extras };
+      return { negocio, cliente, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, campos_extras };
     })
     .filter((row) => row.cliente && row.fabricante);
 }

@@ -64,6 +64,7 @@ const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: st
   complemento: { desc: 'Complemento do endereço.', example: 'Sala 101', storage: 'clientes.complemento', synonyms: ['complemento'] },
   data_criacao: { desc: 'Data de criação original, convertida para formato ISO quando possível.', example: '2024-01-31', storage: 'clientes.data_criacao', synonyms: ['data criacao', 'data criação', 'criado', 'criado em', 'data cadastro'], type: 'date' },
   cliente: { desc: 'Nome da empresa cliente.', example: 'Engecomp Soluções LTDA', storage: 'pedidos.cliente_id', synonyms: ['cliente', 'empresa', 'construtora'] },
+  obra: { desc: 'Nome ou endereço da obra.', example: 'Edifício Blue Tower', storage: 'pedidos.obra_id', synonyms: ['obra', 'endereco da obra', 'endereço da obra', 'local da obra'] },
   fabricante: { desc: 'Nome do fabricante.', example: 'Tigre', storage: 'pedidos.fabricante_id', synonyms: ['fabricante', 'fornecedor', 'marca', 'pipeline'] },
   valor: { desc: 'Valor total convertido para número.', example: '15420.75', storage: 'pedidos.valor_total', synonyms: ['valor', 'total', 'preco', 'preço', 'orcamento'], type: 'number' },
   observacoes: { desc: 'Notas livres sobre o registro.', example: 'Entrega prevista para 15/12', storage: 'pedidos.observacoes', synonyms: ['observacoes', 'observações', 'obs', 'nota', 'descricao'] },
@@ -172,13 +173,26 @@ export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): str
       excelEpoch.setUTCDate(excelEpoch.getUTCDate() + value);
       return excelEpoch.toISOString().slice(0, 10);
     }
-    const br = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+    const str = raw.trim();
+    const br = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
     if (br) {
+      const day = br[1].padStart(2, '0');
+      const month = br[2].padStart(2, '0');
       const year = br[3].length === 2 ? `20${br[3]}` : br[3];
-      return `${year}-${br[2].padStart(2, '0')}-${br[1].padStart(2, '0')}`;
+      return `${year}-${month}-${day}`;
     }
-    const date = new Date(raw);
-    return Number.isNaN(date.getTime()) ? raw : date.toISOString().slice(0, 10);
+    const iso = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+    if (iso) {
+      return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+    }
+    const date = new Date(str);
+    if (!Number.isNaN(date.getTime())) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    return raw;
   }
   if (type === 'status') {
     const normalized = normalizeText(raw);
