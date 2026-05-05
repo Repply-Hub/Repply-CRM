@@ -238,7 +238,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                 </div>
                             )}
 
-                            <ScrollArea className="max-h-[320px] px-1.5 py-2">
+                            <div className="max-h-[320px] overflow-y-auto px-1.5 py-2 custom-scrollbar">
                                 <DragDropContext onDragEnd={handleDragEnd}>
                                     <Droppable droppableId="columns">
                                         {(provided) => (
