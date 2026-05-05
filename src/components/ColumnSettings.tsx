@@ -414,7 +414,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                         )}
                                     </Droppable>
                                 </DragDropContext>
-                            </ScrollArea>
+                            </div>
                         </div>
                     )}
 
