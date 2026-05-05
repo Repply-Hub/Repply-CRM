@@ -322,6 +322,5 @@ export function getImportedPedidosRows(
       });
 
       return { negocio, cliente, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, campos_extras };
-    })
-    .filter((row) => row.cliente && row.fabricante);
+    });
 }
