@@ -212,6 +212,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
   
   // O efeito de limpeza total foi removido para permitir que novas colunas importadas apareçam nas opções.
+  // No entanto, vamos garantir que colunas duplicadas sejam limpas se detectadas.
+  useEffect(() => {
+    const savedAll = localStorage.getItem('pedidos_all_columns');
+    if (savedAll) {
+      try {
+        const parsed = JSON.parse(savedAll);
+        const unique = Array.from(new Map(parsed.map((c: any) => [c.id, c])).values());
+        if (unique.length !== parsed.length) {
+          localStorage.setItem('pedidos_all_columns', JSON.stringify(unique));
+          window.dispatchEvent(new Event('storage'));
+        }
+      } catch (e) {}
+    }
+  }, []);
 
 
   const {
