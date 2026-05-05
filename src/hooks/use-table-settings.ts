@@ -36,7 +36,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
           const defaultCol = defaultColumns.find(d => d.id === col.id);
           return {
             ...col,
-            locked: defaultCol ? (defaultCol.locked ?? false) : col.locked
+            locked: false // As colunas nunca devem estar travadas para edição/ocultação
           };
         });
       } catch (e) {
