@@ -32,7 +32,20 @@ export function getExtraHeaders(key: string, value: ExtraMappingValue): string[]
 }
 
 export function getExtraDisplayName(key: string, value: ExtraMappingValue): string {
-  return Array.isArray(value) ? key : String(value || key);
+  if (Array.isArray(value)) return key;
+  // Se for uma string que contém "::", o formato é "Label::ID"
+  if (typeof value === 'string' && value.includes('::')) {
+    return value.split('::')[0];
+  }
+  return String(value || key);
+}
+
+export function getExtraID(key: string, value: ExtraMappingValue): string {
+  if (Array.isArray(value)) return key;
+  if (typeof value === 'string' && value.includes('::')) {
+    return value.split('::')[1];
+  }
+  return String(value || key);
 }
 
 const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: string; synonyms?: string[]; type?: SupabaseFieldType }> = {
@@ -187,8 +200,9 @@ export function sanitizeImportedRows(params: {
   customColumns?: Record<string, string>;
   fieldDefaultValues?: Record<string, string>;
   fieldLabels?: Record<string, string>;
+  existingColumns?: Array<{ id: string; label: string }>;
 }) {
-  const { rawData, fields, mapping, extras = {}, customColumns = {}, fieldDefaultValues = {}, fieldLabels = {} } = params;
+  const { rawData, fields, mapping, extras = {}, customColumns = {}, fieldDefaultValues = {}, fieldLabels = {}, existingColumns = [] } = params;
   return rawData.map((row) => {
     const payload: Record<string, unknown> = {};
     fields.forEach((field) => {
@@ -241,13 +255,14 @@ export function sanitizeImportedRows(params: {
     Object.entries(extras).forEach(([key, value]) => {
       const headers = getExtraHeaders(key, value);
       const displayName = getExtraDisplayName(key, value);
+      const storageKey = getExtraID(key, value);
       
       const values = headers
         .map(h => row[h])
         .filter(v => v !== undefined && v !== null && String(v ?? '').trim() !== '');
 
       if (values.length > 0) {
-        const sanitizedKey = String(displayName ?? '').trim();
+        const sanitizedKey = String(storageKey ?? displayName ?? '').trim();
         if (sanitizedKey) {
           // Segue a mesma regra de unificação com vírgula para campos extras
           campos_extras[sanitizedKey] = values.join(', ');
@@ -258,6 +273,18 @@ export function sanitizeImportedRows(params: {
       const sanitized = sanitizeFieldValue(value, 'text');
       if (sanitized !== undefined && String(sanitized).trim() && name.trim()) campos_extras[name.trim()] = String(sanitized);
     });
+
+    // Se houver cabeçalhos na planilha que coincidem com colunas existentes mas não foram mapeados, puxa-os automaticamente
+    existingColumns.forEach(col => {
+      // Só tenta se ainda não estiver preenchido por extras ou customColumns
+      if (campos_extras[col.id] || campos_extras[col.label]) return;
+      
+      const spreadsheetValue = row[col.label] ?? row[col.id];
+      if (spreadsheetValue !== undefined && spreadsheetValue !== null && String(spreadsheetValue).trim() !== '') {
+        campos_extras[col.id] = String(spreadsheetValue).trim();
+      }
+    });
+
     payload.campos_extras = campos_extras;
     return payload;
   });
@@ -297,6 +324,7 @@ interface Props {
   fieldLabels?: Record<string, string>;
   setFieldLabels?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   visibleFields: FieldDef[];
+  existingColumns?: Array<{ id: string; label: string; isCustom?: boolean }>;
   onReset: () => void;
   onAutoDetect: () => void;
   onClearAll: () => void;
@@ -308,7 +336,7 @@ interface Props {
 
 export function MappingStep({
   fileName, rawData, headers, mapping, setMapping, fieldDefaultValues = {}, setFieldDefaultValues, extras, setExtras,
-  customColumns = {}, setCustomColumns, fieldLabels = {}, setFieldLabels, visibleFields,
+  customColumns = {}, setCustomColumns, fieldLabels = {}, setFieldLabels, visibleFields, existingColumns = [],
   onReset, onAutoDetect, onClearAll, onSaveAsDefault, isAutoSaveEnabled = false, canProceed, onNext,
 }: Props) {
   const [search, setSearch] = useState('');
@@ -410,7 +438,16 @@ export function MappingStep({
   };
 
   const addExtra = (header: string) => {
-    setExtras((prev) => ({ ...prev, [header]: header }));
+    // Tenta encontrar uma coluna existente com o mesmo nome para reutilizar
+    const existing = existingColumns.find(c => 
+      c.label.toLowerCase().trim() === header.toLowerCase().trim()
+    );
+    
+    if (existing) {
+      setExtras((prev) => ({ ...prev, [header]: `${existing.label}::${existing.id}` }));
+    } else {
+      setExtras((prev) => ({ ...prev, [header]: header }));
+    }
   };
 
   const removeExtra = (header: string) => setExtras((prev) => {
@@ -453,20 +490,36 @@ export function MappingStep({
   };
 
   const updateExtraName = (oldKey: string, nextName: string) => {
+    // Se o nome digitado corresponder a uma coluna existente, vinculamos o ID
+    const existing = existingColumns.find(c => 
+      c.label.toLowerCase().trim() === nextName.toLowerCase().trim()
+    );
+
     setExtras((prev) => {
       const current = prev[oldKey];
+      const finalValue = existing ? `${existing.label}::${existing.id}` : nextName;
+      
       if (Array.isArray(current)) {
         const next = { ...prev };
         delete next[oldKey];
         next[nextName || oldKey] = current;
         return next;
       }
-      return { ...prev, [oldKey]: nextName };
+      return { ...prev, [oldKey]: finalValue };
     });
   };
 
   const handleContinue = () => {
-    const payload = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues, fieldLabels });
+    const payload = sanitizeImportedRows({ 
+      rawData, 
+      fields: visibleFields, 
+      mapping, 
+      extras, 
+      customColumns, 
+      fieldDefaultValues, 
+      fieldLabels,
+      existingColumns 
+    });
     onNext(payload);
   };
 

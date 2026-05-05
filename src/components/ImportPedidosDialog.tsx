@@ -44,6 +44,19 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+  
+  // Obter colunas existentes para reutilização no mapeamento
+  const existingColumns = useMemo(() => {
+    const saved = localStorage.getItem('pedidos_all_columns');
+    if (saved) {
+      try {
+        return JSON.parse(saved) as Array<{ id: string; label: string; isCustom?: boolean }>;
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  }, [open]);
 
   const reset = () => {
     setRawData([]);
@@ -168,7 +181,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       extras, 
       customColumns, 
       fieldDefaultValues, 
-      fieldLabels 
+      fieldLabels,
+      existingColumns
     });
     
     const remappedRows = (sanitized as any[]).map(item => {
@@ -192,11 +206,35 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     [step, mapping, rawData, extras, customColumns]
   );
 
-  const extraFieldNames = useMemo(
-    () => Array.from(new Set([
-      ...Object.entries(extras).map(([col, value]) => getExtraDisplayName(col, value).trim()),
-      ...Object.keys(customColumns).map(n => n.trim()),
-    ].filter(Boolean))),
+  const extraFieldInfos = useMemo(
+    () => {
+      const infos: Array<{ id: string; label: string }> = [];
+      
+      Object.entries(extras).forEach(([col, value]) => {
+        const label = getExtraDisplayName(col, value).trim();
+        // Tenta encontrar se já existe um ID mapeado (via Label::ID)
+        const id = (typeof value === 'string' && value.includes('::')) 
+          ? value.split('::')[1] 
+          : label;
+        
+        if (label) infos.push({ id, label });
+      });
+
+      Object.keys(customColumns).forEach(name => {
+        if (name.trim()) infos.push({ id: name.trim(), label: name.trim() });
+      });
+
+      // Remover duplicatas de ID
+      const unique: Array<{ id: string; label: string }> = [];
+      const usedIds = new Set<string>();
+      infos.forEach(info => {
+        if (!usedIds.has(info.id)) {
+          unique.push(info);
+          usedIds.add(info.id);
+        }
+      });
+      return unique;
+    },
     [extras, customColumns]
   );
 
@@ -237,15 +275,15 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       });
 
       // Adicionar colunas extras (de mapeamento extra e colunas customizadas)
-      extraFieldNames.forEach((name) => {
-        const lowerName = name.toLowerCase().trim();
-        // Se o nome contém ", ", significa que veio de uma unificação. 
-        // Devemos usar apenas a primeira parte como ID/Label da coluna principal.
-        const mainName = name.includes(', ') ? name.split(', ')[0] : name;
+      extraFieldInfos.forEach((info) => {
+        const { id, label } = info;
+        const lowerLabel = label.toLowerCase().trim();
+        const mainName = label.includes(', ') ? label.split(', ')[0] : label;
         const lowerMainName = mainName.toLowerCase().trim();
 
         // Procurar se já existe uma coluna com o mesmo nome principal OU o mesmo ID
         const existingCol = currentColumns.find(c => 
+          c.id === id ||
           c.label.toLowerCase().trim() === lowerMainName || 
           c.id.toLowerCase().trim() === lowerMainName ||
           c.id === mainName
@@ -254,7 +292,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         let finalId = existingCol?.id;
         
         if (!existingCol) {
-          finalId = mainName;
+          finalId = id;
           currentColumns.push({ id: finalId, label: mainName, type: 'text', isCustom: true });
           hasChanges = true;
         }
@@ -405,6 +443,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             fieldLabels={fieldLabels}
             setFieldLabels={setFieldLabels}
             visibleFields={VISIBLE_FIELDS}
+            existingColumns={existingColumns}
             onReset={reset}
             onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
             onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
@@ -431,9 +470,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                   {fileName}
                 </Badge>
                 <Badge variant="outline">{previewRows.length} registros válidos</Badge>
-                {extraFieldNames.length > 0 && (
+                {extraFieldInfos.length > 0 && (
                   <Badge className="bg-accent text-accent-foreground border-accent">
-                    +{extraFieldNames.length} extra{extraFieldNames.length === 1 ? '' : 's'}
+                    +{extraFieldInfos.length} extra{extraFieldInfos.length === 1 ? '' : 's'}
                   </Badge>
                 )}
               </div>
@@ -445,8 +484,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 text-warning" />
               Clientes e fabricantes não encontrados serão criados automaticamente.
-              {extraFieldNames.length > 0 && (
-                <span>Extras: {extraFieldNames.join(', ')}.</span>
+              {extraFieldInfos.length > 0 && (
+                <span>Extras: {extraFieldInfos.map(info => info.label).join(', ')}.</span>
               )}
             </div>
 
@@ -461,9 +500,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Etapa</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Data</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Obs</TableHead>
-                    {extraFieldNames.map(name => (
-                      <TableHead key={name} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
-                        {name} <span className="text-[10px] opacity-70">(extra)</span>
+                    {extraFieldInfos.map(info => (
+                      <TableHead key={info.id} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
+                        {info.label} <span className="text-[10px] opacity-70">(extra)</span>
                       </TableHead>
                     ))}
                   </TableRow>
@@ -482,9 +521,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                         {r.data_pedido ? new Date(r.data_pedido).toLocaleDateString('pt-BR') : '-'}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap max-w-[150px] truncate">{r.observacoes || '-'}</TableCell>
-                      {extraFieldNames.map(name => (
-                        <TableCell key={name} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
-                          {r.campos_extras?.[name] || '-'}
+                      {extraFieldInfos.map(info => (
+                        <TableCell key={info.id} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
+                          {r.campos_extras?.[info.id] || r.campos_extras?.[info.label] || '-'}
                         </TableCell>
                       ))}
                     </TableRow>
