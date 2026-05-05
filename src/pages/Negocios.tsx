@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useDeferredValue } from 'react';
+import { useEffect, useMemo, useState, useCallback, useDeferredValue, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parse, isValid } from 'date-fns';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
