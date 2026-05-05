@@ -213,11 +213,19 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
       // Atualizar nomes das colunas (padrão e extras) para salvar como colunas na página de Negócios
       const savedAllColumns = localStorage.getItem('pedidos_all_columns');
-      let currentColumns = savedAllColumns ? JSON.parse(savedAllColumns) : [...VISIBLE_FIELDS.map(f => ({ id: f.key, label: f.label, type: 'text' }))];
+      let currentColumns: any[] = savedAllColumns ? JSON.parse(savedAllColumns) : [...VISIBLE_FIELDS.map(f => ({ id: f.key, label: f.label, type: 'text' }))];
       const savedVisible = localStorage.getItem('pedidos_visible_columns');
       let currentVisible: string[] = savedVisible ? JSON.parse(savedVisible) : currentColumns.map((c: any) => c.id);
       let hasChanges = false;
       let visibleChanged = false;
+
+      // Garantir que as colunas padrão existem no currentColumns (sem duplicar)
+      VISIBLE_FIELDS.forEach(f => {
+        if (!currentColumns.some(c => c.id === f.key)) {
+          currentColumns.push({ id: f.key, label: f.label, type: 'text' });
+          hasChanges = true;
+        }
+      });
 
       // Atualizar labels dos campos padrão que foram renomeados
       Object.entries(fieldLabels).forEach(([key, label]) => {
@@ -228,11 +236,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         }
       });
 
-      // Adicionar colunas extras (de mapeamento extra e colunas customizadas) para que apareçam
-      // na lista de Negócios e no botão de Opções de colunas.
+      // Adicionar colunas extras (de mapeamento extra e colunas customizadas)
       extraFieldNames.forEach((name) => {
         const id = `extra_${name}`;
-        if (!currentColumns.find((c: any) => c.id === id)) {
+        if (!currentColumns.some(c => c.id === id)) {
           currentColumns.push({ id, label: name, type: 'text', isCustom: true });
           hasChanges = true;
         }
