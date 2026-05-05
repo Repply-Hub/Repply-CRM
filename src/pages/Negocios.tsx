@@ -131,7 +131,7 @@ const PedidoRow = memo(({
           case 'cliente':
             return <TableCell key={colId} className="font-medium">{pedido.cliente?.empresa ?? '-'}</TableCell>;
           case 'obra':
-            return <TableCell key={colId}>{pedido.obra?.nome_obra ?? '-'}</TableCell>;
+            return <TableCell key={colId}>{pedido.obra?.nome_obra ?? pedido.endereco_entrega ?? '-'}</TableCell>;
           case 'fabricante':
             return <TableCell key={colId}>{pedido.fabricante?.nome ?? '-'}</TableCell>;
           case 'valor':
