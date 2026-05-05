@@ -255,6 +255,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       toast.info(`${allRows.length - rows.length} linhas foram ignoradas por não possuírem Cliente ou Fabricante.`);
     }
     setImporting(true);
+    setImportProgress(0);
     try {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       if (!vid) throw new Error('Vendedor não encontrado');
