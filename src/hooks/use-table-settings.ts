@@ -51,8 +51,10 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem(`${key}_visible_columns`);
     const initial = saved ? JSON.parse(saved) : defaultColumns.map(c => c.id);
-    // Garantir que as colunas visíveis são únicas
-    return Array.from(new Set(initial));
+    // Garantir que as colunas visíveis são apenas as que existem nos padrões
+    return Array.from(new Set(initial)).filter(id => 
+      defaultColumns.some(d => d.id === id)
+    ) as string[];
   });
 
   const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
