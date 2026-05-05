@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,6 +42,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   });
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
@@ -68,6 +70,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setFieldLabels({});
     setFileName('');
     setStep('upload');
+    setImportProgress(0);
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -253,6 +256,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       toast.info(`${allRows.length - rows.length} linhas foram ignoradas por não possuírem Cliente ou Fabricante.`);
     }
     setImporting(true);
+    setImportProgress(0);
     try {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       if (!vid) throw new Error('Vendedor não encontrado');
@@ -376,6 +380,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
       const BATCH = 200;
       let imported = 0;
+      setImportProgress(10); // Iniciando processamento
+
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH).map(r => {
           const clientId = clienteMap.get(r.cliente.toLowerCase().trim())!;
@@ -409,7 +415,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         const { error } = await supabase.from('pedidos').insert(batch);
         if (error) throw error;
         imported += batch.length;
+        setImportProgress(Math.min(95, 10 + Math.floor((imported / rows.length) * 85)));
       }
+
+      setImportProgress(100);
 
       qc.invalidateQueries({ queryKey: ['pedidos'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
@@ -584,8 +593,21 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               )}
             </div>
 
+            {importing && (
+              <div className="space-y-2 py-4">
+                <div className="flex justify-between text-xs font-medium">
+                  <span>Processando importação...</span>
+                  <span>{importProgress}%</span>
+                </div>
+                <Progress value={importProgress} className="h-2" />
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Não feche esta janela até a conclusão
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStep('mapping')}>Voltar</Button>
+              <Button variant="outline" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
               <Button onClick={handleImport} disabled={importing}>
                 {importing ? (
                   <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importando...</>
