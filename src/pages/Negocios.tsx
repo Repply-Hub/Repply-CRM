@@ -213,14 +213,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   
   // Efeito para forçar o reset das colunas para os padrões e limpar o localStorage
   useEffect(() => {
-    const resetKey = 'pedidos_force_reset_defaults_v2';
+    const resetKey = 'pedidos_force_reset_defaults_v3';
     const hasBeenReset = localStorage.getItem(resetKey);
     
     if (!hasBeenReset) {
-      console.log('Forçando reset das colunas para os padrões...');
+      console.log('Forçando reset total das colunas para os padrões...');
       localStorage.removeItem('pedidos_all_columns');
       localStorage.removeItem('pedidos_visible_columns');
       localStorage.removeItem('pedidos_custom_labels');
+      localStorage.removeItem('pedidos_presets');
       localStorage.setItem(resetKey, 'true');
       window.location.reload();
     }
