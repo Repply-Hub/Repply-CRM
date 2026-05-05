@@ -44,6 +44,19 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+  
+  // Obter colunas existentes para reutilização no mapeamento
+  const existingColumns = useMemo(() => {
+    const saved = localStorage.getItem('pedidos_all_columns');
+    if (saved) {
+      try {
+        return JSON.parse(saved) as Array<{ id: string; label: string; isCustom?: boolean }>;
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  }, [open]);
 
   const reset = () => {
     setRawData([]);
