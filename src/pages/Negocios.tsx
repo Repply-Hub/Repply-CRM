@@ -975,79 +975,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      paginated.map(p => {
-                        const camposExtras = (p as any).campos_extras || {};
-                        return (
-                          <TableRow key={p.id} className={`cursor-pointer hover:bg-muted/30 ${selected.has(p.id) ? 'bg-primary/5' : ''}`} onClick={() => setViewOrderId(p.id)}>
-                            <TableCell className="w-10" onClick={e => e.stopPropagation()}>
-                              <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} aria-label={`Selecionar ${p.cliente?.empresa}`} />
-                            </TableCell>
-                            {tableVisibleColumns.map(colId => {
-                              const isCustom = colId.startsWith('custom_') || colId.startsWith('extra_');
-                              const daysInStage = Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000);
-                              const isAlert = daysInStage >= 7;
-                              if (isCustom) {
-                                const extraName = colId.startsWith('extra_') ? colId.slice(6) : colId;
-                                const value = camposExtras[extraName] ?? camposExtras[colId] ?? camposExtras[getLabel(colId)];
-                                return (
-                                  <TableCell key={colId} className="text-xs text-muted-foreground">
-                                    {value || '—'}
-                                  </TableCell>
-                                );
-                              }
+                      paginated.map(p => (
+                        <PedidoRow
+                          key={p.id}
+                          pedido={p}
+                          selected={selected.has(p.id)}
+                          onToggle={() => toggleOne(p.id)}
+                          onClick={() => setViewOrderId(p.id)}
+                          visibleColumns={tableVisibleColumns}
+                          KANBAN_STAGES={KANBAN_STAGES}
+                          getLabel={getLabel}
+                          stageLabel={stageLabel}
+                        />
+                      ))
 
-                              switch (colId) {
-                                case 'negocio':
-                                  return (
-                                    <TableCell key={colId} className="min-w-[300px]">
-                                      <div className="space-y-2">
-                                        {isAlert && (
-                                          <div className="flex w-fit items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-1 text-[11px] font-semibold text-destructive">
-                                            <AlertTriangle className="h-3 w-3" />
-                                            {daysInStage} dias nesta etapa
-                                          </div>
-                                        )}
-                                        <p className="pr-4 text-sm font-semibold leading-snug text-card-foreground">
-                                          {p.cliente?.empresa ?? 'Sem cliente'}
-                                        </p>
-                                        <div className="grid gap-1.5 text-xs text-muted-foreground sm:grid-cols-2">
-                                          <div className="flex min-w-0 items-center gap-2">
-                                            <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
-                                            <span className="truncate">{p.obra?.nome_obra ?? '-'}</span>
-                                          </div>
-                                          <div className="flex min-w-0 items-center gap-2">
-                                            <Factory className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
-                                            <span className="truncate">{p.fabricante?.nome ?? '-'}</span>
-                                          </div>
-                                          <div className="flex items-center gap-2 text-sm font-semibold text-card-foreground">
-                                            <DollarSign className="h-3.5 w-3.5 shrink-0 text-primary/70" />
-                                            {(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </TableCell>
-                                  );
-                                case 'cliente':
-                                  return <TableCell key={colId} className="font-medium">{p.cliente?.empresa ?? '-'}</TableCell>;
-                                case 'obra':
-                                  return <TableCell key={colId}>{p.obra?.nome_obra ?? '-'}</TableCell>;
-                                case 'fabricante':
-                                  return <TableCell key={colId}>{p.fabricante?.nome ?? '-'}</TableCell>;
-                                case 'valor':
-                                  return <TableCell key={colId}>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>;
-                                case 'etapa':
-                                  return (
-                                    <TableCell key={colId}>
-                                      <Badge className={getStageBadgeClass(KANBAN_STAGES.find(s => s.key === p.status)?.color ?? 'muted-foreground')}>
-                                        {stageLabel(p.status)}
-                                      </Badge>
-                                    </TableCell>
-                                  );
-                                case 'vendedor':
-                                  return <TableCell key={colId}>{p.vendedor?.nome ?? '-'}</TableCell>;
-                                case 'acoes':
-                                  return (
-                                    <TableCell key={colId}>
                                       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewOrderId(p.id)} title="Visualizar e Editar">
                                           <Eye className="h-4 w-4 text-primary" />
