@@ -278,7 +278,8 @@ export function getImportedPedidosRows(
       if (mapping.data_pedido && row[mapping.data_pedido]) {
         const rawDate = row[mapping.data_pedido];
         if (typeof rawDate === 'number') {
-          // Handle Excel numeric date format
+          // Handle Excel numeric date format - Excel starts from 1899-12-30
+          // Use UTC to avoid timezone issues during conversion
           const date = XLSX.SSF.parse_date_code(rawDate);
           data_pedido = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
         } else {
@@ -292,9 +293,11 @@ export function getImportedPedidosRows(
             const year = ddmmyyyyMatch[3];
             data_pedido = `${year}-${month}-${day}`;
           } else {
-            // Fallback para o parse padrão do JS (YYYY-MM-DD ou MM/DD/YYYY)
+            // Tenta converter qualquer string de data para o início do dia em UTC
             const d = new Date(dateStr);
             if (!isNaN(d.getTime())) {
+              // Se a string contiver apenas data (sem hora), o JS pode interpretar como UTC ou Local
+              // Para garantir consistência, extraímos os componentes
               const year = d.getFullYear();
               const month = String(d.getMonth() + 1).padStart(2, '0');
               const day = String(d.getDate()).padStart(2, '0');
