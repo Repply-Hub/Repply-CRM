@@ -206,10 +206,13 @@ export function sanitizeImportedRows(params: {
           .filter(v => v !== undefined && v !== null && String(v ?? '').trim() !== '');
         
         if (values.length > 0) {
-          // Para campos de texto, une com espaço. Para outros, pega o primeiro valor não vazio
+          // Para campos de texto, une com vírgula e espaço seguindo a regra:
+          // A: 1, B: 2 -> "1, 2"
+          // A: empty, B: 2 -> "2"
+          // A: 1, B: empty -> "1"
           const type = getFieldType(field);
           if (type === 'text') {
-            rawValue = values.join(' ');
+            rawValue = values.join(', ');
           } else {
             rawValue = values[0];
           }
@@ -246,7 +249,8 @@ export function sanitizeImportedRows(params: {
       if (values.length > 0) {
         const sanitizedKey = String(displayName ?? '').trim();
         if (sanitizedKey) {
-          campos_extras[sanitizedKey] = values.join(' ');
+          // Segue a mesma regra de unificação com vírgula para campos extras
+          campos_extras[sanitizedKey] = values.join(', ');
         }
       }
     });
@@ -370,7 +374,7 @@ export function MappingStep({
         .filter(v => v !== undefined && v !== null && String(v ?? '').trim() !== '');
       
       if (values.length > 0) {
-        return values.join(' ');
+        return values.join(', ');
       }
     }
     return '';
