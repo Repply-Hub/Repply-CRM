@@ -443,6 +443,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
       qc.invalidateQueries({ queryKey: ['pedidos'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
+      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
+      qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
       toast.success(`${imported} negócios importados com sucesso!`);
       reset();
       onOpenChange(false);
