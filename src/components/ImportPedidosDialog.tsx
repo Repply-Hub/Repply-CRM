@@ -430,7 +430,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             observacoes: r.observacoes || null,
             campos_extras: finalCamposExtras,
             data_pedido: r.data_pedido || new Date().toISOString().split('T')[0],
-            created_at: r.data_pedido ? `${r.data_pedido}T12:00:00Z` : new Date().toISOString(),
+            created_at: r.data_pedido ? `${r.data_pedido}T12:00:00.000Z` : new Date().toISOString(),
+            prazo_resposta: r.status === 'fechamento' ? (r.data_pedido || new Date().toISOString().split('T')[0]) : null,
           };
         });
         const { error } = await supabase.from('pedidos').insert(batch);
