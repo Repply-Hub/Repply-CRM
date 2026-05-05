@@ -500,6 +500,7 @@ export type Database = {
           empresa_id: string
           id: string
           labels_personalizados: Json
+          modelos: Json
           tabela_key: string
           tamanho_pagina: number
           updated_at: string
@@ -511,6 +512,7 @@ export type Database = {
           empresa_id: string
           id?: string
           labels_personalizados?: Json
+          modelos?: Json
           tabela_key: string
           tamanho_pagina?: number
           updated_at?: string
@@ -522,6 +524,7 @@ export type Database = {
           empresa_id?: string
           id?: string
           labels_personalizados?: Json
+          modelos?: Json
           tabela_key?: string
           tamanho_pagina?: number
           updated_at?: string
