@@ -331,7 +331,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         }
 
         if (finalId && !currentVisible.includes(finalId)) {
-          currentVisible.push(finalId);
+          // Inserir após a coluna de etapa (status) se for nova
+          const statusIdx = currentVisible.indexOf('etapa');
+          if (statusIdx !== -1) {
+            currentVisible.splice(statusIdx + 1, 0, finalId);
+          } else {
+            currentVisible.push(finalId);
+          }
           visibleChanged = true;
         }
       });
