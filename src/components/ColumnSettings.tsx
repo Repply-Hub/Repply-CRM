@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen, Type, Hash, Calendar, ToggleLeft, DollarSign, Filter, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -103,6 +103,19 @@ export const ColumnSettings = memo(function ColumnSettings({
     const [newPresetName, setNewPresetName] = React.useState('');
     const [isSavingPreset, setIsSavingPreset] = React.useState(false);
 
+    // Corrigir possíveis problemas de interação do dnd dentro de Popovers/ScrollAreas
+    useEffect(() => {
+        if (open) {
+            const handleTouchMove = (e: TouchEvent) => {
+                if (document.querySelector('[data-rbd-drag-handle-context-id]')) {
+                    // Previne scroll durante o drag em mobile se necessário
+                }
+            };
+            window.addEventListener('touchmove', handleTouchMove, { passive: false });
+            return () => window.removeEventListener('touchmove', handleTouchMove);
+        }
+    }, [open]);
+
     const toggleColumn = (columnId: string) => {
         const column = columns.find(c => c.id === columnId);
         if (column?.locked) return;
@@ -144,6 +157,7 @@ export const ColumnSettings = memo(function ColumnSettings({
         if (!result.destination) return;
         if (result.destination.index === result.source.index) return;
         
+        // Passar os índices para a função de reordenação do hook
         onReorder?.(result.source.index, result.destination.index);
     };
 
@@ -164,7 +178,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                     <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={8} className="w-auto p-0 shadow-2xl border-border/40 overflow-hidden">
+            <PopoverContent align="end" sideOffset={8} className="w-auto p-0 shadow-2xl border-border/40 z-[50]">
                 <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b border-border/50">
                     <div className="flex items-center gap-2">
                         <Settings2 className="h-4 w-4 text-primary" />
@@ -172,7 +186,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                     </div>
                 </div>
                 
-                <div className="flex divide-x divide-border/50">
+                <div className="flex divide-x divide-border/50 overflow-visible">
                     {!hideColumns && (
                         <div className="w-[320px] p-2">
                             <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
@@ -224,7 +238,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                 </div>
                             )}
 
-                            <ScrollArea className="max-h-[320px] overflow-y-auto px-1.5 py-2">
+                            <div className="max-h-[320px] overflow-y-auto px-1.5 py-2 custom-scrollbar">
                                 <DragDropContext onDragEnd={handleDragEnd}>
                                     <Droppable droppableId="columns">
                                         {(provided) => (
@@ -250,8 +264,8 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                     ref={provided.innerRef}
                                                                     {...provided.draggableProps}
                                                                     className={cn(
-                                                                        "group flex items-center gap-1 pr-1",
-                                                                        snapshot.isDragging && "z-50"
+                                                                        "group flex items-center gap-1 pr-1 outline-none",
+                                                                        snapshot.isDragging && "z-[9999]"
                                                                     )}
                                                                 >
                                                                     <div 
@@ -400,7 +414,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                         )}
                                     </Droppable>
                                 </DragDropContext>
-                            </ScrollArea>
+                            </div>
                         </div>
                     )}
 

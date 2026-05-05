@@ -164,7 +164,17 @@
   background: transparent;
 }
 
-/* Firefox */
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.4);
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--border)) transparent;
