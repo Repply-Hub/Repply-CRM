@@ -144,6 +144,7 @@ export const ColumnSettings = memo(function ColumnSettings({
         if (!result.destination) return;
         if (result.destination.index === result.source.index) return;
         
+        // Passar os índices para a função de reordenação do hook
         onReorder?.(result.source.index, result.destination.index);
     };
 
