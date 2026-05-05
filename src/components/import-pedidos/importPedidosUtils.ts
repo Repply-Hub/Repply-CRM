@@ -1,13 +1,14 @@
 import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
 import * as XLSX from 'xlsx';
 
-export type FieldKey = 'negocio' | 'cliente' | 'fabricante' | 'valor' | 'observacoes' | 'status' | 'data_pedido';
+export type FieldKey = 'negocio' | 'cliente' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'data_pedido';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'negocio', label: 'Negócio', required: false },
   { key: 'cliente', label: 'Cliente', required: false },
   { key: 'fabricante', label: 'Fabricante', required: false },
   { key: 'valor', label: 'Valor', required: false },
+  { key: 'vendedor', label: 'Responsável/Vendedor', required: false },
   { key: 'status', label: 'Etapa', required: false },
   { key: 'data_pedido', label: 'Data', required: false },
   { key: 'observacoes', label: 'Observações', required: false },
@@ -18,6 +19,7 @@ const EMPTY_MAPPING: Record<FieldKey, string> = {
   cliente: '',
   fabricante: '',
   valor: '',
+  vendedor: '',
   observacoes: '',
   status: '',
   data_pedido: '',
@@ -83,20 +85,22 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /criado/, score: 80 },
     { pattern: /date/, score: 85 },
   ],
+  vendedor: [
+    { pattern: /^vendedor$/, score: 100 },
+    { pattern: /^responsavel$/, score: 100 },
+    { pattern: /vendedor/, score: 90 },
+    { pattern: /responsavel/, score: 90 },
+    { pattern: /dono/, score: 80 },
+    { pattern: /owner/, score: 80 },
+    { pattern: /assigned/, score: 75 },
+  ],
   observacoes: [
-    { pattern: /^nome\s+do\s+negocio$/, score: 100 },
-    { pattern: /^titulo\s+do\s+negocio$/, score: 95 },
-    { pattern: /^vendedor$/, score: 90 },
-    { pattern: /^responsavel$/, score: 90 },
-    { pattern: /vendedor/, score: 85 },
-    { pattern: /responsavel/, score: 85 },
+    { pattern: /^observacoes$/, score: 100 },
     { pattern: /observa/, score: 95 },
     { pattern: /obs/, score: 92 },
     { pattern: /nota/, score: 88 },
     { pattern: /descri/, score: 78 },
     { pattern: /detalhe/, score: 76 },
-    { pattern: /nome\s+do\s+negocio/, score: 90 },
-    { pattern: /titulo/, score: 68 },
   ],
 };
 
@@ -105,6 +109,7 @@ const MIN_SCORE: Record<FieldKey, number> = {
   cliente: 70,
   fabricante: 70,
   valor: 66,
+  vendedor: 70,
   observacoes: 68,
   status: 70,
   data_pedido: 70,
@@ -253,6 +258,7 @@ export function getImportedPedidosRows(
       const cliente = mapping.cliente ? row[mapping.cliente]?.toString().trim() || '' : '';
       const fabricante = mapping.fabricante ? row[mapping.fabricante]?.toString().trim() || '' : '';
       const valor = mapping.valor ? parseNumber(row[mapping.valor]) : 0;
+      const vendedor = mapping.vendedor ? row[mapping.vendedor]?.toString().trim() || '' : '';
       const observacoes = mapping.observacoes ? row[mapping.observacoes]?.toString().trim() || '' : '';
       const status = mapping.status ? resolveImportedPedidoStatus(row[mapping.status]) : 'novo_lead';
       
@@ -290,7 +296,7 @@ export function getImportedPedidosRows(
         if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
-      return { negocio, cliente, fabricante, valor, observacoes, status, data_pedido, campos_extras };
+      return { negocio, cliente, fabricante, valor, vendedor, observacoes, status, data_pedido, campos_extras };
     })
     .filter((row) => row.cliente && row.fabricante);
 }
