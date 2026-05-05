@@ -251,8 +251,8 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                     ref={provided.innerRef}
                                                                     {...provided.draggableProps}
                                                                     className={cn(
-                                                                        "group flex items-center gap-1 pr-1",
-                                                                        snapshot.isDragging && "z-50"
+                                                                        "group flex items-center gap-1 pr-1 outline-none",
+                                                                        snapshot.isDragging && "z-[9999]"
                                                                     )}
                                                                 >
                                                                     <div 
