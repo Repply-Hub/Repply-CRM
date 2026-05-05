@@ -129,7 +129,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     }, 1000);
 
     return () => clearTimeout(saveTimeout);
-  }, [empresaId, key, columns, visibleColumns, customLabels, pageSize]);
+  }, [empresaId, key, columns, visibleColumns, customLabels, pageSize, presets]);
 
   // 3. Persistence (LocalStorage as fallback/cache)
   // Listen for storage changes (e.g. from ImportPedidosDialog)
