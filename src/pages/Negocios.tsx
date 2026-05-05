@@ -1093,9 +1093,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   );
 
 
+  const isFiltered = hasPipelineFilters || deferredSearch.trim() !== '';
+
   const subtitle = isPipelineMode
-    ? `${pipelineOrders.length} negócios · Total: ${(totalPipeline || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-    : `${filtered.length} negócios · Total: ${(filtered.reduce((acc, p) => acc + (Number(p.valor_total) || 0), 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+    ? `${pipelineOrders.length} negócios${isFiltered ? ' (filtrados)' : ''} · Total: ${(totalPipeline || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+    : `${filtered.length} negócios${isFiltered ? ' (filtrados)' : ''} · Total: ${(filtered.reduce((acc, p) => acc + (Number(p.valor_total) || 0), 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
 
   return (
     <AppLayout title="Negócios" subtitle={subtitle}>
