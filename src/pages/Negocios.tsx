@@ -50,6 +50,7 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'etapa', label: 'Etapa', locked: false },
   { id: 'vendedor', label: 'Responsável/Vendedor', locked: false },
   { id: 'data_pedido', label: 'Data', locked: false },
+  { id: 'prazo_resposta', label: 'Fechamento', locked: false },
   { id: 'observacoes', label: 'Observações', locked: false },
   { id: 'acoes', label: 'Ações', locked: false },
 ];
@@ -152,6 +153,14 @@ const PedidoRow = memo(({
               <TableCell key={colId} className="whitespace-nowrap px-4">
                 {pedido.data_pedido 
                   ? format(parse(pedido.data_pedido, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR }) 
+                  : '—'}
+              </TableCell>
+            );
+          case 'prazo_resposta':
+            return (
+              <TableCell key={colId} className="whitespace-nowrap px-4">
+                {pedido.prazo_resposta 
+                  ? format(parse(pedido.prazo_resposta, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR }) 
                   : '—'}
               </TableCell>
             );
@@ -1000,6 +1009,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   {selectedViewOrder.data_pedido ? format(new Date(selectedViewOrder.data_pedido), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                 </p>
               </div>
+              {selectedViewOrder.prazo_resposta && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <CalendarIcon className="h-3 w-3" /> Data de Fechamento
+                  </p>
+                  <p className="text-sm font-medium">
+                    {format(parse(selectedViewOrder.prazo_resposta, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR })}
+                  </p>
+                </div>
+              )}
               {/* Renderização de Campos Extras dinâmicos */}
               {tableVisibleColumns.map(colId => {
                 const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);

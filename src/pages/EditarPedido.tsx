@@ -110,8 +110,8 @@ const EditarPedido = () => {
       setFabricanteId(p.fabricante_id);
       setVendedorId(p.usuario_id);
       setStatus(p.status || 'novo_lead');
-      setDataPedido(parseISO(p.data_pedido));
-      setPrazoResposta(p.prazo_resposta ? parseISO(p.prazo_resposta) : undefined);
+      setDataPedido(new Date(p.data_pedido + 'T12:00:00'));
+      setPrazoResposta(p.prazo_resposta ? new Date(p.prazo_resposta + 'T12:00:00') : undefined);
       setOrigemLead(p.origem_lead || '');
       setEnderecoEntrega(p.endereco_entrega || '');
       setObservacoes(p.observacoes || '');
@@ -447,7 +447,12 @@ const EditarPedido = () => {
                         <Calendar
                           mode="single"
                           selected={dataPedido}
-                          onSelect={(d) => d && setDataPedido(d)}
+                          onSelect={(d) => {
+                            if (d) {
+                              const localDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60 * 1000));
+                              setDataPedido(localDate);
+                            }
+                          }}
                           locale={ptBR}
                           initialFocus
                           className={cn("p-3 pointer-events-auto")}
@@ -468,7 +473,14 @@ const EditarPedido = () => {
                         <Calendar
                           mode="single"
                           selected={prazoResposta}
-                          onSelect={setPrazoResposta}
+                          onSelect={(d) => {
+                            if (d) {
+                              const localDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60 * 1000));
+                              setPrazoResposta(localDate);
+                            } else {
+                              setPrazoResposta(undefined);
+                            }
+                          }}
                           locale={ptBR}
                           initialFocus
                           className={cn("p-3 pointer-events-auto")}

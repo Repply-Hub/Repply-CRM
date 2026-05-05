@@ -13,6 +13,7 @@ export interface PedidoWithRelations {
   usuario_id: string;
   obra_id: string | null;
   endereco_entrega: string | null;
+  prazo_resposta: string | null;
   campos_extras: Record<string, any> | null;
   cliente: { id: string; empresa: string } | null;
   fabricante: { id: string; nome: string } | null;
@@ -34,7 +35,7 @@ export function usePedidos(empresaId?: string) {
           .from('pedidos')
           .select(`
             id, status, valor_total, data_pedido, created_at, observacoes,
-            cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras,
+            cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta,
             cliente:clientes(id, empresa),
             fabricante:fabricantes(id, nome),
             vendedor:usuarios(id, nome, empresa_id),
@@ -83,7 +84,10 @@ export function useUpdatePedidoStatus() {
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const updateData: Record<string, unknown> = { status };
       if (status === 'fechamento') {
-        updateData.prazo_resposta = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const offset = now.getTimezoneOffset();
+        const localDate = new Date(now.getTime() - (offset * 60 * 1000));
+        updateData.prazo_resposta = localDate.toISOString().split('T')[0];
       }
       const { error } = await supabase.from('pedidos').update(updateData).eq('id', id);
       if (error) throw error;
