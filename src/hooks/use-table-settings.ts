@@ -88,8 +88,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
           if (data.colunas_visiveis) setVisibleColumns(data.colunas_visiveis as any);
           if (data.labels_personalizados) setCustomLabels(data.labels_personalizados as any);
           if (data.tamanho_pagina) setPageSize(data.tamanho_pagina);
-          // If you decide to add presets to DB later:
-          // if (data.modelos) setPresets(data.modelos as any);
+          if (data.modelos) setPresets(data.modelos as any);
         }
       } catch (err) {
         console.error('Erro ao carregar configurações da tabela:', err);
@@ -118,6 +117,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
             colunas_visiveis: visibleColumns,
             labels_personalizados: customLabels,
             tamanho_pagina: pageSize,
+            modelos: presets,
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'empresa_id, tabela_key'
