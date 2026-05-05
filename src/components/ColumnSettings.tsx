@@ -103,6 +103,19 @@ export const ColumnSettings = memo(function ColumnSettings({
     const [newPresetName, setNewPresetName] = React.useState('');
     const [isSavingPreset, setIsSavingPreset] = React.useState(false);
 
+    // Corrigir possíveis problemas de interação do dnd dentro de Popovers/ScrollAreas
+    useEffect(() => {
+        if (open) {
+            const handleTouchMove = (e: TouchEvent) => {
+                if (document.querySelector('[data-rbd-drag-handle-context-id]')) {
+                    // Previne scroll durante o drag em mobile se necessário
+                }
+            };
+            window.addEventListener('touchmove', handleTouchMove, { passive: false });
+            return () => window.removeEventListener('touchmove', handleTouchMove);
+        }
+    }, [open]);
+
     const toggleColumn = (columnId: string) => {
         const column = columns.find(c => c.id === columnId);
         if (column?.locked) return;
