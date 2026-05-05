@@ -550,6 +550,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                       <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="text-xs font-medium whitespace-nowrap">{r.cliente}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{r.fabricante}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap max-w-[120px] truncate">{r.obra || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
                         {r.valor ? r.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                       </TableCell>
