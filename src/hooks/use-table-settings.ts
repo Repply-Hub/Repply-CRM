@@ -24,17 +24,10 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as ColumnDefinition[];
-        // Filtra para manter APENAS colunas que existem nos padrões (remove extras)
-        const onlyDefaults = parsed.filter(col => 
-          defaultColumns.some(d => d.id === col.id)
-        );
+        // Remover duplicatas por ID
+        const unique = Array.from(new Map(parsed.map(c => [c.id, c])).values());
         
-        // Se após filtrar não sobrou nada ou mudou o tamanho, volta para o padrão original
-        if (onlyDefaults.length === 0 || onlyDefaults.length !== defaultColumns.length) {
-          return defaultColumns;
-        }
-
-        return onlyDefaults.map(col => {
+        return unique.map(col => {
           const defaultCol = defaultColumns.find(d => d.id === col.id);
           return {
             ...col,
@@ -51,10 +44,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem(`${key}_visible_columns`);
     const initial = saved ? JSON.parse(saved) : defaultColumns.map(c => c.id);
-    // Garantir que as colunas visíveis são apenas as que existem nos padrões
-    return Array.from(new Set(initial)).filter(id => 
-      defaultColumns.some(d => d.id === id)
-    ) as string[];
+    return Array.from(new Set(initial)) as string[];
   });
 
   const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
