@@ -32,7 +32,20 @@ export function getExtraHeaders(key: string, value: ExtraMappingValue): string[]
 }
 
 export function getExtraDisplayName(key: string, value: ExtraMappingValue): string {
-  return Array.isArray(value) ? key : String(value || key);
+  if (Array.isArray(value)) return key;
+  // Se for uma string que contém "::", o formato é "Label::ID"
+  if (typeof value === 'string' && value.includes('::')) {
+    return value.split('::')[0];
+  }
+  return String(value || key);
+}
+
+export function getExtraID(key: string, value: ExtraMappingValue): string {
+  if (Array.isArray(value)) return key;
+  if (typeof value === 'string' && value.includes('::')) {
+    return value.split('::')[1];
+  }
+  return String(value || key);
 }
 
 const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: string; synonyms?: string[]; type?: SupabaseFieldType }> = {
