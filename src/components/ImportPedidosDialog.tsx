@@ -350,14 +350,21 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH).map(r => {
           const importedVendedorId = r.vendedor ? vendedorMap.get(r.vendedor.toLowerCase().trim()) : null;
+          
+          // Se o vendedor da planilha não existir no sistema, salvamos o nome dele como um campo extra
+          const finalCamposExtras = { ...(r.campos_extras || {}) };
+          if (r.vendedor && !importedVendedorId) {
+            finalCamposExtras['Vendedor Original'] = r.vendedor;
+          }
+
           return {
             cliente_id: clienteMap.get(r.cliente.toLowerCase().trim())!,
             fabricante_id: fabricanteMap.get(r.fabricante.toLowerCase().trim())!,
             usuario_id: importedVendedorId || vid,
             status: r.status,
             valor_total: r.valor || null,
-          observacoes: r.observacoes || null,
-          campos_extras: r.campos_extras || {},
+            observacoes: r.observacoes || null,
+            campos_extras: finalCamposExtras,
           data_pedido: (() => {
             if (!r.data_pedido) return new Date().toISOString().split('T')[0];
             const d = new Date(r.data_pedido);
