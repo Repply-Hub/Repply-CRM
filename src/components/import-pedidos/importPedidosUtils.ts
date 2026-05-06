@@ -338,6 +338,6 @@ export function getImportedPedidosRows(
         if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
-      return { negocio, cliente, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, campos_extras };
+      return { negocio, cliente, contato, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, campos_extras };
     });
 }
