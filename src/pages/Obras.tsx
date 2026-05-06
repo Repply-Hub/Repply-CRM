@@ -454,9 +454,6 @@ export default function Obras() {
                       Detalhes da obra vinculada ao cliente.
                     </SheetDescription>
                   </div>
-                  <Badge variant={getStatusInfo(selectedObra.status).variant}>
-                    {getStatusInfo(selectedObra.status).label}
-                  </Badge>
                 </div>
               </SheetHeader>
 
