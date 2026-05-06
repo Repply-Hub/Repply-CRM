@@ -527,7 +527,10 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           }
         }
         imported += rows.slice(i, i + BATCH).length;
+        setImportProgress(Math.min(95, Math.floor((imported / rows.length) * 100)));
       }
+
+      setImportProgress(100);
 
       qc.invalidateQueries({ queryKey: [target === 'contatos' ? 'contatos' : 'clientes'] });
       toast.success(`${imported} ${target === 'contatos' ? 'contatos' : 'clientes'} importados com sucesso!`);
