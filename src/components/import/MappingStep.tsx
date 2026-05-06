@@ -107,6 +107,11 @@ function fuzzyScore(field: FieldDef, header: string): number {
     ...(FIELD_HINTS[field.key]?.synonyms ?? []),
   ].map(normalizeText).filter(Boolean)));
 
+  // Regras específicas de alta prioridade
+  if (field.key === 'nome_contato') {
+    if (normalizedHeader === 'contato') return 100;
+  }
+
   return terms.reduce((best, term) => {
     if (normalizedHeader === term) return Math.max(best, 100);
     if (normalizedHeader.includes(term) || term.includes(normalizedHeader)) return Math.max(best, 86);
