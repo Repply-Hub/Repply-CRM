@@ -442,6 +442,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             finalCamposExtras['Vendedor Original'] = r.vendedor;
           }
           
+          // Salva o contato como campo extra
+          if (r.contato) {
+            finalCamposExtras['Contato'] = r.contato;
+          }
+          
           // Salva o título do negócio se ele for diferente do nome do cliente
           // Se não houver título na planilha, usamos o nome da obra ou o nome do cliente como padrão
           if (r.negocio) {
