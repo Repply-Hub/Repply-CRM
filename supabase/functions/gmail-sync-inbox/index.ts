@@ -119,7 +119,7 @@ serve(async (req) => {
           // 7. Check if message is unread in Gmail
           const isUnreadInGmail = message.labelIds?.includes('UNREAD') ?? false;
 
-          // 7. Upsert into emails_recebidos
+          // 8. Upsert into emails_recebidos
           const { error: upsertError } = await supabaseClient
             .from('emails_recebidos')
             .upsert({
@@ -127,11 +127,14 @@ serve(async (req) => {
               remetente: from,
               assunto: subject,
               corpo_html: body,
-              lido: false,
+              lido: !isUnreadInGmail, // Se não tiver a label UNREAD, está lido
               criado_em: created_at,
               resend_id: message.id,
               gmail_message_id: message.id
-            }, { onConflict: 'resend_id' })
+            }, { 
+              onConflict: 'resend_id',
+              ignoreDuplicates: false 
+            })
 
           if (!upsertError) syncedCount++
         }
