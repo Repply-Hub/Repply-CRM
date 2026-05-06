@@ -72,9 +72,9 @@ export function usePedidos(empresaId?: string) {
 
       return allData;
     },
-    staleTime: 0,
-    gcTime: 5 * 60_000,
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 60 * 5, // 5 minutos de cache (evita refetch excessivo)
+    gcTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false, // Evita recarregar 50k registros toda vez que o usuário volta à aba
   });
 }
 
