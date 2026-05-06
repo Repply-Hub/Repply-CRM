@@ -21,9 +21,10 @@ interface MapaObrasProps {
   obras: ObraComCoordenada[] | undefined;
   isLoading: boolean;
   searchTerm?: string;
+  selectedObraId?: string;
 }
 
-export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps) {
+export function MapaObras({ obras, isLoading, searchTerm = '', selectedObraId }: MapaObrasProps) {
   const navigate = useNavigate();
   const { items, carregando, progresso } = useGeocodeObras(obras);
   const [selectedObra, setSelectedObra] = useState<ObraComCoordenada | null>(null);
@@ -62,7 +63,19 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
   }, []);
 
   useEffect(() => {
-    if (map && searchTerm && searchTerm.trim().length > 3) {
+    if (!map) return;
+
+    if (selectedObraId) {
+      const obraMatch = obrasComCoord.find(o => o.id === selectedObraId);
+      if (obraMatch) {
+        map.setCenter({ lat: obraMatch.latitude!, lng: obraMatch.longitude! });
+        map.setZoom(17);
+        setSelectedObra(obraMatch);
+        return;
+      }
+    }
+
+    if (searchTerm && searchTerm.trim().length > 3) {
       const geocoder = new google.maps.Geocoder();
       // First try to find among existing obras
       const obraMatch = obrasComCoord.find(o => 
@@ -85,7 +98,7 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
         }
       });
     }
-  }, [map, searchTerm, obrasComCoord]);
+  }, [map, searchTerm, obrasComCoord, selectedObraId]);
 
   if (isLoading || !isLoaded) {
     return (

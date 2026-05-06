@@ -107,12 +107,13 @@ export default function Obras() {
     if (state?.selectedObraId && obras) {
       const obra = obras.find(o => o.id === state.selectedObraId);
       if (obra) {
-        setSelectedObra(obra);
-        if (state.activeTab) {
-          setActiveTab(state.activeTab);
+        if (state.activeTab === 'mapa') {
+          setActiveTab('mapa');
+        } else {
+          setSelectedObra(obra);
+          // Limpa o estado apenas se não for mapa, pois o mapa precisa dele para centralizar
+          navigate(location.pathname, { replace: true, state: {} });
         }
-        // Limpa o estado para não reabrir ao navegar de volta
-        navigate(location.pathname, { replace: true, state: {} });
       }
     }
   }, [location.state, obras, navigate, location.pathname]);
@@ -449,7 +450,8 @@ export default function Obras() {
               <MapaObras 
                 obras={obrasParaMapa} 
                 isLoading={isLoading} 
-                searchTerm={search} 
+                searchTerm={search}
+                selectedObraId={(location.state as any)?.selectedObraId}
               />
             </Card>
           </TabsContent>
