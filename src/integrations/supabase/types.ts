@@ -673,31 +673,40 @@ export type Database = {
           assunto: string | null
           corpo_html: string | null
           criado_em: string | null
-          destinatarios: string[]
+          data_recebimento: string | null
+          destinatarios: string[] | null
+          gmail_message_id: string | null
           id: string
           lido: boolean | null
           remetente: string
-          resend_id: string
+          resend_id: string | null
+          user_id: string | null
         }
         Insert: {
           assunto?: string | null
           corpo_html?: string | null
           criado_em?: string | null
-          destinatarios: string[]
+          data_recebimento?: string | null
+          destinatarios?: string[] | null
+          gmail_message_id?: string | null
           id?: string
           lido?: boolean | null
           remetente: string
-          resend_id: string
+          resend_id?: string | null
+          user_id?: string | null
         }
         Update: {
           assunto?: string | null
           corpo_html?: string | null
           criado_em?: string | null
-          destinatarios?: string[]
+          data_recebimento?: string | null
+          destinatarios?: string[] | null
+          gmail_message_id?: string | null
           id?: string
           lido?: boolean | null
           remetente?: string
-          resend_id?: string
+          resend_id?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
