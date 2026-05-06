@@ -115,6 +115,56 @@ export function useUnreadChatMessages() {
   });
 }
 
+export function useUnreadChatByTarget() {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['unread_chat_by_target', user?.id],
+    queryFn: async () => {
+      if (!user) return {};
+      
+      const { data: me } = await supabase
+        .from('usuarios')
+        .select('id, empresa_id')
+        .eq('user_id', user.id)
+        .single();
+        
+      if (!me) return {};
+
+      // We need to fetch unread messages count grouped by target
+      // Target can be:
+      // - Direct messages: recipient_id is me, group_id is null, company_id is relevant (but recipient_id is the primary filter)
+      // - General: recipient_id is null, group_id is null, company_id is mine
+      // - Group: group_id is not null, company_id is mine
+      const { data, error } = await supabase
+        .from('chat_mensagens')
+        .select('usuario_id, grupo_id, recipient_id')
+        .eq('lida', false)
+        .neq('usuario_id', me.id)
+        .or(`recipient_id.eq.${me.id},and(recipient_id.is.null,grupo_id.is.null,empresa_id.eq.${me.empresa_id}),and(grupo_id.not.is.null,empresa_id.eq.${me.empresa_id})`);
+      
+      if (error) throw error;
+      
+      const counts: Record<string, number> = {};
+      
+      data?.forEach(msg => {
+        let key = 'geral';
+        if (msg.grupo_id) {
+          key = `grupo_${msg.grupo_id}`;
+        } else if (msg.recipient_id === me.id) {
+          key = `dm_${msg.usuario_id}`;
+        }
+        
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      
+      return counts;
+    },
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+}
+
 export function useUnreadCount() {
   const { data: notificacoes } = useNotificacoes();
   const { data: unreadEmails = 0 } = useUnreadEmails();
