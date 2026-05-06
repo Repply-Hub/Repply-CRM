@@ -103,11 +103,14 @@ export default function Obras() {
   }, [statusObras, newObra.status]);
 
   useEffect(() => {
-    const state = location.state as { selectedObraId?: string } | null;
+    const state = location.state as { selectedObraId?: string, activeTab?: string } | null;
     if (state?.selectedObraId && obras) {
       const obra = obras.find(o => o.id === state.selectedObraId);
       if (obra) {
         setSelectedObra(obra);
+        if (state.activeTab) {
+          setActiveTab(state.activeTab);
+        }
         // Limpa o estado para não reabrir ao navegar de volta
         navigate(location.pathname, { replace: true, state: {} });
       }
