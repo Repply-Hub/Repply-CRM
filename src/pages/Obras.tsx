@@ -498,7 +498,9 @@ export default function Obras() {
                         onClick={() => {
                           const address = selectedObra.endereco_entrega || selectedObra.nome_obra;
                           if (address) {
-                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank');
+                            setSearch(address);
+                            setActiveTab('mapa');
+                            setSelectedObra(null); // Fecha o painel lateral
                           }
                         }}
                         disabled={!selectedObra.endereco_entrega && !selectedObra.nome_obra}
