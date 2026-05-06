@@ -675,6 +675,7 @@ export type Database = {
           criado_em: string | null
           data_recebimento: string | null
           destinatarios: string[] | null
+          excluido: boolean | null
           gmail_message_id: string | null
           id: string
           lido: boolean | null
@@ -688,6 +689,7 @@ export type Database = {
           criado_em?: string | null
           data_recebimento?: string | null
           destinatarios?: string[] | null
+          excluido?: boolean | null
           gmail_message_id?: string | null
           id?: string
           lido?: boolean | null
@@ -701,6 +703,7 @@ export type Database = {
           criado_em?: string | null
           data_recebimento?: string | null
           destinatarios?: string[] | null
+          excluido?: boolean | null
           gmail_message_id?: string | null
           id?: string
           lido?: boolean | null
