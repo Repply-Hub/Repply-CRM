@@ -560,8 +560,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         )}
 
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-
-        {step === 'upload' && (
+          {step === 'upload' && (
           <div
             className="border-2 border-dashed border-border rounded-2xl p-16 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/[0.02] transition-all group relative overflow-hidden"
             onDragOver={(e) => e.preventDefault()}
