@@ -979,7 +979,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       {selectedFabricantes.length}
                     </Badge>
                   )}
-                  <ChevronRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
+                  <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </button>
             </PopoverTrigger>
