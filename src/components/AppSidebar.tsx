@@ -10,6 +10,7 @@ import { useSidebarPreferences, SidebarItem } from '@/hooks/use-sidebar-preferen
 import { usePermissoes } from '@/hooks/use-permissoes';
 import { getIconComponent } from '@/lib/sidebar-icons';
 import { SidebarAddItemDialog } from '@/components/SidebarAddItemDialog';
+import { useUnreadEmails } from '@/hooks/use-notificacoes';
 import logoSidebar from '@/assets/logo-sidebar.svg';
 import { toast } from 'sonner';
 import {
@@ -32,6 +33,7 @@ export function AppSidebar() {
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState<SidebarItem[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const { data: unreadEmails = 0 } = useUnreadEmails();
 
   const { items, save, isSaving } = useSidebarPreferences();
 
@@ -235,17 +237,33 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {displayItems.map((item) => {
                     const Icon = getIconComponent(item.icon);
+                    const showBadge = item.id === 'emails' && unreadEmails > 0;
+                    
                     return (
                       <SidebarMenuItem key={item.id}>
                         <SidebarMenuButton asChild tooltip={item.label}>
                           <NavLink
                             to={item.path}
                             end={item.path === '/'}
-                            className="hover:bg-sidebar-accent/60 rounded-lg transition-all duration-150"
+                            className="hover:bg-sidebar-accent/60 rounded-lg transition-all duration-150 relative"
                             activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-sm"
                           >
-                            {Icon && <Icon className="h-4 w-4 shrink-0" />}
-                            {!collapsed && <span className="text-[13px]">{item.label}</span>}
+                            <div className="relative">
+                              {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                              {showBadge && collapsed && (
+                                <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive animate-pulse border-2 border-sidebar shadow-sm" />
+                              )}
+                            </div>
+                            {!collapsed && (
+                              <div className="flex items-center justify-between flex-1 min-w-0">
+                                <span className="text-[13px] truncate">{item.label}</span>
+                                {showBadge && (
+                                  <span className="ml-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
+                                    {unreadEmails > 99 ? '99+' : unreadEmails}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </NavLink>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
