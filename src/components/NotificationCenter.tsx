@@ -75,7 +75,10 @@ export function NotificationCenter() {
       toast.info(`📧 Você tem ${unreadEmails} e-mail${unreadEmails > 1 ? 's' : ''} não lido${unreadEmails > 1 ? 's' : ''}`, {
         description: 'Clique para abrir sua caixa de entrada',
         duration: 6000,
-        onClick: () => navigate('/emails'),
+        action: {
+          label: 'Ver e-mails',
+          onClick: () => navigate('/emails'),
+        },
       });
     }
     lastEmailCount.current = unreadEmails;
