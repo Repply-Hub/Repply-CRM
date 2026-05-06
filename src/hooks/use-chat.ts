@@ -82,12 +82,19 @@ export function useChatMessages(grupoId: string | null = null, recipientId: stri
         const isCurrentDM = recipientId && (newMsg.recipient_id === recipientId || newMsg.usuario_id === recipientId);
 
         if (isCurrentGeral || isCurrentGrupo || isCurrentDM) {
-          // Tenta buscar as informações do vendedor para evitar o delay do invalidade
-          const { data: vendedor } = await supabase
-            .from('usuarios')
-            .select('id, nome, email, avatar_url')
-            .eq('id', newMsg.usuario_id)
-            .single();
+          // Tenta buscar as informações do vendedor no cache antes de fazer uma nova query
+          const members = qc.getQueryData<any[]>(['chat-members']) || [];
+          let vendedor = members.find(m => m.id === newMsg.usuario_id);
+
+          if (!vendedor) {
+            // Se não estiver no cache, busca no banco
+            const { data } = await supabase
+              .from('usuarios')
+              .select('id, nome, email, avatar_url')
+              .eq('id', newMsg.usuario_id)
+              .single();
+            vendedor = data;
+          }
 
           const completeMsg = {
             ...newMsg,
@@ -95,13 +102,12 @@ export function useChatMessages(grupoId: string | null = null, recipientId: stri
           };
 
           qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId], (old) => {
-            // Evita duplicados (caso o remetente receba seu próprio broadcast)
             const exists = (old || []).some(m => m.id === completeMsg.id);
             if (exists) return old;
             return [...(old || []), completeMsg];
           });
 
-          // Ainda invalidamos para garantir sincronia total, mas o setQueryData acima já atualizou a UI
+          // Invalidamos para garantir sincronia, mas a UI já foi atualizada
           qc.invalidateQueries({ queryKey: ['chat_mensagens', grupoId, recipientId] });
           qc.invalidateQueries({ queryKey: ['unread_chat_count'] });
           qc.invalidateQueries({ queryKey: ['unread_chat_by_target'] });
