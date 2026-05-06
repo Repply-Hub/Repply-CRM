@@ -561,12 +561,10 @@ const Emails = () => {
               variant="ghost" 
               className="rounded-full px-4 text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2"
               onClick={() => {
-                if (confirm("Deseja realmente excluir este e-mail?")) {
-                  deleteEmailMutation.mutate({ 
-                    id: selectedEmail.id, 
-                    type: selectedEmail.type || (selectedEmail.criado_em ? "received" : "sent") 
-                  });
-                }
+                setEmailToDelete({ 
+                  id: selectedEmail.id, 
+                  type: selectedEmail.type || (selectedEmail.criado_em ? "received" : "sent") 
+                });
               }}
             >
               <Trash2 className="h-4 w-4" /> Excluir
