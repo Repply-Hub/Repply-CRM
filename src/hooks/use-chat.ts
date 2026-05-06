@@ -15,6 +15,8 @@ export interface ChatMessage {
   arquivo_url?: string | null;
   arquivo_nome?: string | null;
   arquivo_tipo?: string | null;
+  lida: boolean;
+  lida_em?: string | null;
   vendedor?: { id: string; nome: string; email: string; avatar_url?: string | null };
 }
 
@@ -214,6 +216,7 @@ export function useSendMessage() {
             created_at: new Date().toISOString(),
             grupo_id: grupoId || null,
             recipient_id: recipientId || null,
+            lida: false,
             vendedor: myVendedor ? {
               id: myVendedor.id,
               nome: myVendedor.nome,
@@ -234,6 +237,7 @@ export function useSendMessage() {
               arquivo_url: URL.createObjectURL(file),
               arquivo_nome: file.name,
               arquivo_tipo: file.type,
+              lida: false,
               vendedor: myVendedor ? {
                 id: myVendedor.id,
                 nome: myVendedor.nome,
@@ -272,6 +276,41 @@ export function useSendMessage() {
   }, [mutation]);
 
   return { send, sending };
+}
+
+export function useMarkChatAsRead() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ grupoId, recipientId }: { grupoId?: string | null, recipientId?: string | null }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
+      const { data: me } = await supabase.from('usuarios').select('id, empresa_id').eq('user_id', userData.user.id).single();
+      if (!me) return;
+
+      let query = supabase
+        .from('chat_mensagens')
+        .update({ lida: true, lida_em: new Date().toISOString() })
+        .eq('lida', false)
+        .neq('usuario_id', me.id);
+
+      if (grupoId) {
+        query = query.eq('grupo_id', grupoId);
+      } else if (recipientId) {
+        query = query.eq('usuario_id', recipientId).eq('recipient_id', me.id);
+      } else {
+        query = query.is('grupo_id', null).is('recipient_id', null).eq('empresa_id', me.empresa_id);
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ['chat_mensagens', variables.grupoId, variables.recipientId] });
+      qc.invalidateQueries({ queryKey: ['unread_chat_count'] });
+    }
+  });
 }
 
 export function useClearChat() {

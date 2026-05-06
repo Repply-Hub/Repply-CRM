@@ -81,12 +81,47 @@ export function useUnreadEmails() {
   });
 }
 
+export function useUnreadChatMessages() {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['unread_chat_count', user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      
+      const { data: me } = await supabase
+        .from('usuarios')
+        .select('id, empresa_id')
+        .eq('user_id', user.id)
+        .single();
+        
+      if (!me) return 0;
+
+      // Unread messages:
+      // 1. Direct messages to me
+      // 2. Messages in my company's general/group chats not sent by me
+      const { count, error } = await supabase
+        .from('chat_mensagens')
+        .select('*', { count: 'exact', head: true })
+        .eq('lida', false)
+        .neq('usuario_id', me.id)
+        .or(`recipient_id.eq.${me.id},and(recipient_id.is.null,grupo_id.is.null,empresa_id.eq.${me.empresa_id}),and(grupo_id.not.is.null,empresa_id.eq.${me.empresa_id})`);
+      
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!user,
+    refetchInterval: 30000, // Check every 30 seconds
+  });
+}
+
 export function useUnreadCount() {
   const { data: notificacoes } = useNotificacoes();
   const { data: unreadEmails = 0 } = useUnreadEmails();
+  const { data: unreadChat = 0 } = useUnreadChatMessages();
   
   const unreadNotifs = (notificacoes ?? []).filter(n => !n.lida).length;
-  return unreadNotifs + unreadEmails;
+  return unreadNotifs + unreadEmails + unreadChat;
 }
 
 export function useMarkAsRead() {
