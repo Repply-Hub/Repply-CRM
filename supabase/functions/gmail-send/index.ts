@@ -66,17 +66,46 @@ serve(async (req) => {
         .eq('user_id', userId)
     }
 
-    // Prepare RFC 2822 message
+    // Remove external images/logos from HTML and prepare plain text version
+    const cleanHtml = body.replace(/<img[^>]*src=["']https:\/\/ukwwhwytyovrzefkdeyj\.supabase\.co\/storage\/v1\/object\/public\/[^"']*["'][^>]*>/gi, '')
+      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, (match: string) => {
+        return `<header style="padding: 20px 0; border-bottom: 1px solid #eee; margin-bottom: 20px;">
+          <h2 style="color: #333; margin: 0;">MD Representações</h2>
+        </header>`
+      });
+
+    const plainText = body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    // Prepare RFC 2822 message as multipart/alternative
+    const boundary = `----=_Part_${Math.random().toString(36).substr(2, 9)}`;
     const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
+    const fromHeader = `${userData.nome} <${userData.email}>`;
+    
     const messageParts = [
+      `From: ${fromHeader}`,
       `To: ${to}`,
-      'Content-Type: text/html; charset=utf-8',
-      'MIME-Version: 1.0',
       `Subject: ${utf8Subject}`,
+      'MIME-Version: 1.0',
+      'X-Mailer: MD Representações CRM',
+      'Precedence: normal',
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
       '',
-      body,
+      `--${boundary}`,
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 7bit',
+      '',
+      plainText,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/html; charset=utf-8',
+      'Content-Transfer-Encoding: 7bit',
+      '',
+      cleanHtml,
+      '',
+      `--${boundary}--`
     ];
-    const message = messageParts.join('\n');
+    
+    const message = messageParts.join('\r\n');
 
     // Encode as URL-safe base64
     const encodedMessage = btoa(unescape(encodeURIComponent(message)))
