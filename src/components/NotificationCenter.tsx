@@ -3,7 +3,7 @@ import { Bell, CheckCheck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useNotificacoes, useUnreadCount, useMarkAsRead, useMarkAllAsRead, type Notificacao } from '@/hooks/use-notificacoes';
+import { useNotificacoes, useUnreadCount, useMarkAsRead, useMarkAllAsRead, useUnreadEmails, type Notificacao } from '@/hooks/use-notificacoes';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -61,11 +61,29 @@ function formatTime(dateStr: string): string {
 
 export function NotificationCenter() {
   const { data: notificacoes } = useNotificacoes();
+  const { data: unreadEmails = 0 } = useUnreadEmails();
   const unreadCount = useUnreadCount();
   const markRead = useMarkAsRead();
   const markAllRead = useMarkAllAsRead();
   const navigate = useNavigate();
   const lastToastTime = useRef<number>(localStorage.getItem('last_notif_toast') ? parseInt(localStorage.getItem('last_notif_toast')!) : 0);
+  const lastEmailCount = useRef<number>(parseInt(localStorage.getItem('last_email_count') || '0'));
+
+  useEffect(() => {
+    // Notify about unread emails if count increased
+    if (unreadEmails > lastEmailCount.current) {
+      toast.info(`📧 Você tem ${unreadEmails} e-mail${unreadEmails > 1 ? 's' : ''} não lido${unreadEmails > 1 ? 's' : ''}`, {
+        description: 'Clique para abrir sua caixa de entrada',
+        duration: 6000,
+        action: {
+          label: 'Ver e-mails',
+          onClick: () => navigate('/emails'),
+        },
+      });
+    }
+    lastEmailCount.current = unreadEmails;
+    localStorage.setItem('last_email_count', unreadEmails.toString());
+  }, [unreadEmails, navigate]);
 
   useEffect(() => {
     if (!notificacoes) return;
@@ -120,11 +138,27 @@ export function NotificationCenter() {
           )}
         </div>
         <ScrollArea className="h-96">
-          {(!notificacoes || notificacoes.length === 0) ? (
+          {unreadEmails > 0 && (
+            <div className="px-4 py-3 bg-primary/5 border-b border-border">
+              <button 
+                className="w-full text-left flex items-center gap-3"
+                onClick={() => navigate('/emails')}
+              >
+                <div className="bg-primary/10 p-2 rounded-full">
+                  <Bell className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">E-mails não lidos</p>
+                  <p className="text-xs text-muted-foreground">Você tem {unreadEmails} nova(s) mensagem(ns)</p>
+                </div>
+              </button>
+            </div>
+          )}
+          {(!notificacoes || notificacoes.length === 0) && unreadEmails === 0 ? (
             <p className="text-xs text-muted-foreground p-4 text-center">Nenhuma notificação no momento.</p>
           ) : (
             <div className="divide-y divide-border">
-              {notificacoes.map(n => (
+              {(notificacoes || []).map(n => (
                 <div
                   key={n.id}
                   className={cn(

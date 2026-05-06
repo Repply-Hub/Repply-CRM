@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './use-auth';
 
 export interface Notificacao {
   id: string;
@@ -16,10 +17,12 @@ export interface Notificacao {
 
 export function useNotificacoes() {
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   const query = useQuery({
-    queryKey: ['notificacoes'],
+    queryKey: ['notificacoes', user?.id],
     queryFn: async () => {
+      if (!user) return [];
       const { data, error } = await supabase
         .from('notificacoes')
         .select('*')
@@ -28,10 +31,12 @@ export function useNotificacoes() {
       if (error) throw error;
       return data as Notificacao[];
     },
+    enabled: !!user,
   });
 
   // Realtime subscription
   useEffect(() => {
+    if (!user) return;
     const channel = supabase
       .channel('notificacoes-realtime')
       .on(
@@ -50,14 +55,38 @@ export function useNotificacoes() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [qc]);
+  }, [qc, user]);
 
   return query;
 }
 
+export function useUnreadEmails() {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['unread_emails_count', user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      const { count, error } = await supabase
+        .from('emails_recebidos')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('lido', false);
+      
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!user,
+    refetchInterval: 60000, // Check every minute
+  });
+}
+
 export function useUnreadCount() {
-  const { data } = useNotificacoes();
-  return (data ?? []).filter(n => !n.lida).length;
+  const { data: notificacoes } = useNotificacoes();
+  const { data: unreadEmails = 0 } = useUnreadEmails();
+  
+  const unreadNotifs = (notificacoes ?? []).filter(n => !n.lida).length;
+  return unreadNotifs + unreadEmails;
 }
 
 export function useMarkAsRead() {
@@ -76,14 +105,30 @@ export function useMarkAsRead() {
 
 export function useMarkAllAsRead() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  
   return useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
+      if (!user) return;
+      
+      // Mark notifications as read
+      await supabase
         .from('notificacoes')
         .update({ lida: true })
+        .eq('usuario_id', user.id)
         .eq('lida', false);
-      if (error) throw error;
+        
+      // Mark emails as read
+      await supabase
+        .from('emails_recebidos')
+        .update({ lido: true })
+        .eq('user_id', user.id)
+        .eq('lido', false);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notificacoes'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notificacoes'] });
+      qc.invalidateQueries({ queryKey: ['unread_emails_count'] });
+      qc.invalidateQueries({ queryKey: ['received_emails'] });
+    },
   });
 }
