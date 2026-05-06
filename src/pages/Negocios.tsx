@@ -882,7 +882,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           size="sm"
           className={cn(
             "h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/10 data-[state=open]:text-primary data-[state=open]:border-primary/50 shadow-sm active:scale-[0.98]",
-            hasPipelineFilters && "border-primary/50 bg-primary/[0.02] text-primary"
+            hasPipelineFilters && "data-[state=closed]:border-primary/50 data-[state=closed]:bg-primary/[0.02] data-[state=closed]:text-primary data-[state=open]:border-primary/50 data-[state=open]:bg-primary/10 data-[state=open]:text-primary"
           )}
         >
           <Filter className="h-4 w-4" />
