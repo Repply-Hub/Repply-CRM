@@ -689,7 +689,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   const optionsPopover = useMemo(() => (
-    <Popover>
+    <Popover modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
