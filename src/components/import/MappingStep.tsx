@@ -54,7 +54,7 @@ const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: st
   tipo: { desc: 'Categoria ou segmento do cliente.', example: 'construtora', storage: 'clientes.tipo', synonyms: ['tipo', 'segmento', 'segmento de atuação', 'segmento de atuacao', 'categoria', 'segemento', 'segemento de atuacao'] },
   cnpj: { desc: 'CNPJ ou CPF, salvo apenas com números.', example: '12.345.678/0001-90', storage: 'clientes.cnpj', synonyms: ['cnpj', 'cpf', 'documento', 'cpf cnpj'], type: 'cnpj' },
   email: { desc: 'E-mail principal.', example: 'contato@empresa.com.br', storage: 'clientes.email', synonyms: ['email', 'e-mail', 'mail'], type: 'email' },
-  telefone: { desc: 'Telefone com DDD. Para mais de um número, separe por vírgula.', example: '(84) 99999-9999, (84) 98888-8888', storage: 'clientes.telefone', synonyms: ['telefone', 'telefone de trabalho', 'fone', 'celular', 'whatsapp', 'tel', 'contato'], type: 'phone' },
+  telefone: { desc: 'Telefone com DDD. Para mais de um número, separe por vírgula.', example: '(84) 99999-9999, (84) 98888-8888', storage: 'clientes.telefone', synonyms: ['telefone', 'telefone de trabalho', 'fone', 'celular', 'whatsapp', 'tel'], type: 'phone' },
   logradouro: { desc: 'Rua, avenida ou logradouro.', example: 'Av. Hermes da Fonseca', storage: 'clientes.logradouro', synonyms: ['logradouro', 'rua', 'address', 'endereco'] },
   numero: { desc: 'Número do endereço.', example: '123', storage: 'clientes.numero', synonyms: ['numero', 'número', 'number', 'num'] },
   bairro: { desc: 'Bairro do endereço.', example: 'Petrópolis', storage: 'clientes.bairro', synonyms: ['bairro', 'neighborhood', 'suburb'] },
@@ -106,6 +106,11 @@ function fuzzyScore(field: FieldDef, header: string): number {
     field.label,
     ...(FIELD_HINTS[field.key]?.synonyms ?? []),
   ].map(normalizeText).filter(Boolean)));
+
+  // Regras específicas de alta prioridade
+  if (field.key === 'nome_contato') {
+    if (normalizedHeader === 'contato') return 100;
+  }
 
   return terms.reduce((best, term) => {
     if (normalizedHeader === term) return Math.max(best, 100);
