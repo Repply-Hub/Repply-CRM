@@ -623,45 +623,59 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         )}
 
         {step === 'preview' && (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className="gap-1">
-                  <FileSpreadsheet className="h-3 w-3" />
-                  {fileName}
-                </Badge>
-                <Badge variant="outline">{previewRows.length} registros válidos</Badge>
-                {extraFieldInfos.length > 0 && (
-                  <Badge className="bg-accent text-accent-foreground border-accent">
-                    +{extraFieldInfos.length} extra{extraFieldInfos.length === 1 ? '' : 's'}
-                  </Badge>
-                )}
+          <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-border/50 shadow-sm">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileSpreadsheet className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-foreground">{fileName}</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <Badge variant="outline" className="text-[10px] font-bold py-0 h-5 bg-background">{previewRows.length} registros válidos</Badge>
+                    {extraFieldInfos.length > 0 && (
+                      <Badge className="bg-accent/10 text-accent-foreground border-accent/20 text-[10px] font-bold py-0 h-5">
+                        +{extraFieldInfos.length} campos extras
+                      </Badge>
+                    )}
+                  </div>
+                </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setStep('mapping')}>
-                <X className="h-4 w-4 mr-1" /> Voltar ao mapeamento
+              <Button variant="ghost" size="sm" onClick={() => setStep('mapping')} className="h-9 px-3 text-muted-foreground hover:text-foreground">
+                <Pencil className="h-4 w-4 mr-2" /> Alterar mapeamento
               </Button>
             </div>
 
-            <div className="space-y-3">
-              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-                Clientes e fabricantes não encontrados serão criados automaticamente.
-                {extraFieldInfos.length > 0 && (
-                  <span>Extras: {extraFieldInfos.map(info => info.label).join(', ')}.</span>
-                )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
+                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-amber-900">Importação Automática</span>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Clientes e fabricantes não encontrados serão criados automaticamente com base no mapeamento.
+                  </p>
+                </div>
               </div>
 
               {ignoredColumns.length > 0 && (
-                <div className="bg-muted/50 rounded-lg p-3 border border-border/50">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <X className="h-3 w-3" /> Colunas ignoradas (não mapeadas)
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ignoredColumns.map(col => (
-                      <Badge key={col} variant="outline" className="text-[10px] font-normal py-0 h-5 bg-background">
-                        {col}
-                      </Badge>
-                    ))}
+                <div className="bg-muted/50 border border-border/50 rounded-xl p-4 flex items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center shrink-0 border border-border/50">
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="flex flex-col gap-1 overflow-hidden">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Colunas Ignoradas</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {ignoredColumns.slice(0, 5).map(col => (
+                        <Badge key={col} variant="outline" className="text-[9px] font-normal py-0 h-4 px-1.5 bg-background">
+                          {col}
+                        </Badge>
+                      ))}
+                      {ignoredColumns.length > 5 && (
+                        <span className="text-[9px] text-muted-foreground px-1">+{ignoredColumns.length - 5} outras</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
