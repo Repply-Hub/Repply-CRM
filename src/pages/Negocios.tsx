@@ -892,7 +892,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               {activeFilterCount}
             </Badge>
           )}
-          <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+          <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={8} className="w-64 p-2 shadow-2xl border-border/40 z-[50] bg-background">
