@@ -1124,14 +1124,14 @@ export default function Portal() {
                             </div>
                           </div>
                           <div className="w-full max-w-full overflow-x-auto rounded-md border overscroll-x-contain">
-                            <table className="min-w-[1100px] text-xs">
+                            <table className="min-w-[1100px] text-sm">
                               <thead>
-                                <tr className="bg-muted/50">
+                                <tr className="bg-muted/50 border-b border-border/60">
                                   <th className="px-2 py-2 w-8"></th>
                                   {headers.map((h) => (
-                                    <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
+                                    <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap uppercase tracking-wider">{h}</th>
                                   ))}
-                                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Ações</th>
+                                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap uppercase tracking-wider">Ações</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1141,7 +1141,7 @@ export default function Portal() {
                                   const colCount = headers.length + 2;
                                   return (
                                     <>
-                                      <tr key={rowKey} className="border-t border-border/50 hover:bg-accent/30">
+                                      <tr key={rowKey} className="border-t border-border/50 hover:bg-muted/30 transition-colors">
                                         <td className="px-2 py-2">
                                           {row['Texto Encontrado'] && (
                                             <button
@@ -1152,8 +1152,17 @@ export default function Portal() {
                                             </button>
                                           )}
                                         </td>
-                                        {headers.map((h) => (
-                                          <td key={h} className="max-w-[200px] truncate px-3 py-2" title={row[h]}>
+                                        {headers.map((h, hIdx) => (
+                                          <td 
+                                            key={h} 
+                                            className={cn(
+                                              "max-w-[200px] truncate px-3 py-2.5",
+                                              hIdx === 0 ? "font-semibold text-foreground" : 
+                                              (h === 'Construtora / Obra' || h === 'Empresa') ? "font-medium text-foreground" : 
+                                              "font-normal text-muted-foreground"
+                                            )} 
+                                            title={row[h]}
+                                          >
                                             {row[h]}
                                           </td>
                                         ))}

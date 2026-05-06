@@ -852,7 +852,7 @@ const Clientes = () => {
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
                     {visibleColumns.map(colId => (
-                      <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                      <th key={colId} className="text-left py-2.5 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap uppercase tracking-wider">
                         {getLabel(colId)}
                       </th>
                     ))}
@@ -895,7 +895,7 @@ const Clientes = () => {
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <Icon className="h-4 w-4 text-primary" />
                                   </div>
-                                  <span className="font-medium whitespace-nowrap">{client.empresa}</span>
+                                  <span className="font-semibold text-sm whitespace-nowrap text-foreground">{client.empresa}</span>
                                 </div>
                               </td>
                             );
@@ -918,7 +918,7 @@ const Clientes = () => {
                           }
 
                           return (
-                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap" onClick={navigateToDetail}>
+                            <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")} onClick={navigateToDetail}>
                               {value || '—'}
                             </td>
                           );
@@ -953,7 +953,7 @@ const Clientes = () => {
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
                     {visibleColumns.map(colId => (
-                      <th key={colId} className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs whitespace-nowrap">
+                      <th key={colId} className="text-left py-2.5 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap uppercase tracking-wider">
                         {getLabel(colId)}
                       </th>
                     ))}
@@ -994,14 +994,25 @@ const Clientes = () => {
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <User className="h-4 w-4 text-primary" />
                                   </div>
-                                  <span className="font-medium whitespace-nowrap">{contato.nome_contato || 'Sem nome'}</span>
+                                  <span className="font-semibold text-sm whitespace-nowrap text-foreground">{contato.nome_contato || 'Sem nome'}</span>
                                 </div>
                               </td>
                             );
                           }
 
+                          if (colId === 'empresa') {
+                            return (
+                              <td key={colId} className="py-2.5 px-4 text-sm font-medium text-foreground whitespace-nowrap" onClick={() => {
+                                const slug = slugify(contato.nome_contato || 'contato');
+                                navigate(`/contatos/${slug}-${contato.id}`);
+                              }}>
+                                {value || '—'}
+                              </td>
+                            );
+                          }
+
                           return (
-                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap" onClick={() => {
+                            <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")} onClick={() => {
                               const slug = slugify(contato.nome_contato || 'contato');
                               navigate(`/contatos/${slug}-${contato.id}`);
                             }}>
