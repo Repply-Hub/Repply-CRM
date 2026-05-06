@@ -1028,17 +1028,9 @@ export function MappingStep({
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <Sparkles className="h-3 w-3 text-accent-foreground" />
-            Ao continuar, CNPJ/telefone, números, datas e status serão sanitizados antes do preview.
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onReset} size="sm">Cancelar</Button>
-            <Button disabled={!canProceed || requiredMissing.length > 0} onClick={handleContinue} size="sm" className="gap-1.5">
-              Pré-visualizar <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
+        <div className="flex items-center justify-between gap-3 pt-1 opacity-0 pointer-events-none h-0">
+          {/* Botões originais ocultos pois o Dialog agora gerencia o rodapé */}
+          <Button onClick={handleContinue} />
         </div>
       </div>
     </TooltipProvider>
