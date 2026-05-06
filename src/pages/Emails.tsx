@@ -217,6 +217,24 @@ const Emails = () => {
     },
   });
 
+  const bulkUpdateReadStatusMutation = useMutation({
+    mutationFn: async ({ ids, lido }: { ids: string[]; lido: boolean }) => {
+      const { error } = await supabase
+        .from("emails_recebidos")
+        .update({ lido })
+        .in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("E-mails atualizados com sucesso");
+      queryClient.invalidateQueries({ queryKey: ["received_emails"] });
+      setSelectedIds([]);
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao atualizar e-mails: " + (error.message || "Erro desconhecido"));
+    },
+  });
+
   const toggleSelectAll = () => {
     const currentEmails = activeTab === "received" ? receivedEmails : emails;
     if (!currentEmails) return;
