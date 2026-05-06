@@ -144,7 +144,14 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
                 <p className="font-bold text-base leading-tight text-slate-900">{selectedObra.nome_obra}</p>
                 
                 {selectedObra.cliente_empresa && (
-                  <div className="flex items-center gap-1.5 text-sm text-slate-700 font-medium bg-slate-50 p-1.5 rounded border border-slate-100">
+                  <div 
+                    className="flex items-center gap-1.5 text-sm text-slate-700 font-medium bg-slate-50 p-1.5 rounded border border-slate-100 cursor-pointer hover:bg-slate-100 hover:text-blue-600 transition-colors"
+                    onClick={() => {
+                      if (selectedObra.cliente_id) {
+                        navigate(`/clientes/${selectedObra.cliente_id}`);
+                      }
+                    }}
+                  >
                     <Building2 className="h-4 w-4 shrink-0 text-slate-500" />
                     <span>{selectedObra.cliente_empresa}</span>
                   </div>
