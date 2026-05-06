@@ -196,8 +196,40 @@ const Emails = () => {
     },
     onError: (error: any) => {
       toast.error("Erro ao excluir e-mail: " + (error.message || "Erro desconhecido"));
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async ({ ids, type }: { ids: string[]; type: "sent" | "received" }) => {
+      const table = type === "sent" ? "emails" : "emails_recebidos";
+      const { error } = await supabase.from(table).delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast.success(`${variables.ids.length} e-mail(s) excluído(s) com sucesso`);
+      queryClient.invalidateQueries({ queryKey: [variables.type === "sent" ? "emails" : "received_emails"] });
+      setSelectedIds([]);
+      setIsBulkDeleting(false);
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao excluir e-mails: " + (error.message || "Erro desconhecido"));
+      setIsBulkDeleting(false);
     },
   });
+
+  const toggleSelectAll = () => {
+    const currentEmails = activeTab === "received" ? receivedEmails : emails;
+    if (!currentEmails) return;
+
+    if (selectedIds.length === currentEmails.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(currentEmails.map((e: any) => e.id));
+    }
+  };
+
+  const toggleSelectId = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
