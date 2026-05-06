@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { Loader2, MapPin, Building2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
