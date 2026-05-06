@@ -78,6 +78,7 @@ const PedidoRow = memo(({
   onToggle, 
   onClick, 
   visibleColumns, 
+  columns,
   KANBAN_STAGES, 
   getLabel, 
   stageLabel 
@@ -87,6 +88,7 @@ const PedidoRow = memo(({
   onToggle: () => void, 
   onClick: () => void, 
   visibleColumns: string[],
+  columns: any[],
   KANBAN_STAGES: any[],
   getLabel: (id: string) => string,
   stageLabel: (status: string) => string
@@ -100,7 +102,8 @@ const PedidoRow = memo(({
       <TableCell className="w-10" onClick={e => e.stopPropagation()}>
         <Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Selecionar ${pedido.cliente?.empresa}`} />
       </TableCell>
-      {visibleColumns.map(colId => {
+      {columns.filter(col => visibleColumns.includes(col.id)).map(col => {
+        const colId = col.id;
         // Colunas padrão do sistema
         const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);
         
@@ -266,7 +269,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     presets,
     savePreset,
     loadPreset,
-    deletePreset
+    deletePreset,
+    resetToDefaults
   } = useTableSettings({
     key: 'pedidos',
     defaultColumns: PEDIDOS_COLUMNS,
@@ -692,190 +696,134 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   const optionsPopover = useMemo(() => (
-    <Popover modal={false}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/10 data-[state=open]:text-primary data-[state=open]:border-primary/50 shadow-sm active:scale-[0.98]"
-        >
-          <Settings2 className="h-4 w-4 text-muted-foreground" />
-          <span className="hidden sm:inline">Opções</span>
-          <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={8} className="w-64 p-2 shadow-2xl border-border/40 z-[50] bg-background">
-        <div className="flex flex-col gap-1">
-          <div className="px-3 py-2 border-b border-border/50 mb-1">
-            <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Menu de Opções</h4>
-          </div>
-
-          {/* Submenu Colunas */}
-          <Popover modal={false}>
-            <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
-                <div className="flex items-center gap-3">
-                  <Columns3 className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span>Colunas</span>
-                </div>
-                <ChevronDown className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-auto p-0 shadow-xl border-border/40 bg-background z-[60]">
-              <div className="w-[320px] p-2">
-                <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
-                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Colunas Visíveis</span>
-                  <button
-                    onClick={() => handleAddColumn('Nova Coluna')}
-                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 group"
-                    title="Criar nova coluna"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span className="text-[10px] font-bold">Nova Coluna</span>
-                  </button>
-                </div>
-
-                <div className="max-h-[320px] overflow-y-auto px-1.5 py-2">
-                  <div className="space-y-1">
-                    {allAvailableColumns.map((column) => {
-                      const checked = visibleColumns.includes(column.id);
-                      const disabled = column.locked || (checked && visibleColumns.length === 1);
-                      return (
-                        <div
-                          key={column.id}
-                          role="button"
-                          onClick={() => {
-                            if (disabled) return;
-                            if (checked) {
-                              setVisibleColumns(visibleColumns.filter(id => id !== column.id));
-                            } else {
-                              setVisibleColumns([...visibleColumns, column.id]);
-                            }
-                          }}
-                          className={cn(
-                            'flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left hover:bg-muted/80 cursor-pointer',
-                            disabled && 'cursor-not-allowed opacity-50',
-                            !checked && 'opacity-50 grayscale-[0.5]'
-                          )}
-                        >
-                          <div className={cn(
-                            'h-7 w-7 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
-                            checked ? 'bg-primary/10 border-primary/20 text-primary shadow-sm' : 'bg-background border-border/60 text-muted-foreground'
-                          )}>
-                            {checked ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4 opacity-40" />}
-                          </div>
-                          <span className="flex-1 truncate">{getLabel(column.id)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {/* Submenu Ações */}
-          <Popover modal={false}>
-            <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
-                <div className="flex items-center gap-3">
-                  <Settings2 className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span>Ações</span>
-                </div>
-                <ChevronDown className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-56 p-2 shadow-xl border-border/40 bg-background z-[60]">
-              <div className="space-y-1">
-                <div className="px-2 py-1.5 border-b border-border/50 mb-1">
-                  <h4 className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Ações Disponíveis</h4>
-                </div>
-
-                {showKanban ? (
-                  <>
-                    <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/30 rounded">
-                      Etapas Kanban
-                    </div>
-                    {KANBAN_STAGES.map((stage) => {
-                      const checked = visibleKanbanStages.includes(stage.key);
-                      const disabled = visibleKanbanStages.length === 1 && checked;
-                      return (
-                        <button
-                          key={stage.key}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => toggleKanbanStage(stage.key)}
-                          className={cn(
-                            'flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-xs font-medium transition-all text-left',
-                            'hover:bg-muted/80 disabled:cursor-not-allowed',
-                            !checked && 'opacity-40'
-                          )}
-                        >
-                          <span className={cn('h-3 w-3 rounded-sm shrink-0 border border-border/40', `bg-${stage.color}`)} />
-                          <span className="flex-1 truncate">{stage.label}</span>
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
-                      className="w-full text-center text-[10px] text-primary font-bold px-2 py-1.5 mt-1 rounded-md hover:bg-primary/5 transition-colors uppercase tracking-wider"
-                    >
-                      Resetar etapas
-                    </button>
-                    <div className="h-px bg-border/50 my-1" />
-                    <button
-                      type="button"
-                      onClick={() => setColunasDialogOpen(true)}
-                      className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-xs font-medium hover:bg-muted/80 transition-all"
-                    >
-                      <Columns3 className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>Gerenciar colunas</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleExportPdf()}
-                      className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-xs font-medium hover:bg-muted/80 transition-all"
-                    >
-                      <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>Exportar PDF</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImportOpen(true)}
-                      className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-xs font-medium hover:bg-muted/80 transition-all"
-                    >
-                      <Upload className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>Importar</span>
-                    </button>
-                  </>
-                )}
-                <div className="h-px bg-border/50 my-1" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
-                      localStorage.removeItem('pedidos_all_columns');
-                      localStorage.removeItem('pedidos_visible_columns');
-                      localStorage.removeItem('pedidos_custom_labels');
-                      window.location.reload();
-                    }
-                  }}
-                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-all"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span>Limpar colunas</span>
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
+    <ColumnSettings
+      columns={columns}
+      visibleColumns={visibleColumns}
+      onChange={setVisibleColumns}
+      onRename={handleRename}
+      onTypeChange={handleTypeChange}
+      onAdd={handleAddColumn}
+      onRemove={handleRemoveColumn}
+      onReorder={handleReorder}
+      presets={presets}
+      onSavePreset={savePreset}
+      onLoadPreset={loadPreset}
+      onDeletePreset={deletePreset}
+      label="Colunas"
+    >
+      <div className="flex flex-col gap-1 p-1">
+        <div className="px-3 py-2 border-b border-border/50 mb-1">
+          <h4 className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Menu de Opções</h4>
         </div>
-      </PopoverContent>
-    </Popover>
-  ), [allAvailableColumns, visibleColumns, setVisibleColumns, handleRename, handleTypeChange, handleReorder, handleAddColumn, handleRemoveColumn, showKanban, KANBAN_STAGES, visibleKanbanStages, toggleKanbanStage, handleKanbanStagesChange, setColunasDialogOpen, handleExportPdf, setImportOpen]);
+
+        {showKanban && (
+          <div className="space-y-1 mb-2">
+            <div className="px-3 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/30 rounded mx-1">
+              Etapas Kanban
+            </div>
+            {KANBAN_STAGES.map((stage) => {
+              const checked = visibleKanbanStages.includes(stage.key);
+              const disabled = visibleKanbanStages.length === 1 && checked;
+              return (
+                <button
+                  key={stage.key}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => toggleKanbanStage(stage.key)}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-xs font-medium transition-all text-left mx-0',
+                    'hover:bg-muted/80 disabled:cursor-not-allowed',
+                    !checked && 'opacity-40'
+                  )}
+                >
+                  <span className={cn('h-3 w-3 rounded-sm shrink-0 border border-border/40', `bg-${stage.color}`)} />
+                  <span className="flex-1 truncate">{stage.label}</span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
+              className="w-full text-center text-[10px] text-primary font-bold px-2 py-1.5 mt-1 rounded-md hover:bg-primary/5 transition-colors uppercase tracking-wider"
+            >
+              Resetar etapas
+            </button>
+            <div className="h-px bg-border/50 my-1 mx-2" />
+          </div>
+        )}
+
+        <button
+          onClick={() => setImportOpen(true)}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group"
+        >
+          <Upload className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+          <span>Importar Excel</span>
+        </button>
+
+        <button
+          onClick={() => handleExportPdf()}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group"
+        >
+          <FileDown className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+          <span>Exportar PDF</span>
+        </button>
+
+        {showKanban && (
+          <button
+            type="button"
+            onClick={() => setColunasDialogOpen(true)}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-all group"
+          >
+            <Columns3 className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            <span>Gerenciar colunas Kanban</span>
+          </button>
+        )}
+
+        <button
+          onClick={() => setConfirmDeleteOpen(true)}
+          disabled={selected.size === 0}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-destructive/10 text-destructive disabled:opacity-50 disabled:hover:bg-transparent transition-colors group"
+        >
+          <Trash2 className="h-4 w-4 opacity-70 group-hover:opacity-100" />
+          <span>Excluir Selecionados ({selected.size})</span>
+        </button>
+
+        <div className="h-px bg-border/50 my-1 mx-2" />
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
+              resetToDefaults();
+            }
+          }}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-all"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          <span>Resetar todas as configurações</span>
+        </button>
+      </div>
+    </ColumnSettings>
+  ), [
+    columns,
+    visibleColumns,
+    setVisibleColumns,
+    handleRename,
+    handleTypeChange,
+    handleAddColumn,
+    handleRemoveColumn,
+    handleReorder,
+    presets,
+    savePreset,
+    loadPreset,
+    deletePreset,
+    resetToDefaults,
+    selected.size,
+    showKanban,
+    KANBAN_STAGES,
+    visibleKanbanStages,
+    toggleKanbanStage,
+    handleKanbanStagesChange
+  ]);
 
   const filtrosPopover = useMemo(() => (
     <Popover modal={false}>
@@ -1230,7 +1178,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </div>
               )}
               {/* Renderização de Campos Extras dinâmicos */}
-              {tableVisibleColumns.map(colId => {
+              {columns.filter(col => tableVisibleColumns.includes(col.id)).map(col => {
+                const colId = col.id;
                 const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);
                 if (isDefault || colId === 'acoes') return null;
                 
@@ -1396,6 +1345,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   orders={ordersByStage[stage.key] ?? []}
                   onCardClick={setViewOrderId}
                   visibleColumns={visibleColumns}
+                  columns={columns}
                 />
               ))}
               <button
@@ -1430,12 +1380,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       <TableHead className="w-10">
                         <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
-                      {tableVisibleColumns.map(colId => (
-                        <TableHead key={colId} className={cn(
+                      {columns.filter(col => tableVisibleColumns.includes(col.id)).map(col => (
+                        <TableHead key={col.id} className={cn(
                           "whitespace-nowrap px-4 py-3 text-xs font-semibold",
-                          colId === 'acoes' ? "w-[80px] text-center" : "min-w-[150px]"
+                          col.id === 'acoes' ? "w-[80px] text-center" : "min-w-[150px]"
                         )}>
-                          {getLabel(colId)}
+                          {getLabel(col.id)}
                         </TableHead>
                       ))}
                     </TableRow>
@@ -1456,6 +1406,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           onToggle={() => toggleOne(p.id)}
                           onClick={() => setViewOrderId(p.id)}
                           visibleColumns={tableVisibleColumns}
+                          columns={columns}
                           KANBAN_STAGES={KANBAN_STAGES}
                           getLabel={getLabel}
                           stageLabel={stageLabel}

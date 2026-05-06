@@ -10,9 +10,10 @@ interface KanbanCardProps {
   order: Order;
   index: number;
   visibleColumns?: string[];
+  columns?: any[];
 }
 
-export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visibleColumns }: KanbanCardProps & { onClick?: (id: string) => void }) {
+export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visibleColumns, columns }: KanbanCardProps & { onClick?: (id: string) => void }) {
   const navigate = useNavigate();
   const isAlert = order.daysInStage >= order.alertDays;
 
@@ -89,13 +90,16 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                     </div>
                   )}
                   
-                  {/* Exibir campos extras se estiverem visíveis */}
-                  {visibleColumns?.filter(colId => colId.startsWith('custom_') || !['negocio', 'cliente', 'obra', 'fabricante', 'valor', 'vendedor', 'data_pedido', 'etapa', 'observacoes', 'acoes'].includes(colId)).map(colId => {
-                    const value = order.campos_extras?.[colId];
+                  {/* Exibir campos extras se estiverem visíveis, respeitando a ordem das colunas */}
+                  {columns?.filter(col => 
+                    visibleColumns?.includes(col.id) && 
+                    !['negocio', 'cliente', 'obra', 'fabricante', 'valor', 'vendedor', 'data_pedido', 'etapa', 'observacoes', 'acoes'].includes(col.id)
+                  ).map(col => {
+                    const value = order.campos_extras?.[col.id] || order.campos_extras?.[col.label];
                     if (!value) return null;
                     return (
-                      <div key={colId} className="text-[11px] text-muted-foreground/80 flex gap-2 items-center">
-                        <span className="font-medium">{colId.startsWith('custom_') ? colId.split('_').slice(1, -1).join(' ') : colId}:</span>
+                      <div key={col.id} className="text-[11px] text-muted-foreground/80 flex gap-2 items-center">
+                        <span className="font-medium truncate max-w-[80px]">{col.customLabel || col.label}:</span>
                         <span className="truncate">{value}</span>
                       </div>
                     );
