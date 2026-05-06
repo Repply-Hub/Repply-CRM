@@ -1029,7 +1029,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Clock className="h-3 w-3" /> Data do Pedido
+                  <Clock className="h-3 w-3" /> Data de Criação
                 </p>
                 <p className="text-sm font-medium">
                   {selectedViewOrder.data_pedido ? (() => {
