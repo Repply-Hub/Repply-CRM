@@ -19,7 +19,7 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ArrowRight
+  ChevronRight, ArrowRight
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -892,7 +892,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               {activeFilterCount}
             </Badge>
           )}
-          <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+          <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={8} className="w-64 p-2 shadow-2xl border-border/40 z-[50] bg-background">
@@ -1008,94 +1008,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </div>
                 <div className="flex items-center gap-2">
                   {(dateFrom || dateTo) && (
-                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">Ativo</Badge>
-                  )}
-                  <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="right" align="start" sideOffset={10} className="w-auto p-4 shadow-xl border-border/40 bg-background z-[60]">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Definir Período</p>
-              <div className="space-y-3">
-                <div className="relative group">
-                  <Input
-                    placeholder="De: DD/MM/AAAA"
-                    className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
-                    value={dateFrom ? (typeof dateFrom === 'string' ? dateFrom : format(dateFrom, 'dd/MM/yyyy')) : ''}
-                    onChange={(e) => {
-                      let val = e.target.value.replace(/\D/g, '');
-                      if (val.length > 8) val = val.slice(0, 8);
-                      let formatted = val;
-                      if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
-                      if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
-                      // @ts-ignore
-                      setDateFrom(formatted);
-                      if (formatted.length === 10) {
-                        const d = parse(formatted, 'dd/MM/yyyy', new Date());
-                        if (isValid(d)) setDateFrom(d);
-                      } else if (formatted === '') {
-                        setDateFrom(undefined);
-                      }
-                    }}
-                  />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
-                        <CalendarIcon className="h-3.5 w-3.5" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className="p-3 pointer-events-auto" />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="relative group">
-                  <Input
-                    placeholder="Até: DD/MM/AAAA"
-                    className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
-                    value={dateTo ? (typeof dateTo === 'string' ? dateTo : format(dateTo, 'dd/MM/yyyy')) : ''}
-                    onChange={(e) => {
-                      let val = e.target.value.replace(/\D/g, '');
-                      if (val.length > 8) val = val.slice(0, 8);
-                      let formatted = val;
-                      if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
-                      if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
-                      // @ts-ignore
-                      setDateTo(formatted);
-                      if (formatted.length === 10) {
-                        const d = parse(formatted, 'dd/MM/yyyy', new Date());
-                        if (isValid(d)) setDateTo(d);
-                      } else if (formatted === '') {
-                        setDateTo(undefined);
-                      }
-                    }}
-                  />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
-                        <CalendarIcon className="h-3.5 w-3.5" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className="p-3 pointer-events-auto" />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {/* Submenu Status */}
-          <Popover modal={false}>
-            <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span>Status</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {showOnlyAttention && (
                     <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">Ativo</Badge>
                   )}
                   <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
