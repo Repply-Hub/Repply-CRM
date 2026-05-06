@@ -95,17 +95,19 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700">
           <MapPin className="h-4 w-4 text-primary" />
-          <span className="font-medium text-foreground">{obrasComCoord.length}</span>
-          <span>obra(s) no mapa</span>
+          <span className="font-semibold text-slate-900 dark:text-slate-100">{obrasComCoord.length}</span>
+          <span className="text-slate-600 dark:text-slate-400">obra(s) no mapa</span>
         </div>
         {obrasSemLocalizacao.length > 0 && (
-          <span className="text-xs">• {obrasSemLocalizacao.length} sem informações de localização</span>
+          <div className="text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-1 rounded-md border border-amber-100 dark:border-amber-800">
+            {obrasSemLocalizacao.length} sem localização
+          </div>
         )}
         {carregando && (
-          <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800 animate-pulse">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800 animate-pulse shadow-sm">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span>Mapeando obras ({progresso.atual}/{progresso.total})…</span>
           </div>
