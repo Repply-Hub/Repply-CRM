@@ -56,6 +56,9 @@ const Emails = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>("received");
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [pageSent, setPageSent] = useState(0);
+  const [pageReceived, setPageReceived] = useState(0);
+  const PAGE_SIZE = 15;
   const { isConnected, connectedEmail, sendEmail } = useGmail();
   const [formData, setFormData] = useState({ 
     destinatario: "", 
