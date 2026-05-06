@@ -520,32 +520,44 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         </DialogHeader>
 
         {step !== 'upload' && (
-          <div className="px-6 py-3 border-y bg-background flex items-center justify-center gap-4 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className={cn(
-                "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
-                step === 'mapping' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
-              )}>
-                1
+          <div className="px-6 py-3 border-y bg-background flex flex-col gap-3 shrink-0">
+            <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
+                  step === 'mapping' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
+                )}>
+                  1
+                </div>
+                <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'mapping' ? "text-primary" : "text-muted-foreground")}>
+                  Mapeamento
+                </span>
               </div>
-              <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'mapping' ? "text-primary" : "text-muted-foreground")}>
-                Mapeamento
-              </span>
-            </div>
-            
-            <div className="w-12 h-px bg-border" />
-            
-            <div className="flex items-center gap-2">
-              <div className={cn(
-                "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
-                step === 'preview' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
-              )}>
-                2
+              
+              <div className="w-12 h-px bg-border" />
+              
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
+                  step === 'preview' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
+                )}>
+                  2
+                </div>
+                <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'preview' ? "text-primary" : "text-muted-foreground")}>
+                  Revisão
+                </span>
               </div>
-              <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'preview' ? "text-primary" : "text-muted-foreground")}>
-                Revisão
-              </span>
             </div>
+
+            {importing && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-primary">
+                  <span>Processando importação...</span>
+                  <span>{importProgress}%</span>
+                </div>
+                <Progress value={importProgress} className="h-1.5" />
+              </div>
+            )}
           </div>
         )}
 
