@@ -138,7 +138,8 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
       for (let i = 0; i < pendentes.length; i++) {
         if (cancelado) break;
         const obra = pendentes[i];
-        const coord = await geocodificar(obra.endereco_entrega!);
+        const enderecoBusca = obra.endereco_entrega || obra.nome_obra;
+        const coord = await geocodificar(enderecoBusca);
         if (cancelado) break;
 
         if (coord) {
