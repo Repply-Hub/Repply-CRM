@@ -124,7 +124,13 @@ export default function Obras() {
 
   const getStatusInfo = (slug: string) => {
     const status = statusObras?.find(s => s.slug === slug);
-    if (!status) return { label: slug, variant: 'outline' as const };
+    if (!status) {
+      const label = slug === 'em_andamento' ? 'Em Andamento' : slug.replace(/_/g, ' ');
+      return { 
+        label: label.charAt(0).toUpperCase() + label.slice(1), 
+        variant: 'outline' as const 
+      };
+    }
     return { 
       label: status.nome, 
       variant: 'default' as const 

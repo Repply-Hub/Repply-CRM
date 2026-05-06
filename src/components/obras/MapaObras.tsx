@@ -11,7 +11,7 @@ const containerStyle = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  em_andamento: 'Em andamento',
+  em_andamento: 'Em Andamento',
   ativa: 'Ativa',
   concluida: 'Concluída',
   parada: 'Parada',
