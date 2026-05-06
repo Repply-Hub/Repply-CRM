@@ -73,9 +73,13 @@ const Emails = () => {
   const { data: emails, isLoading: isSentLoading } = useQuery({
     queryKey: ["emails", searchTerm],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
       let query = supabase
         .from("emails")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (searchTerm) {
@@ -91,9 +95,13 @@ const Emails = () => {
   const { data: receivedEmails, isLoading: isReceivedLoading } = useQuery({
     queryKey: ["received_emails"],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
       const { data, error } = await supabase
         .from("emails_recebidos")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
