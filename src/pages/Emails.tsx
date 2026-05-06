@@ -181,6 +181,24 @@ const Emails = () => {
     },
   });
 
+  const deleteEmailMutation = useMutation({
+    mutationFn: async ({ id, type }: { id: string; type: "sent" | "received" }) => {
+      const table = type === "sent" ? "emails" : "emails_recebidos";
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast.success("E-mail excluído com sucesso");
+      queryClient.invalidateQueries({ queryKey: [variables.type === "sent" ? "emails" : "received_emails"] });
+      if (selectedEmail?.id === variables.id) {
+        setSelectedEmail(null);
+      }
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao excluir e-mail: " + (error.message || "Erro desconhecido"));
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.destinatario || !formData.assunto || !formData.corpo) {
