@@ -541,6 +541,33 @@ const Emails = () => {
                   </div>
                 )}
               </div>
+              {totalSent > PAGE_SIZE && (
+                <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/5 shrink-0">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando {pageSent * PAGE_SIZE + 1} - {Math.min((pageSent + 1) * PAGE_SIZE, totalSent)} de {totalSent}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPageSent(p => Math.max(0, p - 1))}
+                      disabled={pageSent === 0}
+                      className="h-8"
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPageSent(p => p + 1)}
+                      disabled={(pageSent + 1) * PAGE_SIZE >= totalSent}
+                      className="h-8"
+                    >
+                      Próximo <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </TabsContent>
 
