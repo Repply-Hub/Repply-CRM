@@ -17,6 +17,64 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Check if it's a "mark as read" request
+    if (req.method === 'POST') {
+      const { action, messageId } = await req.json();
+      
+      if (action === 'mark_as_read' && messageId) {
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) throw new Error('No authorization header');
+        
+        const { data: { user }, error: authError } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
+        if (authError || !user) throw new Error('Unauthorized');
+
+        const { data: tokenData } = await supabaseClient
+          .from('gmail_tokens')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (tokenData) {
+          let accessToken = tokenData.access_token;
+          // Token refresh logic (simplified for here, but should ideally reuse common logic)
+          if (Date.now() >= (tokenData.expires_at - 60000)) {
+            const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                client_id: Deno.env.get('GOOGLE_CLIENT_ID')!,
+                client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET')!,
+                refresh_token: tokenData.refresh_token,
+                grant_type: 'refresh_token',
+              }),
+            });
+            const newTokens = await refreshResponse.json();
+            if (!newTokens.error) {
+              accessToken = newTokens.access_token;
+              await supabaseClient.from('gmail_tokens').update({
+                access_token: accessToken,
+                expires_at: Date.now() + (newTokens.expires_in * 1000),
+              }).eq('user_id', user.id);
+            }
+          }
+
+          // Mark as read in Gmail (remove UNREAD label)
+          await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`, {
+            method: 'POST',
+            headers: { 
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ removeLabelIds: ['UNREAD'] })
+          });
+
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+    }
+
     // 1. Fetch all connected users
     const { data: tokens, error: tokensError } = await supabaseClient
       .from('gmail_tokens')
@@ -116,7 +174,10 @@ serve(async (req) => {
             body = decodeURIComponent(escape(atob(base64)))
           }
 
-          // 7. Upsert into emails_recebidos
+          // 7. Check if message is unread in Gmail
+          const isUnreadInGmail = message.labelIds?.includes('UNREAD') ?? false;
+
+          // 8. Upsert into emails_recebidos
           const { error: upsertError } = await supabaseClient
             .from('emails_recebidos')
             .upsert({
@@ -124,11 +185,14 @@ serve(async (req) => {
               remetente: from,
               assunto: subject,
               corpo_html: body,
-              lido: false,
+              lido: !isUnreadInGmail, // Se não tiver a label UNREAD, está lido
               criado_em: created_at,
               resend_id: message.id,
               gmail_message_id: message.id
-            }, { onConflict: 'resend_id' })
+            }, { 
+              onConflict: 'resend_id',
+              ignoreDuplicates: false 
+            })
 
           if (!upsertError) syncedCount++
         }
