@@ -1013,10 +1013,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   <ChevronRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </button>
-...
-                  <ChevronRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </button>
+            </PopoverTrigger>
             </PopoverTrigger>
             <PopoverContent side="right" align="start" sideOffset={10} className="w-56 p-3 shadow-xl border-border/40 bg-background z-[60]">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filtros de Atenção</p>
