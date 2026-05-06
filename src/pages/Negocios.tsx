@@ -694,7 +694,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <Button
           variant="outline"
           size="sm"
-          className="h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/[0.06] data-[state=open]:text-primary data-[state=open]:border-primary/60 shadow-sm active:scale-[0.98]"
+          className="h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/10 data-[state=open]:text-primary data-[state=open]:border-primary/50 shadow-sm active:scale-[0.98]"
         >
           <Settings2 className="h-4 w-4 text-muted-foreground" />
           <span className="hidden sm:inline">Opções</span>
@@ -710,7 +710,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           {/* Submenu Colunas */}
           <Popover modal={false}>
             <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
                 <div className="flex items-center gap-3">
                   <Columns3 className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                   <span>Colunas</span>
@@ -774,7 +774,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           {/* Submenu Ações */}
           <Popover modal={false}>
             <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
                 <div className="flex items-center gap-3">
                   <Settings2 className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                   <span>Ações</span>
@@ -881,8 +881,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           variant="outline"
           size="sm"
           className={cn(
-            "h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/[0.06] data-[state=open]:text-primary data-[state=open]:border-primary/60 shadow-sm active:scale-[0.98]",
-            hasPipelineFilters && "border-primary/50 bg-primary/[0.02] text-primary"
+            "h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/10 data-[state=open]:text-primary data-[state=open]:border-primary/50 shadow-sm active:scale-[0.98]",
+            hasPipelineFilters && "data-[state=closed]:border-primary/50 data-[state=closed]:bg-primary/[0.02] data-[state=closed]:text-primary data-[state=open]:border-primary/50 data-[state=open]:bg-primary/10 data-[state=open]:text-primary"
           )}
         >
           <Filter className="h-4 w-4" />
@@ -904,7 +904,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           {/* Submenu Etapa */}
           <Popover modal={false}>
             <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
                 <div className="flex items-center gap-3">
                   <LayoutGrid className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                   <span>Etapa</span>
@@ -937,7 +937,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           {/* Submenu Vendedor */}
           <Popover modal={false}>
             <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
                 <div className="flex items-center gap-3">
                   <User className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                   <span>Vendedor</span>
@@ -968,7 +968,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           {/* Submenu Fabricante */}
           <Popover modal={false}>
             <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
                 <div className="flex items-center gap-3">
                   <Factory className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                   <span>Fabricante</span>
@@ -1001,7 +1001,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           {/* Submenu Período */}
           <Popover modal={false}>
             <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
                 <div className="flex items-center gap-3">
                   <CalendarIcon className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                   <span>Período</span>
@@ -1014,7 +1014,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </div>
               </button>
             </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-auto p-4 shadow-xl border-border/40 bg-background z-[60]">
+            <PopoverContent side="left" align="start" sideOffset={10} className="w-56 p-3 shadow-xl border-border/40 bg-background z-[60]">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filtros de Atenção</p>
               <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
                 <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
