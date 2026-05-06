@@ -1129,9 +1129,9 @@ export default function Portal() {
                                 <tr className="bg-muted/50 border-b border-border/60">
                                   <th className="px-2 py-2 w-8"></th>
                                   {headers.map((h) => (
-                                    <th key={h} className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap uppercase tracking-wider">{h}</th>
+                                    <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap uppercase tracking-wider">{h}</th>
                                   ))}
-                                  <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap uppercase tracking-wider">Ações</th>
+                                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap uppercase tracking-wider">Ações</th>
                                 </tr>
                               </thead>
                               <tbody>
