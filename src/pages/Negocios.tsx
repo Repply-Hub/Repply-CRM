@@ -1010,7 +1010,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   {(dateFrom || dateTo) && (
                     <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">Ativo</Badge>
                   )}
-                  <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
+                  <ChevronDown className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </button>
             </PopoverTrigger>
