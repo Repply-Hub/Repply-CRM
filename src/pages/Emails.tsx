@@ -657,10 +657,15 @@ const Emails = () => {
               <Button 
                 className="rounded-full px-6 gap-2"
                 onClick={() => {
+                  const replySubject = selectedEmail?.assunto.toLowerCase().startsWith("re:") 
+                    ? selectedEmail.assunto 
+                    : `Re: ${selectedEmail?.assunto}`;
+                  
                   setFormData({
                     ...formData,
                     destinatario: selectedEmail?.remetente || selectedEmail?.destinatario,
-                    assunto: `Re: ${selectedEmail?.assunto}`
+                    assunto: replySubject,
+                    corpo: `\n\n--- Em ${format(new Date(selectedEmail.created_at || selectedEmail.criado_em), "dd/MM/yyyy HH:mm")}, ${selectedEmail.remetente} escreveu:\n\n${selectedEmail.corpo || ""}`
                   });
                   setSelectedEmail(null);
                   setIsComposeOpen(true);
