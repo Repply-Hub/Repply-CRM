@@ -428,8 +428,23 @@ const Emails = () => {
                           <span className="text-sm font-semibold text-foreground mr-2 shrink-0">{email.assunto}</span>
                           <span className="text-sm text-muted-foreground">- {email.corpo}</span>
                         </div>
-                        <div className="shrink-0 text-xs font-medium text-muted-foreground">
-                          {format(new Date(email.created_at), "dd 'de' MMM", { locale: ptBR })}
+                        <div className="flex items-center gap-3">
+                          <div className="shrink-0 text-xs font-medium text-muted-foreground">
+                            {format(new Date(email.created_at), "dd 'de' MMM", { locale: ptBR })}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm("Deseja realmente excluir este e-mail?")) {
+                                deleteEmailMutation.mutate({ id: email.id, type: "sent" });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}
