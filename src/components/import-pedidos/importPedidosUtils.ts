@@ -119,9 +119,9 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /^observacoes$/, score: 100 },
     { pattern: /observa/, score: 95 },
     { pattern: /obs/, score: 92 },
-    { pattern: /nota/, score: 88 },
-    { pattern: /descri/, score: 78 },
-    { pattern: /detalhe/, score: 76 },
+    { pattern: /\bnota\b/i, score: 88 },
+    { pattern: /\bdescri/i, score: 78 },
+    { pattern: /\bdetalhe/i, score: 76 },
   ],
 };
 
