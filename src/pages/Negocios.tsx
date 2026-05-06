@@ -266,7 +266,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     presets,
     savePreset,
     loadPreset,
-    deletePreset
+    deletePreset,
+    resetToDefaults
   } = useTableSettings({
     key: 'pedidos',
     defaultColumns: PEDIDOS_COLUMNS,
