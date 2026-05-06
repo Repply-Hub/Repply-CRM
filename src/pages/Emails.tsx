@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,8 @@ import {
   PenBox,
   Trash2,
   MoreVertical,
-  
+  CheckSquare,
+  Square
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,9 +41,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
+import { Checkbox } from "@/components/ui/checkbox";
 import { useSearchParams } from "react-router-dom";
-import { useEffect } from "react";
 import { useGmail } from "@/hooks/useGmail";
 
 const Emails = () => {
@@ -51,6 +51,9 @@ const Emails = () => {
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [emailToDelete, setEmailToDelete] = useState<{ id: string; type: "sent" | "received" } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<string>("received");
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const { isConnected, connectedEmail, sendEmail } = useGmail();
   const [formData, setFormData] = useState({ 
     destinatario: "", 
@@ -196,6 +199,59 @@ const Emails = () => {
     },
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async ({ ids, type }: { ids: string[]; type: "sent" | "received" }) => {
+      const table = type === "sent" ? "emails" : "emails_recebidos";
+      const { error } = await supabase.from(table).delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast.success(`${variables.ids.length} e-mail(s) excluído(s) com sucesso`);
+      queryClient.invalidateQueries({ queryKey: [variables.type === "sent" ? "emails" : "received_emails"] });
+      setSelectedIds([]);
+      setIsBulkDeleting(false);
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao excluir e-mails: " + (error.message || "Erro desconhecido"));
+      setIsBulkDeleting(false);
+    },
+  });
+
+  const bulkUpdateReadStatusMutation = useMutation({
+    mutationFn: async ({ ids, lido }: { ids: string[]; lido: boolean }) => {
+      const { error } = await supabase
+        .from("emails_recebidos")
+        .update({ lido })
+        .in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("E-mails atualizados com sucesso");
+      queryClient.invalidateQueries({ queryKey: ["received_emails"] });
+      setSelectedIds([]);
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao atualizar e-mails: " + (error.message || "Erro desconhecido"));
+    },
+  });
+
+  const toggleSelectAll = () => {
+    const currentEmails = activeTab === "received" ? receivedEmails : emails;
+    if (!currentEmails) return;
+
+    if (selectedIds.length === currentEmails.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(currentEmails.map((e: any) => e.id));
+    }
+  };
+
+  const toggleSelectId = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.destinatario || !formData.assunto || !formData.corpo) {
@@ -207,32 +263,86 @@ const Emails = () => {
 
   return (
     <AppLayout title="E-mail" subtitle="Interface Gmail" mainClassName="flex-1 overflow-hidden p-0">
-      <Tabs defaultValue="received" className="flex flex-col h-full bg-background overflow-hidden">
+      <Tabs 
+        defaultValue="received" 
+        className="flex flex-col h-full bg-background overflow-hidden"
+        onValueChange={(val) => {
+          setActiveTab(val);
+          setSelectedIds([]);
+        }}
+      >
         {/* Header with Search and Tab Actions */}
         <div className="px-4 py-3 flex items-center justify-between gap-4 border-b bg-background/95 sticky top-0 z-10">
           <div className="flex items-center gap-4 flex-1">
-            <TabsList className="bg-muted/50 p-1 h-10">
-              <TabsTrigger 
-                value="received" 
-                className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
-              >
-                <Inbox className="h-4 w-4" /> 
-                <span className="hidden sm:inline">Recebidos</span>
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
-                  {receivedEmails?.length || 0}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="sent" 
-                className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
-              >
-                <Send className="h-4 w-4" /> 
-                <span className="hidden sm:inline">Enviados</span>
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
-                  {emails?.length || 0}
-                </Badge>
-              </TabsTrigger>
-            </TabsList>
+            {selectedIds.length > 0 ? (
+              <div className="flex items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="select-all-bulk"
+                    checked={
+                      selectedIds.length > 0 && 
+                      selectedIds.length === (activeTab === "received" ? receivedEmails?.length : emails?.length)
+                    }
+                    onCheckedChange={toggleSelectAll}
+                  />
+                  <span className="text-sm font-medium text-primary">
+                    {selectedIds.length} selecionado(s)
+                  </span>
+                </div>
+                <div className="h-4 w-[1px] bg-primary/20 mx-2" />
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
+                  onClick={() => setIsBulkDeleting(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </Button>
+                {activeTab === "received" && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 text-primary hover:bg-primary/10 gap-2"
+                    onClick={() => bulkUpdateReadStatusMutation.mutate({ ids: selectedIds, lido: true })}
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    Lido
+                  </Button>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 text-muted-foreground"
+                  onClick={() => setSelectedIds([])}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
+              <TabsList className="bg-muted/50 p-1 h-10">
+                <TabsTrigger 
+                  value="received" 
+                  className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  <Inbox className="h-4 w-4" /> 
+                  <span className="hidden sm:inline">Recebidos</span>
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
+                    {receivedEmails?.length || 0}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="sent" 
+                  className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  <Send className="h-4 w-4" /> 
+                  <span className="hidden sm:inline">Enviados</span>
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
+                    {emails?.length || 0}
+                  </Badge>
+                </TabsTrigger>
+              </TabsList>
+            )}
 
             <div className="flex items-center gap-2 flex-1 max-w-md hidden md:flex">
               <div className="relative flex-1">
@@ -374,11 +484,15 @@ const Emails = () => {
                     {emails.map((email) => (
                       <div 
                         key={email.id} 
-                        className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4"
+                        className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''}`}
                         onClick={() => setSelectedEmail({ ...email, type: "sent" })}
                       >
                         <div className="flex items-center gap-3 shrink-0">
-                          <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
+                          <Checkbox 
+                            checked={selectedIds.includes(email.id)}
+                            onCheckedChange={() => toggleSelectId(email.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
                           <Mail className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
                         </div>
                         <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
@@ -432,7 +546,7 @@ const Emails = () => {
                     {receivedEmails.map((email) => (
                       <div 
                         key={email.id} 
-                        className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4"
+                        className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''}`}
                         onClick={() => setSelectedEmail({
                           ...email,
                           destinatario: email.destinatarios?.[0] || "",
@@ -444,7 +558,11 @@ const Emails = () => {
                         })}
                       >
                         <div className="flex items-center gap-3 shrink-0">
-                          <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
+                          <Checkbox 
+                            checked={selectedIds.includes(email.id)}
+                            onCheckedChange={() => toggleSelectId(email.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
                           <Inbox className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
                         </div>
                         <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
@@ -576,6 +694,31 @@ const Emails = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={isBulkDeleting} onOpenChange={setIsBulkDeleting}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir e-mails em massa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a excluir {selectedIds.length} e-mail(s). 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsBulkDeleting(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                bulkDeleteMutation.mutate({ 
+                  ids: selectedIds, 
+                  type: activeTab as "sent" | "received" 
+                });
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir todos
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
