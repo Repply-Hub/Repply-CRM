@@ -279,6 +279,7 @@ export function getImportedPedidosRows(
     .map((row) => {
       const negocio = mapping.negocio ? row[mapping.negocio]?.toString().trim() || '' : '';
       const cliente = mapping.cliente ? row[mapping.cliente]?.toString().trim() || '' : '';
+      const contato = mapping.contato ? row[mapping.contato]?.toString().trim() || '' : '';
       const obra = mapping.obra ? row[mapping.obra]?.toString().trim() || '' : '';
       const fabricante = mapping.fabricante ? row[mapping.fabricante]?.toString().trim() || '' : '';
       const valor = mapping.valor ? parseNumber(row[mapping.valor]) : 0;
