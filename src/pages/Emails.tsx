@@ -181,6 +181,24 @@ const Emails = () => {
     },
   });
 
+  const deleteEmailMutation = useMutation({
+    mutationFn: async ({ id, type }: { id: string; type: "sent" | "received" }) => {
+      const table = type === "sent" ? "emails" : "emails_recebidos";
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast.success("E-mail excluído com sucesso");
+      queryClient.invalidateQueries({ queryKey: [variables.type === "sent" ? "emails" : "received_emails"] });
+      if (selectedEmail?.id === variables.id) {
+        setSelectedEmail(null);
+      }
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao excluir e-mail: " + (error.message || "Erro desconhecido"));
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.destinatario || !formData.assunto || !formData.corpo) {
@@ -397,7 +415,7 @@ const Emails = () => {
                       <div 
                         key={email.id} 
                         className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4"
-                        onClick={() => setSelectedEmail(email)}
+                        onClick={() => setSelectedEmail({ ...email, type: "sent" })}
                       >
                         <div className="flex items-center gap-3 shrink-0">
                           <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
@@ -410,8 +428,23 @@ const Emails = () => {
                           <span className="text-sm font-semibold text-foreground mr-2 shrink-0">{email.assunto}</span>
                           <span className="text-sm text-muted-foreground">- {email.corpo}</span>
                         </div>
-                        <div className="shrink-0 text-xs font-medium text-muted-foreground">
-                          {format(new Date(email.created_at), "dd 'de' MMM", { locale: ptBR })}
+                        <div className="flex items-center gap-3">
+                          <div className="shrink-0 text-xs font-medium text-muted-foreground">
+                            {format(new Date(email.created_at), "dd 'de' MMM", { locale: ptBR })}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm("Deseja realmente excluir este e-mail?")) {
+                                deleteEmailMutation.mutate({ id: email.id, type: "sent" });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -448,7 +481,8 @@ const Emails = () => {
                           remetente: email.remetente,
                           corpo: "",
                           html: email.corpo_html,
-                          created_at: email.criado_em
+                          created_at: email.criado_em,
+                          type: "received"
                         })}
                       >
                         <div className="flex items-center gap-3 shrink-0">
@@ -462,8 +496,23 @@ const Emails = () => {
                           <span className="text-sm font-bold text-foreground mr-2 shrink-0">{email.assunto}</span>
                           <span className="text-sm text-muted-foreground">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
                         </div>
-                        <div className="shrink-0 text-xs font-bold text-foreground">
-                          {email.criado_em && format(new Date(email.criado_em), "HH:mm", { locale: ptBR })}
+                        <div className="flex items-center gap-3">
+                          <div className="shrink-0 text-xs font-bold text-foreground">
+                            {email.criado_em && format(new Date(email.criado_em), "HH:mm", { locale: ptBR })}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm("Deseja realmente excluir este e-mail recebido?")) {
+                                deleteEmailMutation.mutate({ id: email.id, type: "received" });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -514,24 +563,40 @@ const Emails = () => {
               )}
             </div>
           </div>
-          <div className="p-4 border-t bg-muted/5 flex justify-end gap-2">
-            <Button variant="outline" className="rounded-full px-6" onClick={() => setSelectedEmail(null)}>
-              Fechar
-            </Button>
+          <div className="p-4 border-t bg-muted/5 flex justify-between gap-2">
             <Button 
-              className="rounded-full px-6 gap-2"
+              variant="ghost" 
+              className="rounded-full px-4 text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2"
               onClick={() => {
-                setFormData({
-                  ...formData,
-                  destinatario: selectedEmail?.remetente || selectedEmail?.destinatario,
-                  assunto: `Re: ${selectedEmail?.assunto}`
-                });
-                setSelectedEmail(null);
-                setIsComposeOpen(true);
+                if (confirm("Deseja realmente excluir este e-mail?")) {
+                  deleteEmailMutation.mutate({ 
+                    id: selectedEmail.id, 
+                    type: selectedEmail.type || (selectedEmail.criado_em ? "received" : "sent") 
+                  });
+                }
               }}
             >
-              <History className="h-4 w-4" /> Responder
+              <Trash2 className="h-4 w-4" /> Excluir
             </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="rounded-full px-6" onClick={() => setSelectedEmail(null)}>
+                Fechar
+              </Button>
+              <Button 
+                className="rounded-full px-6 gap-2"
+                onClick={() => {
+                  setFormData({
+                    ...formData,
+                    destinatario: selectedEmail?.remetente || selectedEmail?.destinatario,
+                    assunto: `Re: ${selectedEmail?.assunto}`
+                  });
+                  setSelectedEmail(null);
+                  setIsComposeOpen(true);
+                }}
+              >
+                <History className="h-4 w-4" /> Responder
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
