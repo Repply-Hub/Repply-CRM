@@ -624,14 +624,14 @@ const Emails = () => {
               </div>
             </div>
 
-            <div className="text-base text-foreground/90 leading-relaxed min-h-[200px]">
+            <div className="text-base text-slate-800 leading-relaxed min-h-[200px] bg-white p-4 rounded-lg border border-slate-100">
               {selectedEmail?.html ? (
                 <div 
-                  className="prose prose-sm max-w-none dark:prose-invert"
+                  className="prose prose-sm max-w-none text-slate-800"
                   dangerouslySetInnerHTML={{ __html: selectedEmail.html }} 
                 />
               ) : (
-                <div className="whitespace-pre-wrap">
+                <div className="whitespace-pre-wrap text-slate-800">
                   {selectedEmail?.corpo}
                 </div>
               )}
