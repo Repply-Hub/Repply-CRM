@@ -91,49 +91,57 @@ const Emails = () => {
     },
   });
 
-  const { data: emails, isLoading: isSentLoading } = useQuery({
-    queryKey: ["emails", searchTerm],
+  const { data: sentData, isLoading: isSentLoading } = useQuery({
+    queryKey: ["emails", searchTerm, pageSent],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      if (!user) return { emails: [], count: 0 };
 
       let query = supabase
         .from("emails")
-        .select("id, user_id, destinatario, remetente, assunto, corpo, html, status, created_at, updated_at")
+        .select("id, user_id, destinatario, remetente, assunto, corpo, html, status, created_at, updated_at", { count: "exact" })
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(pageSent * PAGE_SIZE, (pageSent + 1) * PAGE_SIZE - 1);
 
       if (searchTerm) {
         query = query.or(`destinatario.ilike.%${searchTerm}%,assunto.ilike.%${searchTerm}%,corpo.ilike.%${searchTerm}%`);
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data;
+      return { emails: data || [], count: count || 0 };
     },
   });
 
-  const { data: receivedEmails, isLoading: isReceivedLoading } = useQuery({
-    queryKey: ["received_emails"],
+  const emails = sentData?.emails || [];
+  const totalSent = sentData?.count || 0;
+
+  const { data: receivedData, isLoading: isReceivedLoading } = useQuery({
+    queryKey: ["received_emails", pageReceived],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      if (!user) return { emails: [], count: 0 };
 
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from("emails_recebidos")
-        .select("id, lido, criado_em, user_id, data_recebimento, corpo_html, gmail_message_id, remetente, destinatarios, assunto")
+        .select("id, lido, criado_em, user_id, data_recebimento, corpo_html, gmail_message_id, remetente, destinatarios, assunto", { count: "exact" })
         .eq("user_id", user.id)
-        .order("criado_em", { ascending: false });
+        .eq("excluido", false)
+        .order("criado_em", { ascending: false })
+        .range(pageReceived * PAGE_SIZE, (pageReceived + 1) * PAGE_SIZE - 1);
       
       if (error) {
         console.error("Erro ao buscar e-mails recebidos:", error);
         throw error;
       }
       
-      console.log(`Query e-mails recebidos retornou ${data?.length || 0} registros para o usuário ${user.id}`);
-      return data;
+      return { emails: data || [], count: count || 0 };
     },
   });
+
+  const receivedEmails = receivedData?.emails || [];
+  const totalReceived = receivedData?.count || 0;
 
   const sendEmailMutation = useMutation({
     mutationFn: async (data: { destinatario: string; assunto: string; corpo: string }) => {
