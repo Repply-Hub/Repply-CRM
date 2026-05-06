@@ -19,6 +19,7 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
 const EMPTY_MAPPING: Record<FieldKey, string> = {
   negocio: '',
   cliente: '',
+  contato: '',
   obra: '',
   fabricante: '',
   valor: '',
@@ -47,6 +48,15 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /razao/, score: 75 },
     { pattern: /construtora/, score: 75 },
     { pattern: /nome.*cliente/, score: 70 },
+  ],
+  contato: [
+    { pattern: /^contato$/, score: 100 },
+    { pattern: /^contato\s+principal$/, score: 100 },
+    { pattern: /^nome\s+contato$/, score: 100 },
+    { pattern: /^nome\s+do\s+contato$/, score: 100 },
+    { pattern: /contato/, score: 95 },
+    { pattern: /responsavel/, score: 85 },
+    { pattern: /pessoa/, score: 80 },
   ],
   obra: [
     { pattern: /^obra$/, score: 100 },
@@ -118,6 +128,7 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
 const MIN_SCORE: Record<FieldKey, number> = {
   negocio: 70,
   cliente: 70,
+  contato: 70,
   obra: 70,
   fabricante: 70,
   valor: 66,
