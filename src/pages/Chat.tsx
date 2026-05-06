@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, ChatGrupo, ChatMessage } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, ChatGrupo, ChatMessage, useMarkChatAsRead } from '@/hooks/use-chat';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -258,6 +258,7 @@ const Chat = () => {
   const { send, sending } = useSendMessage();
   const clearChat = useClearChat();
   const { data: grupos = [] } = useChatGrupos();
+  const markAsRead = useMarkChatAsRead();
 
   const { data: myVendedor } = useQuery({
     queryKey: ['my-vendedor'],
@@ -287,18 +288,24 @@ const Chat = () => {
   });
 
   useEffect(() => {
-    if (!messages) return;
+    if (!messages || messages.length === 0) return;
+    
+    // Mark messages as read when they are loaded in the view
+    markAsRead.mutate({ grupoId: activeGrupoId, recipientId: activeRecipientId });
+
     const scrollContainer = document.querySelector('[data-radix-scroll-area-viewport]');
     if (scrollContainer) {
       setTimeout(() => {
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
       }, 50);
     }
-  }, [messages, target]);
+  }, [messages?.length, activeGrupoId, activeRecipientId]);
 
   useEffect(() => {
     // Focus input when changing chat target
     inputRef.current?.focus();
+    // Also mark as read when switching chat
+    markAsRead.mutate({ grupoId: activeGrupoId, recipientId: activeRecipientId });
   }, [target]);
 
   const handleSend = async () => {

@@ -10,7 +10,7 @@ import { useSidebarPreferences, SidebarItem } from '@/hooks/use-sidebar-preferen
 import { usePermissoes } from '@/hooks/use-permissoes';
 import { getIconComponent } from '@/lib/sidebar-icons';
 import { SidebarAddItemDialog } from '@/components/SidebarAddItemDialog';
-import { useUnreadEmails } from '@/hooks/use-notificacoes';
+import { useUnreadEmails, useUnreadChatMessages } from '@/hooks/use-notificacoes';
 import logoSidebar from '@/assets/logo-sidebar.svg';
 import { toast } from 'sonner';
 import {
@@ -34,6 +34,7 @@ export function AppSidebar() {
   const [editItems, setEditItems] = useState<SidebarItem[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { data: unreadEmails = 0 } = useUnreadEmails();
+  const { data: unreadChat = 0 } = useUnreadChatMessages();
 
   const { items, save, isSaving } = useSidebarPreferences();
 
@@ -237,7 +238,8 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {displayItems.map((item) => {
                     const Icon = getIconComponent(item.icon);
-                    const showBadge = item.id === 'emails' && unreadEmails > 0;
+                    const showBadge = (item.id === 'emails' && unreadEmails > 0) || (item.id === 'chat' && unreadChat > 0);
+                    const badgeCount = item.id === 'emails' ? unreadEmails : unreadChat;
                     
                     return (
                       <SidebarMenuItem key={item.id}>
@@ -259,7 +261,7 @@ export function AppSidebar() {
                                 <span className="text-[13px] truncate">{item.label}</span>
                                 {showBadge && (
                                   <span className="ml-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
-                                    {unreadEmails > 99 ? '99+' : unreadEmails}
+                                    {badgeCount > 99 ? '99+' : badgeCount}
                                   </span>
                                 )}
                               </div>
