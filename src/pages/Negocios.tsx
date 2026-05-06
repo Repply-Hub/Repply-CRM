@@ -688,112 +688,154 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   const optionsPopover = useMemo(() => (
-    <ColumnSettings
-      columns={allAvailableColumns}
-      visibleColumns={visibleColumns}
-      onChange={setVisibleColumns}
-      onRename={handleRename}
-      onTypeChange={handleTypeChange}
-      onReorder={handleReorder}
-      onAdd={handleAddColumn}
-      onOpenChange={(open) => {
-        if (!open) {
-          // Quando fechar o popover, podemos forçar uma pequena limpeza se houver duplicatas de IDs
-          // Isso ajuda a manter a UI limpa.
-        }
-      }}
-      onRemove={handleRemoveColumn}
-      hideColumns={false}
-      label="Colunas"
-    >
-      <div className={cn("p-1", !showKanban && "border-t border-border/50")}>
-        <div className="px-4 py-2.5 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
-          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-            {showKanban ? 'Personalizar Etapas Kanban' : 'Ações'}
-          </span>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/[0.04] data-[state=open]:text-primary data-[state=open]:border-primary/60 shadow-sm active:scale-[0.98]"
+        >
+          <Settings2 className="h-4 w-4 text-muted-foreground" />
+          <span className="hidden sm:inline">Opções</span>
+          <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={8} className="w-64 p-2 shadow-2xl border-border/40 z-[50] bg-background">
+        <div className="flex flex-col gap-1">
+          <div className="px-3 py-2 border-b border-border/50 mb-1">
+            <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Menu de Opções</h4>
+          </div>
+
+          {/* Submenu Colunas */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+                <div className="flex items-center gap-3">
+                  <Columns3 className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                  <span>Colunas</span>
+                </div>
+                <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="left" align="start" sideOffset={10} className="w-auto p-0 shadow-xl border-border/40">
+              <ColumnSettings
+                columns={allAvailableColumns}
+                visibleColumns={visibleColumns}
+                onChange={setVisibleColumns}
+                onRename={handleRename}
+                onTypeChange={handleTypeChange}
+                onReorder={handleReorder}
+                onAdd={handleAddColumn}
+                onRemove={handleRemoveColumn}
+                hideColumns={false}
+                hideTrigger={true}
+                open={true}
+                label="Colunas Visíveis"
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* Submenu Ações */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+                <div className="flex items-center gap-3">
+                  <Settings2 className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                  <span>Ações</span>
+                </div>
+                <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="left" align="start" sideOffset={10} className="w-56 p-2 shadow-xl border-border/40 bg-background">
+              <div className="space-y-1">
+                <div className="px-2 py-1.5 border-b border-border/50 mb-1">
+                  <h4 className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Ações Disponíveis</h4>
+                </div>
+
+                {showKanban ? (
+                  <>
+                    <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/30 rounded">
+                      Etapas Kanban
+                    </div>
+                    {KANBAN_STAGES.map((stage) => {
+                      const checked = visibleKanbanStages.includes(stage.key);
+                      const disabled = visibleKanbanStages.length === 1 && checked;
+                      return (
+                        <button
+                          key={stage.key}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => toggleKanbanStage(stage.key)}
+                          className={cn(
+                            'flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-xs font-medium transition-all text-left',
+                            'hover:bg-muted/80 disabled:cursor-not-allowed',
+                            !checked && 'opacity-40'
+                          )}
+                        >
+                          <span className={cn('h-3 w-3 rounded-sm shrink-0 border border-border/40', `bg-${stage.color}`)} />
+                          <span className="flex-1 truncate">{stage.label}</span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
+                      className="w-full text-center text-[10px] text-primary font-bold px-2 py-1.5 mt-1 rounded-md hover:bg-primary/5 transition-colors uppercase tracking-wider"
+                    >
+                      Resetar etapas
+                    </button>
+                    <div className="h-px bg-border/50 my-1" />
+                    <button
+                      type="button"
+                      onClick={() => setColunasDialogOpen(true)}
+                      className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-xs font-medium hover:bg-muted/80 transition-all"
+                    >
+                      <Columns3 className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>Gerenciar colunas</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleExportPdf()}
+                      className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-xs font-medium hover:bg-muted/80 transition-all"
+                    >
+                      <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>Exportar PDF</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImportOpen(true)}
+                      className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-xs font-medium hover:bg-muted/80 transition-all"
+                    >
+                      <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>Importar</span>
+                    </button>
+                  </>
+                )}
+                <div className="h-px bg-border/50 my-1" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
+                      localStorage.removeItem('pedidos_all_columns');
+                      localStorage.removeItem('pedidos_visible_columns');
+                      localStorage.removeItem('pedidos_custom_labels');
+                      window.location.reload();
+                    }
+                  }}
+                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-all"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Limpar colunas</span>
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
-        
-        <div className="px-1.5 py-0.5 space-y-1">
-          {showKanban ? (
-            <div className="space-y-1">
-              {KANBAN_STAGES.map((stage) => {
-                const checked = visibleKanbanStages.includes(stage.key);
-                const disabled = visibleKanbanStages.length === 1 && checked;
-                return (
-                  <button
-                    key={stage.key}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => toggleKanbanStage(stage.key)}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left',
-                      'hover:bg-muted/80 disabled:cursor-not-allowed',
-                      !checked && 'opacity-40'
-                    )}
-                  >
-                    <span className={cn('h-3.5 w-3.5 rounded-md shrink-0 border border-border/40', `bg-${stage.color}`)} />
-                    <span className="flex-1 truncate">{stage.label}</span>
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
-                className="w-full text-center text-[11px] text-primary font-bold px-2 py-2 mt-1 rounded-md hover:bg-primary/5 transition-colors uppercase tracking-wider"
-              >
-                Resetar etapas
-              </button>
-            </div>
-          ) : null}
-          
-          {showKanban && (
-            <button
-              type="button"
-              onClick={() => setColunasDialogOpen(true)}
-              className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium hover:bg-muted/80 transition-all text-left"
-            >
-              <Columns3 className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>Gerenciar colunas kanban</span>
-            </button>
-          )}
-          {!showKanban && (
-            <>
-              <button
-                type="button"
-                onClick={() => handleExportPdf()}
-                className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium hover:bg-muted/80 transition-all text-left"
-              >
-                <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Exportar PDF</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setImportOpen(true)}
-                className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium hover:bg-muted/80 transition-all text-left"
-              >
-                <Upload className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Importar</span>
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
-                localStorage.removeItem('pedidos_all_columns');
-                localStorage.removeItem('pedidos_visible_columns');
-                localStorage.removeItem('pedidos_custom_labels');
-                window.location.reload();
-              }
-            }}
-            className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium text-destructive hover:bg-destructive/10 transition-all text-left"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span>Limpar todas as colunas</span>
-          </button>
-        </div>
-      </div>
-    </ColumnSettings>
+      </PopoverContent>
+    </Popover>
   ), [allAvailableColumns, visibleColumns, setVisibleColumns, handleRename, handleTypeChange, handleReorder, handleAddColumn, handleRemoveColumn, showKanban, KANBAN_STAGES, visibleKanbanStages, toggleKanbanStage, handleKanbanStagesChange, setColunasDialogOpen, handleExportPdf, setImportOpen]);
 
   const filtrosPopover = useMemo(() => (
