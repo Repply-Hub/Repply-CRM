@@ -488,18 +488,27 @@ export default function Obras() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <MapPin className="h-3 w-3" /> Endereço de Entrega
+                      <MapPin className="h-3 w-3" /> Localização
                     </Label>
-                    <p 
-                      className="text-sm font-medium flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
-                      onClick={() => {
-                        if (selectedObra.endereco_entrega) {
-                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedObra.endereco_entrega)}`, '_blank');
-                        }
-                      }}
-                    >
-                      {selectedObra.endereco_entrega || '—'}
-                    </p>
+                    <div className="pt-1">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 gap-2 text-xs"
+                        onClick={() => {
+                          if (selectedObra.endereco_entrega) {
+                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedObra.endereco_entrega)}`, '_blank');
+                          }
+                        }}
+                        disabled={!selectedObra.endereco_entrega}
+                      >
+                        <MapIcon className="h-3.5 w-3.5 text-primary" />
+                        Visualizar no mapa
+                      </Button>
+                      {!selectedObra.endereco_entrega && (
+                        <p className="text-[10px] text-muted-foreground mt-1 italic">Endereço não informado</p>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
