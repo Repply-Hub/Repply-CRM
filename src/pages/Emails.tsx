@@ -535,16 +535,27 @@ const Emails = () => {
                     {receivedEmails.map((email) => (
                       <div 
                         key={email.id} 
-                        className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''}`}
-                        onClick={() => setSelectedEmail({
-                          ...email,
-                          destinatario: email.destinatarios?.[0] || "",
-                          remetente: email.remetente,
-                          corpo: "",
-                          html: email.corpo_html,
-                          created_at: email.criado_em,
-                          type: "received"
-                        })}
+                        className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''} ${!email.lido ? 'bg-muted/20' : ''}`}
+                        onClick={async () => {
+                          if (!email.lido) {
+                            await supabase
+                              .from("emails_recebidos")
+                              .update({ lido: true })
+                              .eq("id", email.id);
+                            queryClient.invalidateQueries({ queryKey: ["received_emails"] });
+                          }
+                          
+                          setSelectedEmail({
+                            ...email,
+                            destinatario: email.destinatarios?.[0] || "",
+                            remetente: email.remetente,
+                            corpo: "",
+                            html: email.corpo_html,
+                            created_at: email.criado_em,
+                            type: "received"
+                          });
+                        }}
+
                       >
                         <div className="flex items-center gap-3 shrink-0">
                           <Checkbox 
@@ -555,16 +566,17 @@ const Emails = () => {
                           <Inbox className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
                         </div>
                         <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
-                          <span className="text-sm font-bold text-foreground">{email.remetente}</span>
+                          <span className={`text-sm ${!email.lido ? 'font-bold text-foreground' : 'font-normal text-muted-foreground'}`}>{email.remetente}</span>
                         </div>
                         <div className="flex-1 truncate overflow-hidden">
-                          <span className="text-sm font-bold text-foreground mr-2 shrink-0">{email.assunto}</span>
-                          <span className="text-sm text-muted-foreground">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
+                          <span className={`text-sm ${!email.lido ? 'font-bold text-foreground' : 'font-normal text-foreground'} mr-2 shrink-0`}>{email.assunto}</span>
+                          <span className="text-sm text-muted-foreground opacity-60">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="shrink-0 text-xs font-bold text-foreground">
+                          <div className={`shrink-0 text-xs ${!email.lido ? 'font-bold text-foreground' : 'font-normal text-muted-foreground'}`}>
                             {email.criado_em && format(new Date(email.criado_em), "HH:mm", { locale: ptBR })}
                           </div>
+
                           <Button
                             variant="ghost"
                             size="icon"
