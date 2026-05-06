@@ -708,7 +708,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           </div>
 
           {/* Submenu Colunas */}
-          <Popover>
+          <Popover modal={false}>
             <PopoverTrigger asChild>
               <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
                 <div className="flex items-center gap-3">
@@ -718,7 +718,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
               </button>
             </PopoverTrigger>
-            <PopoverContent side="right" align="start" sideOffset={10} className="w-auto p-0 shadow-xl border-border/40">
+            <PopoverContent side="right" align="start" sideOffset={10} className="w-auto p-0 shadow-xl border-border/40 bg-background z-[60]">
               <ColumnSettings
                 columns={allAvailableColumns}
                 visibleColumns={visibleColumns}
