@@ -496,16 +496,17 @@ export default function Obras() {
                         size="sm" 
                         className="h-8 gap-2 text-xs"
                         onClick={() => {
-                          if (selectedObra.endereco_entrega) {
-                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedObra.endereco_entrega)}`, '_blank');
+                          const address = selectedObra.endereco_entrega || selectedObra.nome_obra;
+                          if (address) {
+                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank');
                           }
                         }}
-                        disabled={!selectedObra.endereco_entrega}
+                        disabled={!selectedObra.endereco_entrega && !selectedObra.nome_obra}
                       >
                         <MapIcon className="h-3.5 w-3.5 text-primary" />
                         Visualizar no mapa
                       </Button>
-                      {!selectedObra.endereco_entrega && (
+                      {!selectedObra.endereco_entrega && !selectedObra.nome_obra && (
                         <p className="text-[10px] text-muted-foreground mt-1 italic">Endereço não informado</p>
                       )}
                     </div>
