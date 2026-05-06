@@ -743,19 +743,42 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               </div>
             )}
 
-            <div className="flex justify-end items-center gap-3 pt-4 border-t bg-muted/30 px-6 py-4 shrink-0">
-              <Button variant="ghost" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
-              <Button onClick={handleImport} disabled={importing} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
-                {importing ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
-                ) : (
-                  <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {previewRows.length} negócios</>
-                )}
-              </Button>
-            </div>
           </div>
         )}
         </div>
+
+        {step === 'mapping' && (
+          <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
+            <Button variant="ghost" onClick={reset}>Cancelar</Button>
+            <Button 
+              onClick={() => {
+                const mapped = getMappedRows();
+                if (mapped.length === 0) {
+                  toast.error('Nenhum registro válido com o mapeamento atual');
+                  return;
+                }
+                setStep('preview');
+              }} 
+              className="h-10 px-6 font-bold shadow-lg shadow-primary/20"
+              disabled={!canProceedToPreview}
+            >
+              Revisar Importação <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        )}
+
+        {step === 'preview' && (
+          <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
+            <Button variant="ghost" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
+            <Button onClick={handleImport} disabled={importing} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
+              {importing ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
+              ) : (
+                <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {previewRows.length} negócios</>
+              )}
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
