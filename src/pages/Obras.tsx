@@ -109,13 +109,14 @@ export default function Obras() {
       if (obra) {
         if (state.activeTab === 'mapa') {
           setActiveTab('mapa');
-          // No mapa, queremos que a obra seja selecionada visualmente no componente MapaObras
         } else {
           setSelectedObra(obra);
+          // Limpa o estado apenas se não for mapa, pois o mapa precisa dele para centralizar
+          navigate(location.pathname, { replace: true, state: {} });
         }
       }
     }
-  }, [location.state, obras]);
+  }, [location.state, obras, navigate, location.pathname]);
 
   const {
     columns,
