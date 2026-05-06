@@ -505,7 +505,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
-        <DialogHeader className="px-6 py-4 bg-muted/30 shrink-0">
+        <DialogHeader className="px-6 py-4 bg-muted/30 shrink-0 border-b flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2.5 text-xl font-bold">
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -517,11 +517,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               </div>
             </DialogTitle>
           </div>
-        </DialogHeader>
-
-        {step !== 'upload' && (
-          <div className="px-6 py-3 border-y bg-background flex flex-col gap-3 shrink-0">
-            <div className="flex items-center justify-center gap-4">
+          
+          {step !== 'upload' && (
+            <div className="flex items-center gap-4 bg-background/50 px-4 py-2 rounded-xl border border-border/50 shadow-sm self-start">
               <div className="flex items-center gap-2">
                 <div className={cn(
                   "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
@@ -534,7 +532,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                 </span>
               </div>
               
-              <div className="w-12 h-px bg-border" />
+              <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
               
               <div className="flex items-center gap-2">
                 <div className={cn(
@@ -548,22 +546,22 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                 </span>
               </div>
             </div>
-
-            {importing && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
-                <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-primary">
-                  <span>Processando importação...</span>
-                  <span>{importProgress}%</span>
-                </div>
-                <Progress value={importProgress} className="h-1.5" />
+          )}
+          
+          {importing && (
+            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 bg-background/50 p-2 px-3 rounded-lg border border-primary/20 self-start min-w-[200px]">
+              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-primary">
+                <span>Importando...</span>
+                <span>{importProgress}%</span>
               </div>
-            )}
-          </div>
-        )}
+              <Progress value={importProgress} className="h-1" />
+            </div>
+          )}
+        </DialogHeader>
+
 
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-
-        {step === 'upload' && (
+          {step === 'upload' && (
           <div
             className="border-2 border-dashed border-border rounded-2xl p-16 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/[0.02] transition-all group relative overflow-hidden"
             onDragOver={(e) => e.preventDefault()}
