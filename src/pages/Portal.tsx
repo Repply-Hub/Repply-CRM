@@ -1124,14 +1124,14 @@ export default function Portal() {
                             </div>
                           </div>
                           <div className="w-full max-w-full overflow-x-auto rounded-md border overscroll-x-contain">
-                            <table className="min-w-[1100px] text-xs">
+                            <table className="min-w-[1100px] text-sm">
                               <thead>
-                                <tr className="bg-muted/50">
+                                <tr className="bg-muted/50 border-b border-border/60">
                                   <th className="px-2 py-2 w-8"></th>
                                   {headers.map((h) => (
-                                    <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
+                                    <th key={h} className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap uppercase tracking-wider">{h}</th>
                                   ))}
-                                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Ações</th>
+                                  <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap uppercase tracking-wider">Ações</th>
                                 </tr>
                               </thead>
                               <tbody>
