@@ -276,6 +276,19 @@ const NovoPedido = () => {
     }
 
     try {
+      // Verificar se já existe uma obra com este nome para este cliente (evitar duplicados)
+      const normalizedNewName = newObraNome.trim().toLowerCase();
+      const existingObra = obras?.find(o => o.nome_obra.trim().toLowerCase() === normalizedNewName);
+
+      if (existingObra) {
+        setObraId(existingObra.id);
+        if (existingObra.endereco_entrega) setEnderecoEntrega(existingObra.endereco_entrega);
+        toast.info('Esta obra já existia e foi selecionada automaticamente.');
+        setObraDialogOpen(false);
+        setNewObraNome('');
+        return;
+      }
+
       await createObraMutation.mutateAsync({
         nome_obra: newObraNome,
         cliente_id: clienteId,
