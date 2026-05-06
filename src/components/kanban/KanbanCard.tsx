@@ -13,7 +13,7 @@ interface KanbanCardProps {
   columns?: any[];
 }
 
-export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visibleColumns }: KanbanCardProps & { onClick?: (id: string) => void }) {
+export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visibleColumns, columns }: KanbanCardProps & { onClick?: (id: string) => void }) {
   const navigate = useNavigate();
   const isAlert = order.daysInStage >= order.alertDays;
 
