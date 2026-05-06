@@ -701,7 +701,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={8} className="w-64 p-2 shadow-2xl border-border/40 z-[50] bg-background">
+      <PopoverContent align="start" sideOffset={8} className="w-64 p-2 shadow-2xl border-border/40 z-[50] bg-background">
         <div className="flex flex-col gap-1">
           <div className="px-3 py-2 border-b border-border/50 mb-1">
             <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Menu de Opções</h4>
