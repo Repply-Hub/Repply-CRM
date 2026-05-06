@@ -560,37 +560,39 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         )}
 
         {step === 'mapping' && (
-          <MappingStep
-            fileName={fileName}
-            rawData={rawData}
-            headers={headers}
-            mapping={mapping}
-            setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>}
-            fieldDefaultValues={fieldDefaultValues}
-            setFieldDefaultValues={setFieldDefaultValues}
-            extras={extras}
-            setExtras={setExtras}
-            customColumns={customColumns}
-            setCustomColumns={setCustomColumns}
-            fieldLabels={fieldLabels}
-            setFieldLabels={setFieldLabels}
-            visibleFields={VISIBLE_FIELDS}
-            existingColumns={existingColumns}
-            onReset={reset}
-            onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
-            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
-            onSaveAsDefault={saveAsDefault}
-            isAutoSaveEnabled={isAutoSaveEnabled}
-            canProceed={canProceedToPreview}
-            onNext={() => {
-              const mapped = getMappedRows();
-              if (mapped.length === 0) {
-                toast.error('Nenhum registro válido com o mapeamento atual');
-                return;
-              }
-              setStep('preview');
-            }}
-          />
+          <div className="bg-background rounded-xl border shadow-sm overflow-hidden">
+            <MappingStep
+              fileName={fileName}
+              rawData={rawData}
+              headers={headers}
+              mapping={mapping}
+              setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>}
+              fieldDefaultValues={fieldDefaultValues}
+              setFieldDefaultValues={setFieldDefaultValues}
+              extras={extras}
+              setExtras={setExtras}
+              customColumns={customColumns}
+              setCustomColumns={setCustomColumns}
+              fieldLabels={fieldLabels}
+              setFieldLabels={setFieldLabels}
+              visibleFields={VISIBLE_FIELDS}
+              existingColumns={existingColumns}
+              onReset={reset}
+              onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
+              onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
+              onSaveAsDefault={saveAsDefault}
+              isAutoSaveEnabled={isAutoSaveEnabled}
+              canProceed={canProceedToPreview}
+              onNext={() => {
+                const mapped = getMappedRows();
+                if (mapped.length === 0) {
+                  toast.error('Nenhum registro válido com o mapeamento atual');
+                  return;
+                }
+                setStep('preview');
+              }}
+            />
+          </div>
         )}
 
         {step === 'preview' && (
