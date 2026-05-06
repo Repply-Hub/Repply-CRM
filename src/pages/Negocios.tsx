@@ -895,136 +895,238 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <ChevronDown className="h-3.5 w-3.5 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={8} className="w-auto min-w-[820px] max-w-[980px] p-4 shadow-2xl border-border/40 z-[50] bg-background">
-        <div className="flex gap-0 divide-x divide-border">
-          <div className="flex-1 min-w-[140px] pr-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Etapa</p>
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
-                Todas as etapas
-              </label>
-              {KANBAN_STAGES.map(s => (
-                <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                  <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
-                  {s.label}
-                </label>
-              ))}
-            </div>
+      <PopoverContent align="start" sideOffset={8} className="w-64 p-2 shadow-2xl border-border/40 z-[50] bg-background">
+        <div className="flex flex-col gap-1">
+          <div className="px-3 py-2 border-b border-border/50 mb-1">
+            <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Filtros</h4>
           </div>
-          <div className="flex-1 min-w-[130px] px-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
-            <div className="space-y-1 max-h-60 overflow-y-auto">
-              {(vendedores ?? []).map(v => (
-                <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                  <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
-                  {v.nome}
+
+          {/* Submenu Etapa */}
+          <Popover modal={false}>
+            <PopoverTrigger asChild>
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+                <div className="flex items-center gap-3">
+                  <LayoutGrid className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                  <span>Etapa</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {stageFilter !== 'todos' && (
+                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">1</Badge>
+                  )}
+                  <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="start" sideOffset={10} className="w-60 p-3 shadow-xl border-border/40 bg-background z-[60]">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Selecionar Etapa</p>
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                  <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
+                  Todas as etapas
                 </label>
-              ))}
-            </div>
-          </div>
-          <div className="flex-1 min-w-[130px] px-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fabricante</p>
-            <ScrollArea className="h-60">
-              <div className="space-y-1 pr-3">
-                {(fabricantes ?? []).map(f => (
-                  <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                    <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
-                    {f.nome}
+                {KANBAN_STAGES.map(s => (
+                  <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                    <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
+                    {s.label}
                   </label>
                 ))}
               </div>
-            </ScrollArea>
-          </div>
-          <div className="min-w-[130px] px-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Período</p>
-            <div className="space-y-2">
-              <div className="relative group">
-                <Input
-                  placeholder="De: DD/MM/AAAA"
-                  className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
-                  value={dateFrom ? (typeof dateFrom === 'string' ? dateFrom : format(dateFrom, 'dd/MM/yyyy')) : ''}
-                  onChange={(e) => {
-                    let val = e.target.value.replace(/\D/g, '');
-                    if (val.length > 8) val = val.slice(0, 8);
-                    
-                    let formatted = val;
-                    if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
-                    if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
-                    
-                    // @ts-ignore
-                    setDateFrom(formatted);
-                    
-                    if (formatted.length === 10) {
-                      const d = parse(formatted, 'dd/MM/yyyy', new Date());
-                      if (isValid(d)) setDateFrom(d);
-                    } else if (formatted === '') {
-                      setDateFrom(undefined);
-                    }
-                  }}
-                />
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
-                      <CalendarIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className="p-3 pointer-events-auto" />
-                  </PopoverContent>
-                </Popover>
-              </div>
+            </PopoverContent>
+          </Popover>
 
-              <div className="relative group">
-                <Input
-                  placeholder="Até: DD/MM/AAAA"
-                  className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
-                  value={dateTo ? (typeof dateTo === 'string' ? dateTo : format(dateTo, 'dd/MM/yyyy')) : ''}
-                  onChange={(e) => {
-                    let val = e.target.value.replace(/\D/g, '');
-                    if (val.length > 8) val = val.slice(0, 8);
-                    
-                    let formatted = val;
-                    if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
-                    if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
-                    
-                    // @ts-ignore
-                    setDateTo(formatted);
-
-                    if (formatted.length === 10) {
-                      const d = parse(formatted, 'dd/MM/yyyy', new Date());
-                      if (isValid(d)) setDateTo(d);
-                    } else if (formatted === '') {
-                      setDateTo(undefined);
-                    }
-                  }}
-                />
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
-                      <CalendarIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className="p-3 pointer-events-auto" />
-                  </PopoverContent>
-                </Popover>
+          {/* Submenu Vendedor */}
+          <Popover modal={false}>
+            <PopoverTrigger asChild>
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+                <div className="flex items-center gap-3">
+                  <User className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                  <span>Vendedor</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedVendedores.length > 0 && (
+                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">
+                      {selectedVendedores.length}
+                    </Badge>
+                  )}
+                  <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="start" sideOffset={10} className="w-60 p-3 shadow-xl border-border/40 bg-background z-[60]">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filtrar por Vendedor</p>
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {(vendedores ?? []).map(v => (
+                  <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                    <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
+                    {v.nome}
+                  </label>
+                ))}
               </div>
-            </div>
-          </div>
-          <div className="flex flex-col justify-between min-w-[120px] pl-4">
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
+            </PopoverContent>
+          </Popover>
+
+          {/* Submenu Fabricante */}
+          <Popover modal={false}>
+            <PopoverTrigger asChild>
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+                <div className="flex items-center gap-3">
+                  <Factory className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                  <span>Fabricante</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedFabricantes.length > 0 && (
+                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">
+                      {selectedFabricantes.length}
+                    </Badge>
+                  )}
+                  <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="start" sideOffset={10} className="w-60 p-3 shadow-xl border-border/40 bg-background z-[60]">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filtrar por Fabricante</p>
+              <ScrollArea className="h-60">
+                <div className="space-y-1 pr-3">
+                  {(fabricantes ?? []).map(f => (
+                    <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                      <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
+                      {f.nome}
+                    </label>
+                  ))}
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+
+          {/* Submenu Período */}
+          <Popover modal={false}>
+            <PopoverTrigger asChild>
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+                <div className="flex items-center gap-3">
+                  <CalendarIcon className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                  <span>Período</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(dateFrom || dateTo) && (
+                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">Ativo</Badge>
+                  )}
+                  <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="start" sideOffset={10} className="w-auto p-4 shadow-xl border-border/40 bg-background z-[60]">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Definir Período</p>
+              <div className="space-y-3">
+                <div className="relative group">
+                  <Input
+                    placeholder="De: DD/MM/AAAA"
+                    className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
+                    value={dateFrom ? (typeof dateFrom === 'string' ? dateFrom : format(dateFrom, 'dd/MM/yyyy')) : ''}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, '');
+                      if (val.length > 8) val = val.slice(0, 8);
+                      let formatted = val;
+                      if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
+                      if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
+                      // @ts-ignore
+                      setDateFrom(formatted);
+                      if (formatted.length === 10) {
+                        const d = parse(formatted, 'dd/MM/yyyy', new Date());
+                        if (isValid(d)) setDateFrom(d);
+                      } else if (formatted === '') {
+                        setDateFrom(undefined);
+                      }
+                    }}
+                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="relative group">
+                  <Input
+                    placeholder="Até: DD/MM/AAAA"
+                    className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
+                    value={dateTo ? (typeof dateTo === 'string' ? dateTo : format(dateTo, 'dd/MM/yyyy')) : ''}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, '');
+                      if (val.length > 8) val = val.slice(0, 8);
+                      let formatted = val;
+                      if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
+                      if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
+                      // @ts-ignore
+                      setDateTo(formatted);
+                      if (formatted.length === 10) {
+                        const d = parse(formatted, 'dd/MM/yyyy', new Date());
+                        if (isValid(d)) setDateTo(d);
+                      } else if (formatted === '') {
+                        setDateTo(undefined);
+                      }
+                    }}
+                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Submenu Status */}
+          <Popover modal={false}>
+            <PopoverTrigger asChild>
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                  <span>Status</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {showOnlyAttention && (
+                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">Ativo</Badge>
+                  )}
+                  <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="start" sideOffset={10} className="w-56 p-3 shadow-xl border-border/40 bg-background z-[60]">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filtros de Atenção</p>
               <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
                 <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
-                Atenção
+                Atenção (7+ dias)
               </label>
-            </div>
-          </div>
+            </PopoverContent>
+          </Popover>
+
+          {(hasPipelineFilters || search.trim() !== '') && (
+            <>
+              <div className="h-px bg-border/50 my-1" />
+              <button
+                onClick={clearPipelineFilters}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                <span>Limpar Filtros</span>
+              </button>
+            </>
+          )}
         </div>
       </PopoverContent>
     </Popover>
-  ), [hasPipelineFilters, activeFilterCount, KANBAN_STAGES, stageFilter, handleStageFilterChange, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention]);
+  ), [hasPipelineFilters, activeFilterCount, clearPipelineFilters, KANBAN_STAGES, stageFilter, handleStageFilterChange, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention, search]);
   const selectedViewOrder = useMemo(() => 
     (pedidos ?? []).find(p => p.id === viewOrderId),
   [pedidos, viewOrderId]);
