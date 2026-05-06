@@ -499,11 +499,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       if (selectedVendedores.length > 0 && !selectedVendedores.includes(o.vendedorId)) return false;
       if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(o.fabricanteId)) return false;
       if (showOnlyAttention && o.daysInStage < o.alertDays) return false;
-      if (dateFrom && new Date(o.createdAt) < dateFrom) return false;
-      if (dateTo) {
-        const end = new Date(dateTo);
-        end.setHours(23, 59, 59, 999);
-        if (new Date(o.createdAt) > end) return false;
+      if (o.createdAt) {
+        const pedidoDate = parseISO(o.createdAt);
+        if (dateFrom && startOfDay(pedidoDate) < startOfDay(dateFrom)) return false;
+        if (dateTo && startOfDay(pedidoDate) > endOfDay(dateTo)) return false;
+      } else if (dateFrom || dateTo) {
+        return false;
       }
       if (q) {
         const clientName = (o.clientName || '').toLowerCase();
