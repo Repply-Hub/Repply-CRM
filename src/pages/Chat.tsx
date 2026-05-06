@@ -362,7 +362,7 @@ const Chat = () => {
     <div className="flex items-center gap-3">
       <MessageCircle className="h-5 w-5 text-primary" />
       <div>
-        <h1 className="text-base sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight">Chat Interno</h1>
+        <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight md:text-xl">Chat Interno</h1>
         <p className="text-[10px] sm:text-sm text-muted-foreground">Converse com sua equipe em tempo real</p>
       </div>
     </div>
