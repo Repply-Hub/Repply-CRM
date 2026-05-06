@@ -564,7 +564,7 @@ const Fabricantes = () => {
                           <TableHeader>
                             <TableRow className="bg-muted/30 hover:bg-muted/30">
                               {visiblePrecoColumns.map(colId => (
-                                <TableHead key={colId} className={cn("text-xs font-semibold whitespace-nowrap", colId === 'imagem' && "w-16", colId === 'acoes' && "w-20")}>
+                                <TableHead key={colId} className={cn("text-xs font-semibold whitespace-nowrap px-4 py-3", colId === 'imagem' && "w-16", colId === 'acoes' && "w-20")}>
                                   {getPrecoLabel(colId)}
                                 </TableHead>
                               ))}
