@@ -18,7 +18,7 @@ interface KanbanColumnProps {
   columns?: any[];
 }
 
-export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders, onCardClick, visibleColumns }: KanbanColumnProps) {
+export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders, onCardClick, visibleColumns, columns }: KanbanColumnProps) {
   const navigate = useNavigate();
   const total = orders.reduce((acc, o) => acc + o.valor, 0);
 
