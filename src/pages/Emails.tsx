@@ -357,7 +357,7 @@ const Emails = () => {
                   <Inbox className="h-4 w-4" /> 
                   <span className="hidden sm:inline">Recebidos</span>
                   <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
-                    {receivedEmails?.length || 0}
+                    {totalReceived}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger 
@@ -367,7 +367,7 @@ const Emails = () => {
                   <Send className="h-4 w-4" /> 
                   <span className="hidden sm:inline">Enviados</span>
                   <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
-                    {emails?.length || 0}
+                    {totalSent}
                   </Badge>
                 </TabsTrigger>
               </TabsList>
