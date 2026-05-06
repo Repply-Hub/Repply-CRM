@@ -192,6 +192,7 @@ export default function Obras() {
         longitude: o.longitude ?? null,
         geocoded_at: o.geocoded_at ?? null,
         cliente_empresa: o.clientes?.empresa ?? null,
+        cliente_id: o.clientes?.id ?? null,
       })),
     [filtered]
   );
@@ -374,10 +375,12 @@ export default function Obras() {
                                 {colId === 'status' && <Badge variant={status.variant} className="text-[10px]">{status.label}</Badge>}
                                 {colId === 'cliente' && (
                                   <span 
-                                    className="hover:text-primary transition-colors"
+                                    className="hover:text-primary transition-colors font-medium"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      navigate(`/clientes/${cliente.id}`);
+                                      if (cliente?.id) {
+                                        navigate(`/clientes/${cliente.id}`);
+                                      }
                                     }}
                                   >
                                     {cliente?.empresa || '—'}

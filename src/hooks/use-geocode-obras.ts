@@ -11,6 +11,7 @@ export interface ObraComCoordenada {
   longitude: number | null;
   geocoded_at?: string | null;
   cliente_empresa?: string | null;
+  cliente_id?: string | null;
 }
 
 interface NominatimResult {
