@@ -503,13 +503,33 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-primary" />
-            Importar Negócios
-          </DialogTitle>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+        <DialogHeader className="px-6 py-4 border-b bg-muted/30 shrink-0">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2.5 text-xl font-bold">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <FileSpreadsheet className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex flex-col items-start gap-0.5">
+                <span>Importar Negócios</span>
+                <span className="text-xs font-normal text-muted-foreground">Converta sua planilha em novas oportunidades de venda</span>
+              </div>
+            </DialogTitle>
+            {step !== 'upload' && (
+              <div className="flex items-center gap-2">
+                <div className={cn("flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all", step === 'mapping' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                  1. Mapeamento
+                </div>
+                <ArrowRight className="h-3 w-3 text-muted-foreground/40" />
+                <div className={cn("flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all", step === 'preview' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                  2. Revisão
+                </div>
+              </div>
+            )}
+          </div>
         </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
 
         {step === 'upload' && (
           <div
