@@ -464,7 +464,7 @@ export default function Tarefas() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pendente">Pendente</SelectItem>
-                    <SelectItem value="em_andamento">Em andamento</SelectItem>
+                    <SelectItem value="em andamento">Em andamento</SelectItem>
                     <SelectItem value="concluida">Concluída</SelectItem>
                   </SelectContent>
                 </Select>
