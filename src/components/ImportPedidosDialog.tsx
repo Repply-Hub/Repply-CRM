@@ -549,15 +549,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           )}
         </DialogHeader>
 
-        {importing && (
-          <div className="px-6 py-2 border-b bg-primary/5 space-y-1.5 animate-in fade-in slide-in-from-top-1 shrink-0">
-            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-primary">
-              <span>Processando importação...</span>
-              <span>{importProgress}%</span>
-            </div>
-            <Progress value={importProgress} className="h-1" />
-          </div>
-        )}
 
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           {step === 'upload' && (
