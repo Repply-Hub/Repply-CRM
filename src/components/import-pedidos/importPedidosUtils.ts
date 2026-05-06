@@ -143,7 +143,7 @@ const STATUS_RULES: Array<{ status: string; patterns: RegExp[] }> = [
   { status: 'negociacao', patterns: [/negocia/, /tratativa/] },
   { status: 'enviado', patterns: [/enviad/, /apresentad/, /proposta/] },
   { status: 'elaboracao', patterns: [/elabora/, /orcamento/, /cotacao/, /em andamento/] },
-  { status: 'novo_lead', patterns: [/novo lead/, /\blead\b/, /\bnovo\b/] },
+  { status: 'novo lead', patterns: [/novo lead/, /\blead\b/, /\bnovo\b/] },
 ];
 
 function normalizeText(value: unknown): string {
