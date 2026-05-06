@@ -116,6 +116,9 @@ serve(async (req) => {
             body = decodeURIComponent(escape(atob(base64)))
           }
 
+          // 7. Check if message is unread in Gmail
+          const isUnreadInGmail = message.labelIds?.includes('UNREAD') ?? false;
+
           // 7. Upsert into emails_recebidos
           const { error: upsertError } = await supabaseClient
             .from('emails_recebidos')
