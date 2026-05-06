@@ -231,6 +231,8 @@ export type Database = {
           empresa_id: string
           grupo_id: string | null
           id: string
+          lida: boolean
+          lida_em: string | null
           recipient_id: string | null
           usuario_id: string
         }
@@ -243,6 +245,8 @@ export type Database = {
           empresa_id: string
           grupo_id?: string | null
           id?: string
+          lida?: boolean
+          lida_em?: string | null
           recipient_id?: string | null
           usuario_id: string
         }
@@ -255,6 +259,8 @@ export type Database = {
           empresa_id?: string
           grupo_id?: string | null
           id?: string
+          lida?: boolean
+          lida_em?: string | null
           recipient_id?: string | null
           usuario_id?: string
         }
