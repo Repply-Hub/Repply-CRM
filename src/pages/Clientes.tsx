@@ -1001,7 +1001,7 @@ const Clientes = () => {
                           }
 
                           return (
-                            <td key={colId} className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap" onClick={() => {
+                            <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")} onClick={() => {
                               const slug = slugify(contato.nome_contato || 'contato');
                               navigate(`/contatos/${slug}-${contato.id}`);
                             }}>
