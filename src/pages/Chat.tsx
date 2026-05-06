@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, ChatGrupo, ChatMessage, useMarkChatAsRead } from '@/hooks/use-chat';
+import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,7 @@ function MembersList({
   collapsed: boolean;
   onToggle: () => void;
   grupos: ChatGrupo[];
+  unreadCounts: Record<string, number>;
 }) {
   if (collapsed) {
     return (
@@ -161,6 +163,11 @@ function MembersList({
               <p className="text-xs font-medium text-foreground truncate">Chat Geral</p>
               <p className="text-[10px] text-muted-foreground">Toda a equipe</p>
             </div>
+            {unreadCounts['geral'] > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                {unreadCounts['geral']}
+              </span>
+            )}
           </button>
 
           {/* Grupos */}
@@ -187,6 +194,11 @@ function MembersList({
                 <p className="text-xs font-medium text-foreground truncate">{g.nome}</p>
                 <p className="text-[10px] text-muted-foreground">Grupo</p>
               </div>
+              {unreadCounts[`grupo_${g.id}`] > 0 && (
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                  {unreadCounts[`grupo_${g.id}`]}
+                </span>
+              )}
             </button>
           ))}
 
@@ -228,6 +240,11 @@ function MembersList({
                   </p>
                   <p className="text-[10px] text-muted-foreground capitalize truncate">{m.role}</p>
                 </div>
+                {unreadCounts[`dm_${m.id}`] > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                    {unreadCounts[`dm_${m.id}`]}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -259,6 +276,7 @@ const Chat = () => {
   const clearChat = useClearChat();
   const { data: grupos = [] } = useChatGrupos();
   const markAsRead = useMarkChatAsRead();
+  const { data: unreadCounts = {} } = useUnreadChatByTarget();
 
   const { data: myVendedor } = useQuery({
     queryKey: ['my-vendedor'],
@@ -386,6 +404,7 @@ const Chat = () => {
           collapsed={teamCollapsed}
           onToggle={() => setTeamCollapsed(prev => !prev)}
           grupos={grupos}
+          unreadCounts={unreadCounts}
         />
 
         <div className="flex-1 flex flex-col min-w-0">
