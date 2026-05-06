@@ -179,13 +179,6 @@ export const ColumnSettings = memo(function ColumnSettings({
                 </Button>
             </PopoverTrigger>
             <PopoverContent align="end" sideOffset={8} className="w-auto p-0 shadow-2xl border-border/40 z-[50]">
-                <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b border-border/50">
-                    <div className="flex items-center gap-2">
-                        <Settings2 className="h-4 w-4 text-primary" />
-                        <h4 className="font-medium text-sm leading-none">Opções</h4>
-                    </div>
-                </div>
-                
                 <div className="flex divide-x divide-border/50 overflow-visible">
                     {!hideColumns && (
                         <div className="w-[320px] p-2">
