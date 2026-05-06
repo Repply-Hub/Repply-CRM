@@ -71,6 +71,7 @@ function MembersList({
   collapsed,
   onToggle,
   grupos,
+  unreadCounts,
 }: {
   members: Vendedor[];
   myId: string | null;
