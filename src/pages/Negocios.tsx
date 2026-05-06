@@ -719,20 +719,55 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </button>
             </PopoverTrigger>
             <PopoverContent side="right" align="start" sideOffset={10} className="w-auto p-0 shadow-xl border-border/40 bg-background z-[60]">
-              <ColumnSettings
-                columns={allAvailableColumns}
-                visibleColumns={visibleColumns}
-                onChange={setVisibleColumns}
-                onRename={handleRename}
-                onTypeChange={handleTypeChange}
-                onReorder={handleReorder}
-                onAdd={handleAddColumn}
-                onRemove={handleRemoveColumn}
-                hideColumns={false}
-                hideTrigger={true}
-                open={true}
-                label="Colunas Visíveis"
-              />
+              <div className="w-[320px] p-2">
+                <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Colunas Visíveis</span>
+                  <button
+                    onClick={() => handleAddColumn('Nova Coluna')}
+                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 group"
+                    title="Criar nova coluna"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span className="text-[10px] font-bold">Nova Coluna</span>
+                  </button>
+                </div>
+
+                <div className="max-h-[320px] overflow-y-auto px-1.5 py-2">
+                  <div className="space-y-1">
+                    {allAvailableColumns.map((column) => {
+                      const checked = visibleColumns.includes(column.id);
+                      const disabled = column.locked || (checked && visibleColumns.length === 1);
+                      return (
+                        <div
+                          key={column.id}
+                          role="button"
+                          onClick={() => {
+                            if (disabled) return;
+                            if (checked) {
+                              setVisibleColumns(visibleColumns.filter(id => id !== column.id));
+                            } else {
+                              setVisibleColumns([...visibleColumns, column.id]);
+                            }
+                          }}
+                          className={cn(
+                            'flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left hover:bg-muted/80 cursor-pointer',
+                            disabled && 'cursor-not-allowed opacity-50',
+                            !checked && 'opacity-50 grayscale-[0.5]'
+                          )}
+                        >
+                          <div className={cn(
+                            'h-7 w-7 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
+                            checked ? 'bg-primary/10 border-primary/20 text-primary shadow-sm' : 'bg-background border-border/60 text-muted-foreground'
+                          )}>
+                            {checked ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4 opacity-40" />}
+                          </div>
+                          <span className="flex-1 truncate">{getLabel(column.id)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </PopoverContent>
           </Popover>
 
