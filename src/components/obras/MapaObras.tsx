@@ -24,6 +24,7 @@ interface MapaObrasProps {
 }
 
 export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps) {
+  const navigate = useNavigate();
   const { items, carregando, progresso } = useGeocodeObras(obras);
   const [selectedObra, setSelectedObra] = useState<ObraComCoordenada | null>(null);
   
