@@ -3,7 +3,7 @@ import { Bell, CheckCheck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useNotificacoes, useUnreadCount, useMarkAsRead, useMarkAllAsRead, type Notificacao } from '@/hooks/use-notificacoes';
+import { useNotificacoes, useUnreadCount, useMarkAsRead, useMarkAllAsRead, useUnreadEmails, type Notificacao } from '@/hooks/use-notificacoes';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
