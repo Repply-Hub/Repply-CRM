@@ -101,7 +101,7 @@ const Emails = () => {
 
       const { data, error } = await supabase
         .from("emails_recebidos")
-        .select("*")
+        .select("id, lido, criado_em, user_id, data_recebimento, corpo_html, gmail_message_id, remetente, destinatarios, assunto")
         .eq("user_id", user.id)
         .order("criado_em", { ascending: false });
       
