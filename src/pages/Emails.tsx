@@ -78,7 +78,7 @@ const Emails = () => {
 
       let query = supabase
         .from("emails")
-        .select("*")
+        .select("id, user_id, destinatario, remetente, assunto, corpo, html, status, created_at, updated_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
