@@ -517,7 +517,7 @@ const Emails = () => {
                     {receivedEmails.map((email) => (
                       <div 
                         key={email.id} 
-                        className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4"
+                        className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''}`}
                         onClick={() => setSelectedEmail({
                           ...email,
                           destinatario: email.destinatarios?.[0] || "",
@@ -529,7 +529,11 @@ const Emails = () => {
                         })}
                       >
                         <div className="flex items-center gap-3 shrink-0">
-                          <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
+                          <Checkbox 
+                            checked={selectedIds.includes(email.id)}
+                            onCheckedChange={() => toggleSelectId(email.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
                           <Inbox className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
                         </div>
                         <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
