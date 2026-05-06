@@ -374,28 +374,12 @@ export default function Obras() {
                                 )}
                                 {colId === 'status' && <Badge variant={status.variant} className="text-[10px]">{status.label}</Badge>}
                                 {colId === 'cliente' && (
-                                  <span 
-                                    className="hover:text-primary transition-colors font-medium"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (cliente?.id) {
-                                        navigate(`/clientes/${cliente.id}`);
-                                      }
-                                    }}
-                                  >
+                                  <span className="font-medium">
                                     {cliente?.empresa || '—'}
                                   </span>
                                 )}
                                 {colId === 'endereco' && (
-                                  <span 
-                                    className="hover:text-primary transition-colors"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (obra.endereco_entrega) {
-                                        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(obra.endereco_entrega)}`, '_blank');
-                                      }
-                                    }}
-                                  >
+                                  <span>
                                     {obra.endereco_entrega || obra.nome_obra}
                                   </span>
                                 )}
