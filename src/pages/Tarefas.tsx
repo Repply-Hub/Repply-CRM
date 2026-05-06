@@ -41,7 +41,7 @@ const TAREFA_COLUMNS: ColumnDefinition[] = [
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: 'Pendente', className: 'bg-destructive/15 text-destructive border-destructive/30' },
-  em_andamento: { label: 'Em andamento', className: 'bg-warning/15 text-warning border-warning/30' },
+  'em andamento': { label: 'Em andamento', className: 'bg-warning/15 text-warning border-warning/30' },
   concluida: { label: 'Concluída', className: 'bg-success/15 text-success border-success/30' },
 };
 
