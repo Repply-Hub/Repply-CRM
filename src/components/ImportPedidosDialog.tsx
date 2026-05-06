@@ -743,13 +743,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
-              <Button onClick={handleImport} disabled={importing}>
+            <div className="flex justify-end items-center gap-3 pt-4 border-t bg-muted/30 px-6 py-4 shrink-0">
+              <Button variant="ghost" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
+              <Button onClick={handleImport} disabled={importing} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
                 {importing ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importando...</>
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
                 ) : (
-                  <><CheckCircle2 className="h-4 w-4 mr-1" /> Importar {previewRows.length} negócios</>
+                  <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {previewRows.length} negócios</>
                 )}
               </Button>
             </div>
