@@ -368,7 +368,7 @@ export default function Obras() {
                     <thead>
                       <tr className="border-b bg-muted/50">
                         {visibleColumns.map(colId => (
-                          <th key={colId} className="text-left py-2.5 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap uppercase tracking-wider">
+                          <th key={colId} className="text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap">
                             {getLabel(colId)}
                           </th>
                         ))}
