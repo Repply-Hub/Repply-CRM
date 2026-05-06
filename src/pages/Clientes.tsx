@@ -1000,6 +1000,17 @@ const Clientes = () => {
                             );
                           }
 
+                          if (colId === 'empresa') {
+                            return (
+                              <td key={colId} className="py-2.5 px-4 text-sm font-medium text-foreground whitespace-nowrap" onClick={() => {
+                                const slug = slugify(contato.nome_contato || 'contato');
+                                navigate(`/contatos/${slug}-${contato.id}`);
+                              }}>
+                                {value || '—'}
+                              </td>
+                            );
+                          }
+
                           return (
                             <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")} onClick={() => {
                               const slug = slugify(contato.nome_contato || 'contato');
