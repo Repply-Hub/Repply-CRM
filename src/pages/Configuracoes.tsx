@@ -188,6 +188,31 @@ function ProfileTab() {
     });
   };
 
+  const uploadEmailLogo = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setIsUploading(true);
+      if (!event.target.files || event.target.files.length === 0) return;
+      
+      const file = event.target.files[0];
+      const filePath = `logo-email.png`;
+
+      // Upload with upsert: true to replace existing logo
+      const { error: uploadError } = await supabase.storage
+        .from('email-assets')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+      
+      toast.success('Logo da empresa atualizada com sucesso!');
+      // Force refresh by invalidating any relevant queries if needed, 
+      // though the URL remains the same, browser cache might need clearing
+    } catch (error: any) {
+      toast.error('Erro ao carregar logo: ' + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSalvarEmail = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
