@@ -107,15 +107,15 @@ export default function Obras() {
     if (state?.selectedObraId && obras) {
       const obra = obras.find(o => o.id === state.selectedObraId);
       if (obra) {
-        setSelectedObra(obra);
-        if (state.activeTab) {
-          setActiveTab(state.activeTab);
+        if (state.activeTab === 'mapa') {
+          setActiveTab('mapa');
+          // No mapa, queremos que a obra seja selecionada visualmente no componente MapaObras
+        } else {
+          setSelectedObra(obra);
         }
-        // Limpa o estado para não reabrir ao navegar de volta
-        navigate(location.pathname, { replace: true, state: {} });
       }
     }
-  }, [location.state, obras, navigate, location.pathname]);
+  }, [location.state, obras]);
 
   const {
     columns,
