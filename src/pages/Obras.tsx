@@ -192,6 +192,7 @@ export default function Obras() {
         longitude: o.longitude ?? null,
         geocoded_at: o.geocoded_at ?? null,
         cliente_empresa: o.clientes?.empresa ?? null,
+        cliente_id: o.clientes?.id ?? null,
       })),
     [filtered]
   );
