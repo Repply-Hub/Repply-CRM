@@ -49,7 +49,7 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'valor', label: 'Valor', locked: false },
   { id: 'etapa', label: 'Etapa', locked: false },
   { id: 'vendedor', label: 'Responsável/Vendedor', locked: false },
-  { id: 'data_pedido', label: 'Data', locked: false },
+  { id: 'data_pedido', label: 'Criação', locked: false },
   { id: 'prazo_resposta', label: 'Fechamento', locked: false },
   { id: 'observacoes', label: 'Observações', locked: false },
   { id: 'acoes', label: 'Ações', locked: false },
@@ -152,7 +152,10 @@ const PedidoRow = memo(({
             return (
               <TableCell key={colId} className="whitespace-nowrap px-4">
                 {pedido.data_pedido 
-                  ? format(parse(pedido.data_pedido, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR }) 
+                  ? (() => {
+                    const dateParts = pedido.data_pedido.split('-');
+                    return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                  })()
                   : '—'}
               </TableCell>
             );
@@ -160,7 +163,10 @@ const PedidoRow = memo(({
             return (
               <TableCell key={colId} className="whitespace-nowrap px-4">
                 {pedido.prazo_resposta 
-                  ? format(parse(pedido.prazo_resposta, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR }) 
+                  ? (() => {
+                    const dateParts = pedido.prazo_resposta.split('-');
+                    return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                  })()
                   : '—'}
               </TableCell>
             );
@@ -1023,10 +1029,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Clock className="h-3 w-3" /> Data do Pedido
+                  <Clock className="h-3 w-3" /> Data de Criação
                 </p>
                 <p className="text-sm font-medium">
-                  {selectedViewOrder.data_pedido ? format(new Date(selectedViewOrder.data_pedido), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                  {selectedViewOrder.data_pedido ? (() => {
+                    const dateParts = selectedViewOrder.data_pedido.split('-');
+                    return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                  })() : '-'}
                 </p>
               </div>
               {selectedViewOrder.prazo_resposta && (
@@ -1035,7 +1044,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     <CalendarIcon className="h-3 w-3" /> Data de Fechamento
                   </p>
                   <p className="text-sm font-medium">
-                    {format(parse(selectedViewOrder.prazo_resposta, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR })}
+                    {(() => {
+                      const dateParts = selectedViewOrder.prazo_resposta.split('-');
+                      return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                    })()}
                   </p>
                 </div>
               )}

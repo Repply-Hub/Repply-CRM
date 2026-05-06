@@ -460,9 +460,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             valor_total: r.valor || null,
             observacoes: r.observacoes || null,
             campos_extras: finalCamposExtras,
-            data_pedido: r.data_pedido || new Date().toISOString().split('T')[0],
+            data_pedido: r.data_pedido || new Date().toLocaleDateString('en-CA'), // en-CA retorna YYYY-MM-DD
             created_at: r.data_pedido ? `${r.data_pedido}T12:00:00.000Z` : new Date().toISOString(),
-            prazo_resposta: r.status === 'fechamento' ? (r.data_pedido || new Date().toISOString().split('T')[0]) : null,
+            prazo_resposta: r.status === 'fechamento' ? (r.data_pedido || new Date().toLocaleDateString('en-CA')) : null,
           };
         });
         const { error } = await supabase.from('pedidos').insert(batch);
