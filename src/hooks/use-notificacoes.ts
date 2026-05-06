@@ -82,9 +82,10 @@ export function useUnreadEmails() {
 }
 
 export function useUnreadChatMessages() {
+  const qc = useQueryClient();
   const { user } = useAuth();
   
-  return useQuery({
+  const query = useQuery({
     queryKey: ['unread_chat_count', user?.id],
     queryFn: async () => {
       if (!user) return 0;
@@ -97,9 +98,6 @@ export function useUnreadChatMessages() {
         
       if (!me) return 0;
 
-      // Unread messages:
-      // 1. Direct messages to me
-      // 2. Messages in my company's general/group chats not sent by me
       const { count, error } = await supabase
         .from('chat_mensagens')
         .select('*', { count: 'exact', head: true })
@@ -111,14 +109,27 @@ export function useUnreadChatMessages() {
       return count || 0;
     },
     enabled: !!user,
-    refetchInterval: 30000, // Check every 30 seconds
   });
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel('chat-unread-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, () => {
+        qc.invalidateQueries({ queryKey: ['unread_chat_count'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc, user]);
+
+  return query;
 }
 
 export function useUnreadChatByTarget() {
+  const qc = useQueryClient();
   const { user } = useAuth();
   
-  return useQuery({
+  const query = useQuery({
     queryKey: ['unread_chat_by_target', user?.id],
     queryFn: async () => {
       if (!user) return {};
@@ -131,11 +142,6 @@ export function useUnreadChatByTarget() {
         
       if (!me) return {};
 
-      // We need to fetch unread messages count grouped by target
-      // Target can be:
-      // - Direct messages: recipient_id is me, group_id is null, company_id is relevant (but recipient_id is the primary filter)
-      // - General: recipient_id is null, group_id is null, company_id is mine
-      // - Group: group_id is not null, company_id is mine
       const { data, error } = await supabase
         .from('chat_mensagens')
         .select('usuario_id, grupo_id, recipient_id')
@@ -161,8 +167,20 @@ export function useUnreadChatByTarget() {
       return counts;
     },
     enabled: !!user,
-    refetchInterval: 30000,
   });
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel('chat-targets-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, () => {
+        qc.invalidateQueries({ queryKey: ['unread_chat_by_target'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc, user]);
+
+  return query;
 }
 
 export function useUnreadCount() {
