@@ -479,7 +479,7 @@ const ClienteDetalhe = () => {
                 <div 
                   key={obra.id} 
                   className="rounded-lg border border-border p-3 cursor-pointer hover:bg-muted/50 hover:border-primary/30 transition-all"
-                  onClick={() => navigate('/obras', { state: { selectedObraId: obra.id } })}
+                  onClick={() => navigate('/obras', { state: { selectedObraId: obra.id, activeTab: 'mapa' } })}
                 >
                   <p className="text-sm font-medium text-foreground">{obra.nome_obra}</p>
                   {obra.endereco_entrega && (
