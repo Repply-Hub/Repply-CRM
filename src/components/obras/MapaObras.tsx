@@ -140,24 +140,28 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
               position={{ lat: selectedObra.latitude!, lng: selectedObra.longitude! }}
               onCloseClick={() => setSelectedObra(null)}
             >
-              <div className="p-1 space-y-1.5 min-w-[180px] max-w-[250px] text-foreground">
-                <p className="font-bold text-sm leading-tight">{selectedObra.nome_obra}</p>
+              <div className="p-2 space-y-2 min-w-[200px] max-w-[280px]">
+                <p className="font-bold text-base leading-tight text-slate-900">{selectedObra.nome_obra}</p>
+                
                 {selectedObra.cliente_empresa && (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Building2 className="h-3 w-3 shrink-0" />
+                  <div className="flex items-center gap-1.5 text-sm text-slate-700 font-medium bg-slate-50 p-1.5 rounded border border-slate-100">
+                    <Building2 className="h-4 w-4 shrink-0 text-slate-500" />
                     <span>{selectedObra.cliente_empresa}</span>
                   </div>
                 )}
+                
                 {selectedObra.endereco_entrega && (
-                  <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                    <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-1.5 text-sm text-slate-600 leading-snug">
+                    <MapPin className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
                     <span className="break-words">{selectedObra.endereco_entrega}</span>
                   </div>
                 )}
-                <div className="mt-1">
-                  <Badge variant="outline" className="text-[10px] py-0 h-4">
+                
+                <div className="pt-1 flex items-center justify-between">
+                  <Badge className="bg-blue-600 hover:bg-blue-700 text-white border-none text-[11px] px-2 py-0.5">
                     {STATUS_LABEL[selectedObra.status] ?? selectedObra.status}
                   </Badge>
+                  <span className="text-[10px] text-slate-400 italic">ID: {selectedObra.id.split('-')[0]}</span>
                 </div>
               </div>
             </InfoWindow>
