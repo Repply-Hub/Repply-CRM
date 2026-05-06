@@ -105,9 +105,9 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
           <span className="text-xs">• {obrasSemLocalizacao.length} sem informações de localização</span>
         )}
         {carregando && (
-          <div className="flex items-center gap-1.5 text-xs text-primary animate-pulse">
+          <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800 animate-pulse">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>Geocodificando endereços ({progresso.atual}/${progresso.total})…</span>
+            <span>Mapeando obras ({progresso.atual}/{progresso.total})…</span>
           </div>
         )}
       </div>
