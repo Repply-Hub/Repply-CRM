@@ -256,28 +256,64 @@ const Emails = () => {
         {/* Header with Search and Tab Actions */}
         <div className="px-4 py-3 flex items-center justify-between gap-4 border-b bg-background/95 sticky top-0 z-10">
           <div className="flex items-center gap-4 flex-1">
-            <TabsList className="bg-muted/50 p-1 h-10">
-              <TabsTrigger 
-                value="received" 
-                className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
-              >
-                <Inbox className="h-4 w-4" /> 
-                <span className="hidden sm:inline">Recebidos</span>
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
-                  {receivedEmails?.length || 0}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="sent" 
-                className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
-              >
-                <Send className="h-4 w-4" /> 
-                <span className="hidden sm:inline">Enviados</span>
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
-                  {emails?.length || 0}
-                </Badge>
-              </TabsTrigger>
-            </TabsList>
+            {selectedIds.length > 0 ? (
+              <div className="flex items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="select-all-bulk"
+                    checked={
+                      selectedIds.length > 0 && 
+                      selectedIds.length === (activeTab === "received" ? receivedEmails?.length : emails?.length)
+                    }
+                    onCheckedChange={toggleSelectAll}
+                  />
+                  <span className="text-sm font-medium text-primary">
+                    {selectedIds.length} selecionado(s)
+                  </span>
+                </div>
+                <div className="h-4 w-[1px] bg-primary/20 mx-2" />
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
+                  onClick={() => setIsBulkDeleting(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 text-muted-foreground"
+                  onClick={() => setSelectedIds([])}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
+              <TabsList className="bg-muted/50 p-1 h-10">
+                <TabsTrigger 
+                  value="received" 
+                  className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  <Inbox className="h-4 w-4" /> 
+                  <span className="hidden sm:inline">Recebidos</span>
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
+                    {receivedEmails?.length || 0}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="sent" 
+                  className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  <Send className="h-4 w-4" /> 
+                  <span className="hidden sm:inline">Enviados</span>
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
+                    {emails?.length || 0}
+                  </Badge>
+                </TabsTrigger>
+              </TabsList>
+            )}
 
             <div className="flex items-center gap-2 flex-1 max-w-md hidden md:flex">
               <div className="relative flex-1">
