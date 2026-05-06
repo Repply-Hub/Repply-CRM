@@ -650,6 +650,33 @@ const Emails = () => {
                   </div>
                 )}
               </div>
+              {totalReceived > PAGE_SIZE && (
+                <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/5 shrink-0">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando {pageReceived * PAGE_SIZE + 1} - {Math.min((pageReceived + 1) * PAGE_SIZE, totalReceived)} de {totalReceived}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPageReceived(p => Math.max(0, p - 1))}
+                      disabled={pageReceived === 0}
+                      className="h-8"
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPageReceived(p => p + 1)}
+                      disabled={(pageReceived + 1) * PAGE_SIZE >= totalReceived}
+                      className="h-8"
+                    >
+                      Próximo <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </TabsContent>
         </div>
