@@ -551,24 +551,33 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-primary" />
-            Importar {target === 'contatos' ? 'Contatos' : 'Empresas'}
-          </DialogTitle>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+        <DialogHeader className="px-6 py-4 border-b bg-muted/30 shrink-0">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2.5 text-xl font-bold">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <FileSpreadsheet className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex flex-col items-start gap-0.5">
+                <span>Importar {target === 'contatos' ? 'Contatos' : 'Empresas'}</span>
+                <span className="text-xs font-normal text-muted-foreground">Adicione múltiplos registros de uma só vez</span>
+              </div>
+            </DialogTitle>
+            {step !== 'upload' && (
+              <div className="flex items-center gap-2">
+                <div className={cn("flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all", step === 'mapping' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                  1. Mapeamento
+                </div>
+                <ArrowRight className="h-3 w-3 text-muted-foreground/40" />
+                <div className={cn("flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all", step === 'preview' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                  2. Revisão
+                </div>
+              </div>
+            )}
+          </div>
         </DialogHeader>
 
-        {/* Step indicators */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-          <Badge variant={step === 'upload' ? 'default' : 'secondary'} className="text-xs">
-            1. Origem
-          </Badge>
-          <ArrowRight className="h-3 w-3" />
-          <Badge variant={step === 'mapping' ? 'default' : 'secondary'} className="text-xs">2. Mapear Colunas</Badge>
-          <ArrowRight className="h-3 w-3" />
-          <Badge variant={step === 'preview' ? 'default' : 'secondary'} className="text-xs">3. Confirmar</Badge>
-        </div>
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
 
         {step === 'upload' && (
           <div
