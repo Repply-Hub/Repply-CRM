@@ -1404,6 +1404,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           onToggle={() => toggleOne(p.id)}
                           onClick={() => setViewOrderId(p.id)}
                           visibleColumns={tableVisibleColumns}
+                          columns={columns}
                           KANBAN_STAGES={KANBAN_STAGES}
                           getLabel={getLabel}
                           stageLabel={stageLabel}
