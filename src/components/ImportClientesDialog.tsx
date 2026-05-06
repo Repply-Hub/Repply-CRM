@@ -558,7 +558,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         </DialogTrigger>
       )}
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
-        <DialogHeader className="px-6 py-4 bg-muted/30 shrink-0">
+        <DialogHeader className="px-6 py-4 bg-muted/30 shrink-0 border-b">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2.5 text-xl font-bold">
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -569,38 +569,48 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                 <span className="text-xs font-normal text-muted-foreground">Adicione múltiplos registros de uma só vez</span>
               </div>
             </DialogTitle>
+
+            {step !== 'upload' && (
+              <div className="flex items-center gap-4 bg-background/50 px-4 py-2 rounded-xl border border-border/50 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
+                    step === 'mapping' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
+                  )}>
+                    1
+                  </div>
+                  <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'mapping' ? "text-primary" : "text-muted-foreground")}>
+                    Mapeamento
+                  </span>
+                </div>
+                
+                <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
+                
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
+                    step === 'preview' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
+                  )}>
+                    2
+                  </div>
+                  <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'preview' ? "text-primary" : "text-muted-foreground")}>
+                    Revisão
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </DialogHeader>
 
-        {step !== 'upload' && (
-          <div className="px-6 py-3 border-y bg-background flex flex-col gap-3 shrink-0">
-            <div className="flex items-center justify-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className={cn(
-                  "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
-                  step === 'mapping' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
-                )}>
-                  1
-                </div>
-                <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'mapping' ? "text-primary" : "text-muted-foreground")}>
-                  Mapeamento
-                </span>
-              </div>
-              
-              <div className="w-12 h-px bg-border" />
-              
-              <div className="flex items-center gap-2">
-                <div className={cn(
-                  "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
-                  step === 'preview' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
-                )}>
-                  2
-                </div>
-                <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'preview' ? "text-primary" : "text-muted-foreground")}>
-                  Revisão
-                </span>
-              </div>
+        {importing && (
+          <div className="px-6 py-2 border-b bg-primary/5 space-y-1.5 animate-in fade-in slide-in-from-top-1 shrink-0">
+            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-primary">
+              <span>Processando importação...</span>
+              <span>{importProgress}%</span>
             </div>
+            <Progress value={importProgress} className="h-1" />
+          </div>
+        )}
 
             {importing && (
               <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
