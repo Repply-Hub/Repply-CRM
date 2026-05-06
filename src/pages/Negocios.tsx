@@ -963,13 +963,33 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Building2 className="h-3 w-3" /> Cliente
                 </p>
-                <p className="text-sm font-medium">{selectedViewOrder.cliente?.empresa ?? '-'}</p>
+                {selectedViewOrder.cliente ? (
+                  <button 
+                    onClick={() => navigate(`/clientes/${selectedViewOrder.cliente?.id}`)}
+                    className="text-sm font-medium hover:text-primary transition-colors text-left flex items-center gap-1 group"
+                  >
+                    {selectedViewOrder.cliente.empresa}
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                ) : (
+                  <p className="text-sm font-medium">-</p>
+                )}
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Building2 className="h-3 w-3" /> Obra
                 </p>
-                <p className="text-sm font-medium">{selectedViewOrder.obra?.nome_obra ?? '-'}</p>
+                {selectedViewOrder.obra ? (
+                  <button 
+                    onClick={() => navigate(`/obras/${selectedViewOrder.obra?.id}`)}
+                    className="text-sm font-medium hover:text-primary transition-colors text-left flex items-center gap-1 group"
+                  >
+                    {selectedViewOrder.obra.nome_obra}
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                ) : (
+                  <p className="text-sm font-medium">{selectedViewOrder.obra?.nome_obra ?? '-'}</p>
+                )}
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
