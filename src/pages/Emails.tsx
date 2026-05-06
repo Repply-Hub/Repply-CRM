@@ -58,9 +58,10 @@ const Emails = () => {
   const [formData, setFormData] = useState({ 
     destinatario: "", 
     assunto: "", 
-    corpo: "",
-    logoUrl: "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" 
+    corpo: ""
   });
+  
+  const COMPANY_LOGO_URL = "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png";
 
   useEffect(() => {
     const to = searchParams.get("to");
@@ -130,7 +131,7 @@ const Emails = () => {
   });
 
   const sendEmailMutation = useMutation({
-    mutationFn: async (data: { destinatario: string; assunto: string; corpo: string; logoUrl: string }) => {
+    mutationFn: async (data: { destinatario: string; assunto: string; corpo: string }) => {
       if (!isConnected) {
         throw new Error("Conecte seu Gmail nas configurações para enviar e-mails.");
       }
@@ -140,7 +141,7 @@ const Emails = () => {
           ${data.corpo.replace(/\n/g, '<br>')}
         </div>
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-          <img src="${data.logoUrl}?t=${Date.now()}" alt="MD Representações" style="max-height: 50px; display: block; margin-bottom: 10px;" />
+          <img src="${COMPANY_LOGO_URL}?t=${Date.now()}" alt="MD Representações" style="max-height: 50px; display: block; margin-bottom: 10px;" />
           <div style="color: #333; font-weight: bold; font-size: 16px;">${perfil?.nome || "Equipe MD"}</div>
           ${perfil?.assinatura_email ? `<div style="color: #666; font-size: 14px; margin-top: 4px;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</div>` : ''}
           <div style="color: #94a3b8; font-size: 12px; margin-top: 15px;">
@@ -171,8 +172,7 @@ const Emails = () => {
       setFormData({ 
         destinatario: "", 
         assunto: "", 
-        corpo: "",
-        logoUrl: "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png"
+        corpo: ""
       });
       queryClient.invalidateQueries({ queryKey: ["emails"] });
     },
@@ -446,18 +446,7 @@ const Emails = () => {
                       </Button>
                     </div>
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1 group">
-                        <Label htmlFor="logo" className="text-xs text-muted-foreground cursor-pointer group-hover:text-primary transition-colors flex items-center gap-1">
-                          <MoreVertical className="h-3 w-3" /> Logo
-                        </Label>
-                        <Input
-                          id="logo"
-                          className="w-32 h-7 text-[10px]"
-                          placeholder="URL do logo"
-                          value={formData.logoUrl}
-                          onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                        />
-                      </div>
+                      {/* Logo URL removed to keep it company-exclusive */}
                     </div>
                   </div>
                 </form>
