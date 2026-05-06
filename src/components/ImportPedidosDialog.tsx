@@ -547,6 +547,16 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               </div>
             </div>
           )}
+          
+          {importing && (
+            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 bg-background/50 p-2 px-3 rounded-lg border border-primary/20 self-start min-w-[200px]">
+              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-primary">
+                <span>Importando...</span>
+                <span>{importProgress}%</span>
+              </div>
+              <Progress value={importProgress} className="h-1" />
+            </div>
+          )}
         </DialogHeader>
 
 
