@@ -356,11 +356,11 @@ export default function Tarefas() {
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </TableHead>
                     {visibleColumns.map(colId => (
-                      <TableHead key={colId} className={cn(\"text-xs font-medium text-muted-foreground whitespace-nowrap uppercase tracking-wider\", (colId === 'responsavel' || colId === 'prazo_final') && \"hidden lg:table-cell\", colId === 'projeto' && \"hidden xl:table-cell\")}>
+                      <TableHead key={colId} className={cn("text-xs font-medium text-muted-foreground whitespace-nowrap uppercase tracking-wider", (colId === 'responsavel' || colId === 'prazo_final') && "hidden lg:table-cell", colId === 'projeto' && "hidden xl:table-cell")}>
                         {getLabel(colId)}
                       </TableHead>
                     ))}
-                    <TableHead className=\"w-[80px] text-xs font-medium text-muted-foreground whitespace-nowrap uppercase tracking-wider\">Ações</TableHead>
+                    <TableHead className="w-[80px] text-xs font-medium text-muted-foreground whitespace-nowrap uppercase tracking-wider">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
