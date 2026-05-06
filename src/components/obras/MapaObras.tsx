@@ -159,12 +159,10 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
                   </div>
                 )}
                 
-                {selectedObra.endereco_entrega && (
-                  <div className="flex items-start gap-1.5 text-sm text-slate-600 leading-snug">
-                    <MapPin className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
-                    <span className="break-words">{selectedObra.endereco_entrega}</span>
-                  </div>
-                )}
+                <div className="flex items-start gap-1.5 text-sm text-slate-600 leading-snug">
+                  <MapPin className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
+                  <span className="break-words">{selectedObra.endereco_entrega || selectedObra.nome_obra}</span>
+                </div>
                 
                 <div className="pt-1 flex items-center justify-between">
                   <Badge className="bg-blue-600 hover:bg-blue-700 text-white border-none text-[11px] px-2 py-0.5">
