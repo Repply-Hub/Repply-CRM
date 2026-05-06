@@ -436,11 +436,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         const days = Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000);
         if (days < 7) return false;
       }
-      if (dateFrom && new Date(p.data_pedido) < dateFrom) return false;
-      if (dateTo) {
-        const end = new Date(dateTo);
-        end.setHours(23, 59, 59, 999);
-        if (new Date(p.data_pedido) > end) return false;
+      if (p.data_pedido) {
+        const pedidoDate = parseISO(p.data_pedido);
+        if (dateFrom && startOfDay(pedidoDate) < startOfDay(dateFrom)) return false;
+        if (dateTo && startOfDay(pedidoDate) > endOfDay(dateTo)) return false;
+      } else if (dateFrom || dateTo) {
+        // Se tem filtro de data mas o pedido não tem data, oculta
+        return false;
       }
       return true;
     });
