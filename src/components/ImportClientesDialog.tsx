@@ -72,9 +72,9 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   cep: [/^cep$/, /cep/, /zip/, /postcode/],
   nome_contato: [
     /^nome$/, /^nome\s*completo$/, /^primeiro\s*nome$/, /^first\s*name$/, /^full\s*name$/, /^nome\s*proprio$/,
-    /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
+    /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
     /^contato\s*principal$/,
-    /contato/, /responsavel/, /^nome\b/, /first.*name/, /full.*name/
+    /responsavel/, /^nome\b/, /first.*name/, /full.*name/
   ],
   sobrenome_contato: [
     /^sobrenome$/, /^ultimo\s*nome$/, /^last\s*name$/, /^surname$/, /^apelido$/,
