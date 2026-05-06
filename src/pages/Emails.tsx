@@ -481,7 +481,8 @@ const Emails = () => {
                           remetente: email.remetente,
                           corpo: "",
                           html: email.corpo_html,
-                          created_at: email.criado_em
+                          created_at: email.criado_em,
+                          type: "received"
                         })}
                       >
                         <div className="flex items-center gap-3 shrink-0">
@@ -495,8 +496,23 @@ const Emails = () => {
                           <span className="text-sm font-bold text-foreground mr-2 shrink-0">{email.assunto}</span>
                           <span className="text-sm text-muted-foreground">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
                         </div>
-                        <div className="shrink-0 text-xs font-bold text-foreground">
-                          {email.criado_em && format(new Date(email.criado_em), "HH:mm", { locale: ptBR })}
+                        <div className="flex items-center gap-3">
+                          <div className="shrink-0 text-xs font-bold text-foreground">
+                            {email.criado_em && format(new Date(email.criado_em), "HH:mm", { locale: ptBR })}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm("Deseja realmente excluir este e-mail recebido?")) {
+                                deleteEmailMutation.mutate({ id: email.id, type: "received" });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}
