@@ -83,7 +83,7 @@ serve(async (req) => {
     // Prepare RFC 2822 message as multipart/alternative
     const boundary = `----=_Part_${Math.random().toString(36).substr(2, 9)}`;
     const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
-    const fromHeader = `${userData.nome} <${userData.email}>`;
+    const fromHeader = `${userName} <${userEmail}>`;
     
     const messageParts = [
       `From: ${fromHeader}`,
