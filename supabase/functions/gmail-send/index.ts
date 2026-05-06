@@ -118,6 +118,7 @@ serve(async (req) => {
       .replace(/=+$/, '');
 
     // Send via Gmail API
+    console.log(`Sending email to ${to} with subject ${subject}`);
     const sendResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
       method: 'POST',
       headers: {
@@ -128,7 +129,11 @@ serve(async (req) => {
     })
 
     const result = await sendResponse.json()
-    if (result.error) throw new Error(result.error.message)
+    console.log('Gmail API result:', JSON.stringify(result));
+    if (result.error) {
+      console.error('Gmail API error:', result.error);
+      throw new Error(result.error.message || 'Error from Gmail API');
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
