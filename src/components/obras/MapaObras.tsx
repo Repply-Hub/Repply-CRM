@@ -21,6 +21,7 @@ interface MapaObrasProps {
   obras: ObraComCoordenada[] | undefined;
   isLoading: boolean;
   searchTerm?: string;
+  selectedObraId?: string;
 }
 
 export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps) {
