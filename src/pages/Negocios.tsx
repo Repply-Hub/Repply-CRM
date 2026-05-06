@@ -1178,7 +1178,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </div>
               )}
               {/* Renderização de Campos Extras dinâmicos */}
-              {tableVisibleColumns.map(colId => {
+              {columns.filter(col => tableVisibleColumns.includes(col.id)).map(col => {
+                const colId = col.id;
                 const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);
                 if (isDefault || colId === 'acoes') return null;
                 
