@@ -31,7 +31,7 @@ serve(async (req) => {
       `&response_type=code` +
       `&scope=${scope}` +
       `&access_type=offline` +
-      `&prompt=consent` +
+      `&prompt=consent select_account` +
       `&state=${userId}`
 
     return new Response(JSON.stringify({ url: authUrl }), {
