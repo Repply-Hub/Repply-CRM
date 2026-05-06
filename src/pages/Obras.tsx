@@ -391,7 +391,7 @@ export default function Obras() {
                             {visibleColumns.map(colId => (
                               <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
                                 {colId === 'nome_obra' && (
-                                  <span className="font-medium text-foreground">
+                                  <span className="font-semibold text-sm text-foreground">
                                     {obra.nome_obra}
                                   </span>
                                 )}
