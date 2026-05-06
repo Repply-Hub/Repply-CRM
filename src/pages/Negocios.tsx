@@ -896,136 +896,135 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={8} className="w-auto min-w-[820px] max-w-[980px] p-4 shadow-2xl border-border/40 z-[50] bg-background">
-      <div className="flex gap-0 divide-x divide-border">
-        <div className="flex-1 min-w-[140px] pr-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Etapa</p>
-          <div className="space-y-1">
-            <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-              <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
-              Todas as etapas
-            </label>
-            {KANBAN_STAGES.map(s => (
-              <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
-                {s.label}
+        <div className="flex gap-0 divide-x divide-border">
+          <div className="flex-1 min-w-[140px] pr-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Etapa</p>
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
+                Todas as etapas
               </label>
-            ))}
-          </div>
-        </div>
-        <div className="flex-1 min-w-[130px] px-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
-          <div className="space-y-1 max-h-60 overflow-y-auto">
-            {(vendedores ?? []).map(v => (
-              <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
-                {v.nome}
-              </label>
-            ))}
-          </div>
-        </div>
-        <div className="flex-1 min-w-[130px] px-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fabricante</p>
-          <ScrollArea className="h-60">
-            <div className="space-y-1 pr-3">
-              {(fabricantes ?? []).map(f => (
-                <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                  <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
-                  {f.nome}
+              {KANBAN_STAGES.map(s => (
+                <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                  <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
+                  {s.label}
                 </label>
               ))}
             </div>
-          </ScrollArea>
-        </div>
-        <div className="min-w-[130px] px-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Período</p>
-          <div className="space-y-2">
-            <div className="relative group">
-              <Input
-                placeholder="De: DD/MM/AAAA"
-                className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
-                value={dateFrom ? (typeof dateFrom === 'string' ? dateFrom : format(dateFrom, 'dd/MM/yyyy')) : ''}
-                onChange={(e) => {
-                  let val = e.target.value.replace(/\D/g, '');
-                  if (val.length > 8) val = val.slice(0, 8);
-                  
-                  let formatted = val;
-                  if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
-                  if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
-                  
-                  // We temporarily set it as a string to allow typing
-                  // @ts-ignore
-                  setDateFrom(formatted);
-                  
-                  if (formatted.length === 10) {
-                    const d = parse(formatted, 'dd/MM/yyyy', new Date());
-                    if (isValid(d)) setDateFrom(d);
-                  } else if (formatted === '') {
-                    setDateFrom(undefined);
-                  }
-                }}
-              />
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
-                    <CalendarIcon className="h-3.5 w-3.5" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className="p-3 pointer-events-auto" />
-                </PopoverContent>
-              </Popover>
+          </div>
+          <div className="flex-1 min-w-[130px] px-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Vendedor</p>
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              {(vendedores ?? []).map(v => (
+                <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                  <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
+                  {v.nome}
+                </label>
+              ))}
             </div>
+          </div>
+          <div className="flex-1 min-w-[130px] px-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fabricante</p>
+            <ScrollArea className="h-60">
+              <div className="space-y-1 pr-3">
+                {(fabricantes ?? []).map(f => (
+                  <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                    <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
+                    {f.nome}
+                  </label>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+          <div className="min-w-[130px] px-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Período</p>
+            <div className="space-y-2">
+              <div className="relative group">
+                <Input
+                  placeholder="De: DD/MM/AAAA"
+                  className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
+                  value={dateFrom ? (typeof dateFrom === 'string' ? dateFrom : format(dateFrom, 'dd/MM/yyyy')) : ''}
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/\D/g, '');
+                    if (val.length > 8) val = val.slice(0, 8);
+                    
+                    let formatted = val;
+                    if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
+                    if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
+                    
+                    // @ts-ignore
+                    setDateFrom(formatted);
+                    
+                    if (formatted.length === 10) {
+                      const d = parse(formatted, 'dd/MM/yyyy', new Date());
+                      if (isValid(d)) setDateFrom(d);
+                    } else if (formatted === '') {
+                      setDateFrom(undefined);
+                    }
+                  }}
+                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
+                      <CalendarIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} className="p-3 pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            <div className="relative group">
-              <Input
-                placeholder="Até: DD/MM/AAAA"
-                className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
-                value={dateTo ? (typeof dateTo === 'string' ? dateTo : format(dateTo, 'dd/MM/yyyy')) : ''}
-                onChange={(e) => {
-                  let val = e.target.value.replace(/\D/g, '');
-                  if (val.length > 8) val = val.slice(0, 8);
-                  
-                  let formatted = val;
-                  if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
-                  if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
-                  
-                  // We temporarily set it as a string to allow typing
-                  // @ts-ignore
-                  setDateTo(formatted);
+              <div className="relative group">
+                <Input
+                  placeholder="Até: DD/MM/AAAA"
+                  className="h-8 text-[11px] pl-8 w-32 group-hover:border-primary transition-colors"
+                  value={dateTo ? (typeof dateTo === 'string' ? dateTo : format(dateTo, 'dd/MM/yyyy')) : ''}
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/\D/g, '');
+                    if (val.length > 8) val = val.slice(0, 8);
+                    
+                    let formatted = val;
+                    if (val.length > 2) formatted = val.slice(0, 2) + '/' + val.slice(2);
+                    if (val.length > 4) formatted = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
+                    
+                    // @ts-ignore
+                    setDateTo(formatted);
 
-                  if (formatted.length === 10) {
-                    const d = parse(formatted, 'dd/MM/yyyy', new Date());
-                    if (isValid(d)) setDateTo(d);
-                  } else if (formatted === '') {
-                    setDateTo(undefined);
-                  }
-                }}
-              />
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
-                    <CalendarIcon className="h-3.5 w-3.5" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className="p-3 pointer-events-auto" />
-                </PopoverContent>
-              </Popover>
+                    if (formatted.length === 10) {
+                      const d = parse(formatted, 'dd/MM/yyyy', new Date());
+                      if (isValid(d)) setDateTo(d);
+                    } else if (formatted === '') {
+                      setDateTo(undefined);
+                    }
+                  }}
+                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 absolute left-1 top-1 text-muted-foreground hover:text-primary">
+                      <CalendarIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} className="p-3 pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col justify-between min-w-[120px] pl-4">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
+              <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
+                Atenção
+              </label>
             </div>
           </div>
         </div>
-        <div className="flex flex-col justify-between min-w-[120px] pl-4">
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
-            <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-              <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
-              Atenção
-            </label>
-          </div>
-        </div>
-      </div>
-    </FilterButton>
-  ), [hasPipelineFilters, activeFilterCount, clearPipelineFilters, KANBAN_STAGES, stageFilter, handleStageFilterChange, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention]);
+      </PopoverContent>
+    </Popover>
+  ), [hasPipelineFilters, activeFilterCount, KANBAN_STAGES, stageFilter, handleStageFilterChange, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention]);
   const selectedViewOrder = useMemo(() => 
     (pedidos ?? []).find(p => p.id === viewOrderId),
   [pedidos, viewOrderId]);
