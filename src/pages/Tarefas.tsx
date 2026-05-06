@@ -351,16 +351,16 @@ export default function Tarefas() {
             <div className="hidden md:block rounded-xl border border-border/60 border-b-0 rounded-b-none overflow-x-auto shadow-[var(--shadow-card)]">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
+                  <TableRow className="bg-muted/50 border-b border-border/60">
                     <TableHead className="w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </TableHead>
                     {visibleColumns.map(colId => (
-                      <TableHead key={colId} className={cn("whitespace-nowrap", (colId === 'responsavel' || colId === 'prazo_final') && "hidden lg:table-cell", colId === 'projeto' && "hidden xl:table-cell")}>
+                      <TableHead key={colId} className={cn(\"text-xs font-medium text-muted-foreground whitespace-nowrap uppercase tracking-wider\", (colId === 'responsavel' || colId === 'prazo_final') && \"hidden lg:table-cell\", colId === 'projeto' && \"hidden xl:table-cell\")}>
                         {getLabel(colId)}
                       </TableHead>
                     ))}
-                    <TableHead className="w-[80px]">Ações</TableHead>
+                    <TableHead className=\"w-[80px] text-xs font-medium text-muted-foreground whitespace-nowrap uppercase tracking-wider\">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
