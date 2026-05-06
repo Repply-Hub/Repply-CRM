@@ -188,6 +188,31 @@ function ProfileTab() {
     });
   };
 
+  const uploadEmailLogo = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setIsUploading(true);
+      if (!event.target.files || event.target.files.length === 0) return;
+      
+      const file = event.target.files[0];
+      const filePath = `logo-email.png`;
+
+      // Upload with upsert: true to replace existing logo
+      const { error: uploadError } = await supabase.storage
+        .from('email-assets')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+      
+      toast.success('Logo da empresa atualizada com sucesso!');
+      // Force refresh by invalidating any relevant queries if needed, 
+      // though the URL remains the same, browser cache might need clearing
+    } catch (error: any) {
+      toast.error('Erro ao carregar logo: ' + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSalvarEmail = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -252,6 +277,35 @@ function ProfileTab() {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-primary" /> Logotipo da Empresa
+            </CardTitle>
+            <CardDescription>Esta logo aparecerá no rodapé dos seus e-mails enviados</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg bg-muted/30">
+              <img 
+                src="https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" 
+                alt="Logo da Empresa" 
+                className="max-h-20 mb-4 object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200x50?text=MD+Representações';
+                }}
+              />
+              <Button variant="outline" size="sm" asChild disabled={isUploading}>
+                <label className="cursor-pointer gap-2">
+                  {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                  Alterar Logotipo
+                  <input type="file" accept="image/*" onChange={uploadEmailLogo} disabled={isUploading} className="hidden" />
+                </label>
+              </Button>
+              <p className="text-[10px] text-muted-foreground mt-2">Recomendado: fundo transparente (PNG), max 50px de altura</p>
+            </div>
           </CardContent>
         </Card>
 

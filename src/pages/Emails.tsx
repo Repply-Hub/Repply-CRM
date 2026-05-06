@@ -140,7 +140,7 @@ const Emails = () => {
           ${data.corpo.replace(/\n/g, '<br>')}
         </div>
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-          <img src="${data.logoUrl}" alt="MD Representações" style="max-height: 50px; display: block; margin-bottom: 10px;" />
+          <img src="${data.logoUrl}?t=${Date.now()}" alt="MD Representações" style="max-height: 50px; display: block; margin-bottom: 10px;" />
           <div style="color: #333; font-weight: bold; font-size: 16px;">${perfil?.nome || "Equipe MD"}</div>
           ${perfil?.assinatura_email ? `<div style="color: #666; font-size: 14px; margin-top: 4px;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</div>` : ''}
           <div style="color: #94a3b8; font-size: 12px; margin-top: 15px;">
