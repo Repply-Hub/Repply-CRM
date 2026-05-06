@@ -359,15 +359,7 @@ export default function Obras() {
                             key={obra.id} 
                             className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
                             onClick={() => {
-                              setEditObra({
-                                id: obra.id,
-                                nome_obra: obra.nome_obra,
-                                cliente_id: obra.cliente_id,
-                                endereco_entrega: obra.endereco_entrega || '',
-                                status: obra.status,
-                                spe_cnpj: obra.spe_cnpj || '',
-                              });
-                              setEditDialogOpen(true);
+                              setSelectedObra(obra);
                             }}
                           >
                             {visibleColumns.map(colId => (
