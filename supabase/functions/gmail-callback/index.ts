@@ -66,8 +66,8 @@ serve(async (req) => {
 
     // Redirect back to settings page
     // Note: Adjust the redirect URL to match your app's settings route
-    const appUrl = Deno.env.get('APP_URL') || url.origin.replace('.supabase.co', '')
-    return Response.redirect(`${appUrl}/settings?gmail=success`, 303)
+    const appUrl = Deno.env.get('APP_URL') || 'https://mdrepresentacoes.grupoclimb.ai'
+    return Response.redirect(`${appUrl}/configuracoes?tab=perfil`, 303)
   } catch (error) {
     console.error('Callback error:', error)
     return new Response(JSON.stringify({ error: error.message }), { 
