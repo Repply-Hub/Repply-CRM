@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.import-licencas]
 verify_jwt = false
+
+[functions.gmail-sync-inbox]
+verify_jwt = false
