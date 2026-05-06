@@ -1141,7 +1141,7 @@ export default function Portal() {
                                   const colCount = headers.length + 2;
                                   return (
                                     <>
-                                      <tr key={rowKey} className="border-t border-border/50 hover:bg-accent/30">
+                                      <tr key={rowKey} className="border-t border-border/50 hover:bg-muted/30 transition-colors">
                                         <td className="px-2 py-2">
                                           {row['Texto Encontrado'] && (
                                             <button
