@@ -449,7 +449,8 @@ export default function Obras() {
               <MapaObras 
                 obras={obrasParaMapa} 
                 isLoading={isLoading} 
-                searchTerm={search} 
+                searchTerm={search}
+                selectedObraId={(location.state as any)?.selectedObraId}
               />
             </Card>
           </TabsContent>
