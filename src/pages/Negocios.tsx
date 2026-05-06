@@ -782,7 +782,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <ChevronDown className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
               </button>
             </PopoverTrigger>
-            <PopoverContent side="right" align="start" sideOffset={10} className="w-56 p-2 shadow-xl border-border/40 bg-background z-[60]">
+            <PopoverContent side="left" align="start" sideOffset={10} className="w-56 p-2 shadow-xl border-border/40 bg-background z-[60]">
               <div className="space-y-1">
                 <div className="px-2 py-1.5 border-b border-border/50 mb-1">
                   <h4 className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Ações Disponíveis</h4>
