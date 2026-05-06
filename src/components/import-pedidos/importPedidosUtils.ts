@@ -293,15 +293,19 @@ export function getImportedPedidosRows(
             const year = ddmmyyyyMatch[3];
             data_pedido = `${year}-${month}-${day}`;
           } else {
-            // Tenta converter qualquer string de data para o início do dia em UTC
-            const d = new Date(dateStr);
-            if (!isNaN(d.getTime())) {
-              // Se a string contiver apenas data (sem hora), o JS pode interpretar como UTC ou Local
-              // Para garantir consistência, extraímos os componentes
-              const year = d.getFullYear();
-              const month = String(d.getMonth() + 1).padStart(2, '0');
-              const day = String(d.getDate()).padStart(2, '0');
-              data_pedido = `${year}-${month}-${day}`;
+            // Tenta converter para o início do dia local para evitar problemas de fuso horário
+            const parts = dateStr.split(/[\/\-]/);
+            if (parts.length === 3 && parts[0].length <= 2 && parts[2].length === 4) {
+              // DD/MM/YYYY fallback manual
+              data_pedido = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            } else {
+              const d = new Date(dateStr);
+              if (!isNaN(d.getTime())) {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                data_pedido = `${year}-${month}-${day}`;
+              }
             }
           }
         }
