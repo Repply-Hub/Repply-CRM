@@ -415,7 +415,7 @@ const Emails = () => {
                       <div 
                         key={email.id} 
                         className="px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4"
-                        onClick={() => setSelectedEmail(email)}
+                        onClick={() => setSelectedEmail({ ...email, type: "sent" })}
                       >
                         <div className="flex items-center gap-3 shrink-0">
                           <Plus className="h-4 w-4 text-muted-foreground/30 rotate-45 group-hover:text-muted-foreground" />
