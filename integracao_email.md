@@ -1,40 +1,38 @@
 # Documentação da Integração de E-mail
 
-O sistema utiliza a API do **Resend** para envio e recebimento de e-mails, integrada via **Supabase Edge Functions**.
+O sistema utiliza a API do **Gmail** para envio e recebimento de e-mails, integrada via **Supabase Edge Functions**.
 
 ## 1. Arquitetura da Integração
 
-- **Provedor de E-mail:** [Resend](https://resend.com/)
-- **Backend (Envio):** Edge Function `send-email`
-- **Backend (Recebimento):** Edge Function `resend-inbound-webhook`
+- **Provedor de E-mail:** [Google Gmail API](https://developers.google.com/gmail/api)
+- **Backend (Envio):** Edge Function `gmail-send`
+- **Backend (Sincronização):** Edge Function `gmail-sync-inbox` (executada via pg_cron a cada 2 minutos)
 - **Frontend:** Página de E-mails (`src/pages/Emails.tsx`)
 - **Armazenamento de Dados:** 
   - Tabela `emails`: Histórico de mensagens enviadas.
-  - Tabela `emails_recebidos`: Mensagens recebidas via Inbound.
-  - Tabela `user_integrations`: API Key e remetente por usuário.
+  - Tabela `emails_recebidos`: Mensagens recebidas e sincronizadas da Inbox.
+  - Tabela `gmail_tokens`: Tokens OAuth (Access e Refresh) por usuário.
   - Tabela `usuarios`: Assinatura personalizada.
 
 ## 2. Configurações Necessárias
 
-### Envio
-Cada usuário configura sua integração em **E-mails > Configurações**:
-- **Resend API Key:** Chave pessoal (começa com `re_`).
-- **E-mail do Remetente:** Domínio verificado no Resend.
+### Conexão Gmail
+Cada usuário conecta sua conta Google em **Configurações > Perfil**:
+- **OAuth 2.0:** Fluxo seguro de autorização.
+- **Tokens:** Armazenados de forma segura e renovados automaticamente.
 
-### Recebimento (Inbound)
-Para receber e-mails no sistema:
-1. No painel do Resend, vá em **Receiving** e obtenha seu endereço `.resend.app` ou configure um domínio próprio.
-2. Em **Webhooks**, adicione um novo webhook:
-   - **URL:** `https://cvbgrjauqjawrsyknhyj.supabase.co/functions/v1/resend-inbound-webhook`
-   - **Eventos:** Selecione `email.received`.
-3. Todo e-mail enviado para seu endereço cadastrado será salvo automaticamente na tabela `emails_recebidos`.
+### Sincronização
+A sincronização ocorre em segundo plano:
+1. Uma função cron (`pg_cron`) chama a Edge Function `gmail-sync-inbox` a cada 2 minutos.
+2. A função busca as últimas 20 mensagens da Inbox de cada usuário conectado.
+3. Mensagens novas são salvas na tabela `emails_recebidos`.
 
 ## 3. Funcionalidades de Envio
-... keep existing code
-## 5. Endpoints e Segurança
-- **Envio:** `invoke("send-email")`
-- **Recebimento:** Webhook público em `/functions/v1/resend-inbound-webhook` (processa apenas eventos `email.received`).
+O envio é feito através da interface de e-mail do sistema, permitindo anexar assinaturas personalizadas e logotipos da MD Representações.
+
+## 4. Endpoints e Segurança
+- **Envio:** `invoke("gmail-send")`
+- **Sincronização:** Edge Function `gmail-sync-inbox` processa as mensagens da Inbox.
 - **Segurança:** 
   - O envio exige autenticação do usuário.
-  - O recebimento é protegido por lógica de evento específica e RLS para visualização.
-
+  - RLS (Row Level Security) garante que cada usuário veja apenas seus próprios e-mails.
