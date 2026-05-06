@@ -367,14 +367,7 @@ export default function Obras() {
                             {visibleColumns.map(colId => (
                               <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
                                 {colId === 'nome_obra' && (
-                                  <span 
-                                    className="font-medium text-foreground hover:text-primary transition-colors"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSearch(obra.nome_obra);
-                                      setActiveTab('mapa');
-                                    }}
-                                  >
+                                  <span className="font-medium text-foreground">
                                     {obra.nome_obra}
                                   </span>
                                 )}
