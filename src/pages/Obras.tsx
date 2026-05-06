@@ -59,6 +59,7 @@ type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
 
 export default function Obras() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: obras, isLoading } = useObras();
   const { data: clientes } = useClientes();
   const createObra = useCreateObra();
