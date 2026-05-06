@@ -122,29 +122,15 @@ const Emails = () => {
       }
 
       const htmlBody = `
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 0; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-          <div style="background-color: #f8fafc; padding: 30px; border-bottom: 1px solid #e2e8f0; text-align: center;">
-            <img src="${data.logoUrl}" alt="Logo MD Representações" style="max-height: 60px; width: auto; display: inline-block;" />
-          </div>
-          
-          <div style="padding: 40px 30px; line-height: 1.6; font-size: 16px; color: #334155;">
-            <div style="margin-bottom: 25px;">
-              ${data.corpo.replace(/\n/g, '<br>')}
-            </div>
-          </div>
-          
-          <div style="background-color: #f8fafc; padding: 30px; border-top: 1px solid #e2e8f0; color: #64748b;">
-            <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
-              <tr>
-                <td style="vertical-align: middle;">
-                  <div style="font-weight: 700; color: #0f172a; font-size: 16px; margin-bottom: 4px;">${perfil?.nome || "Equipe MD"}</div>
-                  ${perfil?.assinatura_email ? `<div style="font-size: 14px; line-height: 1.5; color: #64748b; margin-bottom: 15px;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</div>` : ''}
-                  <div style="font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 15px;">
-                    Esta é uma mensagem enviada por MD Representações.
-                  </div>
-                </td>
-              </tr>
-            </table>
+        <div style="font-family: sans-serif; font-size: 16px; color: #333; line-height: 1.5;">
+          ${data.corpo.replace(/\n/g, '<br>')}
+        </div>
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+          <img src="${data.logoUrl}" alt="MD Representações" style="max-height: 50px; display: block; margin-bottom: 10px;" />
+          <div style="color: #333; font-weight: bold; font-size: 16px;">${perfil?.nome || "Equipe MD"}</div>
+          ${perfil?.assinatura_email ? `<div style="color: #666; font-size: 14px; margin-top: 4px;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</div>` : ''}
+          <div style="color: #94a3b8; font-size: 12px; margin-top: 15px;">
+            MD Representações
           </div>
         </div>
       `;
