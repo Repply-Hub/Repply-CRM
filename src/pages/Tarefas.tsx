@@ -378,7 +378,7 @@ export default function Tarefas() {
                           if (colId === 'titulo') {
                             return (
                               <TableCell key={colId} className="max-w-[300px]">
-                                <p className="font-medium text-sm text-card-foreground">{t.titulo}</p>
+                                <p className="font-semibold text-sm text-card-foreground">{t.titulo}</p>
                                 {visibleColumns.includes('projeto') && t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
                                 {visibleColumns.includes('responsavel') && t.responsavel && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.responsavel}</p>}
                               </TableCell>
