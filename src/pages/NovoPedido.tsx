@@ -329,7 +329,7 @@ const NovoPedido = () => {
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/pedidos')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-lg">Novo Pedido</h1>
+          <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">Novo Pedido</h1>
         </div>
       }
     >

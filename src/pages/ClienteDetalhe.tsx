@@ -268,7 +268,7 @@ const ClienteDetalhe = () => {
             <Icon className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-lg">{(cliente as any).razao_social || cliente.empresa}</h1>
+            <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{(cliente as any).razao_social || cliente.empresa}</h1>
             <div className="flex items-center gap-2">
               {(cliente as any).razao_social && (cliente as any).razao_social !== cliente.empresa && (
                 <span className="text-xs sm:text-sm text-muted-foreground truncate">{cliente.empresa}</span>
