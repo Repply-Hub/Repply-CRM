@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useObras } from '@/hooks/use-obras';
 import { useStatusObras } from '@/hooks/use-status-obras';
