@@ -86,6 +86,7 @@ serve(async (req) => {
 
             const headers = message.payload.headers
             const from = headers.find((h: any) => h.name === 'From')?.value || ''
+            const to = headers.find((h: any) => h.name === 'To')?.value || ''
             const subject = headers.find((h: any) => h.name === 'Subject')?.value || '(Sem assunto)'
             const dateStr = headers.find((h: any) => h.name === 'Date')?.value
             const dataRecebimento = dateStr ? new Date(dateStr).toISOString() : new Date().toISOString()
@@ -96,7 +97,13 @@ serve(async (req) => {
             const getHtmlPart = (part: any): string => {
               if (part.mimeType === 'text/html' && part.body.data) {
                 const base64 = part.body.data.replace(/-/g, '+').replace(/_/g, '/')
-                return decodeURIComponent(escape(atob(base64)))
+                // Using TextDecoder for more robust UTF-8 decoding
+                const binaryString = atob(base64)
+                const bytes = new Uint8Array(binaryString.length)
+                for (let i = 0; i < binaryString.length; i++) {
+                  bytes[i] = binaryString.charCodeAt(i)
+                }
+                return new TextDecoder().decode(bytes)
               }
               if (part.parts) {
                 for (const subPart of part.parts) {
@@ -111,7 +118,12 @@ serve(async (req) => {
               bodyHtml = getHtmlPart(message.payload)
             } else if (message.payload.body.data) {
               const base64 = message.payload.body.data.replace(/-/g, '+').replace(/_/g, '/')
-              bodyHtml = decodeURIComponent(escape(atob(base64)))
+              const binaryString = atob(base64)
+              const bytes = new Uint8Array(binaryString.length)
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i)
+              }
+              bodyHtml = new TextDecoder().decode(bytes)
             }
 
             // 6. Upsert into emails_recebidos
@@ -121,6 +133,7 @@ serve(async (req) => {
                 gmail_message_id: message.id,
                 user_id: userToken.user_id,
                 remetente: from,
+                destinatarios: to ? [to] : [],
                 assunto: subject,
                 corpo_html: bodyHtml,
                 data_recebimento: dataRecebimento,
