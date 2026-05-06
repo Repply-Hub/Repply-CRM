@@ -196,6 +196,9 @@ const Emails = () => {
     },
     onError: (error: any) => {
       toast.error("Erro ao excluir e-mail: " + (error.message || "Erro desconhecido"));
+    },
+  });
+
   const bulkDeleteMutation = useMutation({
     mutationFn: async ({ ids, type }: { ids: string[]; type: "sent" | "received" }) => {
       const table = type === "sent" ? "emails" : "emails_recebidos";
