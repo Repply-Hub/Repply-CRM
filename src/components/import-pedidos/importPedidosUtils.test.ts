@@ -39,6 +39,7 @@ describe('importPedidosUtils', () => {
     const mapping = {
       negocio: 'Nome do negócio',
       cliente: 'Empresa',
+      contato: 'Contato',
       obra: '',
       fabricante: 'Pipeline',
       valor: 'Valor total',
@@ -52,6 +53,7 @@ describe('importPedidosUtils', () => {
       {
         negocio: 'Repav Rosário Edificações',
         cliente: 'Repav Rosário Edificações e Pavimentação',
+        contato: 'João',
         obra: '',
         fabricante: 'Portobello',
         valor: 10500,
@@ -64,6 +66,7 @@ describe('importPedidosUtils', () => {
       {
         negocio: 'Obra Torre Sul',
         cliente: 'Construtora ABC',
+        contato: 'Maria',
         obra: '',
         fabricante: 'Eliane',
         valor: 2000,
