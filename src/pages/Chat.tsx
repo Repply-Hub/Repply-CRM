@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, ChatGrupo, ChatMessage, useMarkChatAsRead } from '@/hooks/use-chat';
+import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -70,6 +71,7 @@ function MembersList({
   collapsed,
   onToggle,
   grupos,
+  unreadCounts,
 }: {
   members: Vendedor[];
   myId: string | null;
@@ -78,52 +80,78 @@ function MembersList({
   collapsed: boolean;
   onToggle: () => void;
   grupos: ChatGrupo[];
+  unreadCounts: Record<string, number>;
 }) {
   if (collapsed) {
     return (
       <div className="w-12 border-r border-border flex flex-col h-full shrink-0 items-center gap-1">
-        <button
-          onClick={() => onSelect({ type: 'geral' })}
-          className={cn('p-1 rounded-lg transition-colors', target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50')}
-          title="Chat Geral"
-        >
-          <Avatar className="h-7 w-7">
-            <AvatarFallback className="bg-primary text-primary-foreground text-[8px]">
-              <Users className="h-3.5 w-3.5" />
-            </AvatarFallback>
-          </Avatar>
-        </button>
-        {grupos.map(g => (
+        <div className="relative">
           <button
-            key={g.id}
-            onClick={() => onSelect({ type: 'grupo', grupoId: g.id })}
-            className={cn('p-1 rounded-lg transition-colors', target.type === 'grupo' && target.grupoId === g.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
-            title={g.nome}
+            onClick={() => onSelect({ type: 'geral' })}
+            className={cn('p-1 rounded-lg transition-colors', target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50')}
+            title="Chat Geral"
           >
             <Avatar className="h-7 w-7">
-              <AvatarFallback className="bg-chart-2 text-white text-[8px] font-semibold">
-                <Users2 className="h-3.5 w-3.5" />
+              <AvatarFallback className="bg-primary text-primary-foreground text-[8px]">
+                <Users className="h-3.5 w-3.5" />
               </AvatarFallback>
             </Avatar>
           </button>
-        ))}
-        {members.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => onSelect({ type: 'dm', memberId: m.id, recipientId: m.id })}
-            className={cn('p-1 rounded-lg transition-colors', target.type === 'dm' && target.memberId === m.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
-            title={m.nome}
-          >
-            <Avatar className="h-7 w-7 border border-primary/10">
-              {m.avatar_url && (
-                <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+          {unreadCounts['geral'] > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
+              {unreadCounts['geral']}
+            </span>
+          )}
+        </div>
+        {grupos.map(g => {
+          const count = unreadCounts[`grupo_${g.id}`];
+          return (
+            <div key={g.id} className="relative">
+              <button
+                onClick={() => onSelect({ type: 'grupo', grupoId: g.id })}
+                className={cn('p-1 rounded-lg transition-colors', target.type === 'grupo' && target.grupoId === g.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
+                title={g.nome}
+              >
+                <Avatar className="h-7 w-7">
+                  <AvatarFallback className="bg-chart-2 text-white text-[8px] font-semibold">
+                    <Users2 className="h-3.5 w-3.5" />
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+              {count > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
+                  {count}
+                </span>
               )}
-              <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
-                {getInitials(m.nome)}
-              </AvatarFallback>
-            </Avatar>
-          </button>
-        ))}
+            </div>
+          );
+        })}
+        {members.map((m) => {
+          const count = unreadCounts[`dm_${m.id}`];
+          return (
+            <div key={m.id} className="relative">
+              <button
+                onClick={() => onSelect({ type: 'dm', memberId: m.id, recipientId: m.id })}
+                className={cn('p-1 rounded-lg transition-colors', target.type === 'dm' && target.memberId === m.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
+                title={m.nome}
+              >
+                <Avatar className="h-7 w-7 border border-primary/10">
+                  {m.avatar_url && (
+                    <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+                  )}
+                  <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
+                    {getInitials(m.nome)}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+              {count > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
+                  {count}
+                </span>
+              )}
+            </div>
+          );
+        })}
         <div className="mt-auto border-t border-border w-full flex justify-center py-2 h-[4rem] items-center bg-muted/30">
           <button onClick={onToggle} className="p-2 rounded-lg hover:bg-muted/50 transition-colors" title="Expandir equipe">
             <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
@@ -161,6 +189,11 @@ function MembersList({
               <p className="text-xs font-medium text-foreground truncate">Chat Geral</p>
               <p className="text-[10px] text-muted-foreground">Toda a equipe</p>
             </div>
+            {unreadCounts['geral'] > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                {unreadCounts['geral']}
+              </span>
+            )}
           </button>
 
           {/* Grupos */}
@@ -187,6 +220,11 @@ function MembersList({
                 <p className="text-xs font-medium text-foreground truncate">{g.nome}</p>
                 <p className="text-[10px] text-muted-foreground">Grupo</p>
               </div>
+              {unreadCounts[`grupo_${g.id}`] > 0 && (
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                  {unreadCounts[`grupo_${g.id}`]}
+                </span>
+              )}
             </button>
           ))}
 
@@ -228,6 +266,11 @@ function MembersList({
                   </p>
                   <p className="text-[10px] text-muted-foreground capitalize truncate">{m.role}</p>
                 </div>
+                {unreadCounts[`dm_${m.id}`] > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                    {unreadCounts[`dm_${m.id}`]}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -259,6 +302,7 @@ const Chat = () => {
   const clearChat = useClearChat();
   const { data: grupos = [] } = useChatGrupos();
   const markAsRead = useMarkChatAsRead();
+  const { data: unreadCounts = {} } = useUnreadChatByTarget();
 
   const { data: myVendedor } = useQuery({
     queryKey: ['my-vendedor'],
@@ -386,6 +430,7 @@ const Chat = () => {
           collapsed={teamCollapsed}
           onToggle={() => setTeamCollapsed(prev => !prev)}
           grupos={grupos}
+          unreadCounts={unreadCounts}
         />
 
         <div className="flex-1 flex flex-col min-w-0">
