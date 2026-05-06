@@ -102,6 +102,18 @@ export default function Obras() {
     }
   }, [statusObras, newObra.status]);
 
+  useEffect(() => {
+    const state = location.state as { selectedObraId?: string } | null;
+    if (state?.selectedObraId && obras) {
+      const obra = obras.find(o => o.id === state.selectedObraId);
+      if (obra) {
+        setSelectedObra(obra);
+        // Limpa o estado para não reabrir ao navegar de volta
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [location.state, obras, navigate, location.pathname]);
+
   const {
     columns,
     visibleColumns,
