@@ -15,6 +15,7 @@ interface KanbanColumnProps {
   orders: Order[];
   onCardClick?: (id: string) => void;
   visibleColumns?: string[];
+  columns?: any[];
 }
 
 export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders, onCardClick, visibleColumns }: KanbanColumnProps) {
