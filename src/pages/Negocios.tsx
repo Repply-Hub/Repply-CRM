@@ -904,7 +904,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           {/* Submenu Etapa */}
           <Popover modal={false}>
             <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group">
+              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
                 <div className="flex items-center gap-3">
                   <LayoutGrid className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                   <span>Etapa</span>
