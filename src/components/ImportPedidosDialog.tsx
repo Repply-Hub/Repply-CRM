@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X, ArrowRight, Plus, Pencil, EyeOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -503,28 +504,75 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-primary" />
-            Importar Negócios
-          </DialogTitle>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+        <DialogHeader className="px-6 py-4 border-b bg-muted/30 shrink-0">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2.5 text-xl font-bold">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <FileSpreadsheet className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex flex-col items-start gap-0.5">
+                <span>Importar Negócios</span>
+                <span className="text-xs font-normal text-muted-foreground">Converta sua planilha em novas oportunidades de venda</span>
+              </div>
+            </DialogTitle>
+            {step !== 'upload' && (
+              <div className="flex items-center gap-2">
+                <div className={cn("flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all", step === 'mapping' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                  1. Mapeamento
+                </div>
+                <ArrowRight className="h-3 w-3 text-muted-foreground/40" />
+                <div className={cn("flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all", step === 'preview' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                  2. Revisão
+                </div>
+              </div>
+            )}
+          </div>
         </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
 
         {step === 'upload' && (
           <div
-            className="border-2 border-dashed border-border rounded-xl p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
+            className="border-2 border-dashed border-border rounded-2xl p-16 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/[0.02] transition-all group relative overflow-hidden"
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
             onClick={() => fileRef.current?.click()}
           >
-            <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-            <p className="text-sm font-medium text-foreground mb-1">Arraste o arquivo aqui ou clique para selecionar</p>
-            <p className="text-xs text-muted-foreground mb-3">Formatos aceitos: .xlsx, .xls, .csv</p>
-            <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 max-w-md mx-auto text-left">
-              <p className="font-medium mb-1">Qualquer planilha é aceita!</p>
-              <p>Colunas que não existirem no sistema podem ser adicionadas como "novas" durante o mapeamento.</p>
+            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            
+            <div className="relative z-10">
+              <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-6 group-hover:scale-110 group-hover:bg-primary/10 transition-all duration-300">
+                <Upload className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Arraste seu arquivo aqui</h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
+                Ou clique para selecionar um arquivo <span className="font-semibold text-primary">.xlsx, .xls ou .csv</span> do seu computador
+              </p>
+              
+              <div className="flex flex-col gap-3 max-w-sm mx-auto">
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/50 text-left">
+                  <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center shrink-0 shadow-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-foreground">Detecção Inteligente</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">Mapeamos automaticamente as colunas da sua planilha.</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/50 text-left">
+                  <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center shrink-0 shadow-sm">
+                    <Plus className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-foreground">Campos Personalizados</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">Adicione informações extras que não existem no sistema.</span>
+                  </div>
+                </div>
+              </div>
             </div>
+
             <input
               ref={fileRef}
               type="file"
@@ -539,79 +587,95 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         )}
 
         {step === 'mapping' && (
-          <MappingStep
-            fileName={fileName}
-            rawData={rawData}
-            headers={headers}
-            mapping={mapping}
-            setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>}
-            fieldDefaultValues={fieldDefaultValues}
-            setFieldDefaultValues={setFieldDefaultValues}
-            extras={extras}
-            setExtras={setExtras}
-            customColumns={customColumns}
-            setCustomColumns={setCustomColumns}
-            fieldLabels={fieldLabels}
-            setFieldLabels={setFieldLabels}
-            visibleFields={VISIBLE_FIELDS}
-            existingColumns={existingColumns}
-            onReset={reset}
-            onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
-            onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
-            onSaveAsDefault={saveAsDefault}
-            isAutoSaveEnabled={isAutoSaveEnabled}
-            canProceed={canProceedToPreview}
-            onNext={() => {
-              const mapped = getMappedRows();
-              if (mapped.length === 0) {
-                toast.error('Nenhum registro válido com o mapeamento atual');
-                return;
-              }
-              setStep('preview');
-            }}
-          />
+          <div className="bg-muted/30 rounded-xl border border-border/50 shadow-sm overflow-hidden flex flex-col h-full animate-in fade-in zoom-in-95 duration-200">
+            <MappingStep
+              fileName={fileName}
+              rawData={rawData}
+              headers={headers}
+              mapping={mapping}
+              setMapping={setMapping as React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>}
+              fieldDefaultValues={fieldDefaultValues}
+              setFieldDefaultValues={setFieldDefaultValues}
+              extras={extras}
+              setExtras={setExtras}
+              customColumns={customColumns}
+              setCustomColumns={setCustomColumns}
+              fieldLabels={fieldLabels}
+              setFieldLabels={setFieldLabels}
+              visibleFields={VISIBLE_FIELDS}
+              existingColumns={existingColumns}
+              onReset={reset}
+              onAutoDetect={() => { setMapping(detectImportPedidosMapping(headers, rawData)); setExtras({}); }}
+              onClearAll={() => { setMapping(createEmptyMapping()); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
+              onSaveAsDefault={saveAsDefault}
+              isAutoSaveEnabled={isAutoSaveEnabled}
+              canProceed={canProceedToPreview}
+              onNext={() => {
+                const mapped = getMappedRows();
+                if (mapped.length === 0) {
+                  toast.error('Nenhum registro válido com o mapeamento atual');
+                  return;
+                }
+                setStep('preview');
+              }}
+            />
+          </div>
         )}
 
         {step === 'preview' && (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className="gap-1">
-                  <FileSpreadsheet className="h-3 w-3" />
-                  {fileName}
-                </Badge>
-                <Badge variant="outline">{previewRows.length} registros válidos</Badge>
-                {extraFieldInfos.length > 0 && (
-                  <Badge className="bg-accent text-accent-foreground border-accent">
-                    +{extraFieldInfos.length} extra{extraFieldInfos.length === 1 ? '' : 's'}
-                  </Badge>
-                )}
+          <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-border/50 shadow-sm">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileSpreadsheet className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-foreground">{fileName}</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <Badge variant="outline" className="text-[10px] font-bold py-0 h-5 bg-background">{previewRows.length} registros válidos</Badge>
+                    {extraFieldInfos.length > 0 && (
+                      <Badge className="bg-accent/10 text-accent-foreground border-accent/20 text-[10px] font-bold py-0 h-5">
+                        +{extraFieldInfos.length} campos extras
+                      </Badge>
+                    )}
+                  </div>
+                </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setStep('mapping')}>
-                <X className="h-4 w-4 mr-1" /> Voltar ao mapeamento
+              <Button variant="ghost" size="sm" onClick={() => setStep('mapping')} className="h-9 px-3 text-muted-foreground hover:text-foreground">
+                <Pencil className="h-4 w-4 mr-2" /> Alterar mapeamento
               </Button>
             </div>
 
-            <div className="space-y-3">
-              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-                Clientes e fabricantes não encontrados serão criados automaticamente.
-                {extraFieldInfos.length > 0 && (
-                  <span>Extras: {extraFieldInfos.map(info => info.label).join(', ')}.</span>
-                )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
+                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-amber-900">Importação Automática</span>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Clientes e fabricantes não encontrados serão criados automaticamente com base no mapeamento.
+                  </p>
+                </div>
               </div>
 
               {ignoredColumns.length > 0 && (
-                <div className="bg-muted/50 rounded-lg p-3 border border-border/50">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <X className="h-3 w-3" /> Colunas ignoradas (não mapeadas)
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ignoredColumns.map(col => (
-                      <Badge key={col} variant="outline" className="text-[10px] font-normal py-0 h-5 bg-background">
-                        {col}
-                      </Badge>
-                    ))}
+                <div className="bg-muted/50 border border-border/50 rounded-xl p-4 flex items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center shrink-0 border border-border/50">
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="flex flex-col gap-1 overflow-hidden">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Colunas Ignoradas</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {ignoredColumns.slice(0, 5).map(col => (
+                        <Badge key={col} variant="outline" className="text-[9px] font-normal py-0 h-4 px-1.5 bg-background">
+                          {col}
+                        </Badge>
+                      ))}
+                      {ignoredColumns.length > 5 && (
+                        <span className="text-[9px] text-muted-foreground px-1">+{ignoredColumns.length - 5} outras</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -664,11 +728,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                   ))}
                 </TableBody>
               </Table>
-              {previewRows.length > 50 && (
-                <p className="text-xs text-muted-foreground text-center py-2">
-                  Mostrando 50 de {previewRows.length} registros
-                </p>
-              )}
             </div>
 
             {importing && (
@@ -684,16 +743,40 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
-              <Button onClick={handleImport} disabled={importing}>
-                {importing ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importando...</>
-                ) : (
-                  <><CheckCircle2 className="h-4 w-4 mr-1" /> Importar {previewRows.length} negócios</>
-                )}
-              </Button>
-            </div>
+          </div>
+        )}
+        </div>
+
+        {step === 'mapping' && (
+          <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
+            <Button variant="ghost" onClick={reset}>Cancelar</Button>
+            <Button 
+              onClick={() => {
+                const mapped = getMappedRows();
+                if (mapped.length === 0) {
+                  toast.error('Nenhum registro válido com o mapeamento atual');
+                  return;
+                }
+                setStep('preview');
+              }} 
+              className="h-10 px-6 font-bold shadow-lg shadow-primary/20"
+              disabled={!canProceedToPreview}
+            >
+              Revisar Importação <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        )}
+
+        {step === 'preview' && (
+          <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
+            <Button variant="ghost" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
+            <Button onClick={handleImport} disabled={importing} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
+              {importing ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
+              ) : (
+                <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {previewRows.length} negócios</>
+              )}
+            </Button>
           </div>
         )}
       </DialogContent>

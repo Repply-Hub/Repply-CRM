@@ -547,21 +547,23 @@ export function MappingStep({
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex flex-col gap-4">
-        <div className="rounded-xl border bg-card shadow-sm">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/30 rounded-t-xl">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <FileSpreadsheet className="h-4 w-4" />
+        <div className="rounded-xl border border-border/50 bg-card shadow-sm">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/20">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/10">
+                <FileSpreadsheet className="h-5 w-5" />
               </div>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-foreground truncate">{fileName}</div>
-                <div className="text-xs text-muted-foreground">{rawData.length} linhas · {headers.length} cabeçalhos encontrados</div>
+              <div className="min-w-0 flex flex-col">
+                <div className="text-sm font-bold text-foreground truncate max-w-[300px]">{fileName}</div>
+                <div className="text-[11px] text-muted-foreground leading-none mt-1">{rawData.length} linhas processadas</div>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={onAutoDetect} className="gap-1.5 h-8"><Sparkles className="h-3.5 w-3.5" /> Auto</Button>
-              <Button variant="ghost" size="sm" onClick={onClearAll} className="h-8 px-2">Limpar</Button>
-              <Button variant="ghost" size="sm" onClick={onReset} className="h-8 px-2"><X className="h-3.5 w-3.5 mr-1" /> Trocar arquivo</Button>
+            <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-lg border border-border/30">
+              <Button variant="ghost" size="sm" onClick={onAutoDetect} className="gap-1.5 h-7 text-[10px] font-bold uppercase tracking-wider hover:bg-background hover:text-primary transition-all"><Sparkles className="h-3 w-3" /> Auto</Button>
+              <div className="w-px h-4 bg-border/50" />
+              <Button variant="ghost" size="sm" onClick={onClearAll} className="h-7 px-2 text-[10px] font-bold uppercase tracking-wider hover:bg-background hover:text-destructive">Limpar</Button>
+              <div className="w-px h-4 bg-border/50" />
+              <Button variant="ghost" size="sm" onClick={onReset} className="h-7 px-2 text-[10px] font-bold uppercase tracking-wider hover:bg-background"><X className="h-3 w-3 mr-1" /> Trocar</Button>
             </div>
           </div>
           <div className="flex flex-col border-t bg-muted/10 divide-y divide-border/30">
@@ -1028,17 +1030,9 @@ export function MappingStep({
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <Sparkles className="h-3 w-3 text-accent-foreground" />
-            Ao continuar, CNPJ/telefone, números, datas e status serão sanitizados antes do preview.
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onReset} size="sm">Cancelar</Button>
-            <Button disabled={!canProceed || requiredMissing.length > 0} onClick={handleContinue} size="sm" className="gap-1.5">
-              Pré-visualizar <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
+        <div className="flex items-center justify-between gap-3 pt-1 opacity-0 pointer-events-none h-0">
+          {/* Botões originais ocultos pois o Dialog agora gerencia o rodapé */}
+          <Button onClick={handleContinue} />
         </div>
       </div>
     </TooltipProvider>
