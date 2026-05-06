@@ -101,8 +101,8 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
           <span className="font-medium text-foreground">{obrasComCoord.length}</span>
           <span>obra(s) no mapa</span>
         </div>
-        {obrasSemEndereco.length > 0 && (
-          <span className="text-xs">• {obrasSemEndereco.length} sem endereço cadastrado</span>
+        {obrasSemLocalizacao.length > 0 && (
+          <span className="text-xs">• {obrasSemLocalizacao.length} sem informações de localização</span>
         )}
         {carregando && (
           <div className="flex items-center gap-1.5 text-xs text-primary animate-pulse">
