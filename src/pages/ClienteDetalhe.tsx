@@ -511,6 +511,17 @@ const ClienteDetalhe = () => {
                         return;
                       }
                       try {
+                        // Verificar se já existe obra com este nome (evitar duplicados)
+                        const normalizedNewName = novaObra.nome_obra.trim().toLowerCase();
+                        const existingObra = (cliente.obras || []).find((o: any) => o.nome_obra.trim().toLowerCase() === normalizedNewName);
+
+                        if (existingObra) {
+                          toast.info('Esta obra já existe para este cliente.');
+                          setAddObraOpen(false);
+                          setNovaObra({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
+                          return;
+                        }
+
                         await createObra.mutateAsync({
                           ...novaObra,
                           cliente_id: id!
