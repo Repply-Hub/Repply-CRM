@@ -983,7 +983,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </div>
               </button>
             </PopoverTrigger>
-            <PopoverContent side="right" align="start" sideOffset={10} className="w-60 p-3 shadow-xl border-border/40 bg-background z-[60]">
+            <PopoverContent side="left" align="start" sideOffset={10} className="w-60 p-3 shadow-xl border-border/40 bg-background z-[60]">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filtrar por Fabricante</p>
               <ScrollArea className="h-60">
                 <div className="space-y-1 pr-3">
