@@ -396,7 +396,7 @@ export default function Obras() {
                                       }
                                     }}
                                   >
-                                    {obra.endereco_entrega || '—'}
+                                    {obra.endereco_entrega || obra.nome_obra}
                                   </span>
                                 )}
                                 {colId === 'spe_cnpj' && (obra.spe_cnpj || '—')}
