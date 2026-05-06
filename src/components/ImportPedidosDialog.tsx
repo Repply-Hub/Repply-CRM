@@ -194,10 +194,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     return (sanitized as any[]).map(item => {
       const { campos_extras, ...rest } = item;
       return {
-        cliente: rest.cliente || '',
-        fabricante: rest.fabricante || '',
-        obra: rest.obra || '',
         negocio: rest.negocio || '',
+        cliente: rest.cliente || '',
+        contato: rest.contato || '',
+        obra: rest.obra || '',
+        fabricante: rest.fabricante || '',
         valor: typeof rest.valor === 'number' ? rest.valor : 0,
         vendedor: rest.vendedor || '',
         status: rest.status || 'novo_lead',
@@ -439,6 +440,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           const finalCamposExtras = { ...(r.campos_extras || {}) };
           if (r.vendedor && !importedVendedorId) {
             finalCamposExtras['Vendedor Original'] = r.vendedor;
+          }
+          
+          // Salva o contato como campo extra
+          if (r.contato) {
+            finalCamposExtras['Contato'] = r.contato;
           }
           
           // Salva o título do negócio se ele for diferente do nome do cliente
