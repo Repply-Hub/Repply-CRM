@@ -1375,12 +1375,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       <TableHead className="w-10">
                         <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
-                      {tableVisibleColumns.map(colId => (
-                        <TableHead key={colId} className={cn(
+                      {columns.filter(col => tableVisibleColumns.includes(col.id)).map(col => (
+                        <TableHead key={col.id} className={cn(
                           "whitespace-nowrap px-4 py-3 text-xs font-semibold",
-                          colId === 'acoes' ? "w-[80px] text-center" : "min-w-[150px]"
+                          col.id === 'acoes' ? "w-[80px] text-center" : "min-w-[150px]"
                         )}>
-                          {getLabel(colId)}
+                          {getLabel(col.id)}
                         </TableHead>
                       ))}
                     </TableRow>
