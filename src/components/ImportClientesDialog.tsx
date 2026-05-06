@@ -169,6 +169,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   });
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const [previewRowsSnapshot, setPreviewRowsSnapshot] = useState<any[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
