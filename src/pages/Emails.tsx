@@ -51,6 +51,9 @@ const Emails = () => {
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [emailToDelete, setEmailToDelete] = useState<{ id: string; type: "sent" | "received" } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<string>("received");
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const { isConnected, connectedEmail, sendEmail } = useGmail();
   const [formData, setFormData] = useState({ 
     destinatario: "", 
