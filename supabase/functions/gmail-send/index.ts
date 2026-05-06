@@ -22,18 +22,28 @@ serve(async (req) => {
     // Get tokens and user info from DB
     const { data: tokenData, error: tokenError } = await supabaseClient
       .from('gmail_tokens')
-      .select('*, usuarios(nome, email)')
+      .select('*')
       .eq('user_id', userId)
       .single()
 
     if (tokenError || !tokenData) {
-      throw new Error('Gmail integration not found for user')
+      throw new Error('Integração Gmail não encontrada para este usuário. Por favor, conecte sua conta novamente.')
     }
 
-    const userData = tokenData.usuarios as any;
-    if (!userData) {
-      throw new Error('User profile not found')
+    // Get user profile separately to avoid join issues
+    const { data: userData, error: userError } = await supabaseClient
+      .from('usuarios')
+      .select('nome, email')
+      .eq('user_id', userId)
+      .single()
+
+    if (userError || !userData) {
+      console.warn('User profile not found for ID:', userId, userError)
     }
+
+    const userName = userData?.nome || 'Usuário MD'
+    const userEmail = tokenData.email || userData?.email || 'contato@mdrepresentacoes.com'
+
 
     let accessToken = tokenData.access_token
 
