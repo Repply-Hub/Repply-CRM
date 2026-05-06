@@ -28,7 +28,7 @@ export function useGmail() {
       if (!user?.id) throw new Error('Usuário não autenticado');
       
       const { data, error } = await supabase.functions.invoke('gmail-auth-url', {
-        body: { userId: user.id },
+        body: { userId: user.id, timestamp: new Date().getTime() },
       });
 
       if (error) throw error;
