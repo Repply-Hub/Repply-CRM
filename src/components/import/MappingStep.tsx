@@ -205,8 +205,8 @@ export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): str
     if (/negocia|tratativa/.test(normalized)) return 'negociacao';
     if (/enviad|apresentad|proposta/.test(normalized)) return 'enviado';
     if (/elabora|orcamento|cotacao|andamento/.test(normalized)) return 'elaboracao';
-    if (/novo|lead/.test(normalized)) return 'novo_lead';
-    return normalized.replace(/\s+/g, '_') || undefined;
+    if (/novo|lead/.test(normalized)) return 'novo lead';
+    return normalized.replace(/\s+/g, ' ') || undefined;
   }
   return raw.replace(/\s+/g, ' ').trim() || undefined;
 }

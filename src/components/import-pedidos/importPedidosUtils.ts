@@ -143,7 +143,7 @@ const STATUS_RULES: Array<{ status: string; patterns: RegExp[] }> = [
   { status: 'negociacao', patterns: [/negocia/, /tratativa/] },
   { status: 'enviado', patterns: [/enviad/, /apresentad/, /proposta/] },
   { status: 'elaboracao', patterns: [/elabora/, /orcamento/, /cotacao/, /em andamento/] },
-  { status: 'novo_lead', patterns: [/novo lead/, /\blead\b/, /\bnovo\b/] },
+  { status: 'novo lead', patterns: [/novo lead/, /\blead\b/, /\bnovo\b/] },
 ];
 
 function normalizeText(value: unknown): string {
@@ -229,7 +229,7 @@ export function parseNumber(value: unknown): number {
 
 export function resolveImportedPedidoStatus(value: unknown): string {
   const normalized = normalizeText(value);
-  if (!normalized) return 'novo_lead';
+  if (!normalized) return 'novo lead';
 
   for (const rule of STATUS_RULES) {
     if (rule.patterns.some((pattern) => pattern.test(normalized))) {
@@ -237,7 +237,7 @@ export function resolveImportedPedidoStatus(value: unknown): string {
     }
   }
 
-  return 'novo_lead';
+  return 'novo lead';
 }
 
 export function detectImportPedidosMapping(

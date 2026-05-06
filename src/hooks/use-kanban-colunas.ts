@@ -29,9 +29,10 @@ function slugify(str: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 40) || `coluna_${Date.now()}`;
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40) || `coluna ${Date.now()}`;
 }
 
 export function useKanbanColunas() {
@@ -70,7 +71,7 @@ export function useCreateKanbanColuna() {
       let slug = baseSlug;
       let i = 2;
       while (slugs.has(slug)) {
-        slug = `${baseSlug}_${i++}`;
+        slug = `${baseSlug} ${i++}`;
       }
       const maxOrdem = (existentes ?? []).reduce((m, e) => Math.max(m, e.ordem), -1);
 

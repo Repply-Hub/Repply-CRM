@@ -41,7 +41,7 @@ const TAREFA_COLUMNS: ColumnDefinition[] = [
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: 'Pendente', className: 'bg-destructive/15 text-destructive border-destructive/30' },
-  em_andamento: { label: 'Em andamento', className: 'bg-warning/15 text-warning border-warning/30' },
+  'em andamento': { label: 'Em andamento', className: 'bg-warning/15 text-warning border-warning/30' },
   concluida: { label: 'Concluída', className: 'bg-success/15 text-success border-success/30' },
 };
 
@@ -264,7 +264,7 @@ export default function Tarefas() {
                 <SelectContent>
                   <SelectItem value="todos">Todos os status</SelectItem>
                   <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="em_andamento">Em andamento</SelectItem>
+                  <SelectItem value="em andamento">Em andamento</SelectItem>
                   <SelectItem value="concluida">Concluída</SelectItem>
                 </SelectContent>
               </Select>
@@ -464,7 +464,7 @@ export default function Tarefas() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pendente">Pendente</SelectItem>
-                    <SelectItem value="em_andamento">Em andamento</SelectItem>
+                    <SelectItem value="em andamento">Em andamento</SelectItem>
                     <SelectItem value="concluida">Concluída</SelectItem>
                   </SelectContent>
                 </Select>

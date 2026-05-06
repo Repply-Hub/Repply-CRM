@@ -83,7 +83,7 @@ export function MarcadoresMultiSelect({ value, onChange }: Props) {
     }
     const id = nome.toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      .replace(/[^a-z0-9]+/g, ' ').trim();
     if (!id) {
       toast.error('Nome inválido');
       return;
