@@ -472,7 +472,7 @@ export default function Obras() {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <HardHat className="h-5 w-5 text-primary" />
-                  <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-lg">{selectedObra.nome_obra}</span>
+                  <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{selectedObra.nome_obra}</span>
                 </DialogTitle>
               </DialogHeader>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
