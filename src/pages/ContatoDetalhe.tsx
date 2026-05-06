@@ -140,7 +140,7 @@ const ContatoDetalhe = () => {
             <User className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-lg">
+            <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">
               {contato.nome_contato}
             </h1>
             <div className="flex items-center gap-2">
