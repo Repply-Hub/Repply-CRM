@@ -1,11 +1,12 @@
 import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
 import * as XLSX from 'xlsx';
 
-export type FieldKey = 'negocio' | 'cliente' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'data_pedido';
+export type FieldKey = 'negocio' | 'cliente' | 'contato' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'data_pedido';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'negocio', label: 'Negócio', required: false },
   { key: 'cliente', label: 'Cliente', required: false },
+  { key: 'contato', label: 'Contato', required: false },
   { key: 'obra', label: 'Obra/Endereço', required: false },
   { key: 'fabricante', label: 'Fabricante', required: false },
   { key: 'valor', label: 'Valor', required: false },
