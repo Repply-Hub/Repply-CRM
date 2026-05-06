@@ -1032,7 +1032,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   <Clock className="h-3 w-3" /> Data do Pedido
                 </p>
                 <p className="text-sm font-medium">
-                  {selectedViewOrder.data_pedido ? format(new Date(selectedViewOrder.data_pedido), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                  {selectedViewOrder.data_pedido ? (() => {
+                    const dateParts = selectedViewOrder.data_pedido.split('-');
+                    return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                  })() : '-'}
                 </p>
               </div>
               {selectedViewOrder.prazo_resposta && (
