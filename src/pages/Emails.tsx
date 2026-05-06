@@ -245,7 +245,14 @@ const Emails = () => {
 
   return (
     <AppLayout title="E-mail" subtitle="Interface Gmail" mainClassName="flex-1 overflow-hidden p-0">
-      <Tabs defaultValue="received" className="flex flex-col h-full bg-background overflow-hidden">
+      <Tabs 
+        defaultValue="received" 
+        className="flex flex-col h-full bg-background overflow-hidden"
+        onValueChange={(val) => {
+          setActiveTab(val);
+          setSelectedIds([]);
+        }}
+      >
         {/* Header with Search and Tab Actions */}
         <div className="px-4 py-3 flex items-center justify-between gap-4 border-b bg-background/95 sticky top-0 z-10">
           <div className="flex items-center gap-4 flex-1">
