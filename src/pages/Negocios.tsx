@@ -78,6 +78,7 @@ const PedidoRow = memo(({
   onToggle, 
   onClick, 
   visibleColumns, 
+  columns,
   KANBAN_STAGES, 
   getLabel, 
   stageLabel 
@@ -87,6 +88,7 @@ const PedidoRow = memo(({
   onToggle: () => void, 
   onClick: () => void, 
   visibleColumns: string[],
+  columns: any[],
   KANBAN_STAGES: any[],
   getLabel: (id: string) => string,
   stageLabel: (status: string) => string
