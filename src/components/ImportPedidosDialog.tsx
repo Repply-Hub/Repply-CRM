@@ -587,7 +587,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         )}
 
         {step === 'mapping' && (
-          <div className="bg-background rounded-xl border shadow-sm overflow-hidden">
+          <div className="bg-muted/30 rounded-xl border border-border/50 shadow-sm overflow-hidden flex flex-col h-full animate-in fade-in zoom-in-95 duration-200">
             <MappingStep
               fileName={fileName}
               rawData={rawData}
