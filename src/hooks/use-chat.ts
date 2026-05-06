@@ -73,7 +73,7 @@ export function useChatMessages(grupoId: string | null = null, recipientId: stri
         event: 'INSERT', 
         schema: 'public', 
         table: 'chat_mensagens'
-      }, (payload) => {
+      }, async (payload) => {
         const newMsg = payload.new as any;
         
         // Verifica se a nova mensagem pertence ao canal atual
@@ -82,7 +82,29 @@ export function useChatMessages(grupoId: string | null = null, recipientId: stri
         const isCurrentDM = recipientId && (newMsg.recipient_id === recipientId || newMsg.usuario_id === recipientId);
 
         if (isCurrentGeral || isCurrentGrupo || isCurrentDM) {
+          // Tenta buscar as informações do vendedor para evitar o delay do invalidade
+          const { data: vendedor } = await supabase
+            .from('usuarios')
+            .select('id, nome, email, avatar_url')
+            .eq('id', newMsg.usuario_id)
+            .single();
+
+          const completeMsg = {
+            ...newMsg,
+            vendedor: vendedor || undefined
+          };
+
+          qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId], (old) => {
+            // Evita duplicados (caso o remetente receba seu próprio broadcast)
+            const exists = (old || []).some(m => m.id === completeMsg.id);
+            if (exists) return old;
+            return [...(old || []), completeMsg];
+          });
+
+          // Ainda invalidamos para garantir sincronia total, mas o setQueryData acima já atualizou a UI
           qc.invalidateQueries({ queryKey: ['chat_mensagens', grupoId, recipientId] });
+          qc.invalidateQueries({ queryKey: ['unread_chat_count'] });
+          qc.invalidateQueries({ queryKey: ['unread_chat_by_target'] });
         }
       })
       .subscribe();
