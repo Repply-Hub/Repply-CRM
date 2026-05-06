@@ -100,7 +100,8 @@ const PedidoRow = memo(({
       <TableCell className="w-10" onClick={e => e.stopPropagation()}>
         <Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Selecionar ${pedido.cliente?.empresa}`} />
       </TableCell>
-      {visibleColumns.map(colId => {
+      {columns.filter(col => visibleColumns.includes(col.id)).map(col => {
+        const colId = col.id;
         // Colunas padrão do sistema
         const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);
         
