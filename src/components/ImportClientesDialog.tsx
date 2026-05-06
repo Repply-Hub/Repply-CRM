@@ -612,18 +612,6 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           </div>
         )}
 
-            {importing && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
-                <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-primary">
-                  <span>Processando importação...</span>
-                  <span>{importProgress}%</span>
-                </div>
-                <Progress value={importProgress} className="h-1.5" />
-              </div>
-            )}
-          </div>
-        )}
-
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
 
         {step === 'upload' && (
