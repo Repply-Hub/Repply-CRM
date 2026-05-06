@@ -534,18 +534,45 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
         {step === 'upload' && (
           <div
-            className="border-2 border-dashed border-border rounded-xl p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
+            className="border-2 border-dashed border-border rounded-2xl p-16 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/[0.02] transition-all group relative overflow-hidden"
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
             onClick={() => fileRef.current?.click()}
           >
-            <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-            <p className="text-sm font-medium text-foreground mb-1">Arraste o arquivo aqui ou clique para selecionar</p>
-            <p className="text-xs text-muted-foreground mb-3">Formatos aceitos: .xlsx, .xls, .csv</p>
-            <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 max-w-md mx-auto text-left">
-              <p className="font-medium mb-1">Qualquer planilha é aceita!</p>
-              <p>Colunas que não existirem no sistema podem ser adicionadas como "novas" durante o mapeamento.</p>
+            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            
+            <div className="relative z-10">
+              <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-6 group-hover:scale-110 group-hover:bg-primary/10 transition-all duration-300">
+                <Upload className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Arraste seu arquivo aqui</h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
+                Ou clique para selecionar um arquivo <span className="font-semibold text-primary">.xlsx, .xls ou .csv</span> do seu computador
+              </p>
+              
+              <div className="flex flex-col gap-3 max-w-sm mx-auto">
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/50 text-left">
+                  <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center shrink-0 shadow-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-foreground">Detecção Inteligente</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">Mapeamos automaticamente as colunas da sua planilha.</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/50 text-left">
+                  <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center shrink-0 shadow-sm">
+                    <Plus className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-foreground">Campos Personalizados</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">Adicione informações extras que não existem no sistema.</span>
+                  </div>
+                </div>
+              </div>
             </div>
+
             <input
               ref={fileRef}
               type="file"
