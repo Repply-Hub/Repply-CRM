@@ -299,6 +299,17 @@ const Emails = () => {
                   <Trash2 className="h-4 w-4" />
                   Excluir
                 </Button>
+                {activeTab === "received" && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 text-primary hover:bg-primary/10 gap-2"
+                    onClick={() => bulkUpdateReadStatusMutation.mutate({ ids: selectedIds, lido: true })}
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    Lido
+                  </Button>
+                )}
                 <Button 
                   variant="ghost" 
                   size="sm" 
