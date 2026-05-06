@@ -885,7 +885,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             hasPipelineFilters && "border-primary/50 bg-primary/[0.02] text-primary"
           )}
         >
-          <Filter className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4" />
           <span className="hidden sm:inline">Filtros</span>
           {activeFilterCount > 0 && (
             <Badge variant="secondary" className="ml-1 h-5 min-w-[20px] px-1 bg-primary text-primary-foreground">
