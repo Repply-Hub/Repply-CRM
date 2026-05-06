@@ -875,14 +875,27 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   ), [allAvailableColumns, visibleColumns, setVisibleColumns, handleRename, handleTypeChange, handleReorder, handleAddColumn, handleRemoveColumn, showKanban, KANBAN_STAGES, visibleKanbanStages, toggleKanbanStage, handleKanbanStagesChange, setColunasDialogOpen, handleExportPdf, setImportOpen]);
 
   const filtrosPopover = useMemo(() => (
-    <FilterButton
-      hasFilters={hasPipelineFilters}
-      activeFilterCount={activeFilterCount}
-      onClear={clearPipelineFilters}
-
-      align="end"
-      popoverClassName="w-auto min-w-[820px] max-w-[980px] p-4"
-    >
+    <Popover modal={false}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] shadow-sm active:scale-[0.98]",
+            hasPipelineFilters && "border-primary/50 bg-primary/[0.02] text-primary"
+          )}
+        >
+          <Filter className="h-4 w-4" />
+          <span className="hidden sm:inline">Filtros</span>
+          {activeFilterCount > 0 && (
+            <Badge variant="secondary" className="ml-1 h-5 min-w-[20px] px-1 bg-primary text-primary-foreground">
+              {activeFilterCount}
+            </Badge>
+          )}
+          <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" sideOffset={8} className="w-auto min-w-[820px] max-w-[980px] p-4 shadow-2xl border-border/40 z-[50] bg-background">
       <div className="flex gap-0 divide-x divide-border">
         <div className="flex-1 min-w-[140px] pr-4">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Etapa</p>
