@@ -594,10 +594,28 @@ const Emails = () => {
                         className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''} ${!email.lido ? 'bg-muted/20' : ''}`}
                         onClick={async () => {
                           if (!email.lido) {
+                            // Atualiza localmente para feedback imediato
                             await supabase
                               .from("emails_recebidos")
                               .update({ lido: true })
                               .eq("id", email.id);
+                            
+                            // Tenta atualizar no Gmail também se tiver o hook configurado
+                            try {
+                              const { data: { session } } = await supabase.auth.getSession();
+                              if (session?.access_token && email.gmail_message_id) {
+                                await supabase.functions.invoke('gmail-sync-inbox', {
+                                  method: 'POST',
+                                  body: { 
+                                    action: 'mark_as_read', 
+                                    messageId: email.gmail_message_id 
+                                  }
+                                });
+                              }
+                            } catch (e) {
+                              console.error("Erro ao sincronizar status de lido com Gmail:", e);
+                            }
+
                             queryClient.invalidateQueries({ queryKey: ["received_emails"] });
                           }
                           
