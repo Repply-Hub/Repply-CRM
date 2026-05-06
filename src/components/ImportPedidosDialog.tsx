@@ -359,7 +359,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       }
 
       // Função auxiliar para buscar todas as linhas (contornando o limite de 1000 do Supabase)
-      const fetchAll = async (table: string, columns: string) => {
+      const fetchAll = async (table: any, columns: string) => {
         let allData: any[] = [];
         let from = 0;
         const limit = 1000;
@@ -367,9 +367,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         while (hasMore) {
           const { data, error } = await supabase.from(table).select(columns).range(from, from + limit - 1);
           if (error) throw error;
-          allData = [...allData, ...data];
-          hasMore = data.length === limit;
-          from += limit;
+          if (!data || data.length === 0) {
+            hasMore = false;
+          } else {
+            allData = [...allData, ...data];
+            hasMore = data.length === limit;
+            from += limit;
+          }
         }
         return allData;
       };
