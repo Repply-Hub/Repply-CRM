@@ -44,6 +44,7 @@ import { SearchWithRecent } from '@/components/SearchWithRecent';
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'negocio', label: 'Negócio', locked: false },
   { id: 'cliente', label: 'Cliente', locked: false },
+  { id: 'contato', label: 'Contato', locked: false },
   { id: 'obra', label: 'Obra', locked: false },
   { id: 'fabricante', label: 'Fabricante', locked: false },
   { id: 'valor', label: 'Valor', locked: false },
