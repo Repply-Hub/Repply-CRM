@@ -41,8 +41,8 @@ export function MapaObras({ obras, isLoading, searchTerm = '' }: MapaObrasProps)
     [items]
   );
 
-  const obrasSemEndereco = useMemo(
-    () => items.filter((o) => !o.endereco_entrega),
+  const obrasSemLocalizacao = useMemo(
+    () => items.filter((o) => !o.endereco_entrega && !o.nome_obra),
     [items]
   );
 
