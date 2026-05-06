@@ -202,7 +202,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         fabricante: rest.fabricante || '',
         valor: typeof rest.valor === 'number' ? rest.valor : 0,
         vendedor: rest.vendedor || '',
-        status: rest.status || 'novo_lead',
+        status: rest.status || 'novo lead',
         data_pedido: rest.data_pedido || undefined,
         observacoes: rest.observacoes || '',
         campos_extras: campos_extras || {}
