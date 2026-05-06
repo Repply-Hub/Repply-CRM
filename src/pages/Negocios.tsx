@@ -694,7 +694,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <Button
           variant="outline"
           size="sm"
-          className="h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/[0.06] data-[state=open]:text-primary data-[state=open]:border-primary/60 shadow-sm active:scale-[0.98]"
+          className="h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/10 data-[state=open]:text-primary data-[state=open]:border-primary/50 shadow-sm active:scale-[0.98]"
         >
           <Settings2 className="h-4 w-4 text-muted-foreground" />
           <span className="hidden sm:inline">Opções</span>
