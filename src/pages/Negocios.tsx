@@ -1014,12 +1014,76 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </div>
               </button>
             </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-56 p-3 shadow-xl border-border/40 bg-background z-[60]">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filtros de Atenção</p>
-              <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
-                Atenção (7+ dias)
-              </label>
+            <PopoverContent side="left" align="start" sideOffset={10} className="w-64 p-4 shadow-xl border-border/40 bg-background z-[60]">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <CalendarIcon className="h-3 w-3" /> Data Início
+                  </p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "w-full justify-start text-left font-normal h-9",
+                          !dateFrom && "text-muted-foreground"
+                        )}
+                      >
+                        {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Selecione..."}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateFrom}
+                        onSelect={setDateFrom}
+                        initialFocus
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <CalendarIcon className="h-3 w-3" /> Data Final
+                  </p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "w-full justify-start text-left font-normal h-9",
+                          !dateTo && "text-muted-foreground"
+                        )}
+                      >
+                        {dateTo ? format(dateTo, "dd/MM/yyyy") : "Selecione..."}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateTo}
+                        onSelect={setDateTo}
+                        initialFocus
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="h-px bg-border/50 my-1" />
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Filtros de Atenção</p>
+                  <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                    <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
+                    Atenção (7+ dias)
+                  </label>
+                </div>
+              </div>
             </PopoverContent>
           </Popover>
 
