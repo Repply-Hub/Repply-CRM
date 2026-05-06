@@ -66,14 +66,8 @@ serve(async (req) => {
         .eq('user_id', userId)
     }
 
-    // Remove external images/logos from HTML and prepare plain text version
-    const cleanHtml = body.replace(/<img[^>]*src=["']https:\/\/ukwwhwytyovrzefkdeyj\.supabase\.co\/storage\/v1\/object\/public\/[^"']*["'][^>]*>/gi, '')
-      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, (match: string) => {
-        return `<header style="padding: 20px 0; border-bottom: 1px solid #eee; margin-bottom: 20px;">
-          <h2 style="color: #333; margin: 0;">MD Representações</h2>
-        </header>`
-      });
-
+    // Prepare clean HTML and plain text version
+    const cleanHtml = body;
     const plainText = body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     
     // Prepare RFC 2822 message as multipart/alternative
