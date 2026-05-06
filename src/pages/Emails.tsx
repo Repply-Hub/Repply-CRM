@@ -50,6 +50,7 @@ const Emails = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [emailToDelete, setEmailToDelete] = useState<{ id: string; type: "sent" | "received" } | null>(null);
   const { isConnected, connectedEmail, sendEmail } = useGmail();
   const [formData, setFormData] = useState({ 
     destinatario: "", 
