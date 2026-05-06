@@ -63,7 +63,19 @@ export function MapaObras({ obras, isLoading, searchTerm = '', selectedObraId }:
   }, []);
 
   useEffect(() => {
-    if (map && searchTerm && searchTerm.trim().length > 3) {
+    if (!map) return;
+
+    if (selectedObraId) {
+      const obraMatch = obrasComCoord.find(o => o.id === selectedObraId);
+      if (obraMatch) {
+        map.setCenter({ lat: obraMatch.latitude!, lng: obraMatch.longitude! });
+        map.setZoom(17);
+        setSelectedObra(obraMatch);
+        return;
+      }
+    }
+
+    if (searchTerm && searchTerm.trim().length > 3) {
       const geocoder = new google.maps.Geocoder();
       // First try to find among existing obras
       const obraMatch = obrasComCoord.find(o => 
@@ -86,7 +98,7 @@ export function MapaObras({ obras, isLoading, searchTerm = '', selectedObraId }:
         }
       });
     }
-  }, [map, searchTerm, obrasComCoord]);
+  }, [map, searchTerm, obrasComCoord, selectedObraId]);
 
   if (isLoading || !isLoaded) {
     return (
