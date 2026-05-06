@@ -512,12 +512,6 @@ export default function Obras() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <FileText className="h-3 w-3" /> CNPJ / SPE
-                    </Label>
-                    <p className="text-sm font-medium">{selectedObra.spe_cnpj || '—'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <Calendar className="h-3 w-3" /> Data de Cadastro
                     </Label>
                     <p className="text-sm font-medium">
