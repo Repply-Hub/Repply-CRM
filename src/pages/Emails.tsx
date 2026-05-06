@@ -16,7 +16,7 @@ import {
   PenBox,
   Trash2,
   MoreVertical,
-  Activity,
+  
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -255,43 +255,6 @@ const Emails = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-10 gap-2 border-primary/20 hover:bg-primary/5 text-primary"
-              onClick={async () => {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (!session) return;
-                
-                const promise = fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmail-debug`, {
-                  headers: {
-                    Authorization: `Bearer ${session.access_token}`,
-                  },
-                }).then(res => res.json());
-
-                toast.promise(promise, {
-                  loading: 'Executando diagnóstico...',
-                  success: (data) => {
-                    return (
-                      <div className="space-y-1 text-xs">
-                        <div className="font-bold text-sm mb-1">Resultado do Diagnóstico:</div>
-                        <p>Token: {data.tem_token ? "✅" : "❌"}</p>
-                        <p>Expirado: {data.token_expirado ? "⚠️ Sim" : "✅ Não"}</p>
-                        <p>Email: {data.email_conectado || "N/A"}</p>
-                        <p>Status API: {data.gmail_profile_status || "N/A"}</p>
-                        <p>Msgs na INBOX: {data.mensagens_encontradas}</p>
-                        <p>Registros na Tabela: {data.emails_recebidos_na_tabela}</p>
-                        {data.erro && <p className="text-red-500 font-bold">Erro: {data.erro}</p>}
-                      </div>
-                    );
-                  },
-                  error: 'Falha ao executar diagnóstico',
-                });
-              }}
-            >
-              <Activity className="h-4 w-4" />
-              Diagnóstico
-            </Button>
             <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
               <DialogTrigger asChild>
                 <Button className="h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm gap-2 text-sm font-bold px-4 transition-all">
