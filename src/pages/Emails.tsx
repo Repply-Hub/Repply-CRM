@@ -183,9 +183,17 @@ const Emails = () => {
 
   const deleteEmailMutation = useMutation({
     mutationFn: async ({ id, type }: { id: string; type: "sent" | "received" }) => {
-      const table = type === "sent" ? "emails" : "emails_recebidos";
-      const { error } = await supabase.from(table).delete().eq("id", id);
-      if (error) throw error;
+      if (type === "sent") {
+        const { error } = await supabase.from("emails").delete().eq("id", id);
+        if (error) throw error;
+      } else {
+        // Para recebidos, usamos exclusão lógica para evitar que o sync traga de volta
+        const { error } = await supabase
+          .from("emails_recebidos")
+          .update({ excluido: true })
+          .eq("id", id);
+        if (error) throw error;
+      }
     },
     onSuccess: (_, variables) => {
       toast.success("E-mail excluído com sucesso");
@@ -201,9 +209,17 @@ const Emails = () => {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async ({ ids, type }: { ids: string[]; type: "sent" | "received" }) => {
-      const table = type === "sent" ? "emails" : "emails_recebidos";
-      const { error } = await supabase.from(table).delete().in("id", ids);
-      if (error) throw error;
+      if (type === "sent") {
+        const { error } = await supabase.from("emails").delete().in("id", ids);
+        if (error) throw error;
+      } else {
+        // Para recebidos, usamos exclusão lógica
+        const { error } = await supabase
+          .from("emails_recebidos")
+          .update({ excluido: true })
+          .in("id", ids);
+        if (error) throw error;
+      }
     },
     onSuccess: (_, variables) => {
       toast.success(`${variables.ids.length} e-mail(s) excluído(s) com sucesso`);
