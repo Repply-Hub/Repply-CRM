@@ -563,24 +563,40 @@ const Emails = () => {
               )}
             </div>
           </div>
-          <div className="p-4 border-t bg-muted/5 flex justify-end gap-2">
-            <Button variant="outline" className="rounded-full px-6" onClick={() => setSelectedEmail(null)}>
-              Fechar
-            </Button>
+          <div className="p-4 border-t bg-muted/5 flex justify-between gap-2">
             <Button 
-              className="rounded-full px-6 gap-2"
+              variant="ghost" 
+              className="rounded-full px-4 text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2"
               onClick={() => {
-                setFormData({
-                  ...formData,
-                  destinatario: selectedEmail?.remetente || selectedEmail?.destinatario,
-                  assunto: `Re: ${selectedEmail?.assunto}`
-                });
-                setSelectedEmail(null);
-                setIsComposeOpen(true);
+                if (confirm("Deseja realmente excluir este e-mail?")) {
+                  deleteEmailMutation.mutate({ 
+                    id: selectedEmail.id, 
+                    type: selectedEmail.type || (selectedEmail.criado_em ? "received" : "sent") 
+                  });
+                }
               }}
             >
-              <History className="h-4 w-4" /> Responder
+              <Trash2 className="h-4 w-4" /> Excluir
             </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="rounded-full px-6" onClick={() => setSelectedEmail(null)}>
+                Fechar
+              </Button>
+              <Button 
+                className="rounded-full px-6 gap-2"
+                onClick={() => {
+                  setFormData({
+                    ...formData,
+                    destinatario: selectedEmail?.remetente || selectedEmail?.destinatario,
+                    assunto: `Re: ${selectedEmail?.assunto}`
+                  });
+                  setSelectedEmail(null);
+                  setIsComposeOpen(true);
+                }}
+              >
+                <History className="h-4 w-4" /> Responder
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
