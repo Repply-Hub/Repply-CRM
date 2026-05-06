@@ -216,6 +216,7 @@ export function useSendMessage() {
             created_at: new Date().toISOString(),
             grupo_id: grupoId || null,
             recipient_id: recipientId || null,
+            lida: false,
             vendedor: myVendedor ? {
               id: myVendedor.id,
               nome: myVendedor.nome,
@@ -236,6 +237,7 @@ export function useSendMessage() {
               arquivo_url: URL.createObjectURL(file),
               arquivo_nome: file.name,
               arquivo_tipo: file.type,
+              lida: false,
               vendedor: myVendedor ? {
                 id: myVendedor.id,
                 nome: myVendedor.nome,
