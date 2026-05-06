@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useDeferredValue, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { parse, isValid } from 'date-fns';
+import { parse, isValid, startOfDay, endOfDay, parseISO } from 'date-fns';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
@@ -436,11 +436,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         const days = Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000);
         if (days < 7) return false;
       }
-      if (dateFrom && new Date(p.data_pedido) < dateFrom) return false;
-      if (dateTo) {
-        const end = new Date(dateTo);
-        end.setHours(23, 59, 59, 999);
-        if (new Date(p.data_pedido) > end) return false;
+      if (p.data_pedido) {
+        const pedidoDate = parseISO(p.data_pedido);
+        if (dateFrom && startOfDay(pedidoDate) < startOfDay(dateFrom)) return false;
+        if (dateTo && startOfDay(pedidoDate) > endOfDay(dateTo)) return false;
+      } else if (dateFrom || dateTo) {
+        // Se tem filtro de data mas o pedido não tem data, oculta
+        return false;
       }
       return true;
     });
@@ -497,11 +499,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       if (selectedVendedores.length > 0 && !selectedVendedores.includes(o.vendedorId)) return false;
       if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(o.fabricanteId)) return false;
       if (showOnlyAttention && o.daysInStage < o.alertDays) return false;
-      if (dateFrom && new Date(o.createdAt) < dateFrom) return false;
-      if (dateTo) {
-        const end = new Date(dateTo);
-        end.setHours(23, 59, 59, 999);
-        if (new Date(o.createdAt) > end) return false;
+      if (o.createdAt) {
+        const pedidoDate = parseISO(o.createdAt);
+        if (dateFrom && startOfDay(pedidoDate) < startOfDay(dateFrom)) return false;
+        if (dateTo && startOfDay(pedidoDate) > endOfDay(dateTo)) return false;
+      } else if (dateFrom || dateTo) {
+        return false;
       }
       if (q) {
         const clientName = (o.clientName || '').toLowerCase();
@@ -1014,12 +1017,76 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </div>
               </button>
             </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-56 p-3 shadow-xl border-border/40 bg-background z-[60]">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filtros de Atenção</p>
-              <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
-                Atenção (7+ dias)
-              </label>
+            <PopoverContent side="left" align="start" sideOffset={10} className="w-64 p-4 shadow-xl border-border/40 bg-background z-[60]">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <CalendarIcon className="h-3 w-3" /> Data Início
+                  </p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "w-full justify-start text-left font-normal h-9",
+                          !dateFrom && "text-muted-foreground"
+                        )}
+                      >
+                        {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Selecione..."}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateFrom}
+                        onSelect={setDateFrom}
+                        initialFocus
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <CalendarIcon className="h-3 w-3" /> Data Final
+                  </p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "w-full justify-start text-left font-normal h-9",
+                          !dateTo && "text-muted-foreground"
+                        )}
+                      >
+                        {dateTo ? format(dateTo, "dd/MM/yyyy") : "Selecione..."}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateTo}
+                        onSelect={setDateTo}
+                        initialFocus
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="h-px bg-border/50 my-1" />
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Filtros de Atenção</p>
+                  <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                    <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
+                    Atenção (7+ dias)
+                  </label>
+                </div>
+              </div>
             </PopoverContent>
           </Popover>
 
