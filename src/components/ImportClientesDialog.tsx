@@ -613,8 +613,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         )}
 
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-
-        {step === 'upload' && (
+          {step === 'upload' && (
           <div
             className="border-2 border-dashed border-border rounded-xl p-10 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
             onDragOver={(e) => e.preventDefault()}
