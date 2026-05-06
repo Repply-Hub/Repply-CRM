@@ -496,7 +496,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
   const stageLabel = (s: string) => {
     const labels: Record<string, string> = {
-      novo_lead: 'Novo Lead', elaboracao: 'Elaboração', enviado: 'Enviado',
+      'novo lead': 'Novo Lead', elaboracao: 'Elaboração', enviado: 'Enviado',
       negociacao: 'Negociação', fechamento: 'Fechamento',
     };
     return labels[s] || s;
