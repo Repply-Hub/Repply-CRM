@@ -264,7 +264,7 @@ export default function Tarefas() {
                 <SelectContent>
                   <SelectItem value="todos">Todos os status</SelectItem>
                   <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="em_andamento">Em andamento</SelectItem>
+                  <SelectItem value="em andamento">Em andamento</SelectItem>
                   <SelectItem value="concluida">Concluída</SelectItem>
                 </SelectContent>
               </Select>
