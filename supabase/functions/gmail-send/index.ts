@@ -19,15 +19,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get tokens from DB
+    // Get tokens and user info from DB
     const { data: tokenData, error: tokenError } = await supabaseClient
       .from('gmail_tokens')
-      .select('*')
+      .select('*, usuarios(nome, email)')
       .eq('user_id', userId)
       .single()
 
     if (tokenError || !tokenData) {
       throw new Error('Gmail integration not found for user')
+    }
+
+    const userData = tokenData.usuarios as any;
+    if (!userData) {
+      throw new Error('User profile not found')
     }
 
     let accessToken = tokenData.access_token
