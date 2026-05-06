@@ -163,7 +163,10 @@ const PedidoRow = memo(({
             return (
               <TableCell key={colId} className="whitespace-nowrap px-4">
                 {pedido.prazo_resposta 
-                  ? format(parse(pedido.prazo_resposta, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR }) 
+                  ? (() => {
+                    const dateParts = pedido.prazo_resposta.split('-');
+                    return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                  })()
                   : '—'}
               </TableCell>
             );
