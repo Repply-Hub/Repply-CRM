@@ -71,7 +71,7 @@ export function useCreateKanbanColuna() {
       let slug = baseSlug;
       let i = 2;
       while (slugs.has(slug)) {
-        slug = `${baseSlug}_${i++}`;
+        slug = `${baseSlug} ${i++}`;
       }
       const maxOrdem = (existentes ?? []).reduce((m, e) => Math.max(m, e.ordem), -1);
 
