@@ -132,6 +132,12 @@ const PedidoRow = memo(({
             );
           case 'cliente':
             return <TableCell key={colId} className="font-medium whitespace-nowrap px-4">{pedido.cliente?.empresa ?? '-'}</TableCell>;
+          case 'contato':
+            return (
+              <TableCell key={colId} className="whitespace-nowrap px-4">
+                {camposExtras['Contato'] || '—'}
+              </TableCell>
+            );
           case 'obra':
             return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.obra?.nome_obra ?? pedido.endereco_entrega ?? '-'}</TableCell>;
           case 'fabricante':
