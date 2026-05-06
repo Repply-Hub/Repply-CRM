@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { 
   Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, 
-  LayoutGrid, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2
+  LayoutGrid, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2,
+  FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
