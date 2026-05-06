@@ -684,26 +684,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                   ))}
                 </TableBody>
               </Table>
-              {previewRows.length > 50 && (
-                <p className="text-xs text-muted-foreground text-center py-2">
-                  Mostrando 50 de {previewRows.length} registros
-                </p>
-              )}
-            </div>
-
-            {importing && (
-              <div className="space-y-2 py-4">
-                <div className="flex justify-between text-xs font-medium">
-                  <span>Processando importação...</span>
-                  <span>{importProgress}%</span>
-                </div>
-                <Progress value={importProgress} className="h-2" />
-                <p className="text-[10px] text-muted-foreground text-center">
-                  Não feche esta janela até a conclusão
-                </p>
-              </div>
-            )}
-
             </div>
 
             {importing && (
