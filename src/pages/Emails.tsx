@@ -101,11 +101,16 @@ const Emails = () => {
 
       const { data, error } = await supabase
         .from("emails_recebidos")
-        .select("*")
+        .select("id, lido, criado_em, user_id, data_recebimento, corpo_html, gmail_message_id, remetente, destinatarios, assunto")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("criado_em", { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao buscar e-mails recebidos:", error);
+        throw error;
+      }
+      
+      console.log(`Query e-mails recebidos retornou ${data?.length || 0} registros para o usuário ${user.id}`);
       return data;
     },
   });
