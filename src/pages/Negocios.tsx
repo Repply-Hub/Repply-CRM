@@ -1044,7 +1044,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     <CalendarIcon className="h-3 w-3" /> Data de Fechamento
                   </p>
                   <p className="text-sm font-medium">
-                    {format(parse(selectedViewOrder.prazo_resposta, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy', { locale: ptBR })}
+                    {(() => {
+                      const dateParts = selectedViewOrder.prazo_resposta.split('-');
+                      return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                    })()}
                   </p>
                 </div>
               )}
