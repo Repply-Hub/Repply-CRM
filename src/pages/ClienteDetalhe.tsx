@@ -476,7 +476,11 @@ const ClienteDetalhe = () => {
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2">
               {cliente.obras && cliente.obras.map((obra: any) => (
-                <div key={obra.id} className="rounded-lg border border-border p-3">
+                <div 
+                  key={obra.id} 
+                  className="rounded-lg border border-border p-3 cursor-pointer hover:bg-muted/50 hover:border-primary/30 transition-all"
+                  onClick={() => navigate('/obras', { state: { selectedObraId: obra.id } })}
+                >
                   <p className="text-sm font-medium text-foreground">{obra.nome_obra}</p>
                   {obra.endereco_entrega && (
                     <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">

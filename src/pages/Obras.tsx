@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useObras } from '@/hooks/use-obras';
 import { useStatusObras } from '@/hooks/use-status-obras';
@@ -59,6 +59,7 @@ type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
 
 export default function Obras() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: obras, isLoading } = useObras();
   const { data: clientes } = useClientes();
   const createObra = useCreateObra();
@@ -100,6 +101,18 @@ export default function Obras() {
       setNewObra(prev => ({ ...prev, status: statusObras[0].slug }));
     }
   }, [statusObras, newObra.status]);
+
+  useEffect(() => {
+    const state = location.state as { selectedObraId?: string } | null;
+    if (state?.selectedObraId && obras) {
+      const obra = obras.find(o => o.id === state.selectedObraId);
+      if (obra) {
+        setSelectedObra(obra);
+        // Limpa o estado para não reabrir ao navegar de volta
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [location.state, obras, navigate, location.pathname]);
 
   const {
     columns,
