@@ -13,9 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { 
   Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, 
-  LayoutGrid, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2
+  LayoutGrid, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2,
+  FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -365,14 +367,7 @@ export default function Obras() {
                             {visibleColumns.map(colId => (
                               <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
                                 {colId === 'nome_obra' && (
-                                  <span 
-                                    className="font-medium text-foreground hover:text-primary transition-colors"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSearch(obra.nome_obra);
-                                      setActiveTab('mapa');
-                                    }}
-                                  >
+                                  <span className="font-medium text-foreground">
                                     {obra.nome_obra}
                                   </span>
                                 )}
@@ -457,65 +452,75 @@ export default function Obras() {
           onOpenChange={setStatusDialogOpen} 
         />
 
-        {/* Obra Details/Edit Dialog */}
-        <Dialog open={!!selectedObra} onOpenChange={(open) => !open && setSelectedObra(null)}>
+        {/* Obra Details Sheet (Lateral) */}
+        <Sheet open={!!selectedObra} onOpenChange={(open) => !open && setSelectedObra(null)}>
           {selectedObra && (
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <HardHat className="h-5 w-5 text-primary" />
-                  <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{selectedObra.nome_obra}</span>
-                </DialogTitle>
-              </DialogHeader>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-xs text-muted-foreground uppercase">Cliente</Label>
+            <SheetContent className="sm:max-w-xl overflow-y-auto">
+              <SheetHeader className="pb-6 border-b">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <SheetTitle className="flex items-center gap-2">
+                      <HardHat className="h-5 w-5 text-primary" />
+                      <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{selectedObra.nome_obra}</span>
+                    </SheetTitle>
+                    <SheetDescription>
+                      Detalhes da obra vinculada ao cliente.
+                    </SheetDescription>
+                  </div>
+                  <Badge variant={getStatusInfo(selectedObra.status).variant}>
+                    {getStatusInfo(selectedObra.status).label}
+                  </Badge>
+                </div>
+              </SheetHeader>
+
+              <div className="py-6 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Building2 className="h-3 w-3" /> Cliente
+                    </Label>
                     <p 
-                      className="font-medium hover:text-primary transition-colors cursor-pointer"
+                      className="text-sm font-medium hover:text-primary transition-colors cursor-pointer"
                       onClick={() => navigate(`/clientes/${selectedObra.cliente_id}`)}
                     >
                       {selectedObra.clientes?.empresa || '—'}
                     </p>
                   </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground uppercase">Endereço de Entrega</Label>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <MapPin className="h-3 w-3" /> Endereço de Entrega
+                    </Label>
                     <p 
-                      className="font-medium flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+                      className="text-sm font-medium flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
                       onClick={() => {
                         if (selectedObra.endereco_entrega) {
                           window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedObra.endereco_entrega)}`, '_blank');
                         }
                       }}
                     >
-                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
                       {selectedObra.endereco_entrega || '—'}
                     </p>
                   </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground uppercase">CNPJ / SPE</Label>
-                    <p className="font-medium">{selectedObra.spe_cnpj || '—'}</p>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <FileText className="h-3 w-3" /> CNPJ / SPE
+                    </Label>
+                    <p className="text-sm font-medium">{selectedObra.spe_cnpj || '—'}</p>
                   </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-xs text-muted-foreground uppercase">Status Atual</Label>
-                    <div className="pt-1">
-                      <Badge variant={getStatusInfo(selectedObra.status).variant}>
-                        {getStatusInfo(selectedObra.status).label}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground uppercase">Data de Cadastro</Label>
-                    <p className="font-medium flex items-center gap-1 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3" /> Data de Cadastro
+                    </Label>
+                    <p className="text-sm font-medium">
                       {format(new Date(selectedObra.created_at), "dd/MM/yyyy 'às' HH:mm")}
                     </p>
                   </div>
                 </div>
+
+                {/* Você pode adicionar mais seções aqui futuramente, como histórico ou pedidos vinculados */}
               </div>
-              <DialogFooter>
+
+              <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
                 <div className="flex w-full justify-between items-center">
                   <Button 
                     variant="ghost" 
@@ -526,7 +531,7 @@ export default function Obras() {
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
-                    Excluir Obra
+                    Excluir
                   </Button>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setSelectedObra(null)}>Fechar</Button>
@@ -541,13 +546,13 @@ export default function Obras() {
                       });
                       setEditDialogOpen(true);
                       setSelectedObra(null);
-                    }}>Editar Informações</Button>
+                    }}>Editar</Button>
                   </div>
                 </div>
-              </DialogFooter>
-            </DialogContent>
+              </SheetFooter>
+            </SheetContent>
           )}
-        </Dialog>
+        </Sheet>
 
         {/* Edit Obra Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
