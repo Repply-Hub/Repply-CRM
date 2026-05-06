@@ -44,6 +44,7 @@ import { SearchWithRecent } from '@/components/SearchWithRecent';
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'negocio', label: 'Negócio', locked: false },
   { id: 'cliente', label: 'Cliente', locked: false },
+  { id: 'contato', label: 'Contato', locked: false },
   { id: 'obra', label: 'Obra', locked: false },
   { id: 'fabricante', label: 'Fabricante', locked: false },
   { id: 'valor', label: 'Valor', locked: false },
@@ -131,6 +132,12 @@ const PedidoRow = memo(({
             );
           case 'cliente':
             return <TableCell key={colId} className="font-medium whitespace-nowrap px-4">{pedido.cliente?.empresa ?? '-'}</TableCell>;
+          case 'contato':
+            return (
+              <TableCell key={colId} className="whitespace-nowrap px-4">
+                {camposExtras['Contato'] || '—'}
+              </TableCell>
+            );
           case 'obra':
             return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.obra?.nome_obra ?? pedido.endereco_entrega ?? '-'}</TableCell>;
           case 'fabricante':

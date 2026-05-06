@@ -115,11 +115,24 @@ function autoDetectMapping(headers: string[], fields: { key: FieldKey; label: st
 
 function autoDetectExtras(headers: string[], mappedHeaders: Iterable<string>) {
   const used = new Set(mappedHeaders);
-  const extraRules = [/^criado\s*por$/, /^created\s*by$/, /vendedor/, /responsavel\s*cadastro/, /origem/, /observacoes/, /obs/, /nota/, /setor/, /departamento/];
+  const extraRules = [/^criado\s*por$/, /^created\s*by$/, /vendedor/, /responsavel\s*cadastro/, /origem/, /setor/, /departamento/];
+  const observationsRules = [/observacoes/, /obs/, /nota/, /observacao/];
+  
   return headers.reduce<Record<string, string>>((acc, header) => {
     if (used.has(header)) return acc;
     const norm = normalizeText(header);
-    if (extraRules.some(rule => rule.test(norm))) acc[header] = header.trim();
+    
+    // Prioriza regras normais
+    if (extraRules.some(rule => rule.test(norm))) {
+      acc[header] = header.trim();
+    } 
+    // Regras de observações (usando \b para evitar conflito com contato)
+    else if (observationsRules.some(rule => rule.test(norm))) {
+      // Se a regra for /nota/, usamos \b para ser exato
+      if (norm.includes('nota') && !/\bnota\b/.test(norm)) return acc;
+      acc[header] = header.trim();
+    }
+    
     return acc;
   }, {});
 }
