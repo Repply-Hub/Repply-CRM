@@ -123,7 +123,7 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
     setItems(obras);
 
     const pendentes = obras.filter(
-      (o) => !!o.endereco_entrega && (o.latitude === null || o.longitude === null) && !o.geocoded_at
+      (o) => (!!o.endereco_entrega || !!o.nome_obra) && (o.latitude === null || o.longitude === null) && !o.geocoded_at
     );
     
     console.log('[useGeocodeObras] Obras pendentes:', pendentes.length);
@@ -138,7 +138,8 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
       for (let i = 0; i < pendentes.length; i++) {
         if (cancelado) break;
         const obra = pendentes[i];
-        const coord = await geocodificar(obra.endereco_entrega!);
+        const enderecoBusca = obra.endereco_entrega || obra.nome_obra;
+        const coord = await geocodificar(enderecoBusca);
         if (cancelado) break;
 
         if (coord) {
