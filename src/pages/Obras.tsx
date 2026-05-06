@@ -454,9 +454,6 @@ export default function Obras() {
                       Detalhes da obra vinculada ao cliente.
                     </SheetDescription>
                   </div>
-                  <Badge variant={getStatusInfo(selectedObra.status).variant}>
-                    {getStatusInfo(selectedObra.status).label}
-                  </Badge>
                 </div>
               </SheetHeader>
 
@@ -499,7 +496,12 @@ export default function Obras() {
                         <p className="text-[10px] text-muted-foreground mt-1 italic">Endereço não informado</p>
                       )}
                     </div>
-                  </div>
+                      <div className="mt-3">
+                        <Badge variant={getStatusInfo(selectedObra.status).variant}>
+                          {getStatusInfo(selectedObra.status).label}
+                        </Badge>
+                      </div>
+                    </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <Calendar className="h-3 w-3" /> Data de Cadastro
