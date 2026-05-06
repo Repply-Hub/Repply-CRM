@@ -852,7 +852,7 @@ const Clientes = () => {
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
                     {visibleColumns.map(colId => (
-                      <th key={colId} className="text-left py-2.5 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap uppercase tracking-wider">
+                      <th key={colId} className="text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap">
                         {getLabel(colId)}
                       </th>
                     ))}
@@ -953,7 +953,7 @@ const Clientes = () => {
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
                     {visibleColumns.map(colId => (
-                      <th key={colId} className="text-left py-2.5 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap uppercase tracking-wider">
+                      <th key={colId} className="text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap">
                         {getLabel(colId)}
                       </th>
                     ))}
