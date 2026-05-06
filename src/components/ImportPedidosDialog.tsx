@@ -194,10 +194,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     return (sanitized as any[]).map(item => {
       const { campos_extras, ...rest } = item;
       return {
-        cliente: rest.cliente || '',
-        fabricante: rest.fabricante || '',
-        obra: rest.obra || '',
         negocio: rest.negocio || '',
+        cliente: rest.cliente || '',
+        contato: rest.contato || '',
+        obra: rest.obra || '',
+        fabricante: rest.fabricante || '',
         valor: typeof rest.valor === 'number' ? rest.valor : 0,
         vendedor: rest.vendedor || '',
         status: rest.status || 'novo_lead',
