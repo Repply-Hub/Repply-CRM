@@ -704,6 +704,21 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               </div>
             )}
 
+            </div>
+
+            {importing && (
+              <div className="space-y-2 py-4">
+                <div className="flex justify-between text-xs font-medium">
+                  <span>Processando importação...</span>
+                  <span>{importProgress}%</span>
+                </div>
+                <Progress value={importProgress} className="h-2" />
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Não feche esta janela até a conclusão
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
               <Button onClick={handleImport} disabled={importing}>
@@ -716,6 +731,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             </div>
           </div>
         )}
+        </div>
       </DialogContent>
     </Dialog>
   );
