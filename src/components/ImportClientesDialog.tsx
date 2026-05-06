@@ -62,7 +62,7 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   tipo: [/^tipo$/, /segmento/, /segemento/, /segmento\s*de\s*atuacao/, /segemento\s*de\s*atuacao/, /categoria/],
   cnpj: [/^cnpj$/, /^cpf$/, /cpf.*cnpj/, /cnpj/, /cpf/],
   email: [/^e-?mail$/, /mail/],
-  telefone: [/^telefone$/, /^telefone\s*de\s*trabalho$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/],
+  telefone: [/^telefone$/, /^telefone\s*de\s*trabalho$/, /^fone$/, /^celular$/, /^tel$/, /telefone/, /celular/, /fone/, /\btel\b/, /^contato$/],
   logradouro: [/^logradouro$/, /^rua$/, /logradouro/, /rua/, /address/, /endereco/],
   numero: [/^numero$/, /numero/, /number/, /num/],
   complemento: [/^complemento$/, /complemento/],
@@ -72,9 +72,9 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   cep: [/^cep$/, /cep/, /zip/, /postcode/],
   nome_contato: [
     /^nome$/, /^nome\s*completo$/, /^primeiro\s*nome$/, /^first\s*name$/, /^full\s*name$/, /^nome\s*proprio$/,
-    /^contato$/, /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
+    /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
     /^contato\s*principal$/,
-    /contato/, /responsavel/, /^nome\b/, /first.*name/, /full.*name/
+    /responsavel/, /^nome\b/, /first.*name/, /full.*name/
   ],
   sobrenome_contato: [
     /^sobrenome$/, /^ultimo\s*nome$/, /^last\s*name$/, /^surname$/, /^apelido$/,
