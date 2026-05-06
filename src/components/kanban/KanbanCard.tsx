@@ -10,6 +10,7 @@ interface KanbanCardProps {
   order: Order;
   index: number;
   visibleColumns?: string[];
+  columns?: any[];
 }
 
 export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visibleColumns }: KanbanCardProps & { onClick?: (id: string) => void }) {
