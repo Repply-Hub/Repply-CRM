@@ -30,6 +30,16 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
@@ -40,6 +50,7 @@ const Emails = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [emailToDelete, setEmailToDelete] = useState<{ id: string; type: "sent" | "received" } | null>(null);
   const { isConnected, connectedEmail, sendEmail } = useGmail();
   const [formData, setFormData] = useState({ 
     destinatario: "", 
@@ -424,9 +435,7 @@ const Emails = () => {
                             className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (confirm("Deseja realmente excluir este e-mail?")) {
-                                deleteEmailMutation.mutate({ id: email.id, type: "sent" });
-                              }
+                              setEmailToDelete({ id: email.id, type: "sent" });
                             }}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -492,9 +501,7 @@ const Emails = () => {
                             className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (confirm("Deseja realmente excluir este e-mail recebido?")) {
-                                deleteEmailMutation.mutate({ id: email.id, type: "received" });
-                              }
+                              setEmailToDelete({ id: email.id, type: "received" });
                             }}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -554,12 +561,10 @@ const Emails = () => {
               variant="ghost" 
               className="rounded-full px-4 text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2"
               onClick={() => {
-                if (confirm("Deseja realmente excluir este e-mail?")) {
-                  deleteEmailMutation.mutate({ 
-                    id: selectedEmail.id, 
-                    type: selectedEmail.type || (selectedEmail.criado_em ? "received" : "sent") 
-                  });
-                }
+                setEmailToDelete({ 
+                  id: selectedEmail.id, 
+                  type: selectedEmail.type || (selectedEmail.criado_em ? "received" : "sent") 
+                });
               }}
             >
               <Trash2 className="h-4 w-4" /> Excluir
@@ -586,6 +591,32 @@ const Emails = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!emailToDelete} onOpenChange={(open) => !open && setEmailToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente o e-mail
+              do nosso banco de dados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (emailToDelete) {
+                  deleteEmailMutation.mutate(emailToDelete);
+                  setEmailToDelete(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };
