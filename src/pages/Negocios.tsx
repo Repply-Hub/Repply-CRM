@@ -701,7 +701,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={8} className="w-64 p-2 shadow-2xl border-border/40 z-[50] bg-background">
+      <PopoverContent align="start" sideOffset={8} className="w-64 p-2 shadow-2xl border-border/40 z-[50] bg-background">
         <div className="flex flex-col gap-1">
           <div className="px-3 py-2 border-b border-border/50 mb-1">
             <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Menu de Opções</h4>
@@ -718,7 +718,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
               </button>
             </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-auto p-0 shadow-xl border-border/40">
+            <PopoverContent side="right" align="start" sideOffset={10} className="w-auto p-0 shadow-xl border-border/40">
               <ColumnSettings
                 columns={allAvailableColumns}
                 visibleColumns={visibleColumns}
@@ -747,7 +747,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
               </button>
             </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-56 p-2 shadow-xl border-border/40 bg-background">
+            <PopoverContent side="right" align="start" sideOffset={10} className="w-56 p-2 shadow-xl border-border/40 bg-background">
               <div className="space-y-1">
                 <div className="px-2 py-1.5 border-b border-border/50 mb-1">
                   <h4 className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Ações Disponíveis</h4>
