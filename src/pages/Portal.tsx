@@ -1156,10 +1156,10 @@ export default function Portal() {
                                           <td 
                                             key={h} 
                                             className={cn(
-                                              \"max-w-[200px] truncate px-3 py-2.5\",
-                                              hIdx === 0 ? \"font-semibold text-foreground\" : 
-                                              (h === 'Construtora / Obra' || h === 'Empresa') ? \"font-medium text-foreground\" : 
-                                              \"font-normal text-muted-foreground\"
+                                              "max-w-[200px] truncate px-3 py-2.5",
+                                              hIdx === 0 ? "font-semibold text-foreground" : 
+                                              (h === 'Construtora / Obra' || h === 'Empresa') ? "font-medium text-foreground" : 
+                                              "font-normal text-muted-foreground"
                                             )} 
                                             title={row[h]}
                                           >
