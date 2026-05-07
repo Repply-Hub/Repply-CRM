@@ -204,6 +204,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         vendedor: rest.vendedor || '',
         status: rest.status || 'novo lead',
         data_pedido: rest.data_pedido || undefined,
+        prazo_resposta: rest.prazo_resposta || undefined,
         observacoes: rest.observacoes || '',
         campos_extras: campos_extras || {}
       };
