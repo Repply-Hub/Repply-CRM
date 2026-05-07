@@ -18,11 +18,11 @@ interface Props {
 }
 
 const TARGET_FIELDS = [
-  { key: 'descricao_material', label: 'Produto *', required: true },
-  { key: 'imagem_url', label: 'Fotos (URL)' },
-  { key: 'estoque_disponivel', label: 'Estoque Disponível' },
-  { key: 'unidade', label: 'Unidade de Medida' },
-  { key: 'preco_unitario', label: 'Preço de Varejo *', required: true },
+  { key: 'descricao_material', label: 'Produto', required: true },
+  { key: 'imagem_url', label: 'Fotos' },
+  { key: 'estoque_disponivel', label: 'Estoque disponível' },
+  { key: 'unidade', label: 'Unidade de medida' },
+  { key: 'preco_unitario', label: 'Preço de varejo', required: true },
   { key: 'referencia', label: 'Referência' },
   { key: 'categoria', label: 'Categoria' },
 ] as const;
