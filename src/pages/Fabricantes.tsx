@@ -851,12 +851,6 @@ const Fabricantes = () => {
                 onClick={() => {
                   if (newCategoryName.trim()) {
                     setEditPreco(null);
-                    // Passamos a categoria para o formulário de preço via estado, 
-                    // mas como o PrecoForm é um componente separado, precisamos garantir que ele receba.
-                    // Vou ajustar o PrecoForm para aceitar uma categoria inicial opcional ou usar o estado do pai.
-                    // Para simplificar, vamos apenas abrir o dialog de preço e o usuário digita ou 
-                    // podemos passar via prop se ajustarmos o PrecoForm.
-                    // Vamos ajustar o PrecoForm para aceitar initialCategory.
                     setPrecoDialog(true);
                   }
                 }}
@@ -867,6 +861,7 @@ const Fabricantes = () => {
           </div>
         </DialogContent>
       </Dialog>
+
 
 
       <AlertDialog open={!!deleteAlert} onOpenChange={(o) => !o && setDeleteAlert(null)}>
