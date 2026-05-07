@@ -37,7 +37,8 @@ export function ProductForm({ open, onOpenChange, fabricanteId: initialFabId, ed
   const { data: todasCategorias } = useCategorias();
   const { data: fabricantes } = useFabricantes();
   
-  const [fabricanteId, setFabricanteId] = useState(initialFabId ?? editData?.fabricante_id ?? '');
+  const [fabricanteId, setFabricanteId] = useState('');
+  const [desc, setDesc] = useState('');
   const [ref, setRef] = useState('');
   const [preco, setPreco] = useState('');
   const [unidade, setUnidade] = useState('un');
@@ -51,6 +52,7 @@ export function ProductForm({ open, onOpenChange, fabricanteId: initialFabId, ed
   // Reset form when opening/closing or changing editData
   useEffect(() => {
     if (open) {
+      setFabricanteId(initialFabId ?? editData?.fabricante_id ?? '');
       setDesc(editData?.descricao_material ?? '');
       setRef(editData?.referencia ?? '');
       setPreco(editData?.preco_unitario?.toString() ?? '');
@@ -60,7 +62,7 @@ export function ProductForm({ open, onOpenChange, fabricanteId: initialFabId, ed
       setImagemUrl(editData?.imagem_url ?? null);
       setEstoque(editData?.estoque_disponivel?.toString() ?? '0');
     }
-  }, [open, editData, initialCategory]);
+  }, [open, editData, initialCategory, initialFabId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,6 +103,18 @@ export function ProductForm({ open, onOpenChange, fabricanteId: initialFabId, ed
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader><DialogTitle>{editData ? 'Editar' : 'Novo'} Produto</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          {!initialFabId && !editData && (
+            <div className="space-y-2">
+              <Label>Fabricante</Label>
+              <SearchableSelect
+                options={(fabricantes ?? []).map(f => ({ value: f.id, label: f.nome }))}
+                value={fabricanteId}
+                onValueChange={setFabricanteId}
+                placeholder="Selecione um fabricante"
+              />
+            </div>
+          )}
+          
           <div>
             <Label className="mb-2 block">Imagem</Label>
             <ProductImageUpload value={imagemUrl} onChange={setImagemUrl} fabricanteId={fabricanteId} />
