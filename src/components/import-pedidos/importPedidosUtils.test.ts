@@ -76,6 +76,7 @@ describe('importPedidosUtils', () => {
         observacoes: '',
         status: 'enviado',
         data_pedido: undefined,
+        prazo_resposta: undefined,
         campos_extras: {},
       },
     ]);
