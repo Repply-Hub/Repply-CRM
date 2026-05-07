@@ -122,6 +122,8 @@ const NovoPedido = () => {
   const [observacoes, setObservacoes] = useState('');
   const [proximoContato, setProximoContato] = useState<Date | undefined>();
   const [proximoContatoHora, setProximoContatoHora] = useState('09:00');
+  const [valorManual, setValorManual] = useState<number | null>(null);
+  const [isManualMode, setIsManualMode] = useState(false);
 
   // Derived
   const selectedCliente = useMemo(() => clientes?.find(c => c.id === clienteId), [clientes, clienteId]);
