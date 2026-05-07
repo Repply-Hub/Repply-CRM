@@ -116,7 +116,7 @@ const Catalogo = () => {
             />
             
             <SearchableSelect
-              options={[
+              options={useMemo(() => [
                 { value: "todos", label: "Todos fabricantes" },
                 ...(fabricantes ?? [])
                   .sort((a, b) => {
@@ -125,7 +125,7 @@ const Catalogo = () => {
                     return a.nome.localeCompare(b.nome);
                   })
                   .map(f => ({ value: f.id, label: f.nome }))
-              ]}
+              ], [fabricantes, fabricanteId])}
               value={fabricanteId}
               onValueChange={setFabricanteId}
               placeholder="Fabricante"
