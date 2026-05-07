@@ -178,7 +178,7 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
             <FileSpreadsheet className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
             <p className="text-sm font-medium mb-1">Selecione uma planilha (.xlsx, .xls ou .csv)</p>
             <p className="text-xs text-muted-foreground mb-4">
-              Colunas reconhecidas: descrição, referência, categoria, preço, unidade
+              Colunas reconhecidas: produto, fotos, estoque disponível, unidade de medida, preço de varejo, referência, categoria
             </p>
             <input
               id="catalogo-import-file"
