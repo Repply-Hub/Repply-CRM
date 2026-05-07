@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, ChevronsUpDown, Search, Plus } from "lucide-react";
+import { Check, ChevronDown, Search, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,7 +56,7 @@ export function SearchableSelect({
           className={cn("w-full justify-between font-normal", className)}
         >
           {selectedOption ? selectedOption.label : placeholder}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { Check, ChevronDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -95,7 +95,7 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
             className="w-full justify-between font-normal"
           >
             {selectedCliente ? selectedCliente.empresa : placeholder}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent 
