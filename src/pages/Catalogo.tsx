@@ -65,9 +65,14 @@ const Catalogo = () => {
     }
   };
 
+  const showFolders = categoria === 'todas' && busca.trim() === '';
+
   return (
-    <AppLayout title="Catálogo de Produtos" subtitle={`${filtered.length} produto(s)`}>
-      <div className="p-4 md:p-6 w-full space-y-4">
+    <AppLayout 
+      title="Catálogo de Produtos" 
+      subtitle={showFolders ? `${categorias.length} categoria(s)` : `${filtered.length} produto(s)`}
+    >
+      <div className="p-4 md:p-6 w-full space-y-6">
         <Card className="rounded-xl border-border/60">
           <CardContent className="p-4 flex flex-wrap gap-3 items-center">
             <SearchWithRecent
@@ -88,7 +93,7 @@ const Catalogo = () => {
               className="w-52"
             />
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <SearchableSelect
                 options={[
                   { value: "todas", label: "Todas categorias" },
@@ -114,32 +119,90 @@ const Catalogo = () => {
           </CardContent>
         </Card>
 
-        {categorias.length > 0 && (
-          <Card className="rounded-xl border-border/60">
-            <CardContent className="p-4">
-              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Gerenciar categorias</p>
-              <div className="flex flex-wrap gap-2">
-                {categorias.map(c => (
-                  <div key={c} className="inline-flex items-center gap-1 rounded-full bg-muted/60 pl-3 pr-1 py-1 text-xs">
-                    <span className="font-medium">{c}</span>
-                    <span className="text-muted-foreground">({countByCategoria.get(c) ?? 0})</span>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDelete(c)}
-                      className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                      title={`Excluir categoria "${c}"`}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+        {!showFolders && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => {
+              setCategoria('todas');
+              setBusca('');
+            }}
+            className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar para todas as categorias
+          </Button>
         )}
 
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : showFolders ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {categorias.map(c => (
+              <Card 
+                key={c} 
+                className="rounded-xl border-border/60 overflow-hidden hover:shadow-md transition-all cursor-pointer group bg-card/50"
+                onClick={() => setCategoria(c)}
+              >
+                <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
+                  <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                    <Folder className="h-8 w-8 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-base line-clamp-1">{c}</p>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {countByCategoria.get(c) ?? 0} produtos
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs font-medium"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCategoria(c);
+                      }}
+                    >
+                      Abrir pasta
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDelete(c);
+                      }}
+                      title={`Excluir categoria "${c}"`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            
+            {/* Folder for items without category if they exist */}
+            {(produtos ?? []).some((p: any) => !p.categoria) && (
+              <Card 
+                className="rounded-xl border-border/60 overflow-hidden hover:shadow-md transition-all cursor-pointer group bg-card/50"
+                onClick={() => setCategoria('sem-categoria')}
+              >
+                <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
+                  <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
+                    <Package className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-base line-clamp-1 italic">Sem categoria</p>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {(produtos ?? []).filter((p: any) => !p.categoria).length} produtos
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         ) : filtered.length === 0 ? (
           <Card className="rounded-xl border-border/60">
             <CardContent className="flex flex-col items-center py-16 text-center">
