@@ -390,7 +390,16 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   );
 
   const handleImport = async () => {
-    const rows = previewRowsSnapshot.length > 0 ? [...previewRowsSnapshot] : getMappedRows();
+    const allRows = getMappedRows();
+    const rows = previewRowsSnapshot.length > 0 ? [...previewRowsSnapshot] : allRows;
+    const ignoredRows = rawData.filter((_, index) => {
+      const mappedRow = allRows[index];
+      if (!mappedRow) return true;
+      return target === 'contatos' 
+        ? !(mappedRow.empresa || mappedRow.nome_contato) 
+        : !(mappedRow.empresa || mappedRow.razao_social || mappedRow.cnpj);
+    });
+
     if (rows.length === 0) {
       toast.error('Nenhum registro válido após o mapeamento');
       return;
