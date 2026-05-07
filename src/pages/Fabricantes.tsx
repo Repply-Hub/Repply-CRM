@@ -374,6 +374,9 @@ const Fabricantes = () => {
   const [editPreco, setEditPreco] = useState<any>(null);
   const [importDialog, setImportDialog] = useState(false);
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
   const [globalImportOpen, setGlobalImportOpen] = useState(false);
   const [deleteAlert, setDeleteAlert] = useState<{ type: 'fab' | 'preco'; id: string } | null>(null);
 
@@ -617,12 +620,24 @@ const Fabricantes = () => {
                         <Button 
                           size="sm" 
                           variant="outline" 
+                          onClick={() => setNewCategoryOpen(true)} 
+                          className="gap-1.5 h-9"
+                          title="Criar nova categoria para este fabricante"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> 
+                          <span>Nova Categoria</span>
+                        </Button>
+
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
                           onClick={() => setImportDialog(true)} 
                           className="gap-1.5 h-9"
                         >
                           <Upload className="h-3.5 w-3.5" /> 
                           <span>Importar</span>
                         </Button>
+
                         
                         <Button 
                           size="sm" 
