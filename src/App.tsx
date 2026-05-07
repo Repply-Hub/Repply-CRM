@@ -20,6 +20,7 @@ import Calendario from "./pages/Calendario";
 import Tarefas from "./pages/Tarefas";
 import Chat from "./pages/Chat";
 import Emails from "./pages/Emails";
+import LinhasIgnoradas from "./pages/LinhasIgnoradas";
 
 import Login from "./pages/Login";
 import EsqueciSenha from "./pages/EsqueciSenha";
