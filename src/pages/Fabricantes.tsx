@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFabricantes } from '@/hooks/use-clientes';
 import { useCreateFabricante } from '@/hooks/use-mutations';
 import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante, useCategorias } from '@/hooks/use-fabricantes';
-import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash, Upload, ImageIcon } from 'lucide-react';
+import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash, Upload, ImageIcon, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
@@ -116,12 +116,13 @@ function FabricanteForm({ open, onOpenChange, editData }: {
 }
 
 // ─── Preco Form Dialog ──────────────────────────────────────────────
-function PrecoForm({ open, onOpenChange, fabricanteId, editData, initialCategory }: {
+function PrecoForm({ open, onOpenChange, fabricanteId, editData, initialCategory, onDeleteClick }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   fabricanteId: string;
   editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean; categoria?: string | null; imagem_url?: string | null; estoque_disponivel?: number | null };
   initialCategory?: string;
+  onDeleteClick?: (id: string) => void;
 }) {
 
   const createPreco = useCreatePreco();
@@ -265,9 +266,24 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData, initialCategory
               </Select>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="vigente" checked={vigente} onChange={e => setVigente(e.target.checked)} className="rounded border-input" />
-            <Label htmlFor="vigente">Produto vigente (disponível)</Label>
+          <div className="flex items-center justify-between gap-4 pt-2">
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="vigente" checked={vigente} onChange={e => setVigente(e.target.checked)} className="rounded border-input" />
+              <Label htmlFor="vigente">Produto vigente (disponível)</Label>
+            </div>
+            
+            {editData && onDeleteClick && (
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5 h-8"
+                onClick={() => onDeleteClick(editData.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Excluir</span>
+              </Button>
+            )}
           </div>
           <Button type="submit" className="w-full" disabled={isPending}>{isPending ? 'Salvando...' : 'Salvar'}</Button>
         </form>
@@ -736,12 +752,15 @@ const Fabricantes = () => {
                                       case 'acoes':
                                         return (
                                           <TableCell key={colId}>
-                                            <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                                              <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-7 sm:w-7" onClick={() => { setEditPreco(p); setPrecoDialog(true); }}>
-                                                <Pencil className="h-3.5 w-3.5" />
-                                              </Button>
-                                              <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-7 sm:w-7 text-destructive hover:text-destructive" onClick={() => setDeleteAlert({ type: 'preco', id: p.id })}>
-                                                <Trash2 className="h-3.5 w-3.5" />
+                                            <div className="flex justify-center">
+                                              <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" 
+                                                onClick={() => { setEditPreco(p); setPrecoDialog(true); }}
+                                                title="Visualizar/Editar produto"
+                                              >
+                                                <Eye className="h-4 w-4" />
                                               </Button>
                                             </div>
                                           </TableCell>
@@ -806,6 +825,10 @@ const Fabricantes = () => {
           fabricanteId={selectedFabId} 
           editData={editPreco} 
           initialCategory={newCategoryName}
+          onDeleteClick={(id) => {
+            setPrecoDialog(false);
+            setDeleteAlert({ type: 'preco', id });
+          }}
         />
       )}
 
