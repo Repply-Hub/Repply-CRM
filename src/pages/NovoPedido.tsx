@@ -734,11 +734,12 @@ const NovoPedido = () => {
                       </Table>
                       <div className="flex justify-between items-center px-4 py-3 bg-muted/30 border-t border-border">
                         <div className="flex-1 max-w-[200px] space-y-1">
-                          <Label className="text-xs text-muted-foreground">Valor de Negociação</Label>
+                          <Label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Valor de Negociação</Label>
                           <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">R$</span>
                             <Input 
                               type="number" 
-                              className={cn("h-9 text-sm font-medium", isManualMode ? "border-primary ring-1 ring-primary" : "bg-muted/50")}
+                              className={cn("h-9 pl-8 text-sm font-bold transition-all", isManualMode ? "border-primary ring-1 ring-primary bg-background" : "bg-muted/30 border-transparent")}
                               value={isManualMode ? (valorManual ?? 0) : valorTotalItens}
                               onChange={(e) => {
                                 setValorManual(parseFloat(e.target.value) || 0);
