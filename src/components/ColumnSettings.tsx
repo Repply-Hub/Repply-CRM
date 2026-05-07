@@ -248,7 +248,38 @@ export const ColumnSettings = memo(function ColumnSettings({
 
                                         <div className="flex-1 overflow-y-auto px-1.5 py-2 custom-scrollbar min-h-0">
                                             <DragDropContext onDragEnd={handleDragEnd}>
-                                                <Droppable droppableId="columns">
+                                                <Droppable droppableId="columns" mode="virtual" renderClone={(provided, snapshot, rubric) => {
+                                                    const column = columns[rubric.source.index];
+                                                    const checked = visibleColumns.includes(column.id);
+                                                    return (
+                                                        <div
+                                                            {...provided.draggableProps}
+                                                            {...provided.dragHandleProps}
+                                                            ref={provided.innerRef}
+                                                            className={cn(
+                                                                "group flex items-center gap-1 pr-1 outline-none bg-accent rounded-lg",
+                                                                snapshot.isDragging && "z-[9999]"
+                                                            )}
+                                                            style={{
+                                                                ...provided.draggableProps.style,
+                                                                width: '300px'
+                                                            }}
+                                                        >
+                                                            <div className="p-1 text-muted-foreground/40">
+                                                                <GripVertical className="h-3.5 w-3.5" />
+                                                            </div>
+                                                            <div className="flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left">
+                                                                <div className={cn(
+                                                                    'h-7 w-7 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
+                                                                    checked ? 'bg-primary/10 border-primary/20 text-primary shadow-sm' : 'bg-muted/50 border-border/40 text-muted-foreground/40'
+                                                                )}>
+                                                                    {checked ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                                                                </div>
+                                                                <span className="truncate">{column.customLabel || column.label}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }}>
                                                     {(provided) => (
                                                         <div 
                                                             {...provided.droppableProps}
