@@ -262,28 +262,28 @@ function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
     <Card className="rounded-xl border-border/60 overflow-hidden">
       <div className="h-1.5 w-full bg-[image:var(--gradient-brand)]" />
       <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Factory className="h-7 w-7 text-primary" />
+            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Factory className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
             </div>
-            <div>
-              <h2 className="text-foreground font-bold text-lg">{fab.nome}</h2>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-foreground font-bold text-base sm:text-lg truncate">{fab.nome}</h2>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 sm:mt-2">
                 {fab.cnpj && (
-                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
                     <Hash className="h-3.5 w-3.5" />
                     {fab.cnpj}
                   </span>
                 )}
                 {fab.nome_contato && (
-                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
                     <User className="h-3.5 w-3.5" />
                     {fab.nome_contato}
                   </span>
                 )}
                 {fab.telefone && (
-                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
                     <Phone className="h-3.5 w-3.5" />
                     {fab.telefone}
                   </span>
@@ -291,12 +291,12 @@ function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
               </div>
             </div>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5">
+          <div className="flex gap-2 flex-shrink-0 w-full sm:w-auto">
+            <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5 flex-1 sm:flex-initial">
               <Pencil className="h-3.5 w-3.5" /> Editar
             </Button>
-            <Button variant="destructive" size="sm" onClick={onDelete} className="gap-1.5">
-              <Trash2 className="h-3.5 w-3.5" />
+            <Button variant="destructive" size="sm" onClick={onDelete} className="gap-1.5 flex-1 sm:flex-initial">
+              <Trash2 className="h-3.5 w-3.5" /> <span className="sm:hidden lg:inline">Excluir</span>
             </Button>
           </div>
         </div>
