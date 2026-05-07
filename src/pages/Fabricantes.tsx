@@ -186,8 +186,10 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><Label>Preço Unitário (R$)</Label><Input type="number" step="0.01" value={preco} onChange={e => setPreco(e.target.value)} required /></div>
-            <div>
+            <div><Label>Preço de Varejo (R$)</Label><Input type="number" step="0.01" value={preco} onChange={e => setPreco(e.target.value)} required /></div>
+            <div><Label>Estoque Disponível</Label><Input type="number" step="0.01" value={estoque} onChange={e => setEstoque(e.target.value)} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
               <Label>Unidade</Label>
               <Select value={unidade} onValueChange={setUnidade}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
