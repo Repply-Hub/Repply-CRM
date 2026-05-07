@@ -124,7 +124,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
 }) {
   const createPreco = useCreatePreco();
   const updatePreco = useUpdatePreco();
-  const { data: categorias } = useCategorias();
+  const { data: todasCategorias } = useCategorias();
   const [desc, setDesc] = useState(editData?.descricao_material ?? '');
   const [ref, setRef] = useState(editData?.referencia ?? '');
   const [preco, setPreco] = useState(editData?.preco_unitario?.toString() ?? '');
@@ -133,6 +133,14 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
   const [categoria, setCategoria] = useState(editData?.categoria ?? '');
   const [imagemUrl, setImagemUrl] = useState<string | null>(editData?.imagem_url ?? null);
   const [estoque, setEstoque] = useState(editData?.estoque_disponivel?.toString() ?? '0');
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Filtrar categorias apenas deste fabricante ou mostrar todas as globais?
+  // O usuário pediu "criar categorias dentro daquela marca em específico"
+  // Atualmente o useCategorias retorna todas as categorias da tabela_precos.
+  // Vamos usar as categorias globais para o datalist, mas permitir criar uma nova via input.
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,17 +182,59 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
             <div><Label>Referência</Label><Input value={ref} onChange={e => setRef(e.target.value)} placeholder="Código" /></div>
             <div>
               <Label>Categoria</Label>
-              <Input
-                value={categoria}
-                onChange={e => setCategoria(e.target.value)}
-                list="categorias-list"
-                placeholder="Ex: Pisos, Louças"
-              />
-              <datalist id="categorias-list">
-                {(categorias ?? []).map(c => <option key={c} value={c} />)}
-              </datalist>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    value={categoria}
+                    onChange={e => setCategoria(e.target.value)}
+                    list="categorias-list"
+                    placeholder="Ex: Pisos, Louças"
+                  />
+                  <datalist id="categorias-list">
+                    {(todasCategorias ?? []).map(c => <option key={c} value={c} />)}
+                  </datalist>
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => setNewCategoryOpen(true)}
+                  title="Criar nova categoria"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
+          
+          <Dialog open={newCategoryOpen} onOpenChange={setNewCategoryOpen}>
+            <DialogContent className="sm:max-w-[300px]">
+              <DialogHeader>
+                <DialogTitle className="text-sm">Nova Categoria</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 pt-2">
+                <Input 
+                  placeholder="Nome da categoria" 
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  autoFocus
+                />
+                <Button 
+                  className="w-full h-8 text-xs" 
+                  onClick={() => {
+                    if (newCategoryName.trim()) {
+                      setCategoria(newCategoryName.trim());
+                      setNewCategoryName('');
+                      setNewCategoryOpen(false);
+                    }
+                  }}
+                >
+                  Confirmar
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Preço de Varejo (R$)</Label><Input type="number" step="0.01" value={preco} onChange={e => setPreco(e.target.value)} required /></div>
             <div><Label>Estoque Disponível</Label><Input type="number" step="0.01" value={estoque} onChange={e => setEstoque(e.target.value)} /></div>
