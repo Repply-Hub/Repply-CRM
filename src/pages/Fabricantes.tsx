@@ -657,11 +657,11 @@ const Fabricantes = () => {
                         <Package className="h-10 w-10 text-muted-foreground/30 mb-3" />
                         <p className="text-sm text-muted-foreground font-medium">Nenhum produto cadastrado</p>
                         <p className="text-xs text-muted-foreground/70 mt-1">Adicione produtos ao catálogo deste fabricante</p>
-                        <div className="flex gap-2 mt-4">
-                          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setImportDialog(true)}>
+                        <div className="flex flex-col sm:flex-row gap-2 mt-4 w-full sm:w-auto px-4 sm:px-0">
+                          <Button size="sm" variant="outline" className="gap-1.5 w-full sm:w-auto" onClick={() => setImportDialog(true)}>
                             <Upload className="h-3.5 w-3.5" /> Importar planilha
                           </Button>
-                          <Button size="sm" className="gap-1.5" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
+                          <Button size="sm" className="gap-1.5 w-full sm:w-auto" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
                             <Plus className="h-3.5 w-3.5" /> Adicionar produto
                           </Button>
                         </div>
