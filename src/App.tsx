@@ -97,6 +97,7 @@ const AppRoutes = () => (
     <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
     <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
     <Route path="/emails" element={<ProtectedRoute><Emails /></ProtectedRoute>} />
+    <Route path="/importacao/ignoradas" element={<ProtectedRoute><LinhasIgnoradas /></ProtectedRoute>} />
 
     <Route path="*" element={<NotFound />} />
   </Routes>
