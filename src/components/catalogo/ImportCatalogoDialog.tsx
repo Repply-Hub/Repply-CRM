@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -121,6 +122,25 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
     }
 
     try {
+      // Salvar linhas ignoradas para revisão posterior
+      if (ignoredRowsData.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const ignoredBatch = ignoredRowsData.map(row => ({
+            usuario_id: user.id,
+            tipo_importacao: 'catalogo',
+            dados_originais: row,
+            motivo_ignorado: 'Falta Descrição ou Preço'
+          }));
+          
+          const { error: ignoreError } = await supabase
+            .from('linhas_ignoradas_importacao')
+            .insert(ignoredBatch);
+          
+          if (ignoreError) console.error('Erro ao salvar linhas ignoradas:', ignoreError);
+        }
+      }
+
       const { inserted } = await bulk.mutateAsync(records);
       toast.success(`${inserted} produto(s) importado(s)!`);
       reset();
