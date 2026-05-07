@@ -178,7 +178,12 @@ export const ColumnSettings = memo(function ColumnSettings({
                     <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={8} className="w-[200px] p-0 shadow-2xl border-border/40 z-[50] overflow-hidden">
+            <PopoverContent align="end" sideOffset={8} className="w-[200px] p-0 shadow-2xl border-border/40 z-[50] overflow-hidden" onPointerDownOutside={(e) => {
+                // Previne fechar o popover principal se o clique for no clone do drag and drop
+                if (e.target instanceof Element && e.target.closest('[data-rbd-drag-handle-context-id]')) {
+                    e.preventDefault();
+                }
+            }}>
                 <div className="flex flex-col divide-y divide-border/50 overflow-hidden max-h-[min(calc(100vh-120px),700px)]">
                     {!hideColumns && (
                         <div className="w-full flex flex-col">
