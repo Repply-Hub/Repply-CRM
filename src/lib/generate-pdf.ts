@@ -34,7 +34,13 @@ export async function generatePedidosPdf(pedidos: PedidoRow[], titulo: string = 
 
   try {
     const img = await loadImage(logoUrl);
-    doc.addImage(img, 'WEBP', 14, 8, 30, 12);
+    const maxWidth = 30;
+    const maxHeight = 12;
+    const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+    const imgWidth = img.width * ratio;
+    const imgHeight = img.height * ratio;
+    
+    doc.addImage(img, 'WEBP', 14, 8, imgWidth, imgHeight);
   } catch {
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
