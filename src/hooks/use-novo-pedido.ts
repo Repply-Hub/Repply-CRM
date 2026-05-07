@@ -60,14 +60,15 @@ export interface NovoPedidoPayload {
   cliente_id: string;
   fabricante_id: string;
   usuario_id: string;
-   obra_id?: string;
-   status?: string;
-   data_pedido: string;
+  obra_id?: string;
+  status?: string;
+  data_pedido: string;
   prazo_resposta?: string;
   origem_lead?: string;
   endereco_entrega?: string;
   observacoes?: string;
   pdf_url?: string;
+  valor_total?: number;
   itens: {
     descricao_material: string;
     referencia_fabricante?: string;
