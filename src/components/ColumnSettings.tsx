@@ -266,7 +266,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                             {...provided.dragHandleProps}
                                                             ref={provided.innerRef}
                                                             className={cn(
-                                                                "group flex items-center gap-1 pr-1 outline-none bg-accent rounded-lg",
+                                                                "group flex items-center gap-1 pr-1 outline-none bg-background border border-border/40 shadow-xl rounded-lg pointer-events-none",
                                                                 snapshot.isDragging && "z-[9999]"
                                                             )}
                                                             style={{
