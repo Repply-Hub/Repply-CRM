@@ -132,7 +132,8 @@ const NovoPedido = () => {
   const selectedObra = useMemo(() => obras?.find(o => o.id === obraId), [obras, obraId]);
   const { data: tabelaPrecos } = useTabelaPrecos(fabricanteId || null);
 
-  const valorTotal = useMemo(() => itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0), [itens]);
+  const valorTotalItens = useMemo(() => itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0), [itens]);
+  const valorFinal = isManualMode ? (valorManual || 0) : valorTotalItens;
 
   // Set default vendedor when data loads
   useEffect(() => {
