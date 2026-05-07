@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -87,29 +88,33 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
       return;
     }
 
-    const records = rows
-      .map(row => {
-        const get = (target: TargetKey) => {
-          const col = Object.entries(mapping).find(([, v]) => v === target)?.[0];
-          if (!col) return undefined;
-          const v = row[col];
-          return v === '' ? undefined : v;
-        };
-        const precoRaw = get('preco_unitario');
-        const preco = typeof precoRaw === 'number'
-          ? precoRaw
-          : parseFloat(String(precoRaw ?? '').replace(/\./g, '').replace(',', '.'));
-        return {
-          fabricante_id: fabricanteId,
-          descricao_material: String(get('descricao_material') ?? '').trim(),
-          referencia: get('referencia') ? String(get('referencia')).trim() : null,
-          categoria: get('categoria') ? String(get('categoria')).trim() : null,
-          unidade: get('unidade') ? String(get('unidade')).trim() : null,
-          preco_unitario: preco,
-          vigente: true,
-        };
-      })
-      .filter(r => r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
+    const allMappedRecords = rows.map(row => {
+      const get = (target: TargetKey) => {
+        const col = Object.entries(mapping).find(([, v]) => v === target)?.[0];
+        if (!col) return undefined;
+        const v = row[col];
+        return v === '' ? undefined : v;
+      };
+      const precoRaw = get('preco_unitario');
+      const preco = typeof precoRaw === 'number'
+        ? precoRaw
+        : parseFloat(String(precoRaw ?? '').replace(/\./g, '').replace(',', '.'));
+      return {
+        fabricante_id: fabricanteId,
+        descricao_material: String(get('descricao_material') ?? '').trim(),
+        referencia: get('referencia') ? String(get('referencia')).trim() : null,
+        categoria: get('categoria') ? String(get('categoria')).trim() : null,
+        unidade: get('unidade') ? String(get('unidade')).trim() : null,
+        preco_unitario: preco,
+        vigente: true,
+      };
+    });
+
+    const records = allMappedRecords.filter(r => r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
+    const ignoredRowsData = rows.filter((_, index) => {
+      const r = allMappedRecords[index];
+      return !(r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
+    });
 
     if (records.length === 0) {
       toast.error('Nenhuma linha válida encontrada');
@@ -117,6 +122,25 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
     }
 
     try {
+      // Salvar linhas ignoradas para revisão posterior
+      if (ignoredRowsData.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const ignoredBatch = ignoredRowsData.map(row => ({
+            usuario_id: user.id,
+            tipo_importacao: 'catalogo',
+            dados_originais: row,
+            motivo_ignorado: 'Falta Descrição ou Preço'
+          }));
+          
+          const { error: ignoreError } = await supabase
+            .from('linhas_ignoradas_importacao')
+            .insert(ignoredBatch);
+          
+          if (ignoreError) console.error('Erro ao salvar linhas ignoradas:', ignoreError);
+        }
+      }
+
       const { inserted } = await bulk.mutateAsync(records);
       toast.success(`${inserted} produto(s) importado(s)!`);
       reset();

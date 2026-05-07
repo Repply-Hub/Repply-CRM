@@ -269,20 +269,40 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const handleImport = async () => {
     const allRows = getMappedRows();
     const rows = allRows.filter(r => r.cliente && r.fabricante);
+    const ignoredRowsData = rawData.filter((_, index) => {
+      const mapped = allRows[index];
+      return !(mapped.cliente && mapped.fabricante);
+    });
     
     if (rows.length === 0) {
       toast.error('Nenhum registro válido para importar. Verifique se as colunas de Cliente e Fabricante estão mapeadas e preenchidas.');
       return;
     }
     
-    if (rows.length < allRows.length) {
-      toast.info(`${allRows.length - rows.length} linhas foram ignoradas por não possuírem Cliente ou Fabricante.`);
-    }
     setImporting(true);
     setImportProgress(0);
     try {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       if (!vid) throw new Error('Vendedor não encontrado');
+
+      // Salvar linhas ignoradas para revisão posterior
+      if (ignoredRowsData.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const ignoredBatch = ignoredRowsData.map(row => ({
+            usuario_id: user.id,
+            tipo_importacao: 'negocios',
+            dados_originais: row,
+            motivo_ignorado: 'Falta Cliente ou Fabricante'
+          }));
+          
+          const { error: ignoreError } = await supabase
+            .from('linhas_ignoradas_importacao')
+            .insert(ignoredBatch);
+          
+          if (ignoreError) console.error('Erro ao salvar linhas ignoradas:', ignoreError);
+        }
+      }
 
       // Atualizar nomes das colunas (padrão e extras) para salvar como colunas na página de Negócios
       const savedAllColumns = localStorage.getItem('pedidos_all_columns');

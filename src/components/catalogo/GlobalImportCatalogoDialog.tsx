@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -130,7 +131,7 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
 
   const canProceedToPreview = Boolean(mapping.descricao_material && mapping.preco_unitario && (mapping.fabricante_nome || selectedFabricanteId));
 
-  const getMappedRows = () => {
+  const getMappedRowsAndIgnored = () => {
     const sanitized = sanitizeImportedRows({ 
       rawData, 
       fields: VISIBLE_FIELDS, 
@@ -141,8 +142,9 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
     });
     
     const recordsByFab: Record<string, any[]> = {};
+    const ignoredRows: any[] = [];
 
-    sanitized.forEach(row => {
+    sanitized.forEach((row, index) => {
       let fabId = selectedFabricanteId;
       const fabName = row.fabricante_nome ? String(row.fabricante_nome).toLowerCase().trim() : '';
 
@@ -151,7 +153,12 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
         if (matched) fabId = matched.id;
       }
 
-      if (!fabId) return;
+      const isValid = fabId && row.descricao_material && Number(row.preco_unitario) > 0;
+
+      if (!isValid) {
+        ignoredRows.push(rawData[index]);
+        return;
+      }
 
       if (!recordsByFab[fabId]) recordsByFab[fabId] = [];
       recordsByFab[fabId].push({
@@ -166,19 +173,19 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
       });
     });
 
-    return recordsByFab;
+    return { recordsByFab, ignoredRows };
   };
 
   const previewData = useMemo(() => {
-    if (step !== 'preview') return { recordsByFab: {}, allRecords: [], uniqueFabIds: [] };
-    const recordsByFab = getMappedRows();
+    if (step !== 'preview') return { recordsByFab: {}, allRecords: [], uniqueFabIds: [], ignoredRows: [] };
+    const { recordsByFab, ignoredRows } = getMappedRowsAndIgnored();
     const allRecords = Object.values(recordsByFab).flat();
     const uniqueFabIds = Object.keys(recordsByFab);
-    return { recordsByFab, allRecords, uniqueFabIds };
+    return { recordsByFab, allRecords, uniqueFabIds, ignoredRows };
   }, [step, mapping, rawData, extras, customColumns, selectedFabricanteId, fabricantes]);
 
   const handleImport = async () => {
-    const { allRecords, uniqueFabIds } = previewData;
+    const { allRecords, uniqueFabIds, ignoredRows } = previewData;
     if (allRecords.length === 0) {
       toast.error('Nenhum registro válido encontrado');
       return;
@@ -186,6 +193,25 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
 
     setImporting(true);
     try {
+      // Salvar linhas ignoradas para revisão posterior
+      if (ignoredRows.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const ignoredBatch = ignoredRows.map(row => ({
+            usuario_id: user.id,
+            tipo_importacao: 'catalogo_geral',
+            dados_originais: row,
+            motivo_ignorado: 'Falta Fabricante, Descrição ou Preço'
+          }));
+          
+          const { error: ignoreError } = await supabase
+            .from('linhas_ignoradas_importacao')
+            .insert(ignoredBatch);
+          
+          if (ignoreError) console.error('Erro ao salvar linhas ignoradas:', ignoreError);
+        }
+      }
+
       const { inserted } = await bulk.mutateAsync(allRecords);
       toast.success(`${inserted} produtos importados com sucesso!`);
       
