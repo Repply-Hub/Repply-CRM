@@ -197,7 +197,11 @@ export const ColumnSettings = memo(function ColumnSettings({
                                         <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200" />
                                     </button>
                                 </PopoverTrigger>
-                                <PopoverContent side="left" align="start" sideOffset={5} className="w-[320px] p-0 shadow-2xl border-border/40 z-[60]">
+                                <PopoverContent side="left" align="start" sideOffset={5} className="w-[320px] p-0 shadow-2xl border-border/40 z-[60]" onPointerDownOutside={(e) => {
+                                    if (e.target instanceof Element && e.target.closest('[data-rbd-drag-handle-context-id]')) {
+                                        e.preventDefault();
+                                    }
+                                }}>
                                     <div className="flex flex-col h-full max-h-[500px]">
                                         <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
                                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
