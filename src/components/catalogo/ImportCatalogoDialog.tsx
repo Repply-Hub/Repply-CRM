@@ -87,29 +87,33 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
       return;
     }
 
-    const records = rows
-      .map(row => {
-        const get = (target: TargetKey) => {
-          const col = Object.entries(mapping).find(([, v]) => v === target)?.[0];
-          if (!col) return undefined;
-          const v = row[col];
-          return v === '' ? undefined : v;
-        };
-        const precoRaw = get('preco_unitario');
-        const preco = typeof precoRaw === 'number'
-          ? precoRaw
-          : parseFloat(String(precoRaw ?? '').replace(/\./g, '').replace(',', '.'));
-        return {
-          fabricante_id: fabricanteId,
-          descricao_material: String(get('descricao_material') ?? '').trim(),
-          referencia: get('referencia') ? String(get('referencia')).trim() : null,
-          categoria: get('categoria') ? String(get('categoria')).trim() : null,
-          unidade: get('unidade') ? String(get('unidade')).trim() : null,
-          preco_unitario: preco,
-          vigente: true,
-        };
-      })
-      .filter(r => r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
+    const allMappedRecords = rows.map(row => {
+      const get = (target: TargetKey) => {
+        const col = Object.entries(mapping).find(([, v]) => v === target)?.[0];
+        if (!col) return undefined;
+        const v = row[col];
+        return v === '' ? undefined : v;
+      };
+      const precoRaw = get('preco_unitario');
+      const preco = typeof precoRaw === 'number'
+        ? precoRaw
+        : parseFloat(String(precoRaw ?? '').replace(/\./g, '').replace(',', '.'));
+      return {
+        fabricante_id: fabricanteId,
+        descricao_material: String(get('descricao_material') ?? '').trim(),
+        referencia: get('referencia') ? String(get('referencia')).trim() : null,
+        categoria: get('categoria') ? String(get('categoria')).trim() : null,
+        unidade: get('unidade') ? String(get('unidade')).trim() : null,
+        preco_unitario: preco,
+        vigente: true,
+      };
+    });
+
+    const records = allMappedRecords.filter(r => r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
+    const ignoredRowsData = rows.filter((_, index) => {
+      const r = allMappedRecords[index];
+      return !(r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
+    });
 
     if (records.length === 0) {
       toast.error('Nenhuma linha válida encontrada');
