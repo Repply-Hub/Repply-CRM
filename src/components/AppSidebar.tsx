@@ -37,9 +37,10 @@ export function AppSidebar() {
   const { data: unreadChat = 0 } = useUnreadChatMessages();
 
   const { items, save, isSaving } = useSidebarPreferences();
+  const { profile } = useAuth();
 
-  const { data: vendedor } = useQuery({
-    queryKey: ['meu_perfil', user?.id],
+  const { data: vendedorLocal } = useQuery({
+    queryKey: ['meu_perfil_sidebar', user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('usuarios')
@@ -48,8 +49,11 @@ export function AppSidebar() {
         .maybeSingle();
       return data;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !profile,
+    staleTime: 1000 * 60 * 5, // 5 minutos de cache
   });
+
+  const vendedor = profile || vendedorLocal;
 
   const isVendedor = vendedor?.role === 'vendedor';
   const { data: permissoes } = usePermissoes(isVendedor ? vendedor?.id : undefined);
