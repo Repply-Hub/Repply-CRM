@@ -219,29 +219,44 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData, initialCategory
           </div>
           
           <Dialog open={newCategoryOpen} onOpenChange={setNewCategoryOpen}>
-            <DialogContent className="sm:max-w-[300px]">
+            <DialogContent className="w-[90vw] sm:max-w-[300px] p-4 sm:p-6 rounded-xl sm:rounded-lg">
               <DialogHeader>
-                <DialogTitle className="text-sm">Nova Categoria</DialogTitle>
+                <DialogTitle className="text-sm font-semibold">Nova Categoria</DialogTitle>
               </DialogHeader>
-              <div className="space-y-3 pt-2">
-                <Input 
-                  placeholder="Nome da categoria" 
-                  value={newCategoryName}
-                  onChange={e => setNewCategoryName(e.target.value)}
-                  autoFocus
-                />
-                <Button 
-                  className="w-full h-8 text-xs" 
-                  onClick={() => {
-                    if (newCategoryName.trim()) {
-                      setCategoria(newCategoryName.trim());
-                      setNewCategoryName('');
-                      setNewCategoryOpen(false);
-                    }
-                  }}
-                >
-                  Confirmar
-                </Button>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="new-category-input" className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Nome</Label>
+                  <Input 
+                    id="new-category-input"
+                    placeholder="Ex: Pisos, Louças..." 
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    autoFocus
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button 
+                    type="button"
+                    variant="ghost"
+                    className="flex-1 h-9 text-xs" 
+                    onClick={() => setNewCategoryOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    className="flex-[2] h-9 text-xs" 
+                    onClick={() => {
+                      if (newCategoryName.trim()) {
+                        setCategoria(newCategoryName.trim());
+                        setNewCategoryName('');
+                        setNewCategoryOpen(false);
+                      }
+                    }}
+                  >
+                    Confirmar
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
