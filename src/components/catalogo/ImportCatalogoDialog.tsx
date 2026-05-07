@@ -152,7 +152,7 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
         preco_unitario: preco,
         vigente: true,
       };
-    }).filter(r => r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
+    }).filter(r => r.descricao_material && !isNaN(r.preco_unitario));
 
     if (records.length === 0) {
       console.log('Dados processados para depuração:', rows.slice(0, 3));
