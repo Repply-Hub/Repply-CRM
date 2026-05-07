@@ -808,6 +808,48 @@ const Fabricantes = () => {
         }}
       />
 
+      <Dialog open={newCategoryOpen} onOpenChange={setNewCategoryOpen}>
+        <DialogContent className="sm:max-w-[350px]">
+          <DialogHeader>
+            <DialogTitle>Nova Categoria</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome da Categoria</Label>
+              <Input 
+                placeholder="Ex: Cerâmicas, Ferramentas..." 
+                value={newCategoryName}
+                onChange={e => setNewCategoryName(e.target.value)}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Dica: Você também pode criar categorias diretamente ao adicionar ou editar um produto.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setNewCategoryOpen(false)}>Cancelar</Button>
+              <Button 
+                onClick={() => {
+                  if (newCategoryName.trim()) {
+                    setEditPreco(null);
+                    // Passamos a categoria para o formulário de preço via estado, 
+                    // mas como o PrecoForm é um componente separado, precisamos garantir que ele receba.
+                    // Vou ajustar o PrecoForm para aceitar uma categoria inicial opcional ou usar o estado do pai.
+                    // Para simplificar, vamos apenas abrir o dialog de preço e o usuário digita ou 
+                    // podemos passar via prop se ajustarmos o PrecoForm.
+                    // Vamos ajustar o PrecoForm para aceitar initialCategory.
+                    setPrecoDialog(true);
+                  }
+                }}
+              >
+                Continuar para Novo Produto
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
       <AlertDialog open={!!deleteAlert} onOpenChange={(o) => !o && setDeleteAlert(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
