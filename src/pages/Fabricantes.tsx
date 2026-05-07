@@ -521,52 +521,61 @@ const Fabricantes = () => {
                           {precos?.length ?? 0} produto{(precos?.length ?? 0) !== 1 ? 's' : ''} cadastrado{(precos?.length ?? 0) !== 1 ? 's' : ''}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2 flex-wrap items-center w-full sm:w-auto">
-                        <div className="flex-1 sm:flex-initial">
-                          <FilterButton
-                            hasFilters={hasFilters}
-                            activeFilterCount={activeFilterCount}
-                            onClear={() => setFiltroCategoria('todas')}
-                            className="w-full sm:w-auto"
-                          >
-                            <div className="space-y-2">
-                              <Label className="text-xs uppercase text-muted-foreground font-semibold">Categoria</Label>
-                              <SearchableSelect
-                                options={[
-                                  { value: "todas", label: "Todas categorias" },
-                                  ...categoriasPreco.map(c => ({ value: c, label: c }))
-                                ]}
-                                value={filtroCategoria}
-                                onValueChange={setFiltroCategoria}
-                                placeholder="Filtrar por categoria"
-                              />
-                            </div>
-                          </FilterButton>
-                        </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <FilterButton
+                          hasFilters={hasFilters}
+                          activeFilterCount={activeFilterCount}
+                          onClear={() => setFiltroCategoria('todas')}
+                          className="h-9"
+                        >
+                          <div className="space-y-2">
+                            <Label className="text-xs uppercase text-muted-foreground font-semibold">Categoria</Label>
+                            <SearchableSelect
+                              options={[
+                                { value: "todas", label: "Todas categorias" },
+                                ...categoriasPreco.map(c => ({ value: c, label: c }))
+                              ]}
+                              value={filtroCategoria}
+                              onValueChange={setFiltroCategoria}
+                              placeholder="Filtrar por categoria"
+                            />
+                          </div>
+                        </FilterButton>
 
-                        <div className="flex gap-2 w-full sm:w-auto">
-                          <ColumnSettings
-                            columns={precoColumns}
-                            visibleColumns={visiblePrecoColumns}
-                            onChange={setVisiblePrecoColumns}
-                            onRename={handlePrecoRename}
-                            onTypeChange={handlePrecoTypeChange}
-                            onReorder={handlePrecoReorder}
-                            onAdd={handleAddPrecoColumn}
-                            onRemove={handleRemovePrecoColumn}
-                            presets={precoPresets}
-                            onSavePreset={savePrecoPreset}
-                            onLoadPreset={loadPrecoPreset}
-                            onDeletePreset={deletePrecoPreset}
-                            className="h-8 flex-1 sm:flex-initial"
-                          />
-                          <Button size="sm" variant="outline" onClick={() => setImportDialog(true)} className="gap-1.5 h-8 flex-1 sm:flex-initial">
-                            <Upload className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Importar</span>
-                          </Button>
-                          <Button size="sm" onClick={() => { setEditPreco(null); setPrecoDialog(true); }} className="gap-1.5 h-8 flex-1 sm:flex-initial">
-                            <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Novo Produto</span><span className="sm:hidden">Novo</span>
-                          </Button>
-                        </div>
+                        <ColumnSettings
+                          columns={precoColumns}
+                          visibleColumns={visiblePrecoColumns}
+                          onChange={setVisiblePrecoColumns}
+                          onRename={handlePrecoRename}
+                          onTypeChange={handlePrecoTypeChange}
+                          onReorder={handlePrecoReorder}
+                          onAdd={handleAddPrecoColumn}
+                          onRemove={handleRemovePrecoColumn}
+                          presets={precoPresets}
+                          onSavePreset={savePrecoPreset}
+                          onLoadPreset={loadPrecoPreset}
+                          onDeletePreset={deletePrecoPreset}
+                          className="h-9"
+                        />
+
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => setImportDialog(true)} 
+                          className="gap-1.5 h-9"
+                        >
+                          <Upload className="h-3.5 w-3.5" /> 
+                          <span>Importar</span>
+                        </Button>
+                        
+                        <Button 
+                          size="sm" 
+                          onClick={() => { setEditPreco(null); setPrecoDialog(true); }} 
+                          className="gap-1.5 h-9 bg-primary hover:bg-primary/90"
+                        >
+                          <Plus className="h-4 w-4" /> 
+                          <span>Novo Produto</span>
+                        </Button>
                       </div>
                     </div>
                   </CardHeader>
