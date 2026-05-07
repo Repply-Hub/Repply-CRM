@@ -32,12 +32,13 @@ import { SearchableSelect } from '@/components/SearchableSelect';
 import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
-  { id: 'imagem', label: 'Imagem', locked: false },
-  { id: 'descricao', label: 'Descrição', locked: false },
+  { id: 'descricao', label: 'Produto', locked: false },
+  { id: 'imagem', label: 'Fotos', locked: false },
+  { id: 'estoque', label: 'Estoque Disponível', locked: false },
+  { id: 'unidade', label: 'Unidade de Medida', locked: false },
+  { id: 'preco', label: 'Preço de Varejo', locked: false },
   { id: 'categoria', label: 'Categoria', locked: false },
   { id: 'referencia', label: 'Referência', locked: false },
-  { id: 'preco', label: 'Preço Unit.', locked: false },
-  { id: 'unidade', label: 'Unidade', locked: false },
   { id: 'status', label: 'Status', locked: false },
   { id: 'acoes', label: 'Ações', locked: false },
 ];
@@ -119,7 +120,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   fabricanteId: string;
-  editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean; categoria?: string | null; imagem_url?: string | null };
+  editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean; categoria?: string | null; imagem_url?: string | null; estoque_disponivel?: number | null };
 }) {
   const createPreco = useCreatePreco();
   const updatePreco = useUpdatePreco();
@@ -131,6 +132,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
   const [vigente, setVigente] = useState(editData?.vigente ?? true);
   const [categoria, setCategoria] = useState(editData?.categoria ?? '');
   const [imagemUrl, setImagemUrl] = useState<string | null>(editData?.imagem_url ?? null);
+  const [estoque, setEstoque] = useState(editData?.estoque_disponivel?.toString() ?? '0');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,6 +144,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
       vigente,
       categoria: categoria.trim() || null,
       imagem_url: imagemUrl,
+      estoque_disponivel: parseFloat(estoque) || 0,
     };
     try {
       if (editData) {
@@ -183,7 +186,10 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><Label>Preço Unitário (R$)</Label><Input type="number" step="0.01" value={preco} onChange={e => setPreco(e.target.value)} required /></div>
+            <div><Label>Preço de Varejo (R$)</Label><Input type="number" step="0.01" value={preco} onChange={e => setPreco(e.target.value)} required /></div>
+            <div><Label>Estoque Disponível</Label><Input type="number" step="0.01" value={estoque} onChange={e => setEstoque(e.target.value)} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Unidade</Label>
               <Select value={unidade} onValueChange={setUnidade}>
@@ -626,6 +632,8 @@ const Fabricantes = () => {
                                         );
                                       case 'descricao':
                                         return <TableCell key={colId} className="font-medium text-sm">{p.descricao_material}</TableCell>;
+                                      case 'estoque':
+                                        return <TableCell key={colId} className="text-sm text-muted-foreground">{p.estoque_disponivel ?? 0}</TableCell>;
                                       case 'categoria':
                                         return (
                                           <TableCell key={colId} className="text-xs">

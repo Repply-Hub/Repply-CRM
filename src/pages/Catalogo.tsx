@@ -162,12 +162,13 @@ const Catalogo = () => {
                 <CardContent className="p-3 space-y-1">
                   <p className="text-sm font-semibold line-clamp-2" title={p.descricao_material}>{p.descricao_material}</p>
                   <p className="text-xs text-muted-foreground truncate">{p.fabricantes?.nome ?? '-'}</p>
-                  <div className="flex items-center justify-between gap-2 pt-1">
+                  <div className="flex flex-col gap-1 pt-1">
                     <p className="text-sm font-bold text-primary">
                       {Number(p.preco_unitario).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      {p.unidade && <span className="text-[10px] text-muted-foreground font-normal"> /{p.unidade}</span>}
+                      {p.unidade && <span className="text-[10px] text-muted-foreground font-normal"> / {p.unidade}</span>}
                     </p>
-                    {p.categoria && <Badge variant="secondary" className="text-[10px] font-normal">{p.categoria}</Badge>}
+                    <p className="text-[10px] text-muted-foreground">Estoque: {p.estoque_disponivel ?? 0}</p>
+                    {p.categoria && <Badge variant="secondary" className="text-[10px] font-normal self-start">{p.categoria}</Badge>}
                   </div>
                   {p.referencia && <p className="text-[10px] text-muted-foreground">Ref: {p.referencia}</p>}
                 </CardContent>

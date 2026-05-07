@@ -1676,6 +1676,7 @@ export type Database = {
           categoria: string | null
           created_at: string
           descricao_material: string
+          estoque_disponivel: number | null
           fabricante_id: string
           id: string
           imagem_url: string | null
@@ -1688,6 +1689,7 @@ export type Database = {
           categoria?: string | null
           created_at?: string
           descricao_material: string
+          estoque_disponivel?: number | null
           fabricante_id: string
           id?: string
           imagem_url?: string | null
@@ -1700,6 +1702,7 @@ export type Database = {
           categoria?: string | null
           created_at?: string
           descricao_material?: string
+          estoque_disponivel?: number | null
           fabricante_id?: string
           id?: string
           imagem_url?: string | null
