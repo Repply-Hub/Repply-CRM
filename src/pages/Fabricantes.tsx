@@ -144,6 +144,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
       vigente,
       categoria: categoria.trim() || null,
       imagem_url: imagemUrl,
+      estoque_disponivel: parseFloat(estoque) || 0,
     };
     try {
       if (editData) {
