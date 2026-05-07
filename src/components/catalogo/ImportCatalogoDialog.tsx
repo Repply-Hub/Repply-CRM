@@ -98,7 +98,7 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
       return;
     }
 
-    const records = rows.map(row => {
+    const records = rows.map((row, index) => {
       const get = (target: TargetKey) => {
         const col = Object.entries(mapping).find(([, v]) => v === target)?.[0];
         if (!col) return undefined;
@@ -111,18 +111,39 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
       if (typeof precoRaw === 'number') {
         preco = precoRaw;
       } else if (precoRaw) {
-        preco = parseFloat(String(precoRaw).replace(/[^\d,.]/g, '').replace(',', '.'));
+        // Handle various currency formats: R$ 1.234,56 or 1234.56
+        const sanitized = String(precoRaw)
+          .replace(/[^\d,.]/g, '') // remove currency symbols and letters
+          .trim();
+        
+        if (sanitized.includes(',') && sanitized.includes('.')) {
+          // Format like 1.234,56
+          preco = parseFloat(sanitized.replace(/\./g, '').replace(',', '.'));
+        } else if (sanitized.includes(',')) {
+          // Format like 1234,56
+          preco = parseFloat(sanitized.replace(',', '.'));
+        } else {
+          // Format like 1234.56
+          preco = parseFloat(sanitized);
+        }
       }
 
       const estoqueRaw = get('estoque_disponivel');
       let estoque = null;
       if (estoqueRaw !== undefined && estoqueRaw !== null && estoqueRaw !== '') {
-        estoque = typeof estoqueRaw === 'number' ? estoqueRaw : parseFloat(String(estoqueRaw).replace(/[^\d,.]/g, '').replace(',', '.'));
+        if (typeof estoqueRaw === 'number') {
+          estoque = estoqueRaw;
+        } else {
+          const sanitized = String(estoqueRaw).replace(/[^\d,.]/g, '').replace(',', '.');
+          estoque = parseFloat(sanitized);
+        }
       }
+
+      const descricao = String(get('descricao_material') ?? '').trim();
 
       return {
         fabricante_id: fabricanteId,
-        descricao_material: String(get('descricao_material') ?? '').trim(),
+        descricao_material: descricao,
         referencia: get('referencia') ? String(get('referencia')).trim() : null,
         categoria: get('categoria') ? String(get('categoria')).trim() : null,
         unidade: get('unidade') ? String(get('unidade')).trim() : null,
@@ -132,8 +153,10 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
         vigente: true,
       };
     }).filter(r => r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
+
     if (records.length === 0) {
-      toast.error('Nenhuma linha válida encontrada. Verifique se as colunas de Produto e Preço estão preenchidas.');
+      console.log('Dados processados para depuração:', rows.slice(0, 3));
+      toast.error('Nenhuma linha válida encontrada. Verifique se as colunas de "Produto" e "Preço de varejo" estão corretamente preenchidas.');
       return;
     }
 
