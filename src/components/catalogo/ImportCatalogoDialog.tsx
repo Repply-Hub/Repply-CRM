@@ -18,11 +18,13 @@ interface Props {
 }
 
 const TARGET_FIELDS = [
-  { key: 'descricao_material', label: 'Descrição *', required: true },
+  { key: 'descricao_material', label: 'Produto *', required: true },
+  { key: 'imagem_url', label: 'Fotos (URL)' },
+  { key: 'estoque_disponivel', label: 'Estoque Disponível' },
+  { key: 'unidade', label: 'Unidade de Medida' },
+  { key: 'preco_unitario', label: 'Preço de Varejo *', required: true },
   { key: 'referencia', label: 'Referência' },
   { key: 'categoria', label: 'Categoria' },
-  { key: 'preco_unitario', label: 'Preço unitário *', required: true },
-  { key: 'unidade', label: 'Unidade' },
 ] as const;
 
 type TargetKey = typeof TARGET_FIELDS[number]['key'];
@@ -31,11 +33,13 @@ const SKIP = '__skip__';
 
 function autoMap(header: string): TargetKey | null {
   const h = header.toLowerCase().trim();
-  if (/(desc|produto|material|item)/.test(h)) return 'descricao_material';
+  if (/(produto|desc|material|item)/.test(h)) return 'descricao_material';
+  if (/(foto|img|imagem|url)/.test(h)) return 'imagem_url';
+  if (/(estoque|disponível|disponivel|qtd|quant)/.test(h)) return 'estoque_disponivel';
+  if (/(unidade|medida|un)/.test(h)) return 'unidade';
+  if (/(preço|preco|valor|varejo)/.test(h)) return 'preco_unitario';
   if (/(ref|cód|cod|sku)/.test(h)) return 'referencia';
   if (/(categ|linha|grupo|famíl|famil)/.test(h)) return 'categoria';
-  if (/(preço|preco|valor)/.test(h)) return 'preco_unitario';
-  if (/(un|medida)/.test(h)) return 'unidade';
   return null;
 }
 
