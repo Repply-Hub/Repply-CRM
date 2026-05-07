@@ -608,11 +608,35 @@ const NovoPedido = () => {
                   </div>
 
                   {itens.length === 0 ? (
-                    <div className="border border-dashed border-border rounded-lg p-8 text-center">
-                      <p className="text-sm text-muted-foreground mb-3">Nenhum item adicionado</p>
-                      <Button size="sm" variant="outline" onClick={addItem}>
-                        <Plus className="h-4 w-4 mr-1" /> Adicionar primeiro item
-                      </Button>
+                    <div className="space-y-4">
+                      <div className="border border-dashed border-border rounded-lg p-8 text-center">
+                        <p className="text-sm text-muted-foreground mb-3">Nenhum item adicionado</p>
+                        <Button size="sm" variant="outline" onClick={addItem}>
+                          <Plus className="h-4 w-4 mr-1" /> Adicionar primeiro item
+                        </Button>
+                      </div>
+                      
+                      <div className="flex justify-end">
+                        <div className="w-full max-w-[240px] space-y-1 p-4 border rounded-xl bg-muted/20">
+                          <Label className="text-sm font-semibold">Valor de Negociação</Label>
+                          <div className="relative">
+                            <Input 
+                              type="number" 
+                              className="h-10 text-base font-bold"
+                              value={valorManual ?? ''}
+                              onChange={(e) => {
+                                setValorManual(parseFloat(e.target.value) || 0);
+                                setIsManualMode(true);
+                              }}
+                              placeholder="0,00"
+                            />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                              <span className="text-muted-foreground hidden">R$</span>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">Defina o valor manualmente se não houver itens.</p>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="rounded-xl border border-border overflow-hidden">
