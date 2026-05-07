@@ -118,7 +118,13 @@ const Catalogo = () => {
             <SearchableSelect
               options={[
                 { value: "todos", label: "Todos fabricantes" },
-                ...(fabricantes ?? []).map(f => ({ value: f.id, label: f.nome }))
+                ...(fabricantes ?? [])
+                  .sort((a, b) => {
+                    if (a.id === fabricanteId) return -1;
+                    if (b.id === fabricanteId) return 1;
+                    return a.nome.localeCompare(b.nome);
+                  })
+                  .map(f => ({ value: f.id, label: f.nome }))
               ]}
               value={fabricanteId}
               onValueChange={setFabricanteId}
