@@ -369,7 +369,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                                         </button>
                                                                                     )}
                                                                                 </div>
-                                                                            )
+                                                                            );
                                                                         }}
                                                                     </Draggable>
                                                                 );
