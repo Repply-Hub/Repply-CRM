@@ -1,7 +1,7 @@
 import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
 import * as XLSX from 'xlsx';
 
-export type FieldKey = 'negocio' | 'cliente' | 'contato' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'data_pedido';
+export type FieldKey = 'negocio' | 'cliente' | 'contato' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'data_pedido' | 'prazo_resposta';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'negocio', label: 'Negócio', required: false },
@@ -12,7 +12,8 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'valor', label: 'Valor', required: false },
   { key: 'vendedor', label: 'Responsável/Vendedor', required: false },
   { key: 'status', label: 'Etapa', required: false },
-  { key: 'data_pedido', label: 'Data', required: false },
+  { key: 'data_pedido', label: 'Criação', required: false },
+  { key: 'prazo_resposta', label: 'Fechamento', required: false },
   { key: 'observacoes', label: 'Observações', required: false },
 ];
 
@@ -27,6 +28,7 @@ const EMPTY_MAPPING: Record<FieldKey, string> = {
   observacoes: '',
   status: '',
   data_pedido: '',
+  prazo_resposta: '',
 };
 
 const FIELD_KEYS = Object.keys(EMPTY_MAPPING) as FieldKey[];
@@ -102,9 +104,17 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /^data$/, score: 100 },
     { pattern: /^criado$/, score: 98 },
     { pattern: /^criado\s*em$/, score: 98 },
+    { pattern: /^criacao$/, score: 100 },
     { pattern: /data/, score: 85 },
     { pattern: /criado/, score: 80 },
     { pattern: /date/, score: 85 },
+  ],
+  prazo_resposta: [
+    { pattern: /^fechamento$/, score: 100 },
+    { pattern: /^prazo$/, score: 95 },
+    { pattern: /^prazo\s*resposta$/, score: 100 },
+    { pattern: /fechamento/, score: 85 },
+    { pattern: /prazo/, score: 80 },
   ],
   vendedor: [
     { pattern: /^vendedor$/, score: 100 },
@@ -136,6 +146,7 @@ const MIN_SCORE: Record<FieldKey, number> = {
   observacoes: 68,
   status: 70,
   data_pedido: 70,
+  prazo_resposta: 70,
 };
 
 const STATUS_RULES: Array<{ status: string; patterns: RegExp[] }> = [
@@ -289,39 +300,12 @@ export function getImportedPedidosRows(
       
       let data_pedido = undefined;
       if (mapping.data_pedido && row[mapping.data_pedido]) {
-        const rawDate = row[mapping.data_pedido];
-        if (typeof rawDate === 'number') {
-          // Handle Excel numeric date format - Excel starts from 1899-12-30
-          // Use UTC to avoid timezone issues during conversion
-          const date = XLSX.SSF.parse_date_code(rawDate);
-          data_pedido = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
-        } else {
-          const dateStr = rawDate.toString().trim();
-          
-          // Tenta detectar formato DD/MM/YYYY ou DD-MM-YYYY
-          const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-          if (ddmmyyyyMatch) {
-            const day = ddmmyyyyMatch[1].padStart(2, '0');
-            const month = ddmmyyyyMatch[2].padStart(2, '0');
-            const year = ddmmyyyyMatch[3];
-            data_pedido = `${year}-${month}-${day}`;
-          } else {
-            // Tenta converter para o início do dia local para evitar problemas de fuso horário
-            const parts = dateStr.split(/[\/\-]/);
-            if (parts.length === 3 && parts[0].length <= 2 && parts[2].length === 4) {
-              // DD/MM/YYYY fallback manual
-              data_pedido = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            } else {
-              const d = new Date(dateStr);
-              if (!isNaN(d.getTime())) {
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                data_pedido = `${year}-${month}-${day}`;
-              }
-            }
-          }
-        }
+        data_pedido = processDate(row[mapping.data_pedido]);
+      }
+
+      let prazo_resposta = undefined;
+      if (mapping.prazo_resposta && row[mapping.prazo_resposta]) {
+        prazo_resposta = processDate(row[mapping.prazo_resposta]);
       }
 
       const campos_extras: Record<string, string> = {};
@@ -338,6 +322,43 @@ export function getImportedPedidosRows(
         if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
-      return { negocio, cliente, contato, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, campos_extras };
+      return { negocio, cliente, contato, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, prazo_resposta, campos_extras };
     });
+}
+
+function processDate(rawDate: any): string | undefined {
+  if (!rawDate) return undefined;
+  if (typeof rawDate === 'number') {
+    // Handle Excel numeric date format - Excel starts from 1899-12-30
+    // Use UTC to avoid timezone issues during conversion
+    const date = XLSX.SSF.parse_date_code(rawDate);
+    return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+  } else {
+    const dateStr = rawDate.toString().trim();
+    
+    // Tenta detectar formato DD/MM/YYYY ou DD-MM-YYYY
+    const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (ddmmyyyyMatch) {
+      const day = ddmmyyyyMatch[1].padStart(2, '0');
+      const month = ddmmyyyyMatch[2].padStart(2, '0');
+      const year = ddmmyyyyMatch[3];
+      return `${year}-${month}-${day}`;
+    } else {
+      // Tenta converter para o início do dia local para evitar problemas de fuso horário
+      const parts = dateStr.split(/[\/\-]/);
+      if (parts.length === 3 && parts[0].length <= 2 && parts[2].length === 4) {
+        // DD/MM/YYYY fallback manual
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      } else {
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        }
+      }
+    }
+  }
+  return undefined;
 }

@@ -204,6 +204,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         vendedor: rest.vendedor || '',
         status: rest.status || 'novo lead',
         data_pedido: rest.data_pedido || undefined,
+        prazo_resposta: rest.prazo_resposta || undefined,
         observacoes: rest.observacoes || '',
         campos_extras: campos_extras || {}
       };
@@ -489,7 +490,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             campos_extras: finalCamposExtras,
             data_pedido: r.data_pedido || new Date().toLocaleDateString('en-CA'), // en-CA retorna YYYY-MM-DD
             created_at: r.data_pedido ? `${r.data_pedido}T12:00:00.000Z` : new Date().toISOString(),
-            prazo_resposta: r.status === 'fechamento' ? (r.data_pedido || new Date().toLocaleDateString('en-CA')) : null,
+            prazo_resposta: r.prazo_resposta || (r.status === 'fechamento' ? (r.data_pedido || new Date().toLocaleDateString('en-CA')) : null),
           };
         });
         const { error } = await supabase.from('pedidos').insert(batch);
