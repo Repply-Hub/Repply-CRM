@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useCatalogoGlobal, useDeleteCategoria, useDeletePreco, useBulkDeletePrecos } from '@/hooks/use-fabricantes';
 import { useFabricantes } from '@/hooks/use-clientes';
-import { Search, Package, ImageIcon, Loader2, Trash2, Folder, ChevronLeft, ArrowLeft, Eye, Plus } from 'lucide-react';
+import { Search, Package, ImageIcon, Loader2, Trash2, Folder, ChevronLeft, ArrowLeft, Eye, Plus, CheckSquare, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProductForm } from '@/components/catalogo/ProductForm';
 import { SearchableSelect } from '@/components/SearchableSelect';
