@@ -32,12 +32,13 @@ import { SearchableSelect } from '@/components/SearchableSelect';
 import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
-  { id: 'imagem', label: 'Imagem', locked: false },
-  { id: 'descricao', label: 'Descrição', locked: false },
+  { id: 'descricao', label: 'Produto', locked: false },
+  { id: 'imagem', label: 'Fotos', locked: false },
+  { id: 'estoque', label: 'Estoque Disponível', locked: false },
+  { id: 'unidade', label: 'Unidade de Medida', locked: false },
+  { id: 'preco', label: 'Preço de Varejo', locked: false },
   { id: 'categoria', label: 'Categoria', locked: false },
   { id: 'referencia', label: 'Referência', locked: false },
-  { id: 'preco', label: 'Preço Unit.', locked: false },
-  { id: 'unidade', label: 'Unidade', locked: false },
   { id: 'status', label: 'Status', locked: false },
   { id: 'acoes', label: 'Ações', locked: false },
 ];
