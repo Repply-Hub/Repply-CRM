@@ -18,9 +18,12 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, title, subtitle, headerContent, mainClassName }: AppLayoutProps) {
-  const { user } = useAuth();
-  const { data: perfil } = useQuery({
-    queryKey: ['meu_perfil', user?.id],
+  const { user, profile } = useAuth();
+  
+  // Usamos o perfil do AuthContext se disponível, senão buscamos localmente
+  // Isso evita múltiplas buscas do mesmo perfil em cada montagem de layout
+  const { data: perfilLocal } = useQuery({
+    queryKey: ['meu_perfil_layout', user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('usuarios')
@@ -29,8 +32,11 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
         .maybeSingle();
       return data;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !profile,
+    staleTime: 1000 * 60 * 5, // 5 minutos de cache
   });
+
+  const displayPerfil = profile || perfilLocal;
 
   const initials = perfil?.nome
     ? perfil.nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
