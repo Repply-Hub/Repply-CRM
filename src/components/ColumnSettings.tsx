@@ -178,7 +178,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                     <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={8} className="w-auto p-0 shadow-2xl border-border/40 z-[50]">
+            <PopoverContent align="end" sideOffset={8} className="w-[200px] p-0 shadow-2xl border-border/40 z-[50] overflow-hidden">
                 <div className="flex flex-col divide-y divide-border/50 overflow-hidden max-h-[min(calc(100vh-120px),700px)]">
                     {!hideColumns && (
                         <div className="w-full flex flex-col">
@@ -192,13 +192,16 @@ export const ColumnSettings = memo(function ColumnSettings({
                                         <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200" />
                                     </button>
                                 </PopoverTrigger>
-                                <PopoverContent side="right" align="start" sideOffset={5} className="w-[320px] p-0 shadow-2xl border-border/40 z-[60]">
+                                <PopoverContent side="left" align="start" sideOffset={5} className="w-[320px] p-0 shadow-2xl border-border/40 z-[60]">
                                     <div className="flex flex-col h-full max-h-[500px]">
                                         <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
                                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
                                             {onAdd && (
                                                 <button
-                                                    onClick={() => setIsAdding(!isAdding)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setIsAdding(!isAdding);
+                                                    }}
                                                     className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 group"
                                                     title="Criar nova coluna"
                                                 >
