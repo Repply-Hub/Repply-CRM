@@ -103,7 +103,8 @@ const Catalogo = () => {
               <SearchableSelect
                 options={[
                   { value: "todas", label: "Todas categorias" },
-                  ...categorias.map(c => ({ value: c, label: c }))
+                  ...categorias.map(c => ({ value: c, label: c })),
+                  ...((produtos ?? []).some((p: any) => !p.categoria) ? [{ value: "sem-categoria", label: "Sem categoria" }] : [])
                 ]}
                 value={categoria}
                 onValueChange={setCategoria}
