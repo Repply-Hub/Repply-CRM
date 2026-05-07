@@ -33,19 +33,15 @@ const SKIP = '__skip__';
 
 function autoMap(header: string): TargetKey | null {
   const h = header.toLowerCase().trim();
-  if (h === 'produto') return 'descricao_material';
-  if (h === 'fotos') return 'imagem_url';
-  if (h === 'estoque disponível') return 'estoque_disponivel';
-  if (h === 'unidade de medida') return 'unidade';
-  if (h === 'preço de varejo') return 'preco_unitario';
   
-  if (/(produto|desc|material|item)/.test(h)) return 'descricao_material';
-  if (/(foto|img|imagem|url)/.test(h)) return 'imagem_url';
-  if (/(estoque|disponível|disponivel|qtd|quant)/.test(h)) return 'estoque_disponivel';
-  if (/(unidade|medida|un)/.test(h)) return 'unidade';
-  if (/(preço|preco|valor|varejo)/.test(h)) return 'preco_unitario';
+  if (h === 'produto' || /(produto|desc|material|item)/.test(h)) return 'descricao_material';
+  if (h === 'fotos' || h === 'mais fotos' || /(foto|img|imagem|url)/.test(h)) return 'imagem_url';
+  if (h === 'estoque disponível' || h === 'estoque disponivel' || /(estoque|disponível|disponivel|qtd|quant)/.test(h)) return 'estoque_disponivel';
+  if (h === 'unidade de medida' || /(unidade|medida|un)/.test(h)) return 'unidade';
+  if (h === 'preço de varejo' || h === 'preco de varejo' || /(preço|preco|valor|varejo)/.test(h)) return 'preco_unitario';
   if (/(ref|cód|cod|sku)/.test(h)) return 'referencia';
   if (/(categ|linha|grupo|famíl|famil)/.test(h)) return 'categoria';
+  
   return null;
 }
 
