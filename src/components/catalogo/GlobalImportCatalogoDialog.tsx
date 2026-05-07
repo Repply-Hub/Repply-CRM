@@ -163,16 +163,18 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
       }
 
       if (!recordsByFab[fabId]) recordsByFab[fabId] = [];
-      recordsByFab[fabId].push({
-        fabricante_id: fabId,
-        descricao_material: row.descricao_material,
-        referencia: row.referencia || null,
-        categoria: row.categoria || null,
-        unidade: row.unidade || null,
-        preco_unitario: Number(row.preco_unitario),
-        vigente: true,
-        campos_extras: row.campos_extras || {},
-      });
+        recordsByFab[fabId].push({
+          fabricante_id: fabId,
+          descricao_material: row.descricao_material,
+          referencia: row.referencia || null,
+          categoria: row.categoria || null,
+          unidade: row.unidade || null,
+          imagem_url: row.imagem_url || null,
+          estoque_disponivel: row.estoque_disponivel !== undefined && row.estoque_disponivel !== '' ? Number(row.estoque_disponivel) : null,
+          preco_unitario: Number(row.preco_unitario),
+          vigente: true,
+          campos_extras: row.campos_extras || {},
+        });
     });
 
     return { recordsByFab, ignoredRows };
