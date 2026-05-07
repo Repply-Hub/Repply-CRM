@@ -64,10 +64,21 @@ export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorC
                   Solte aqui para mover
                 </div>
               )}
-              {orders.map((order, idx) => (
+              {visibleOrders.map((order, idx) => (
                 <KanbanCard key={order.id} order={order} index={idx} onClick={onCardClick} visibleColumns={visibleColumns} columns={columns} />
               ))}
               {provided.placeholder}
+              {hasMore && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadMore}
+                  className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs text-primary hover:bg-primary/5 border-primary/20"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  Ver mais ({orders.length - visibleCount})
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
