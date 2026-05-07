@@ -500,7 +500,7 @@ const Fabricantes = () => {
                 {/* Price Table */}
                 <Card className="rounded-xl border-border/60">
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <CardTitle className="text-base font-bold flex items-center gap-2">
                           <Package className="h-4 w-4 text-primary" /> Catálogo de Produtos
