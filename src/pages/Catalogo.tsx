@@ -300,8 +300,23 @@ const Catalogo = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filtered.map((p: any) => (
-              <Card key={p.id} className="rounded-xl border-border/60 overflow-hidden hover:shadow-[var(--shadow-card-hover)] transition-shadow group relative">
+              <Card 
+                key={p.id} 
+                className={`rounded-xl border-border/60 overflow-hidden hover:shadow-[var(--shadow-card-hover)] transition-all group relative ${
+                  selectedIds.includes(p.id) ? 'ring-2 ring-primary border-primary bg-primary/5' : ''
+                } ${isSelectionMode ? 'cursor-pointer' : ''}`}
+                onClick={() => isSelectionMode && toggleSelection(p.id)}
+              >
                 <div className="aspect-square bg-muted/40 flex items-center justify-center overflow-hidden relative">
+                  {isSelectionMode && (
+                    <div className="absolute top-2 left-2 z-10">
+                      {selectedIds.includes(p.id) ? (
+                        <CheckSquare className="h-6 w-6 text-primary fill-white" />
+                      ) : (
+                        <Square className="h-6 w-6 text-muted-foreground/40 bg-white/80 rounded" />
+                      )}
+                    </div>
+                  )}
                   {p.imagem_url ? (
                     <img src={p.imagem_url} alt={p.descricao_material} className="h-full w-full object-cover" loading="lazy" />
                   ) : (
