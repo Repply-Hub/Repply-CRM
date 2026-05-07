@@ -82,7 +82,7 @@ export const StandardPopoverMenu = ({
                     <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
                         <h4 className="font-bold text-[10px] uppercase tracking-[0.15em] text-muted-foreground/80 leading-none">{label}</h4>
                     </div>
-                    <div className="p-1.5 flex flex-col gap-0.5">
+                    <div className="p-1.5 flex flex-col gap-0.5 overflow-y-auto max-h-[calc(90vh-80px)] custom-scrollbar">
                         {children}
                     </div>
                 </div>
