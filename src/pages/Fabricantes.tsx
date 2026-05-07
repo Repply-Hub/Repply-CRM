@@ -116,12 +116,14 @@ function FabricanteForm({ open, onOpenChange, editData }: {
 }
 
 // ─── Preco Form Dialog ──────────────────────────────────────────────
-function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
+function PrecoForm({ open, onOpenChange, fabricanteId, editData, initialCategory }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   fabricanteId: string;
   editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean; categoria?: string | null; imagem_url?: string | null; estoque_disponivel?: number | null };
+  initialCategory?: string;
 }) {
+
   const createPreco = useCreatePreco();
   const updatePreco = useUpdatePreco();
   const { data: todasCategorias } = useCategorias();
@@ -130,11 +132,19 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
   const [preco, setPreco] = useState(editData?.preco_unitario?.toString() ?? '');
   const [unidade, setUnidade] = useState(editData?.unidade ?? 'un');
   const [vigente, setVigente] = useState(editData?.vigente ?? true);
-  const [categoria, setCategoria] = useState(editData?.categoria ?? '');
+  const [categoria, setCategoria] = useState(editData?.categoria ?? initialCategory ?? '');
   const [imagemUrl, setImagemUrl] = useState<string | null>(editData?.imagem_url ?? null);
   const [estoque, setEstoque] = useState(editData?.estoque_disponivel?.toString() ?? '0');
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Sync initialCategory if it changes
+  useEffect(() => {
+    if (initialCategory && !editData) {
+      setCategoria(initialCategory);
+    }
+  }, [initialCategory, editData]);
+
 
   // Filtrar categorias apenas deste fabricante ou mostrar todas as globais?
   // O usuário pediu "criar categorias dentro daquela marca em específico"
@@ -789,7 +799,16 @@ const Fabricantes = () => {
       </div>
 
       <FabricanteForm open={fabDialog} onOpenChange={setFabDialog} editData={editFab} />
-      {selectedFabId && <PrecoForm open={precoDialog} onOpenChange={setPrecoDialog} fabricanteId={selectedFabId} editData={editPreco} />}
+      {selectedFabId && (
+        <PrecoForm 
+          open={precoDialog} 
+          onOpenChange={setPrecoDialog} 
+          fabricanteId={selectedFabId} 
+          editData={editPreco} 
+          initialCategory={newCategoryName}
+        />
+      )}
+
       {selectedFabId && (
         <ImportCatalogoDialog
           open={importDialog}
