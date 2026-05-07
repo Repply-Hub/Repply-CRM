@@ -62,6 +62,7 @@ describe('importPedidosUtils', () => {
         observacoes: '',
         status: 'negociacao',
         data_pedido: undefined,
+        prazo_resposta: undefined,
         campos_extras: {},
       },
       {
