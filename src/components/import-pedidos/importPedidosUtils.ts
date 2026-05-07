@@ -12,7 +12,8 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'valor', label: 'Valor', required: false },
   { key: 'vendedor', label: 'Responsável/Vendedor', required: false },
   { key: 'status', label: 'Etapa', required: false },
-  { key: 'data_pedido', label: 'Data', required: false },
+  { key: 'data_pedido', label: 'Criação', required: false },
+  { key: 'prazo_resposta', label: 'Fechamento', required: false },
   { key: 'observacoes', label: 'Observações', required: false },
 ];
 
