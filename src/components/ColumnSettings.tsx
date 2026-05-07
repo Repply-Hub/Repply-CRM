@@ -43,6 +43,8 @@ interface ColumnPreset {
     name: string;
 }
 
+import { StandardPopoverMenu, StandardMenuItem } from '@/components/ui/standard-popover-menu';
+
 interface ColumnSettingsProps {
     columns: ColumnDefinition[];
     visibleColumns: string[];
@@ -172,80 +174,57 @@ export const ColumnSettings = memo(function ColumnSettings({
     };
 
     return (
-        <Popover open={open} onOpenChange={onOpenChange}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                        'h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/[0.04] data-[state=open]:text-primary data-[state=open]:border-primary/60 shadow-sm active:scale-[0.98]',
-                        hideTrigger && 'hidden',
-                        className
-                    )}
-                >
-                    <Settings2 className="h-4 w-4 text-muted-foreground group-data-[state=open]:text-primary" />
-                    <span className="hidden sm:inline">Opções</span>
-                    <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={8} className="min-w-[180px] w-auto p-0 shadow-2xl border-border/40 z-[50] overflow-hidden" onPointerDownOutside={(e) => {
-                // Previne fechar o popover principal se o clique for no clone do drag and drop
-                if (e.target instanceof Element && e.target.closest('[data-rbd-drag-handle-context-id]')) {
-                    e.preventDefault();
-                }
-            }}>
-                <div className="flex flex-col divide-y divide-border/50 overflow-hidden max-h-[min(calc(100vh-120px),700px)]">
+        <StandardPopoverMenu
+            label="Opções"
+            icon={Settings2}
+            variant="trigger"
+            align="end"
+            side="bottom"
+            sideOffset={8}
+            className={hideTrigger ? 'hidden' : ''}
+            popoverClassName="w-64"
+        >
+
                     {!hideColumns && (
-                        <div className="w-full flex flex-col">
-                            <Popover modal={false}>
-                                <PopoverTrigger asChild>
-                                    <button className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors group">
-                                        <div className="flex items-center gap-2">
-                                            <Columns3 className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
-                                        </div>
-                                        <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200" />
-                                    </button>
-                                </PopoverTrigger>
-                                <PopoverContent side="left" align="start" sideOffset={5} className="min-w-[280px] w-auto max-w-[400px] p-0 shadow-2xl border-border/40 z-[60]" onPointerDownOutside={(e) => {
-                                    if (e.target instanceof Element && e.target.closest('[data-rbd-drag-handle-context-id]')) {
-                                        e.preventDefault();
-                                    }
-                                }}>
-                                    <div className="flex flex-col h-full max-h-[500px]">
-                                        <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
-                                            <div className="flex items-center gap-1">
-                                                {onReset && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
-                                                                onReset();
-                                                            }
-                                                        }}
-                                                        className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-all active:scale-95 group"
-                                                        title="Resetar para o padrão"
-                                                    >
-                                                        <RotateCcw className="h-3 w-3" />
-                                                        <span className="text-[10px] font-bold text-destructive/80">Resetar</span>
-                                                    </button>
-                                                )}
-                                                {onAdd && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setIsAdding(!isAdding);
-                                                        }}
-                                                        className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 group"
-                                                        title="Criar nova coluna"
-                                                    >
-                                                        <Plus className="h-3.5 w-3.5" />
-                                                        <span className="text-[10px] font-bold">Nova</span>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
+                        <StandardPopoverMenu
+                            label={label}
+                            icon={Columns3}
+                            side="left"
+                            align="start"
+                            sideOffset={10}
+                            popoverClassName="w-[300px]"
+                        >
+                            <div className="flex flex-col h-full max-h-[500px]">
+                                <div className="flex items-center gap-1 justify-end px-1 pb-2">
+                                    {onReset && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
+                                                    onReset();
+                                                }
+                                            }}
+                                            className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-all active:scale-95 group"
+                                            title="Resetar para o padrão"
+                                        >
+                                            <RotateCcw className="h-3 w-3" />
+                                            <span className="text-[10px] font-bold text-destructive/80">Resetar</span>
+                                        </button>
+                                    )}
+                                    {onAdd && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsAdding(!isAdding);
+                                            }}
+                                            className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 group"
+                                            title="Criar nova coluna"
+                                        >
+                                            <Plus className="h-3.5 w-3.5" />
+                                            <span className="text-[10px] font-bold">Nova</span>
+                                        </button>
+                                    )}
+                                </div>
 
                                         {isAdding && onAdd && (
                                             <div className="px-2 py-2 mb-2 bg-muted/40 rounded-md space-y-2 m-2">
@@ -412,36 +391,28 @@ export const ColumnSettings = memo(function ColumnSettings({
                                             </DragDropContext>
                                         </div>
                                     </div>
-                                </PopoverContent>
-                            </Popover>
-                        </div>
+                        </StandardPopoverMenu>
                     )}
 
                     {(onSavePreset || presets.length > 0) && (
-                        <div className="w-full flex flex-col">
-                            <Popover modal={false}>
-                                <PopoverTrigger asChild>
-                                    <button className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors group border-t border-border/50">
-                                        <div className="flex items-center gap-2">
-                                            <FolderOpen className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Modelos</span>
-                                        </div>
-                                        <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200" />
-                                    </button>
-                                </PopoverTrigger>
-                                <PopoverContent side="left" align="start" sideOffset={5} className="w-[280px] p-0 shadow-2xl border-border/40 z-[60] bg-background">
-                                    <div className="flex flex-col h-full">
-                                        <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Modelos</span>
-                                            {onSavePreset && !isSavingPreset && (
-                                                <button
-                                                    onClick={() => setIsSavingPreset(true)}
-                                                    className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
-                                                >
-                                                    <Save className="h-3 w-3" /> Salvar atual
-                                                </button>
-                                            )}
-                                        </div>
+                        <StandardPopoverMenu
+                            label="Modelos"
+                            icon={FolderOpen}
+                            side="left"
+                            align="start"
+                            sideOffset={10}
+                        >
+                            <div className="flex flex-col h-full">
+                                <div className="px-1 pb-2 flex items-center justify-end">
+                                    {onSavePreset && !isSavingPreset && (
+                                        <button
+                                            onClick={() => setIsSavingPreset(true)}
+                                            className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                        >
+                                            <Save className="h-3 w-3" /> Salvar atual
+                                        </button>
+                                    )}
+                                </div>
                                         <div className="p-2 flex-1 overflow-hidden flex flex-col space-y-3">
                                             {isSavingPreset && (
                                                 <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -539,93 +510,22 @@ export const ColumnSettings = memo(function ColumnSettings({
                                             </AlertDialog>
                                         </div>
                                     </div>
-                                </PopoverContent>
-                            </Popover>
-                        </div>
+                        </StandardPopoverMenu>
                     )}
                     {children}
-                </div>
-            </PopoverContent>
-        </Popover>
+        </StandardPopoverMenu>
     );
 });
 
-export const ColumnSettingsHeader = ({ label, icon: Icon, children }: { label: string; icon: any; children?: React.ReactNode }) => (
-    <div className="w-full flex flex-col border-t border-border/50 first:border-t-0">
-        <div className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 group">
-            <div className="flex items-center gap-2">
-                <Icon className="h-4 w-4 text-muted-foreground transition-colors" />
-                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
-            </div>
-            {children}
+export const ColumnSettingsHeader = ({ label, icon: Icon }: { label: string; icon: any }) => (
+    <div className="px-3 py-2 border-b border-border/50 mt-1 mb-1">
+        <div className="flex items-center gap-2">
+            <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+            <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground">{label}</h4>
         </div>
     </div>
 );
 
-export const ColumnSettingsItem = ({ 
-    label, 
-    icon: Icon, 
-    onClick, 
-    disabled, 
-    variant = 'default',
-    badge
-}: { 
-    label: string; 
-    icon: any; 
-    onClick?: () => void; 
-    disabled?: boolean;
-    variant?: 'default' | 'destructive';
-    badge?: string | number;
-}) => (
-    <button
-        type="button"
-        disabled={disabled}
-        onClick={onClick}
-        className={cn(
-            "flex w-full items-center justify-between px-4 py-2.5 text-[13px] font-medium transition-all group",
-            variant === 'destructive' 
-                ? "text-destructive hover:bg-destructive/10" 
-                : "hover:bg-muted/80",
-            disabled && "opacity-50 cursor-not-allowed"
-        )}
-    >
-        <div className="flex items-center gap-3">
-            <Icon className={cn(
-                "h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors",
-                variant === 'destructive' && "text-destructive/70 group-hover:text-destructive"
-            )} />
-            <span className="truncate">{label}</span>
-        </div>
-        {badge !== undefined && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                {badge}
-            </span>
-        )}
-    </button>
-);
-export const ColumnSettingsPopover = ({ label, icon: Icon, children }: { label: string; icon: any; children: React.ReactNode }) => (
-    <div className="w-full flex flex-col border-t border-border/50 first:border-t-0">
-        <Popover modal={false}>
-            <PopoverTrigger asChild>
-                <button className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors group">
-                    <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
-                    </div>
-                    <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                </button>
-            </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={5} className="min-w-[220px] w-auto max-w-[350px] p-0 shadow-2xl border-border/40 z-[60] bg-background">
+export const ColumnSettingsItem = StandardMenuItem;
 
-                <div className="flex flex-col h-full">
-                    <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50">
-                        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
-                    </div>
-                    <div className="flex flex-col p-1.5 space-y-0.5">
-                        {children}
-                    </div>
-                </div>
-            </PopoverContent>
-        </Popover>
-    </div>
-);
+export const ColumnSettingsPopover = StandardPopoverMenu;

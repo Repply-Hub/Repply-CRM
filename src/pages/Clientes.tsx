@@ -548,51 +548,72 @@ const Clientes = () => {
             activeFilterCount={activeFilterCount}
             onClear={() => {
               setTipoFilter('todos');
-              setSearch('');
+              setSortOrder('asc');
             }}
-            popoverClassName="w-auto p-0"
+            popoverClassName="w-64"
           >
-            <div className="flex divide-x divide-border/50">
-              <div className="w-[280px] p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Tipo</Label>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 px-2 text-[10px] text-primary hover:text-primary hover:bg-primary/5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setNewTipoTarget('filter');
-                      setNewTipoOpen(true);
-                    }}
-                  >
-                    Gerenciar
-                  </Button>
+            <div className="flex flex-col gap-1">
+              {/* Submenu Tipo */}
+              <StandardPopoverMenu
+                label="Tipo"
+                icon={Settings2}
+                badge={tipoFilter !== 'todos' ? 1 : undefined}
+                side="left"
+                align="start"
+                sideOffset={10}
+                popoverClassName="w-64"
+              >
+                <div className="flex flex-col h-full">
+                  <div className="p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Selecionar Tipo</p>
+                      <button 
+                        className="text-[10px] font-bold text-primary hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNewTipoTarget('filter');
+                          setNewTipoOpen(true);
+                        }}
+                      >
+                        Gerenciar
+                      </button>
+                    </div>
+                    <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1); }}>
+                      <SelectTrigger className="w-full h-9">
+                        <SelectValue placeholder="Todos os tipos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tipoFilterOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1); }}>
-                  <SelectTrigger className="w-full h-9">
-                    <SelectValue placeholder="Todos os tipos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tipoFilterOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              </StandardPopoverMenu>
 
-              <div className="w-[200px] p-4 space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-semibold">Ordenação</Label>
-                <Select value={sortOrder} onValueChange={(v: 'asc' | 'desc') => setSortOrder(v)}>
-                  <SelectTrigger className="w-full h-9">
-                    <SelectValue placeholder="Ordenar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="asc">Nome (A-Z)</SelectItem>
-                    <SelectItem value="desc">Nome (Z-A)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Submenu Ordenação */}
+              <StandardPopoverMenu
+                label="Ordenação"
+                icon={ArrowUpDown}
+                side="left"
+                align="start"
+                sideOffset={10}
+                popoverClassName="w-60"
+              >
+                <div className="p-3 space-y-3">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Critério</p>
+                  <Select value={sortOrder} onValueChange={(v: 'asc' | 'desc') => setSortOrder(v)}>
+                    <SelectTrigger className="w-full h-9">
+                      <SelectValue placeholder="Ordenar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="asc">Nome (A-Z)</SelectItem>
+                      <SelectItem value="desc">Nome (Z-A)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </StandardPopoverMenu>
             </div>
           </FilterButton>
 

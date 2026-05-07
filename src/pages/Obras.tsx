@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { StandardPopoverMenu, StandardMenuItem } from '@/components/ui/standard-popover-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
@@ -280,64 +282,80 @@ export default function Obras() {
                   setStatusFilter('todos');
                   setSort('recent');
                 }}
-                popoverClassName="w-auto p-0"
+                popoverClassName="w-64"
                 align="end"
               >
-                <div className="flex divide-x divide-border/50">
-                  <div className="w-[280px] p-4 space-y-2">
-                    <Label className="text-xs uppercase text-muted-foreground font-semibold">Status</Label>
-                    <div className="space-y-1">
-                      <div 
-                        className={cn(
-                          "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
-                          statusFilter === 'todos' && "bg-accent text-accent-foreground"
-                        )}
-                        onClick={() => setStatusFilter('todos')}
-                      >
-                        <Checkbox checked={statusFilter === 'todos'} onCheckedChange={() => setStatusFilter('todos')} />
-                        Todos os status
-                      </div>
-                      {statusObras?.map(status => (
+                <div className="flex flex-col gap-1">
+                  {/* Submenu Status */}
+                  <StandardPopoverMenu
+                    label="Status"
+                    icon={LayoutGrid}
+                    badge={statusFilter !== 'todos' ? 1 : undefined}
+                    side="left"
+                    align="start"
+                    sideOffset={10}
+                    popoverClassName="w-64"
+                  >
+                    <div className="flex flex-col h-full">
+                      <div className="p-1 space-y-1">
                         <div 
-                          key={status.slug} 
                           className={cn(
                             "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
-                            statusFilter === status.slug && "bg-accent text-accent-foreground"
+                            statusFilter === 'todos' && "bg-accent text-accent-foreground"
                           )}
-                          onClick={() => setStatusFilter(status.slug)}
+                          onClick={() => setStatusFilter('todos')}
                         >
-                          <Checkbox checked={statusFilter === status.slug} onCheckedChange={() => setStatusFilter(status.slug)} />
-                          {status.nome}
+                          <Checkbox checked={statusFilter === 'todos'} onCheckedChange={() => setStatusFilter('todos')} />
+                          Todos os status
                         </div>
-                      ))}
+                        {statusObras?.map(status => (
+                          <div 
+                            key={status.slug} 
+                            className={cn(
+                              "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
+                              statusFilter === status.slug && "bg-accent text-accent-foreground"
+                            )}
+                            onClick={() => setStatusFilter(status.slug)}
+                          >
+                            <Checkbox checked={statusFilter === status.slug} onCheckedChange={() => setStatusFilter(status.slug)} />
+                            {status.nome}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="px-1 py-1 mt-1 border-t border-border/50">
+                        <StandardMenuItem
+                          label="Gerenciar Status"
+                          icon={Settings2}
+                          onClick={() => setStatusDialogOpen(true)}
+                        />
+                      </div>
                     </div>
-                    <div className="pt-2 border-t mt-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="w-full justify-start gap-2 h-8 text-xs font-medium text-muted-foreground hover:text-foreground"
-                        onClick={() => setStatusDialogOpen(true)}
-                      >
-                        <Settings2 className="h-3.5 w-3.5" />
-                        Gerenciar Status
-                      </Button>
-                    </div>
-                  </div>
+                  </StandardPopoverMenu>
 
-                  <div className="w-[200px] p-4 space-y-2">
-                    <Label className="text-xs uppercase text-muted-foreground font-semibold">Ordenação</Label>
-                    <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-                      <SelectTrigger className="w-full h-9">
-                        <SelectValue placeholder="Ordenar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="recent">Mais recentes</SelectItem>
-                        <SelectItem value="oldest">Mais antigas</SelectItem>
-                        <SelectItem value="name_asc">Nome A-Z</SelectItem>
-                        <SelectItem value="name_desc">Nome Z-A</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Submenu Ordenação */}
+                  <StandardPopoverMenu
+                    label="Ordenação"
+                    icon={ArrowUpDown}
+                    side="left"
+                    align="start"
+                    sideOffset={10}
+                    popoverClassName="w-60"
+                  >
+                    <div className="p-3 space-y-3">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Critério</p>
+                      <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
+                        <SelectTrigger className="w-full h-9">
+                          <SelectValue placeholder="Ordenar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="recent">Mais recentes</SelectItem>
+                          <SelectItem value="oldest">Mais antigas</SelectItem>
+                          <SelectItem value="name_asc">Nome A-Z</SelectItem>
+                          <SelectItem value="name_desc">Nome Z-A</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </StandardPopoverMenu>
                 </div>
               </FilterButton>
 

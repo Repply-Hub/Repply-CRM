@@ -12,6 +12,7 @@ import { usePedidos, useHistoricoContatos, useUpdatePedidoStatus } from '@/hooks
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { StandardPopoverMenu, StandardMenuItem } from '@/components/ui/standard-popover-menu';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -795,244 +796,179 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     savePreset,
     loadPreset,
     deletePreset,
-    resetToDefaults,
-    selected.size,
     showKanban,
     KANBAN_STAGES,
     visibleKanbanStages,
     toggleKanbanStage,
-    handleKanbanStagesChange
+    handleKanbanStagesChange,
+    selected.size,
+    setImportOpen,
+    setColunasDialogOpen,
+    setConfirmDeleteOpen
   ]);
 
-  const filtrosPopover = useMemo(() => (
-    <Popover modal={false}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn(
-            "h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] data-[state=open]:bg-primary/10 data-[state=open]:text-primary data-[state=open]:border-primary/50 shadow-sm active:scale-[0.98]",
-            hasPipelineFilters && "data-[state=closed]:border-primary/50 data-[state=closed]:bg-primary/[0.02] data-[state=closed]:text-primary data-[state=open]:border-primary/50 data-[state=open]:bg-primary/10 data-[state=open]:text-primary"
-          )}
+    const filtrosPopover = useMemo(() => (
+    <FilterButton
+      hasFilters={activeFilterCount > 0}
+      activeFilterCount={activeFilterCount}
+      onClear={clearPipelineFilters}
+      className={cn(
+        hasPipelineFilters && "data-[state=closed]:border-primary/50 data-[state=closed]:bg-primary/[0.02] data-[state=closed]:text-primary data-[state=open]:border-primary/50 data-[state=open]:bg-primary/10 data-[state=open]:text-primary"
+      )}
+      align="start"
+      popoverClassName="w-64"
+    >
+      <div className="flex flex-col gap-1">
+        {/* Submenu Etapa */}
+        <StandardPopoverMenu
+          label="Etapa"
+          icon={LayoutGrid}
+          badge={stageFilter !== 'todos' ? 1 : undefined}
+          side="left"
+          align="start"
+          sideOffset={10}
+          popoverClassName="w-60"
         >
-          <Filter className="h-4 w-4" />
-          <span className="hidden sm:inline">Filtros</span>
-          {activeFilterCount > 0 && (
-            <Badge variant="secondary" className="ml-1 h-5 min-w-[20px] px-1 bg-primary text-primary-foreground">
-              {activeFilterCount}
-            </Badge>
-          )}
-          <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={8} className="w-64 p-2 shadow-2xl border-border/40 z-[50] bg-background">
-        <div className="flex flex-col gap-1">
-          <div className="px-3 py-2 border-b border-border/50 mb-1">
-            <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Filtros</h4>
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+              <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
+              Todas as etapas
+            </label>
+            {KANBAN_STAGES.map(s => (
+              <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
+                {s.label}
+              </label>
+            ))}
           </div>
+        </StandardPopoverMenu>
 
-          {/* Submenu Etapa */}
-          <Popover modal={false}>
-            <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
-                <div className="flex items-center gap-3">
-                  <LayoutGrid className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span>Etapa</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {stageFilter !== 'todos' && (
-                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">1</Badge>
-                  )}
-                  <ChevronDown className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-60 p-3 shadow-xl border-border/40 bg-background z-[60]">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Selecionar Etapa</p>
-              <div className="space-y-1">
-                <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                  <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
-                  Todas as etapas
+        {/* Submenu Vendedor */}
+        <StandardPopoverMenu
+          label="Vendedor"
+          icon={User}
+          badge={selectedVendedores.length > 0 ? selectedVendedores.length : undefined}
+          side="left"
+          align="start"
+          sideOffset={10}
+          popoverClassName="w-60"
+        >
+          <ScrollArea className="h-60">
+            <div className="space-y-1 pr-3">
+              {(vendedores ?? []).map(v => (
+                <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                  <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
+                  {v.nome}
                 </label>
-                {KANBAN_STAGES.map(s => (
-                  <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                    <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
-                    {s.label}
-                  </label>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+              ))}
+            </div>
+          </ScrollArea>
+        </StandardPopoverMenu>
 
-          {/* Submenu Vendedor */}
-          <Popover modal={false}>
-            <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
-                <div className="flex items-center gap-3">
-                  <User className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span>Vendedor</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedVendedores.length > 0 && (
-                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">
-                      {selectedVendedores.length}
-                    </Badge>
-                  )}
-                  <ChevronDown className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-60 p-3 shadow-xl border-border/40 bg-background z-[60]">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filtrar por Vendedor</p>
-              <div className="space-y-1 max-h-60 overflow-y-auto">
-                {(vendedores ?? []).map(v => (
-                  <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                    <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
-                    {v.nome}
-                  </label>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+        {/* Submenu Fabricante */}
+        <StandardPopoverMenu
+          label="Fabricante"
+          icon={Factory}
+          badge={selectedFabricantes.length > 0 ? selectedFabricantes.length : undefined}
+          side="left"
+          align="start"
+          sideOffset={10}
+          popoverClassName="w-60"
+        >
+          <ScrollArea className="h-60">
+            <div className="space-y-1 pr-3">
+              {(fabricantes ?? []).map(f => (
+                <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                  <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
+                  {f.nome}
+                </label>
+              ))}
+            </div>
+          </ScrollArea>
+        </StandardPopoverMenu>
 
-          {/* Submenu Fabricante */}
-          <Popover modal={false}>
-            <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
-                <div className="flex items-center gap-3">
-                  <Factory className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span>Fabricante</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedFabricantes.length > 0 && (
-                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">
-                      {selectedFabricantes.length}
-                    </Badge>
-                  )}
-                  <ChevronDown className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-60 p-3 shadow-xl border-border/40 bg-background z-[60]">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Filtrar por Fabricante</p>
-              <ScrollArea className="h-60">
-                <div className="space-y-1 pr-3">
-                  {(fabricantes ?? []).map(f => (
-                    <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                      <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
-                      {f.nome}
-                    </label>
-                  ))}
-                </div>
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
+        {/* Submenu Período */}
+        <StandardPopoverMenu
+          label="Período"
+          icon={CalendarIcon}
+          badge={(dateFrom || dateTo) ? 'Ativo' : undefined}
+          side="left"
+          align="start"
+          sideOffset={10}
+          popoverClassName="w-64"
+        >
+          <div className="space-y-4 p-2">
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                Data Início
+              </p>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-9",
+                      !dateFrom && "text-muted-foreground"
+                    )}
+                  >
+                    {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Selecione..."}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFrom}
+                    onSelect={setDateFrom}
+                    locale={ptBR}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
 
-          {/* Submenu Período */}
-          <Popover modal={false}>
-            <PopoverTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 data-[state=open]:bg-primary/10 data-[state=open]:text-primary transition-colors group">
-                <div className="flex items-center gap-3">
-                  <CalendarIcon className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                  <span>Período</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {(dateFrom || dateTo) && (
-                    <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-primary/10 text-primary border-none">Ativo</Badge>
-                  )}
-                  <ChevronDown className="h-3.5 w-3.5 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="left" align="start" sideOffset={10} className="w-64 p-4 shadow-xl border-border/40 bg-background z-[60]">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                    <CalendarIcon className="h-3 w-3" /> Data Início
-                  </p>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={cn(
-                          "w-full justify-start text-left font-normal h-9",
-                          !dateFrom && "text-muted-foreground"
-                        )}
-                      >
-                        {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Selecione..."}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateFrom}
-                        onSelect={setDateFrom}
-                        initialFocus
-                        locale={ptBR}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                Data Fim
+              </p>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-9",
+                      !dateTo && "text-muted-foreground"
+                    )}
+                  >
+                    {dateTo ? format(dateTo, "dd/MM/yyyy") : "Selecione..."}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateTo}
+                    onSelect={setDateTo}
+                    initialFocus
+                    locale={ptBR}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </StandardPopoverMenu>
 
-                <div className="space-y-2">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                    <CalendarIcon className="h-3 w-3" /> Data Final
-                  </p>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={cn(
-                          "w-full justify-start text-left font-normal h-9",
-                          !dateTo && "text-muted-foreground"
-                        )}
-                      >
-                        {dateTo ? format(dateTo, "dd/MM/yyyy") : "Selecione..."}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateTo}
-                        onSelect={setDateTo}
-                        initialFocus
-                        locale={ptBR}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+        <div className="h-px bg-border/50 my-1" />
 
-                <div className="h-px bg-border/50 my-1" />
-
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Filtros de Atenção</p>
-                  <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                    <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
-                    Atenção (7+ dias)
-                  </label>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {(hasPipelineFilters || search.trim() !== '') && (
-            <>
-              <div className="h-px bg-border/50 my-1" />
-              <button
-                onClick={clearPipelineFilters}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <X className="h-4 w-4" />
-                <span>Limpar Filtros</span>
-              </button>
-            </>
-          )}
+        <div className="space-y-2 py-1">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3">Atenção</p>
+          <label className="flex items-center gap-2 px-3 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+            <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
+            Atenção (7+ dias)
+          </label>
         </div>
-      </PopoverContent>
-    </Popover>
-  ), [hasPipelineFilters, activeFilterCount, clearPipelineFilters, KANBAN_STAGES, stageFilter, handleStageFilterChange, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention, search]);
+      </div>
+    </FilterButton>
+  ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, stageFilter, handleStageFilterChange, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention]);
   const selectedViewOrder = useMemo(() => 
     (pedidos ?? []).find(p => p.id === viewOrderId),
   [pedidos, viewOrderId]);
