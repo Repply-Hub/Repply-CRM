@@ -18,11 +18,11 @@ interface Props {
 }
 
 const TARGET_FIELDS = [
-  { key: 'descricao_material', label: 'Produto *', required: true },
-  { key: 'imagem_url', label: 'Fotos (URL)' },
-  { key: 'estoque_disponivel', label: 'Estoque Disponível' },
-  { key: 'unidade', label: 'Unidade de Medida' },
-  { key: 'preco_unitario', label: 'Preço de Varejo *', required: true },
+  { key: 'descricao_material', label: 'Produto', required: true },
+  { key: 'imagem_url', label: 'Fotos' },
+  { key: 'estoque_disponivel', label: 'Estoque disponível' },
+  { key: 'unidade', label: 'Unidade de medida' },
+  { key: 'preco_unitario', label: 'Preço de varejo', required: true },
   { key: 'referencia', label: 'Referência' },
   { key: 'categoria', label: 'Categoria' },
 ] as const;
@@ -33,6 +33,12 @@ const SKIP = '__skip__';
 
 function autoMap(header: string): TargetKey | null {
   const h = header.toLowerCase().trim();
+  if (h === 'produto') return 'descricao_material';
+  if (h === 'fotos') return 'imagem_url';
+  if (h === 'estoque disponível') return 'estoque_disponivel';
+  if (h === 'unidade de medida') return 'unidade';
+  if (h === 'preço de varejo') return 'preco_unitario';
+  
   if (/(produto|desc|material|item)/.test(h)) return 'descricao_material';
   if (/(foto|img|imagem|url)/.test(h)) return 'imagem_url';
   if (/(estoque|disponível|disponivel|qtd|quant)/.test(h)) return 'estoque_disponivel';
