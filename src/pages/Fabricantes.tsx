@@ -92,7 +92,7 @@ function FabricanteForm({ open, onOpenChange, editData }: {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader><DialogTitle>{editData ? 'Editar' : 'Cadastrar'} Fabricante</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
@@ -159,7 +159,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader><DialogTitle>{editData ? 'Editar' : 'Novo'} Produto</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
@@ -262,28 +262,28 @@ function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
     <Card className="rounded-xl border-border/60 overflow-hidden">
       <div className="h-1.5 w-full bg-[image:var(--gradient-brand)]" />
       <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Factory className="h-7 w-7 text-primary" />
+            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Factory className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
             </div>
-            <div>
-              <h2 className="text-foreground font-bold text-lg">{fab.nome}</h2>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-foreground font-bold text-base sm:text-lg truncate">{fab.nome}</h2>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 sm:mt-2">
                 {fab.cnpj && (
-                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
                     <Hash className="h-3.5 w-3.5" />
                     {fab.cnpj}
                   </span>
                 )}
                 {fab.nome_contato && (
-                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
                     <User className="h-3.5 w-3.5" />
                     {fab.nome_contato}
                   </span>
                 )}
                 {fab.telefone && (
-                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
                     <Phone className="h-3.5 w-3.5" />
                     {fab.telefone}
                   </span>
@@ -291,12 +291,12 @@ function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
               </div>
             </div>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5">
+          <div className="flex gap-2 flex-shrink-0 w-full sm:w-auto">
+            <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5 flex-1 sm:flex-initial">
               <Pencil className="h-3.5 w-3.5" /> Editar
             </Button>
-            <Button variant="destructive" size="sm" onClick={onDelete} className="gap-1.5">
-              <Trash2 className="h-3.5 w-3.5" />
+            <Button variant="destructive" size="sm" onClick={onDelete} className="gap-1.5 flex-1 sm:flex-initial">
+              <Trash2 className="h-3.5 w-3.5" /> <span className="sm:hidden lg:inline">Excluir</span>
             </Button>
           </div>
         </div>
@@ -408,7 +408,7 @@ const Fabricantes = () => {
           <div className={`lg:col-span-4 xl:col-span-3 ${showingDetail ? 'hidden lg:block' : ''}`}>
             <Card className="rounded-xl border-border/60 sticky top-4">
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <Factory className="h-4 w-4 text-primary" /> Fabricantes
@@ -418,10 +418,10 @@ const Fabricantes = () => {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setGlobalImportOpen(true)} className="gap-1.5 h-8">
-                      <Upload className="h-3.5 w-3.5" /> Importar
+                    <Button size="sm" variant="outline" onClick={() => setGlobalImportOpen(true)} className="gap-1.5 h-8 flex-1 sm:flex-initial">
+                      <Upload className="h-3.5 w-3.5" /> <span className="sm:hidden xl:inline">Importar</span>
                     </Button>
-                    <Button size="sm" onClick={() => { setEditFab(null); setFabDialog(true); }} className="gap-1.5 h-8">
+                    <Button size="sm" onClick={() => { setEditFab(null); setFabDialog(true); }} className="gap-1.5 h-8 flex-1 sm:flex-initial">
                       <Plus className="h-3.5 w-3.5" /> Novo
                     </Button>
                   </div>
@@ -500,7 +500,7 @@ const Fabricantes = () => {
                 {/* Price Table */}
                 <Card className="rounded-xl border-border/60">
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <CardTitle className="text-base font-bold flex items-center gap-2">
                           <Package className="h-4 w-4 text-primary" /> Catálogo de Produtos
@@ -509,47 +509,52 @@ const Fabricantes = () => {
                           {precos?.length ?? 0} produto{(precos?.length ?? 0) !== 1 ? 's' : ''} cadastrado{(precos?.length ?? 0) !== 1 ? 's' : ''}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2 flex-wrap items-center">
-                        <FilterButton
-                          hasFilters={hasFilters}
-                          activeFilterCount={activeFilterCount}
-                          onClear={() => setFiltroCategoria('todas')}
-                        >
-                          <div className="space-y-2">
-                            <Label className="text-xs uppercase text-muted-foreground font-semibold">Categoria</Label>
-                            <SearchableSelect
-                              options={[
-                                { value: "todas", label: "Todas categorias" },
-                                ...categoriasPreco.map(c => ({ value: c, label: c }))
-                              ]}
-                              value={filtroCategoria}
-                              onValueChange={setFiltroCategoria}
-                              placeholder="Filtrar por categoria"
-                            />
-                          </div>
-                        </FilterButton>
+                      <div className="flex gap-2 flex-wrap items-center w-full sm:w-auto">
+                        <div className="flex-1 sm:flex-initial">
+                          <FilterButton
+                            hasFilters={hasFilters}
+                            activeFilterCount={activeFilterCount}
+                            onClear={() => setFiltroCategoria('todas')}
+                            className="w-full sm:w-auto"
+                          >
+                            <div className="space-y-2">
+                              <Label className="text-xs uppercase text-muted-foreground font-semibold">Categoria</Label>
+                              <SearchableSelect
+                                options={[
+                                  { value: "todas", label: "Todas categorias" },
+                                  ...categoriasPreco.map(c => ({ value: c, label: c }))
+                                ]}
+                                value={filtroCategoria}
+                                onValueChange={setFiltroCategoria}
+                                placeholder="Filtrar por categoria"
+                              />
+                            </div>
+                          </FilterButton>
+                        </div>
 
-                        <ColumnSettings
-                          columns={precoColumns}
-                          visibleColumns={visiblePrecoColumns}
-                          onChange={setVisiblePrecoColumns}
-                          onRename={handlePrecoRename}
-                          onTypeChange={handlePrecoTypeChange}
-                          onReorder={handlePrecoReorder}
-                          onAdd={handleAddPrecoColumn}
-                          onRemove={handleRemovePrecoColumn}
-                          presets={precoPresets}
-                          onSavePreset={savePrecoPreset}
-                          onLoadPreset={loadPrecoPreset}
-                          onDeletePreset={deletePrecoPreset}
-                          className="h-8"
-                        />
-                        <Button size="sm" variant="outline" onClick={() => setImportDialog(true)} className="gap-1.5 h-8">
-                          <Upload className="h-3.5 w-3.5" /> Importar
-                        </Button>
-                        <Button size="sm" onClick={() => { setEditPreco(null); setPrecoDialog(true); }} className="gap-1.5 h-8">
-                          <Plus className="h-3.5 w-3.5" /> Novo Produto
-                        </Button>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          <ColumnSettings
+                            columns={precoColumns}
+                            visibleColumns={visiblePrecoColumns}
+                            onChange={setVisiblePrecoColumns}
+                            onRename={handlePrecoRename}
+                            onTypeChange={handlePrecoTypeChange}
+                            onReorder={handlePrecoReorder}
+                            onAdd={handleAddPrecoColumn}
+                            onRemove={handleRemovePrecoColumn}
+                            presets={precoPresets}
+                            onSavePreset={savePrecoPreset}
+                            onLoadPreset={loadPrecoPreset}
+                            onDeletePreset={deletePrecoPreset}
+                            className="h-8 flex-1 sm:flex-initial"
+                          />
+                          <Button size="sm" variant="outline" onClick={() => setImportDialog(true)} className="gap-1.5 h-8 flex-1 sm:flex-initial">
+                            <Upload className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Importar</span>
+                          </Button>
+                          <Button size="sm" onClick={() => { setEditPreco(null); setPrecoDialog(true); }} className="gap-1.5 h-8 flex-1 sm:flex-initial">
+                            <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Novo Produto</span><span className="sm:hidden">Novo</span>
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -627,11 +632,11 @@ const Fabricantes = () => {
                                       case 'acoes':
                                         return (
                                           <TableCell key={colId}>
-                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditPreco(p); setPrecoDialog(true); }}>
+                                            <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-7 sm:w-7" onClick={() => { setEditPreco(p); setPrecoDialog(true); }}>
                                                 <Pencil className="h-3.5 w-3.5" />
                                               </Button>
-                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteAlert({ type: 'preco', id: p.id })}>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-7 sm:w-7 text-destructive hover:text-destructive" onClick={() => setDeleteAlert({ type: 'preco', id: p.id })}>
                                                 <Trash2 className="h-3.5 w-3.5" />
                                               </Button>
                                             </div>
@@ -652,11 +657,11 @@ const Fabricantes = () => {
                         <Package className="h-10 w-10 text-muted-foreground/30 mb-3" />
                         <p className="text-sm text-muted-foreground font-medium">Nenhum produto cadastrado</p>
                         <p className="text-xs text-muted-foreground/70 mt-1">Adicione produtos ao catálogo deste fabricante</p>
-                        <div className="flex gap-2 mt-4">
-                          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setImportDialog(true)}>
+                        <div className="flex flex-col sm:flex-row gap-2 mt-4 w-full sm:w-auto px-4 sm:px-0">
+                          <Button size="sm" variant="outline" className="gap-1.5 w-full sm:w-auto" onClick={() => setImportDialog(true)}>
                             <Upload className="h-3.5 w-3.5" /> Importar planilha
                           </Button>
-                          <Button size="sm" className="gap-1.5" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
+                          <Button size="sm" className="gap-1.5 w-full sm:w-auto" onClick={() => { setEditPreco(null); setPrecoDialog(true); }}>
                             <Plus className="h-3.5 w-3.5" /> Adicionar produto
                           </Button>
                         </div>
