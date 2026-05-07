@@ -632,6 +632,8 @@ const Fabricantes = () => {
                                         );
                                       case 'descricao':
                                         return <TableCell key={colId} className="font-medium text-sm">{p.descricao_material}</TableCell>;
+                                      case 'estoque':
+                                        return <TableCell key={colId} className="text-sm text-muted-foreground">{p.estoque_disponivel ?? 0}</TableCell>;
                                       case 'categoria':
                                         return (
                                           <TableCell key={colId} className="text-xs">
