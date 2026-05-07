@@ -295,6 +295,52 @@ const Catalogo = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ProductForm
+        open={!!editProduct}
+        onOpenChange={o => !o && setEditProduct(null)}
+        editData={editProduct}
+        onDeleteClick={(id) => {
+          setEditProduct(null);
+          setDeleteProductId(id);
+        }}
+      />
+
+      <ProductForm
+        open={showAddProduct}
+        onOpenChange={setShowAddProduct}
+        initialCategory={categoria !== 'todas' && categoria !== 'sem-categoria' ? categoria : undefined}
+      />
+
+      <AlertDialog open={!!deleteProductId} onOpenChange={o => !o && setDeleteProductId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir produto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O produto será removido permanentemente do catálogo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!deleteProductId) return;
+                try {
+                  await deletePreco.mutateAsync(deleteProductId);
+                  toast.success('Produto excluído com sucesso!');
+                  setDeleteProductId(null);
+                } catch (err: any) {
+                  toast.error('Erro ao excluir produto');
+                }
+              }}
+              disabled={deletePreco.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletePreco.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };
