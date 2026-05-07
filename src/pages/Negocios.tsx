@@ -712,9 +712,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       label="Colunas"
     >
       <div className="flex flex-col gap-1 p-1">
-        <div className="px-3 py-2 border-b border-border/50 mb-1">
-          <h4 className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Menu de Opções</h4>
-        </div>
 
         {showKanban && (
           <div className="space-y-1 mb-2">
