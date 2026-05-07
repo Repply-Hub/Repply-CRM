@@ -415,6 +415,26 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         console.error('Erro ao buscar ID do usuário:', rpcError);
         throw new Error('Não foi possível identificar seu perfil de usuário. Verifique se seu cadastro está completo.');
       }
+
+      // Salvar linhas ignoradas para revisão posterior
+      if (ignoredRows.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const ignoredBatch = ignoredRows.map(row => ({
+            usuario_id: user.id,
+            tipo_importacao: `clientes_${target}`,
+            dados_originais: row,
+            motivo_ignorado: target === 'contatos' ? 'Falta Empresa ou Nome' : 'Falta Empresa, Razão Social ou CNPJ'
+          }));
+          
+          const { error: ignoreError } = await supabase
+            .from('linhas_ignoradas_importacao')
+            .insert(ignoredBatch);
+          
+          if (ignoreError) console.error('Erro ao salvar linhas ignoradas:', ignoreError);
+        }
+      }
+
       const BATCH = 500;
       let imported = 0;
       console.debug('[ImportClientes] preview snapshot usado na confirmação', rows.slice(0, 5));
@@ -558,6 +578,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       setImporting(false);
     }
   };
+
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
