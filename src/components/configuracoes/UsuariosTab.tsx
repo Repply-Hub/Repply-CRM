@@ -605,7 +605,7 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId }
               {vendedor.avatar_url ? (
                 <img src={vendedor.avatar_url} alt={vendedor.nome} className="h-full w-full object-cover" />
               ) : (
-                <span className="text-xl font-bold text-primary">{iniciais}</span>
+                <span className="text-foreground font-bold text-lg text-primary">{iniciais}</span>
               )}
             </div>
             <div className="flex-1 min-w-0">

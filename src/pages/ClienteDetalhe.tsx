@@ -197,7 +197,7 @@ const ClienteDetalhe = () => {
         <DialogHeader className="pb-6 border-b">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-1">
-              <DialogTitle className="text-xl font-bold">
+              <DialogTitle className="text-foreground font-bold text-lg">
                 {selectedViewOrder?.cliente?.empresa ?? 'Detalhes do Negócio'}
               </DialogTitle>
               <p className="text-sm text-muted-foreground">

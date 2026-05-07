@@ -268,7 +268,7 @@ function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
               <Factory className="h-7 w-7 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-foreground">{fab.nome}</h2>
+              <h2 className="text-foreground font-bold text-lg">{fab.nome}</h2>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
                 {fab.cnpj && (
                   <span className="text-sm text-muted-foreground flex items-center gap-1.5">

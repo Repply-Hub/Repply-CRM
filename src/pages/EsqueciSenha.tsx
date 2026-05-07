@@ -43,7 +43,7 @@ export default function EsqueciSenha() {
             <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
               <Mail className="h-7 w-7 text-primary" />
             </div>
-            <h2 className="text-xl font-bold text-foreground">Email enviado!</h2>
+            <h2 className="text-foreground font-bold text-lg">Email enviado!</h2>
             <p className="text-sm text-muted-foreground">
               Se o email informado estiver cadastrado, você receberá um link para redefinir sua senha.
               Verifique também a pasta de spam.

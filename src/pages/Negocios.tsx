@@ -979,7 +979,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <SheetHeader className="pb-6 border-b">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-1">
-              <SheetTitle className="text-xl font-bold">
+              <SheetTitle className="text-foreground font-bold text-lg">
                 {selectedViewOrder?.cliente?.empresa ?? 'Detalhes do Negócio'}
               </SheetTitle>
               <SheetDescription>

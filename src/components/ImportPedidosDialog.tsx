@@ -527,7 +527,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
         <DialogHeader className="px-6 py-4 bg-muted/30 shrink-0 border-b flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2.5 text-xl font-bold">
+            <DialogTitle className="flex items-center gap-2.5 text-foreground font-bold text-lg">
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <FileSpreadsheet className="h-6 w-6 text-primary" />
               </div>
