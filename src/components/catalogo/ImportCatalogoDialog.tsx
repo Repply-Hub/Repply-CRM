@@ -155,7 +155,14 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
     }).filter(r => r.descricao_material && !isNaN(r.preco_unitario));
 
     if (records.length === 0) {
-      console.log('Dados processados para depuração:', rows.slice(0, 3));
+      const descColExists = !!descCol;
+      const precoColExists = !!precoCol;
+      console.log('Dados processados para depuração:', {
+        rowsSample: rows.slice(0, 3),
+        mapping,
+        descColExists,
+        precoColExists
+      });
       toast.error('Nenhuma linha válida encontrada. Verifique se as colunas de "Produto" e "Preço de varejo" estão corretamente preenchidas.');
       return;
     }
