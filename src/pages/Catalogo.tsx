@@ -169,13 +169,55 @@ const Catalogo = () => {
             </Button>
           ) : <div />}
 
-          <Button 
-            onClick={() => setShowAddProduct(true)}
-            className="rounded-xl shadow-md gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Novo Produto
-          </Button>
+          <div className="flex items-center gap-2">
+            {!showFolders && (
+              <>
+                {isSelectionMode ? (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        setIsSelectionMode(false);
+                        setSelectedIds([]);
+                      }}
+                      className="rounded-xl gap-2"
+                    >
+                      <X className="h-4 w-4" />
+                      Cancelar
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      disabled={selectedIds.length === 0 || bulkDelete.isPending}
+                      onClick={() => setConfirmBulkDelete(true)}
+                      className="rounded-xl gap-2 shadow-md"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir Selecionados ({selectedIds.length})
+                    </Button>
+                  </>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsSelectionMode(true)}
+                    className="rounded-xl gap-2"
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    Selecionar
+                  </Button>
+                )}
+              </>
+            )}
+            <Button 
+              onClick={() => setShowAddProduct(true)}
+              className="rounded-xl shadow-md gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Produto
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
