@@ -104,9 +104,17 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /^data$/, score: 100 },
     { pattern: /^criado$/, score: 98 },
     { pattern: /^criado\s*em$/, score: 98 },
+    { pattern: /^criacao$/, score: 100 },
     { pattern: /data/, score: 85 },
     { pattern: /criado/, score: 80 },
     { pattern: /date/, score: 85 },
+  ],
+  prazo_resposta: [
+    { pattern: /^fechamento$/, score: 100 },
+    { pattern: /^prazo$/, score: 95 },
+    { pattern: /^prazo\s*resposta$/, score: 100 },
+    { pattern: /fechamento/, score: 85 },
+    { pattern: /prazo/, score: 80 },
   ],
   vendedor: [
     { pattern: /^vendedor$/, score: 100 },
