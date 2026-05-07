@@ -120,7 +120,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   fabricanteId: string;
-  editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean; categoria?: string | null; imagem_url?: string | null };
+  editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean; categoria?: string | null; imagem_url?: string | null; estoque_disponivel?: number | null };
 }) {
   const createPreco = useCreatePreco();
   const updatePreco = useUpdatePreco();
@@ -132,6 +132,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
   const [vigente, setVigente] = useState(editData?.vigente ?? true);
   const [categoria, setCategoria] = useState(editData?.categoria ?? '');
   const [imagemUrl, setImagemUrl] = useState<string | null>(editData?.imagem_url ?? null);
+  const [estoque, setEstoque] = useState(editData?.estoque_disponivel?.toString() ?? '0');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
