@@ -255,46 +255,9 @@ export const ColumnSettings = memo(function ColumnSettings({
                                             </div>
                                         )}
 
-                                        <div className="flex-1 overflow-y-auto px-1.5 py-2 custom-scrollbar min-h-0">
+                                        <div className="flex-1 overflow-y-auto overflow-x-hidden px-1.5 py-2 custom-scrollbar min-h-0 relative">
                                             <DragDropContext onDragEnd={handleDragEnd}>
-                                                <Droppable droppableId="columns" mode="virtual" renderClone={(provided, snapshot, rubric) => {
-                                                    const column = columns[rubric.source.index];
-                                                    const checked = visibleColumns.includes(column.id);
-                                                    
-                                                    // Bloquear o arraste apenas no eixo Y (vertical)
-                                                    const transform = provided.draggableProps.style?.transform;
-                                                    const lockedTransform = transform ? transform.replace(/\(([^,]+),/, '(0px,') : transform;
-                                                    
-                                                    return (
-                                                        <div
-                                                            {...provided.draggableProps}
-                                                            {...provided.dragHandleProps}
-                                                            ref={provided.innerRef}
-                                                            className={cn(
-                                                                "group flex items-center gap-1 pr-1 outline-none bg-background border border-border/40 shadow-xl rounded-lg pointer-events-none",
-                                                                snapshot.isDragging && "z-[9999]"
-                                                            )}
-                                                            style={{
-                                                                ...provided.draggableProps.style,
-                                                                transform: lockedTransform,
-                                                                width: '300px'
-                                                            }}
-                                                        >
-                                                            <div className="p-1 text-muted-foreground/40">
-                                                                <GripVertical className="h-3.5 w-3.5" />
-                                                            </div>
-                                                            <div className="flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left">
-                                                                <div className={cn(
-                                                                    'h-7 w-7 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
-                                                                    checked ? 'bg-primary/10 border-primary/20 text-primary shadow-sm' : 'bg-muted/50 border-border/40 text-muted-foreground/40'
-                                                                )}>
-                                                                    {checked ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                                                                </div>
-                                                                <span className="truncate">{column.customLabel || column.label}</span>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }}>
+                                                <Droppable droppableId="columns">
                                                     {(provided) => (
                                                         <div 
                                                             {...provided.droppableProps}
@@ -312,15 +275,22 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                         draggableId={column.id} 
                                                                         index={index}
                                                                     >
-                                                                        {(provided, snapshot) => (
-                                                                        <div 
-                                                                            ref={provided.innerRef}
-                                                                            {...provided.draggableProps}
-                                                                            className={cn(
-                                                                                "group flex items-center gap-1 pr-1 outline-none",
-                                                                                snapshot.isDragging && "opacity-0 pointer-events-none"
-                                                                            )}
-                                                                        >
+                                                                        {(provided, snapshot) => {
+                                                                            // Bloquear o arraste apenas no eixo Y (vertical)
+                                                                            const transform = provided.draggableProps.style?.transform;
+                                                                            if (transform) {
+                                                                                provided.draggableProps.style.transform = transform.replace(/\(([^,]+),/, '(0px,');
+                                                                            }
+
+                                                                            return (
+                                                                            <div 
+                                                                                ref={provided.innerRef}
+                                                                                {...provided.draggableProps}
+                                                                                className={cn(
+                                                                                    "group flex items-center gap-1 pr-1 outline-none transition-all",
+                                                                                    snapshot.isDragging && "z-[9999] bg-background border border-border/40 shadow-xl rounded-lg"
+                                                                                )}
+                                                                            >
                                                                                 <div 
                                                                                     {...provided.dragHandleProps}
                                                                                     className="p-1 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors"
