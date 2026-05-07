@@ -645,7 +645,7 @@ const Fabricantes = () => {
 
       <FabricanteForm open={fabDialog} onOpenChange={setFabDialog} editData={editFab} />
       {selectedFabId && (
-        <PrecoForm 
+        <ProductForm 
           open={precoDialog} 
           onOpenChange={setPrecoDialog} 
           fabricanteId={selectedFabId} 
