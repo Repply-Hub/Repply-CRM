@@ -602,27 +602,30 @@ const NovoPedido = () => {
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <Label className="text-base font-semibold">Itens do Pedido</Label>
-                    <Button size="sm" variant="outline" onClick={addItem}>
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar Item
-                    </Button>
+                    {itens.length > 0 && (
+                      <Button size="sm" variant="outline" onClick={addItem}>
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar Item
+                      </Button>
+                    )}
                   </div>
 
                   {itens.length === 0 ? (
-                    <div className="space-y-4">
-                      <div className="border border-dashed border-border rounded-lg p-8 text-center">
-                        <p className="text-sm text-muted-foreground mb-3">Nenhum item adicionado</p>
-                        <Button size="sm" variant="outline" onClick={addItem}>
+                    <div className="space-y-6">
+                      <div className="border border-dashed border-border rounded-lg p-12 text-center bg-muted/5">
+                        <p className="text-sm text-muted-foreground mb-4">Ainda não há itens neste pedido.</p>
+                        <Button size="sm" onClick={addItem}>
                           <Plus className="h-4 w-4 mr-1" /> Adicionar primeiro item
                         </Button>
                       </div>
                       
-                      <div className="flex justify-end">
-                        <div className="w-full max-w-[240px] space-y-1 p-4 border rounded-xl bg-muted/20">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2 p-4 border rounded-xl bg-muted/10">
                           <Label className="text-sm font-semibold">Valor de Negociação</Label>
                           <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">R$</span>
                             <Input 
                               type="number" 
-                              className="h-10 text-base font-bold"
+                              className="h-10 pl-9 text-base font-bold"
                               value={valorManual ?? ''}
                               onChange={(e) => {
                                 setValorManual(parseFloat(e.target.value) || 0);
@@ -630,11 +633,28 @@ const NovoPedido = () => {
                               }}
                               placeholder="0,00"
                             />
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                              <span className="text-muted-foreground hidden">R$</span>
-                            </div>
                           </div>
-                          <p className="text-[10px] text-muted-foreground">Defina o valor manualmente se não houver itens.</p>
+                          <p className="text-[10px] text-muted-foreground">Defina o valor manualmente caso não queira listar itens individuais.</p>
+                        </div>
+
+                        <div className="space-y-2 p-4 border rounded-xl bg-muted/10">
+                          <Label className="text-sm font-semibold">Próximo Contato Agendado</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className={cn("w-full h-10 justify-start text-left font-normal bg-background", !proximoContato && "text-muted-foreground")}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {proximoContato ? format(proximoContato, "dd/MM/yyyy") : "Selecionar data"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar mode="single" selected={proximoContato} onSelect={setProximoContato} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                            </PopoverContent>
+                          </Popover>
+                          {proximoContato && (
+                            <div className="mt-2">
+                              <Input type="time" className="h-8 text-xs" value={proximoContatoHora} onChange={e => setProximoContatoHora(e.target.value)} />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
