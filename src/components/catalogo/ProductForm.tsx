@@ -150,43 +150,59 @@ export function ProductForm({ open, onOpenChange, fabricanteId: initialFabId, ed
           </div>
           
           <Dialog open={newCategoryOpen} onOpenChange={setNewCategoryOpen}>
-            <DialogContent className="w-[90vw] sm:max-w-[300px] p-4 sm:p-6 rounded-xl sm:rounded-lg">
-              <DialogHeader>
-                <DialogTitle className="text-sm font-semibold">Nova Categoria</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label htmlFor="new-category-input" className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Nome</Label>
-                  <Input 
-                    id="new-category-input"
-                    placeholder="Ex: Pisos, Louças..." 
-                    value={newCategoryName}
-                    onChange={e => setNewCategoryName(e.target.value)}
-                    autoFocus
-                    className="h-9 text-sm"
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Button 
-                    type="button"
-                    variant="ghost"
-                    className="flex-1 h-9 text-xs" 
-                    onClick={() => setNewCategoryOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button 
-                    className="flex-[2] h-9 text-xs" 
-                    onClick={() => {
-                      if (newCategoryName.trim()) {
-                        setCategoria(newCategoryName.trim());
-                        setNewCategoryName('');
+            <DialogContent className="w-[95vw] sm:max-w-[400px] p-0 overflow-hidden rounded-2xl sm:rounded-xl border-none shadow-2xl">
+              <div className="bg-gradient-to-br from-primary/5 to-background p-6">
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Plus className="h-5 w-5 text-primary" />
+                    </div>
+                    Nova Categoria
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-6 pt-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="new-category-input" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
+                      Nome da Categoria
+                    </Label>
+                    <Input 
+                      id="new-category-input"
+                      placeholder="Ex: Pisos, Louças, Tintas..." 
+                      value={newCategoryName}
+                      onChange={e => setNewCategoryName(e.target.value)}
+                      autoFocus
+                      className="h-12 text-base rounded-xl border-muted-foreground/20 focus-visible:ring-primary/30"
+                    />
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      className="flex-1 h-12 rounded-xl font-semibold order-2 sm:order-1" 
+                      onClick={() => {
                         setNewCategoryOpen(false);
-                      }
-                    }}
-                  >
-                    Confirmar
-                  </Button>
+                        setNewCategoryName('');
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      className="flex-[2] h-12 rounded-xl font-bold shadow-lg shadow-primary/20 order-1 sm:order-2" 
+                      onClick={() => {
+                        if (newCategoryName.trim()) {
+                          setCategoria(newCategoryName.trim());
+                          setNewCategoryName('');
+                          setNewCategoryOpen(false);
+                        } else {
+                          toast.error("Por favor, digite um nome para a categoria");
+                        }
+                      }}
+                    >
+                      Criar Categoria
+                    </Button>
+                  </div>
                 </div>
               </div>
             </DialogContent>
