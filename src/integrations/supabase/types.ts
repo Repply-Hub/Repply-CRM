@@ -1187,6 +1187,33 @@ export type Database = {
         }
         Relationships: []
       }
+      linhas_ignoradas_importacao: {
+        Row: {
+          created_at: string
+          dados_originais: Json
+          id: string
+          motivo_ignorado: string | null
+          tipo_importacao: string
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string
+          dados_originais: Json
+          id?: string
+          motivo_ignorado?: string | null
+          tipo_importacao: string
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string
+          dados_originais?: Json
+          id?: string
+          motivo_ignorado?: string | null
+          tipo_importacao?: string
+          usuario_id?: string
+        }
+        Relationships: []
+      }
       mensagens_whatsapp: {
         Row: {
           cliente_id: string | null
