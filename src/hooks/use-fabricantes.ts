@@ -10,6 +10,7 @@ export interface PrecoPayload {
   vigente?: boolean;
   categoria?: string | null;
   imagem_url?: string | null;
+  estoque_disponivel?: number | null;
 }
 
 export function useTabelaPrecos(fabricanteId: string | null) {
