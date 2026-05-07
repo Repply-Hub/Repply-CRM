@@ -175,7 +175,7 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Importar Catálogo</DialogTitle>
           <DialogDescription>
@@ -184,8 +184,8 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
         </DialogHeader>
 
         {!file ? (
-          <div className="border-2 border-dashed border-border rounded-xl p-8 text-center">
-            <FileSpreadsheet className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
+          <div className="border-2 border-dashed border-border rounded-xl p-6 sm:p-8 text-center">
+            <FileSpreadsheet className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/50 mx-auto mb-3" />
             <p className="text-sm font-medium mb-1">Selecione uma planilha (.xlsx, .xls ou .csv)</p>
             <p className="text-xs text-muted-foreground mb-4">
               Colunas reconhecidas: produto, fotos, estoque disponível, unidade de medida, preço de varejo, referência, categoria
@@ -209,10 +209,12 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm bg-muted/40 rounded-lg p-3">
-              <CheckCircle2 className="h-4 w-4 text-success" />
-              <span className="font-medium truncate">{file.name}</span>
-              <span className="text-muted-foreground ml-auto">{rows.length} linhas</span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm bg-muted/40 rounded-lg p-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                <span className="font-medium truncate">{file.name}</span>
+              </div>
+              <span className="text-muted-foreground sm:ml-auto">{rows.length} linhas</span>
             </div>
 
             <div>
@@ -220,10 +222,10 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
               <p className="text-xs text-muted-foreground mb-3">
                 Associe as colunas da planilha aos campos do catálogo.
               </p>
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              <div className="space-y-3 sm:space-y-2 max-h-72 overflow-y-auto pr-1">
                 {headers.map(h => (
-                  <div key={h} className="grid grid-cols-2 gap-3 items-center">
-                    <div className="text-sm font-medium truncate" title={h}>{h}</div>
+                  <div key={h} className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 items-start sm:items-center border-b sm:border-0 pb-3 sm:pb-0 last:border-0">
+                    <div className="text-sm font-medium break-words" title={h}>{h}</div>
                     <Select
                       value={mapping[h] ?? SKIP}
                       onValueChange={(v) => setMapping(prev => ({ ...prev, [h]: v as any }))}
@@ -243,11 +245,11 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
               </div>
             </div>
 
-            <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={reset} disabled={bulk.isPending}>
+            <div className="flex flex-col sm:flex-row gap-2 justify-end pt-2">
+              <Button variant="outline" onClick={reset} disabled={bulk.isPending} className="w-full sm:w-auto">
                 Trocar arquivo
               </Button>
-              <Button onClick={handleImport} disabled={bulk.isPending} className="gap-1.5">
+              <Button onClick={handleImport} disabled={bulk.isPending} className="w-full sm:w-auto gap-1.5">
                 {bulk.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 Importar
               </Button>

@@ -236,7 +236,7 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto flex flex-col">
+      <DialogContent className="max-w-3xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto flex flex-col p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-primary" />
@@ -249,7 +249,7 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
 
         {step === 'upload' && (
           <div
-            className="border-2 border-dashed border-border rounded-xl p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
+            className="border-2 border-dashed border-border rounded-xl p-8 sm:p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
             onClick={() => fileRef.current?.click()}
@@ -365,9 +365,9 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
               )}
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStep('mapping')}>Voltar</Button>
-              <Button onClick={handleImport} disabled={importing}>
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setStep('mapping')} className="w-full sm:w-auto">Voltar</Button>
+              <Button onClick={handleImport} disabled={importing} className="w-full sm:w-auto">
                 {importing ? (
                   <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importando...</>
                 ) : (
