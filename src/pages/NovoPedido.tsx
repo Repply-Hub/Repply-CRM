@@ -941,6 +941,7 @@ function ItemDescricaoField({
                         {tp.referencia && `Ref: ${tp.referencia} · `}
                         {tp.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         {tp.unidade && ` / ${tp.unidade}`}
+                        {tp.estoque_disponivel !== undefined && ` · Estoque: ${tp.estoque_disponivel}`}
                       </p>
                     </div>
                   </CommandItem>
