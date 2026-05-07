@@ -34,6 +34,7 @@ import { ListPagination } from '@/components/ListPagination';
 import { cn, slugify } from '@/lib/utils';
 import { ExportClientesButton } from '@/components/ExportClientesButton';
 import { FilterButton } from '@/components/FilterButton';
+import { StandardPopoverMenu } from '@/components/ui/standard-popover-menu';
 
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
