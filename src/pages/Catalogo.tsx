@@ -43,7 +43,13 @@ const Catalogo = () => {
     const q = busca.trim().toLowerCase();
     return (produtos ?? []).filter((p: any) => {
       if (fabricanteId !== 'todos' && p.fabricante_id !== fabricanteId) return false;
-      if (categoria !== 'todas' && p.categoria !== categoria) return false;
+      
+      if (categoria === 'sem-categoria') {
+        if (p.categoria) return false;
+      } else if (categoria !== 'todas' && p.categoria !== categoria) {
+        return false;
+      }
+
       if (!q) return true;
       return (
         p.descricao_material?.toLowerCase().includes(q) ||
