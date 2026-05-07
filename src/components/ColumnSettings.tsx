@@ -178,7 +178,12 @@ export const ColumnSettings = memo(function ColumnSettings({
                     <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={8} className="w-[200px] p-0 shadow-2xl border-border/40 z-[50] overflow-hidden">
+            <PopoverContent align="end" sideOffset={8} className="w-[200px] p-0 shadow-2xl border-border/40 z-[50] overflow-hidden" onPointerDownOutside={(e) => {
+                // Previne fechar o popover principal se o clique for no clone do drag and drop
+                if (e.target instanceof Element && e.target.closest('[data-rbd-drag-handle-context-id]')) {
+                    e.preventDefault();
+                }
+            }}>
                 <div className="flex flex-col divide-y divide-border/50 overflow-hidden max-h-[min(calc(100vh-120px),700px)]">
                     {!hideColumns && (
                         <div className="w-full flex flex-col">
@@ -192,7 +197,11 @@ export const ColumnSettings = memo(function ColumnSettings({
                                         <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200" />
                                     </button>
                                 </PopoverTrigger>
-                                <PopoverContent side="left" align="start" sideOffset={5} className="w-[320px] p-0 shadow-2xl border-border/40 z-[60]">
+                                <PopoverContent side="left" align="start" sideOffset={5} className="w-[320px] p-0 shadow-2xl border-border/40 z-[60]" onPointerDownOutside={(e) => {
+                                    if (e.target instanceof Element && e.target.closest('[data-rbd-drag-handle-context-id]')) {
+                                        e.preventDefault();
+                                    }
+                                }}>
                                     <div className="flex flex-col h-full max-h-[500px]">
                                         <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
                                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
@@ -248,7 +257,38 @@ export const ColumnSettings = memo(function ColumnSettings({
 
                                         <div className="flex-1 overflow-y-auto px-1.5 py-2 custom-scrollbar min-h-0">
                                             <DragDropContext onDragEnd={handleDragEnd}>
-                                                <Droppable droppableId="columns">
+                                                <Droppable droppableId="columns" mode="virtual" renderClone={(provided, snapshot, rubric) => {
+                                                    const column = columns[rubric.source.index];
+                                                    const checked = visibleColumns.includes(column.id);
+                                                    return (
+                                                        <div
+                                                            {...provided.draggableProps}
+                                                            {...provided.dragHandleProps}
+                                                            ref={provided.innerRef}
+                                                            className={cn(
+                                                                "group flex items-center gap-1 pr-1 outline-none bg-background border border-border/40 shadow-xl rounded-lg pointer-events-none",
+                                                                snapshot.isDragging && "z-[9999]"
+                                                            )}
+                                                            style={{
+                                                                ...provided.draggableProps.style,
+                                                                width: '300px'
+                                                            }}
+                                                        >
+                                                            <div className="p-1 text-muted-foreground/40">
+                                                                <GripVertical className="h-3.5 w-3.5" />
+                                                            </div>
+                                                            <div className="flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left">
+                                                                <div className={cn(
+                                                                    'h-7 w-7 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
+                                                                    checked ? 'bg-primary/10 border-primary/20 text-primary shadow-sm' : 'bg-muted/50 border-border/40 text-muted-foreground/40'
+                                                                )}>
+                                                                    {checked ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                                                                </div>
+                                                                <span className="truncate">{column.customLabel || column.label}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }}>
                                                     {(provided) => (
                                                         <div 
                                                             {...provided.droppableProps}
@@ -267,14 +307,14 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                         index={index}
                                                                     >
                                                                         {(provided, snapshot) => (
-                                                                            <div 
-                                                                                ref={provided.innerRef}
-                                                                                {...provided.draggableProps}
-                                                                                className={cn(
-                                                                                    "group flex items-center gap-1 pr-1 outline-none",
-                                                                                    snapshot.isDragging && "z-[9999]"
-                                                                                )}
-                                                                            >
+                                                                        <div 
+                                                                            ref={provided.innerRef}
+                                                                            {...provided.draggableProps}
+                                                                            className={cn(
+                                                                                "group flex items-center gap-1 pr-1 outline-none",
+                                                                                snapshot.isDragging && "opacity-0 pointer-events-none"
+                                                                            )}
+                                                                        >
                                                                                 <div 
                                                                                     {...provided.dragHandleProps}
                                                                                     className="p-1 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors"
