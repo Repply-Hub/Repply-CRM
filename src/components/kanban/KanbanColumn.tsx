@@ -1,7 +1,7 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Droppable } from '@hello-pangea/dnd';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronDown } from 'lucide-react';
 import { KanbanCard } from './KanbanCard';
 import { Order, KanbanStage } from '@/types';
 import { cn } from '@/lib/utils';
@@ -18,9 +18,19 @@ interface KanbanColumnProps {
   columns?: any[];
 }
 
+const ITEMS_PER_PAGE = 10;
+
 export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders, onCardClick, visibleColumns, columns }: KanbanColumnProps) {
   const navigate = useNavigate();
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const total = orders.reduce((acc, o) => acc + o.valor, 0);
+
+  const visibleOrders = orders.slice(0, visibleCount);
+  const hasMore = orders.length > visibleCount;
+
+  const loadMore = () => {
+    setVisibleCount(prev => prev + ITEMS_PER_PAGE);
+  };
 
   return (
     <div className="flex flex-col w-64 sm:w-72 min-w-[256px] sm:min-w-[288px] shrink-0 max-h-[calc(100vh-180px)] sm:max-h-[calc(100vh-220px)]">
