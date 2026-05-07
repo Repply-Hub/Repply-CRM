@@ -258,6 +258,7 @@ const NovoPedido = () => {
           preco_unitario: i.preco_unitario,
         })),
         proximo_contato: proximoContatoISO,
+        valor_total: valorFinal,
       });
       toast.success('Pedido criado com sucesso!');
       navigate('/');
