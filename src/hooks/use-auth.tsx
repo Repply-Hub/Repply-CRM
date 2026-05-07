@@ -51,13 +51,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      setSession(session);
+      
+      // Se a sessão for a mesma e o evento não for um login/logout explícito, ignoramos
+      // Isso evita refreshes desnecessários ao navegar entre páginas que podem disparar
+      // renovações de token silenciosas.
+      setSession(prev => {
+        if (prev?.access_token === session?.access_token && event === 'SIGNED_IN') {
+          return prev;
+        }
+        return session;
+      });
+
       if (session?.user) {
-        // Ao mudar o estado de auth, garantimos que o loading volte 
-        // brevemente se o perfil estiver sendo buscado
-        setLoading(true);
+        // Só buscamos o perfil se ele ainda não existir ou se for uma mudança de sessão real
         fetchProfile(session.user.id).finally(() => {
           if (mounted) setLoading(false);
         });
