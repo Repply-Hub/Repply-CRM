@@ -176,9 +176,19 @@ const Dashboard = () => {
       }
     });
     const arr = Array.from(map.entries()).map(([fabrica, valor]) => ({ fabrica, valor }));
-    arr.sort((a, b) => fabricaSort === 'maior' ? b.valor - a.valor : a.valor - b.valor);
+    // No sorting here anymore, we do it in useMemo
     return arr;
-  }, [filteredPedidos, fabricaSort]);
+  }, [filteredPedidos]);
+
+  const rendimentoFabricaSorted = useMemo(() => {
+    return [...rendimentoFabrica].sort((a, b) => fabricaSort === 'maior' ? b.valor - a.valor : a.valor - b.valor);
+  }, [rendimentoFabrica, fabricaSort]);
+
+  const faturamentoPorFabricaPizza = useMemo(() => {
+    return rendimentoFabrica
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 5);
+  }, [rendimentoFabrica]);
 
   const rendimentoVendedor = useMemo(() => {
     const map = new Map<string, number>();
@@ -428,8 +438,58 @@ const Dashboard = () => {
 
         {/* Rendimento Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-          {/* Rendimento por Fábrica */}
+          {/* Faturamento por Fábrica - Donut Chart */}
           {rendimentoFabrica.length > 0 && (
+            <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+              <CardHeader className="pb-1">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <Factory className="h-4 w-4 text-primary" /> Faturamento por Fábrica
+                </CardTitle>
+                <CardDescription className="text-xs">Distribuição do faturamento entre os principais fabricantes</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={faturamentoPorFabricaPizza}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={100}
+                      dataKey="valor"
+                      nameKey="fabrica"
+                      label={renderCustomLabel}
+                      paddingAngle={3}
+                      cornerRadius={4}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    >
+                      {faturamentoPorFabricaPizza.map((_, idx) => (
+                        <Cell 
+                          key={`cell-${idx}`} 
+                          fill={[
+                            chartColors.primary,
+                            chartColors.success,
+                            chartColors.warning,
+                            'hsl(24, 100%, 47%)',
+                            'hsl(280, 65%, 60%)'
+                          ][idx % 5]} 
+                          stroke="hsl(var(--card))" 
+                          strokeWidth={2} 
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={<ChartTooltip formatValue={formatCurrency} />}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Rendimento por Fábrica - Bar Chart */}
+          {rendimentoFabricaSorted.length > 0 && (
             <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
               <CardHeader className="pb-1">
                 <div className="flex items-center justify-between">
@@ -452,7 +512,7 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent className="pt-2">
                 <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={rendimentoFabrica} layout="vertical" barCategoryGap="20%">
+                  <BarChart data={rendimentoFabricaSorted} layout="vertical" barCategoryGap="20%">
                     <defs>
                       <linearGradient id="gradientRendimento" x1="0" y1="0" x2="1" y2="0">
                         <stop offset="0%" stopColor={chartColors.primary} stopOpacity={0.7} />
