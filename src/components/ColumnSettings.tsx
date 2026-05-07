@@ -260,6 +260,11 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                 <Droppable droppableId="columns" mode="virtual" renderClone={(provided, snapshot, rubric) => {
                                                     const column = columns[rubric.source.index];
                                                     const checked = visibleColumns.includes(column.id);
+                                                    
+                                                    // Bloquear o arraste apenas no eixo Y (vertical)
+                                                    const transform = provided.draggableProps.style?.transform;
+                                                    const lockedTransform = transform ? transform.replace(/\(([^,]+),/, '(0px,') : transform;
+                                                    
                                                     return (
                                                         <div
                                                             {...provided.draggableProps}
@@ -271,6 +276,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                             )}
                                                             style={{
                                                                 ...provided.draggableProps.style,
+                                                                transform: lockedTransform,
                                                                 width: '300px'
                                                             }}
                                                         >
