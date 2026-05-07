@@ -83,12 +83,6 @@ const Dashboard = () => {
   const fabricantes = useMemo(() => (fabricantesRaw || []) as { id: string; nome: string }[], [fabricantesRaw]);
 
 
-
-
-
-
-
-
   const { data: pedidos } = usePedidos(empresaId);
 
   const isLoading = loadFat;
@@ -223,7 +217,7 @@ const Dashboard = () => {
   return (
     <AppLayout title="Dashboard" subtitle="Visão analítica do desempenho comercial">
       <ErrorBoundary>
-      <div className="p-6 max-w-[1400px] mx-auto">
+      <div className="p-6 w-full">
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {kpis.map((kpi) => (

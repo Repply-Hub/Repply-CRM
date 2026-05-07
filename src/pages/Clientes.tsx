@@ -25,7 +25,7 @@ import { SearchableSelect } from '@/components/SearchableSelect';
 import { SearchWithRecent } from '@/components/SearchWithRecent';
 
 import { toast } from 'sonner';
-import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsPopover } from '@/components/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 import { EnderecoForm } from '@/components/EnderecoForm';
@@ -281,7 +281,8 @@ const Clientes = () => {
     presets,
     savePreset,
     loadPreset,
-    deletePreset
+    deletePreset,
+    resetToDefaults
   } = activeTab === 'empresas' ? empresasSettings : contatosSettings;
 
   const empresas = clients ?? [];
@@ -518,7 +519,7 @@ const Clientes = () => {
 
   return (
     <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`}>
-      <div className="p-6 max-w-[1400px] mx-auto">
+      <div className="p-6 w-full">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-4">
           <TabsList>
             <TabsTrigger value="empresas" className="gap-2">
@@ -608,29 +609,43 @@ const Clientes = () => {
             onSavePreset={savePreset}
             onLoadPreset={loadPreset}
             onDeletePreset={deletePreset}
+            onReset={resetToDefaults}
             label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
           >
-            <div className="pt-2 border-t border-border/50 mt-1 px-1 pb-2 space-y-1">
-              <div className="px-4 py-2 flex items-center justify-between bg-muted/30 border-b border-border/50 mb-1">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Ações</span>
-              </div>
-              
-              <div className="px-1.5 grid grid-cols-2 gap-1.5">
+            <div className="flex flex-col border-t border-border/50">
+              <ColumnSettingsPopover label="Ações" icon={Plus}>
                 <ExportClientesButton 
                   data={activeTab === 'empresas' ? filteredEmpresas : filteredContatos} 
                   type={activeTab} 
+                  renderTrigger={(onClick, exporting) => (
+                    <ColumnSettingsItem 
+                      label={exporting ? "Exportando..." : "Exportar"} 
+                      icon={exporting ? Loader2 : FileDown} 
+                      onClick={onClick} 
+                      disabled={exporting}
+                    />
+                  )}
                 />
 
-                <button
-                  onClick={() => setImportOpen(true)}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left"
-                >
-                  <Upload className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>Importar</span>
-                </button>
-              </div>
+                <ColumnSettingsItem 
+                  label="Importar" 
+                  icon={Upload} 
+                  onClick={() => setImportOpen(true)} 
+                />
+
+                {selected.size > 0 && (
+                  <ColumnSettingsItem 
+                    label="Excluir Selecionados" 
+                    icon={Trash2} 
+                    variant="destructive"
+                    onClick={openTypedConfirm} 
+                    badge={selected.size}
+                  />
+                )}
+              </ColumnSettingsPopover>
             </div>
           </ColumnSettings>
+
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
 
           {/* Novo tipo dialog — criação + gerenciamento */}

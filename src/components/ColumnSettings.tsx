@@ -1,5 +1,6 @@
-import React, { memo, useEffect } from 'react';
-import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen, Type, Hash, Calendar, ToggleLeft, DollarSign, Filter, Eye, EyeOff, Columns3 } from 'lucide-react';
+import React, { memo, useEffect, useState } from 'react';
+
+import { Settings2, Edit2, Check, X, Plus, ChevronDown, GripVertical, Save, Trash2, FolderOpen, Type, Hash, Calendar, ToggleLeft, DollarSign, Filter, Eye, EyeOff, Columns3, RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -63,6 +64,7 @@ interface ColumnSettingsProps {
     hideColumns?: boolean;
     /** Texto exibido no trigger e no título da seção. Default: "Colunas" */
     label?: string;
+    onReset?: () => void;
     children?: React.ReactNode;
 }
 
@@ -93,6 +95,7 @@ export const ColumnSettings = memo(function ColumnSettings({
     hideTrigger,
     label = 'Colunas',
     hideColumns = false,
+    onReset,
     children,
 }: ColumnSettingsProps) {
     const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -102,6 +105,8 @@ export const ColumnSettings = memo(function ColumnSettings({
     const [isAdding, setIsAdding] = React.useState(false);
     const [newPresetName, setNewPresetName] = React.useState('');
     const [isSavingPreset, setIsSavingPreset] = React.useState(false);
+    const [isDragging, setIsDragging] = useState(false);
+
 
     // Corrigir possíveis problemas de interação do dnd dentro de Popovers/ScrollAreas
     useEffect(() => {
@@ -153,7 +158,12 @@ export const ColumnSettings = memo(function ColumnSettings({
         }
     };
 
+    const handleDragStart = () => {
+        setIsDragging(true);
+    };
+
     const handleDragEnd = (result: DropResult) => {
+        setIsDragging(false);
         if (!result.destination) return;
         if (result.destination.index === result.source.index) return;
         
@@ -178,7 +188,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                     <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={8} className="w-[200px] p-0 shadow-2xl border-border/40 z-[50] overflow-hidden" onPointerDownOutside={(e) => {
+            <PopoverContent align="end" sideOffset={8} className="min-w-[180px] w-auto p-0 shadow-2xl border-border/40 z-[50] overflow-hidden" onPointerDownOutside={(e) => {
                 // Previne fechar o popover principal se o clique for no clone do drag and drop
                 if (e.target instanceof Element && e.target.closest('[data-rbd-drag-handle-context-id]')) {
                     e.preventDefault();
@@ -197,7 +207,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                         <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200" />
                                     </button>
                                 </PopoverTrigger>
-                                <PopoverContent side="left" align="start" sideOffset={5} className="w-[320px] p-0 shadow-2xl border-border/40 z-[60]" onPointerDownOutside={(e) => {
+                                <PopoverContent side="left" align="start" sideOffset={5} className="min-w-[280px] w-auto max-w-[400px] p-0 shadow-2xl border-border/40 z-[60]" onPointerDownOutside={(e) => {
                                     if (e.target instanceof Element && e.target.closest('[data-rbd-drag-handle-context-id]')) {
                                         e.preventDefault();
                                     }
@@ -205,19 +215,36 @@ export const ColumnSettings = memo(function ColumnSettings({
                                     <div className="flex flex-col h-full max-h-[500px]">
                                         <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
                                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
-                                            {onAdd && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setIsAdding(!isAdding);
-                                                    }}
-                                                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 group"
-                                                    title="Criar nova coluna"
-                                                >
-                                                    <Plus className="h-3.5 w-3.5" />
-                                                    <span className="text-[10px] font-bold">Nova Coluna</span>
-                                                </button>
-                                            )}
+                                            <div className="flex items-center gap-1">
+                                                {onReset && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
+                                                                onReset();
+                                                            }
+                                                        }}
+                                                        className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-all active:scale-95 group"
+                                                        title="Resetar para o padrão"
+                                                    >
+                                                        <RotateCcw className="h-3 w-3" />
+                                                        <span className="text-[10px] font-bold text-destructive/80">Resetar</span>
+                                                    </button>
+                                                )}
+                                                {onAdd && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setIsAdding(!isAdding);
+                                                        }}
+                                                        className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 group"
+                                                        title="Criar nova coluna"
+                                                    >
+                                                        <Plus className="h-3.5 w-3.5" />
+                                                        <span className="text-[10px] font-bold">Nova</span>
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
 
                                         {isAdding && onAdd && (
@@ -255,8 +282,8 @@ export const ColumnSettings = memo(function ColumnSettings({
                                             </div>
                                         )}
 
-                                        <div className="flex-1 overflow-y-auto overflow-x-hidden px-1.5 py-2 custom-scrollbar min-h-0 relative">
-                                            <DragDropContext onDragEnd={handleDragEnd}>
+                                        <div className={cn("flex-1 overflow-y-auto overflow-x-hidden px-1.5 py-2 custom-scrollbar min-h-0 relative")}>
+                                            <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                                                 <Droppable droppableId="columns">
                                                     {(provided) => (
                                                         <div 
@@ -286,6 +313,9 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                                 <div 
                                                                                     ref={provided.innerRef}
                                                                                     {...provided.draggableProps}
+                                                                                    style={{
+                                                                                        ...provided.draggableProps.style,
+                                                                                    }}
                                                                                     className={cn(
                                                                                         "group flex items-center gap-1 pr-1 outline-none transition-all",
                                                                                         snapshot.isDragging && "z-[9999] bg-background border border-border/40 shadow-xl rounded-lg"
@@ -365,7 +395,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                                                 }}
                                                                                                 className="h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-colors opacity-0 group-hover/btn:opacity-100"
                                                                                             >
-                                                                                                <Trash2 className="h-3 w-3" />
+                                                                                                <Trash2 className="h-3.5 w-3.5" />
                                                                                             </button>
                                                                                         )}
                                                                                     </div>
@@ -501,7 +531,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
                                                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => onChange(columns.map(c => c.id))}>
+                                                        <AlertDialogAction onClick={() => onReset ? onReset() : onChange(columns.map(c => c.id))}>
                                                             Confirmar
                                                         </AlertDialogAction>
                                                     </AlertDialogFooter>
@@ -513,27 +543,89 @@ export const ColumnSettings = memo(function ColumnSettings({
                             </Popover>
                         </div>
                     )}
-                    {children && (
-                        <div className="w-full flex flex-col">
-                            <Popover modal={false}>
-                                <PopoverTrigger asChild>
-                                    <button className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors group border-t border-border/50">
-                                        <div className="flex items-center gap-2">
-                                            {children}
-                                        </div>
-                                        <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200" />
-                                    </button>
-                                </PopoverTrigger>
-                                <PopoverContent side="left" align="start" sideOffset={5} className="w-[280px] p-0 shadow-2xl border-border/40 z-[60] bg-background">
-                                    <div className="flex flex-col h-full">
-                                        {/* Children content can go here if needed, but for now we just show the trigger */}
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    )}
+                    {children}
                 </div>
             </PopoverContent>
         </Popover>
     );
 });
+
+export const ColumnSettingsHeader = ({ label, icon: Icon, children }: { label: string; icon: any; children?: React.ReactNode }) => (
+    <div className="w-full flex flex-col border-t border-border/50 first:border-t-0">
+        <div className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 group">
+            <div className="flex items-center gap-2">
+                <Icon className="h-4 w-4 text-muted-foreground transition-colors" />
+                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
+            </div>
+            {children}
+        </div>
+    </div>
+);
+
+export const ColumnSettingsItem = ({ 
+    label, 
+    icon: Icon, 
+    onClick, 
+    disabled, 
+    variant = 'default',
+    badge
+}: { 
+    label: string; 
+    icon: any; 
+    onClick?: () => void; 
+    disabled?: boolean;
+    variant?: 'default' | 'destructive';
+    badge?: string | number;
+}) => (
+    <button
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        className={cn(
+            "flex w-full items-center justify-between px-4 py-2.5 text-[13px] font-medium transition-all group",
+            variant === 'destructive' 
+                ? "text-destructive hover:bg-destructive/10" 
+                : "hover:bg-muted/80",
+            disabled && "opacity-50 cursor-not-allowed"
+        )}
+    >
+        <div className="flex items-center gap-3">
+            <Icon className={cn(
+                "h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors",
+                variant === 'destructive' && "text-destructive/70 group-hover:text-destructive"
+            )} />
+            <span className="truncate">{label}</span>
+        </div>
+        {badge !== undefined && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                {badge}
+            </span>
+        )}
+    </button>
+);
+export const ColumnSettingsPopover = ({ label, icon: Icon, children }: { label: string; icon: any; children: React.ReactNode }) => (
+    <div className="w-full flex flex-col border-t border-border/50 first:border-t-0">
+        <Popover modal={false}>
+            <PopoverTrigger asChild>
+                <button className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors group">
+                    <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent side="left" align="start" sideOffset={5} className="min-w-[220px] w-auto max-w-[350px] p-0 shadow-2xl border-border/40 z-[60] bg-background">
+
+                <div className="flex flex-col h-full">
+                    <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50">
+                        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
+                    </div>
+                    <div className="flex flex-col p-1.5 space-y-0.5">
+                        {children}
+                    </div>
+                </div>
+            </PopoverContent>
+        </Popover>
+    </div>
+);

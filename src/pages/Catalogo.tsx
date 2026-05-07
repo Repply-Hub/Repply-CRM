@@ -67,7 +67,7 @@ const Catalogo = () => {
 
   return (
     <AppLayout title="Catálogo de Produtos" subtitle={`${filtered.length} produto(s)`}>
-      <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-4">
+      <div className="p-4 md:p-6 w-full space-y-4">
         <Card className="rounded-xl border-border/60">
           <CardContent className="p-4 flex flex-wrap gap-3 items-center">
             <SearchWithRecent

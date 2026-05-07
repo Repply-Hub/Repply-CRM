@@ -8,9 +8,11 @@ import * as XLSX from 'xlsx';
 interface ExportClientesButtonProps {
   data: any[];
   type: 'empresas' | 'contatos';
+  renderTrigger?: (onClick: () => void, exporting: boolean) => React.ReactNode;
 }
 
-export function ExportClientesButton({ data, type }: ExportClientesButtonProps) {
+export function ExportClientesButton({ data, type, renderTrigger }: ExportClientesButtonProps) {
+
   const [exporting, setExporting] = useState(false);
 
   const prepareData = () => {
@@ -64,18 +66,22 @@ export function ExportClientesButton({ data, type }: ExportClientesButtonProps) 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button 
-          disabled={exporting}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {exporting ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-          ) : (
-            <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
-          )}
-          <span>Exportar</span>
-          <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180 ml-auto" />
-        </button>
+        {renderTrigger ? (
+          renderTrigger(() => {}, exporting)
+        ) : (
+          <button 
+            disabled={exporting}
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-lg hover:bg-muted/80 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+            ) : (
+              <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+            <span>Exportar</span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180 ml-auto" />
+          </button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="flex gap-1 p-1 min-w-0">
         <DropdownMenuItem onClick={() => exportFile('xlsx')} className="flex-1 gap-2 text-[12px] py-1.5 justify-center">
@@ -87,4 +93,5 @@ export function ExportClientesButton({ data, type }: ExportClientesButtonProps) 
       </DropdownMenuContent>
     </DropdownMenu>
   );
+
 }

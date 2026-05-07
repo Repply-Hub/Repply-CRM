@@ -88,7 +88,8 @@ export default function Tarefas() {
     presets,
     savePreset,
     loadPreset,
-    deletePreset
+    deletePreset,
+    resetToDefaults
   } = useTableSettings({
     key: 'tarefas',
     defaultColumns: TAREFA_COLUMNS,
@@ -236,7 +237,7 @@ export default function Tarefas() {
 
   return (
     <AppLayout title="Tarefas" subtitle={`${filtered.length} tarefa(s)`}>
-      <div className="p-3 sm:p-4 md:p-6 max-w-[1400px] mx-auto space-y-4 md:space-y-6">
+      <div className="p-3 sm:p-4 md:p-6 w-full space-y-4 md:space-y-6">
         {/* Filters & Actions */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <SearchWithRecent
@@ -290,6 +291,7 @@ export default function Tarefas() {
             onSavePreset={savePreset}
             onLoadPreset={loadPreset}
             onDeletePreset={deletePreset}
+            onReset={resetToDefaults}
           />
           <Button onClick={openNew} size="sm" className="shrink-0">
             <Plus className="h-4 w-4 mr-1" />Nova Tarefa

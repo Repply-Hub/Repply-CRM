@@ -27,7 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsHeader, ColumnSettingsPopover } from '@/components/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -709,95 +709,77 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       onSavePreset={savePreset}
       onLoadPreset={loadPreset}
       onDeletePreset={deletePreset}
+      onReset={resetToDefaults}
       label="Colunas"
     >
-      <div className="flex flex-col gap-1 p-1">
-
+      <div className="flex flex-col border-t border-border/50">
         {showKanban && (
-          <div className="space-y-1 mb-2">
-            <div className="px-3 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/30 rounded mx-1">
-              Etapas Kanban
-            </div>
-            {KANBAN_STAGES.map((stage) => {
-              const checked = visibleKanbanStages.includes(stage.key);
-              const disabled = visibleKanbanStages.length === 1 && checked;
-              return (
+          <ColumnSettingsPopover label="Etapas Kanban" icon={LayoutGrid}>
+            <div className="flex flex-col gap-0.5">
+              <div className="px-3 py-1 flex items-center justify-between border-b border-border/40 mb-1">
+                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Visibilidade</span>
                 <button
-                  key={stage.key}
                   type="button"
-                  disabled={disabled}
-                  onClick={() => toggleKanbanStage(stage.key)}
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-xs font-medium transition-all text-left mx-0',
-                    'hover:bg-muted/80 disabled:cursor-not-allowed',
-                    !checked && 'opacity-40'
-                  )}
+                  onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
+                  className="text-[10px] text-primary font-bold hover:underline uppercase tracking-wider"
                 >
-                  <span className={cn('h-3 w-3 rounded-sm shrink-0 border border-border/40', `bg-${stage.color}`)} />
-                  <span className="flex-1 truncate">{stage.label}</span>
+                  Resetar
                 </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
-              className="w-full text-center text-[10px] text-primary font-bold px-2 py-1.5 mt-1 rounded-md hover:bg-primary/5 transition-colors uppercase tracking-wider"
-            >
-              Resetar etapas
-            </button>
-            <div className="h-px bg-border/50 my-1 mx-2" />
-          </div>
+              </div>
+              {KANBAN_STAGES.map((stage) => {
+                const checked = visibleKanbanStages.includes(stage.key);
+                const disabled = visibleKanbanStages.length === 1 && checked;
+                return (
+                  <button
+                    key={stage.key}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => toggleKanbanStage(stage.key)}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-xs font-medium transition-all text-left',
+                      'hover:bg-muted/80 disabled:cursor-not-allowed',
+                      !checked && 'opacity-40'
+                    )}
+                  >
+                    <span className={cn('h-3 w-3 rounded-sm shrink-0 border border-border/40', `bg-${stage.color}`)} />
+                    <span className="flex-1 truncate">{stage.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </ColumnSettingsPopover>
         )}
 
-        <button
-          onClick={() => setImportOpen(true)}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group"
-        >
-          <Upload className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-          <span>Importar Excel</span>
-        </button>
+        <ColumnSettingsPopover label="Ações" icon={Plus}>
+          <ColumnSettingsItem 
+            label="Importar Excel" 
+            icon={Upload} 
+            onClick={() => setImportOpen(true)} 
+          />
+          
+          <ColumnSettingsItem 
+            label="Exportar PDF" 
+            icon={FileDown} 
+            onClick={() => handleExportPdf()} 
+          />
 
-        <button
-          onClick={() => handleExportPdf()}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-colors group"
-        >
-          <FileDown className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-          <span>Exportar PDF</span>
-        </button>
+          {showKanban && (
+            <ColumnSettingsItem 
+              label="Gerenciar colunas Kanban" 
+              icon={Columns3} 
+              onClick={() => setColunasDialogOpen(true)} 
+            />
+          )}
 
-        {showKanban && (
-          <button
-            type="button"
-            onClick={() => setColunasDialogOpen(true)}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80 transition-all group"
-          >
-            <Columns3 className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-            <span>Gerenciar colunas Kanban</span>
-          </button>
-        )}
-
-        <button
-          onClick={() => setConfirmDeleteOpen(true)}
-          disabled={selected.size === 0}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-destructive/10 text-destructive disabled:opacity-50 disabled:hover:bg-transparent transition-colors group"
-        >
-          <Trash2 className="h-4 w-4 opacity-70 group-hover:opacity-100" />
-          <span>Excluir Selecionados ({selected.size})</span>
-        </button>
-
-        <div className="h-px bg-border/50 my-1 mx-2" />
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
-              resetToDefaults();
-            }
-          }}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-all"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          <span>Resetar todas as configurações</span>
-        </button>
+          <ColumnSettingsItem 
+            label="Excluir Selecionados" 
+            icon={Trash2} 
+            variant="destructive"
+            disabled={selected.size === 0}
+            onClick={() => setConfirmDeleteOpen(true)} 
+            badge={selected.size > 0 ? selected.size : undefined}
+          />
+        </ColumnSettingsPopover>
       </div>
     </ColumnSettings>
   ), [
@@ -1276,7 +1258,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   return (
     <AppLayout title="Negócios" subtitle={subtitle}>
-      <div className="p-3 sm:p-4 md:p-6 max-w-[1600px]">
+      <div className="p-6 w-full">
         <div className="mb-4 md:mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex-1 flex flex-wrap items-center gap-2 min-w-0">
             {isPipelineMode && (

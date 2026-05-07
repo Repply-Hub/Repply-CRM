@@ -400,7 +400,7 @@ const Fabricantes = () => {
 
   return (
     <AppLayout title="Fabricantes & Tabelas de Preço" subtitle={`${fabricantes?.length ?? 0} fabricantes cadastrados`}>
-      <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
+      <div className="p-4 md:p-6 w-full">
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
