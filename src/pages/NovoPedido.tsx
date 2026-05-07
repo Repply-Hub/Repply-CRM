@@ -775,29 +775,31 @@ const NovoPedido = () => {
 
 
 
-                {/* Próximo contato */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Próximo Contato Agendado</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !proximoContato && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {proximoContato ? format(proximoContato, "dd/MM/yyyy") : "Selecionar data"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={proximoContato} onSelect={setProximoContato} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  {proximoContato && (
+                {/* Próximo contato - Somente se houver itens, caso contrário já aparece acima */}
+                {itens.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Horário</Label>
-                      <Input type="time" value={proximoContatoHora} onChange={e => setProximoContatoHora(e.target.value)} />
+                      <Label>Próximo Contato Agendado</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !proximoContato && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {proximoContato ? format(proximoContato, "dd/MM/yyyy") : "Selecionar data"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={proximoContato} onSelect={setProximoContato} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                        </PopoverContent>
+                      </Popover>
                     </div>
-                  )}
-                </div>
+                    {proximoContato && (
+                      <div className="space-y-2">
+                        <Label>Horário</Label>
+                        <Input type="time" value={proximoContatoHora} onChange={e => setProximoContatoHora(e.target.value)} />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex justify-between pt-4">
                   <Button variant="outline" onClick={() => setStep(1)}>
