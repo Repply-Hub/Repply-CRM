@@ -7,12 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreatePreco, useUpdatePreco, useCategorias } from '@/hooks/use-fabricantes';
+import { useFabricantes } from '@/hooks/use-clientes';
 import { ProductImageUpload } from './ProductImageUpload';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 interface ProductFormProps {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  fabricanteId: string;
+  fabricanteId?: string;
   editData?: { 
     id: string; 
     descricao_material: string; 
@@ -22,18 +24,20 @@ interface ProductFormProps {
     vigente: boolean; 
     categoria?: string | null; 
     imagem_url?: string | null; 
-    estoque_disponivel?: number | null 
+    estoque_disponivel?: number | null;
+    fabricante_id?: string;
   };
   initialCategory?: string;
   onDeleteClick?: (id: string) => void;
 }
 
-export function ProductForm({ open, onOpenChange, fabricanteId, editData, initialCategory, onDeleteClick }: ProductFormProps) {
+export function ProductForm({ open, onOpenChange, fabricanteId: initialFabId, editData, initialCategory, onDeleteClick }: ProductFormProps) {
   const createPreco = useCreatePreco();
   const updatePreco = useUpdatePreco();
   const { data: todasCategorias } = useCategorias();
+  const { data: fabricantes } = useFabricantes();
   
-  const [desc, setDesc] = useState('');
+  const [fabricanteId, setFabricanteId] = useState(initialFabId ?? editData?.fabricante_id ?? '');
   const [ref, setRef] = useState('');
   const [preco, setPreco] = useState('');
   const [unidade, setUnidade] = useState('un');
