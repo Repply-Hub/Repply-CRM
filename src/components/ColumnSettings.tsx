@@ -307,14 +307,14 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                         index={index}
                                                                     >
                                                                         {(provided, snapshot) => (
-                                                                            <div 
-                                                                                ref={provided.innerRef}
-                                                                                {...provided.draggableProps}
-                                                                                className={cn(
-                                                                                    "group flex items-center gap-1 pr-1 outline-none",
-                                                                                    snapshot.isDragging && "z-[9999]"
-                                                                                )}
-                                                                            >
+                                                                        <div 
+                                                                            ref={provided.innerRef}
+                                                                            {...provided.draggableProps}
+                                                                            className={cn(
+                                                                                "group flex items-center gap-1 pr-1 outline-none",
+                                                                                snapshot.isDragging && "opacity-0 pointer-events-none"
+                                                                            )}
+                                                                        >
                                                                                 <div 
                                                                                     {...provided.dragHandleProps}
                                                                                     className="p-1 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors"
