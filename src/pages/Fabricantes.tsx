@@ -419,12 +419,22 @@ const Fabricantes = () => {
                       {filtered.length} cadastrado{filtered.length !== 1 ? 's' : ''}
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setGlobalImportOpen(true)} className="gap-1.5 h-8 flex-1 sm:flex-initial">
-                      <Upload className="h-3.5 w-3.5" /> <span className="sm:hidden xl:inline">Importar</span>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      size="icon" 
+                      variant="outline" 
+                      onClick={() => setGlobalImportOpen(true)} 
+                      className="h-9 w-9"
+                      title="Importar fabricantes"
+                    >
+                      <Upload className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" onClick={() => { setEditFab(null); setFabDialog(true); }} className="gap-1.5 h-8 flex-1 sm:flex-initial">
-                      <Plus className="h-3.5 w-3.5" /> Novo
+                    <Button 
+                      size="sm" 
+                      onClick={() => { setEditFab(null); setFabDialog(true); }} 
+                      className="gap-1.5 h-9 bg-primary hover:bg-primary/90"
+                    >
+                      <Plus className="h-4 w-4" /> Novo
                     </Button>
                   </div>
                 </div>
