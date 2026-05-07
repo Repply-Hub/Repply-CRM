@@ -88,7 +88,7 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
     const descCol = Object.entries(mapping).find(([, v]) => v === 'descricao_material')?.[0];
     const precoCol = Object.entries(mapping).find(([, v]) => v === 'preco_unitario')?.[0];
     if (!descCol || !precoCol) {
-      toast.error('Mapeie pelo menos Descrição e Preço unitário');
+      toast.error('Mapeie pelo menos Produto e Preço de Varejo');
       return;
     }
 
@@ -99,16 +99,25 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
         const v = row[col];
         return v === '' ? undefined : v;
       };
+
       const precoRaw = get('preco_unitario');
       const preco = typeof precoRaw === 'number'
         ? precoRaw
-        : parseFloat(String(precoRaw ?? '').replace(/\./g, '').replace(',', '.'));
+        : parseFloat(String(precoRaw ?? '').replace(/[^\d,.]/g, '').replace(',', '.'));
+
+      const estoqueRaw = get('estoque_disponivel');
+      const estoque = estoqueRaw !== undefined 
+        ? (typeof estoqueRaw === 'number' ? estoqueRaw : parseFloat(String(estoqueRaw).replace(/[^\d,.]/g, '').replace(',', '.')))
+        : null;
+
       return {
         fabricante_id: fabricanteId,
         descricao_material: String(get('descricao_material') ?? '').trim(),
         referencia: get('referencia') ? String(get('referencia')).trim() : null,
         categoria: get('categoria') ? String(get('categoria')).trim() : null,
         unidade: get('unidade') ? String(get('unidade')).trim() : null,
+        imagem_url: get('imagem_url') ? String(get('imagem_url')).trim() : null,
+        estoque_disponivel: !isNaN(estoque as number) ? estoque : null,
         preco_unitario: preco,
         vigente: true,
       };
