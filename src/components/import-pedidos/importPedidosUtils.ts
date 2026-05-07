@@ -300,39 +300,12 @@ export function getImportedPedidosRows(
       
       let data_pedido = undefined;
       if (mapping.data_pedido && row[mapping.data_pedido]) {
-        const rawDate = row[mapping.data_pedido];
-        if (typeof rawDate === 'number') {
-          // Handle Excel numeric date format - Excel starts from 1899-12-30
-          // Use UTC to avoid timezone issues during conversion
-          const date = XLSX.SSF.parse_date_code(rawDate);
-          data_pedido = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
-        } else {
-          const dateStr = rawDate.toString().trim();
-          
-          // Tenta detectar formato DD/MM/YYYY ou DD-MM-YYYY
-          const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-          if (ddmmyyyyMatch) {
-            const day = ddmmyyyyMatch[1].padStart(2, '0');
-            const month = ddmmyyyyMatch[2].padStart(2, '0');
-            const year = ddmmyyyyMatch[3];
-            data_pedido = `${year}-${month}-${day}`;
-          } else {
-            // Tenta converter para o início do dia local para evitar problemas de fuso horário
-            const parts = dateStr.split(/[\/\-]/);
-            if (parts.length === 3 && parts[0].length <= 2 && parts[2].length === 4) {
-              // DD/MM/YYYY fallback manual
-              data_pedido = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            } else {
-              const d = new Date(dateStr);
-              if (!isNaN(d.getTime())) {
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                data_pedido = `${year}-${month}-${day}`;
-              }
-            }
-          }
-        }
+        data_pedido = processDate(row[mapping.data_pedido]);
+      }
+
+      let prazo_resposta = undefined;
+      if (mapping.prazo_resposta && row[mapping.prazo_resposta]) {
+        prazo_resposta = processDate(row[mapping.prazo_resposta]);
       }
 
       const campos_extras: Record<string, string> = {};
@@ -349,6 +322,43 @@ export function getImportedPedidosRows(
         if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
-      return { negocio, cliente, contato, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, campos_extras };
+      return { negocio, cliente, contato, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, prazo_resposta, campos_extras };
     });
+}
+
+function processDate(rawDate: any): string | undefined {
+  if (!rawDate) return undefined;
+  if (typeof rawDate === 'number') {
+    // Handle Excel numeric date format - Excel starts from 1899-12-30
+    // Use UTC to avoid timezone issues during conversion
+    const date = XLSX.SSF.parse_date_code(rawDate);
+    return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+  } else {
+    const dateStr = rawDate.toString().trim();
+    
+    // Tenta detectar formato DD/MM/YYYY ou DD-MM-YYYY
+    const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (ddmmyyyyMatch) {
+      const day = ddmmyyyyMatch[1].padStart(2, '0');
+      const month = ddmmyyyyMatch[2].padStart(2, '0');
+      const year = ddmmyyyyMatch[3];
+      return `${year}-${month}-${day}`;
+    } else {
+      // Tenta converter para o início do dia local para evitar problemas de fuso horário
+      const parts = dateStr.split(/[\/\-]/);
+      if (parts.length === 3 && parts[0].length <= 2 && parts[2].length === 4) {
+        // DD/MM/YYYY fallback manual
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      } else {
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        }
+      }
+    }
+  }
+  return undefined;
 }
