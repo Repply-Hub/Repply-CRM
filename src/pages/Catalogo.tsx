@@ -29,6 +29,28 @@ const Catalogo = () => {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const deletePreco = useDeletePreco();
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const bulkDelete = useBulkDeletePrecos();
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDelete.mutateAsync(selectedIds);
+      toast.success(`${selectedIds.length} produto(s) excluído(s) com sucesso!`);
+      setSelectedIds([]);
+      setIsSelectionMode(false);
+      setConfirmBulkDelete(false);
+    } catch (err) {
+      toast.error('Erro ao excluir produtos em massa');
+    }
+  };
 
   const categorias = useMemo(() => {
     const set = new Set<string>();
