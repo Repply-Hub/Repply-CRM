@@ -190,6 +190,7 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
             <div><Label>Estoque Disponível</Label><Input type="number" step="0.01" value={estoque} onChange={e => setEstoque(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <div>
               <Label>Unidade</Label>
               <Select value={unidade} onValueChange={setUnidade}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
