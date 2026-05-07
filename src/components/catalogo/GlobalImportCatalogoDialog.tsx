@@ -16,11 +16,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const VISIBLE_FIELDS: FieldDef[] = [
-  { key: 'descricao_material', label: 'Descrição', required: true, type: 'text' },
+  { key: 'descricao_material', label: 'Produto', required: true, type: 'text' },
+  { key: 'imagem_url', label: 'Fotos', required: false, type: 'text' },
+  { key: 'estoque_disponivel', label: 'Estoque Disponível', required: false, type: 'number' },
+  { key: 'unidade', label: 'Unidade de Medida', required: false, type: 'text' },
+  { key: 'preco_unitario', label: 'Preço de Varejo', required: true, type: 'number' },
   { key: 'referencia', label: 'Referência', required: false, type: 'text' },
   { key: 'categoria', label: 'Categoria', required: false, type: 'text' },
-  { key: 'preco_unitario', label: 'Preço unitário', required: true, type: 'number' },
-  { key: 'unidade', label: 'Unidade', required: false, type: 'text' },
   { key: 'fabricante_nome', label: 'Fabricante', required: false, type: 'text' },
 ];
 
