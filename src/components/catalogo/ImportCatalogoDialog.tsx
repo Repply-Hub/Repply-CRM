@@ -18,11 +18,13 @@ interface Props {
 }
 
 const TARGET_FIELDS = [
-  { key: 'descricao_material', label: 'Descrição *', required: true },
+  { key: 'descricao_material', label: 'Produto *', required: true },
+  { key: 'imagem_url', label: 'Fotos (URL)' },
+  { key: 'estoque_disponivel', label: 'Estoque Disponível' },
+  { key: 'unidade', label: 'Unidade de Medida' },
+  { key: 'preco_unitario', label: 'Preço de Varejo *', required: true },
   { key: 'referencia', label: 'Referência' },
   { key: 'categoria', label: 'Categoria' },
-  { key: 'preco_unitario', label: 'Preço unitário *', required: true },
-  { key: 'unidade', label: 'Unidade' },
 ] as const;
 
 type TargetKey = typeof TARGET_FIELDS[number]['key'];
@@ -31,11 +33,13 @@ const SKIP = '__skip__';
 
 function autoMap(header: string): TargetKey | null {
   const h = header.toLowerCase().trim();
-  if (/(desc|produto|material|item)/.test(h)) return 'descricao_material';
+  if (/(produto|desc|material|item)/.test(h)) return 'descricao_material';
+  if (/(foto|img|imagem|url)/.test(h)) return 'imagem_url';
+  if (/(estoque|disponível|disponivel|qtd|quant)/.test(h)) return 'estoque_disponivel';
+  if (/(unidade|medida|un)/.test(h)) return 'unidade';
+  if (/(preço|preco|valor|varejo)/.test(h)) return 'preco_unitario';
   if (/(ref|cód|cod|sku)/.test(h)) return 'referencia';
   if (/(categ|linha|grupo|famíl|famil)/.test(h)) return 'categoria';
-  if (/(preço|preco|valor)/.test(h)) return 'preco_unitario';
-  if (/(un|medida)/.test(h)) return 'unidade';
   return null;
 }
 
@@ -84,7 +88,7 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
     const descCol = Object.entries(mapping).find(([, v]) => v === 'descricao_material')?.[0];
     const precoCol = Object.entries(mapping).find(([, v]) => v === 'preco_unitario')?.[0];
     if (!descCol || !precoCol) {
-      toast.error('Mapeie pelo menos Descrição e Preço unitário');
+      toast.error('Mapeie pelo menos Produto e Preço de Varejo');
       return;
     }
 
@@ -95,16 +99,25 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
         const v = row[col];
         return v === '' ? undefined : v;
       };
+
       const precoRaw = get('preco_unitario');
       const preco = typeof precoRaw === 'number'
         ? precoRaw
-        : parseFloat(String(precoRaw ?? '').replace(/\./g, '').replace(',', '.'));
+        : parseFloat(String(precoRaw ?? '').replace(/[^\d,.]/g, '').replace(',', '.'));
+
+      const estoqueRaw = get('estoque_disponivel');
+      const estoque = estoqueRaw !== undefined 
+        ? (typeof estoqueRaw === 'number' ? estoqueRaw : parseFloat(String(estoqueRaw).replace(/[^\d,.]/g, '').replace(',', '.')))
+        : null;
+
       return {
         fabricante_id: fabricanteId,
         descricao_material: String(get('descricao_material') ?? '').trim(),
         referencia: get('referencia') ? String(get('referencia')).trim() : null,
         categoria: get('categoria') ? String(get('categoria')).trim() : null,
         unidade: get('unidade') ? String(get('unidade')).trim() : null,
+        imagem_url: get('imagem_url') ? String(get('imagem_url')).trim() : null,
+        estoque_disponivel: !isNaN(estoque as number) ? estoque : null,
         preco_unitario: preco,
         vigente: true,
       };
@@ -165,7 +178,7 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
             <FileSpreadsheet className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
             <p className="text-sm font-medium mb-1">Selecione uma planilha (.xlsx, .xls ou .csv)</p>
             <p className="text-xs text-muted-foreground mb-4">
-              Colunas reconhecidas: descrição, referência, categoria, preço, unidade
+              Colunas reconhecidas: produto, fotos, estoque disponível, unidade de medida, preço de varejo, referência, categoria
             </p>
             <input
               id="catalogo-import-file"
