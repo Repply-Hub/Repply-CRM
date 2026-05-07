@@ -291,12 +291,14 @@ function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
               </div>
             </div>
           </div>
-          <div className="flex gap-2 flex-shrink-0 w-full sm:w-auto">
-            <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5 flex-1 sm:flex-initial">
-              <Pencil className="h-3.5 w-3.5" /> Editar
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5 h-9">
+              <Pencil className="h-3.5 w-3.5" /> 
+              <span>Editar</span>
             </Button>
-            <Button variant="destructive" size="sm" onClick={onDelete} className="gap-1.5 flex-1 sm:flex-initial">
-              <Trash2 className="h-3.5 w-3.5" /> <span className="sm:hidden lg:inline">Excluir</span>
+            <Button variant="destructive" size="sm" onClick={onDelete} className="gap-1.5 h-9">
+              <Trash2 className="h-3.5 w-3.5" /> 
+              <span>Excluir</span>
             </Button>
           </div>
         </div>
