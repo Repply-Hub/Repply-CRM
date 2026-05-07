@@ -60,14 +60,15 @@ export interface NovoPedidoPayload {
   cliente_id: string;
   fabricante_id: string;
   usuario_id: string;
-   obra_id?: string;
-   status?: string;
-   data_pedido: string;
+  obra_id?: string;
+  status?: string;
+  data_pedido: string;
   prazo_resposta?: string;
   origem_lead?: string;
   endereco_entrega?: string;
   observacoes?: string;
   pdf_url?: string;
+  valor_total?: number;
   itens: {
     descricao_material: string;
     referencia_fabricante?: string;
@@ -97,6 +98,7 @@ export function useCreatePedidoCompleto() {
           prazo_resposta: payload.prazo_resposta || null,
           origem_lead: payload.origem_lead || null,
           endereco_entrega: payload.endereco_entrega || null,
+          valor_total: payload.valor_total || 0,
         })
         .select('id')
         .single();
