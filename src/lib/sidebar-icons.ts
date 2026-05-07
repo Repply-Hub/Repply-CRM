@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Kanban, Users, FileText, Settings, HardHat, Factory,
   Globe, CalendarDays, ClipboardList, Link, BarChart3, Mail, Phone,
   Star, Heart, BookOpen, Briefcase, Home, Map, Package, ShoppingCart,
-  Truck, Wallet, Wrench, Zap, MessageCircle, List, type LucideIcon
+  Truck, Wallet, Wrench, Zap, MessageCircle, List, FileWarning, type LucideIcon
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, LucideIcon> = {
