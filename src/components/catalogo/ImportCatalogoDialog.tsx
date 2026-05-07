@@ -98,23 +98,27 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
       return;
     }
 
-    const allMappedRecords = rows.map(row => {
+    const records = rows.map(row => {
       const get = (target: TargetKey) => {
         const col = Object.entries(mapping).find(([, v]) => v === target)?.[0];
         if (!col) return undefined;
         const v = row[col];
-        return v === '' ? undefined : v;
+        return v === '' || v === undefined || v === null ? undefined : v;
       };
 
       const precoRaw = get('preco_unitario');
-      const preco = typeof precoRaw === 'number'
-        ? precoRaw
-        : parseFloat(String(precoRaw ?? '').replace(/[^\d,.]/g, '').replace(',', '.'));
+      let preco = 0;
+      if (typeof precoRaw === 'number') {
+        preco = precoRaw;
+      } else if (precoRaw) {
+        preco = parseFloat(String(precoRaw).replace(/[^\d,.]/g, '').replace(',', '.'));
+      }
 
       const estoqueRaw = get('estoque_disponivel');
-      const estoque = estoqueRaw !== undefined 
-        ? (typeof estoqueRaw === 'number' ? estoqueRaw : parseFloat(String(estoqueRaw).replace(/[^\d,.]/g, '').replace(',', '.')))
-        : null;
+      let estoque = null;
+      if (estoqueRaw !== undefined && estoqueRaw !== null && estoqueRaw !== '') {
+        estoque = typeof estoqueRaw === 'number' ? estoqueRaw : parseFloat(String(estoqueRaw).replace(/[^\d,.]/g, '').replace(',', '.'));
+      }
 
       return {
         fabricante_id: fabricanteId,
@@ -123,43 +127,17 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
         categoria: get('categoria') ? String(get('categoria')).trim() : null,
         unidade: get('unidade') ? String(get('unidade')).trim() : null,
         imagem_url: get('imagem_url') ? String(get('imagem_url')).trim() : null,
-        estoque_disponivel: !isNaN(estoque as number) ? estoque : null,
+        estoque_disponivel: (estoque !== null && !isNaN(estoque)) ? estoque : null,
         preco_unitario: preco,
         vigente: true,
       };
-    });
-
-    const records = allMappedRecords.filter(r => r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
-    const ignoredRowsData = rows.filter((_, index) => {
-      const r = allMappedRecords[index];
-      return !(r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
-    });
-
+    }).filter(r => r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
     if (records.length === 0) {
-      toast.error('Nenhuma linha válida encontrada');
+      toast.error('Nenhuma linha válida encontrada. Verifique se as colunas de Produto e Preço estão preenchidas.');
       return;
     }
 
     try {
-      // Salvar linhas ignoradas para revisão posterior
-      if (ignoredRowsData.length > 0) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const ignoredBatch = ignoredRowsData.map(row => ({
-            usuario_id: user.id,
-            tipo_importacao: 'catalogo',
-            dados_originais: row,
-            motivo_ignorado: 'Falta Descrição ou Preço'
-          }));
-          
-          const { error: ignoreError } = await supabase
-            .from('linhas_ignoradas_importacao')
-            .insert(ignoredBatch);
-          
-          if (ignoreError) console.error('Erro ao salvar linhas ignoradas:', ignoreError);
-        }
-      }
-
       const { inserted } = await bulk.mutateAsync(records);
       toast.success(`${inserted} produto(s) importado(s)!`);
       reset();
