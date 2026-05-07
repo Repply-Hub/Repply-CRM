@@ -92,7 +92,7 @@ function FabricanteForm({ open, onOpenChange, editData }: {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader><DialogTitle>{editData ? 'Editar' : 'Cadastrar'} Fabricante</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
