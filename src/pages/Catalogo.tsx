@@ -9,9 +9,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useCatalogoGlobal, useDeleteCategoria, useDeletePreco } from '@/hooks/use-fabricantes';
+import { useCatalogoGlobal, useDeleteCategoria, useDeletePreco, useBulkDeletePrecos } from '@/hooks/use-fabricantes';
 import { useFabricantes } from '@/hooks/use-clientes';
-import { Search, Package, ImageIcon, Loader2, Trash2, Folder, ChevronLeft, ArrowLeft, Eye, Plus } from 'lucide-react';
+import { Search, Package, ImageIcon, Loader2, Trash2, Folder, ChevronLeft, ArrowLeft, Eye, Plus, CheckSquare, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProductForm } from '@/components/catalogo/ProductForm';
 import { SearchableSelect } from '@/components/SearchableSelect';
@@ -29,6 +29,28 @@ const Catalogo = () => {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const deletePreco = useDeletePreco();
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const bulkDelete = useBulkDeletePrecos();
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDelete.mutateAsync(selectedIds);
+      toast.success(`${selectedIds.length} produto(s) excluído(s) com sucesso!`);
+      setSelectedIds([]);
+      setIsSelectionMode(false);
+      setConfirmBulkDelete(false);
+    } catch (err) {
+      toast.error('Erro ao excluir produtos em massa');
+    }
+  };
 
   const categorias = useMemo(() => {
     const set = new Set<string>();
@@ -147,13 +169,55 @@ const Catalogo = () => {
             </Button>
           ) : <div />}
 
-          <Button 
-            onClick={() => setShowAddProduct(true)}
-            className="rounded-xl shadow-md gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Novo Produto
-          </Button>
+          <div className="flex items-center gap-2">
+            {!showFolders && (
+              <>
+                {isSelectionMode ? (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        setIsSelectionMode(false);
+                        setSelectedIds([]);
+                      }}
+                      className="rounded-xl gap-2"
+                    >
+                      <X className="h-4 w-4" />
+                      Cancelar
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      disabled={selectedIds.length === 0 || bulkDelete.isPending}
+                      onClick={() => setConfirmBulkDelete(true)}
+                      className="rounded-xl gap-2 shadow-md"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir Selecionados ({selectedIds.length})
+                    </Button>
+                  </>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsSelectionMode(true)}
+                    className="rounded-xl gap-2"
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    Selecionar
+                  </Button>
+                )}
+              </>
+            )}
+            <Button 
+              onClick={() => setShowAddProduct(true)}
+              className="rounded-xl shadow-md gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Produto
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -236,8 +300,23 @@ const Catalogo = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filtered.map((p: any) => (
-              <Card key={p.id} className="rounded-xl border-border/60 overflow-hidden hover:shadow-[var(--shadow-card-hover)] transition-shadow group relative">
+              <Card 
+                key={p.id} 
+                className={`rounded-xl border-border/60 overflow-hidden hover:shadow-[var(--shadow-card-hover)] transition-all group relative ${
+                  selectedIds.includes(p.id) ? 'ring-2 ring-primary border-primary bg-primary/5' : ''
+                } ${isSelectionMode ? 'cursor-pointer' : ''}`}
+                onClick={() => isSelectionMode && toggleSelection(p.id)}
+              >
                 <div className="aspect-square bg-muted/40 flex items-center justify-center overflow-hidden relative">
+                  {isSelectionMode && (
+                    <div className="absolute top-2 left-2 z-10">
+                      {selectedIds.includes(p.id) ? (
+                        <CheckSquare className="h-6 w-6 text-primary fill-white" />
+                      ) : (
+                        <Square className="h-6 w-6 text-muted-foreground/40 bg-white/80 rounded" />
+                      )}
+                    </div>
+                  )}
                   {p.imagem_url ? (
                     <img src={p.imagem_url} alt={p.descricao_material} className="h-full w-full object-cover" loading="lazy" />
                   ) : (
@@ -341,6 +420,27 @@ const Catalogo = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {selectedIds.length} produtos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todos os {selectedIds.length} produtos selecionados serão removidos permanentemente do catálogo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDelete.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDelete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excluir Todos'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </AppLayout>
   );
 };

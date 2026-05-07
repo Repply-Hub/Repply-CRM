@@ -125,6 +125,21 @@ export function useDeletePreco() {
   });
 }
 
+export function useBulkDeletePrecos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from('tabela_precos').delete().in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tabela_precos'] });
+      qc.invalidateQueries({ queryKey: ['catalogo_global'] });
+      qc.invalidateQueries({ queryKey: ['catalogo_categorias'] });
+    },
+  });
+}
+
 /** Remove uma categoria: seta categoria=NULL em todos os produtos que a usam. */
 export function useDeleteCategoria() {
   const qc = useQueryClient();
