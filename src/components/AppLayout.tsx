@@ -38,8 +38,8 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
 
   const displayPerfil = profile || perfilLocal;
 
-  const initials = perfil?.nome
-    ? perfil.nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+  const initials = displayPerfil?.nome
+    ? displayPerfil.nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
     : '';
 
   return (
@@ -62,7 +62,7 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
               <NotificationCenter />
               <Link to="/configuracoes?tab=perfil" className="shrink-0">
                 <Avatar className="h-8 w-8 border border-primary/20 hover:ring-2 hover:ring-primary/20 transition-all">
-                  <AvatarImage src={perfil?.avatar_url || ''} alt={perfil?.nome || ''} />
+                  <AvatarImage src={displayPerfil?.avatar_url || ''} alt={displayPerfil?.nome || ''} />
                   <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
                     {initials || <UserCircle className="h-4 w-4" />}
                   </AvatarFallback>
