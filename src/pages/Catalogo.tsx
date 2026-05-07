@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useCatalogoGlobal, useDeleteCategoria } from '@/hooks/use-fabricantes';
 import { useFabricantes } from '@/hooks/use-clientes';
-import { Search, Package, ImageIcon, Loader2, Trash2 } from 'lucide-react';
+import { Search, Package, ImageIcon, Loader2, Trash2, Folder, ChevronLeft, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { SearchableSelect } from '@/components/SearchableSelect';
 import { SearchWithRecent } from '@/components/SearchWithRecent';
