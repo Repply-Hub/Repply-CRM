@@ -34,6 +34,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Wrench,
   Zap,
   MessageCircle,
+  FileWarning,
 };
 
 export const AVAILABLE_ICONS = Object.keys(ICON_MAP);
