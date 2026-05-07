@@ -47,6 +47,7 @@ describe('importPedidosUtils', () => {
       observacoes: '',
       status: 'Fase',
       data_pedido: '',
+      prazo_resposta: '',
     };
 
     expect(getImportedPedidosRows(rows, mapping)).toEqual([
