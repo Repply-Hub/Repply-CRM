@@ -132,13 +132,8 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
         vigente: true,
       };
     }).filter(r => r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
-    const ignoredRowsData = rows.filter((_, index) => {
-      const r = allMappedRecords[index];
-      return !(r.descricao_material && !isNaN(r.preco_unitario) && r.preco_unitario > 0);
-    });
-
     if (records.length === 0) {
-      toast.error('Nenhuma linha válida encontrada');
+      toast.error('Nenhuma linha válida encontrada. Verifique se as colunas de Produto e Preço estão preenchidas.');
       return;
     }
 
