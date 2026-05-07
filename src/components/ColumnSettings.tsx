@@ -371,6 +371,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                                 </div>
                                                                             </div>
                                                                         )}
+                                                                    };
                                                                     </Draggable>
                                                                 );
                                                             })}
