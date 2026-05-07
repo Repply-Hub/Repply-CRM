@@ -515,7 +515,7 @@ export default function Tarefas() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <div className="flex items-center justify-between pr-8">
-              <DialogTitle className="text-xl font-bold">{viewTarefa?.titulo}</DialogTitle>
+              <DialogTitle className="text-foreground font-bold text-lg">{viewTarefa?.titulo}</DialogTitle>
               <Badge className={getStatusInfo(viewTarefa?.status || '').className}>
                 {getStatusInfo(viewTarefa?.status || '').label}
               </Badge>
