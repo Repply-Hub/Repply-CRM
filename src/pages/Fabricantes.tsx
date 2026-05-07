@@ -116,23 +116,41 @@ function FabricanteForm({ open, onOpenChange, editData }: {
 }
 
 // ─── Preco Form Dialog ──────────────────────────────────────────────
-function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
+function PrecoForm({ open, onOpenChange, fabricanteId, editData, initialCategory }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   fabricanteId: string;
   editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean; categoria?: string | null; imagem_url?: string | null; estoque_disponivel?: number | null };
+  initialCategory?: string;
 }) {
+
   const createPreco = useCreatePreco();
   const updatePreco = useUpdatePreco();
-  const { data: categorias } = useCategorias();
+  const { data: todasCategorias } = useCategorias();
   const [desc, setDesc] = useState(editData?.descricao_material ?? '');
   const [ref, setRef] = useState(editData?.referencia ?? '');
   const [preco, setPreco] = useState(editData?.preco_unitario?.toString() ?? '');
   const [unidade, setUnidade] = useState(editData?.unidade ?? 'un');
   const [vigente, setVigente] = useState(editData?.vigente ?? true);
-  const [categoria, setCategoria] = useState(editData?.categoria ?? '');
+  const [categoria, setCategoria] = useState(editData?.categoria ?? initialCategory ?? '');
   const [imagemUrl, setImagemUrl] = useState<string | null>(editData?.imagem_url ?? null);
   const [estoque, setEstoque] = useState(editData?.estoque_disponivel?.toString() ?? '0');
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Sync initialCategory if it changes
+  useEffect(() => {
+    if (initialCategory && !editData) {
+      setCategoria(initialCategory);
+    }
+  }, [initialCategory, editData]);
+
+
+  // Filtrar categorias apenas deste fabricante ou mostrar todas as globais?
+  // O usuário pediu "criar categorias dentro daquela marca em específico"
+  // Atualmente o useCategorias retorna todas as categorias da tabela_precos.
+  // Vamos usar as categorias globais para o datalist, mas permitir criar uma nova via input.
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,17 +192,59 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData }: {
             <div><Label>Referência</Label><Input value={ref} onChange={e => setRef(e.target.value)} placeholder="Código" /></div>
             <div>
               <Label>Categoria</Label>
-              <Input
-                value={categoria}
-                onChange={e => setCategoria(e.target.value)}
-                list="categorias-list"
-                placeholder="Ex: Pisos, Louças"
-              />
-              <datalist id="categorias-list">
-                {(categorias ?? []).map(c => <option key={c} value={c} />)}
-              </datalist>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    value={categoria}
+                    onChange={e => setCategoria(e.target.value)}
+                    list="categorias-list"
+                    placeholder="Ex: Pisos, Louças"
+                  />
+                  <datalist id="categorias-list">
+                    {(todasCategorias ?? []).map(c => <option key={c} value={c} />)}
+                  </datalist>
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => setNewCategoryOpen(true)}
+                  title="Criar nova categoria"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
+          
+          <Dialog open={newCategoryOpen} onOpenChange={setNewCategoryOpen}>
+            <DialogContent className="sm:max-w-[300px]">
+              <DialogHeader>
+                <DialogTitle className="text-sm">Nova Categoria</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 pt-2">
+                <Input 
+                  placeholder="Nome da categoria" 
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  autoFocus
+                />
+                <Button 
+                  className="w-full h-8 text-xs" 
+                  onClick={() => {
+                    if (newCategoryName.trim()) {
+                      setCategoria(newCategoryName.trim());
+                      setNewCategoryName('');
+                      setNewCategoryOpen(false);
+                    }
+                  }}
+                >
+                  Confirmar
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Preço de Varejo (R$)</Label><Input type="number" step="0.01" value={preco} onChange={e => setPreco(e.target.value)} required /></div>
             <div><Label>Estoque Disponível</Label><Input type="number" step="0.01" value={estoque} onChange={e => setEstoque(e.target.value)} /></div>
@@ -324,6 +384,9 @@ const Fabricantes = () => {
   const [editPreco, setEditPreco] = useState<any>(null);
   const [importDialog, setImportDialog] = useState(false);
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
   const [globalImportOpen, setGlobalImportOpen] = useState(false);
   const [deleteAlert, setDeleteAlert] = useState<{ type: 'fab' | 'preco'; id: string } | null>(null);
 
@@ -567,12 +630,24 @@ const Fabricantes = () => {
                         <Button 
                           size="sm" 
                           variant="outline" 
+                          onClick={() => setNewCategoryOpen(true)} 
+                          className="gap-1.5 h-9"
+                          title="Criar nova categoria para este fabricante"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> 
+                          <span>Nova Categoria</span>
+                        </Button>
+
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
                           onClick={() => setImportDialog(true)} 
                           className="gap-1.5 h-9"
                         >
                           <Upload className="h-3.5 w-3.5" /> 
                           <span>Importar</span>
                         </Button>
+
                         
                         <Button 
                           size="sm" 
@@ -724,7 +799,16 @@ const Fabricantes = () => {
       </div>
 
       <FabricanteForm open={fabDialog} onOpenChange={setFabDialog} editData={editFab} />
-      {selectedFabId && <PrecoForm open={precoDialog} onOpenChange={setPrecoDialog} fabricanteId={selectedFabId} editData={editPreco} />}
+      {selectedFabId && (
+        <PrecoForm 
+          open={precoDialog} 
+          onOpenChange={setPrecoDialog} 
+          fabricanteId={selectedFabId} 
+          editData={editPreco} 
+          initialCategory={newCategoryName}
+        />
+      )}
+
       {selectedFabId && (
         <ImportCatalogoDialog
           open={importDialog}
@@ -742,6 +826,43 @@ const Fabricantes = () => {
           setGlobalImportOpen(false);
         }}
       />
+
+      <Dialog open={newCategoryOpen} onOpenChange={setNewCategoryOpen}>
+        <DialogContent className="sm:max-w-[350px]">
+          <DialogHeader>
+            <DialogTitle>Nova Categoria</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome da Categoria</Label>
+              <Input 
+                placeholder="Ex: Cerâmicas, Ferramentas..." 
+                value={newCategoryName}
+                onChange={e => setNewCategoryName(e.target.value)}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Dica: Você também pode criar categorias diretamente ao adicionar ou editar um produto.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setNewCategoryOpen(false)}>Cancelar</Button>
+              <Button 
+                onClick={() => {
+                  if (newCategoryName.trim()) {
+                    setEditPreco(null);
+                    setPrecoDialog(true);
+                  }
+                }}
+              >
+                Continuar para Novo Produto
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
 
       <AlertDialog open={!!deleteAlert} onOpenChange={(o) => !o && setDeleteAlert(null)}>
         <AlertDialogContent>
