@@ -283,91 +283,92 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                             }
 
                                                                             return (
-                                                                            <div 
-                                                                                ref={provided.innerRef}
-                                                                                {...provided.draggableProps}
-                                                                                className={cn(
-                                                                                    "group flex items-center gap-1 pr-1 outline-none transition-all",
-                                                                                    snapshot.isDragging && "z-[9999] bg-background border border-border/40 shadow-xl rounded-lg"
-                                                                                )}
-                                                                            >
                                                                                 <div 
-                                                                                    {...provided.dragHandleProps}
-                                                                                    className="p-1 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-                                                                                >
-                                                                                    <GripVertical className="h-3.5 w-3.5" />
-                                                                                </div>
-
-                                                                                <div
-                                                                                    role="button"
-                                                                                    tabIndex={0}
-                                                                                    onClick={() => !disabled && !isEditing && toggleColumn(column.id)}
-                                                                                    onKeyDown={e => {
-                                                                                        if (!isEditing && (e.key === 'Enter' || e.key === ' ')) {
-                                                                                            e.preventDefault();
-                                                                                            if (!disabled) toggleColumn(column.id);
-                                                                                        }
-                                                                                    }}
+                                                                                    ref={provided.innerRef}
+                                                                                    {...provided.draggableProps}
                                                                                     className={cn(
-                                                                                        'flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left group/btn',
-                                                                                        snapshot.isDragging ? 'bg-accent' : 'hover:bg-muted/80',
-                                                                                        isEditing ? 'cursor-default' : 'cursor-pointer',
-                                                                                        disabled && 'cursor-not-allowed',
-                                                                                        !checked && !isEditing && 'opacity-50 grayscale-[0.5]'
+                                                                                        "group flex items-center gap-1 pr-1 outline-none transition-all",
+                                                                                        snapshot.isDragging && "z-[9999] bg-background border border-border/40 shadow-xl rounded-lg"
                                                                                     )}
                                                                                 >
+                                                                                    <div 
+                                                                                        {...provided.dragHandleProps}
+                                                                                        className="p-1 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                                                                                    >
+                                                                                        <GripVertical className="h-3.5 w-3.5" />
+                                                                                    </div>
+
                                                                                     <div
+                                                                                        role="button"
+                                                                                        tabIndex={0}
+                                                                                        onClick={() => !disabled && !isEditing && toggleColumn(column.id)}
+                                                                                        onKeyDown={e => {
+                                                                                            if (!isEditing && (e.key === 'Enter' || e.key === ' ')) {
+                                                                                                e.preventDefault();
+                                                                                                if (!disabled) toggleColumn(column.id);
+                                                                                            }
+                                                                                        }}
                                                                                         className={cn(
-                                                                                            'h-7 w-7 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
-                                                                                            checked 
-                                                                                                ? 'bg-primary/10 border-primary/20 text-primary shadow-sm' 
-                                                                                                : 'bg-background border-border/60 group-hover/btn:border-primary/40 text-muted-foreground'
+                                                                                            'flex-1 flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all text-left group/btn',
+                                                                                            snapshot.isDragging ? 'bg-accent' : 'hover:bg-muted/80',
+                                                                                            isEditing ? 'cursor-default' : 'cursor-pointer',
+                                                                                            disabled && 'cursor-not-allowed',
+                                                                                            !checked && !isEditing && 'opacity-50 grayscale-[0.5]'
                                                                                         )}
                                                                                     >
-                                                                                        {checked ? (
-                                                                                            <Eye className={cn("h-4 w-4", disabled && "opacity-50")} />
+                                                                                        <div
+                                                                                            className={cn(
+                                                                                                'h-7 w-7 rounded-md shrink-0 flex items-center justify-center border transition-all duration-200',
+                                                                                                checked 
+                                                                                                    ? 'bg-primary/10 border-primary/20 text-primary shadow-sm' 
+                                                                                                    : 'bg-background border-border/60 group-hover/btn:border-primary/40 text-muted-foreground'
+                                                                                            )}
+                                                                                        >
+                                                                                            {checked ? (
+                                                                                                <Eye className={cn("h-4 w-4", disabled && "opacity-50")} />
+                                                                                            ) : (
+                                                                                                <EyeOff className="h-4 w-4 opacity-40" />
+                                                                                            )}
+                                                                                        </div>
+                                                                                        {isEditing ? (
+                                                                                            <div className="flex-1 flex flex-col gap-1.5" onClick={e => e.stopPropagation()}>
+                                                                                                <Input
+                                                                                                    value={editValue}
+                                                                                                    onChange={e => setEditValue(e.target.value)}
+                                                                                                    className="h-7 text-xs py-0 px-2"
+                                                                                                    autoFocus
+                                                                                                    onKeyDown={e => {
+                                                                                                        if (e.key === 'Enter') handleRename();
+                                                                                                        if (e.key === 'Escape') setEditingId(null);
+                                                                                                    }}
+                                                                                                />
+                                                                                            </div>
                                                                                         ) : (
-                                                                                            <EyeOff className="h-4 w-4 opacity-40" />
+                                                                                            <span className="flex-1 truncate">{column.customLabel || column.label}</span>
+                                                                                        )}
+                                                                                        {!column.locked && onRename && !isEditing && (
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    startEditing(column);
+                                                                                                }}
+                                                                                                className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted transition-colors opacity-0 group-hover/btn:opacity-100"
+                                                                                            >
+                                                                                                <Edit2 className="h-3 w-3" />
+                                                                                            </button>
+                                                                                        )}
+                                                                                        {column.isCustom && onRemove && !isEditing && (
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    onRemove(column.id);
+                                                                                                }}
+                                                                                                className="h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-colors opacity-0 group-hover/btn:opacity-100"
+                                                                                            >
+                                                                                                <Trash2 className="h-3 w-3" />
+                                                                                            </button>
                                                                                         )}
                                                                                     </div>
-                                                                                    {isEditing ? (
-                                                                                        <div className="flex-1 flex flex-col gap-1.5" onClick={e => e.stopPropagation()}>
-                                                                                            <Input
-                                                                                                value={editValue}
-                                                                                                onChange={e => setEditValue(e.target.value)}
-                                                                                                className="h-7 text-xs py-0 px-2"
-                                                                                                autoFocus
-                                                                                                onKeyDown={e => {
-                                                                                                    if (e.key === 'Enter') handleRename();
-                                                                                                    if (e.key === 'Escape') setEditingId(null);
-                                                                                                }}
-                                                                                            />
-                                                                                        </div>
-                                                                                    ) : (
-                                                                                        <span className="flex-1 truncate">{column.customLabel || column.label}</span>
-                                                                                    )}
-                                                                                    {!column.locked && onRename && !isEditing && (
-                                                                                        <button
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                startEditing(column);
-                                                                                            }}
-                                                                                            className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted transition-colors opacity-0 group-hover/btn:opacity-100"
-                                                                                        >
-                                                                                            <Edit2 className="h-3 w-3" />
-                                                                                        </button>
-                                                                                    )}
-                                                                                    {column.isCustom && onRemove && !isEditing && (
-                                                                                        <button
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                onRemove(column.id);
-                                                                                            }}
-                                                                                            className="h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-colors opacity-0 group-hover/btn:opacity-100"
-                                                                                        >
-                                                                                            <Trash2 className="h-3 w-3" />
-                                                                                        </button>
-                                                                                    )}
                                                                                 </div>
                                                                             );
                                                                         }}
@@ -518,20 +519,14 @@ export const ColumnSettings = memo(function ColumnSettings({
                                 <PopoverTrigger asChild>
                                     <button className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors group border-t border-border/50">
                                         <div className="flex items-center gap-2">
-                                            <Settings2 className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Menu de Opções</span>
+                                            {children}
                                         </div>
                                         <ChevronDown className="h-3.5 w-3.5 opacity-50 transition-transform duration-200" />
                                     </button>
                                 </PopoverTrigger>
-                                <PopoverContent side="left" align="start" sideOffset={5} className="w-[300px] p-0 shadow-2xl border-border/40 z-[60] bg-background">
-                                    <div className="flex flex-col h-full max-h-[500px]">
-                                        <div className="px-4 py-3 bg-muted/30 border-b border-border/50">
-                                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Menu de Opções</span>
-                                        </div>
-                                        <div className="overflow-y-auto custom-scrollbar p-1">
-                                            {children}
-                                        </div>
+                                <PopoverContent side="left" align="start" sideOffset={5} className="w-[280px] p-0 shadow-2xl border-border/40 z-[60] bg-background">
+                                    <div className="flex flex-col h-full">
+                                        {/* Children content can go here if needed, but for now we just show the trigger */}
                                     </div>
                                 </PopoverContent>
                             </Popover>
