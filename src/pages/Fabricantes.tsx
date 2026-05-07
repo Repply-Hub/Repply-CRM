@@ -30,6 +30,7 @@ import { FilterButton } from '@/components/FilterButton';
 import { Filter } from 'lucide-react';
 import { SearchableSelect } from '@/components/SearchableSelect';
 import { SearchWithRecent } from '@/components/SearchWithRecent';
+import { ProductForm } from '@/components/catalogo/ProductForm';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
   { id: 'descricao', label: 'Produto', locked: false },
