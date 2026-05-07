@@ -25,6 +25,10 @@ const Catalogo = () => {
   const [fabricanteId, setFabricanteId] = useState('todos');
   const [categoria, setCategoria] = useState('todas');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [editProduct, setEditProduct] = useState<any>(null);
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const deletePreco = useDeletePreco();
+  const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
 
   const categorias = useMemo(() => {
     const set = new Set<string>();
