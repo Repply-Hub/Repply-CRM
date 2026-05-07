@@ -98,6 +98,7 @@ export function useCreatePedidoCompleto() {
           prazo_resposta: payload.prazo_resposta || null,
           origem_lead: payload.origem_lead || null,
           endereco_entrega: payload.endereco_entrega || null,
+          valor_total: payload.valor_total || 0,
         })
         .select('id')
         .single();
