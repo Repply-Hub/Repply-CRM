@@ -146,6 +146,7 @@ const MIN_SCORE: Record<FieldKey, number> = {
   observacoes: 68,
   status: 70,
   data_pedido: 70,
+  prazo_resposta: 70,
 };
 
 const STATUS_RULES: Array<{ status: string; patterns: RegExp[] }> = [
