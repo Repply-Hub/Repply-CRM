@@ -439,54 +439,52 @@ const Dashboard = () => {
         {/* Rendimento Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
           {/* Faturamento por Fábrica - Donut Chart */}
-          {rendimentoFabrica.length > 0 && (
-            <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
-              <CardHeader className="pb-1">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <Factory className="h-4 w-4 text-primary" /> Faturamento por Fábrica
-                </CardTitle>
-                <CardDescription className="text-xs">Distribuição do faturamento entre os principais fabricantes</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-2">
-                <ResponsiveContainer width="100%" height={260}>
-                  <PieChart>
-                    <Pie
-                      data={faturamentoPorFabricaPizza}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={65}
-                      outerRadius={100}
-                      dataKey="valor"
-                      nameKey="fabrica"
-                      label={renderCustomLabel}
-                      paddingAngle={3}
-                      cornerRadius={4}
-                      animationDuration={1000}
-                      animationEasing="ease-out"
-                    >
-                      {faturamentoPorFabricaPizza.map((_, idx) => (
-                        <Cell 
-                          key={`cell-${idx}`} 
-                          fill={[
-                            chartColors.primary,
-                            chartColors.success,
-                            chartColors.warning,
-                            'hsl(24, 100%, 47%)',
-                            'hsl(280, 65%, 60%)'
-                          ][idx % 5]} 
-                          stroke="hsl(var(--card))" 
-                          strokeWidth={2} 
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      content={<ChartTooltip formatValue={formatCurrency} />}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
+          <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <Factory className="h-4 w-4 text-primary" /> Faturamento por Fábrica
+              </CardTitle>
+              <CardDescription className="text-xs">Distribuição do faturamento entre os principais fabricantes</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={faturamentoPorFabricaPizza}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={65}
+                    outerRadius={100}
+                    dataKey="valor"
+                    nameKey="fabrica"
+                    label={renderCustomLabel}
+                    paddingAngle={3}
+                    cornerRadius={4}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
+                  >
+                    {faturamentoPorFabricaPizza.map((_, idx) => (
+                      <Cell 
+                        key={`cell-${idx}`} 
+                        fill={[
+                          chartColors.primary,
+                          chartColors.success,
+                          chartColors.warning,
+                          'hsl(24, 100%, 47%)',
+                          'hsl(280, 65%, 60%)'
+                        ][idx % 5]} 
+                        stroke="hsl(var(--card))" 
+                        strokeWidth={2} 
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    content={<ChartTooltip formatValue={formatCurrency} />}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
           {/* Rendimento por Fábrica - Bar Chart */}
           {rendimentoFabricaSorted.length > 0 && (
