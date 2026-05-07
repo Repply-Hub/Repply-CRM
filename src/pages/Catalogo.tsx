@@ -236,13 +236,23 @@ const Catalogo = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filtered.map((p: any) => (
-              <Card key={p.id} className="rounded-xl border-border/60 overflow-hidden hover:shadow-[var(--shadow-card-hover)] transition-shadow">
-                <div className="aspect-square bg-muted/40 flex items-center justify-center overflow-hidden">
+              <Card key={p.id} className="rounded-xl border-border/60 overflow-hidden hover:shadow-[var(--shadow-card-hover)] transition-shadow group relative">
+                <div className="aspect-square bg-muted/40 flex items-center justify-center overflow-hidden relative">
                   {p.imagem_url ? (
                     <img src={p.imagem_url} alt={p.descricao_material} className="h-full w-full object-cover" loading="lazy" />
                   ) : (
                     <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
                   )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <Button 
+                      size="icon" 
+                      variant="secondary" 
+                      className="rounded-full h-10 w-10 shadow-lg"
+                      onClick={() => setEditProduct(p)}
+                    >
+                      <Eye className="h-5 w-5" />
+                    </Button>
+                  </div>
                 </div>
                 <CardContent className="p-3 space-y-1">
                   <p className="text-sm font-semibold line-clamp-2" title={p.descricao_material}>{p.descricao_material}</p>
