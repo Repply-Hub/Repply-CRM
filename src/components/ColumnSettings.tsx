@@ -179,9 +179,9 @@ export const ColumnSettings = memo(function ColumnSettings({
                 </Button>
             </PopoverTrigger>
             <PopoverContent align="end" sideOffset={8} className="w-auto p-0 shadow-2xl border-border/40 z-[50]">
-                <div className="flex divide-x divide-border/50 overflow-visible">
+                <div className="flex divide-x divide-border/50 overflow-hidden max-h-[min(calc(100vh-120px),600px)]">
                     {!hideColumns && (
-                        <div className="w-[320px] p-2">
+                        <div className="w-[320px] flex flex-col h-full">
                             <div className="px-4 py-3 flex items-center justify-between bg-muted/30 border-b border-border/50 rounded-t-md">
                                 <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
                                 {onAdd && (
@@ -231,7 +231,7 @@ export const ColumnSettings = memo(function ColumnSettings({
                                 </div>
                             )}
 
-                            <div className="max-h-[320px] overflow-y-auto px-1.5 py-2 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto px-1.5 py-2 custom-scrollbar min-h-0">
                                 <DragDropContext onDragEnd={handleDragEnd}>
                                     <Droppable droppableId="columns">
                                         {(provided) => (
@@ -522,9 +522,12 @@ export const ColumnSettings = memo(function ColumnSettings({
                             </div>
                         </div>
                     )}
+                    {children && (
+                        <div className="min-w-[240px] max-w-[320px] overflow-y-auto custom-scrollbar p-1">
+                            {children}
+                        </div>
+                    )}
                 </div>
-
-                {children}
             </PopoverContent>
         </Popover>
     );
