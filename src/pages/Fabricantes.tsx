@@ -408,7 +408,7 @@ const Fabricantes = () => {
           <div className={`lg:col-span-4 xl:col-span-3 ${showingDetail ? 'hidden lg:block' : ''}`}>
             <Card className="rounded-xl border-border/60 sticky top-4">
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <Factory className="h-4 w-4 text-primary" /> Fabricantes
@@ -418,10 +418,10 @@ const Fabricantes = () => {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setGlobalImportOpen(true)} className="gap-1.5 h-8">
-                      <Upload className="h-3.5 w-3.5" /> Importar
+                    <Button size="sm" variant="outline" onClick={() => setGlobalImportOpen(true)} className="gap-1.5 h-8 flex-1 sm:flex-initial">
+                      <Upload className="h-3.5 w-3.5" /> <span className="sm:hidden xl:inline">Importar</span>
                     </Button>
-                    <Button size="sm" onClick={() => { setEditFab(null); setFabDialog(true); }} className="gap-1.5 h-8">
+                    <Button size="sm" onClick={() => { setEditFab(null); setFabDialog(true); }} className="gap-1.5 h-8 flex-1 sm:flex-initial">
                       <Plus className="h-3.5 w-3.5" /> Novo
                     </Button>
                   </div>
