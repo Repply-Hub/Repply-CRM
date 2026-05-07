@@ -18,9 +18,12 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, title, subtitle, headerContent, mainClassName }: AppLayoutProps) {
-  const { user } = useAuth();
-  const { data: perfil } = useQuery({
-    queryKey: ['meu_perfil', user?.id],
+  const { user, profile } = useAuth();
+  
+  // Usamos o perfil do AuthContext se disponível, senão buscamos localmente
+  // Isso evita múltiplas buscas do mesmo perfil em cada montagem de layout
+  const { data: perfilLocal } = useQuery({
+    queryKey: ['meu_perfil_layout', user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('usuarios')
@@ -29,11 +32,14 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
         .maybeSingle();
       return data;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !profile,
+    staleTime: 1000 * 60 * 5, // 5 minutos de cache
   });
 
-  const initials = perfil?.nome
-    ? perfil.nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+  const displayPerfil = profile || perfilLocal;
+
+  const initials = displayPerfil?.nome
+    ? displayPerfil.nome.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
     : '';
 
   return (
@@ -56,7 +62,7 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
               <NotificationCenter />
               <Link to="/configuracoes?tab=perfil" className="shrink-0">
                 <Avatar className="h-8 w-8 border border-primary/20 hover:ring-2 hover:ring-primary/20 transition-all">
-                  <AvatarImage src={perfil?.avatar_url || ''} alt={perfil?.nome || ''} />
+                  <AvatarImage src={displayPerfil?.avatar_url || ''} alt={displayPerfil?.nome || ''} />
                   <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
                     {initials || <UserCircle className="h-4 w-4" />}
                   </AvatarFallback>
