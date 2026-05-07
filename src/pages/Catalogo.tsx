@@ -131,20 +131,30 @@ const Catalogo = () => {
           </CardContent>
         </Card>
 
-        {!showFolders && (
+        <div className="flex justify-between items-center gap-4">
+          {!showFolders ? (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                setCategoria('todas');
+                setBusca('');
+              }}
+              className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para todas as categorias
+            </Button>
+          ) : <div />}
+
           <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => {
-              setCategoria('todas');
-              setBusca('');
-            }}
-            className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+            onClick={() => setShowAddProduct(true)}
+            className="rounded-xl shadow-md gap-2"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar para todas as categorias
+            <Plus className="h-4 w-4" />
+            Novo Produto
           </Button>
-        )}
+        </div>
 
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
