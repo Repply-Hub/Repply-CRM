@@ -116,12 +116,13 @@ function FabricanteForm({ open, onOpenChange, editData }: {
 }
 
 // ─── Preco Form Dialog ──────────────────────────────────────────────
-function PrecoForm({ open, onOpenChange, fabricanteId, editData, initialCategory }: {
+function PrecoForm({ open, onOpenChange, fabricanteId, editData, initialCategory, onDeleteClick }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   fabricanteId: string;
   editData?: { id: string; descricao_material: string; referencia?: string | null; preco_unitario: number; unidade?: string | null; vigente: boolean; categoria?: string | null; imagem_url?: string | null; estoque_disponivel?: number | null };
   initialCategory?: string;
+  onDeleteClick?: (id: string) => void;
 }) {
 
   const createPreco = useCreatePreco();
@@ -271,16 +272,13 @@ function PrecoForm({ open, onOpenChange, fabricanteId, editData, initialCategory
               <Label htmlFor="vigente">Produto vigente (disponível)</Label>
             </div>
             
-            {editData && (
+            {editData && onDeleteClick && (
               <Button 
                 type="button" 
                 variant="ghost" 
                 size="sm" 
                 className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5 h-8"
-                onClick={() => {
-                  onOpenChange(false);
-                  setDeleteAlert({ type: 'preco', id: editData.id });
-                }}
+                onClick={() => onDeleteClick(editData.id)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>Excluir</span>
@@ -827,6 +825,10 @@ const Fabricantes = () => {
           fabricanteId={selectedFabId} 
           editData={editPreco} 
           initialCategory={newCategoryName}
+          onDeleteClick={(id) => {
+            setPrecoDialog(false);
+            setDeleteAlert({ type: 'preco', id });
+          }}
         />
       )}
 
