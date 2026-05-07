@@ -328,50 +328,15 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     return result;
   };
 
-  const getMappedRowsBase = (sanitizedRows = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues })) => {
-    return sanitizedRows
+  const getMappedRowsBase = (sanitizedRows = sanitizeImportedRows({ rawData, fields: visibleFields, mapping, extras, customColumns, fieldDefaultValues }), shouldFilter = true) => {
+    const mapped = sanitizedRows
       .map(row => {
-        const get = (k: FieldKey) => (row[k] ?? '').toString().trim();
-        const empresa = get('empresa');
-        const razao_social = get('razao_social');
-        const cnpj = get('cnpj');
-        const primeiro = get('nome_contato');
-        const sobrenome = get('sobrenome_contato');
-        const nome_contato = [primeiro, sobrenome].filter(Boolean).join(' ').trim();
-        const tipoRaw = get('tipo');
-
-        // Resolve o nome da empresa usando fallbacks se necessário
-        let resolvedEmpresa = empresa;
-        if (!resolvedEmpresa) {
-          if (target === 'contatos') {
-            resolvedEmpresa = nome_contato ? 'Sem empresa' : '';
-          } else {
-            resolvedEmpresa = razao_social || cnpj || '';
-          }
-        }
-
-        return {
-          empresa: resolvedEmpresa,
-          razao_social: razao_social || undefined,
-          tipo: TIPO_MAP[tipoRaw.toLowerCase()] || (tipoRaw ? tipoRaw.toLowerCase() : undefined),
-          cnpj: cnpj || undefined,
-          email: get('email') || undefined,
-          telefone: get('telefone') || undefined,
-          logradouro: get('logradouro') || undefined,
-          numero: get('numero') || undefined,
-          complemento: get('complemento') || undefined,
-          bairro: get('bairro') || undefined,
-          cidade: get('cidade') || undefined,
-          uf: get('uf') || undefined,
-          cep: get('cep') || undefined,
-          nome_contato: nome_contato || undefined,
-          cargo: get('cargo') || undefined,
-          classificacao: get('classificacao') || undefined,
-          data_criacao: get('data_criacao') || undefined,
-          campos_extras: (row.campos_extras as Record<string, string>) || {},
+... keep existing code
         };
-      })
-      .filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : (r.empresa || r.razao_social || r.cnpj));
+      });
+    
+    if (!shouldFilter) return mapped;
+    return mapped.filter(r => target === 'contatos' ? (r.empresa || r.nome_contato) : (r.empresa || r.razao_social || r.cnpj));
   };
 
   const getMappedRows = (sanitizedRows?: ReturnType<typeof sanitizeImportedRows>) => {
