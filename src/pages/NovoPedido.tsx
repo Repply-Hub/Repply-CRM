@@ -688,11 +688,39 @@ const NovoPedido = () => {
                           ))}
                         </TableBody>
                       </Table>
-                      <div className="flex justify-end px-4 py-3 bg-muted/30 border-t border-border">
+                      <div className="flex justify-between items-center px-4 py-3 bg-muted/30 border-t border-border">
+                        <div className="flex-1 max-w-[200px] space-y-1">
+                          <Label className="text-xs text-muted-foreground">Valor de Negociação</Label>
+                          <div className="relative">
+                            <Input 
+                              type="number" 
+                              className={cn("h-9 text-sm font-medium", isManualMode ? "border-primary ring-1 ring-primary" : "bg-muted/50")}
+                              value={isManualMode ? (valorManual ?? 0) : valorTotalItens}
+                              onChange={(e) => {
+                                setValorManual(parseFloat(e.target.value) || 0);
+                                setIsManualMode(true);
+                              }}
+                              placeholder="0,00"
+                            />
+                            {isManualMode && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="absolute right-1 top-1 h-7 px-2 text-[10px] text-primary"
+                                onClick={() => {
+                                  setIsManualMode(false);
+                                  setValorManual(null);
+                                }}
+                              >
+                                Automático
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                         <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Valor Total</p>
+                          <p className="text-xs text-muted-foreground">{isManualMode ? 'Valor Manual' : 'Total dos Itens'}</p>
                           <p className="text-lg font-bold text-foreground">
-                            {valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {valorFinal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </p>
                         </div>
                       </div>
