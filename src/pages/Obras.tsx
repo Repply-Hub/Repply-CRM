@@ -235,6 +235,25 @@ export default function Obras() {
   const hasFilters = statusFilter !== 'todos' || sort !== 'recent';
   const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0) + (sort !== 'recent' ? 1 : 0);
 
+  const paginatedObras = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filtered.slice(startIndex, startIndex + pageSize);
+  }, [filtered, page, pageSize]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === paginatedObras.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(paginatedObras.map(o => o.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
   return (
     <AppLayout 
       title="Obras" 
