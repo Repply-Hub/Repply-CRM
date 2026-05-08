@@ -425,17 +425,15 @@ export default function Obras() {
                       </div>
                     )}
                   </div>
-                  {selectedIds.length > 0 && (
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      onClick={() => setConfirmDeleteBulk(true)}
-                      className="gap-2 h-8"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Remover Selecionados ({selectedIds.length})
-                    </Button>
-                  )}
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    onClick={() => setConfirmDeleteBulk(true)}
+                    className="gap-2 h-8"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Opções de Remoção em Massa
+                  </Button>
                 </div>
                 
                 <div className="rounded-lg border border-border/60 overflow-x-auto bg-card">
