@@ -450,10 +450,12 @@ export default function Obras() {
                           <tr 
                             key={obra.id} 
                             className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                            onClick={() => {
-                              setSelectedObra(obra);
-                            }}
-                          >
+                          <td className="py-3 px-4 w-10" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox 
+                              checked={selectedIds.includes(obra.id)}
+                              onCheckedChange={() => toggleSelect(obra.id)}
+                            />
+                          </td>
                             {visibleColumns.map(colId => (
                               <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
                                 {colId === 'nome_obra' && (
