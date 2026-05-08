@@ -196,6 +196,20 @@ export function useDeleteObra() {
   });
 }
 
+export function useDeleteObrasBulk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from('obras').delete().in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obras'] });
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+    },
+  });
+}
+
 export function useCreateFabricante() {
   const qc = useQueryClient();
   return useMutation({

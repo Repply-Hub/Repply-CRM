@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useCreateObra, useUpdateObra, useDeleteObra } from '@/hooks/use-mutations';
+import { useCreateObra, useUpdateObra, useDeleteObra, useDeleteObrasBulk } from '@/hooks/use-mutations';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { formatCnpj, isValidCnpj } from '@/utils/cnpj';
@@ -69,6 +69,7 @@ export default function Obras() {
   const createObra = useCreateObra();
   const updateObra = useUpdateObra();
   const deleteObra = useDeleteObra();
+  const deleteObrasBulk = useDeleteObrasBulk();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
@@ -81,6 +82,8 @@ export default function Obras() {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmDeleteBulk, setConfirmDeleteBulk] = useState(false);
 
   const [newObra, setNewObra] = useState({
     nome_obra: '',
@@ -231,6 +234,25 @@ export default function Obras() {
 
   const hasFilters = statusFilter !== 'todos' || sort !== 'recent';
   const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0) + (sort !== 'recent' ? 1 : 0);
+
+  const paginatedObras = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filtered.slice(startIndex, startIndex + pageSize);
+  }, [filtered, page, pageSize]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === paginatedObras.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(paginatedObras.map(o => o.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
 
   return (
     <AppLayout 
@@ -386,12 +408,31 @@ export default function Obras() {
               </div>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
+                  {selectedIds.length > 0 && (
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => setConfirmDeleteBulk(true)}
+                      className="gap-2 h-8"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Remover Selecionados ({selectedIds.length})
+                    </Button>
+                  )}
+                </div>
                 
                 <div className="rounded-lg border border-border/60 overflow-x-auto bg-card">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
+                        <th className="py-3 px-4 w-10">
+                          <Checkbox 
+                            checked={selectedIds.length === paginatedObras.length && paginatedObras.length > 0}
+                            onCheckedChange={toggleSelectAll}
+                          />
+                        </th>
                         {visibleColumns.map(colId => (
                           <th key={colId} className="text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap">
                             {getLabel(colId)}
@@ -400,7 +441,7 @@ export default function Obras() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.slice((page - 1) * pageSize, page * pageSize).map(obra => {
+                      {paginatedObras.map(obra => {
                         const status = getStatusInfo(obra.status);
                         const cliente = obra.clientes as any;
                         const camposExtras = (obra as any).campos_extras || {};
@@ -409,10 +450,14 @@ export default function Obras() {
                           <tr 
                             key={obra.id} 
                             className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                            onClick={() => {
-                              setSelectedObra(obra);
-                            }}
+                            onClick={() => setSelectedObra(obra)}
                           >
+                            <td className="py-3 px-4 w-10" onClick={(e) => e.stopPropagation()}>
+                              <Checkbox 
+                                checked={selectedIds.includes(obra.id)}
+                                onCheckedChange={() => toggleSelect(obra.id)}
+                              />
+                            </td>
                             {visibleColumns.map(colId => (
                               <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
                                 {colId === 'nome_obra' && (
@@ -787,6 +832,35 @@ export default function Obras() {
             </form>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={confirmDeleteBulk} onOpenChange={setConfirmDeleteBulk}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Obras Selecionadas</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir as {selectedIds.length} obras selecionadas? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  try {
+                    await deleteObrasBulk.mutateAsync(selectedIds);
+                    toast.success(`${selectedIds.length} obras excluídas com sucesso!`);
+                    setSelectedIds([]);
+                  } catch (error: any) {
+                    toast.error("Erro ao excluir obras: " + error.message);
+                  }
+                  setConfirmDeleteBulk(false);
+                }}
+              >
+                Excluir Todas
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && setConfirmDeleteId(null)}>
           <AlertDialogContent>
