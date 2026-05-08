@@ -79,6 +79,9 @@ export function DateRangePicker({ value, onChange }: Props) {
               numberOfMonths={2}
               locale={ptBR}
               className="pointer-events-auto"
+              captionLayout="dropdown-buttons"
+              fromYear={2000}
+              toYear={new Date().getFullYear() + 10}
             />
           </div>
         </div>
