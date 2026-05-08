@@ -48,8 +48,12 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         ...classNames,
       }}
       components={{
-        IconLeft: () => null,
-        IconRight: () => null,
+        Button: ({ ..._props }) => {
+          if (_props.name === "previous-button" || _props.name === "next-button") {
+            return null;
+          }
+          return <button {..._props} />;
+        },
         Dropdown: ({ value, onChange, children, ..._props }: DropdownProps) => {
           const options = React.Children.toArray(children) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[];
           const selected = options.find((child) => child.props.value === value);
