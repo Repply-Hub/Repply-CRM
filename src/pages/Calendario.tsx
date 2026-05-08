@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from "react";
-import { addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, format } from "date-fns";
+import { addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/AppLayout";
 import { Calendar } from "@/components/ui/calendar";
