@@ -334,11 +334,17 @@ export default function Calendario() {
               onMonthChange={setMonth}
               locale={ptBR}
               className="p-2 w-full"
+              captionLayout="dropdown-buttons"
+              fromYear={2020}
+              toYear={2030}
               classNames={{
                 months: "w-full",
                 month: "w-full space-y-2",
-                caption: "flex justify-center pt-1 relative items-center",
-                caption_label: "text-xs font-medium",
+                caption: "flex justify-center pt-1 relative items-center gap-1",
+                caption_dropdowns: "flex justify-center gap-1",
+                vhidden: "hidden",
+                dropdown: "bg-transparent border-none text-[10px] font-medium focus:ring-0 cursor-pointer p-0",
+                caption_label: "text-xs font-medium hidden",
                 nav: "space-x-1 flex items-center",
                 nav_button:
                   "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100 border rounded-md inline-flex items-center justify-center",
