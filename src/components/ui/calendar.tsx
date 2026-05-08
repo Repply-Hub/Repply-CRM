@@ -26,7 +26,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         caption_dropdowns: "flex justify-center gap-2",
         vhidden: "hidden",
         dropdown: "bg-transparent border-none text-xs font-medium focus:ring-0 cursor-pointer p-0",
-        nav: "hidden",
+        nav: "hidden hidden",
         nav_button: "hidden",
         nav_button_previous: "hidden",
         nav_button_next: "hidden",
