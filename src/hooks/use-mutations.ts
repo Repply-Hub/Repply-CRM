@@ -186,8 +186,14 @@ export function useDeleteObra() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('obras').delete().eq('id', id);
-      if (error) throw error;
+      console.log('Excluindo obra única:', id);
+      const { data, error } = await supabase.from('obras').delete().eq('id', id).select();
+      if (error) {
+        console.error('Erro ao excluir obra única:', error);
+        throw error;
+      }
+      console.log('Resultado exclusão única:', data);
+      return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['obras'] });
