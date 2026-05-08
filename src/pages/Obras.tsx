@@ -240,11 +240,19 @@ export default function Obras() {
     return filtered.slice(startIndex, startIndex + pageSize);
   }, [filtered, page, pageSize]);
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === paginatedObras.length) {
+  const toggleSelectAllPage = () => {
+    if (selectedIds.length === paginatedObras.length && paginatedObras.every(o => selectedIds.includes(o.id))) {
       setSelectedIds([]);
     } else {
       setSelectedIds(paginatedObras.map(o => o.id));
+    }
+  };
+
+  const toggleSelectAllGeneral = () => {
+    if (selectedIds.length === filtered.length && filtered.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filtered.map(o => o.id));
     }
   };
 
