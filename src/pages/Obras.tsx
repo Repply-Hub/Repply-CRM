@@ -240,11 +240,19 @@ export default function Obras() {
     return filtered.slice(startIndex, startIndex + pageSize);
   }, [filtered, page, pageSize]);
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === paginatedObras.length) {
+  const toggleSelectAllPage = () => {
+    if (selectedIds.length === paginatedObras.length && paginatedObras.every(o => selectedIds.includes(o.id))) {
       setSelectedIds([]);
     } else {
       setSelectedIds(paginatedObras.map(o => o.id));
+    }
+  };
+
+  const toggleSelectAllGeneral = () => {
+    if (selectedIds.length === filtered.length && filtered.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filtered.map(o => o.id));
     }
   };
 
@@ -408,8 +416,30 @@ export default function Obras() {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
+                  <div className="flex items-center gap-4">
+                    <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
+                    {filtered.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={toggleSelectAllPage}
+                          className="h-8 text-[10px] uppercase font-bold tracking-wider"
+                        >
+                          Selecionar Página
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={toggleSelectAllGeneral}
+                          className="h-8 text-[10px] uppercase font-bold tracking-wider"
+                        >
+                          Selecionar Tudo
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   {selectedIds.length > 0 && (
                     <Button 
                       variant="destructive" 
@@ -427,10 +457,10 @@ export default function Obras() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="py-3 px-4 w-10">
+                        <th className="py-3 px-4 w-10 text-center">
                           <Checkbox 
-                            checked={selectedIds.length === paginatedObras.length && paginatedObras.length > 0}
-                            onCheckedChange={toggleSelectAll}
+                            checked={selectedIds.length > 0 && selectedIds.length === paginatedObras.length && paginatedObras.every(o => selectedIds.includes(o.id))}
+                            onCheckedChange={toggleSelectAllPage}
                           />
                         </th>
                         {visibleColumns.map(colId => (
