@@ -66,18 +66,18 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
             onChange?.({ target: { value: newValue } } as React.ChangeEvent<HTMLSelectElement>);
           };
 
-          const filteredOptions = isYear 
+          const filteredOptions = isYear
             ? options.filter(option => option.props.children?.toString().toLowerCase().includes(searchTerm.toLowerCase()))
             : options;
 
           return (
             <Select value={value?.toString()} onValueChange={handleChange} open={isOpen} onOpenChange={setIsOpen}>
-              <SelectTrigger className="h-7 w-fit min-w-[70px] border-none bg-transparent px-2 py-0 text-xs font-medium hover:bg-accent focus:ring-0">
+              <SelectTrigger className="h-7 w-fit min-w-[70px] border-none bg-transparent px-2 py-0 text-xs font-medium hover:bg-accent focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 capitalize">
                 <SelectValue>{selected?.props.children}</SelectValue>
               </SelectTrigger>
-              <SelectContent position="popper" className="max-h-[300px]">
+              <SelectContent position="popper" className={cn("max-h-[300px]", isYear ? "min-w-[145px] w-[145px]" : "min-w-[120px]")}>
                 {isYear && (
-                  <div className="flex items-center border-b px-3 py-2 sticky top-0 bg-background z-10">
+                  <div className="flex items-center border-b px-3 py-2 sticky -top-1 -mx-1 -mt-1 mb-1 bg-background z-10">
                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                     <Input
                       ref={inputRef}
@@ -85,22 +85,20 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       onKeyDown={(e) => e.stopPropagation()}
-                      className="h-8 w-full border-none focus-visible:ring-0 text-xs p-0"
+                      className="h-8 w-full border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-xs p-0"
                     />
                   </div>
                 )}
-                <div className="overflow-y-auto">
-                  {filteredOptions.map((option) => (
-                    <SelectItem key={option.props.value?.toString()} value={option.props.value?.toString() ?? ""}>
-                      {option.props.children}
-                    </SelectItem>
-                  ))}
-                  {isYear && filteredOptions.length === 0 && (
-                    <div className="py-6 text-center text-xs text-muted-foreground">
-                      Nenhum ano encontrado.
-                    </div>
-                  )}
-                </div>
+                {filteredOptions.map((option) => (
+                  <SelectItem key={option.props.value?.toString()} value={option.props.value?.toString() ?? ""} className={!isYear ? "capitalize" : ""}>
+                    {option.props.children}
+                  </SelectItem>
+                ))}
+                {isYear && filteredOptions.length === 0 && (
+                  <div className="py-6 text-center text-xs text-muted-foreground">
+                    Nenhum ano encontrado.
+                  </div>
+                )}
               </SelectContent>
             </Select>
           );

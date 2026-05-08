@@ -335,7 +335,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
-  const [stageFilter, setStageFilter] = useState('todos');
+  const [selectedStages, setSelectedStages] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder || viewOrderId);
@@ -421,10 +421,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
-  const handleStageFilterChange = (value: string) => {
-    setStageFilter(value);
-    setPage(1);
-  };
+  // Função substituída pela seleção múltipla de etapas, o reset de página é gerenciado pelo useEffect ou quando clica.
 
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || (key || '');
 
@@ -456,13 +453,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const filtered = useMemo(() => {
     const q = deferredSearch.trim().toLowerCase();
     return baseListPedidos.filter(p => {
-      if (stageFilter !== 'todos' && p.status !== stageFilter) return false;
+      if (selectedStages.length > 0 && !selectedStages.includes(p.status)) return false;
       if (!q) return true;
       const empresa = (p.cliente?.empresa ?? '').toLowerCase();
       const fab = (p.fabricante?.nome ?? '').toLowerCase();
       return empresa.includes(q) || fab.includes(q);
     });
-  }, [baseListPedidos, deferredSearch, stageFilter]);
+  }, [baseListPedidos, deferredSearch, selectedStages]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(
@@ -531,8 +528,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [pipelineOrders, KANBAN_STAGES]);
 
   const totalPipeline = useMemo(() => pipelineOrders.reduce((acc, o) => acc + (Number(o.valor) || 0), 0), [pipelineOrders]);
-  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || stageFilter !== 'todos';
-  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (stageFilter !== 'todos' ? 1 : 0);
+  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || selectedStages.length > 0;
+  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (selectedStages.length > 0 ? 1 : 0);
 
   const toggleFilter = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
     setList(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -544,7 +541,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setShowOnlyAttention(false);
     setDateFrom(undefined);
     setDateTo(undefined);
-    handleStageFilterChange('todos');
+    setSelectedStages([]);
   };
 
   const handleDragEnd = useCallback(async (result: DropResult) => {
@@ -691,7 +688,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           etapa: stageLabel(p.status),
           data: p.data_pedido,
         })),
-        stageFilter !== 'todos' ? `Orçamentos - ${stageLabel(stageFilter)}` : 'Orçamentos - Todos'
+        selectedStages.length > 0 ? `Orçamentos - Filtrado` : 'Orçamentos - Todos'
       );
     }
   };
@@ -823,20 +820,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <StandardPopoverMenu
           label="Etapa"
           icon={LayoutGrid}
-          badge={stageFilter !== 'todos' ? 1 : undefined}
+          badge={selectedStages.length > 0 ? selectedStages.length : undefined}
           side="left"
           align="start"
           sideOffset={10}
           popoverClassName="w-60"
         >
           <div className="space-y-1">
-            <label className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-              <Checkbox checked={stageFilter === 'todos'} onCheckedChange={() => handleStageFilterChange('todos')} />
-              Todas as etapas
-            </label>
             {KANBAN_STAGES.map(s => (
               <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                <Checkbox checked={stageFilter === s.key} onCheckedChange={() => handleStageFilterChange(stageFilter === s.key ? 'todos' : s.key)} />
+                <Checkbox 
+                  checked={selectedStages.includes(s.key)} 
+                  onCheckedChange={() => {
+                    toggleFilter(selectedStages, setSelectedStages, s.key);
+                    setPage(1);
+                  }} 
+                />
                 {s.label}
               </label>
             ))}
@@ -968,7 +967,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </div>
       </div>
     </FilterButton>
-  ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, stageFilter, handleStageFilterChange, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention]);
+  ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention]);
   const selectedViewOrder = useMemo(() => 
     (pedidos ?? []).find(p => p.id === viewOrderId),
   [pedidos, viewOrderId]);

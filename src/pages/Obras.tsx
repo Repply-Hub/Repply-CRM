@@ -25,6 +25,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useCreateObra, useUpdateObra, useDeleteObra } from '@/hooks/use-mutations';
 import { toast } from 'sonner';
+import { z } from 'zod';
+import { formatCnpj, isValidCnpj } from '@/utils/cnpj';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { ListPagination } from '@/components/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
@@ -95,6 +97,11 @@ export default function Obras() {
     status: '',
     spe_cnpj: '',
   });
+
+  const [newObraCnpjError, setNewObraCnpjError] = useState('');
+  const [editObraCnpjError, setEditObraCnpjError] = useState('');
+
+  const cnpjSchema = z.string().min(18, "CNPJ obrigatório").refine(isValidCnpj, { message: "CNPJ inválido" });
 
   const { data: statusObras } = useStatusObras();
 
@@ -599,10 +606,20 @@ export default function Obras() {
             </DialogHeader>
             <form onSubmit={(e) => {
               e.preventDefault();
-              updateObra.mutate(editObra, {
+              const result = cnpjSchema.safeParse(editObra.spe_cnpj);
+              if (!result.success) {
+                setEditObraCnpjError(result.error.errors[0].message);
+                return;
+              }
+              const payload = {
+                ...editObra,
+                spe_cnpj: editObra.spe_cnpj.replace(/\D/g, "")
+              };
+              updateObra.mutate(payload, {
                 onSuccess: () => {
                   setEditDialogOpen(false);
                   toast.success("Obra atualizada com sucesso!");
+                  setEditObraCnpjError('');
                 }
               });
             }} className="space-y-4">
@@ -654,9 +671,14 @@ export default function Obras() {
                 <Label>SPE / CNPJ</Label>
                 <Input 
                   placeholder="00.000.000/0000-00"
+                  maxLength={18}
                   value={editObra.spe_cnpj}
-                  onChange={(e) => setEditObra(prev => ({ ...prev, spe_cnpj: e.target.value }))}
+                  onChange={(e) => {
+                    setEditObra(prev => ({ ...prev, spe_cnpj: formatCnpj(e.target.value) }));
+                    setEditObraCnpjError('');
+                  }}
                 />
+                {editObraCnpjError && <p className="text-[0.8rem] font-medium text-destructive">{editObraCnpjError}</p>}
               </div>
 
               <DialogFooter>
@@ -681,10 +703,20 @@ export default function Obras() {
                 toast.error("Preencha ao menos o nome e o cliente.");
                 return;
               }
-              createObra.mutate(newObra, {
+              const result = cnpjSchema.safeParse(newObra.spe_cnpj);
+              if (!result.success) {
+                setNewObraCnpjError(result.error.errors[0].message);
+                return;
+              }
+              const payload = {
+                ...newObra,
+                spe_cnpj: newObra.spe_cnpj.replace(/\D/g, "")
+              };
+              createObra.mutate(payload, {
                 onSuccess: () => {
                   setDialogOpen(false);
                   setNewObra({ nome_obra: '', cliente_id: '', endereco_entrega: '', status: statusObras?.[0]?.slug || '', spe_cnpj: '' });
+                  setNewObraCnpjError('');
                 }
               });
             }} className="space-y-4">
@@ -733,12 +765,17 @@ export default function Obras() {
               </div>
 
               <div className="space-y-2">
-                <Label>SPE / CNPJ (Opcional)</Label>
+                <Label>SPE / CNPJ</Label>
                 <Input 
                   placeholder="00.000.000/0000-00"
+                  maxLength={18}
                   value={newObra.spe_cnpj}
-                  onChange={(e) => setNewObra(prev => ({ ...prev, spe_cnpj: e.target.value }))}
+                  onChange={(e) => {
+                    setNewObra(prev => ({ ...prev, spe_cnpj: formatCnpj(e.target.value) }));
+                    setNewObraCnpjError('');
+                  }}
                 />
+                {newObraCnpjError && <p className="text-[0.8rem] font-medium text-destructive">{newObraCnpjError}</p>}
               </div>
 
               <DialogFooter>

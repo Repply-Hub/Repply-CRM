@@ -335,8 +335,8 @@ export default function Calendario() {
               locale={ptBR}
               className="p-2 w-full"
               captionLayout="dropdown-buttons"
-              fromYear={2020}
-              toYear={2030}
+              fromYear={1950}
+              toYear={new Date().getFullYear()}
               classNames={{
                 months: "w-full",
                 month: "w-full space-y-2",
@@ -345,11 +345,11 @@ export default function Calendario() {
                 vhidden: "hidden",
                 dropdown: "bg-transparent border-none text-[10px] font-medium focus:ring-0 cursor-pointer p-0",
                 caption_label: "text-xs font-medium hidden",
-                nav: "space-x-1 flex items-center",
+                nav: "hidden",
                 nav_button:
-                  "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100 border rounded-md inline-flex items-center justify-center",
-                nav_button_previous: "absolute left-1",
-                nav_button_next: "absolute right-1",
+                  "hidden",
+                nav_button_previous: "hidden",
+                nav_button_next: "hidden",
                 table: "w-full border-collapse",
                 head_row: "flex",
                 head_cell: "text-muted-foreground rounded-md w-7 font-normal text-[0.65rem] text-center",
