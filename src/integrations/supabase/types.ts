@@ -1989,6 +1989,7 @@ export type Database = {
     }
     Functions: {
       delete_current_user: { Args: never; Returns: undefined }
+      delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
       get_my_empresa_id: { Args: never; Returns: string }
       get_my_usuario_id: { Args: never; Returns: string }
       get_my_vendedor_id: { Args: never; Returns: string }
