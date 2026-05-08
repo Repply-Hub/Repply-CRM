@@ -206,14 +206,19 @@ export function useDeleteObrasBulk() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      console.log('Iniciando exclusão em massa para IDs:', ids);
+      console.log('Iniciando exclusão em massa via RPC para IDs:', ids);
       if (!ids || ids.length === 0) {
         console.warn('Nenhum ID fornecido para exclusão');
         return;
       }
-      const { data, error, status, statusText } = await supabase.from('obras').delete().in('id', ids);
+      
+      // Usamos a função RPC para contornar problemas de performance/RLS em grandes volumes
+      const { data, error } = await supabase.rpc('delete_obras_bulk', { 
+        obra_ids: ids 
+      });
+
       if (error) {
-        console.error('Erro detalhado Supabase (Bulk Delete):', { error, status, statusText, ids });
+        console.error('Erro ao excluir obras em massa (RPC):', error);
         throw error;
       }
       return data;
