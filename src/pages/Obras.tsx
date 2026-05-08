@@ -833,6 +833,35 @@ export default function Obras() {
           </DialogContent>
         </Dialog>
 
+        <AlertDialog open={confirmDeleteBulk} onOpenChange={setConfirmDeleteBulk}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Obras Selecionadas</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir as {selectedIds.length} obras selecionadas? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  try {
+                    await deleteObrasBulk.mutateAsync(selectedIds);
+                    toast.success(`${selectedIds.length} obras excluídas com sucesso!`);
+                    setSelectedIds([]);
+                  } catch (error: any) {
+                    toast.error("Erro ao excluir obras: " + error.message);
+                  }
+                  setConfirmDeleteBulk(false);
+                }}
+              >
+                Excluir Todas
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => !open && setConfirmDeleteId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
