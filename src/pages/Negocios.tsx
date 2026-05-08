@@ -920,6 +920,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     selected={dateFrom}
                     onSelect={setDateFrom}
                     locale={ptBR}
+                    captionLayout="dropdown-buttons"
+                    fromYear={1950}
+                    toYear={new Date().getFullYear()}
+                    className="[&_.rdp-nav]:hidden [&_.rdp-caption_label]:hidden"
                   />
                 </PopoverContent>
               </Popover>
@@ -949,6 +953,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                     onSelect={setDateTo}
                     initialFocus
                     locale={ptBR}
+                    captionLayout="dropdown-buttons"
+                    fromYear={1950}
+                    toYear={new Date().getFullYear()}
+                    className="[&_.rdp-nav]:hidden [&_.rdp-caption_label]:hidden"
                   />
                 </PopoverContent>
               </Popover>
