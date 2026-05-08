@@ -851,15 +851,51 @@ export default function Obras() {
         <AlertDialog open={confirmDeleteBulk} onOpenChange={setConfirmDeleteBulk}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Excluir Obras Selecionadas</AlertDialogTitle>
+              <AlertDialogTitle>Excluir Obras</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir as {selectedIds.length} obras selecionadas? Esta ação não pode ser desfeita.
+                Selecione quais obras deseja remover. Esta ação não pode ser desfeita.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="flex flex-col gap-3">
+                <Button 
+                  variant="outline" 
+                  className={cn(
+                    "justify-start h-auto py-3 px-4",
+                    selectedIds.length === paginatedObras.length && paginatedObras.every(o => selectedIds.includes(o.id)) && "border-primary bg-primary/5"
+                  )}
+                  onClick={toggleSelectAllPage}
+                >
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="font-semibold">Selecionar Página Atual</span>
+                    <span className="text-xs text-muted-foreground">Remover apenas as {paginatedObras.length} obras que aparecem nesta página</span>
+                  </div>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className={cn(
+                    "justify-start h-auto py-3 px-4",
+                    selectedIds.length === filtered.length && filtered.length > 0 && "border-primary bg-primary/5"
+                  )}
+                  onClick={toggleSelectAllGeneral}
+                >
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="font-semibold">Selecionar Todas</span>
+                    <span className="text-xs text-muted-foreground">Remover todas as {filtered.length} obras encontradas (incluindo outras páginas)</span>
+                  </div>
+                </Button>
+              </div>
+              {selectedIds.length > 0 && (
+                <p className="text-sm font-medium text-destructive">
+                  {selectedIds.length} obra(s) selecionada(s) para exclusão.
+                </p>
+              )}
+            </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={selectedIds.length === 0 || deleteObrasBulk.isPending}
                 onClick={async () => {
                   try {
                     await deleteObrasBulk.mutateAsync(selectedIds);
@@ -871,7 +907,7 @@ export default function Obras() {
                   setConfirmDeleteBulk(false);
                 }}
               >
-                Excluir Todas
+                {deleteObrasBulk.isPending ? "Excluindo..." : "Excluir Selecionadas"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
