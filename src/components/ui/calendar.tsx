@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
 function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
+  const isDropdownMode = props.captionLayout === "dropdown" || props.captionLayout === "dropdown-buttons";
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -21,7 +23,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         caption_dropdowns: "flex justify-center gap-2",
         vhidden: "hidden",
         dropdown: "bg-transparent border-none text-xs font-medium focus:ring-0 cursor-pointer p-0",
-        nav: "space-x-1 flex items-center",
+        nav: cn("space-x-1 flex items-center", isDropdownMode && "hidden"),
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
           "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
