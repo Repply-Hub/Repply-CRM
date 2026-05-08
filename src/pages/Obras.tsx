@@ -896,11 +896,13 @@ export default function Obras() {
                 disabled={selectedIds.length === 0 || deleteObrasBulk.isPending}
                 onClick={async () => {
                   try {
+                    console.log('Botão excluir clicado. IDs selecionados:', selectedIds);
                     await deleteObrasBulk.mutateAsync(selectedIds);
                     toast.success(`${selectedIds.length} obras excluídas com sucesso!`);
                     setSelectedIds([]);
                   } catch (error: any) {
-                    toast.error("Erro ao excluir obras: " + error.message);
+                    console.error('Erro capturado no onClick do modal:', error);
+                    toast.error("Erro ao excluir obras: " + (error.message || "Erro desconhecido"));
                   }
                   setConfirmDeleteBulk(false);
                 }}
