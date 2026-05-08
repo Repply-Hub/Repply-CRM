@@ -51,6 +51,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         Dropdown: ({ value, onChange, children, ..._props }: DropdownProps) => {
           const options = React.Children.toArray(children) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[];
           const selected = options.find((child) => child.props.value === value);
+          const isYear = _props.name === "years";
           const [searchTerm, setSearchTerm] = React.useState("");
           const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -58,7 +59,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
             if (isYear) {
               const timer = setTimeout(() => {
                 inputRef.current?.focus();
-              }, 0);
+              }, 50);
               return () => clearTimeout(timer);
             }
           }, [isYear]);
@@ -67,7 +68,6 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
             onChange?.({ target: { value: newValue } } as React.ChangeEvent<HTMLSelectElement>);
           };
 
-          const isYear = _props.name === "years";
           const filteredOptions = isYear 
             ? options.filter(option => option.props.children?.toString().toLowerCase().includes(searchTerm.toLowerCase()))
             : options;
