@@ -334,6 +334,9 @@ export default function Calendario() {
               onMonthChange={setMonth}
               locale={ptBR}
               className="p-2 w-full"
+              captionLayout="dropdown-buttons"
+              fromYear={2020}
+              toYear={2030}
               classNames={{
                 months: "w-full",
                 month: "w-full space-y-2",
