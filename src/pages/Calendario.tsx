@@ -139,14 +139,20 @@ export default function Calendario() {
   // --- Navegação ---
   const navigate = (direction: "prev" | "next" | "today") => {
     if (direction === "today") {
-      setCurrentDate(new Date());
+      const now = new Date();
+      setCurrentDate(now);
+      setMonth(now);
       return;
     }
     const sign = direction === "next" ? 1 : -1;
     setCurrentDate((d) => {
-      if (viewMode === "dia") return sign > 0 ? addDays(d, 1) : subDays(d, 1);
-      if (viewMode === "semana") return sign > 0 ? addWeeks(d, 1) : subWeeks(d, 1);
-      return sign > 0 ? addMonths(d, 1) : subMonths(d, 1);
+      let nextDate: Date;
+      if (viewMode === "dia") nextDate = sign > 0 ? addDays(d, 1) : subDays(d, 1);
+      else if (viewMode === "semana") nextDate = sign > 0 ? addWeeks(d, 1) : subWeeks(d, 1);
+      else nextDate = sign > 0 ? addMonths(d, 1) : subMonths(d, 1);
+      
+      setMonth(nextDate);
+      return nextDate;
     });
   };
 
