@@ -330,6 +330,8 @@ export default function Calendario() {
               mode="single"
               selected={currentDate}
               onSelect={handleMiniCalendarSelect}
+              month={month}
+              onMonthChange={setMonth}
               locale={ptBR}
               className="p-2 w-full"
               classNames={{
