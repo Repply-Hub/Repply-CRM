@@ -14,8 +14,6 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
 
   return (
     <DayPicker
-      disableNavigation
-
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
       classNames={{
@@ -48,8 +46,8 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         ...classNames,
       }}
       components={{
-        IconLeft: () => null,
-        IconRight: () => null,
+        IconLeft: ({ ..._props }) => null,
+        IconRight: ({ ..._props }) => null,
         Dropdown: ({ value, onChange, children, ..._props }: DropdownProps) => {
           const options = React.Children.toArray(children) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[];
           const selected = options.find((child) => child.props.value === value);
