@@ -160,7 +160,7 @@ export default function Calendario() {
   const handleMiniCalendarSelect = (date: Date | undefined) => {
     if (!date) return;
     setCurrentDate(date);
-    // Removemos a alteração automática para visão de dia para permitir seleção manual no mini-calendário
+    if (viewMode === "mes") setViewMode("dia");
   };
 
   // --- Toggle de tipo de calendário ---
