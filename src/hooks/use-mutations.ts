@@ -200,8 +200,17 @@ export function useDeleteObrasBulk() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      const { error } = await supabase.from('obras').delete().in('id', ids);
-      if (error) throw error;
+      console.log('Iniciando exclusão em massa para IDs:', ids);
+      if (!ids || ids.length === 0) {
+        console.warn('Nenhum ID fornecido para exclusão');
+        return;
+      }
+      const { data, error, status, statusText } = await supabase.from('obras').delete().in('id', ids);
+      if (error) {
+        console.error('Erro detalhado Supabase (Bulk Delete):', { error, status, statusText, ids });
+        throw error;
+      }
+      return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['obras'] });
