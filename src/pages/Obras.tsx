@@ -419,21 +419,18 @@ export default function Obras() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
                   <div className="flex items-center gap-4">
                     <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
-                    {filtered.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        {/* Removidos botões daqui para mover para o modal */}
-                      </div>
+                    {selectedIds.length > 0 && (
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={() => setConfirmDeleteBulk(true)}
+                        className="gap-2 h-8"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Remover Selecionados ({selectedIds.length})
+                      </Button>
                     )}
                   </div>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    onClick={() => setConfirmDeleteBulk(true)}
-                    className="gap-2 h-8"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Opções de Remoção em Massa
-                  </Button>
                 </div>
                 
                 <div className="rounded-lg border border-border/60 overflow-x-auto bg-card">
