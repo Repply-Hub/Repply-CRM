@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useCreateObra, useUpdateObra, useDeleteObra } from '@/hooks/use-mutations';
+import { useCreateObra, useUpdateObra, useDeleteObra, useDeleteObrasBulk } from '@/hooks/use-mutations';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { formatCnpj, isValidCnpj } from '@/utils/cnpj';
