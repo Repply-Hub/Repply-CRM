@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Upload, Search } from 'lucide-react';
-import { format, addDays } from 'date-fns';
+import { format, addDays, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,7 +63,11 @@ export function CalendarHeader({
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 px-2 sm:px-3 text-xs font-bold hover:bg-orange-50 hover:text-orange-600 transition-colors"
+          className={`h-7 px-2 sm:px-3 text-xs font-bold transition-colors ${
+            isSameDay(currentDate, new Date()) 
+              ? "bg-orange-100 text-orange-600 hover:bg-orange-200" 
+              : "hover:bg-orange-50 hover:text-orange-600"
+          }`}
           onClick={() => onNavigate('today')}
         >
           {isMobile ? <CalendarIcon className="h-4 w-4" /> : "Hoje"}
