@@ -891,17 +891,27 @@ export default function Obras() {
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 disabled={selectedIds.length === 0 || deleteObrasBulk.isPending}
-                onClick={async () => {
+                onClick={async (e) => {
+                  e.preventDefault();
                   try {
-                    console.log('Botão excluir clicado. IDs selecionados:', selectedIds);
-                    await deleteObrasBulk.mutateAsync(selectedIds);
+                    console.log('Botão excluir clicado no modal. IDs selecionados:', selectedIds);
+                    const result = await deleteObrasBulk.mutateAsync(selectedIds);
+                    console.log('Resultado da exclusão:', result);
                     toast.success(`${selectedIds.length} obras excluídas com sucesso!`);
                     setSelectedIds([]);
+                    setConfirmDeleteBulk(false);
                   } catch (error: any) {
-                    console.error('Erro capturado no onClick do modal:', error);
-                    toast.error("Erro ao excluir obras: " + (error.message || "Erro desconhecido"));
+                    console.error('Erro detalhado capturado no modal:', error);
+                    let errorMessage = "Erro desconhecido";
+                    
+                    if (error.message) {
+                      errorMessage = error.message;
+                    } else if (typeof error === 'string') {
+                      errorMessage = error;
+                    }
+                    
+                    toast.error("Erro ao excluir obras: " + errorMessage);
                   }
-                  setConfirmDeleteBulk(false);
                 }}
               >
                 {deleteObrasBulk.isPending ? "Excluindo..." : "Excluir Selecionadas"}
