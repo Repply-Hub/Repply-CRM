@@ -51,13 +51,23 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         Dropdown: ({ value, onChange, children, ..._props }: DropdownProps) => {
           const options = React.Children.toArray(children) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[];
           const selected = options.find((child) => child.props.value === value);
+          const isYear = _props.name === "years";
           const [searchTerm, setSearchTerm] = React.useState("");
+          const inputRef = React.useRef<HTMLInputElement>(null);
+
+          React.useEffect(() => {
+            if (isYear) {
+              const timer = setTimeout(() => {
+                inputRef.current?.focus();
+              }, 50);
+              return () => clearTimeout(timer);
+            }
+          }, [isYear]);
 
           const handleChange = (newValue: string) => {
             onChange?.({ target: { value: newValue } } as React.ChangeEvent<HTMLSelectElement>);
           };
 
-          const isYear = _props.name === "years";
           const filteredOptions = isYear 
             ? options.filter(option => option.props.children?.toString().toLowerCase().includes(searchTerm.toLowerCase()))
             : options;
@@ -72,9 +82,11 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
                   <div className="flex items-center border-b px-3 py-2 sticky top-0 bg-background z-10">
                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                     <Input
+                      ref={inputRef}
                       placeholder="Buscar ano..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
                       className="h-8 w-full border-none focus-visible:ring-0 text-xs p-0"
                     />
                   </div>
