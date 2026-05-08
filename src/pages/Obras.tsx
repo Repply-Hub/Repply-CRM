@@ -69,6 +69,7 @@ export default function Obras() {
   const createObra = useCreateObra();
   const updateObra = useUpdateObra();
   const deleteObra = useDeleteObra();
+  const deleteObrasBulk = useDeleteObrasBulk();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [sort, setSort] = useState<SortOption>('recent');
@@ -81,6 +82,8 @@ export default function Obras() {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmDeleteBulk, setConfirmDeleteBulk] = useState(false);
 
   const [newObra, setNewObra] = useState({
     nome_obra: '',
