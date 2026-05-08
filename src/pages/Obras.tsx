@@ -421,22 +421,7 @@ export default function Obras() {
                     <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
                     {filtered.length > 0 && (
                       <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={toggleSelectAllPage}
-                          className="h-8 text-[10px] uppercase font-bold tracking-wider"
-                        >
-                          Selecionar Página
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={toggleSelectAllGeneral}
-                          className="h-8 text-[10px] uppercase font-bold tracking-wider"
-                        >
-                          Selecionar Tudo
-                        </Button>
+                        {/* Removidos botões daqui para mover para o modal */}
                       </div>
                     )}
                   </div>
