@@ -408,12 +408,31 @@ export default function Obras() {
               </div>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
+                  {selectedIds.length > 0 && (
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => setConfirmDeleteBulk(true)}
+                      className="gap-2 h-8"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Remover Selecionados ({selectedIds.length})
+                    </Button>
+                  )}
+                </div>
                 
                 <div className="rounded-lg border border-border/60 overflow-x-auto bg-card">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
+                        <th className="py-3 px-4 w-10">
+                          <Checkbox 
+                            checked={selectedIds.length === paginatedObras.length && paginatedObras.length > 0}
+                            onCheckedChange={toggleSelectAll}
+                          />
+                        </th>
                         {visibleColumns.map(colId => (
                           <th key={colId} className="text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap">
                             {getLabel(colId)}
@@ -422,7 +441,7 @@ export default function Obras() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.slice((page - 1) * pageSize, page * pageSize).map(obra => {
+                      {paginatedObras.map(obra => {
                         const status = getStatusInfo(obra.status);
                         const cliente = obra.clientes as any;
                         const camposExtras = (obra as any).campos_extras || {};
