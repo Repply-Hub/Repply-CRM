@@ -5,6 +5,7 @@
     "": {
       "name": "vite_react_shadcn_ts",
       "dependencies": {
+        "@formkit/auto-animate": "^0.9.0",
         "@hello-pangea/dnd": "^17.0.0",
         "@hookform/resolvers": "^3.10.0",
         "@radix-ui/react-accordion": "^1.2.11",
@@ -175,6 +176,8 @@
     "@floating-ui/react-dom": ["@floating-ui/react-dom@2.1.4", "", { "dependencies": { "@floating-ui/dom": "^1.7.2" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-JbbpPhp38UmXDDAu60RJmbeme37Jbgsm7NrHGgzYYFKmblzRUh6Pa641dII6LsjwF4XlScDrde2UAzDo/b9KPw=="],
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.10", "", {}, "sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ=="],
+
+    "@formkit/auto-animate": ["@formkit/auto-animate@0.9.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@formkit/auto-animate/-/auto-animate-0.9.0.tgz", {}, "sha512-VhP4zEAacXS3dfTpJpJ88QdLqMTcabMg0jwpOSxZ/VzfQVfl3GkZSCZThhGC5uhq/TxPHPzW0dzr4H9Bb1OgKA=="],
 
     "@googlemaps/js-api-loader": ["@googlemaps/js-api-loader@1.16.8", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@googlemaps/js-api-loader/-/js-api-loader-1.16.8.tgz", {}, "sha512-CROqqwfKotdO6EBjZO/gQGVTbeDps5V7Mt9+8+5Q+jTg5CRMi3Ii/L9PmV3USROrt2uWxtGzJHORmByxyo9pSQ=="],
 

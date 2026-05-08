@@ -106,6 +106,7 @@ function parseICS(content: string, calendarType: CalendarType = "empresa"): Even
 export default function Calendario() {
   const [viewMode, setViewMode] = useState<ViewMode>("semana");
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [month, setMonth] = useState(new Date());
   const [visibleCalendars, setVisibleCalendars] = useState<Set<CalendarType>>(new Set(["pessoal", "empresa"]));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [initialSlot, setInitialSlot] = useState<Partial<EventoForm>>({});
@@ -138,14 +139,20 @@ export default function Calendario() {
   // --- Navegação ---
   const navigate = (direction: "prev" | "next" | "today") => {
     if (direction === "today") {
-      setCurrentDate(new Date());
+      const now = new Date();
+      setCurrentDate(now);
+      setMonth(now);
       return;
     }
     const sign = direction === "next" ? 1 : -1;
     setCurrentDate((d) => {
-      if (viewMode === "dia") return sign > 0 ? addDays(d, 1) : subDays(d, 1);
-      if (viewMode === "semana") return sign > 0 ? addWeeks(d, 1) : subWeeks(d, 1);
-      return sign > 0 ? addMonths(d, 1) : subMonths(d, 1);
+      let nextDate: Date;
+      if (viewMode === "dia") nextDate = sign > 0 ? addDays(d, 1) : subDays(d, 1);
+      else if (viewMode === "semana") nextDate = sign > 0 ? addWeeks(d, 1) : subWeeks(d, 1);
+      else nextDate = sign > 0 ? addMonths(d, 1) : subMonths(d, 1);
+      
+      setMonth(nextDate);
+      return nextDate;
     });
   };
 
@@ -323,6 +330,8 @@ export default function Calendario() {
               mode="single"
               selected={currentDate}
               onSelect={handleMiniCalendarSelect}
+              month={month}
+              onMonthChange={setMonth}
               locale={ptBR}
               className="p-2 w-full"
               classNames={{
