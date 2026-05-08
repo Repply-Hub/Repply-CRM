@@ -106,6 +106,7 @@ function parseICS(content: string, calendarType: CalendarType = "empresa"): Even
 export default function Calendario() {
   const [viewMode, setViewMode] = useState<ViewMode>("semana");
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [month, setMonth] = useState(new Date());
   const [visibleCalendars, setVisibleCalendars] = useState<Set<CalendarType>>(new Set(["pessoal", "empresa"]));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [initialSlot, setInitialSlot] = useState<Partial<EventoForm>>({});
