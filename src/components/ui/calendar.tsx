@@ -51,14 +51,16 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
           const [searchTerm, setSearchTerm] = React.useState("");
           const inputRef = React.useRef<HTMLInputElement>(null);
 
+          const [isOpen, setIsOpen] = React.useState(false);
+
           React.useEffect(() => {
-            if (isYear) {
+            if (isYear && isOpen) {
               const timer = setTimeout(() => {
                 inputRef.current?.focus();
-              }, 50);
+              }, 10);
               return () => clearTimeout(timer);
             }
-          }, [isYear]);
+          }, [isYear, isOpen]);
 
           const handleChange = (newValue: string) => {
             onChange?.({ target: { value: newValue } } as React.ChangeEvent<HTMLSelectElement>);
