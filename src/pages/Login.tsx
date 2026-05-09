@@ -111,7 +111,7 @@ export default function Login() {
               <span className="text-white/80">inteligente e ágil</span>
             </h1>
             <p className="text-base text-white/70 max-w-sm leading-relaxed">
-              Pipeline de vendas, controle de orçamentos e dashboards — tudo em um só lugar para sua representação
+              Pipeline de vendas, controle de orçamentos e dashboards, tudo em um só lugar para sua representação
               comercial.
             </p>
 
@@ -223,7 +223,9 @@ export default function Login() {
                     </div>
                     <div>
                       <p className="font-semibold text-sm">Entrar como funcionário</p>
-                      <p className="text-xs text-muted-foreground">Use o código de uso único fornecido pelo seu gestor</p>
+                      <p className="text-xs text-muted-foreground">
+                        Use o código de uso único fornecido pelo seu gestor
+                      </p>
                     </div>
                   </button>
                 </div>
@@ -244,7 +246,9 @@ export default function Login() {
                     <Input name="nome_empresa" required placeholder="Ex: MD Representações" className="h-11" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">CNPJ <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                    <Label className="text-sm font-medium">
+                      CNPJ <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </Label>
                     <Input name="cnpj" placeholder="00.000.000/0001-00" className="h-11" />
                   </div>
                   <div className="space-y-2">
