@@ -65,7 +65,7 @@ export function AppSidebar() {
     
     // Admin vê Dashboard para métricas e Configurações para permissões
     if (isAdmin) {
-      return i.id === 'dashboard' || i.id === 'configuracoes';
+      return i.id === 'dashboard' || i.id === 'usuarios_admin' || i.id === 'configuracoes';
     }
 
     if (!isVendedor) return true; // gestores/empresa see all visible items

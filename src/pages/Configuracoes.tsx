@@ -412,7 +412,7 @@ function ProfileTab() {
 
 const Configuracoes = () => {
   const [searchParams] = useSearchParams();
-  const defaultTab = searchParams.get('tab') || 'perfil';
+  const defaultTab = searchParams.get('tab') === 'usuarios' ? 'vendedores' : (searchParams.get('tab') || 'perfil');
   const [alertDays, setAlertDays] = useState('5');
 
   const { data: isGestor } = useQuery({

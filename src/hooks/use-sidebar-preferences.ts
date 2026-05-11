@@ -24,6 +24,7 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'emails', path: '/emails', label: 'E-mails', icon: 'Mail', visible: true },
   { id: 'configuracoes', path: '/configuracoes', label: 'Configurações', icon: 'Settings', visible: true },
   { id: 'importacoes_ignoradas', path: '/importacao/ignoradas', label: 'Linhas Ignoradas', icon: 'FileWarning', visible: true },
+  { id: 'usuarios_admin', path: '/configuracoes?tab=usuarios', label: 'Usuários', icon: 'Users', visible: true },
 ];
 
 export function useSidebarPreferences() {
