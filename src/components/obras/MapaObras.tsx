@@ -1,8 +1,9 @@
 import { useMemo, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
-import { Loader2, MapPin, Building2 } from 'lucide-react';
+import { Loader2, MapPin, Building2, AlertTriangle, Key } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useGeocodeObras, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
 
 const containerStyle = {
