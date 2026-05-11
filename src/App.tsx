@@ -67,7 +67,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   // Se o usuário está logado e o perfil existe mas não tem empresa vinculada
-  if (session && profile && !profile.empresa_id) {
+  if (session && profile && !profile.empresa_id && profile.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <div className="max-w-md w-full bg-card p-8 rounded-lg shadow-lg border text-center space-y-6">
