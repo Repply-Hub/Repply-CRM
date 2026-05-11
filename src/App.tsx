@@ -11,6 +11,7 @@ import ClienteDetalhe from "./pages/ClienteDetalhe";
 import ContatoDetalhe from "./pages/ContatoDetalhe";
 import NovoPedido from "./pages/NovoPedido";
 import Dashboard from "./pages/Dashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import Configuracoes from "./pages/Configuracoes";
 import Obras from "./pages/Obras";
 import Fabricantes from "./pages/Fabricantes";
@@ -104,6 +105,14 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const DashboardWrapper = () => {
+  const { profile } = useAuth();
+  if (profile?.role === 'admin') {
+    return <AdminDashboard />;
+  }
+  return <Dashboard />;
+};
+
 const AppRoutes = () => (
   <Routes>
     <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
@@ -119,7 +128,7 @@ const AppRoutes = () => (
     <Route path="/obras" element={<ProtectedRoute><Obras /></ProtectedRoute>} />
     <Route path="/fabricantes" element={<ProtectedRoute><Fabricantes /></ProtectedRoute>} />
     <Route path="/portal" element={<ProtectedRoute><Portal /></ProtectedRoute>} />
-    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+    <Route path="/dashboard" element={<ProtectedRoute><DashboardWrapper /></ProtectedRoute>} />
     <Route path="/calendario" element={<ProtectedRoute><Calendario /></ProtectedRoute>} />
     <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
