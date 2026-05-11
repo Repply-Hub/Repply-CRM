@@ -56,12 +56,19 @@ export function AppSidebar() {
   const vendedor = profile || vendedorLocal;
 
   const isVendedor = vendedor?.role === 'vendedor';
+  const isAdmin = vendedor?.role === 'admin';
   const { data: permissoes } = usePermissoes(isVendedor ? vendedor?.id : undefined);
 
   // Filter visible items, and for vendedores also check permissoes_vendedor
   const visibleItems = items.filter(i => {
     if (!i.visible) return false;
-    if (!isVendedor) return true; // admins/empresa see all visible items
+    
+    // Admin só deve ver Configurações para gerenciar permissões
+    if (isAdmin) {
+      return i.id === 'configuracoes';
+    }
+
+    if (!isVendedor) return true; // gestores/empresa see all visible items
     // For vendedores: check if they have pode_ver permission for this module
     if (!permissoes || permissoes.length === 0) return true; // no permissions set = show all (default)
     const perm = permissoes.find(p => p.modulo === i.id);

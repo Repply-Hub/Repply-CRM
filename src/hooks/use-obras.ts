@@ -1,10 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
 
 export function useObras() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+
   return useQuery({
-    queryKey: ['obras'],
+    queryKey: ['obras', profile?.id, profile?.role],
     queryFn: async () => {
+      // Se for admin, não deve ver os dados das obras
+      if (isAdmin) {
+        return [];
+      }
+
       const { data, error } = await supabase
         .from('obras')
         .select('*, latitude, longitude, geocoded_at, clientes(empresa, tipo)')
