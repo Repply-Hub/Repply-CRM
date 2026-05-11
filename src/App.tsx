@@ -38,7 +38,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   // Se o usuário está logado mas não tem perfil ou empresa vinculada
   // Só mostramos o bloqueio se o profile realmente foi retornado como nulo após o loading E a sessão existir
-  if (session && profile === null && profileLocal?.role !== 'admin') {
+  if (session && profile === null && profile?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <div className="max-w-md w-full bg-card p-8 rounded-lg shadow-lg border text-center space-y-6">
