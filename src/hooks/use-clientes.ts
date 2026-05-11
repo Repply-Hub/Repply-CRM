@@ -8,11 +8,13 @@ async function fetchAllClientes() {
   let hasMore = true;
 
   while (hasMore) {
-    const { data, error } = await supabase
+    const query = supabase
       .from('clientes')
       .select('*, obras(*)')
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
+
+    const { data, error } = await query;
     if (error) throw error;
     allData = allData.concat(data ?? []);
     hasMore = (data?.length ?? 0) === PAGE_SIZE;
@@ -23,9 +25,15 @@ async function fetchAllClientes() {
 }
 
 export function useClientes() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+
   return useQuery({
-    queryKey: ['clientes'],
-    queryFn: fetchAllClientes,
+    queryKey: ['clientes', profile?.id, profile?.role],
+    queryFn: async () => {
+      if (isAdmin) return [];
+      return fetchAllClientes();
+    },
   });
 }
 
@@ -36,11 +44,13 @@ async function fetchAllContatos() {
   let hasMore = true;
 
   while (hasMore) {
-    const { data, error } = await supabase
+    const query = supabase
       .from('contatos')
       .select('*')
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
+
+    const { data, error } = await query;
     if (error) throw error;
     allData = allData.concat(data ?? []);
     hasMore = (data?.length ?? 0) === PAGE_SIZE;
@@ -51,16 +61,27 @@ async function fetchAllContatos() {
 }
 
 export function useContatos() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+
   return useQuery({
-    queryKey: ['contatos'],
-    queryFn: fetchAllContatos,
+    queryKey: ['contatos', profile?.id, profile?.role],
+    queryFn: async () => {
+      if (isAdmin) return [];
+      return fetchAllContatos();
+    },
   });
 }
 
 export function useFabricantes() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+
   return useQuery({
-    queryKey: ['fabricantes'],
+    queryKey: ['fabricantes', profile?.id, profile?.role],
     queryFn: async () => {
+      if (isAdmin) return [];
+      
       const { data, error } = await supabase
         .from('fabricantes')
         .select('*')

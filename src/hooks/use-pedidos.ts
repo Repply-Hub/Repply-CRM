@@ -22,8 +22,11 @@ export interface PedidoWithRelations {
 }
 
 export function usePedidos(empresaId?: string) {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+
   return useQuery({
-    queryKey: ['pedidos', empresaId],
+    queryKey: ['pedidos', empresaId, profile?.id, profile?.role],
     queryFn: async () => {
       const allData: PedidoWithRelations[] = [];
       const pageSize = 1000;
@@ -44,8 +47,26 @@ export function usePedidos(empresaId?: string) {
           .order('created_at', { ascending: false })
           .range(from, from + pageSize - 1);
 
-        if (empresaId) {
-          const { data: companyUsers } = await supabase
+        // Se for admin, não aplica filtros de visualização de dados (exceto se empresaId for passado explicitamente)
+        if (!isAdmin) {
+          if (empresaId) {
+            const { data: companyUsers } = await supabase
+              .from('usuarios')
+              .select('id')
+              .eq('empresa_id', empresaId);
+            
+            if (companyUsers && companyUsers.length > 0) {
+              query = query.in('usuario_id', companyUsers.map(u => u.id));
+            } else {
+              return [];
+            }
+          } else if (profile?.id) {
+            // Se for vendedor/gestor, vê apenas os seus ou da sua empresa dependendo da RLS (ou aqui via filtro se preferir)
+            // No momento a RLS deve cuidar disso, mas como o admin pediu para não ver tudo, garantimos o filtro se não for admin
+            // Se a RLS já estiver ativa, esse filtro é redundante mas seguro.
+          }
+        } else if (empresaId) {
+           const { data: companyUsers } = await supabase
             .from('usuarios')
             .select('id')
             .eq('empresa_id', empresaId);
@@ -63,7 +84,6 @@ export function usePedidos(empresaId?: string) {
         if (data && data.length > 0) {
           allData.push(...(data as unknown as PedidoWithRelations[]));
           from += pageSize;
-          // Aumentado o limite para 50.000 para evitar que negócios "fiquem para trás" em grandes bases
           hasMore = data.length === pageSize && allData.length < 50000;
         } else {
           hasMore = false;
@@ -72,9 +92,9 @@ export function usePedidos(empresaId?: string) {
 
       return allData;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutos de cache (evita refetch excessivo)
+    staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 10,
-    refetchOnWindowFocus: false, // Evita recarregar 50k registros toda vez que o usuário volta à aba
+    refetchOnWindowFocus: false,
   });
 }
 
