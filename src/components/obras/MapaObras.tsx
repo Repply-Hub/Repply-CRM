@@ -110,7 +110,27 @@ export function MapaObras({ obras, isLoading, searchTerm = '', selectedObraId }:
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {!hasApiKey && (
+        <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-900 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertTitle className="text-amber-800 dark:text-amber-300 font-semibold">Chave da API do Google Maps ausente</AlertTitle>
+          <AlertDescription>
+            O mapa está operando em modo de demonstração. Para remover a mensagem "This page can't load Google Maps correctly", é necessário configurar a variável <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">VITE_GOOGLE_MAPS_API_KEY</code> no arquivo .env ou nos segredos do projeto.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {loadError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Erro ao carregar o Google Maps</AlertTitle>
+          <AlertDescription>
+            {loadError.message || "Verifique se a sua chave de API é válida e possui as permissões necessárias."}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700">
           <MapPin className="h-4 w-4 text-primary" />
