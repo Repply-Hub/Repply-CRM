@@ -63,9 +63,9 @@ export function AppSidebar() {
   const visibleItems = items.filter(i => {
     if (!i.visible) return false;
     
-    // Admin só deve ver Configurações para gerenciar permissões
+    // Admin vê Dashboard para métricas e Configurações para permissões
     if (isAdmin) {
-      return i.id === 'configuracoes';
+      return i.id === 'dashboard' || i.id === 'configuracoes';
     }
 
     if (!isVendedor) return true; // gestores/empresa see all visible items
