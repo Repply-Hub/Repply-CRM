@@ -30,12 +30,12 @@ export function MapaObras({ obras, isLoading, searchTerm = '', selectedObraId }:
   const { items, carregando, progresso } = useGeocodeObras(obras);
   const [selectedObra, setSelectedObra] = useState<ObraComCoordenada | null>(null);
   
-  // Note: For a production app, the API key should be in an environment variable
-  // but for the preview to work, we'll try to load without a key (will show development watermark)
-  // or use a public one if available.
-  const { isLoaded } = useJsApiLoader({
+  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+  const hasApiKey = googleMapsApiKey.length > 0;
+
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "", 
+    googleMapsApiKey: googleMapsApiKey, 
   });
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
