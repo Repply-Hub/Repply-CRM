@@ -21,6 +21,8 @@ interface KanbanColumnProps {
 const ITEMS_PER_PAGE = 10;
 
 export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders = [], onCardClick, visibleColumns, columns }: KanbanColumnProps) {
+  const safeColor = typeof colorClass === 'string' ? colorClass : 'muted';
+  const safeLabel = typeof label === 'string' ? label : String(label ?? '');
   const navigate = useNavigate();
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const total = orders.reduce((acc, o) => acc + o.valor, 0);
@@ -35,8 +37,8 @@ export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorC
   return (
     <div className="flex flex-col w-64 sm:w-72 min-w-[256px] sm:min-w-[288px] shrink-0 max-h-[calc(100vh-180px)] sm:max-h-[calc(100vh-220px)]">
       <div className="flex items-center gap-2.5 mb-1 px-1">
-        <div className={cn('h-2 w-2 rounded-full ring-2 ring-offset-1 ring-offset-background', `bg-${colorClass}`, `ring-${colorClass}/30`)} />
-        <h3 className="text-sm font-bold text-foreground tracking-tight">{label}</h3>
+        <div className={cn('h-2 w-2 rounded-full ring-2 ring-offset-1 ring-offset-background', `bg-${safeColor}`, `ring-${safeColor}/30`)} />
+        <h3 className="text-sm font-bold text-foreground tracking-tight">{safeLabel}</h3>
         <span className="ml-auto text-[11px] font-semibold bg-secondary text-secondary-foreground px-2.5 py-0.5 rounded-full tabular-nums">
           {orders.length}
         </span>
@@ -51,7 +53,7 @@ export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorC
               ref={provided.innerRef}
               {...provided.droppableProps}
               role="list"
-              aria-label={`Coluna ${label}`}
+              aria-label={`Coluna ${safeLabel}`}
               className={cn(
                 'rounded-xl p-2 min-h-[200px] transition-all duration-300 ease-out',
                 snapshot.isDraggingOver
