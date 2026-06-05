@@ -21,6 +21,8 @@ interface KanbanColumnProps {
 const ITEMS_PER_PAGE = 10;
 
 export const KanbanColumn = memo(function KanbanColumn({ stageKey, label, colorClass, orders = [], onCardClick, visibleColumns, columns }: KanbanColumnProps) {
+  const safeColor = typeof colorClass === 'string' ? colorClass : 'muted';
+  const safeLabel = typeof label === 'string' ? label : String(label ?? '');
   const navigate = useNavigate();
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const total = orders.reduce((acc, o) => acc + o.valor, 0);
