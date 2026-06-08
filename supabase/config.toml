@@ -1,4 +1,4 @@
-project_id = "ukwwhwytyovrzefkdeyj"
+project_id = "hukeirrmsoiowvvrhivx"
 
 [functions.automacao-diaria]
 verify_jwt = false
@@ -10,4 +10,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.gmail-sync-inbox]
+verify_jwt = false
+
+[functions.gmail-callback]
 verify_jwt = false

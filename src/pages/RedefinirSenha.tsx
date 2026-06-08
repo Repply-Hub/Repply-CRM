@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
-import logoLogin from "@/assets/logo-login.svg";
+import { Logo } from "@/components/Logo";
 
 export default function RedefinirSenha() {
   const navigate = useNavigate();
@@ -46,7 +46,7 @@ export default function RedefinirSenha() {
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <img src={logoLogin} alt="MD Representações" className="h-32 w-32 object-contain mb-2" />
+          <Logo className="h-20 w-20" />
         </div>
 
         <h2 className="text-2xl font-bold text-foreground mb-1">Redefinir senha</h2>

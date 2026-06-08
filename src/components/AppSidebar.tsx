@@ -182,11 +182,11 @@ export function AppSidebar() {
             to="/dashboard"
             className={`flex items-center overflow-visible hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : 'gap-3'}`}
           >
-            <img src={logoSidebar} alt="MD Representações" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
+            <img src={logoSidebar} alt="Repply" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />
             {!collapsed && (
               <div className="min-w-0">
-                <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">MD Representações</p>
-                <p className="text-[10px] text-sidebar-foreground/50 font-medium">Gestão Comercial</p>
+                <p className="text-sm font-bold text-sidebar-foreground truncate tracking-tight">Repply</p>
+                <p className="text-[10px] text-sidebar-foreground/50 font-medium">o CRM que fala a sua língua</p>
               </div>
             )}
           </Link>

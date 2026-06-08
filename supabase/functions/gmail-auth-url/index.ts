@@ -21,7 +21,7 @@ serve(async (req) => {
     }
 
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
-    const redirectUri = `https://ukwwhwytyovrzefkdeyj.supabase.co/functions/v1/gmail-callback`
+    const redirectUri = `https://hukeirrmsoiowvvrhivx.supabase.co/functions/v1/gmail-callback`
     
     const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email')
     

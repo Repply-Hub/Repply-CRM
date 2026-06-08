@@ -7,8 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import logoSidebar from "@/assets/logo-sidebar.svg";
-import logoLogin from "@/assets/logo-login.svg";
+import logoLogin from "@/assets/logo-dark.svg";
+import { Logo } from "@/components/Logo";
 
 type RegisterType = "empresa" | "funcionario" | null;
 
@@ -91,47 +91,45 @@ export default function Login() {
   return (
     <div className="min-h-screen flex">
       {/* Left side — brand panel */}
-      <div className="hidden lg:flex lg:w-[45%] gradient-brand relative overflow-hidden">
-        {/* Decorative shapes */}
-        <div className="absolute inset-0">
-          <div className="absolute top-[-10%] left-[-15%] w-[60%] h-[60%] rounded-full bg-white/[0.06]" />
-          <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] rounded-full bg-white/[0.04]" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] rounded-full bg-white/[0.03]" />
+      <div className="hidden lg:flex lg:w-[45%] bg-[#0A0A0A] relative overflow-hidden">
+        {/* Decorative glow */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute bottom-[-10%] left-[10%] w-[60%] h-[60%] rounded-full bg-[#FF5A1F]/[0.06] blur-3xl" />
         </div>
 
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
           <div className="flex items-center gap-3">
-            <img src={logoLogin} alt="MD Representações" className="h-40 w-40 object-contain" />
+            <img src={logoLogin} alt="Repply" className="h-14 w-14 object-contain" />
+            <span className="text-2xl font-bold tracking-tight text-white">Repply</span>
           </div>
 
           <div className="space-y-6">
             <h1 className="text-4xl font-extrabold leading-tight tracking-tight">
-              Gestão comercial
+              o CRM que fala
               <br />
-              <span className="text-white/80">inteligente e ágil</span>
+              <span className="text-[#FF5A1F]">a sua língua.</span>
             </h1>
-            <p className="text-base text-white/70 max-w-sm leading-relaxed">
-              Pipeline de vendas, controle de orçamentos e dashboards, tudo em um só lugar para sua representação
-              comercial.
+            <p className="text-base text-white/60 max-w-sm leading-relaxed">
+              Controle total da carteira, foco no que importa, profissionalismo em cada interação. A sensação de estar no comando.
             </p>
 
             <div className="flex gap-8 pt-4">
               <div>
                 <p className="text-2xl font-bold">100%</p>
-                <p className="text-xs text-white/60">Digital</p>
+                <p className="text-xs text-white/40">Digital</p>
               </div>
               <div>
                 <p className="text-2xl font-bold">5x</p>
-                <p className="text-xs text-white/60">Mais rápido</p>
+                <p className="text-xs text-white/40">Mais rápido</p>
               </div>
               <div>
                 <p className="text-2xl font-bold">360°</p>
-                <p className="text-xs text-white/60">Visão completa</p>
+                <p className="text-xs text-white/40">Visão completa</p>
               </div>
             </div>
           </div>
 
-          <p className="text-xs text-white/40">© {new Date().getFullYear()} MD Representações</p>
+          <p className="text-xs text-white/30">© {new Date().getFullYear()} Repply</p>
         </div>
       </div>
 
@@ -140,8 +138,9 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex flex-col items-center mb-8 lg:hidden">
-            <img src={logoLogin} alt="MD Representações" className="h-40 w-40 object-contain mt-6 -mb-6" />
-            <p className="text-sm text-muted-foreground relative z-10">Gestão comercial inteligente e ágil</p>
+            <Logo className="h-20 w-20 mt-6 mb-3" />
+            <p className="text-xl font-bold text-foreground tracking-tight">Repply</p>
+            <p className="text-sm text-muted-foreground mt-1">o CRM que fala a sua língua</p>
           </div>
 
           <div className="hidden lg:block mb-8">
@@ -243,7 +242,7 @@ export default function Login() {
                   </button>
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Nome da empresa</Label>
-                    <Input name="nome_empresa" required placeholder="Ex: MD Representações" className="h-11" />
+                    <Input name="nome_empresa" required placeholder="Ex: Repply" className="h-11" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">

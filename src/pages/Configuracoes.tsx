@@ -261,9 +261,22 @@ function ProfileTab() {
               <div>
                 <p className="font-semibold">{perfil.nome}</p>
                 <p className="text-sm text-muted-foreground">{perfil.email}</p>
-                <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="text-[10px] mt-1">
-                  {{ admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' }[perfil.role] || perfil.role}
-                </Badge>
+                <div className="flex items-center gap-3 mt-1">
+                  <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="text-[10px]">
+                    {{ admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' }[perfil.role] || perfil.role}
+                  </Badge>
+                  {perfil.avatar_url && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => updatePerfil.mutate({ avatar_url: null })}
+                      className="h-auto p-0 text-[11px] text-destructive hover:text-destructive hover:bg-transparent hover:underline"
+                      disabled={updatePerfil.isPending}
+                    >
+                      Remover imagem
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
             <form onSubmit={handleSalvarPerfil} className="space-y-3">
