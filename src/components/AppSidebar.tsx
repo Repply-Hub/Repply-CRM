@@ -10,7 +10,7 @@ import { useSidebarPreferences, SidebarItem } from '@/hooks/use-sidebar-preferen
 import { usePermissoes } from '@/hooks/use-permissoes';
 import { getIconComponent } from '@/lib/sidebar-icons';
 import { SidebarAddItemDialog } from '@/components/SidebarAddItemDialog';
-import { useUnreadEmails, useUnreadChatMessages } from '@/hooks/use-notificacoes';
+import { useUnreadEmails, useUnreadChatMessages, useUnreadWaMessages } from '@/hooks/use-notificacoes';
 import logoSidebar from '@/assets/logo-sidebar.svg';
 import { toast } from 'sonner';
 import {
@@ -35,6 +35,7 @@ export function AppSidebar() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { data: unreadEmails = 0 } = useUnreadEmails();
   const { data: unreadChat = 0 } = useUnreadChatMessages();
+  const { data: unreadWa = 0 } = useUnreadWaMessages();
 
   const { items, save, isSaving } = useSidebarPreferences();
   const { profile } = useAuth();
@@ -249,8 +250,8 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {displayItems.map((item) => {
                     const Icon = getIconComponent(item.icon);
-                    const showBadge = (item.id === 'emails' && unreadEmails > 0) || (item.id === 'chat' && unreadChat > 0);
-                    const badgeCount = item.id === 'emails' ? unreadEmails : unreadChat;
+                    const showBadge = (item.id === 'emails' && unreadEmails > 0) || (item.id === 'chat' && unreadChat > 0) || (item.id === 'whatsapp' && unreadWa > 0);
+                    const badgeCount = item.id === 'emails' ? unreadEmails : item.id === 'whatsapp' ? unreadWa : unreadChat;
                     
                     return (
                       <SidebarMenuItem key={item.id}>

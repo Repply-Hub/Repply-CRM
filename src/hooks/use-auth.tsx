@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -21,6 +21,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Refs para manter os valores mais recentes acessíveis dentro dos callbacks de subscrição
+  const sessionRef = useRef<Session | null>(null);
+  const profileRef = useRef<any | null>(null);
+
+  const updateSession = (newSession: Session | null) => {
+    sessionRef.current = newSession;
+    setSession(newSession);
+  };
+
+  const updateProfile = (newProfile: any | null) => {
+    profileRef.current = newProfile;
+    setProfile(newProfile);
+  };
+
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from('usuarios')
@@ -30,9 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     if (error) {
       console.error('Erro ao buscar perfil:', error);
-      setProfile(null);
+      updateProfile(null);
     } else {
-      setProfile(data);
+      updateProfile(data);
     }
   };
 
@@ -41,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
-      setSession(session);
+      updateSession(session);
       if (session?.user) {
         fetchProfile(session.user.id).finally(() => {
           if (mounted) setLoading(false);
@@ -51,26 +65,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
-      // Se a sessão for a mesma e o evento não for um login/logout explícito, ignoramos
-      // Isso evita refreshes desnecessários ao navegar entre páginas que podem disparar
-      // renovações de token silenciosas.
-      setSession(prev => {
-        if (prev?.access_token === session?.access_token && event === 'SIGNED_IN') {
-          return prev;
-        }
-        return session;
-      });
+      const currentSession = sessionRef.current;
+      const currentProfile = profileRef.current;
+
+      // Se a sessão for a mesma (mesmo token), ignoramos para evitar loops e buscas repetidas
+      if (currentSession?.access_token === session?.access_token && event === 'SIGNED_IN') {
+        return;
+      }
+
+      updateSession(session);
 
       if (session?.user) {
-        // Só buscamos o perfil se ele ainda não existir ou se for uma mudança de sessão real
-        fetchProfile(session.user.id).finally(() => {
+        // Só buscamos o perfil se ele ainda não existir ou se for uma mudança real de usuário
+        if (!currentProfile || currentProfile.user_id !== session.user.id) {
+          setLoading(true);
+          await fetchProfile(session.user.id);
           if (mounted) setLoading(false);
-        });
+        }
       } else {
-        setProfile(null);
+        updateProfile(null);
         setLoading(false);
       }
     });

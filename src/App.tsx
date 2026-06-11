@@ -21,6 +21,7 @@ import Calendario from "./pages/Calendario";
 import Tarefas from "./pages/Tarefas";
 import Chat from "./pages/Chat";
 import Emails from "./pages/Emails";
+import WhatsAppInbox from "./pages/WhatsAppInbox";
 import LinhasIgnoradas from "./pages/LinhasIgnoradas";
 
 import Login from "./pages/Login";
@@ -133,6 +134,7 @@ const AppRoutes = () => (
     <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
     <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+    <Route path="/whatsapp" element={<ProtectedRoute><WhatsAppInbox /></ProtectedRoute>} />
     <Route path="/emails" element={<ProtectedRoute><Emails /></ProtectedRoute>} />
     <Route path="/importacao/ignoradas" element={<ProtectedRoute><LinhasIgnoradas /></ProtectedRoute>} />
 

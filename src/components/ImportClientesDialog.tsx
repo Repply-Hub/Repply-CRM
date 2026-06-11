@@ -603,43 +603,47 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             </DialogTitle>
           </div>
 
-          {step !== 'upload' && (
-            <div className="flex items-center gap-4 bg-background/50 px-4 py-2 rounded-xl border border-border/50 shadow-sm self-start">
-              <div className="flex items-center gap-2">
-                <div className={cn(
-                  "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
-                  step === 'mapping' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
-                )}>
-                  1
+          {(step !== 'upload' || importing) && (
+            <div className="flex items-center justify-between w-full">
+              {step !== 'upload' ? (
+                <div className="flex items-center gap-4 bg-background/50 px-4 py-2 rounded-xl border border-border/50 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
+                      step === 'mapping' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
+                    )}>
+                      1
+                    </div>
+                    <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'mapping' ? "text-primary" : "text-muted-foreground")}>
+                      Mapeamento
+                    </span>
+                  </div>
+                  
+                  <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
+                  
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
+                      step === 'preview' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
+                    )}>
+                      2
+                    </div>
+                    <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'preview' ? "text-primary" : "text-muted-foreground")}>
+                      Revisão
+                    </span>
+                  </div>
                 </div>
-                <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'mapping' ? "text-primary" : "text-muted-foreground")}>
-                  Mapeamento
-                </span>
-              </div>
+              ) : <div />}
               
-              <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
-              
-              <div className="flex items-center gap-2">
-                <div className={cn(
-                  "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
-                  step === 'preview' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
-                )}>
-                  2
+              {importing && (
+                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 bg-background/50 p-2 px-3 rounded-lg border border-primary/20 min-w-[200px]">
+                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-primary">
+                    <span>Importando...</span>
+                    <span>{importProgress}%</span>
+                  </div>
+                  <Progress value={importProgress} className="h-1" />
                 </div>
-                <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'preview' ? "text-primary" : "text-muted-foreground")}>
-                  Revisão
-                </span>
-              </div>
-            </div>
-          )}
-
-          {importing && (
-            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 bg-background/50 p-2 px-3 rounded-lg border border-primary/20 self-start min-w-[200px]">
-              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-primary">
-                <span>Importando...</span>
-                <span>{importProgress}%</span>
-              </div>
-              <Progress value={importProgress} className="h-1" />
+              )}
             </div>
           )}
         </DialogHeader>
