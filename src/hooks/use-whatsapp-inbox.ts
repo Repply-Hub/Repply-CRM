@@ -76,7 +76,7 @@ export function useWaConversas() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('wa_conversas_realtime')
+      .channel(`wa-conversas-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'whatsapp_conversas' }, (payload) => {
         qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) => {
           const prev = old ?? [];
@@ -127,7 +127,7 @@ export function useWaMensagens(conversaId: string | null) {
   useEffect(() => {
     if (!conversaId) return;
     const channel = supabase
-      .channel(`wa_mensagens_realtime_${conversaId}`)
+      .channel(`wa-msgs-rt-${conversaId}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -385,7 +385,7 @@ export function useUnreadWaMessages() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('wa_unread_realtime')
+      .channel(`wa-unread-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversas' }, () => {
         qc.invalidateQueries({ queryKey: ['unread_wa_count'] });
       })

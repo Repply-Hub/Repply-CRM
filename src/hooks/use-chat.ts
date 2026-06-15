@@ -68,7 +68,7 @@ export function useChatMessages(grupoId: string | null = null, recipientId: stri
 
   useEffect(() => {
     const channel = supabase
-      .channel(`chat_realtime_${grupoId || 'public'}_${recipientId || 'all'}`)
+      .channel(`chat-rt-${grupoId || 'pub'}-${recipientId || 'all'}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
@@ -138,7 +138,7 @@ export function useChatGrupos() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('chat_grupos_realtime')
+      .channel(`chat-grupos-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_grupos' }, () => {
         qc.invalidateQueries({ queryKey: ['chat-grupos'] });
       })

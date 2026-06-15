@@ -36,9 +36,9 @@ export function useNotificacoes() {
 
   // Realtime subscription
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     const channel = supabase
-      .channel('notificacoes-realtime')
+      .channel(`notificacoes-rt-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notificacoes' },
@@ -55,7 +55,7 @@ export function useNotificacoes() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [qc, user]);
+  }, [qc, user?.id]);
 
   return query;
 }
@@ -112,15 +112,15 @@ export function useUnreadChatMessages() {
   });
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     const channel = supabase
-      .channel('chat-unread-realtime')
+      .channel(`chat-unread-rt-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, () => {
         qc.invalidateQueries({ queryKey: ['unread_chat_count'] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [qc, user]);
+  }, [qc, user?.id]);
 
   return query;
 }
@@ -170,15 +170,15 @@ export function useUnreadChatByTarget() {
   });
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     const channel = supabase
-      .channel('chat-targets-realtime')
+      .channel(`chat-targets-rt-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, () => {
         qc.invalidateQueries({ queryKey: ['unread_chat_by_target'] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [qc, user]);
+  }, [qc, user?.id]);
 
   return query;
 }
