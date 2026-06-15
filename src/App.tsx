@@ -139,8 +139,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       key={ebKey}
       fallback={(error) => (
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center p-8">
-          <p className="text-lg font-semibold text-destructive">Algo deu errado</p>
-          {process.env.NODE_ENV !== 'production' && error && (
+          <p className="text-lg font-semibold text-destructive">
+            Algo deu errado
+          </p>
+          {process.env.NODE_ENV !== "production" && error && (
             <p className="text-xs text-muted-foreground max-w-lg font-mono bg-muted/30 px-3 py-2 rounded">
               {error.message}
             </p>
@@ -148,8 +150,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
           <div className="flex gap-3">
             <button
               onClick={() => {
-                const sep = window.location.search ? '&' : '?';
-                window.location.href = window.location.pathname + window.location.search + sep + `_r=${Date.now()}`;
+                const sep = window.location.search ? "&" : "?";
+                window.location.href =
+                  window.location.pathname +
+                  window.location.search +
+                  sep +
+                  `_r=${Date.now()}`;
               }}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
             >
@@ -353,12 +359,15 @@ function UrlCleaner() {
     if (!profileLoaded) return;
     try {
       const url = new URL(window.location.href);
-      if (!url.searchParams.has('_r')) return;
+      if (!url.searchParams.has("_r")) return;
       const newParams = new URLSearchParams();
       url.searchParams.forEach((value, key) => {
-        if (key !== '_r') newParams.append(key, value);
+        if (key !== "_r") newParams.append(key, value);
       });
-      const newUrl = url.pathname + (newParams.toString() ? `?${newParams.toString()}` : '') + url.hash;
+      const newUrl =
+        url.pathname +
+        (newParams.toString() ? `?${newParams.toString()}` : "") +
+        url.hash;
       window.history.replaceState({}, document.title, newUrl);
     } catch (e) {
       // ignore

@@ -1,9 +1,11 @@
-  import { Component, type ReactNode, type ErrorInfo } from "react";
+import { Component, type ReactNode, type ErrorInfo } from "react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode | ((error: Error | null, reset: () => void) => ReactNode);
+  fallback?:
+    | ReactNode
+    | ((error: Error | null, reset: () => void) => ReactNode);
 }
 
 interface State {
@@ -23,18 +25,18 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("[ErrorBoundary] render error:", error, info.componentStack);
-      try {
-        // log global auth snapshot if available to help debugging
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const auth = (window as any).__APP_AUTH_STATE__;
-        if (auth) console.error("[ErrorBoundary] __APP_AUTH_STATE__:", auth);
-        // also set an attribute on body so crashes can be detected from page
-        if (typeof document !== "undefined" && document.body) {
-          document.body.setAttribute("data-last-error-ts", String(Date.now()));
-        }
-      } catch (e) {
-        // ignore
+    try {
+      // log global auth snapshot if available to help debugging
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const auth = (window as any).__APP_AUTH_STATE__;
+      if (auth) console.error("[ErrorBoundary] __APP_AUTH_STATE__:", auth);
+      // also set an attribute on body so crashes can be detected from page
+      if (typeof document !== "undefined" && document.body) {
+        document.body.setAttribute("data-last-error-ts", String(Date.now()));
       }
+    } catch (e) {
+      // ignore
+    }
   }
 
   handleReset = () => {
@@ -44,11 +46,10 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
-        if (typeof this.props.fallback === 'function') {
-          return (this.props.fallback as (e: Error | null, r: () => void) => ReactNode)(
-            this.state.error,
-            this.handleReset
-          );
+        if (typeof this.props.fallback === "function") {
+          return (
+            this.props.fallback as (e: Error | null, r: () => void) => ReactNode
+          )(this.state.error, this.handleReset);
         }
         return this.props.fallback;
       }
