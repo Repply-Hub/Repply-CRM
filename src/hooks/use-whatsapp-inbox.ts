@@ -464,14 +464,35 @@ export function useWaConnect() {
       if (!res.ok) throw new Error(`Erro ${res.status}: ${text}`);
       let data: Record<string, any> = {};
       try { data = JSON.parse(text); } catch { /* ok */ }
-      // uazapi returns QR in data.instance.qrcode (base64 PNG)
-      const qr: string | null =
+
+      // uazapi returns QR in data.instance.qrcode (base64 PNG). Normaliza string
+      // vazia ("") para null — a uazapi retorna qrcode: "" quando não há QR a
+      // gerar (ex.: instância já conectada), e "??" não trata "" como nulo.
+      const rawQr: string | null =
         data?.instance?.qrcode ??
         data?.qrcode?.base64 ??
         (typeof data?.qrcode === 'string' ? data.qrcode : null) ??
         data?.base64 ??
         null;
-      return { qr, data };
+      const qr = rawQr && rawQr.length > 0 ? rawQr : null;
+
+      // Detecta "já conectado" para diferenciar de uma falha real ao gerar QR
+      const alreadyConnected: boolean =
+        data?.connected === true ||
+        data?.status?.connected === true ||
+        data?.status?.loggedIn === true ||
+        data?.instance?.status === 'connected' ||
+        (typeof data?.response === 'string' && data.response.toLowerCase().includes('already connected'));
+
+      if (!qr) {
+        // Loga a resposta completa da uazapi sempre que não há QR, para
+        // diagnosticar formatos de payload não previstos no parsing acima.
+        console.log('[useWaConnect] sem QR na resposta da uazapi', {
+          instanceName: config.instance_name, alreadyConnected, response: data,
+        });
+      }
+
+      return { qr, alreadyConnected, data };
     },
   });
 }

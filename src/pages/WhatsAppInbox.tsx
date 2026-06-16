@@ -470,7 +470,7 @@ function ConfigDialog({ open, onClose }: { open: boolean; onClose: () => void })
     setQr(null);
     setQrError('');
     connect.mutate(cfg, {
-      onSuccess: ({ qr: qrData }) => {
+      onSuccess: ({ qr: qrData, alreadyConnected }) => {
         if (qrData) {
           setQr(qrData);
           clearInterval(intervalRef.current!);
@@ -482,8 +482,14 @@ function ConfigDialog({ open, onClose }: { open: boolean; onClose: () => void })
               toast.success('WhatsApp conectado com sucesso!');
             }
           }, 3000);
+        } else if (alreadyConnected) {
+          // Instância já está logada na uazapi — não há QR a gerar.
+          // Sincroniza o status local em vez de mostrar um erro genérico.
+          syncStatus.mutate(cfg, {
+            onSuccess: () => toast.success('WhatsApp já estava conectado — status atualizado.'),
+          });
         } else {
-          setQrError('QR code não disponível — a instância pode já estar conectada');
+          setQrError('A uazapi não retornou um QR code. Tente novamente em alguns segundos.');
         }
       },
       onError: (err: any) => {
