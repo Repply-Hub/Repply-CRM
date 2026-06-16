@@ -67,7 +67,7 @@ serve(async (req) => {
     const { data: config } = await supabase
       .from("configuracoes_wapi")
       .select("instance_url, api_key, instance_name, api_instance_name, status")
-      .eq("empresa_id", userData.empresa_id).single();
+      .eq("usuario_id", user.id).single();
     if (!config) {
       return new Response(JSON.stringify({ error: "WhatsApp não configurado" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

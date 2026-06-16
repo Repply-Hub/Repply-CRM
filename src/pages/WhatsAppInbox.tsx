@@ -6,13 +6,18 @@ import {
   useWaSendMessage,
   useWaMarcarLida,
   useWaConfig,
-  useWaSaveConfig,
   useWaNovaConversa,
   useWaLimparConversa,
+  useWaArquivarConversa,
+  useWaConnect,
+  useWaSyncStatus,
+  useWaDisconnect,
+  useWaProvision,
   uploadWaMedia,
   type WaConversa,
   type WaMensagem,
   type WaMidiaTipo,
+  type WaConfig,
 } from '@/hooks/use-whatsapp-inbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +46,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import {
   MessageCircle,
@@ -71,6 +83,8 @@ import {
   Pause,
   MoreVertical,
   Trash2,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -433,71 +447,182 @@ function NovaConversaDialog({ open, onClose }: { open: boolean; onClose: (conver
   );
 }
 
-// --- Dialog configurações uazapi ---
+// --- Dialog conexão WhatsApp ---
 function ConfigDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { data: config } = useWaConfig();
-  const saveConfig = useWaSaveConfig();
-  const [instanceUrl, setInstanceUrl] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [instanceName, setInstanceName] = useState('default');
-  const [webhookSecret, setWebhookSecret] = useState('');
+  const { data: config, refetch } = useWaConfig();
+  const { provision, isPending: isProvisioning } = useWaProvision();
+  const connect = useWaConnect();
+  const syncStatus = useWaSyncStatus();
+  const disconnect = useWaDisconnect();
+  const [qr, setQr] = useState<string | null>(null);
+  const [qrError, setQrError] = useState('');
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (config) {
-      setInstanceUrl(config.instance_url);
-      setApiKey(config.api_key);
-      setInstanceName(config.instance_name);
-      setWebhookSecret(config.webhook_secret ?? '');
+    if (!open) {
+      clearInterval(intervalRef.current!);
+      setQr(null);
+      setQrError('');
     }
-  }, [config]);
+  }, [open]);
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    await saveConfig.mutateAsync({
-      instance_url: instanceUrl.replace(/\/$/, ''),
-      api_key: apiKey,
-      instance_name: instanceName,
-      webhook_secret: webhookSecret || null,
-    } as any);
-    onClose();
+  function startQrFlow(cfg: WaConfig) {
+    setQr(null);
+    setQrError('');
+    connect.mutate(cfg, {
+      onSuccess: ({ qr: qrData }) => {
+        if (qrData) {
+          setQr(qrData);
+          clearInterval(intervalRef.current!);
+          intervalRef.current = setInterval(async () => {
+            const result = await syncStatus.mutateAsync(cfg).catch(() => null);
+            if (result?.isConnected) {
+              clearInterval(intervalRef.current!);
+              setQr(null);
+              toast.success('WhatsApp conectado com sucesso!');
+            }
+          }, 3000);
+        } else {
+          setQrError('QR code não disponível — a instância pode já estar conectada');
+        }
+      },
+      onError: (err: any) => {
+        setQrError(err?.message ?? 'Falha ao gerar QR code');
+      },
+    });
   }
 
-  const webhookUrl = `${window.location.origin.replace('localhost', 'your-supabase-project')}/functions/v1/whatsapp-webhook?instance=${instanceName}`;
+  function handleConnect() {
+    if (!config) return;
+    startQrFlow(config);
+  }
+
+  async function handleAtivar() {
+    setQrError('');
+    try {
+      await provision();
+      const { data: freshConfig } = await refetch();
+      if (freshConfig) startQrFlow(freshConfig);
+    } catch {
+      // erro já reportado via toast dentro de useWaProvision
+    }
+  }
+
+  function handleDisconnect() {
+    if (!config) return;
+    clearInterval(intervalRef.current!);
+    setQr(null);
+    disconnect.mutate(config);
+  }
+
+  const isConnected = config?.status === 'connected';
+  const isProvisioned = !!config && config.provisionada;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Configuração WhatsApp (uazapi)</DialogTitle></DialogHeader>
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>URL da instância uazapi</Label>
-            <Input placeholder="https://api.seuservidor.com" value={instanceUrl} onChange={(e) => setInstanceUrl(e.target.value)} />
-            <p className="text-xs text-muted-foreground">URL base do seu servidor uazapi self-hosted</p>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageCircle className="h-4 w-4 text-green-600" />
+            WhatsApp
+          </DialogTitle>
+        </DialogHeader>
+
+        {!isProvisioned ? (
+          <div className="space-y-4 py-1">
+            {isProvisioning ? (
+              <div className="flex flex-col items-center gap-3 py-4 text-sm text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+                Criando sua instância WhatsApp...
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-2 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Você ainda não tem uma instância de WhatsApp ativa.
+                </p>
+                <Button className="w-full" onClick={handleAtivar} disabled={isProvisioning}>
+                  <Wifi className="h-4 w-4 mr-2" />
+                  Ativar WhatsApp
+                </Button>
+              </div>
+            )}
+            {qrError && <p className="text-xs text-red-600 dark:text-red-400">{qrError}</p>}
           </div>
-          <div className="space-y-1.5">
-            <Label>API Key</Label>
-            <Input type="password" placeholder="sua-api-key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+        ) : (
+          <div className="space-y-4 py-1">
+            {/* Instância (somente leitura) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Instância</Label>
+              <Input value={config.instance_name} readOnly disabled className="font-mono text-xs" />
+            </div>
+
+            {/* Status */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Status da conexão</span>
+              <span className={cn(
+                'flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium',
+                isConnected
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              )}>
+                {isConnected ? <Wifi className="h-2.5 w-2.5" /> : <WifiOff className="h-2.5 w-2.5" />}
+                {isConnected ? 'Conectado' : 'Desconectado'}
+              </span>
+            </div>
+
+            {/* QR code */}
+            {connect.isPending && (
+              <div className="flex flex-col items-center gap-3 py-4 text-sm text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+                Gerando QR code...
+              </div>
+            )}
+            {qr && !connect.isPending && (
+              <div className="flex flex-col items-center gap-2">
+                <img
+                  src={qr.startsWith('data:') ? qr : `data:image/png;base64,${qr}`}
+                  alt="QR Code WhatsApp"
+                  className="w-52 h-52 border rounded-xl"
+                />
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Aguardando leitura no WhatsApp...
+                </div>
+              </div>
+            )}
+            {qrError && (
+              <p className="text-xs text-red-600 dark:text-red-400">{qrError}</p>
+            )}
+
+            {/* Ações */}
+            {!isConnected && (
+              <Button
+                className="w-full"
+                variant="secondary"
+                disabled={!config || connect.isPending}
+                onClick={handleConnect}
+              >
+                {connect.isPending
+                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  : <Wifi className="h-4 w-4 mr-2" />}
+                {qr ? 'Atualizar QR code' : 'Conectar via QR code'}
+              </Button>
+            )}
+            {isConnected && (
+              <Button
+                className="w-full"
+                variant="outline"
+                disabled={disconnect.isPending}
+                onClick={handleDisconnect}
+              >
+                {disconnect.isPending
+                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  : <WifiOff className="h-4 w-4 mr-2" />}
+                Desconectar
+              </Button>
+            )}
           </div>
-          <div className="space-y-1.5">
-            <Label>Nome da instância</Label>
-            <Input placeholder="default" value={instanceName} onChange={(e) => setInstanceName(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Webhook Secret (opcional)</Label>
-            <Input type="password" placeholder="segredo-webhook" value={webhookSecret} onChange={(e) => setWebhookSecret(e.target.value)} />
-          </div>
-          <div className="rounded-lg bg-muted/50 p-3 space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">URL do webhook para configurar no uazapi:</p>
-            <p className="text-xs font-mono break-all text-foreground select-all">{webhookUrl}</p>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" disabled={saveConfig.isPending}>
-              {saveConfig.isPending && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
-              Salvar
-            </Button>
-          </DialogFooter>
-        </form>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -512,10 +637,13 @@ export default function WhatsAppInbox() {
   const sendMessage = useWaSendMessage();
   const marcarLida = useWaMarcarLida();
   const limparConversa = useWaLimparConversa();
+  const arquivarConversa = useWaArquivarConversa();
   const [confirmLimpar, setConfirmLimpar] = useState(false);
 
   const [texto, setTexto] = useState('');
   const [busca, setBusca] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState<'aberto' | 'fechado'>('aberto');
+  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'contatos' | 'empresa'>('todos');
   const [showConfig, setShowConfig] = useState(false);
   const [showNovaConversa, setShowNovaConversa] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -586,6 +714,12 @@ export default function WhatsAppInbox() {
   }, [conversaAtiva, viewingImage, showConfig, showNovaConversa, confirmLimpar]);
 
   const conversasFiltradas = conversas.filter((c) => {
+    if (filtroStatus === 'aberto' && c.arquivada) return false;
+    if (filtroStatus === 'fechado' && !c.arquivada) return false;
+
+    if (filtroTipo === 'empresa' && !c.cliente_id) return false;
+    if (filtroTipo === 'contatos' && !c.contato_id) return false;
+
     if (!busca) return true;
     const term = busca.toLowerCase();
     return (c.nome_contato ?? '').toLowerCase().includes(term) || c.telefone.includes(term);
@@ -818,8 +952,46 @@ export default function WhatsAppInbox() {
               </Button>
             </div>
 
-            <div className="p-2 border-b border-border bg-background">
-              <div className="relative">
+            <div className="px-2 pt-2 border-b border-border bg-background space-y-2">
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setFiltroStatus('aberto')}
+                    className={cn(
+                      'flex-1 text-[11px] font-medium rounded-md py-1 transition-colors',
+                      filtroStatus === 'aberto'
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    Em aberto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltroStatus('fechado')}
+                    className={cn(
+                      'flex-1 text-[11px] font-medium rounded-md py-1 transition-colors',
+                      filtroStatus === 'fechado'
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    Fechado
+                  </button>
+                </div>
+                <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as typeof filtroTipo)}>
+                  <SelectTrigger className="h-7 w-[88px] text-[11px] px-2 shrink-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="contatos">Contatos</SelectItem>
+                    <SelectItem value="empresa">Empresa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="relative pb-2">
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:ring-1"
@@ -933,6 +1105,24 @@ export default function WhatsAppInbox() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
+                        className="gap-2"
+                        onClick={() => {
+                          const novaArquivada = !conversaAtiva.arquivada;
+                          arquivarConversa.mutate({ conversaId: conversaAtiva.id, arquivada: novaArquivada });
+                          if (
+                            (novaArquivada && filtroStatus === 'aberto') ||
+                            (!novaArquivada && filtroStatus === 'fechado')
+                          ) {
+                            setConversaAtiva(null);
+                          }
+                        }}
+                      >
+                        {conversaAtiva.arquivada
+                          ? <ArchiveRestore className="h-4 w-4" />
+                          : <Archive className="h-4 w-4" />}
+                        {conversaAtiva.arquivada ? 'Reabrir conversa' : 'Marcar como fechada'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
                         className="text-destructive focus:text-destructive gap-2"
                         onClick={() => setConfirmLimpar(true)}
                       >
@@ -1045,7 +1235,14 @@ export default function WhatsAppInbox() {
                 {!isConnected && config && (
                   <div className="mb-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 px-2">
                     <WifiOff className="h-3.5 w-3.5" />
-                    WhatsApp desconectado — verifique as configurações
+                    WhatsApp desconectado —{' '}
+                    <button
+                      type="button"
+                      className="underline underline-offset-2 hover:opacity-80"
+                      onClick={() => setShowConfig(true)}
+                    >
+                      conectar via QR code
+                    </button>
                   </div>
                 )}
                 {!config && (

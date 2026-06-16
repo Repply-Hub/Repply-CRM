@@ -39,11 +39,13 @@ export interface WaMensagem {
 export interface WaConfig {
   id: string;
   empresa_id: string;
+  usuario_id: string | null;
   instance_url: string;
   api_key: string;
   instance_name: string;
   status: 'connected' | 'disconnected' | 'connecting';
   webhook_secret: string | null;
+  provisionada: boolean;
 }
 
 async function getEmpresaId(): Promise<string | null> {
@@ -51,6 +53,11 @@ async function getEmpresaId(): Promise<string | null> {
   if (!user) return null;
   const { data } = await supabase.from('usuarios').select('empresa_id').eq('user_id', user.id).single();
   return data?.empresa_id ?? null;
+}
+
+async function getUsuarioId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id ?? null;
 }
 
 // --- Conversas ---
@@ -67,7 +74,6 @@ export function useWaConversas() {
         .from('whatsapp_conversas')
         .select('*')
         .eq('empresa_id', empresaId)
-        .eq('arquivada', false)
         .order('ultima_mensagem_at', { ascending: false, nullsFirst: false });
       if (error) throw error;
       return (data as WaConversa[]) ?? [];
@@ -314,53 +320,45 @@ export function useWaConfig() {
   return useQuery<WaConfig | null>({
     queryKey: ['wa_config'],
     queryFn: async () => {
-      const empresaId = await getEmpresaId();
-      if (!empresaId) return null;
+      const usuarioId = await getUsuarioId();
+      if (!usuarioId) return null;
       const { data } = await supabase
         .from('configuracoes_wapi')
         .select('*')
-        .eq('empresa_id', empresaId)
+        .eq('usuario_id', usuarioId)
         .maybeSingle();
       return (data as WaConfig | null) ?? null;
     },
   });
 }
 
-export function useWaSaveConfig() {
+// --- Provisionar instância (cria instância uazapi para o usuário atual) ---
+
+export function useWaProvision() {
   const qc = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (config: Omit<WaConfig, 'id' | 'empresa_id' | 'status'>) => {
-      const empresaId = await getEmpresaId();
-      if (!empresaId) throw new Error('Empresa não encontrada');
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada');
 
-      const { data: existing } = await supabase
-        .from('configuracoes_wapi')
-        .select('id')
-        .eq('empresa_id', empresaId)
-        .maybeSingle();
+      const res = await supabase.functions.invoke('whatsapp-provision', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
 
-      if (existing) {
-        const { error } = await supabase
-          .from('configuracoes_wapi')
-          .update({ ...config, updated_at: new Date().toISOString() })
-          .eq('empresa_id', empresaId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('configuracoes_wapi')
-          .insert({ ...config, empresa_id: empresaId });
-        if (error) throw error;
-      }
+      if (res.error) throw res.error;
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data as { success: boolean; instanceName: string; alreadyProvisioned?: boolean };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['wa_config'] });
-      toast.success('Configuração salva');
     },
     onError: (err: any) => {
-      toast.error(err?.message ?? 'Erro ao salvar configuração');
+      toast.error(err?.message ?? 'Erro ao ativar WhatsApp');
     },
   });
+
+  return { provision: mutation.mutateAsync, isPending: mutation.isPending, error: mutation.error };
 }
 
 // --- Contagem não lidas (para badge no sidebar) ---
@@ -420,6 +418,124 @@ export function useWaLimparConversa() {
     },
     onError: (err: any) => {
       toast.error(err?.message ?? 'Erro ao limpar conversa');
+    },
+  });
+}
+
+// --- Arquivar / reabrir conversa ---
+
+export function useWaArquivarConversa() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { conversaId: string; arquivada: boolean }) => {
+      const { error } = await supabase
+        .from('whatsapp_conversas')
+        .update({ arquivada: params.arquivada })
+        .eq('id', params.conversaId);
+      if (error) throw error;
+      return params;
+    },
+    onSuccess: ({ conversaId, arquivada }) => {
+      qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
+        (old ?? []).map((c) => c.id === conversaId ? { ...c, arquivada } : c)
+      );
+      toast.success(arquivada ? 'Conversa marcada como fechada' : 'Conversa reaberta');
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao atualizar conversa');
+    },
+  });
+}
+
+// --- Conectar instância via QR code ---
+
+export function useWaConnect() {
+  return useMutation({
+    mutationFn: async (config: WaConfig) => {
+      const baseUrl = config.instance_url.replace(/\/$/, '');
+      // Body is empty — instance is identified by the `token` header alone
+      const res = await fetch(`${baseUrl}/instance/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', token: config.api_key },
+        body: JSON.stringify({}),
+      });
+      const text = await res.text().catch(() => '');
+      if (!res.ok) throw new Error(`Erro ${res.status}: ${text}`);
+      let data: Record<string, any> = {};
+      try { data = JSON.parse(text); } catch { /* ok */ }
+      // uazapi returns QR in data.instance.qrcode (base64 PNG)
+      const qr: string | null =
+        data?.instance?.qrcode ??
+        data?.qrcode?.base64 ??
+        (typeof data?.qrcode === 'string' ? data.qrcode : null) ??
+        data?.base64 ??
+        null;
+      return { qr, data };
+    },
+  });
+}
+
+export function useWaSyncStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (config: WaConfig) => {
+      const baseUrl = config.instance_url.replace(/\/$/, '');
+      // GET /instance/status — instance identified by token header
+      const res = await fetch(`${baseUrl}/instance/status`, {
+        method: 'GET',
+        headers: { token: config.api_key },
+      });
+      if (!res.ok) throw new Error(`Status check failed: ${res.status}`);
+      const data = await res.json();
+      // Response: { status: { connected: bool, loggedIn: bool } }
+      const isConnected: boolean =
+        (data?.status?.connected === true && data?.status?.loggedIn === true) ||
+        data?.connected === true;
+      const dbStatus: WaConfig['status'] = isConnected ? 'connected' : 'disconnected';
+      const usuarioId = await getUsuarioId();
+      if (usuarioId) {
+        await supabase
+          .from('configuracoes_wapi')
+          .update({ status: dbStatus })
+          .eq('usuario_id', usuarioId);
+      }
+      return { isConnected, dbStatus };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wa_config'] });
+    },
+  });
+}
+
+// --- Desconectar instância ---
+
+export function useWaDisconnect() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (config: WaConfig) => {
+      const baseUrl = config.instance_url.replace(/\/$/, '');
+      const res = await fetch(`${baseUrl}/instance/disconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', token: config.api_key },
+        body: JSON.stringify({}),
+      });
+      const text = await res.text().catch(() => '');
+      if (!res.ok) throw new Error(`Erro ${res.status}: ${text}`);
+      const usuarioId = await getUsuarioId();
+      if (usuarioId) {
+        await supabase
+          .from('configuracoes_wapi')
+          .update({ status: 'disconnected' })
+          .eq('usuario_id', usuarioId);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wa_config'] });
+      toast.success('WhatsApp desconectado');
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao desconectar');
     },
   });
 }
