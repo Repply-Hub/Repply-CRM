@@ -4,6 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 
+export interface WaResponsavel {
+  id: string;
+  nome: string;
+  avatar_url: string | null;
+}
+
 export interface WaConversa {
   id: string;
   empresa_id: string;
@@ -17,6 +23,7 @@ export interface WaConversa {
   arquivada: boolean;
   created_at: string;
   updated_at: string;
+  responsaveis?: WaResponsavel[];
 }
 
 export interface WaMensagem {
@@ -72,11 +79,14 @@ export function useWaConversas() {
       if (!empresaId) return [];
       const { data, error } = await supabase
         .from('whatsapp_conversas')
-        .select('*')
+        .select('*, responsaveis:whatsapp_conversa_responsaveis(usuario:usuarios(id, nome, avatar_url))')
         .eq('empresa_id', empresaId)
         .order('ultima_mensagem_at', { ascending: false, nullsFirst: false });
       if (error) throw error;
-      return (data as WaConversa[]) ?? [];
+      return ((data ?? []) as any[]).map(c => ({
+        ...c,
+        responsaveis: (c.responsaveis ?? []).map((r: any) => r.usuario).filter(Boolean),
+      })) as WaConversa[];
     },
   });
 
@@ -203,6 +213,7 @@ export function useWaSendMessage() {
       media_url?: string | null;
       media_mime?: string | null;
       nome_arquivo?: string;
+      ptt?: boolean;
     }) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão expirada');
@@ -216,6 +227,7 @@ export function useWaSendMessage() {
           media_url: params.media_url ?? null,
           media_mime: params.media_mime ?? null,
           nome_arquivo: params.nome_arquivo ?? null,
+          ptt: params.ptt ?? false,
         },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
@@ -418,6 +430,102 @@ export function useWaLimparConversa() {
     },
     onError: (err: any) => {
       toast.error(err?.message ?? 'Erro ao limpar conversa');
+    },
+  });
+}
+
+// --- Deletar conversa (apaga mensagens + registro da conversa) ---
+
+export function useWaDeletarConversa() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversaId: string) => {
+      const { error: errMsgs } = await supabase
+        .from('whatsapp_mensagens')
+        .delete()
+        .eq('conversa_id', conversaId);
+      if (errMsgs) throw errMsgs;
+
+      const { error } = await supabase
+        .from('whatsapp_conversas')
+        .delete()
+        .eq('id', conversaId);
+      if (error) throw error;
+    },
+    onSuccess: (_, conversaId) => {
+      qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
+        (old ?? []).filter((c) => c.id !== conversaId)
+      );
+      qc.removeQueries({ queryKey: ['wa_mensagens', conversaId] });
+      toast.success('Conversa deletada');
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao deletar conversa');
+    },
+  });
+}
+
+// --- Deletar múltiplas conversas em massa ---
+
+export function useWaDeletarConversasEmMassa() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (ids.length === 0) return;
+      const { error: errMsgs } = await supabase
+        .from('whatsapp_mensagens')
+        .delete()
+        .in('conversa_id', ids);
+      if (errMsgs) throw errMsgs;
+
+      const { error } = await supabase
+        .from('whatsapp_conversas')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+      return ids;
+    },
+    onSuccess: (ids) => {
+      if (!ids) return;
+      qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
+        (old ?? []).filter((c) => !ids.includes(c.id))
+      );
+      ids.forEach((id) => qc.removeQueries({ queryKey: ['wa_mensagens', id] }));
+      toast.success(`${ids.length} conversa${ids.length > 1 ? 's' : ''} deletada${ids.length > 1 ? 's' : ''}`);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao deletar conversas');
+    },
+  });
+}
+
+// --- Definir responsáveis de uma conversa ---
+
+export function useWaSetResponsaveis() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversaId, usuarioIds }: { conversaId: string; usuarioIds: string[] }) => {
+      const { error: delErr } = await supabase
+        .from('whatsapp_conversa_responsaveis')
+        .delete()
+        .eq('conversa_id', conversaId);
+      if (delErr) throw delErr;
+
+      if (usuarioIds.length > 0) {
+        const { error: insErr } = await supabase
+          .from('whatsapp_conversa_responsaveis')
+          .insert(usuarioIds.map(uid => ({ conversa_id: conversaId, usuario_id: uid })));
+        if (insErr) throw insErr;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wa_conversas'] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao atualizar responsáveis');
     },
   });
 }

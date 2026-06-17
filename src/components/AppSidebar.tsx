@@ -66,8 +66,11 @@ export function AppSidebar() {
     
     // Admin vê Dashboard para métricas e Configurações para permissões
     if (isAdmin) {
-      return i.id === 'dashboard' || i.id === 'usuarios_admin' || i.id === 'configuracoes';
+      return i.id === 'dashboard' || i.id === 'usuarios_admin' || i.id === 'configuracoes' || i.id === 'admin_wa_instancias';
     }
+
+    // Itens exclusivos do admin master nunca aparecem para outros perfis
+    if (i.id === 'admin_wa_instancias' || i.id === 'usuarios_admin') return false;
 
     if (!isVendedor) return true; // gestores/empresa see all visible items
     // For vendedores: check if they have pode_ver permission for this module

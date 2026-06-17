@@ -48,7 +48,7 @@ serve(async (req) => {
       });
     }
 
-    const { telefone, mensagem, conversa_id, tipo = 'texto', media_url, media_mime, nome_arquivo } = body;
+    const { telefone, mensagem, conversa_id, tipo = 'texto', media_url, media_mime, nome_arquivo, ptt = false } = body;
 
     if (!telefone) {
       return new Response(JSON.stringify({ error: "telefone obrigatório" }), {
@@ -90,7 +90,7 @@ serve(async (req) => {
     let wapiUrl = "";
 
     if (tipo === 'texto' || !media_url) {
-      // --- Texto: JSON ---
+      // --- Texto ---
       if (!mensagem) {
         return new Response(JSON.stringify({ error: "mensagem obrigatória para texto" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -106,8 +106,20 @@ serve(async (req) => {
         wapiStatus = res.status;
         responseText = await res.text().catch(() => "");
       } catch (e) { fetchError = String(e); }
+    } else if (ptt && tipo === 'audio') {
+      // --- PTT / voice note ---
+      wapiUrl = `${baseUrl}/send/ptt`;
+      try {
+        const res = await fetch(wapiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", token: config.api_key },
+          body: JSON.stringify({ instanceName: uazapiInstance, number: phone, audio: media_url }),
+        });
+        wapiStatus = res.status;
+        responseText = await res.text().catch(() => "");
+      } catch (e) { fetchError = String(e); }
     } else {
-      // --- Mídia: POST /send/media com JSON, campo "file" como URL (padrão do CLI uazapi) ---
+      // --- Mídia: POST /send/media ---
       const typeMap: Record<string, string> = {
         imagem: 'image',
         audio: 'audio',

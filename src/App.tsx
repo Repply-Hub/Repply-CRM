@@ -24,6 +24,7 @@ import Chat from "./pages/Chat";
 import Emails from "./pages/Emails";
 import WhatsAppInbox from "./pages/WhatsAppInbox";
 import LinhasIgnoradas from "./pages/LinhasIgnoradas";
+import AdminWhatsAppInstancias from "./pages/AdminWhatsAppInstancias";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import Login from "./pages/Login";
@@ -192,6 +193,12 @@ const DashboardWrapper = () => {
   return <Dashboard />;
 };
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth();
+  if (profile && profile.role !== "admin") return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 const AppRoutes = () => (
   <Routes>
     <Route
@@ -345,6 +352,17 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <LinhasIgnoradas />
+        </ProtectedRoute>
+      }
+    />
+
+    <Route
+      path="/admin/instancias-whatsapp"
+      element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AdminWhatsAppInstancias />
+          </AdminRoute>
         </ProtectedRoute>
       }
     />

@@ -2,7 +2,8 @@ import {
   LayoutDashboard, Kanban, Users, FileText, Settings, HardHat, Factory,
   Globe, CalendarDays, ClipboardList, Link, BarChart3, Mail, Phone,
   Star, Heart, BookOpen, Briefcase, Home, Map, Package, ShoppingCart,
-  Truck, Wallet, Wrench, Zap, MessageCircle, MessageSquare, List, FileWarning, type LucideIcon
+  Truck, Wallet, Wrench, Zap, MessageCircle, MessageSquare, List, FileWarning,
+  Smartphone, type LucideIcon
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -36,6 +37,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   MessageCircle,
   MessageSquare,
   FileWarning,
+  Smartphone,
 };
 
 export const AVAILABLE_ICONS = Object.keys(ICON_MAP);

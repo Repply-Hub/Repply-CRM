@@ -40,7 +40,7 @@ serve(async (req) => {
 
     const { data: config } = await supabase
       .from("configuracoes_wapi")
-      .select("empresa_id, webhook_secret")
+      .select("empresa_id, webhook_secret, instance_url, api_key, api_instance_name")
       .eq("instance_name", instanceName)
       .single();
 
@@ -53,11 +53,10 @@ serve(async (req) => {
 
     const empresaId = config.empresa_id;
 
-    // Formato uazapi: { message: {...}, chat: {...}, EventType: "messages", ... }
     const eventType = (payload.EventType ?? payload.event ?? payload.type ?? "").toLowerCase();
 
     if (eventType === "messages" || eventType.includes("message")) {
-      await handleIncomingMessage(supabase, empresaId, payload);
+      await handleIncomingMessage(supabase, empresaId, instanceName, config, payload);
     } else if (eventType.includes("connection")) {
       await handleConnectionUpdate(supabase, empresaId, instanceName, payload);
     }
@@ -75,17 +74,119 @@ serve(async (req) => {
   }
 });
 
-async function handleIncomingMessage(supabase: any, empresaId: string, payload: any) {
+async function uploadBytesToStorage(
+  supabase: any,
+  bytes: Uint8Array,
+  mime: string,
+  empresaId: string,
+  wamid: string,
+): Promise<string | null> {
+  const ext = mime.includes("ogg") ? "ogg" : mime.includes("webm") ? "webm"
+    : mime.includes("mp4") ? "mp4" : mime.includes("mpeg") ? "mp3"
+    : mime.includes("jpeg") || mime.includes("jpg") ? "jpg"
+    : mime.includes("png") ? "png" : mime.includes("pdf") ? "pdf" : "bin";
+
+  const path = `incoming/${empresaId}/${Date.now()}-${wamid.slice(-10)}.${ext}`;
+  const { data: up, error } = await supabase.storage
+    .from("whatsapp-media")
+    .upload(path, bytes, { contentType: mime, upsert: false });
+  if (error) { console.error("[webhook] upload falhou:", error); return null; }
+  return supabase.storage.from("whatsapp-media").getPublicUrl(up.path).data.publicUrl;
+}
+
+function b64ToBytes(raw: string): Uint8Array {
+  const b64 = raw.includes(",") ? raw.split(",")[1] : raw;
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function decryptWhatsAppMedia(
+  encUrl: string,
+  mediaKeyB64: string,
+  tipo: string,
+): Promise<Uint8Array | null> {
+  const infoMap: Record<string, string> = {
+    audio: "WhatsApp Audio Keys",
+    imagem: "WhatsApp Image Keys",
+    video: "WhatsApp Video Keys",
+    documento: "WhatsApp Document Keys",
+    sticker: "WhatsApp Image Keys",
+  };
+  const info = new TextEncoder().encode(infoMap[tipo] ?? "WhatsApp Audio Keys");
+
+  const mediaKey = b64ToBytes(mediaKeyB64);
+  const ikm = await crypto.subtle.importKey("raw", mediaKey, "HKDF", false, ["deriveBits"]);
+  const expandedBits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info },
+    ikm,
+    112 * 8,
+  );
+  const expanded = new Uint8Array(expandedBits);
+  const iv = expanded.slice(0, 16);
+  const cipherKey = expanded.slice(16, 48);
+
+  const res = await fetch(encUrl, { headers: { "User-Agent": "WhatsApp/2.23.0 A" } });
+  if (!res.ok) { console.log(`[webhook] CDN fetch ${res.status}`); return null; }
+  const encData = new Uint8Array(await res.arrayBuffer());
+  const encMedia = encData.slice(0, -10);
+
+  const key = await crypto.subtle.importKey("raw", cipherKey, { name: "AES-CBC" }, false, ["decrypt"]);
+  const plaintext = await crypto.subtle.decrypt({ name: "AES-CBC", iv }, key, encMedia);
+  return new Uint8Array(plaintext);
+}
+
+async function downloadAndStoreMedia(
+  supabase: any,
+  _config: any,
+  empresaId: string,
+  _instanceName: string,
+  wamid: string,
+  mediaMime: string | null,
+  cdnUrl: string | null,
+  inlineB64: string | null,
+  mediaKey: string | null,
+  tipo: string,
+): Promise<string | null> {
+  const mime = (mediaMime ?? "audio/ogg").split(";")[0].trim();
+
+  try {
+    if (inlineB64) {
+      console.log("[webhook] base64 inline");
+      const bytes = b64ToBytes(inlineB64);
+      return await uploadBytesToStorage(supabase, bytes, mime, empresaId, wamid);
+    }
+
+    if (cdnUrl && mediaKey) {
+      console.log("[webhook] descriptografando WhatsApp E2E...");
+      const bytes = await decryptWhatsAppMedia(cdnUrl, mediaKey, tipo);
+      if (bytes) {
+        console.log(`[webhook] descriptografia OK — ${bytes.length} bytes`);
+        return await uploadBytesToStorage(supabase, bytes, mime, empresaId, wamid);
+      }
+    }
+
+    return null;
+  } catch (e) {
+    console.error("[webhook] downloadAndStoreMedia erro:", e);
+    return null;
+  }
+}
+
+async function handleIncomingMessage(
+  supabase: any,
+  empresaId: string,
+  instanceName: string,
+  config: any,
+  payload: any,
+) {
   const msg = payload.message;
   if (!msg) return;
 
-  // Ignora mensagens enviadas pela própria instância ou por API
   if (msg.fromMe === true || msg.wasSentByApi === true) return;
-
-  // Ignora grupos
   if (msg.isGroup === true || payload.chat?.wa_isGroup === true) return;
 
-  // Extrai número do remetente
   const chatid: string = msg.chatid ?? msg.sender_pn ?? "";
   const telefone = chatid.replace("@s.whatsapp.net", "").replace("@c.us", "");
   if (!telefone) return;
@@ -93,33 +194,85 @@ async function handleIncomingMessage(supabase: any, empresaId: string, payload: 
   const wamid: string = msg.messageid ?? msg.id ?? "";
   const pushName: string = msg.senderName ?? payload.chat?.wa_name ?? payload.chat?.name ?? "";
 
-  // Extrai conteúdo conforme tipo
-  const msgType = (msg.type ?? msg.messageType ?? "text").toLowerCase();
-  let conteudo: string = msg.text ?? msg.content ?? msg.caption ?? "";
+  const msgType = (msg.messageType ?? msg.type ?? "text").toLowerCase();
+  const content = msg.content && typeof msg.content === "object" ? msg.content : null;
+  let conteudo: string = msg.text || content?.caption || msg.caption || "";
   let tipo = "texto";
 
-  if (msgType === "image" || msgType === "imageMessage") {
+  const anyMediaUrl = (): string | null =>
+    content?.URL ?? content?.url ?? content?.link ?? content?.audio ??
+    msg.audioUrl ?? msg.imageUrl ?? msg.videoUrl ?? msg.documentUrl ?? null;
+
+  let mediaUrl: string | null = null;
+  let mediaMime: string | null =
+    content?.mimetype ?? content?.mimeType ?? msg.mimetype ?? null;
+
+  if (msgType.includes("image")) {
     tipo = "imagem";
+    mediaUrl = anyMediaUrl();
     if (!conteudo) conteudo = "[Imagem]";
-  } else if (msgType === "audio" || msgType === "audioMessage" || msgType === "ptt") {
+  } else if (
+    msgType.includes("audio") || msgType.includes("ptt") ||
+    msgType.includes("voice") ||
+    msg.ptt === true || content?.ptt === true
+  ) {
     tipo = "audio";
+    mediaUrl = anyMediaUrl();
     conteudo = "[Áudio]";
-  } else if (msgType === "video" || msgType === "videoMessage") {
+  } else if (msgType.includes("video")) {
     tipo = "video";
+    mediaUrl = anyMediaUrl();
     if (!conteudo) conteudo = "[Vídeo]";
-  } else if (msgType === "document" || msgType === "documentMessage") {
+  } else if (msgType.includes("document")) {
     tipo = "documento";
-    if (!conteudo) conteudo = "[Documento]";
-  } else if (msgType === "sticker" || msgType === "stickerMessage") {
+    mediaUrl = anyMediaUrl();
+    if (!conteudo) conteudo = content?.fileName ?? content?.filename ?? "[Documento]";
+  } else if (msgType.includes("sticker")) {
     tipo = "sticker";
+    mediaUrl = anyMediaUrl();
     conteudo = "[Sticker]";
+  }
+
+  // Fallback: detecta pelo mimetype
+  if (tipo === "texto" && mediaMime) {
+    const mime = mediaMime.toLowerCase();
+    if (mime.startsWith("audio/") || mime.includes("ogg") || mime.includes("opus")) {
+      tipo = "audio";
+      mediaUrl = anyMediaUrl();
+      conteudo = "[Áudio]";
+    } else if (mime.startsWith("image/")) {
+      tipo = "imagem";
+      mediaUrl = anyMediaUrl();
+      if (!conteudo) conteudo = "[Imagem]";
+    } else if (mime.startsWith("video/")) {
+      tipo = "video";
+      mediaUrl = anyMediaUrl();
+      if (!conteudo) conteudo = "[Vídeo]";
+    } else if (mime.startsWith("application/") || mime.includes("pdf") || mime.includes("zip")) {
+      tipo = "documento";
+      mediaUrl = anyMediaUrl();
+      if (!conteudo) conteudo = "[Documento]";
+    }
   }
 
   if (!conteudo) conteudo = `[${tipo}]`;
 
-  console.log(`[webhook] mensagem de ${telefone} (${pushName}): "${conteudo}"`);
+  const inlineB64: string | null =
+    msg.base64 ?? content?.base64 ?? msg.data ?? content?.data ?? null;
+  const mediaKey: string | null =
+    content?.mediaKey ?? content?.MediaKey ?? msg.mediaKey ?? null;
 
-  // Upsert da conversa
+  if (tipo !== "texto" && wamid) {
+    const storedUrl = await downloadAndStoreMedia(
+      supabase, config, empresaId, instanceName, wamid, mediaMime,
+      anyMediaUrl(), inlineB64, mediaKey, tipo,
+    );
+    if (storedUrl) mediaUrl = storedUrl;
+    console.log(`[webhook] mídia (${tipo}) stored="${storedUrl ?? "falhou"}"`);
+  }
+
+  console.log(`[webhook] mensagem de ${telefone} (${pushName}): "${conteudo}" tipo=${tipo}`);
+
   const { data: conversa, error: convError } = await supabase
     .from("whatsapp_conversas")
     .upsert(
@@ -141,13 +294,11 @@ async function handleIncomingMessage(supabase: any, empresaId: string, payload: 
     return;
   }
 
-  // Incrementa não lidas
   await supabase
     .from("whatsapp_conversas")
     .update({ nao_lidas: (conversa.nao_lidas ?? 0) + 1 })
     .eq("id", conversa.id);
 
-  // Insere mensagem (sem duplicar pelo wamid)
   const insertData: any = {
     conversa_id: conversa.id,
     empresa_id: empresaId,
@@ -158,6 +309,8 @@ async function handleIncomingMessage(supabase: any, empresaId: string, payload: 
     lida: false,
   };
   if (wamid) insertData.wamid = wamid;
+  if (mediaUrl) insertData.media_url = mediaUrl;
+  if (mediaMime) insertData.media_mime = mediaMime;
 
   const { error: msgError } = await supabase
     .from("whatsapp_mensagens")
