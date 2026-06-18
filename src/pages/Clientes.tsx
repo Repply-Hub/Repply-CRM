@@ -521,8 +521,9 @@ const Clientes = () => {
   return (
     <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`}>
       <div className="p-6 w-full">
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-4">
-          <TabsList>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <TabsList className="shrink-0">
             <TabsTrigger value="empresas" className="gap-2">
               <Building2 className="h-4 w-4" />
               Empresas
@@ -534,9 +535,6 @@ const Clientes = () => {
               <Badge variant="secondary" className="ml-1 text-[10px] h-5 px-1.5">{contatos.length}</Badge>
             </TabsTrigger>
           </TabsList>
-        </Tabs>
-
-        <div className="flex flex-wrap items-center gap-3 mb-4">
           <SearchWithRecent
             placeholder="Buscar..."
             value={search}
@@ -813,6 +811,7 @@ const Clientes = () => {
             </DialogContent>
           </Dialog>
         </div>
+        </Tabs>
 
         {someSelected && (
           <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">

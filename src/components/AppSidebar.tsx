@@ -223,6 +223,11 @@ export function AppSidebar() {
                                   </div>
                                   {Icon && <Icon className="h-4 w-4 shrink-0 text-sidebar-foreground/60" />}
                                   <span className="flex-1 truncate text-[13px] text-sidebar-foreground">{item.label}</span>
+                                  {!item.isCustom && (
+                                    <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded border border-sidebar-foreground/15 text-sidebar-foreground/35 font-medium tracking-wide leading-none">
+                                      padrão
+                                    </span>
+                                  )}
                                   <button
                                     onClick={() => toggleVisibility(item.id)}
                                     className="text-sidebar-foreground/40 hover:text-sidebar-foreground/80 p-0.5"

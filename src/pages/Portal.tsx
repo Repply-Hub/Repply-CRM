@@ -58,6 +58,22 @@ interface SiteResult {
   fetched_at?: string;
 }
 
+function maskCNPJ(cnpj: string): string {
+  const d = cnpj.replace(/\D/g, '');
+  if (d.length !== 14) return cnpj;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12, 14)}`;
+}
+
+function idemaTypeBadge(tipo: string) {
+  if (tipo.includes('Prévia'))
+    return <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] font-medium whitespace-nowrap">Prévia</Badge>;
+  if (tipo.includes('Instalação'))
+    return <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 text-[10px] font-medium whitespace-nowrap">Instalação</Badge>;
+  if (tipo.includes('Operação'))
+    return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[10px] font-medium whitespace-nowrap">Operação</Badge>;
+  return <span className="text-muted-foreground text-xs">{tipo}</span>;
+}
+
 const normalizeNatalLicenseType = (value?: string | null) => {
   const text = (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
@@ -134,10 +150,28 @@ export default function Portal() {
   const [activeTab, setActiveTab] = useState<string>('extremoz');
   const [visibleColumns, setVisibleColumns] = useState<Record<string, string[]>>(() => {
     const saved = localStorage.getItem('portal-visible-columns');
+    if (!saved) return {};
+    const parsed: Record<string, string[]> = JSON.parse(saved);
+    // Migra nomes antigos e garante colunas obrigatórias do IDEMA
+    if (parsed.idema) {
+      parsed.idema = parsed.idema
+        .map(c => c === 'Empreendimento' ? 'Fato Gerador' : c === 'Razão Social' ? 'Interessado' : c);
+      if (!parsed.idema.includes('Nº Processo')) parsed.idema.unshift('Nº Processo');
+    }
+    return parsed;
+  });
+  const [columnLabels, setColumnLabels] = useState<Record<string, Record<string, string>>>(() => {
+    const saved = localStorage.getItem('portal-column-labels');
     return saved ? JSON.parse(saved) : {};
   });
+
+  useEffect(() => {
+    localStorage.setItem('portal-column-labels', JSON.stringify(columnLabels));
+  }, [columnLabels]);
+
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(subMonths(new Date(), 1)));
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+  const [idemaTypeFilter, setIdemaTypeFilter] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem('portal-visible-columns', JSON.stringify(visibleColumns));
@@ -631,29 +665,28 @@ export default function Portal() {
   const fetchIdemaFromDb = async () => {
     setLoading((prev) => ({ ...prev, idema: true }));
     try {
-      let query = supabase.from('licencas_idema').select('*').order('created_at', { ascending: false });
+      let query = supabase
+        .from('licencas_idema')
+        .select('*')
+        .not('numero_processo', 'is', null)
+        .order('data_formacao', { ascending: false });
 
       if (search) {
         const q = `%${search}%`;
-        query = query.or(`cnpj.ilike.${q},razao_social.ilike.${q},empreendimento.ilike.${q},bloco_texto.ilike.${q},tipo_licenca.ilike.${q},municipio.ilike.${q}`);
+        query = query.or(`cnpj.ilike.${q},interessado.ilike.${q},fato_gerador.ilike.${q},tipo_licenca.ilike.${q},numero_processo.ilike.${q}`);
       }
 
       const { data, error } = await query;
       if (error) throw error;
 
       const tableData = (data || []).map(row => ({
-        'Nº Licença': row.numero_licenca || '',
+        'Nº Processo': row.numero_processo || '',
         'Tipo de Licença': row.tipo_licenca || '',
-        'Data Emissão': formatDataEdicao(row.data_emissao || ''),
-        'Validade': formatDataEdicao(row.data_validade || ''),
-        'CNPJ': row.cnpj || '',
-        'Razão Social': row.razao_social || '',
-        'Empreendimento': row.empreendimento || '',
-        'Município': row.municipio || '',
-        'Atividade': row.atividade || '',
-        'Porte': row.porte || '',
-        'Link PDF': row.pdf_link || '',
-        'Texto Encontrado': row.bloco_texto || '',
+        'Data Emissão': row.data_formacao ? format(new Date(row.data_formacao + 'T12:00:00'), 'dd/MM/yyyy') : '',
+        'Interessado': row.interessado || '',
+        'CNPJ': maskCNPJ(row.cnpj || ''),
+        'Fato Gerador': row.fato_gerador || '',
+        'Link PDF': row.url_licenca || '',
       }));
 
       setResults((prev) => ({
@@ -676,173 +709,55 @@ export default function Portal() {
     }
   };
 
-  // ─── IDEMA: client-side scraping with proxy fallback ────────────
+  // ─── IDEMA: scraping via edge function dedicada ────────────────
   const scrapeIdema = async () => {
     setScraping((prev) => ({ ...prev, idema: true }));
     const toastId = toast.loading('Buscando licenças do IDEMA...');
     const idemaUrl = 'https://siga.idema.rn.gov.br/servicos/licencas_emitidas/';
 
-    const extractTableFromHtml = (rawHtml: string): Array<Record<string, string>> => {
-      const rows: Array<Record<string, string>> = [];
-      const tableRegex = /<table[\s\S]*?<\/table>/gi;
-      const tables = rawHtml.match(tableRegex);
-      if (!tables) return rows;
-      for (const table of tables) {
-        const headerRegex = /<th[^>]*>([\s\S]*?)<\/th>/gi;
-        const headers: string[] = [];
-        let hMatch;
-        while ((hMatch = headerRegex.exec(table)) !== null) {
-          headers.push(hMatch[1].replace(/<[^>]+>/g, '').trim());
-        }
-        if (headers.length < 2) continue;
-        const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-        let trMatch;
-        let isFirst = true;
-        while ((trMatch = trRegex.exec(table)) !== null) {
-          if (isFirst && headers.length > 0) { isFirst = false; continue; }
-          isFirst = false;
-          const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-          let tdMatch;
-          const row: Record<string, string> = {};
-          let colIdx = 0;
-          while ((tdMatch = tdRegex.exec(trMatch[1])) !== null) {
-            const key = headers[colIdx] || `col_${colIdx}`;
-            row[key] = tdMatch[1].replace(/<br\s*\/?\s*>/gi, ' | ').replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').trim();
-            colIdx++;
-          }
-          if (Object.keys(row).length > 0) rows.push(row);
-        }
-      }
-      return rows;
-    };
-
-    const processTableRows = async (tableData: Array<Record<string, string>>): Promise<number> => {
-      let totalInserted = 0;
-      for (const row of tableData) {
-        const values = Object.values(row).join(' ');
-        const cnpjMatch = values.match(/\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/);
-        const cnpj = cnpjMatch ? cnpjMatch[0].replace(/\s/g, '') : '';
-        if (cnpj) {
-          const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
-          if (existing && existing.length > 0) continue;
-        }
-        const rowLower: Record<string, string> = {};
-        Object.entries(row).forEach(([k, v]) => { rowLower[k.toLowerCase()] = String(v); });
-        const numeroLicenca = rowLower['nº licença'] || rowLower['nº'] || rowLower['numero'] || rowLower['licença'] || rowLower['n°'] || '';
-        const tipoLicenca = rowLower['tipo'] || rowLower['tipo de licença'] || rowLower['tipo licença'] || '';
-        const razaoSocial = rowLower['razão social'] || rowLower['empresa'] || rowLower['empreendedor'] || rowLower['interessado'] || '';
-        const empreendimento = rowLower['empreendimento'] || rowLower['atividade'] || '';
-        const hasRelevantData = Boolean(cnpj || numeroLicenca || tipoLicenca || razaoSocial || empreendimento);
-        if (!hasRelevantData) continue;
-        await supabase.from('licencas_idema').insert({
-          numero_licenca: numeroLicenca, tipo_licenca: tipoLicenca,
-          data_emissao: rowLower['emissão'] || rowLower['data'] || rowLower['data de emissão'] || rowLower['data emissão'] || '',
-          data_validade: rowLower['validade'] || rowLower['data de validade'] || '',
-          cnpj, razao_social: razaoSocial, empreendimento,
-          municipio: rowLower['município'] || rowLower['municipio'] || rowLower['local'] || '',
-          atividade: rowLower['atividade'] || '', porte: rowLower['porte'] || '',
-          bloco_texto: Object.values(row).map(v => String(v)).join(' | ').substring(0, 500),
-        });
-        totalInserted++;
-      }
-      return totalInserted;
-    };
-
     try {
-      // Strategy 1: Direct browser fetch
-      let html = '';
-      try {
-        const resp = await fetch(idemaUrl, { signal: AbortSignal.timeout(20000) });
-        if (resp.ok) html = await resp.text();
-      } catch (e) {
-        console.log('IDEMA direct fetch failed (likely CORS):', e);
-      }
+      const { data, error } = await supabase.functions.invoke('scrape-licencas-idema');
 
-      // Strategy 2: Edge Function proxy fallback
-      if (!html) {
-        toast.loading('CORS bloqueado. Tentando via servidor...', { id: toastId });
-        try {
-          const { data, error } = await supabase.functions.invoke('portal-scraper', {
-            body: { site_id: 'idema', search: search || undefined },
-          });
-          if (!error && data?.success && data?.data?.table?.length > 0) {
-            const inserted = await processTableRows(data.data.table);
-            if (inserted > 0) {
-              toast.success(`${inserted} registros importados do IDEMA!`, { id: toastId });
-              await fetchIdemaFromDb();
-              return;
-            }
-          }
-          if (!error && data?.data?.text) {
-            html = data.data.text; // Use extracted text as fallback
-          }
-        } catch (proxyErr) {
-          console.log('IDEMA proxy also failed:', proxyErr);
-        }
-      }
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
 
-      if (!html) {
+      const inseridos: number = data?.inseridos ?? 0;
+      const totalScraped: number = data?.total_scraped ?? 0;
+
+      if (totalScraped === 0) {
         setResults((prev) => ({
           ...prev,
           idema: {
             success: false,
-            error: 'O site do IDEMA está instável ou fora do ar. Tente novamente em alguns minutos ou acesse diretamente.',
+            error: 'O IDEMA não retornou licenças no período. O site pode estar indisponível.',
             fallback_url: idemaUrl,
             site: { id: 'idema', name: 'IDEMA', url: idemaUrl },
           },
         }));
-        toast.error('IDEMA inacessível no momento. Tente novamente mais tarde.', { id: toastId });
+        toast.warning('IDEMA não retornou resultados.', { id: toastId });
         return;
       }
 
-      // Parse and import
-      toast.loading('Processando dados do IDEMA...', { id: toastId });
-      const tableData = extractTableFromHtml(html);
-      let totalInserted = await processTableRows(tableData);
-
-      // Fallback: extract CNPJs from text
-      if (totalInserted === 0) {
-        const textContent = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
-        const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
-        const cnpjs = [...new Set((textContent.match(cnpjRegex) || []).map(c => c.replace(/\s/g, '')))];
-        for (const cnpj of cnpjs.slice(0, 50)) {
-          const { data: existing } = await supabase.from('licencas_idema').select('id').eq('cnpj', cnpj).limit(1);
-          if (existing && existing.length > 0) continue;
-          const idx = textContent.indexOf(cnpj);
-          const context = textContent.substring(Math.max(0, idx - 200), Math.min(textContent.length, idx + 300));
-          await supabase.from('licencas_idema').insert({ cnpj, bloco_texto: context.substring(0, 500) });
-          totalInserted++;
-        }
-      }
-
-      if (totalInserted === 0) {
-        setResults((prev) => ({
-          ...prev,
-          idema: {
-            success: false,
-            error: 'O IDEMA respondeu, mas sem resultados importáveis. Tente buscar com um CNPJ ou termo específico.',
-            fallback_url: idemaUrl,
-            site: { id: 'idema', name: 'IDEMA', url: idemaUrl },
-          },
-        }));
-        toast.warning('IDEMA retornou página sem resultados válidos.', { id: toastId });
-        return;
-      }
-
-      toast.success(`${totalInserted} registros importados do IDEMA!`, { id: toastId });
+      toast.success(
+        inseridos > 0
+          ? `${inseridos} nova${inseridos === 1 ? '' : 's'} licença${inseridos === 1 ? '' : 's'} importada${inseridos === 1 ? '' : 's'} do IDEMA!`
+          : `${totalScraped} licenças encontradas (sem novidades).`,
+        { id: toastId },
+      );
       await fetchIdemaFromDb();
     } catch (err) {
       console.error('Scraping IDEMA error:', err);
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
       setResults((prev) => ({
         ...prev,
         idema: {
           success: false,
-          error: 'Erro ao acessar o portal do IDEMA. O site pode estar fora do ar.',
+          error: `Erro ao acessar o IDEMA: ${message}`,
           fallback_url: idemaUrl,
           site: { id: 'idema', name: 'IDEMA', url: idemaUrl },
         },
       }));
-      toast.error('Erro ao acessar site do IDEMA.', { id: toastId });
+      toast.error('Erro ao acessar o IDEMA.', { id: toastId });
     } finally {
       setScraping((prev) => ({ ...prev, idema: false }));
     }
@@ -932,7 +847,7 @@ export default function Portal() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} />
+                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear() + 1} />
               </PopoverContent>
             </Popover>
             <span className="text-xs text-muted-foreground">até</span>
@@ -944,7 +859,7 @@ export default function Portal() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} />
+                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear() + 1} />
               </PopoverContent>
             </Popover>
           </div>
@@ -959,72 +874,90 @@ export default function Portal() {
         </div>
 
         {/* Site cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-          {SITES.map((site) => (
-            <Card key={site.id} className={`rounded-xl border ${site.borderColor} bg-gradient-to-br ${site.gradient} transition-all duration-300 ${site.glowColor} hover:shadow-lg group`}>
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-2xl">{site.icon}</span>
-                    <div>
-                      <CardTitle className="text-sm font-bold tracking-tight">{site.name}</CardTitle>
-                      <CardDescription className="text-[11px] mt-0.5 leading-snug">{site.description}</CardDescription>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className={`${site.badgeClass} shrink-0 text-[10px] font-medium`}>
-                    <Globe className="h-3 w-3 mr-1" />
-                    Gov
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {SITES.map((site) => {
+            const res = results[site.id];
+            const isBusy = loading[site.id] || scraping[site.id];
+            const recordCount = res?.data?.table?.length ?? null;
+            const hasError = res && !res.success;
+            const siteUrl = site.id === 'extremoz' ? 'https://extremoz.rn.gov.br/diario-oficial/' : site.url;
 
-                <div className="flex items-center gap-2">
+            return (
+              <div
+                key={site.id}
+                className={`group relative flex flex-col rounded-xl border bg-card transition-all hover:shadow-md overflow-hidden ${site.borderColor}`}
+              >
+                {/* Acento de cor no topo */}
+                <div className={`h-0.5 w-full bg-gradient-to-r ${site.gradient.replace('from-', 'from-').replace('/10', '/60').replace('/5', '/40')}`} />
+
+                <div className="flex flex-col gap-3 p-4 flex-1">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${site.borderColor} bg-gradient-to-br ${site.gradient} text-base`}>
+                        {site.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold leading-tight truncate">{site.name}</p>
+                        <p className="text-[11px] text-muted-foreground leading-snug mt-0.5 line-clamp-2">{site.description}</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={`${site.badgeClass} shrink-0 text-[10px] font-medium`}>
+                      <Globe className="h-2.5 w-2.5 mr-1" />
+                      Gov
+                    </Badge>
+                  </div>
+
+                  {/* Status */}
+                  <div className="flex items-center justify-between text-[11px]">
+                    {hasError ? (
+                      <span className="flex items-center gap-1 text-destructive">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        <span className="truncate max-w-[160px]" title={res.error ?? ''}>Erro ao carregar</span>
+                      </span>
+                    ) : recordCount !== null ? (
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        {recordCount} registro{recordCount !== 1 ? 's' : ''} carregado{recordCount !== 1 ? 's' : ''}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground/50">Não carregado</span>
+                    )}
+                    <button
+                      onClick={() => window.open(siteUrl, '_blank')}
+                      className="ml-2 shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                      title="Abrir site"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
+                  </div>
+
+                  {/* Link de erro detalhado */}
+                  {hasError && res.fallback_url && (
+                    <a href={res.fallback_url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-destructive/80 hover:text-destructive underline -mt-1">
+                      Acessar site diretamente →
+                    </a>
+                  )}
+
+                  {/* Botão de ação */}
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1 text-xs rounded-lg"
+                    className="w-full h-7 text-xs mt-auto"
                     onClick={() => (site.id === 'extremoz' ? scrapeExtremoz() : site.id === 'natal' ? scrapeNatal() : site.id === 'idema' ? scrapeIdema() : fetchSite(site.id))}
-                    disabled={loading[site.id] || scraping[site.id]}
+                    disabled={isBusy}
                   >
-                    {(loading[site.id] || scraping[site.id]) ? (
+                    {isBusy ? (
                       <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
                     ) : (
                       <CloudDownload className="h-3 w-3 mr-1.5" />
                     )}
-                    {scraping[site.id] ? 'Atualizando...' : 'Atualizar Dados'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 rounded-lg opacity-60 hover:opacity-100"
-                    onClick={() => window.open(
-                      site.id === 'extremoz' ? 'https://extremoz.rn.gov.br/diario-oficial/' : site.url,
-                      '_blank'
-                    )}
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
+                    {scraping[site.id] ? 'Atualizando...' : loading[site.id] ? 'Carregando...' : 'Atualizar Dados'}
                   </Button>
                 </div>
-
-                {/* Error status */}
-                {results[site.id] && !results[site.id].success && (
-                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 text-destructive text-xs">
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium">{results[site.id].error}</p>
-                      {results[site.id].fallback_url && (
-                        <a href={results[site.id].fallback_url} target="_blank" rel="noopener noreferrer" className="underline mt-1 inline-block opacity-80 hover:opacity-100">
-                          Acessar site diretamente →
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            );
+          })}
         </div>
 
         {/* Tab-style buttons like reference image */}
@@ -1058,7 +991,22 @@ export default function Portal() {
         {activeTab && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{SITES.find(s => s.id === activeTab)?.name}</CardTitle>
+              <div className="flex items-baseline gap-2">
+                <CardTitle className="text-base">{SITES.find(s => s.id === activeTab)?.name}</CardTitle>
+                {(() => {
+                  const tableData = results[activeTab]?.data?.table;
+                  if (!tableData?.length) return null;
+                  const total = tableData.length;
+                  const filtered = activeTab === 'idema' && idemaTypeFilter
+                    ? tableData.filter((r: Record<string, string>) => r['Tipo de Licença'] === idemaTypeFilter).length
+                    : total;
+                  return (
+                    <span className="text-xs text-muted-foreground/70">
+                      {filtered !== total ? `(${filtered} de ${total} registros)` : `(${total} registros)`}
+                    </span>
+                  );
+                })()}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="pr-1">
@@ -1097,41 +1045,119 @@ export default function Portal() {
                       const currentVisible = visibleColumns[site.id] || allHeaders;
                       const headers = allHeaders.filter(h => currentVisible.includes(h));
 
+                      const siteLabels = columnLabels[site.id] || {};
                       const colDefinitions = allHeaders.map(h => ({
                         id: h,
-                        label: h
+                        label: h,
+                        customLabel: siteLabels[h] || undefined,
                       }));
 
+                      const IDEMA_TIPOS = ['Licença Prévia', 'Licença de Instalação', 'Licença de Operação'];
+                      const activeRows = site.id === 'idema' && idemaTypeFilter
+                        ? result.data.table.filter(row => row['Tipo de Licença'] === idemaTypeFilter)
+                        : result.data.table;
+
                       const currentPageSize = pageSizes[site.id] || 10;
-                      const totalPages = Math.max(1, Math.ceil(result.data.table.length / currentPageSize));
+                      const totalPages = Math.max(1, Math.ceil(activeRows.length / currentPageSize));
                       const currentPage = Math.min(pages[site.id] || 1, totalPages);
-                      const paginatedRows = result.data.table.slice((currentPage - 1) * currentPageSize, currentPage * currentPageSize);
+                      const paginatedRows = activeRows.slice((currentPage - 1) * currentPageSize, currentPage * currentPageSize);
                       return (
                         <div key={site.id} className="min-w-0" ref={(el) => { sectionRefs.current[site.id] = el; }}>
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                              {site.name} ({result.data.table.length} registros)
-                            </p>
-                            <div className="flex items-center gap-2">
+                          {/* filtros (esq) + opções/csv (dir) */}
+                          <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex flex-wrap gap-1.5">
+                              {site.id === 'idema' && IDEMA_TIPOS.map(tipo => (
+                                <button
+                                  key={tipo}
+                                  onClick={() => {
+                                    setIdemaTypeFilter(prev => prev === tipo ? null : tipo);
+                                    setPages(prev => ({ ...prev, idema: 1 }));
+                                  }}
+                                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                                    idemaTypeFilter === tipo
+                                      ? 'bg-primary text-primary-foreground border-primary'
+                                      : 'bg-background text-muted-foreground border-border hover:border-primary/60 hover:text-foreground'
+                                  }`}
+                                >
+                                  {tipo.replace('Licença ', '')}
+                                </button>
+                              ))}
+                              {site.id === 'idema' && idemaTypeFilter && (
+                                <button
+                                  onClick={() => { setIdemaTypeFilter(null); setPages(prev => ({ ...prev, idema: 1 })); }}
+                                  className="px-3 py-1 rounded-full text-xs font-medium border border-dashed border-muted-foreground/40 text-muted-foreground hover:border-destructive/60 hover:text-destructive transition-colors"
+                                >
+                                  Limpar
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
                               <ColumnSettings
                                 columns={colDefinitions}
                                 visibleColumns={currentVisible}
                                 onChange={(cols) => setVisibleColumns(prev => ({ ...prev, [site.id]: cols }))}
+                                onRename={(colId, newLabel) => setColumnLabels(prev => ({
+                                  ...prev,
+                                  [site.id]: { ...(prev[site.id] || {}), [colId]: newLabel },
+                                }))}
                               />
                               <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={() => exportCsv(site.id)}>
                                 <Download className="mr-1 h-3 w-3" /> CSV
                               </Button>
                             </div>
                           </div>
-                          <div className="w-full max-w-full overflow-x-auto rounded-md border overscroll-x-contain">
-                            <table className="min-w-[1100px] text-sm">
+                          {/* Mobile card list — IDEMA only */}
+                          {site.id === 'idema' && (
+                            <div className="flex flex-col gap-3 md:hidden">
+                              {paginatedRows.map((row, i) => (
+                                <div key={`${site.id}-${currentPage}-${i}-m`} className="rounded-lg border bg-card p-3 space-y-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <span className="font-mono font-semibold text-primary text-xs leading-snug break-all">{row['Nº Processo']}</span>
+                                    {idemaTypeBadge(row['Tipo de Licença'] ?? '')}
+                                  </div>
+                                  <div className="text-sm font-medium text-foreground leading-snug">{row['Interessado']}</div>
+                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>{row['CNPJ']}</span>
+                                    <span>{row['Data Emissão']}</span>
+                                  </div>
+                                  {row['Fato Gerador'] && (
+                                    <p className="text-xs text-muted-foreground leading-snug">
+                                      {row['Fato Gerador'].length > 120 ? row['Fato Gerador'].slice(0, 120) + '…' : row['Fato Gerador']}
+                                    </p>
+                                  )}
+                                  {row['Link PDF'] && (
+                                    <div className="pt-1.5 border-t">
+                                      <a href={row['Link PDF']} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                                        <ExternalLink className="h-3 w-3" /> Ver licença
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className={cn("w-full max-w-full overflow-x-auto rounded-md border overscroll-x-contain", site.id === 'idema' && "hidden md:block")}>
+                            <table className={site.id === 'idema' ? "w-full min-w-[860px] text-sm table-fixed" : "min-w-[1100px] text-sm"}>
                               <thead>
                                 <tr className="bg-muted/50 border-b border-border/60">
                                   <th className="px-2 py-2 w-8"></th>
-                                  {headers.map((h) => (
-                                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
-                                  ))}
-                                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">Ações</th>
+                                  {headers.map((h) => {
+                                    const idemaWidths: Record<string, string> = {
+                                      'Nº Processo':    'w-[190px]',
+                                      'Tipo de Licença':'w-[110px]',
+                                      'Data Emissão':   'w-[104px]',
+                                      'Interessado':    'w-[200px]',
+                                      'CNPJ':           'w-[168px]',
+                                      'Ações':          'w-[60px]',
+                                    };
+                                    const wClass = site.id === 'idema' ? (idemaWidths[h] ?? '') : '';
+                                    return (
+                                      <th key={h} className={cn("px-4 py-3 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap", wClass)}>{siteLabels[h] || h}</th>
+                                    );
+                                  })}
+                                  <th className={cn("px-3 py-3 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap", site.id === 'idema' && 'w-[60px]')}>Ações</th>
+                                  {site.id === 'idema' && <th className="w-8" />}
                                 </tr>
                               </thead>
                               <tbody>
@@ -1152,32 +1178,82 @@ export default function Portal() {
                                             </button>
                                           )}
                                         </td>
-                                        {headers.map((h, hIdx) => (
-                                          <td 
-                                            key={h} 
-                                            className={cn(
-                                              "max-w-[200px] truncate px-3 py-2.5",
-                                              hIdx === 0 ? "font-semibold text-foreground" : 
-                                              (h === 'Construtora / Obra' || h === 'Empresa') ? "font-medium text-foreground" : 
-                                              "font-normal text-muted-foreground"
-                                            )} 
-                                            title={row[h]}
-                                          >
-                                            {row[h]}
-                                          </td>
-                                        ))}
+                                        {headers.map((h, hIdx) => {
+                                          const rawVal = row[h] ?? '';
+                                          // IDEMA: células com render customizado
+                                          if (site.id === 'idema' && h === 'Tipo de Licença') {
+                                            return (
+                                              <td key={h} className="px-3 py-2.5">
+                                                {idemaTypeBadge(rawVal)}
+                                              </td>
+                                            );
+                                          }
+                                          if (site.id === 'idema' && h === 'Data Emissão') {
+                                            return (
+                                              <td key={h} className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
+                                                {rawVal}
+                                              </td>
+                                            );
+                                          }
+                                          if (site.id === 'idema' && h === 'Nº Processo') {
+                                            return (
+                                              <td key={h} className="px-3 py-2.5 whitespace-nowrap font-semibold text-foreground font-mono text-xs">
+                                                {rawVal}
+                                              </td>
+                                            );
+                                          }
+                                          if (site.id === 'idema' && h === 'CNPJ') {
+                                            return (
+                                              <td key={h} className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground font-mono">
+                                                {rawVal}
+                                              </td>
+                                            );
+                                          }
+                                          if (site.id === 'idema' && h === 'Interessado') {
+                                            return (
+                                              <td key={h} className="px-3 py-2.5 text-xs text-muted-foreground">
+                                                {rawVal}
+                                              </td>
+                                            );
+                                          }
+                                          if (site.id === 'idema' && h === 'Fato Gerador') {
+                                            return (
+                                              <td key={h} className="px-3 py-2.5 text-xs text-muted-foreground">
+                                                {rawVal}
+                                              </td>
+                                            );
+                                          }
+                                          return (
+                                            <td
+                                              key={h}
+                                              className={cn(
+                                                "px-3 py-2.5 overflow-hidden",
+                                                site.id === 'idema' ? "truncate" : "max-w-[200px] truncate",
+                                                hIdx === 0 && site.id === 'idema' ? "font-semibold text-foreground font-mono text-xs" :
+                                                hIdx === 0 ? "font-semibold text-foreground" :
+                                                (h === 'Construtora / Obra' || h === 'Empresa') ? "font-medium text-foreground" :
+                                                "font-normal text-muted-foreground"
+                                              )}
+                                              title={rawVal}
+                                            >
+                                              {rawVal}
+                                            </td>
+                                          );
+                                        })}
                                         <td className="px-3 py-2 whitespace-nowrap">
                                           {row['Link PDF'] && (
                                             <a
                                               href={row['Link PDF']}
                                               target="_blank"
                                               rel="noopener noreferrer"
-                                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                                              className="inline-flex items-center gap-1 text-primary hover:underline text-xs"
                                             >
-                                              <ExternalLink className="h-3 w-3" /> PDF
+                                              <ExternalLink className="h-3 w-3" />
+                                              {site.id === 'idema' ? 'Ver' : 'PDF'}
                                             </a>
                                           )}
                                         </td>
+                                        {site.id === 'idema' && <td className="w-8" />}
                                       </tr>
                                       {isExpanded && row['Texto Encontrado'] && (
                                         <tr key={`${rowKey}-text`} className="bg-muted/30">
@@ -1194,21 +1270,21 @@ export default function Portal() {
                                 })}
                               </tbody>
                             </table>
+                            <ListPagination
+                              page={currentPage}
+                              totalPages={totalPages}
+                              totalItems={activeRows.length}
+                              pageSize={currentPageSize}
+                              onPageChange={(nextPage) => setPages((prev) => ({ ...prev, [site.id]: nextPage }))}
+                              onPageSizeChange={(nextPageSize) => {
+                                setPageSizes((prev) => ({ ...prev, [site.id]: nextPageSize }));
+                                setPages((prev) => ({ ...prev, [site.id]: 1 }));
+                              }}
+                              itemLabel="registro"
+                              itemLabelPlural="registros"
+                              className="bg-muted/50 border-t border-border/60 px-3 py-2.5"
+                            />
                           </div>
-                          <ListPagination
-                            page={currentPage}
-                            totalPages={totalPages}
-                            totalItems={result.data.table.length}
-                            pageSize={currentPageSize}
-                            onPageChange={(nextPage) => setPages((prev) => ({ ...prev, [site.id]: nextPage }))}
-                            onPageSizeChange={(nextPageSize) => {
-                              setPageSizes((prev) => ({ ...prev, [site.id]: nextPageSize }));
-                              setPages((prev) => ({ ...prev, [site.id]: 1 }));
-                            }}
-                            itemLabel="registro"
-                            itemLabelPlural="registros"
-                            className="mt-2 rounded-xl border border-border/60 bg-card px-3 py-3"
-                          />
                         </div>
                       );
                     })}

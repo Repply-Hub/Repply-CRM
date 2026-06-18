@@ -49,12 +49,24 @@ export function useSidebarPreferences() {
       // Merge saved preferences with defaults to handle new items added after save.
       // Remove o antigo item 'pedidos' (Lista de Negócios) — funcionalidade unificada em 'pipeline' (/).
       // Garante que 'pipeline' aponte para / com label 'Negócios'.
-      const saved = (data.items as unknown as SidebarItem[])
-        .filter(i => i.id !== 'pedidos')
+      const REMOVED_IDS = new Set(['pedidos', 'portal_consultas']);
+      const rawSaved = data.items as unknown as SidebarItem[];
+      const needsCleanup = rawSaved.some(i => REMOVED_IDS.has(i.id));
+      const saved = rawSaved
+        .filter(i => !REMOVED_IDS.has(i.id))
         .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i);
       const savedIds = new Set(saved.map(i => i.id));
       const newDefaults = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedIds.has(d.id));
-      return [...saved, ...newDefaults];
+      const merged = [...saved, ...newDefaults];
+
+      if (needsCleanup) {
+        await supabase
+          .from('sidebar_preferences')
+          .update({ items: merged as any, updated_at: new Date().toISOString() })
+          .eq('user_id', user!.id);
+      }
+
+      return merged;
     },
     enabled: !!user?.id,
   });
