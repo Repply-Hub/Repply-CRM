@@ -185,14 +185,22 @@ async function handleIncomingMessage(
   if (!msg) return;
 
   if (msg.fromMe === true || msg.wasSentByApi === true) return;
-  if (msg.isGroup === true || payload.chat?.wa_isGroup === true) return;
+
+  const isGroup = msg.isGroup === true || payload.chat?.wa_isGroup === true;
 
   const chatid: string = msg.chatid ?? msg.sender_pn ?? "";
-  const telefone = chatid.replace("@s.whatsapp.net", "").replace("@c.us", "");
+  const telefone = chatid
+    .replace("@s.whatsapp.net", "")
+    .replace("@c.us", "")
+    .replace("@g.us", "");
   if (!telefone) return;
 
   const wamid: string = msg.messageid ?? msg.id ?? "";
-  const pushName: string = msg.senderName ?? payload.chat?.wa_name ?? payload.chat?.name ?? "";
+  // Para grupos, o nome da conversa é o nome do grupo; para individuais é o nome do contato
+  const groupName: string = payload.chat?.wa_name ?? payload.chat?.name ?? "";
+  const pushName: string = isGroup
+    ? (groupName || msg.senderName || "")
+    : (msg.senderName ?? payload.chat?.wa_name ?? payload.chat?.name ?? "");
 
   const msgType = (msg.messageType ?? msg.type ?? "text").toLowerCase();
   const content = msg.content && typeof msg.content === "object" ? msg.content : null;
@@ -271,7 +279,7 @@ async function handleIncomingMessage(
     console.log(`[webhook] mídia (${tipo}) stored="${storedUrl ?? "falhou"}"`);
   }
 
-  console.log(`[webhook] mensagem de ${telefone} (${pushName}): "${conteudo}" tipo=${tipo}`);
+  console.log(`[webhook] mensagem de ${telefone} (${pushName}) grupo=${isGroup}: "${conteudo}" tipo=${tipo}`);
 
   const { data: conversa, error: convError } = await supabase
     .from("whatsapp_conversas")
