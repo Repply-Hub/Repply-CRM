@@ -177,7 +177,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     if (file) handleFile(file);
   };
 
-  const canProceedToPreview = Boolean(mapping.cliente || mapping.fabricante);
+  const canProceedToPreview = Boolean(mapping.cliente && mapping.fabricante);
 
   const getMappedRows = () => {
     const sanitized = sanitizeImportedRows({ 
@@ -285,6 +285,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     try {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       if (!vid) throw new Error('Vendedor não encontrado');
+
+      const { data: isGestor } = await supabase.rpc('is_gestor');
 
       // Salvar linhas ignoradas para revisão posterior
       if (ignoredRowsData.length > 0) {
@@ -450,27 +452,28 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
       const BATCH = 200;
       let imported = 0;
-      setImportProgress(10); // Iniciando processamento
+      let failed = 0;
+      setImportProgress(10);
 
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH).map(r => {
           const clientId = clienteMap.get(r.cliente.toLowerCase().trim())!;
           const obraId = r.obra ? obraMap.get(`${clientId}|${r.obra.toLowerCase().trim()}`) : null;
-          const importedVendedorId = r.vendedor ? vendedorMap.get(r.vendedor.toLowerCase().trim()) : null;
-          
-          // Se o vendedor da planilha não existir no sistema, salvamos o nome dele como um campo extra
+          // Só atribui a outro usuário se o usuário atual for gestor/admin; caso contrário,
+          // o RLS bloquearia o INSERT com usuario_id de terceiros.
+          const matchedVendedorId = r.vendedor ? vendedorMap.get(r.vendedor.toLowerCase().trim()) : null;
+          const importedVendedorId = isGestor ? matchedVendedorId : null;
+
           const finalCamposExtras = { ...(r.campos_extras || {}) };
+          // Preserva o nome do vendedor original sempre que não for atribuído diretamente
           if (r.vendedor && !importedVendedorId) {
             finalCamposExtras['Vendedor Original'] = r.vendedor;
           }
-          
-          // Salva o contato como campo extra
+
           if (r.contato) {
             finalCamposExtras['Contato'] = r.contato;
           }
-          
-          // Salva o título do negócio se ele for diferente do nome do cliente
-          // Se não houver título na planilha, usamos o nome da obra ou o nome do cliente como padrão
+
           if (r.negocio) {
             finalCamposExtras['Negócio'] = r.negocio;
           } else if (r.obra) {
@@ -488,15 +491,28 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             valor_total: r.valor || null,
             observacoes: r.observacoes || null,
             campos_extras: finalCamposExtras,
-            data_pedido: r.data_pedido || new Date().toLocaleDateString('en-CA'), // en-CA retorna YYYY-MM-DD
+            data_pedido: r.data_pedido || new Date().toLocaleDateString('en-CA'),
             created_at: r.data_pedido ? `${r.data_pedido}T12:00:00.000Z` : new Date().toISOString(),
             prazo_resposta: r.prazo_resposta || (r.status === 'fechamento' ? (r.data_pedido || new Date().toLocaleDateString('en-CA')) : null),
           };
         });
+
         const { error } = await supabase.from('pedidos').insert(batch);
-        if (error) throw error;
-        imported += batch.length;
-        setImportProgress(Math.min(95, 10 + Math.floor((imported / rows.length) * 85)));
+        if (error) {
+          // Tenta inserir linha a linha para não perder o batch inteiro
+          for (const row of batch) {
+            const { error: rowError } = await supabase.from('pedidos').insert(row);
+            if (rowError) {
+              failed += 1;
+              console.error('Linha ignorada na importação:', rowError.message, row);
+            } else {
+              imported += 1;
+            }
+          }
+        } else {
+          imported += batch.length;
+        }
+        setImportProgress(Math.min(95, 10 + Math.floor(((imported + failed) / rows.length) * 85)));
       }
 
       setImportProgress(100);
@@ -505,7 +521,14 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       qc.invalidateQueries({ queryKey: ['clientes'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
       qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
-      toast.success(`${imported} negócios importados com sucesso!`);
+
+      if (imported === 0 && failed > 0) {
+        toast.error(`Nenhum negócio importado. ${failed} linha(s) com erro — verifique o console para detalhes.`);
+      } else if (failed > 0) {
+        toast.warning(`${imported} negócios importados. ${failed} linha(s) falharam e foram ignoradas.`);
+      } else {
+        toast.success(`${imported} negócios importados com sucesso!`);
+      }
       reset();
       onOpenChange(false);
     } catch (err: any) {
