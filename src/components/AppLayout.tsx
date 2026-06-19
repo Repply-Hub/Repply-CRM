@@ -53,8 +53,8 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
               <SidebarTrigger className="shrink-0 h-8 w-8 md:hidden" />
               {headerContent ?? (
                 <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
-                  {title && <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{title}</h1>}
-                  {subtitle && <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{subtitle}</p>}
+                  {title && <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{typeof title === 'string' ? title : String(title ?? '')}</h1>}
+                  {subtitle && <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{typeof subtitle === 'string' ? subtitle : String(subtitle ?? '')}</p>}
                 </div>
               )}
             </div>
