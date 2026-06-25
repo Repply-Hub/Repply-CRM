@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Globe, Mail } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Globe, Mail, Smartphone } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
 import { DominioTab } from '@/components/configuracoes/DominioTab';
 import { GmailSettings } from '@/components/email/GmailSettings';
+import { WhatsAppInstanciasTab } from '@/components/configuracoes/WhatsAppInstanciasTab';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -447,6 +448,9 @@ const Configuracoes = () => {
               <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> Usuários</TabsTrigger>
             )}
             {isGestor && (
+              <TabsTrigger value="whatsapp" className="gap-1.5"><Smartphone className="h-4 w-4" /> WhatsApp</TabsTrigger>
+            )}
+            {isGestor && (
               <TabsTrigger value="automacao">Automação</TabsTrigger>
             )}
           </TabsList>
@@ -456,6 +460,12 @@ const Configuracoes = () => {
           {isGestor && (
             <TabsContent value="vendedores" className="mt-4">
               <UsuariosTab />
+            </TabsContent>
+          )}
+
+          {isGestor && (
+            <TabsContent value="whatsapp" className="mt-4">
+              <WhatsAppInstanciasTab />
             </TabsContent>
           )}
 

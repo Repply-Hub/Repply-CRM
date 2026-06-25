@@ -179,12 +179,33 @@ export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): str
       return excelEpoch.toISOString().slice(0, 10);
     }
     const str = raw.trim();
+    // DD/MM/YYYY ou DD-MM-YYYY (sem hora) — group1=dia, group2=mês, group3=ano
     const br = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
     if (br) {
       const day = br[1].padStart(2, '0');
       const month = br[2].padStart(2, '0');
       const year = br[3].length === 2 ? `20${br[3]}` : br[3];
       return `${year}-${month}-${day}`;
+    }
+    // DD/MM/YYYY HH:mm ou DD/MM/YYYY HH:mm:ss (com hora) — group1=dia, group2=mês, group3=ano, group4=HH:mm[:ss]
+    // IMPORTANTE: order dos grupos é idêntica ao branch sem hora acima para evitar troca dia/mês.
+    const brWithTime = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})[T ](\d{2}:\d{2}(?::\d{2})?)/);
+    if (brWithTime) {
+      const day = brWithTime[1].padStart(2, '0');
+      const month = brWithTime[2].padStart(2, '0');
+      const year = brWithTime[3].length === 2 ? `20${brWithTime[3]}` : brWithTime[3];
+      const time = brWithTime[4].substring(0, 5); // trunca para HH:mm
+      const isoDate = `${year}-${month}-${day}`;
+      // Validação pós-conversão: new Date(isoDate) deve devolver o mesmo dia e mês extraídos
+      const check = new Date(isoDate);
+      if (
+        isNaN(check.getTime()) ||
+        check.getUTCMonth() + 1 !== parseInt(month, 10) ||
+        check.getUTCDate() !== parseInt(day, 10)
+      ) {
+        throw new Error(`data inválida: ${str}`);
+      }
+      return `${isoDate}T${time}`;
     }
     const iso = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
     if (iso) {
@@ -266,7 +287,13 @@ export function sanitizeImportedRows(params: {
         rawValue = defaultValue;
       }
 
-      const sanitized = sanitizeFieldValue(rawValue, getFieldType(field));
+      let sanitized: string | number | undefined;
+      try {
+        sanitized = sanitizeFieldValue(rawValue, getFieldType(field));
+      } catch (err) {
+        // Marca a linha para tratamento posterior (ex: data inválida); não aborta o loop de linhas.
+        if (err instanceof Error) (payload as any).__dateError = err.message;
+      }
       if (sanitized !== undefined && sanitized !== '') payload[field.key] = sanitized;
     });
 

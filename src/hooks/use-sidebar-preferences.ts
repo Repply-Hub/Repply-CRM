@@ -24,7 +24,7 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'whatsapp', path: '/whatsapp', label: 'WhatsApp', icon: 'MessageSquare', visible: true },
   { id: 'emails', path: '/emails', label: 'E-mails', icon: 'Mail', visible: true },
   { id: 'configuracoes', path: '/configuracoes', label: 'Configurações', icon: 'Settings', visible: true },
-  { id: 'importacoes_ignoradas', path: '/importacao/ignoradas', label: 'Linhas Ignoradas', icon: 'FileWarning', visible: true },
+
   { id: 'usuarios_admin', path: '/configuracoes?tab=usuarios', label: 'Usuários', icon: 'Users', visible: true },
   { id: 'admin_wa_instancias', path: '/admin/instancias-whatsapp', label: 'Instâncias WhatsApp', icon: 'Smartphone', visible: true },
 ];
@@ -49,7 +49,7 @@ export function useSidebarPreferences() {
       // Merge saved preferences with defaults to handle new items added after save.
       // Remove o antigo item 'pedidos' (Lista de Negócios) — funcionalidade unificada em 'pipeline' (/).
       // Garante que 'pipeline' aponte para / com label 'Negócios'.
-      const REMOVED_IDS = new Set(['pedidos', 'portal_consultas']);
+      const REMOVED_IDS = new Set(['pedidos', 'portal_consultas', 'importacoes_ignoradas']);
       const rawSaved = data.items as unknown as SidebarItem[];
       const needsCleanup = rawSaved.some(i => REMOVED_IDS.has(i.id));
       const saved = rawSaved

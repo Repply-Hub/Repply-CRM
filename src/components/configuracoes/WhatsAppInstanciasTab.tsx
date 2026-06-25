@@ -1,0 +1,683 @@
+import { useRef, useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
+import {
+  useAdminCreateInstance,
+  useAdminDeleteInstance,
+  useAdminConnect,
+  useAdminSyncStatus,
+  useAdminDisconnect,
+  useAdminLinkInstance,
+  useAdminUnlinkInstance,
+} from '@/hooks/use-admin-whatsapp';
+import type { WaConfig } from '@/hooks/use-whatsapp-inbox';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Loader2,
+  Wifi,
+  WifiOff,
+  AlertCircle,
+  User,
+  Smartphone,
+  SmartphoneNfc,
+  Plus,
+  Trash2,
+  RefreshCw,
+  QrCode,
+  PlugZap,
+  Link2,
+  X,
+  ChevronsUpDown,
+  Check,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+interface UsuarioOpcao {
+  usuario_id: string;
+  usuario_auth_id: string;
+  nome: string;
+  role: string;
+}
+
+interface InstanciaRow extends WaConfig {
+  usuarios: UsuarioOpcao[];
+}
+
+// ─── Combobox de usuários com busca ──────────────────────────────────────────
+
+function UsuarioCombobox({
+  usuarios,
+  value,
+  onChange,
+  placeholder = 'Selecione um usuário...',
+  emptyText = 'Nenhum usuário encontrado.',
+}: {
+  usuarios: UsuarioOpcao[];
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  emptyText?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = usuarios.find(u => u.usuario_id === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          {selected ? (
+            <span className="flex items-center gap-2 truncate">
+              {selected.nome}
+              <span className="text-xs text-muted-foreground capitalize">({selected.role})</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar usuário..." />
+          <CommandList>
+            <CommandEmpty>{emptyText}</CommandEmpty>
+            <CommandGroup>
+              {usuarios.map(u => (
+                <CommandItem
+                  key={u.usuario_id}
+                  value={u.nome}
+                  onSelect={() => {
+                    onChange(u.usuario_id === value ? '' : u.usuario_id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn('mr-2 h-4 w-4 shrink-0', value === u.usuario_id ? 'opacity-100' : 'opacity-0')} />
+                  <span className="flex-1 truncate">{u.nome}</span>
+                  <span className="ml-2 text-xs text-muted-foreground capitalize">({u.role})</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ─── Badges ───────────────────────────────────────────────────────────────────
+
+function StatusBadge({ config }: { config: WaConfig }) {
+  if (!config.provisionada) {
+    return (
+      <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30 gap-1 text-[11px]">
+        <AlertCircle className="h-3 w-3" /> Não provisionada
+      </Badge>
+    );
+  }
+  if (config.status === 'connected') {
+    return (
+      <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-emerald-200 gap-1 text-[11px]">
+        <Wifi className="h-3 w-3" /> Conectada
+      </Badge>
+    );
+  }
+  if (config.status === 'connecting') {
+    return (
+      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200 gap-1 text-[11px]">
+        <SmartphoneNfc className="h-3 w-3 animate-pulse" /> Conectando
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-red-100 text-red-800 hover:bg-red-100 border-red-200 gap-1 text-[11px]">
+      <WifiOff className="h-3 w-3" /> Desconectada
+    </Badge>
+  );
+}
+
+// ─── Dialog QR ────────────────────────────────────────────────────────────────
+
+function QrDialog({ open, config, onClose }: { open: boolean; config: WaConfig; onClose: () => void }) {
+  const [qr, setQr] = useState<string | null>(null);
+  const [qrError, setQrError] = useState('');
+  const [polling, setPolling] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connect = useAdminConnect();
+  const syncStatus = useAdminSyncStatus();
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    if (!open) { clearInterval(intervalRef.current!); setQr(null); setQrError(''); setPolling(false); }
+  }, [open]);
+
+  useEffect(() => { if (open && config) startQrFlow(); }, [open]);
+
+  function startQrFlow() {
+    setQr(null); setQrError(''); setPolling(false);
+    clearInterval(intervalRef.current!);
+    connect.mutate(config, {
+      onSuccess: ({ qr: qrData, alreadyConnected }) => {
+        if (qrData) {
+          setQr(qrData); setPolling(true);
+          intervalRef.current = setInterval(async () => {
+            const result = await syncStatus.mutateAsync(config).catch(() => null);
+            if (result?.isConnected) {
+              clearInterval(intervalRef.current!); setPolling(false); setQr(null);
+              qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
+              toast.success('WhatsApp conectado com sucesso!'); onClose();
+            }
+          }, 3000);
+        } else if (alreadyConnected) {
+          syncStatus.mutate(config, { onSuccess: () => { qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] }); toast.success('WhatsApp já estava conectado — status atualizado.'); onClose(); } });
+        } else {
+          setQrError('A uazapi não retornou QR code. Tente novamente em alguns segundos.');
+        }
+      },
+      onError: (err: any) => setQrError(err?.message ?? 'Falha ao gerar QR code'),
+    });
+  }
+
+  const isLoading = connect.isPending || syncStatus.isPending;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-xs">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <QrCode className="h-4 w-4 text-green-600" /> Conectar WhatsApp
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          <p className="text-xs text-muted-foreground font-mono">{config.instance_name}</p>
+          {isLoading && !qr && (
+            <div className="flex flex-col items-center gap-3 py-6">
+              <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+              <p className="text-sm text-muted-foreground">{polling ? 'Aguardando conexão...' : 'Gerando QR Code...'}</p>
+            </div>
+          )}
+          {qr && (
+            <div className="flex flex-col items-center gap-3">
+              <img src={qr.startsWith('data:') ? qr : `data:image/png;base64,${qr}`} alt="QR Code WhatsApp" className="w-52 h-52 rounded-lg border border-border/60 shadow-sm" />
+              <p className="text-xs text-muted-foreground text-center">Abra o WhatsApp no celular e escaneie o QR code</p>
+              {polling && <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Verificando conexão...</div>}
+            </div>
+          )}
+          {qrError && (
+            <div className="space-y-2">
+              <p className="text-xs text-red-600">{qrError}</p>
+              <Button size="sm" variant="outline" className="w-full" onClick={startQrFlow}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Tentar novamente</Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Dialog Vincular Usuário ──────────────────────────────────────────────────
+
+function VincularDialog({
+  open,
+  instancia,
+  todosUsuarios,
+  onClose,
+}: {
+  open: boolean;
+  instancia: InstanciaRow;
+  todosUsuarios: UsuarioOpcao[];
+  onClose: () => void;
+}) {
+  const [selectedUsuarioId, setSelectedUsuarioId] = useState('');
+  const linkMutation = useAdminLinkInstance();
+
+  useEffect(() => { if (!open) setSelectedUsuarioId(''); }, [open]);
+
+  // Usuários ainda não vinculados a ESTA instância
+  const jaVinculados = new Set(instancia.usuarios.map(u => u.usuario_id));
+  const disponiveis = todosUsuarios.filter(u => !jaVinculados.has(u.usuario_id));
+
+  function handleVincular() {
+    if (!selectedUsuarioId) return;
+    linkMutation.mutate({ instanceId: instancia.id, targetUsuarioId: selectedUsuarioId }, { onSuccess: onClose });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Link2 className="h-4 w-4 text-primary" /> Vincular Usuário
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-1">
+          <p className="text-xs text-muted-foreground">
+            Instância: <span className="font-mono">{instancia.instance_name}</span>
+          </p>
+          {disponiveis.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Todos os usuários já estão vinculados a esta instância.
+            </p>
+          ) : (
+            <UsuarioCombobox
+              usuarios={disponiveis}
+              value={selectedUsuarioId}
+              onChange={setSelectedUsuarioId}
+            />
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleVincular} disabled={!selectedUsuarioId || linkMutation.isPending || disponiveis.length === 0}>
+            {linkMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+            Vincular
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Dialog Nova Instância ────────────────────────────────────────────────────
+
+function NovaInstanciaDialog({
+  open,
+  todosUsuarios,
+  onClose,
+}: {
+  open: boolean;
+  todosUsuarios: UsuarioOpcao[];
+  onClose: () => void;
+}) {
+  const [selectedUsuarioId, setSelectedUsuarioId] = useState('');
+  const createMutation = useAdminCreateInstance();
+
+  useEffect(() => { if (!open) setSelectedUsuarioId(''); }, [open]);
+
+  function handleCriar() {
+    createMutation.mutate({ targetUsuarioId: selectedUsuarioId || undefined }, { onSuccess: onClose });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Plus className="h-4 w-4 text-primary" /> Nova Instância WhatsApp
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          <p className="text-sm text-muted-foreground">
+            Uma nova instância será criada na uazapi. Você pode vinculá-la a um ou mais usuários agora ou depois.
+          </p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Vincular a usuário <span className="font-normal">(opcional)</span>
+            </label>
+            <UsuarioCombobox
+              usuarios={todosUsuarios}
+              value={selectedUsuarioId}
+              onChange={setSelectedUsuarioId}
+              placeholder="Sem vínculo por enquanto..."
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleCriar} disabled={createMutation.isPending}>
+            {createMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+            Criar Instância
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Card de Instância ────────────────────────────────────────────────────────
+
+function InstanciaCard({
+  instancia,
+  todosUsuarios,
+}: {
+  instancia: InstanciaRow;
+  todosUsuarios: UsuarioOpcao[];
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [showVincular, setShowVincular] = useState(false);
+  const qc = useQueryClient();
+
+  const deleteInstance = useAdminDeleteInstance();
+  const syncStatus = useAdminSyncStatus();
+  const disconnect = useAdminDisconnect();
+  const unlink = useAdminUnlinkInstance();
+
+  const isConnected = instancia.status === 'connected';
+
+  function invalidate() { qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] }); }
+
+  async function handleSync() {
+    const result = await syncStatus.mutateAsync(instancia, { onSuccess: invalidate }).catch(() => null);
+    if (result) { toast.success(result.isConnected ? 'Conectada' : 'Desconectada'); invalidate(); }
+  }
+
+  async function handleDelete() {
+    await deleteInstance.mutateAsync(instancia.id, { onSuccess: invalidate });
+    setConfirmDelete(false); invalidate();
+  }
+
+  const isBusy = deleteInstance.isPending || syncStatus.isPending || disconnect.isPending || unlink.isPending;
+
+  return (
+    <>
+      <div className="p-3 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors border border-border/40 space-y-2.5">
+        {/* Linha superior: ícone + nome + status + ações */}
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <Smartphone className="h-4 w-4 text-primary" />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-mono text-muted-foreground truncate block">
+              {instancia.instance_name}
+            </span>
+            {instancia.usuarios.length === 0 && (
+              <span className="text-xs text-muted-foreground/60 italic">sem usuários vinculados</span>
+            )}
+          </div>
+
+          <StatusBadge config={instancia} />
+
+          <div className="flex items-center gap-1 shrink-0">
+            {!isConnected && (
+              <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1 border-green-300 text-green-700 hover:bg-green-50" onClick={() => setShowQr(true)} disabled={isBusy}>
+                <QrCode className="h-3 w-3" /> Conectar
+              </Button>
+            )}
+            {isConnected && (
+              <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1 border-red-300 text-red-700 hover:bg-red-50" onClick={() => disconnect.mutate(instancia, { onSuccess: invalidate })} disabled={isBusy}>
+                {disconnect.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <PlugZap className="h-3 w-3" />}
+                Desconectar
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-primary" onClick={() => setShowVincular(true)} disabled={isBusy} title="Vincular usuário">
+              <Link2 className="h-3.5 w-3.5" /> Vincular
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleSync} disabled={isBusy} title="Sincronizar status">
+              {syncStatus.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => setConfirmDelete(true)} disabled={isBusy} title="Remover instância">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Chips de usuários vinculados */}
+        {instancia.usuarios.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pl-12">
+            {instancia.usuarios.map(u => (
+              <span
+                key={u.usuario_id}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary border border-primary/20"
+              >
+                <User className="h-2.5 w-2.5 shrink-0" />
+                {u.nome}
+                <button
+                  className="ml-0.5 hover:text-destructive transition-colors"
+                  onClick={() => unlink.mutate({ instanceId: instancia.id, targetUsuarioId: u.usuario_id }, { onSuccess: invalidate })}
+                  disabled={isBusy}
+                  title={`Desvincular ${u.nome}`}
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showQr && <QrDialog open={showQr} config={instancia} onClose={() => setShowQr(false)} />}
+
+      {showVincular && (
+        <VincularDialog
+          open={showVincular}
+          instancia={instancia}
+          todosUsuarios={todosUsuarios}
+          onClose={() => setShowVincular(false)}
+        />
+      )}
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover instância?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A instância <span className="font-mono font-semibold">{instancia.instance_name}</span> e todos os seus vínculos serão removidos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={handleDelete}>
+              {deleteInstance.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+// ─── Tab principal ────────────────────────────────────────────────────────────
+
+export function WhatsAppInstanciasTab() {
+  const { user } = useAuth();
+  const [showNovaInstancia, setShowNovaInstancia] = useState(false);
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['empresa_wa_instancias'],
+    queryFn: async () => {
+      const { data: meuPerfil, error: errPerfil } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('user_id', user!.id)
+        .single();
+
+      if (errPerfil || !meuPerfil?.empresa_id) throw new Error('Empresa não encontrada');
+      const empresaId = meuPerfil.empresa_id;
+
+      const [
+        { data: instancias, error: errI },
+        { data: usuarios, error: errU },
+      ] = await Promise.all([
+        supabase.from('configuracoes_wapi').select('*').eq('empresa_id', empresaId).order('instance_name'),
+        supabase.from('usuarios').select('id, nome, role, user_id').eq('empresa_id', empresaId).neq('role', 'admin').order('nome'),
+      ]);
+
+      if (errI) throw errI;
+      if (errU) throw errU;
+
+      const instanciaIds = (instancias ?? []).map(i => i.id);
+      const { data: vinculos } = instanciaIds.length > 0
+        ? await supabase.from('wapi_instancia_usuarios').select('instancia_id, usuario_auth_id').in('instancia_id', instanciaIds)
+        : { data: [] };
+
+      // auth_id → usuario
+      const usuarioByAuthId = new Map((usuarios ?? []).map(u => [u.user_id, u]));
+
+      // instancia_id → [UsuarioOpcao]
+      const usuariosPorInstancia = new Map<string, UsuarioOpcao[]>();
+      for (const v of vinculos ?? []) {
+        const u = usuarioByAuthId.get(v.usuario_auth_id);
+        if (!u) continue;
+        const arr = usuariosPorInstancia.get(v.instancia_id) ?? [];
+        arr.push({ usuario_id: u.id, usuario_auth_id: u.user_id, nome: u.nome, role: u.role });
+        usuariosPorInstancia.set(v.instancia_id, arr);
+      }
+
+      const rows: InstanciaRow[] = (instancias ?? []).map(inst => ({
+        ...(inst as WaConfig),
+        usuarios: usuariosPorInstancia.get(inst.id) ?? [],
+      }));
+
+      // Usuários sem nenhuma instância vinculada
+      const authIdsComInstancia = new Set((vinculos ?? []).map(v => v.usuario_auth_id));
+      const todosUsuarios: UsuarioOpcao[] = (usuarios ?? []).map(u => ({
+        usuario_id: u.id,
+        usuario_auth_id: u.user_id,
+        nome: u.nome,
+        role: u.role,
+      }));
+      const usuariosSemInstancia = todosUsuarios.filter(u => !authIdsComInstancia.has(u.usuario_auth_id));
+
+      const conectadas = rows.filter(r => r.status === 'connected').length;
+      const desconectadas = rows.filter(r => r.provisionada && r.status !== 'connected').length;
+      const semUsuario = rows.filter(r => r.usuarios.length === 0).length;
+
+      return { rows, todosUsuarios, usuariosSemInstancia, conectadas, desconectadas, semUsuario };
+    },
+    enabled: !!user,
+  });
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  const rows = data?.rows ?? [];
+  const todosUsuarios = data?.todosUsuarios ?? [];
+  const usuariosSemInstancia = data?.usuariosSemInstancia ?? [];
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho + resumo */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Smartphone className="h-4 w-4 text-primary" /> Instâncias WhatsApp
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Crie instâncias e vincule-as a múltiplos usuários da sua empresa
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8 shrink-0" onClick={() => refetch()}>
+                <RefreshCw className="h-3.5 w-3.5" /> Atualizar
+              </Button>
+              <Button size="sm" className="gap-1.5 text-xs h-8 shrink-0" onClick={() => setShowNovaInstancia(true)}>
+                <Plus className="h-3.5 w-3.5" /> Nova Instância
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-3">
+            <div className={cn('flex flex-col items-center justify-center p-3 rounded-lg border text-center gap-1', (data?.conectadas ?? 0) > 0 ? 'border-emerald-200 bg-emerald-50' : 'border-border bg-muted/30')}>
+              <Wifi className={cn('h-4 w-4', (data?.conectadas ?? 0) > 0 ? 'text-emerald-600' : 'text-muted-foreground')} />
+              <span className={cn('text-xl font-bold', (data?.conectadas ?? 0) > 0 ? 'text-emerald-700' : 'text-muted-foreground')}>{data?.conectadas ?? 0}</span>
+              <span className="text-[11px] text-muted-foreground">Conectadas</span>
+            </div>
+            <div className={cn('flex flex-col items-center justify-center p-3 rounded-lg border text-center gap-1', (data?.desconectadas ?? 0) > 0 ? 'border-red-200 bg-red-50' : 'border-border bg-muted/30')}>
+              <WifiOff className={cn('h-4 w-4', (data?.desconectadas ?? 0) > 0 ? 'text-red-500' : 'text-muted-foreground')} />
+              <span className={cn('text-xl font-bold', (data?.desconectadas ?? 0) > 0 ? 'text-red-600' : 'text-muted-foreground')}>{data?.desconectadas ?? 0}</span>
+              <span className="text-[11px] text-muted-foreground">Desconectadas</span>
+            </div>
+            <div className={cn('flex flex-col items-center justify-center p-3 rounded-lg border text-center gap-1', (data?.semUsuario ?? 0) > 0 ? 'border-amber-200 bg-amber-50' : 'border-border bg-muted/30')}>
+              <User className={cn('h-4 w-4', (data?.semUsuario ?? 0) > 0 ? 'text-amber-600' : 'text-muted-foreground')} />
+              <span className={cn('text-xl font-bold', (data?.semUsuario ?? 0) > 0 ? 'text-amber-700' : 'text-muted-foreground')}>{data?.semUsuario ?? 0}</span>
+              <span className="text-[11px] text-muted-foreground">Sem usuário</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lista de instâncias */}
+      <Card>
+        <CardContent className="pt-5 space-y-2">
+          {rows.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <Smartphone className="h-8 w-8 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">Nenhuma instância criada ainda.</p>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowNovaInstancia(true)}>
+                <Plus className="h-3.5 w-3.5" /> Criar primeira instância
+              </Button>
+            </div>
+          ) : (
+            rows.map(inst => (
+              <InstanciaCard key={inst.id} instancia={inst} todosUsuarios={todosUsuarios} />
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Usuários sem instância */}
+      {usuariosSemInstancia.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
+              <User className="h-4 w-4" /> Usuários sem instância ({usuariosSemInstancia.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-1.5">
+            {usuariosSemInstancia.map(u => (
+              <div key={u.usuario_id} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border/40 bg-muted/10">
+                <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <User className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+                <span className="text-sm flex-1 truncate">{u.nome}</span>
+                <span className="text-[10px] text-muted-foreground capitalize px-1.5 py-0.5 rounded-full border border-border/40 bg-muted/30">{u.role}</span>
+                <Badge variant="outline" className="text-[11px] text-muted-foreground border-muted-foreground/30 gap-1">
+                  <AlertCircle className="h-3 w-3" /> Sem instância
+                </Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <NovaInstanciaDialog
+        open={showNovaInstancia}
+        todosUsuarios={todosUsuarios}
+        onClose={() => setShowNovaInstancia(false)}
+      />
+    </div>
+  );
+}

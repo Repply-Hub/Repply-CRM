@@ -6,31 +6,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function buildInstanceName(empresaId: string, usuarioId: string): string {
+function buildInstanceName(empresaId: string, usuarioAuthId: string): string {
   const sanitize = (s: string) => s.replace(/[^a-z0-9]/gi, "").toLowerCase();
   const empresaPart = sanitize(empresaId).slice(0, 8);
-  const usuarioPart = sanitize(usuarioId).slice(0, 8);
+  const usuarioPart = sanitize(usuarioAuthId).slice(0, 8);
   return `${empresaPart}_${usuarioPart}`;
 }
 
-// Apaga uma instância recém-criada na uazapi quando um passo seguinte do
-// provisionamento falha, para não deixar instância órfã na conta uazapi.
-async function deleteOrphanInstance(baseUrl: string, token: string, instanceName: string): Promise<void> {
+async function deleteOrphanInstance(baseUrl: string, token: string): Promise<void> {
   try {
     const res = await fetch(`${baseUrl}/instance`, {
       method: "DELETE",
       headers: { token },
     });
-    const text = await res.text().catch(() => "");
     if (!res.ok) {
-      console.error("[whatsapp-provision] falha ao limpar instância órfã", {
-        instanceName, status: res.status, body: text,
-      });
-    } else {
-      console.log("[whatsapp-provision] instância órfã removida", { instanceName });
+      const text = await res.text().catch(() => "");
+      console.error("[whatsapp-provision] falha ao limpar instância órfã", { status: res.status, body: text });
     }
   } catch (e) {
-    console.error("[whatsapp-provision] erro de rede ao limpar instância órfã", { instanceName, error: String(e) });
+    console.error("[whatsapp-provision] erro de rede ao limpar instância órfã", String(e));
   }
 }
 
@@ -39,6 +33,12 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -46,11 +46,7 @@ serve(async (req) => {
     );
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!authHeader) return json({ error: "Missing authorization" }, 401);
 
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -59,38 +55,96 @@ serve(async (req) => {
     );
 
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (authError || !user) return json({ error: "Unauthorized" }, 401);
 
-    const { data: userData, error: userError } = await supabase
+    const { data: callerData, error: callerError } = await supabase
       .from("usuarios")
-      .select("id, empresa_id")
+      .select("id, role, empresa_id")
       .eq("user_id", user.id)
       .single();
-    if (userError || !userData) {
-      return new Response(JSON.stringify({ error: "User not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    if (callerError || !callerData) return json({ error: "User not found" }, 404);
+
+    // Lê o body (pode ser vazio para auto-provisionamento do próprio usuário)
+    let body: Record<string, any> = {};
+    try { body = await req.json(); } catch { /* body vazio */ }
+
+    const { action, target_usuario_id } = body;
+
+    // ── DELETE de instância (gestor/empresa/admin para funcionários) ───────────
+    if (action === "delete" && target_usuario_id) {
+      const managerRoles = ["admin", "empresa", "gestor"];
+      if (!managerRoles.includes(callerData.role)) {
+        return json({ error: "Forbidden" }, 403);
+      }
+
+      const { data: target } = await supabase
+        .from("usuarios")
+        .select("id, user_id, empresa_id")
+        .eq("id", target_usuario_id)
+        .single();
+
+      if (!target) return json({ error: "Target user not found" }, 404);
+
+      if (callerData.role !== "admin" && target.empresa_id !== callerData.empresa_id) {
+        return json({ error: "Forbidden: target not in same empresa" }, 403);
+      }
+
+      // Encontra instâncias vinculadas ao usuário via junction table
+      const { data: vinculos } = await supabase
+        .from("wapi_instancia_usuarios")
+        .select("instancia_id, configuracoes_wapi:instancia_id(api_key, instance_url)")
+        .eq("usuario_auth_id", target.user_id);
+
+      for (const v of vinculos ?? []) {
+        const cfg = v.configuracoes_wapi as any;
+        if (cfg?.api_key && cfg?.instance_url) {
+          await deleteOrphanInstance(cfg.instance_url.replace(/\/$/, ""), cfg.api_key);
+        }
+        await supabase.from("configuracoes_wapi").delete().eq("id", v.instancia_id);
+      }
+
+      return json({ success: true });
     }
 
-    const usuarioId = user.id;
-    const empresaId = userData.empresa_id;
+    // ── PROVISION ──────────────────────────────────────────────────────────────
+    // Se vier target_usuario_id, provisiona para outro usuário (gestor/empresa/admin)
+    let targetAuthId = user.id;
+    let empresaId = callerData.empresa_id;
 
-    // Idempotência: se já existe registro para esse usuário, devolve o que já há
-    const { data: existing } = await supabase
-      .from("configuracoes_wapi")
-      .select("instance_name, instance_url, api_key, status, provisionada")
-      .eq("usuario_id", usuarioId)
+    if (target_usuario_id) {
+      const managerRoles = ["admin", "empresa", "gestor"];
+      if (!managerRoles.includes(callerData.role)) {
+        return json({ error: "Forbidden" }, 403);
+      }
+
+      const { data: target } = await supabase
+        .from("usuarios")
+        .select("id, user_id, empresa_id")
+        .eq("id", target_usuario_id)
+        .single();
+
+      if (!target) return json({ error: "Target user not found" }, 404);
+
+      if (callerData.role !== "admin" && target.empresa_id !== callerData.empresa_id) {
+        return json({ error: "Forbidden: target not in same empresa" }, 403);
+      }
+
+      targetAuthId = target.user_id;
+      empresaId = target.empresa_id;
+    }
+
+    // Idempotência: se usuário já tem instância vinculada, devolve a existente
+    const { data: existingLink } = await supabase
+      .from("wapi_instancia_usuarios")
+      .select("configuracoes_wapi:instancia_id(instance_name, provisionada)")
+      .eq("usuario_auth_id", targetAuthId)
+      .limit(1)
       .maybeSingle();
 
-    if (existing && existing.provisionada) {
-      return new Response(
-        JSON.stringify({ success: true, instanceName: existing.instance_name, alreadyProvisioned: true }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const existingCfg = existingLink?.configuracoes_wapi as any;
+    if (existingCfg?.provisionada) {
+      return json({ success: true, instanceName: existingCfg.instance_name, alreadyProvisioned: true });
     }
 
     const UAZAPI_BASE_URL = (Deno.env.get("UAZAPI_BASE_URL") ?? "").replace(/\/$/, "");
@@ -99,16 +153,16 @@ serve(async (req) => {
 
     if (!UAZAPI_BASE_URL || !UAZAPI_ADMIN_TOKEN || !SUPABASE_URL) {
       console.error("[whatsapp-provision] missing env vars", {
-        hasBaseUrl: !!UAZAPI_BASE_URL, hasAdminToken: !!UAZAPI_ADMIN_TOKEN, hasSupabaseUrl: !!SUPABASE_URL,
+        hasBaseUrl: !!UAZAPI_BASE_URL,
+        hasAdminToken: !!UAZAPI_ADMIN_TOKEN,
+        hasSupabaseUrl: !!SUPABASE_URL,
       });
-      return new Response(JSON.stringify({ error: "Configuração do servidor incompleta" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Configuração do servidor incompleta" }, 500);
     }
 
-    const instanceName = buildInstanceName(empresaId, usuarioId);
+    const instanceName = buildInstanceName(empresaId, targetAuthId);
 
-    // --- Step 5: criar instância na uazapi ---
+    // Criar instância na uazapi
     let initData: any = {};
     try {
       const initRes = await fetch(`${UAZAPI_BASE_URL}/instance/init`, {
@@ -118,21 +172,13 @@ serve(async (req) => {
       });
       const initText = await initRes.text();
       if (!initRes.ok) {
-        console.error("[whatsapp-provision] erro em /instance/init", {
-          status: initRes.status, body: initText, instanceName,
-        });
-        return new Response(
-          JSON.stringify({ error: "Erro ao criar instância na uazapi", status: initRes.status, detail: initText }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        console.error("[whatsapp-provision] erro em /instance/init", { status: initRes.status, body: initText, instanceName });
+        return json({ error: "Erro ao criar instância na uazapi", status: initRes.status, detail: initText }, 500);
       }
       try { initData = JSON.parse(initText); } catch { /* ok */ }
     } catch (e) {
       console.error("[whatsapp-provision] erro de rede em /instance/init", e);
-      return new Response(
-        JSON.stringify({ error: "Erro de rede ao criar instância na uazapi", detail: String(e) }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ error: "Erro de rede ao criar instância na uazapi", detail: String(e) }, 500);
     }
 
     const token: string | undefined =
@@ -140,13 +186,10 @@ serve(async (req) => {
 
     if (!token) {
       console.error("[whatsapp-provision] resposta de /instance/init sem token", initData);
-      return new Response(
-        JSON.stringify({ error: "uazapi não retornou token da instância", detail: initData }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ error: "uazapi não retornou token da instância", detail: initData }, 500);
     }
 
-    // --- Step 6: configurar webhook ---
+    // Configurar webhook
     const webhookUrl = `${SUPABASE_URL}/functions/v1/whatsapp-webhook?instance=${instanceName}`;
     try {
       const webhookRes = await fetch(`${UAZAPI_BASE_URL}/webhook`, {
@@ -156,56 +199,47 @@ serve(async (req) => {
       });
       const webhookText = await webhookRes.text().catch(() => "");
       if (!webhookRes.ok) {
-        console.error("[whatsapp-provision] erro em /webhook", {
-          status: webhookRes.status, body: webhookText, instanceName,
-        });
-        await deleteOrphanInstance(UAZAPI_BASE_URL, token, instanceName);
-        return new Response(
-          JSON.stringify({ error: "Erro ao configurar webhook na uazapi", status: webhookRes.status, detail: webhookText }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        console.error("[whatsapp-provision] erro em /webhook", { status: webhookRes.status, body: webhookText });
+        await deleteOrphanInstance(UAZAPI_BASE_URL, token);
+        return json({ error: "Erro ao configurar webhook na uazapi", status: webhookRes.status, detail: webhookText }, 500);
       }
     } catch (e) {
       console.error("[whatsapp-provision] erro de rede em /webhook", e);
-      await deleteOrphanInstance(UAZAPI_BASE_URL, token, instanceName);
-      return new Response(
-        JSON.stringify({ error: "Erro de rede ao configurar webhook na uazapi", detail: String(e) }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      await deleteOrphanInstance(UAZAPI_BASE_URL, token);
+      return json({ error: "Erro de rede ao configurar webhook na uazapi", detail: String(e) }, 500);
     }
 
-    // --- Step 7: salvar configuração ---
-    const { error: upsertError } = await supabase
+    // Salvar configuração
+    const { data: newInst, error: insertError } = await supabase
       .from("configuracoes_wapi")
-      .upsert(
-        {
-          usuario_id: usuarioId,
-          empresa_id: empresaId,
-          instance_name: instanceName,
-          api_key: token,
-          instance_url: UAZAPI_BASE_URL,
-          provisionada: true,
-          status: "disconnected",
-        },
-        { onConflict: "usuario_id" }
-      );
+      .insert({
+        empresa_id: empresaId,
+        instance_name: instanceName,
+        api_key: token,
+        instance_url: UAZAPI_BASE_URL,
+        provisionada: true,
+        status: "disconnected",
+      })
+      .select("id")
+      .single();
 
-    if (upsertError) {
-      console.error("[whatsapp-provision] erro ao salvar configuracoes_wapi", upsertError);
-      return new Response(
-        JSON.stringify({ error: "Erro ao salvar configuração", detail: upsertError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (insertError || !newInst) {
+      console.error("[whatsapp-provision] erro ao salvar configuracoes_wapi", insertError);
+      return json({ error: "Erro ao salvar configuração", detail: insertError?.message }, 500);
     }
 
-    // --- Step 8 ---
-    return new Response(JSON.stringify({ success: true, instanceName }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Vincular via junction table
+    await supabase
+      .from("wapi_instancia_usuarios")
+      .insert({ instancia_id: newInst.id, usuario_auth_id: targetAuthId })
+      .then(({ error }) => {
+        if (error) console.error("[whatsapp-provision] erro ao vincular usuário", error);
+      });
+
+    return json({ success: true, instanceName });
+
   } catch (err) {
     console.error("[whatsapp-provision] erro inesperado", err);
-    return new Response(JSON.stringify({ error: "Internal error", detail: String(err) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: "Internal error", detail: String(err) }, 500);
   }
 });

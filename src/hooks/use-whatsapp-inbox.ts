@@ -46,7 +46,6 @@ export interface WaMensagem {
 export interface WaConfig {
   id: string;
   empresa_id: string;
-  usuario_id: string | null;
   instance_url: string;
   api_key: string;
   instance_name: string;
@@ -335,11 +334,12 @@ export function useWaConfig() {
       const usuarioId = await getUsuarioId();
       if (!usuarioId) return null;
       const { data } = await supabase
-        .from('configuracoes_wapi')
-        .select('*')
-        .eq('usuario_id', usuarioId)
+        .from('wapi_instancia_usuarios')
+        .select('instancia:configuracoes_wapi(*)')
+        .eq('usuario_auth_id', usuarioId)
+        .limit(1)
         .maybeSingle();
-      return (data as WaConfig | null) ?? null;
+      return (data?.instancia as WaConfig | null) ?? null;
     },
   });
 }
@@ -622,13 +622,10 @@ export function useWaSyncStatus() {
         (data?.status?.connected === true && data?.status?.loggedIn === true) ||
         data?.connected === true;
       const dbStatus: WaConfig['status'] = isConnected ? 'connected' : 'disconnected';
-      const usuarioId = await getUsuarioId();
-      if (usuarioId) {
-        await supabase
-          .from('configuracoes_wapi')
-          .update({ status: dbStatus })
-          .eq('usuario_id', usuarioId);
-      }
+      await supabase
+        .from('configuracoes_wapi')
+        .update({ status: dbStatus })
+        .eq('id', config.id);
       return { isConnected, dbStatus };
     },
     onSuccess: () => {
@@ -651,13 +648,10 @@ export function useWaDisconnect() {
       });
       const text = await res.text().catch(() => '');
       if (!res.ok) throw new Error(`Erro ${res.status}: ${text}`);
-      const usuarioId = await getUsuarioId();
-      if (usuarioId) {
-        await supabase
-          .from('configuracoes_wapi')
-          .update({ status: 'disconnected' })
-          .eq('usuario_id', usuarioId);
-      }
+      await supabase
+        .from('configuracoes_wapi')
+        .update({ status: 'disconnected' })
+        .eq('id', config.id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['wa_config'] });

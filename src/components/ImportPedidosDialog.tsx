@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
 import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
+import { useBulkImport } from '@/hooks/use-bulk-import';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 import {
@@ -43,9 +44,18 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   });
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
+  const { importNegocios, progress } = useBulkImport();
   const [ignoredColumns, setIgnoredColumns] = useState<string[]>([]);
-  const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
+  const [step, setStep] = useState<'upload' | 'mapping' | 'preview' | 'done'>('upload');
+  const [importResult, setImportResult] = useState<{
+    totalNoArquivo: number;
+    totalValidados: number;
+    totalIgnoradosValidacao: number;
+    totalInseridos: number;
+    totalDuplicados: number;
+    totalFalharam: number;
+    motivosFalha: Record<string, number>;
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
   
@@ -72,8 +82,8 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setFieldLabels({});
     setFileName('');
     setStep('upload');
-    setImportProgress(0);
     setIgnoredColumns([]);
+    setImportResult(null);
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -118,7 +128,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: 'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '', raw: false });
 
       if (json.length === 0) {
         toast.error('Arquivo vazio ou sem dados válidos');
@@ -268,11 +278,19 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   );
 
   const handleImport = async () => {
+    if (importing) return;
     const allRows = getMappedRows();
-    const rows = allRows.filter(r => r.cliente && r.fabricante);
+    // Linhas com campo de data inválido (ex: "30/12/2022 18:01" → parse falhou)
+    const dateErrorRows = allRows.reduce<Array<{ raw: Record<string, unknown>; motivo: string }>>(
+      (acc, r, idx) => {
+        if ((r as any).__dateError) acc.push({ raw: rawData[idx], motivo: (r as any).__dateError });
+        return acc;
+      }, []
+    );
+    const rows = allRows.filter(r => !((r as any).__dateError) && r.cliente && r.fabricante);
     const ignoredRowsData = rawData.filter((_, index) => {
       const mapped = allRows[index];
-      return !(mapped.cliente && mapped.fabricante);
+      return !((mapped as any).__dateError) && !(mapped.cliente && mapped.fabricante);
     });
     
     if (rows.length === 0) {
@@ -281,30 +299,26 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     }
     
     setImporting(true);
-    setImportProgress(0);
     try {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       if (!vid) throw new Error('Vendedor não encontrado');
 
       const { data: isGestor } = await supabase.rpc('is_gestor');
 
-      // Salvar linhas ignoradas para revisão posterior
-      if (ignoredRowsData.length > 0) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const ignoredBatch = ignoredRowsData.map(row => ({
-            usuario_id: user.id,
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+
+      // Log rows sem cliente/fabricante para revisão posterior
+      if (ignoredRowsData.length > 0 && userId) {
+        const { error: ignoreError } = await supabase
+          .from('linhas_ignoradas_importacao')
+          .insert(ignoredRowsData.map(row => ({
+            usuario_id: userId,
             tipo_importacao: 'negocios',
             dados_originais: row,
-            motivo_ignorado: 'Falta Cliente ou Fabricante'
-          }));
-          
-          const { error: ignoreError } = await supabase
-            .from('linhas_ignoradas_importacao')
-            .insert(ignoredBatch);
-          
-          if (ignoreError) console.error('Erro ao salvar linhas ignoradas:', ignoreError);
-        }
+            motivo_ignorado: 'Falta Cliente ou Fabricante',
+          })));
+        if (ignoreError) console.error('Erro ao salvar linhas ignoradas:', ignoreError);
       }
 
       // Atualizar nomes das colunas (padrão e extras) para salvar como colunas na página de Negócios
@@ -383,154 +397,65 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         window.dispatchEvent(new Event('storage'));
       }
 
-      // Função auxiliar para buscar todas as linhas (contornando o limite de 1000 do Supabase)
-      const fetchAll = async (table: any, columns: string) => {
-        let allData: any[] = [];
-        let from = 0;
-        const limit = 1000;
-        let hasMore = true;
-        while (hasMore) {
-          const { data, error } = await supabase.from(table).select(columns).range(from, from + limit - 1);
-          if (error) throw error;
-          if (!data || data.length === 0) {
-            hasMore = false;
-          } else {
-            allData = [...allData, ...data];
-            hasMore = data.length === limit;
-            from += limit;
-          }
-        }
-        return allData;
-      };
-
-      const clientes = await fetchAll('clientes', 'id, empresa');
-      const fabricantes = await fetchAll('fabricantes', 'id, nome');
-      const todosVendedores = await fetchAll('usuarios', 'id, nome');
-      const obras = await fetchAll('obras', 'id, nome_obra, cliente_id');
-
-      const clienteMap = new Map((clientes ?? []).map(c => [c.empresa.toLowerCase().trim(), c.id]));
-      const fabricanteMap = new Map((fabricantes ?? []).map(f => [f.nome.toLowerCase().trim(), f.id]));
-      const vendedorMap = new Map((todosVendedores ?? []).map(v => [v.nome?.toLowerCase().trim() || '', v.id]));
-      const obraMap = new Map((obras ?? []).map(o => [`${o.cliente_id}|${o.nome_obra?.toLowerCase().trim()}`, o.id]));
-
-      const missingClientes = [...new Set(rows.map(r => r.cliente))].filter(c => !clienteMap.has(c.toLowerCase().trim()));
-      if (missingClientes.length > 0) {
-        const { data: newClientes, error } = await supabase.from('clientes').insert(
-          missingClientes.map(c => ({ empresa: c, tipo: 'construtora', usuario_id: vid }))
-        ).select('id, empresa');
-        if (error) throw error;
-        newClientes?.forEach(c => clienteMap.set(c.empresa.toLowerCase().trim(), c.id));
+      // Busca vendedores para atribuição por nome (somente se gestor)
+      let vendedorMap = new Map<string, string>();
+      if (isGestor) {
+        const { data: vends } = await supabase.from('usuarios').select('id, nome');
+        if (vends) vendedorMap = new Map(vends.map(v => [v.nome?.toLowerCase().trim() || '', v.id]));
       }
 
-      const missingFabricantes = [...new Set(rows.map(r => r.fabricante))].filter(f => !fabricanteMap.has(f.toLowerCase().trim()));
-      if (missingFabricantes.length > 0) {
-        const { data: newFabs, error } = await supabase.from('fabricantes').insert(
-          missingFabricantes.map(f => ({ nome: f }))
-        ).select('id, nome');
-        if (error) throw error;
-        newFabs?.forEach(f => fabricanteMap.set(f.nome.toLowerCase().trim(), f.id));
-      }
+      // Pré-processa linhas: enriquece campos_extras e resolve usuario_id para gestor.
+      // Resolução de clientes/fabricantes/obras, hashing e batch paralelo ficam no hook.
+      const enrichedRows: Record<string, unknown>[] = rows.map(r => {
+        const campos_extras = { ...(r.campos_extras || {}) };
+        const matchedVendedorId = r.vendedor ? vendedorMap.get(r.vendedor.toLowerCase().trim()) : null;
+        const resolvedUserId = isGestor && matchedVendedorId ? matchedVendedorId : null;
 
-      // Processar obras faltantes
-      const obraRows = rows.filter(r => r.obra && r.obra.trim() !== '');
-      const missingObras = obraRows.filter(r => {
-        const clientId = clienteMap.get(r.cliente.toLowerCase().trim());
-        if (!clientId) return false;
-        return !obraMap.has(`${clientId}|${r.obra.toLowerCase().trim()}`);
+        if (r.vendedor && !resolvedUserId) campos_extras['Vendedor Original'] = r.vendedor;
+        if (r.contato) campos_extras['Contato'] = r.contato;
+        if (r.negocio) campos_extras['Negócio'] = r.negocio;
+        else if (r.obra) campos_extras['Negócio'] = r.obra;
+        else campos_extras['Negócio'] = r.cliente;
+
+        return {
+          ...r,
+          campos_extras,
+          data_pedido: r.data_pedido || new Date().toLocaleDateString('en-CA'),
+          created_at: r.data_pedido ? `${r.data_pedido}T12:00:00.000Z` : new Date().toISOString(),
+          prazo_resposta: r.prazo_resposta || (r.status === 'fechamento' ? (r.data_pedido || new Date().toLocaleDateString('en-CA')) : null),
+          usuario_id: resolvedUserId || vid,
+        };
       });
 
-      if (missingObras.length > 0) {
-        const uniqueMissingObras = Array.from(new Map(missingObras.map(r => {
-          const clientId = clienteMap.get(r.cliente.toLowerCase().trim());
-          return [`${clientId}|${r.obra.toLowerCase().trim()}`, { nome_obra: r.obra, cliente_id: clientId }];
-        })).values());
+      const summary = await importNegocios(enrichedRows);
 
-        const { data: newObras, error } = await supabase.from('obras').insert(uniqueMissingObras).select('id, nome_obra, cliente_id');
-        if (error) throw error;
-        newObras?.forEach(o => obraMap.set(`${o.cliente_id}|${o.nome_obra?.toLowerCase().trim()}`, o.id));
-      }
-
-      const BATCH = 200;
-      let imported = 0;
-      let failed = 0;
-      setImportProgress(10);
-
-      for (let i = 0; i < rows.length; i += BATCH) {
-        const batch = rows.slice(i, i + BATCH).map(r => {
-          const clientId = clienteMap.get(r.cliente.toLowerCase().trim())!;
-          const obraId = r.obra ? obraMap.get(`${clientId}|${r.obra.toLowerCase().trim()}`) : null;
-          // Só atribui a outro usuário se o usuário atual for gestor/admin; caso contrário,
-          // o RLS bloquearia o INSERT com usuario_id de terceiros.
-          const matchedVendedorId = r.vendedor ? vendedorMap.get(r.vendedor.toLowerCase().trim()) : null;
-          const importedVendedorId = isGestor ? matchedVendedorId : null;
-
-          const finalCamposExtras = { ...(r.campos_extras || {}) };
-          // Preserva o nome do vendedor original sempre que não for atribuído diretamente
-          if (r.vendedor && !importedVendedorId) {
-            finalCamposExtras['Vendedor Original'] = r.vendedor;
-          }
-
-          if (r.contato) {
-            finalCamposExtras['Contato'] = r.contato;
-          }
-
-          if (r.negocio) {
-            finalCamposExtras['Negócio'] = r.negocio;
-          } else if (r.obra) {
-            finalCamposExtras['Negócio'] = r.obra;
-          } else {
-            finalCamposExtras['Negócio'] = r.cliente;
-          }
-
-          return {
-            cliente_id: clientId,
-            obra_id: obraId,
-            fabricante_id: fabricanteMap.get(r.fabricante.toLowerCase().trim())!,
-            usuario_id: importedVendedorId || vid,
-            status: r.status,
-            valor_total: r.valor || null,
-            observacoes: r.observacoes || null,
-            campos_extras: finalCamposExtras,
-            data_pedido: r.data_pedido || new Date().toLocaleDateString('en-CA'),
-            created_at: r.data_pedido ? `${r.data_pedido}T12:00:00.000Z` : new Date().toISOString(),
-            prazo_resposta: r.prazo_resposta || (r.status === 'fechamento' ? (r.data_pedido || new Date().toLocaleDateString('en-CA')) : null),
-          };
-        });
-
-        const { error } = await supabase.from('pedidos').insert(batch);
-        if (error) {
-          // Tenta inserir linha a linha para não perder o batch inteiro
-          for (const row of batch) {
-            const { error: rowError } = await supabase.from('pedidos').insert(row);
-            if (rowError) {
-              failed += 1;
-              console.error('Linha ignorada na importação:', rowError.message, row);
-            } else {
-              imported += 1;
-            }
-          }
-        } else {
-          imported += batch.length;
+      // Log linhas com data inválida (filtradas antes do hook — não chegam ao importNegocios)
+      if (userId) {
+        for (const { raw, motivo } of dateErrorRows) {
+          await supabase.from('linhas_ignoradas_importacao').insert({
+            usuario_id: userId,
+            tipo_importacao: 'negocios',
+            dados_originais: raw,
+            motivo_ignorado: motivo,
+          });
         }
-        setImportProgress(Math.min(95, 10 + Math.floor(((imported + failed) / rows.length) * 85)));
       }
-
-      setImportProgress(100);
 
       qc.invalidateQueries({ queryKey: ['pedidos'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
       qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
 
-      if (imported === 0 && failed > 0) {
-        toast.error(`Nenhum negócio importado. ${failed} linha(s) com erro — verifique o console para detalhes.`);
-      } else if (failed > 0) {
-        toast.warning(`${imported} negócios importados. ${failed} linha(s) falharam e foram ignoradas.`);
-      } else {
-        toast.success(`${imported} negócios importados com sucesso!`);
-      }
-      reset();
-      onOpenChange(false);
+      setImportResult({
+        totalNoArquivo: rawData.length,
+        totalValidados: rows.length,
+        totalIgnoradosValidacao: ignoredRowsData.length,
+        totalInseridos: summary.inserted,
+        totalDuplicados: summary.duplicados,
+        totalFalharam: (summary.ignored - summary.duplicados) + dateErrorRows.length,
+        motivosFalha: summary.motivosFalha,
+      });
+      setStep('done');
     } catch (err: any) {
       toast.error('Erro na importação: ' + (err.message || 'erro desconhecido'));
     } finally {
@@ -562,7 +487,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             </DialogTitle>
           </div>
           
-          {(step !== 'upload' || importing) && (
+          {((step === 'mapping' || step === 'preview') || importing) && (
             <div className="flex items-center justify-between w-full">
               {step !== 'upload' ? (
                 <div className="flex items-center gap-4 bg-background/50 px-4 py-2 rounded-xl border border-border/50 shadow-sm">
@@ -598,9 +523,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                 <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 bg-background/50 p-2 px-3 rounded-lg border border-primary/20 min-w-[200px]">
                   <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-primary">
                     <span>Importando...</span>
-                    <span>{importProgress}%</span>
+                    <span>{progress}%</span>
                   </div>
-                  <Progress value={importProgress} className="h-1" />
+                  <Progress value={progress} className="h-1" />
                 </div>
               )}
             </div>
@@ -810,6 +735,73 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
           </div>
         )}
+
+        {step === 'done' && importResult && (
+          <div className="flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-center gap-3 py-2">
+              {importResult.totalInseridos === 0 && importResult.totalFalharam > 0 ? (
+                <X className="h-10 w-10 text-destructive" />
+              ) : (
+                <CheckCircle2 className="h-10 w-10 text-green-500" />
+              )}
+              <div>
+                <h3 className="font-bold text-lg">Importação concluída</h3>
+                <p className="text-sm text-muted-foreground">{importResult.totalNoArquivo} linhas no arquivo</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-muted/50 rounded-xl p-4 border text-center">
+                <div className="text-3xl font-bold">{importResult.totalNoArquivo}</div>
+                <div className="text-xs text-muted-foreground mt-1">Total no arquivo</div>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-green-700">{importResult.totalInseridos}</div>
+                <div className="text-xs text-green-600 mt-1">Importados com sucesso</div>
+              </div>
+              {importResult.totalIgnoradosValidacao > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-amber-700">{importResult.totalIgnoradosValidacao}</div>
+                  <div className="text-xs text-amber-600 mt-1">Sem cliente ou fabricante</div>
+                </div>
+              )}
+              {importResult.totalDuplicados > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-blue-700">{importResult.totalDuplicados}</div>
+                  <div className="text-xs text-blue-600 mt-1">Duplicados ignorados</div>
+                </div>
+              )}
+              {importResult.totalFalharam > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-red-700">{importResult.totalFalharam}</div>
+                  <div className="text-xs text-red-600 mt-1">Falhas de inserção</div>
+                </div>
+              )}
+            </div>
+
+            {Object.keys(importResult.motivosFalha).length > 0 && (
+              <div className="bg-muted/30 rounded-xl p-4 border">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  Motivos de falha
+                </p>
+                <div className="space-y-1.5">
+                  {Object.entries(importResult.motivosFalha).map(([motivo, count]) => (
+                    <div key={motivo} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-muted-foreground truncate">{motivo}</span>
+                      <Badge variant="outline" className="shrink-0">{count}×</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(importResult.totalIgnoradosValidacao > 0 || importResult.totalDuplicados > 0 || importResult.totalFalharam > 0) && (
+              <p className="text-xs text-muted-foreground text-center">
+                Linhas ignoradas ficam disponíveis para revisão em <strong>Ações → Linhas Ignoradas</strong>.
+              </p>
+            )}
+          </div>
+        )}
         </div>
 
         {step === 'mapping' && (
@@ -841,6 +833,14 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               ) : (
                 <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {previewRows.length} negócios</>
               )}
+            </Button>
+          </div>
+        )}
+
+        {step === 'done' && (
+          <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
+            <Button onClick={() => onOpenChange(false)} className="h-10 px-6 font-bold">
+              Fechar
             </Button>
           </div>
         )}

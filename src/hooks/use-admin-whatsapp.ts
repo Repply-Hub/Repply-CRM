@@ -3,55 +3,103 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { WaConfig } from './use-whatsapp-inbox';
 
-// --- Provisionar instância para qualquer usuário (admin only) ---
+async function getSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Sessão expirada');
+  return session;
+}
 
-export function useAdminProvision() {
+async function callAdminProvision(body: Record<string, unknown>) {
+  const session = await getSession();
+  const res = await supabase.functions.invoke('whatsapp-admin-provision', {
+    body,
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  if (res.error) throw res.error;
+  if (res.data?.error) throw new Error(res.data.error);
+  return res.data;
+}
+
+// --- Criar nova instância (independente de usuário) ---
+// target_usuario_id é opcional: se fornecido, vincula imediatamente ao criar.
+
+export function useAdminCreateInstance() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (targetUsuarioId: string) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Sessão expirada');
-
-      const res = await supabase.functions.invoke('whatsapp-admin-provision', {
-        body: { action: 'provision', target_usuario_id: targetUsuarioId },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-
-      if (res.error) throw res.error;
-      if (res.data?.error) throw new Error(res.data.error);
-      return res.data as { success: boolean; instanceName: string; alreadyProvisioned?: boolean };
+    mutationFn: async (params: { targetUsuarioId?: string } = {}) => {
+      return callAdminProvision({
+        action: 'create',
+        target_usuario_id: params.targetUsuarioId,
+      }) as Promise<{ success: boolean; instanceName: string }>;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin_wa_instancias'] });
+      qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
+      toast.success('Instância criada com sucesso');
     },
     onError: (err: any) => {
-      toast.error(err?.message ?? 'Erro ao provisionar instância');
+      toast.error(err?.message ?? 'Erro ao criar instância');
     },
   });
 }
 
-// --- Remover instância de qualquer usuário (admin only) ---
+// --- Vincular instância a um usuário ---
+
+export function useAdminLinkInstance() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { instanceId: string; targetUsuarioId: string }) => {
+      return callAdminProvision({
+        action: 'link',
+        instance_id: params.instanceId,
+        target_usuario_id: params.targetUsuarioId,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
+      toast.success('Instância vinculada ao usuário');
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao vincular instância');
+    },
+  });
+}
+
+// --- Desvincular um usuário específico de uma instância ---
+
+export function useAdminUnlinkInstance() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { instanceId: string; targetUsuarioId: string }) => {
+      return callAdminProvision({
+        action: 'unlink',
+        instance_id: params.instanceId,
+        target_usuario_id: params.targetUsuarioId,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
+      toast.success('Usuário desvinculado da instância');
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao desvincular usuário');
+    },
+  });
+}
+
+// --- Remover instância (apaga da uazapi e do banco) ---
 
 export function useAdminDeleteInstance() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (targetUsuarioId: string) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Sessão expirada');
-
-      const res = await supabase.functions.invoke('whatsapp-admin-provision', {
-        body: { action: 'delete', target_usuario_id: targetUsuarioId },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-
-      if (res.error) throw res.error;
-      if (res.data?.error) throw new Error(res.data.error);
-      return res.data;
+    mutationFn: async (instanceId: string) => {
+      return callAdminProvision({ action: 'delete', instance_id: instanceId });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin_wa_instancias'] });
+      qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
       toast.success('Instância removida');
     },
     onError: (err: any) => {
@@ -96,7 +144,7 @@ export function useAdminConnect() {
   });
 }
 
-// --- Sincronizar status de uma instância (atualiza por config.id) ---
+// --- Sincronizar status de uma instância ---
 
 export function useAdminSyncStatus() {
   const qc = useQueryClient();
@@ -123,12 +171,12 @@ export function useAdminSyncStatus() {
       return { isConnected, dbStatus };
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin_wa_instancias'] });
+      qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
     },
   });
 }
 
-// --- Desconectar instância (atualiza por config.id) ---
+// --- Desconectar instância ---
 
 export function useAdminDisconnect() {
   const qc = useQueryClient();
@@ -150,7 +198,7 @@ export function useAdminDisconnect() {
         .eq('id', config.id);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin_wa_instancias'] });
+      qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
       toast.success('WhatsApp desconectado');
     },
     onError: (err: any) => {
@@ -158,3 +206,7 @@ export function useAdminDisconnect() {
     },
   });
 }
+
+// Mantido por compatibilidade com código legado que ainda usa useAdminProvision
+/** @deprecated Use useAdminCreateInstance */
+export const useAdminProvision = useAdminCreateInstance;

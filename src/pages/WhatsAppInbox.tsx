@@ -26,6 +26,7 @@ import {
   type WaConfig,
 } from "@/hooks/use-whatsapp-inbox";
 import { useVendedores } from "@/hooks/use-clientes";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -62,13 +63,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterButton } from "@/components/FilterButton";
 import { Label } from "@/components/ui/label";
 import {
   MessageCircle,
@@ -1143,6 +1138,7 @@ function LeadSheet({
 
 // --- Componente principal ---
 export default function WhatsAppInbox() {
+  const { profile } = useAuth();
   const { data: conversas = [], isLoading: loadingConversas } =
     useWaConversas();
   const { data: config } = useWaConfig();
@@ -1169,9 +1165,8 @@ export default function WhatsAppInbox() {
   const [filtroStatus, setFiltroStatus] = useState<"aberto" | "fechado">(
     "aberto",
   );
-  const [filtroTipo, setFiltroTipo] = useState<
-    "todos" | "contatos" | "empresa"
-  >("todos");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "contatos" | "empresa">("todos");
+  const [filtroConversa, setFiltroConversa] = useState<"todos" | "geral" | "meu">("todos");
   const [showConfig, setShowConfig] = useState(false);
   const [showNovaConversa, setShowNovaConversa] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1312,6 +1307,8 @@ export default function WhatsAppInbox() {
   const conversasPorTipoEBusca = conversas.filter((c) => {
     if (filtroTipo === "empresa" && !c.cliente_id) return false;
     if (filtroTipo === "contatos" && !c.contato_id) return false;
+    if (filtroConversa === "geral" && (c.responsaveis?.length ?? 0) > 0) return false;
+    if (filtroConversa === "meu" && (!profile?.id || !c.responsaveis?.some((r) => r.id === profile.id))) return false;
 
     if (!busca) return true;
     const term = busca.toLowerCase();
@@ -1719,19 +1716,47 @@ export default function WhatsAppInbox() {
                     </span>
                   </button>
                 </div>
-                <Select
-                  value={filtroTipo}
-                  onValueChange={(v) => setFiltroTipo(v as typeof filtroTipo)}
+                <FilterButton
+                  hasFilters={filtroTipo !== "todos" || filtroConversa !== "todos"}
+                  activeFilterCount={(filtroTipo !== "todos" ? 1 : 0) + (filtroConversa !== "todos" ? 1 : 0)}
+                  onClear={() => { setFiltroTipo("todos"); setFiltroConversa("todos"); }}
+                  align="start"
+                  popoverClassName="w-56"
                 >
-                  <SelectTrigger className="h-8 w-full text-[11px] px-3">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="contatos">Contatos</SelectItem>
-                    <SelectItem value="empresa">Empresa</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <div className="flex flex-col gap-0.5">
+                    <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Tipos de clientes</p>
+                    {([["todos", "Todos"], ["contatos", "Contatos"], ["empresa", "Empresa"]] as const).map(([val, label]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setFiltroTipo(val)}
+                        className={cn(
+                          "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                          filtroTipo === val && "bg-primary/10 text-primary",
+                        )}
+                      >
+                        {label}
+                        {filtroTipo === val && <Check className="h-3.5 w-3.5" />}
+                      </button>
+                    ))}
+                    <div className="mx-3 my-1 border-t border-border/50" />
+                    <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Conversa</p>
+                    {([["todos", "Todos"], ["geral", "Não atribuído"], ["meu", "Meus chats"]] as const).map(([val, label]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setFiltroConversa(val)}
+                        className={cn(
+                          "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                          filtroConversa === val && "bg-primary/10 text-primary",
+                        )}
+                      >
+                        {label}
+                        {filtroConversa === val && <Check className="h-3.5 w-3.5" />}
+                      </button>
+                    ))}
+                  </div>
+                </FilterButton>
               </div>
               <div className="relative pb-2">
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -1924,66 +1949,96 @@ export default function WhatsAppInbox() {
               </div>
 
               <div className="px-2 pt-2 border-b border-border bg-background space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 flex-1">
-                    <button
-                      type="button"
-                      onClick={() => setFiltroStatus("aberto")}
-                      className={cn(
-                        "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
-                        filtroStatus === "aberto"
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      Em aberto
-                      <span
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 flex-1">
+                      <button
+                        type="button"
+                        onClick={() => setFiltroStatus("aberto")}
                         className={cn(
-                          "text-[9px] px-1 rounded-full font-semibold",
+                          "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
                           filtroStatus === "aberto"
-                            ? "bg-primary/10 text-primary"
-                            : "bg-muted-foreground/10",
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
                         )}
                       >
-                        {countAbertas}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFiltroStatus("fechado")}
-                      className={cn(
-                        "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
-                        filtroStatus === "fechado"
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      Fechado
-                      <span
+                        Em aberto
+                        <span
+                          className={cn(
+                            "text-[9px] px-1 rounded-full font-semibold",
+                            filtroStatus === "aberto"
+                              ? "bg-primary/10 text-primary"
+                              : "bg-muted-foreground/10",
+                          )}
+                        >
+                          {countAbertas}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFiltroStatus("fechado")}
                         className={cn(
-                          "text-[9px] px-1 rounded-full font-semibold",
+                          "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
                           filtroStatus === "fechado"
-                            ? "bg-primary/10 text-primary"
-                            : "bg-muted-foreground/10",
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
                         )}
                       >
-                        {countFechadas}
-                      </span>
-                    </button>
+                        Fechado
+                        <span
+                          className={cn(
+                            "text-[9px] px-1 rounded-full font-semibold",
+                            filtroStatus === "fechado"
+                              ? "bg-primary/10 text-primary"
+                              : "bg-muted-foreground/10",
+                          )}
+                        >
+                          {countFechadas}
+                        </span>
+                      </button>
+                    </div>
+                    <FilterButton
+                      hasFilters={filtroTipo !== "todos" || filtroConversa !== "todos"}
+                      activeFilterCount={(filtroTipo !== "todos" ? 1 : 0) + (filtroConversa !== "todos" ? 1 : 0)}
+                      onClear={() => { setFiltroTipo("todos"); setFiltroConversa("todos"); }}
+                      align="end"
+                      popoverClassName="w-56"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Tipos de clientes</p>
+                        {([["todos", "Todos"], ["contatos", "Contatos"], ["empresa", "Empresa"]] as const).map(([val, label]) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setFiltroTipo(val)}
+                            className={cn(
+                              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                              filtroTipo === val && "bg-primary/10 text-primary",
+                            )}
+                          >
+                            {label}
+                            {filtroTipo === val && <Check className="h-3.5 w-3.5" />}
+                          </button>
+                        ))}
+                        <div className="mx-3 my-1 border-t border-border/50" />
+                        <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Conversa</p>
+                        {([["todos", "Todos"], ["geral", "Não atribuído"], ["meu", "Meus chats"]] as const).map(([val, label]) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setFiltroConversa(val)}
+                            className={cn(
+                              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                              filtroConversa === val && "bg-primary/10 text-primary",
+                            )}
+                          >
+                            {label}
+                            {filtroConversa === val && <Check className="h-3.5 w-3.5" />}
+                          </button>
+                        ))}
+                      </div>
+                    </FilterButton>
                   </div>
-                  <Select
-                    value={filtroTipo}
-                    onValueChange={(v) => setFiltroTipo(v as typeof filtroTipo)}
-                  >
-                    <SelectTrigger className="h-7 w-[88px] text-[11px] px-2 shrink-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="contatos">Contatos</SelectItem>
-                      <SelectItem value="empresa">Empresa</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
                 <div className="relative pb-2">
                   <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />

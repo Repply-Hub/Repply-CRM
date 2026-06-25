@@ -37,7 +37,7 @@ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent
 
 const Dashboard = () => {
   const [dateRange, setDateRange] = useState<DateRange>({
-    from: subMonths(new Date(), 6),
+    from: subMonths(new Date(), 60),
     to: new Date(),
   });
   const [fabricaSort, setFabricaSort] = useState<'maior' | 'menor'>('maior');

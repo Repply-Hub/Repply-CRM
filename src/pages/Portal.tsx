@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { format, parse, subMonths, startOfMonth, endOfMonth, getMonth, getYear, isValid } from 'date-fns';
+import { format, subMonths, startOfMonth, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 
 const formatDataEdicao = (raw: string): string => {
@@ -486,176 +486,46 @@ export default function Portal() {
     }
   };
 
-  // ─── Natal: client-side scraping with AI extraction ──────────────────────────────
+  // ─── Natal: lista edições via list-dom-editions ──────────────────────────────
+  // Download + parse de PDF roda no GitHub Actions (scripts/dom_natal_scraper.py).
+  // Este botão apenas consulta quais edições existem no período selecionado.
   const scrapeNatal = async () => {
     setScraping((prev) => ({ ...prev, natal: true }));
-    const toastId = toast.loading('Buscando diários oficiais de Natal...');
+    const toastId = toast.loading('Consultando edições disponíveis do DOM Natal...');
     try {
-      // Fetch listing page for current and previous month
       const now = new Date();
       const from = dateFrom || startOfMonth(subMonths(now, 1));
-      const to = dateTo || now;
+      const to   = dateTo   || now;
 
-      // Generate list of months between from and to
-      const months: Array<{ mes: string; ano: string }> = [];
-      const cursor = new Date(getYear(from), getMonth(from), 1);
-      const end = new Date(getYear(to), getMonth(to), 1);
-      while (cursor <= end) {
-        months.push({
-          mes: String(cursor.getMonth() + 1).padStart(2, '0'),
-          ano: String(cursor.getFullYear()),
-        });
+      // Monta lista de meses sem repetição — ignora o dia selecionado
+      const meses: { mes: number; ano: number }[] = [];
+      const cursor = new Date(from.getFullYear(), from.getMonth(), 1);
+      const fim    = new Date(to.getFullYear(),   to.getMonth(),   1);
+      while (cursor <= fim) {
+        meses.push({ mes: cursor.getMonth() + 1, ano: cursor.getFullYear() });
         cursor.setMonth(cursor.getMonth() + 1);
       }
-      if (months.length === 0) {
-        months.push({ mes: String(now.getMonth() + 1).padStart(2, '0'), ano: String(now.getFullYear()) });
-      }
 
-      const pdfLinks: Array<{ href: string; title: string; date: string; numero: string }> = [];
-
-      for (const { mes, ano } of months) {
-        try {
-          const formData = new URLSearchParams();
-          formData.append('mes', mes);
-          formData.append('ano', ano);
-          formData.append('list', 'Listar');
-
-          const resp = await fetch('https://www.natal.rn.gov.br/dom/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString(),
-          });
-          if (!resp.ok) continue;
-          const html = await resp.text();
-
-          const linkRegex = /<a\s+href="(https?:\/\/www2?\.natal\.rn\.gov\.br\/_anexos\/publicacao\/dom\/[^"]+\.pdf)"[^>]*>([^<]+)<\/a>/gi;
-          let match;
-          while ((match = linkRegex.exec(html)) !== null) {
-            const href = match[1];
-            const title = match[2].trim();
-            if (pdfLinks.some(p => p.href === href)) continue;
-            const dateMatch = title.match(/(\d{2}\/\d{2}\/\d{4})/);
-            const numMatch = title.match(/Num\.\s*(\d+)/i);
-            pdfLinks.push({
-              href,
-              title,
-              date: dateMatch ? dateMatch[1] : '',
-              numero: numMatch ? numMatch[1] : '',
-            });
-          }
-        } catch {
-          // continue
-        }
-      }
-
-      if (pdfLinks.length === 0) {
-        toast.error('Nenhum PDF encontrado no DOM de Natal', { id: toastId });
-        setScraping((prev) => ({ ...prev, natal: false }));
-        return;
-      }
-
-      toast.loading(`Encontrados ${pdfLinks.length} PDFs. Verificando novos...`, { id: toastId });
-
-      // Check existing
-      const { data: existing } = await supabase
-        .from('licencas_natal')
-        .select('pdf_link,tipo_licenca,fase_obra,construtora,razao_social,nome_contato,email,endereco_obra,obra_descricao,bloco_texto');
-
-      const relevantLinks = new Set(
-        (existing || [])
-          .filter((row) => isNatalRelevantRecord(row as unknown as Record<string, unknown>) || isNatalPlaceholderRecord(row as unknown as Record<string, unknown>))
-          .map((row) => row.pdf_link)
-          .filter(Boolean)
+      // Uma chamada por mês em paralelo — a API do DOM só aceita mes+ano por request
+      const respostas = await Promise.all(
+        meses.map(({ mes, ano }) =>
+          supabase.functions.invoke('list-dom-editions', { body: { mes, ano } })
+        )
       );
 
-      const newPdfs = pdfLinks.filter(p => !relevantLinks.has(p.href));
-
-      if (newPdfs.length === 0) {
-        toast.success('Banco de dados já está atualizado!', { id: toastId });
-        setScraping((prev) => ({ ...prev, natal: false }));
-        return;
+      let totalEdicoes = 0;
+      for (const { data, error } of respostas) {
+        if (!error && data?.success) totalEdicoes += data.edicoes?.length ?? 0;
       }
 
-      // Process up to 3 PDFs at a time (AI processing is heavier)
-      const toProcess = newPdfs.slice(0, 3);
-      let totalInserted = 0;
-
-      for (let i = 0; i < toProcess.length; i++) {
-        const pdf = toProcess[i];
-        toast.loading(`Processando PDF ${i + 1}/${toProcess.length} com IA... (${pdf.numero || pdf.title})`, { id: toastId });
-
-        try {
-          const { data: aiResult, error: aiError } = await supabase.functions.invoke('extract-natal-pdf', {
-            body: {
-              pdf_url: pdf.href,
-              pdf_date: pdf.date || pdf.title,
-              pdf_numero: pdf.numero,
-            },
-          });
-
-          if (aiError) {
-            console.error('AI extraction error:', aiError);
-            // Fallback: insert basic entry
-            await supabase.from('licencas_natal').insert({
-              data_edicao: pdf.date || pdf.title,
-              numero_dom: pdf.numero,
-              pdf_nome: pdf.href.split('/').pop() || '',
-              pdf_link: pdf.href,
-              bloco_texto: '(Erro na extração via IA)',
-            });
-            totalInserted++;
-            continue;
-          }
-
-          if (aiResult?.success && aiResult.entries?.length > 0) {
-            for (const entry of aiResult.entries) {
-              await supabase.from('licencas_natal').insert({
-                data_edicao: entry.data_edicao || pdf.date || pdf.title,
-                numero_dom: entry.numero_dom || pdf.numero,
-                tipo_licenca: normalizeNatalLicenseType(entry.tipo_licenca) || '',
-                fase_obra: entry.fase_obra || '',
-                construtora: entry.construtora || '',
-                cnpj: entry.cnpj || '',
-                razao_social: entry.razao_social || '',
-                nome_contato: entry.nome_contato || '',
-                email: entry.email || '',
-                endereco_obra: entry.endereco_obra || '',
-                obra_descricao: entry.obra_descricao || '',
-                pdf_nome: pdf.href.split('/').pop() || '',
-                pdf_link: pdf.href,
-                bloco_texto: entry.bloco_texto || '',
-              } as any);
-              totalInserted++;
-            }
-          } else {
-            // No entries found by AI
-            await supabase.from('licencas_natal').insert({
-              data_edicao: pdf.date || pdf.title,
-              numero_dom: pdf.numero,
-              pdf_nome: pdf.href.split('/').pop() || '',
-              pdf_link: pdf.href,
-              bloco_texto: '(Nenhuma licença/obra identificada neste diário)',
-            });
-            totalInserted++;
-          }
-        } catch (err) {
-          console.error('Erro ao processar PDF Natal:', pdf.href, err);
-          await supabase.from('licencas_natal').insert({
-            data_edicao: pdf.date || pdf.title,
-            numero_dom: pdf.numero,
-            pdf_nome: pdf.href.split('/').pop() || '',
-            pdf_link: pdf.href,
-            bloco_texto: '(Erro no processamento)',
-          });
-          totalInserted++;
-        }
-      }
-
-      toast.success(`${totalInserted} novos registros importados de ${toProcess.length} PDFs via IA!`, { id: toastId });
+      toast.success(
+        `${totalEdicoes} edição(ões) disponível(is) no período. Importação via GitHub Actions.`,
+        { id: toastId },
+      );
       await fetchNatalFromDb();
     } catch (err) {
-      console.error('Scraping Natal error:', err);
-      toast.error('Erro ao fazer scraping de Natal', { id: toastId });
+      console.error('Erro ao listar edições Natal:', err);
+      toast.error('Erro ao consultar edições do DOM Natal', { id: toastId });
     } finally {
       setScraping((prev) => ({ ...prev, natal: false }));
     }

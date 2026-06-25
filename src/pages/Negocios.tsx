@@ -20,7 +20,7 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight
+  ChevronRight, FileWarning
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -33,6 +33,7 @@ import { useTableSettings } from '@/hooks/use-table-settings';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ImportPedidosDialog } from '@/components/ImportPedidosDialog';
+import { ImportDialog } from '@/components/ImportDialog';
 import { ListPagination } from '@/components/ListPagination';
 import { KanbanColumn } from '@/components/kanban/KanbanColumn';
 import { FilterButton } from '@/components/FilterButton';
@@ -335,6 +336,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
+  const [importAiOpen, setImportAiOpen] = useState(false);
   const [selectedStages, setSelectedStages] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
@@ -749,14 +751,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         )}
 
         <ColumnSettingsPopover label="Ações" icon={Plus}>
-          <ColumnSettingsItem 
-            label="Importar Excel" 
-            icon={Upload} 
-            onClick={() => setImportOpen(true)} 
+          <ColumnSettingsItem
+            label="Importar"
+            icon={Upload}
+            onClick={() => setImportOpen(true)}
           />
-          
-          <ColumnSettingsItem 
-            label="Exportar PDF" 
+
+          <ColumnSettingsItem
+            label="Linhas Ignoradas"
+            icon={FileWarning}
+            onClick={() => navigate('/importacao/ignoradas')}
+          />
+
+          <ColumnSettingsItem
+            label="Exportar PDF"
             icon={FileDown} 
             onClick={() => handleExportPdf()} 
           />
@@ -1200,9 +1208,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     : `${filtered.length} negócios${isFiltered ? ' (filtrados)' : ''} · Total: ${(filtered.reduce((acc, p) => acc + (Number(p.valor_total) || 0), 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
 
   return (
-    <AppLayout title="Negócios" subtitle={subtitle}>
-      <div className="p-6 w-full">
-        <div className="mb-4 md:mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <AppLayout title="Negócios" subtitle={subtitle} mainClassName={showKanban ? 'flex-1 overflow-hidden flex flex-col' : 'flex-1 overflow-auto'}>
+      <div className={showKanban ? 'flex flex-col flex-1 min-h-0 px-4 sm:px-6 pt-4 sm:pt-6' : 'p-4 sm:p-6'}>
+        <div className={cn('mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between', showKanban ? 'shrink-0' : 'mb-4 md:mb-6')}>
           <div className="flex-1 flex flex-wrap items-center gap-2 min-w-0">
             {isPipelineMode && (
               <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
@@ -1257,7 +1265,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           </div>
         ) : showKanban ? (
           <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-3 px-3 sm:mx-0 sm:px-0">
+            <div className="flex-1 min-h-0 pb-4 flex gap-2 sm:gap-3 lg:gap-4 overflow-x-auto items-stretch">
               {KANBAN_STAGES.filter(stage => visibleKanbanStages.includes(stage.key)).map(stage => (
                 <KanbanColumn
                   key={stage.key}
@@ -1270,16 +1278,18 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   columns={columns}
                 />
               ))}
-              <button
-                type="button"
-                onClick={() => setColunasDialogOpen(true)}
-                className="flex flex-col items-center justify-center w-64 sm:w-72 min-w-[256px] sm:min-w-[288px] shrink-0 h-[200px] mt-[52px] rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-primary/40 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary gap-2 group"
-              >
-                <div className="h-10 w-10 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-                  <Plus className="h-5 w-5" />
-                </div>
-                <span className="font-medium text-sm">Adicionar Etapa</span>
-              </button>
+              <div className="self-start mt-[52px] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setColunasDialogOpen(true)}
+                  className="flex flex-col items-center justify-center w-52 sm:w-64 lg:w-72 min-w-[208px] sm:min-w-[256px] lg:min-w-[288px] h-[180px] rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-primary/40 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary gap-2 group"
+                >
+                  <div className="h-10 w-10 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                    <Plus className="h-5 w-5" />
+                  </div>
+                  <span className="font-medium text-sm">Adicionar Etapa</span>
+                </button>
+              </div>
             </div>
           </DragDropContext>
         ) : (
@@ -1426,6 +1436,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </AlertDialog>
 
       <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
+      <ImportDialog
+        open={importAiOpen}
+        importType="negocios"
+        onOpenChange={(v) => {
+          setImportAiOpen(v);
+          if (!v) queryClient.invalidateQueries({ queryKey: ['pedidos'] });
+        }}
+      />
       
       <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} />
       {viewOrderSheet}

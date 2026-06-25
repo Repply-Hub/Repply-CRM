@@ -79,7 +79,7 @@ export const StandardPopoverMenu = ({
                 className={cn("w-64 p-0 shadow-2xl border-border/40 z-[60] bg-background overflow-hidden", popoverClassName)}
             >
                 <div className="flex flex-col h-full">
-                    <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
+                    <div className="px-4 py-3 bg-muted/20">
                         <h4 className="font-bold text-[10px] uppercase tracking-[0.15em] text-muted-foreground/80 leading-none">{label}</h4>
                     </div>
                     <div className="p-1.5 flex flex-col gap-0.5 overflow-y-auto max-h-[calc(90vh-80px)] custom-scrollbar">
