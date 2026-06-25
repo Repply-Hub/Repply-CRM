@@ -40,52 +40,66 @@ export default function Login() {
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    const form = new FormData(e.currentTarget);
-    const { error } = await signIn(form.get("email") as string, form.get("password") as string);
-    if (error) toast.error(traduzirErro(error.message));
-    setLoading(false);
+    try {
+      const form = new FormData(e.currentTarget);
+      const { error } = await signIn(form.get("email") as string, form.get("password") as string);
+      if (error) toast.error(traduzirErro(error.message));
+    } catch (err: any) {
+      toast.error(traduzirErro(err?.message ?? "Erro inesperado. Tente novamente."));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSignUpEmpresa = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    const form = new FormData(e.currentTarget);
-    const { error } = await signUpEmpresa(
-      form.get("email") as string,
-      form.get("password") as string,
-      form.get("nome") as string,
-      form.get("nome_empresa") as string,
-      form.get("cnpj") as string,
-    );
-    if (error) toast.error(traduzirErro(error.message));
-    else toast.success("Empresa cadastrada! Verifique seu email para confirmar.");
-    setLoading(false);
+    try {
+      const form = new FormData(e.currentTarget);
+      const { error } = await signUpEmpresa(
+        form.get("email") as string,
+        form.get("password") as string,
+        form.get("nome") as string,
+        form.get("nome_empresa") as string,
+        form.get("cnpj") as string,
+      );
+      if (error) toast.error(traduzirErro(error.message));
+      else toast.success("Empresa cadastrada! Verifique seu email para confirmar.");
+    } catch (err: any) {
+      toast.error(traduzirErro(err?.message ?? "Erro inesperado. Tente novamente."));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSignUpFuncionario = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    const form = new FormData(e.currentTarget);
-    const codigoEmpresa = (form.get("codigo_empresa") as string).toUpperCase();
+    try {
+      const form = new FormData(e.currentTarget);
+      const codigoEmpresa = (form.get("codigo_empresa") as string).toUpperCase();
 
-    // Valida o código da empresa antes de criar o usuário (via RPC para funcionar sem auth)
-    const { data: empresa } = await supabase.rpc("validar_codigo_empresa" as any, { p_codigo: codigoEmpresa });
+      // Valida o código da empresa antes de criar o usuário (via RPC para funcionar sem auth)
+      const { data: empresa } = await supabase.rpc("validar_codigo_empresa" as any, { p_codigo: codigoEmpresa });
 
-    if (!empresa) {
-      toast.error("Código de empresa inválido. Solicite o código ao seu gestor.");
+      if (!empresa) {
+        toast.error("Código de empresa inválido. Solicite o código ao seu gestor.");
+        return;
+      }
+
+      const { error } = await signUpFuncionario(
+        form.get("email") as string,
+        form.get("password") as string,
+        form.get("nome") as string,
+        codigoEmpresa,
+      );
+      if (error) toast.error(traduzirErro(error.message));
+      else toast.success(`Cadastro realizado na empresa "${(empresa as any).nome}"! Verifique seu email para confirmar.`);
+    } catch (err: any) {
+      toast.error(traduzirErro(err?.message ?? "Erro inesperado. Tente novamente."));
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { error } = await signUpFuncionario(
-      form.get("email") as string,
-      form.get("password") as string,
-      form.get("nome") as string,
-      codigoEmpresa,
-    );
-    if (error) toast.error(traduzirErro(error.message));
-    else toast.success(`Cadastro realizado na empresa "${(empresa as any).nome}"! Verifique seu email para confirmar.`);
-    setLoading(false);
   };
 
   return (
@@ -134,8 +148,9 @@ export default function Login() {
       </div>
 
       {/* Right side — login form */}
-      <div className="flex-1 flex items-center justify-center bg-background p-6">
-        <div className="w-full max-w-sm">
+      <div className="flex-1 overflow-y-auto bg-background">
+        <div className="min-h-full flex items-center justify-center p-6">
+        <div className="w-full max-w-sm py-6">
           {/* Mobile logo */}
           <div className="flex flex-col items-center mb-8 lg:hidden">
             <Logo className="h-20 w-20 mt-6 mb-3" />
@@ -340,6 +355,7 @@ export default function Login() {
               )}
             </TabsContent>
           </Tabs>
+        </div>
         </div>
       </div>
     </div>
