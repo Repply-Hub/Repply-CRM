@@ -64,10 +64,16 @@ serve(async (req) => {
       });
     }
 
-    const { data: config } = await supabase
-      .from("configuracoes_wapi")
-      .select("instance_url, api_key, instance_name, api_instance_name, status")
-      .eq("usuario_id", user.id).single();
+    const { data: instLink } = await supabase
+      .from("wapi_instancia_usuarios")
+      .select("configuracoes_wapi:instancia_id(instance_url, api_key, instance_name, api_instance_name, status)")
+      .eq("usuario_auth_id", user.id)
+      .limit(1)
+      .maybeSingle();
+    const config = (instLink?.configuracoes_wapi ?? null) as {
+      instance_url: string; api_key: string; instance_name: string;
+      api_instance_name: string | null; status: string;
+    } | null;
     if (!config) {
       return new Response(JSON.stringify({ error: "WhatsApp não configurado" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -80,7 +86,11 @@ serve(async (req) => {
     }
 
     const digits = telefone.replace(/\D/g, "");
-    const phone = digits.startsWith("55") ? digits : `55${digits}`;
+    // Grupos têm JIDs com 15+ dígitos (ex: 120363XXXXXXXXXX); números individuais max 13 dígitos
+    const isGroup = telefone.includes("@g.us") || digits.length > 14;
+    const phone = isGroup
+      ? (telefone.includes("@g.us") ? telefone : `${digits}@g.us`)
+      : (digits.startsWith("55") ? digits : `55${digits}`);
     const uazapiInstance = config.api_instance_name ?? config.instance_name;
     const baseUrl = config.instance_url.replace(/\/$/, "");
 
@@ -148,18 +158,23 @@ serve(async (req) => {
       } catch (e) { fetchError = String(e); }
     }
 
-    // Debug fire-and-forget (não bloqueia a resposta)
-    supabase.from("webhook_debug").insert({
+    // Debug — aguardado para garantir que erros sejam registrados antes do retorno
+    await supabase.from("webhook_debug").insert({
       payload: { _debug: true, url: wapiUrl, status: wapiStatus, response: responseText, fetch_error: fetchError || null }
     });
 
     if (fetchError) {
-      return new Response(JSON.stringify({ error: "Erro de rede", detail: fetchError }), {
+      return new Response(JSON.stringify({ error: "Erro de rede ao contactar WhatsApp", detail: fetchError }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (wapiStatus < 200 || wapiStatus >= 300) {
-      return new Response(JSON.stringify({ error: "Erro uazapi", status: wapiStatus, detail: responseText }), {
+      let wapiError = "";
+      try { wapiError = JSON.parse(responseText)?.error ?? ""; } catch { /* ok */ }
+      const userMessage = wapiError.includes("not on WhatsApp")
+        ? "Número não possui WhatsApp"
+        : wapiError || `Erro ao enviar (status ${wapiStatus})`;
+      return new Response(JSON.stringify({ error: userMessage, detail: responseText }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
