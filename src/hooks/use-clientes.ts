@@ -100,7 +100,23 @@ export function useVendedores() {
       const { data, error } = await supabase
         .from('usuarios')
         .select('*, avatar_url')
+        .is('deleted_at', null)
         .order('nome');
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useVendedoresRemovidos() {
+  return useQuery({
+    queryKey: ['usuarios_removidos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('*, avatar_url')
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false });
       if (error) throw error;
       return data;
     },

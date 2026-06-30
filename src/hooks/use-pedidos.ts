@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/use-auth';
 
 export interface PedidoWithRelations {
   id: string;
@@ -22,77 +21,52 @@ export interface PedidoWithRelations {
   obra: { id: string; nome_obra: string } | null;
 }
 
-export function usePedidos(empresaId?: string) {
-  const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
-
+export function usePedidos(
+  empresaId?: string,
+  page = 0,
+  pageSize = 50,
+  stages?: string[],
+) {
   return useQuery({
-    queryKey: ['pedidos', empresaId, profile?.id, profile?.role],
+    queryKey: ['pedidos', empresaId, page, pageSize, stages],
     queryFn: async () => {
-      const allData: PedidoWithRelations[] = [];
-      const pageSize = 1000;
-      let from = 0;
-      let hasMore = true;
+      let usuarioIds: string[] | null = null;
 
-      while (hasMore) {
-        let query = supabase
-          .from('pedidos')
-          .select(`
-            id, status, valor_total, data_pedido, created_at, observacoes,
-            cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta,
-            cliente:clientes(id, empresa),
-            fabricante:fabricantes(id, nome),
-            vendedor:usuarios(id, nome, empresa_id),
-            obra:obras(id, nome_obra)
-          `)
-          .order('created_at', { ascending: false })
-          .range(from, from + pageSize - 1);
-
-        // Se for admin, não aplica filtros de visualização de dados (exceto se empresaId for passado explicitamente)
-        if (!isAdmin) {
-          if (empresaId) {
-            const { data: companyUsers } = await supabase
-              .from('usuarios')
-              .select('id')
-              .eq('empresa_id', empresaId);
-            
-            if (companyUsers && companyUsers.length > 0) {
-              query = query.in('usuario_id', companyUsers.map(u => u.id));
-            } else {
-              return [];
-            }
-          } else if (profile?.id) {
-            // Se for vendedor/gestor, vê apenas os seus ou da sua empresa dependendo da RLS (ou aqui via filtro se preferir)
-            // No momento a RLS deve cuidar disso, mas como o admin pediu para não ver tudo, garantimos o filtro se não for admin
-            // Se a RLS já estiver ativa, esse filtro é redundante mas seguro.
-          }
-        } else if (empresaId) {
-           const { data: companyUsers } = await supabase
-            .from('usuarios')
-            .select('id')
-            .eq('empresa_id', empresaId);
-          
-          if (companyUsers && companyUsers.length > 0) {
-            query = query.in('usuario_id', companyUsers.map(u => u.id));
-          } else {
-            return [];
-          }
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          allData.push(...(data as unknown as PedidoWithRelations[]));
-          from += pageSize;
-          hasMore = data.length === pageSize && allData.length < 50000;
-        } else {
-          hasMore = false;
-        }
+      if (empresaId) {
+        const { data: companyUsers } = await supabase
+          .from('usuarios')
+          .select('id')
+          .eq('empresa_id', empresaId);
+        usuarioIds = companyUsers?.map(u => u.id) ?? [];
+        if (usuarioIds.length === 0) return { data: [], count: 0 };
       }
 
-      return allData;
+      let query = supabase
+        .from('pedidos')
+        .select(`
+          id, status, valor_total, data_pedido, created_at, observacoes,
+          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta,
+          cliente:clientes(id, empresa),
+          fabricante:fabricantes(id, nome),
+          vendedor:usuarios(id, nome, empresa_id),
+          obra:obras(id, nome_obra)
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (usuarioIds) {
+        query = query.in('usuario_id', usuarioIds);
+      }
+
+      if (stages && stages.length > 0) {
+        query = query.in('status', stages);
+      }
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+      return { data: (data ?? []) as PedidoWithRelations[], count: count ?? 0 };
     },
+    enabled: !!empresaId,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,

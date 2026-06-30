@@ -47,7 +47,8 @@ const ClienteDetalhe = () => {
 
   const navigate = useNavigate();
   const { data: clientes, isLoading: loadingClientes } = useClientes();
-  const { data: pedidos, isLoading: loadingPedidos } = usePedidos();
+  const { data: pedidosResult, isLoading: loadingPedidos } = usePedidos(undefined, 0, 500);
+  const pedidos = pedidosResult?.data ?? [];
   
   // Debug log
   console.log('ClienteDetalhe - slug:', slug, 'extracted id:', id);

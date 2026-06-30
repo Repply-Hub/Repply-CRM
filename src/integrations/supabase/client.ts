@@ -5,26 +5,10 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
-
-// Migrate any existing token from localStorage -> sessionStorage once,
-// so users with an active session are not abruptly logged out on first load.
-const SB_TOKEN_KEY = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`;
-try {
-  const legacy = localStorage.getItem(SB_TOKEN_KEY);
-  if (legacy && !sessionStorage.getItem(SB_TOKEN_KEY)) {
-    sessionStorage.setItem(SB_TOKEN_KEY, legacy);
-  }
-  localStorage.removeItem(SB_TOKEN_KEY);
-} catch {
-  // storage may be unavailable (private mode, SSR) — safe to ignore
-}
-
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: sessionStorage,
+    storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
 });

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useDeferredValue, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parse, isValid, startOfDay, endOfDay, parseISO } from 'date-fns';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { AppLayout } from '@/components/AppLayout';
@@ -209,28 +209,12 @@ PedidoRow.displayName = 'PedidoRow';
 const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { session } = useAuth();
-  
-  const { data: userData } = useQuery({
-    queryKey: ['usuario_perfil_negocios', session?.user?.id],
-    queryFn: async () => {
-      if (!session?.user?.id) return null;
-      const { data } = await supabase
-        .from('usuarios')
-        .select('empresa_id')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!session?.user?.id,
-  });
-
-  const empresaId = userData?.empresa_id;
-  const { data: pedidos, isLoading } = usePedidos(empresaId);
+  const { profile, loading: isUserLoading } = useAuth();
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const updateStatus = useUpdatePedidoStatus();
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
-  const { data: kanbanColunas } = useKanbanColunas();
+  const { data: kanbanColunas } = useKanbanColunas(empresaId);
   
   const KANBAN_STAGES = useMemo(
     () => (kanbanColunas ?? []).map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
@@ -361,6 +345,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Todos os useState declarados — agora seguro referenciar selectedStages no hook
+  const [serverPage, setServerPage] = useState(0);
+  const SERVER_PAGE_SIZE = 50;
+  const { data: pedidosData, isLoading: isPedidosLoading } = usePedidos(
+    empresaId,
+    serverPage,
+    SERVER_PAGE_SIZE,
+    selectedStages.length > 0 ? selectedStages : undefined,
+  );
+  const isLoading = isUserLoading || isPedidosLoading;
+  const pedidos = useMemo(() => pedidosData?.data ?? [], [pedidosData]);
+  const totalCount = pedidosData?.count ?? 0;
+
   useEffect(() => {
     if (!kanbanColunas) return;
     const allKeys = kanbanColunas.map(c => c.slug);
@@ -431,7 +428,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // para permitir que o usuário escolha ver as colunas separadamente.
 
   const baseListPedidos = useMemo(() => {
-    const all = pedidos ?? [];
+    const all = pedidos;
     if (!isPipelineMode) return all;
     return all.filter(p => {
       if (selectedVendedores.length > 0 && !selectedVendedores.includes(p.usuario_id)) return false;
@@ -477,11 +474,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     localStorage.setItem('negocios_search', search);
   }, [search]);
 
+  // Volta para a primeira página do servidor quando filtros mudam
+  useEffect(() => {
+    setServerPage(0);
+  }, [empresaId, deferredSearch, selectedStages, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
+
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  const allOrders = useMemo(() => (pedidos ?? []).map(p => ({
+  const allOrders = useMemo(() => pedidos.map(p => ({
     id: p.id,
     clientName: p.cliente?.empresa ?? 'Sem cliente',
     obra: p.obra?.nome_obra ?? '-',
@@ -649,7 +651,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const handleExportPdf = async (specificPedidoId?: string) => {
     if (specificPedidoId) {
-      const p = pedidos?.find(p => p.id === specificPedidoId);
+      const p = pedidos.find(p => p.id === specificPedidoId);
       if (!p) return;
       await generatePedidosPdf(
         [{
@@ -984,8 +986,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </div>
     </FilterButton>
   ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention]);
-  const selectedViewOrder = useMemo(() => 
-    (pedidos ?? []).find(p => p.id === viewOrderId),
+  const selectedViewOrder = useMemo(() =>
+    pedidos.find(p => p.id === viewOrderId),
   [pedidos, viewOrderId]);
 
   const viewOrderSheet = (
@@ -1360,6 +1362,34 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   itemLabelPlural="negócios"
                   className="border-t border-border/60 bg-card px-3 py-3 sm:px-4"
                 />
+                {totalCount > SERVER_PAGE_SIZE && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
+                    <span className="text-sm text-muted-foreground">
+                      {totalCount} negócios no total
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setServerPage(p => Math.max(0, p - 1))}
+                        disabled={serverPage === 0}
+                      >
+                        Anterior
+                      </Button>
+                      <span className="text-sm px-2">
+                        Página {serverPage + 1} de {Math.ceil(totalCount / SERVER_PAGE_SIZE)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setServerPage(p => p + 1)}
+                        disabled={serverPage >= Math.ceil(totalCount / SERVER_PAGE_SIZE) - 1}
+                      >
+                        Próxima
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             {selectedOrder && (
@@ -1445,7 +1475,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         }}
       />
       
-      <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} />
+      <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} empresaId={empresaId} />
       {viewOrderSheet}
     </AppLayout>
   );

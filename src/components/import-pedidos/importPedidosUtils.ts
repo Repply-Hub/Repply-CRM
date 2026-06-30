@@ -350,6 +350,28 @@ function processDate(rawDate: any): string | undefined {
         // DD/MM/YYYY fallback manual
         return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
       } else {
+        // Ano com 2 dígitos: DD/MM/YY ou MM/DD/YY, com hora opcional (ex: "29/12/23 15:53")
+        const shortYearMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})(?:[\sT][\d:]+)?$/);
+        if (shortYearMatch) {
+          const a = parseInt(shortYearMatch[1]);
+          const b = parseInt(shortYearMatch[2]);
+          const year = `20${shortYearMatch[3]}`;
+          let day: string, month: string;
+          if (a > 12) {
+            // primeiro número > 12 → só pode ser dia → formato BR DD/MM/YY
+            day = shortYearMatch[1].padStart(2, '0');
+            month = shortYearMatch[2].padStart(2, '0');
+          } else if (b > 12) {
+            // segundo número > 12 → só pode ser dia → formato US MM/DD/YY
+            month = shortYearMatch[1].padStart(2, '0');
+            day = shortYearMatch[2].padStart(2, '0');
+          } else {
+            // ambíguos: assume BR (DD/MM)
+            day = shortYearMatch[1].padStart(2, '0');
+            month = shortYearMatch[2].padStart(2, '0');
+          }
+          return `${year}-${month}-${day}`;
+        }
         const d = new Date(dateStr);
         if (!isNaN(d.getTime())) {
           const year = d.getFullYear();

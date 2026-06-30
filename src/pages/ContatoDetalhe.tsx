@@ -43,7 +43,8 @@ const ContatoDetalhe = () => {
     console.log('ContatoDetalhe - contato encontrado:', !!found);
   }
   const { data: clientes } = useClientes();
-  const { data: todosPedidos } = usePedidos();
+  const { data: todosPedidosResult } = usePedidos(undefined, 0, 500);
+  const todosPedidos = todosPedidosResult?.data ?? [];
   const updateContato = useUpdateContato();
   const deleteContato = useDeleteContato();
   const [editOpen, setEditOpen] = useState(false);

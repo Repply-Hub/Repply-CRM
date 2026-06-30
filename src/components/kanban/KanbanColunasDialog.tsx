@@ -21,10 +21,11 @@ import {
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    empresaId?: string | null;
 }
 
-export function KanbanColunasDialog({ open, onOpenChange }: Props) {
-    const { data: colunas, isLoading } = useKanbanColunas();
+export function KanbanColunasDialog({ open, onOpenChange, empresaId }: Props) {
+    const { data: colunas, isLoading } = useKanbanColunas(empresaId);
     const createMut = useCreateKanbanColuna();
     const updateMut = useUpdateKanbanColuna();
     const deleteMut = useDeleteKanbanColuna();

@@ -1847,6 +1847,7 @@ export type Database = {
           assinatura_email: string | null
           avatar_url: string | null
           created_at: string
+          deleted_at: string | null
           email: string
           empresa_id: string | null
           id: string
@@ -1859,6 +1860,7 @@ export type Database = {
           assinatura_email?: string | null
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
           email: string
           empresa_id?: string | null
           id?: string
@@ -1871,6 +1873,7 @@ export type Database = {
           assinatura_email?: string | null
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string
           empresa_id?: string | null
           id?: string

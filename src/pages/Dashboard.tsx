@@ -83,12 +83,13 @@ const Dashboard = () => {
   const fabricantes = useMemo(() => (fabricantesRaw || []) as { id: string; nome: string }[], [fabricantesRaw]);
 
 
-  const { data: pedidos } = usePedidos(empresaId);
+  const { data: pedidosResult } = usePedidos(empresaId, 0, 500);
+  const pedidos = pedidosResult?.data ?? [];
 
   const isLoading = loadFat;
 
   const filteredPedidos = useMemo(() => {
-    const list = pedidos || [];
+    const list = pedidos;
     const from = startOfDay(dateRange.from);
     const to = endOfDay(dateRange.to);
     

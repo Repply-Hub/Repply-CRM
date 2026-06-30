@@ -179,33 +179,33 @@ export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): str
       return excelEpoch.toISOString().slice(0, 10);
     }
     const str = raw.trim();
-    // DD/MM/YYYY ou DD-MM-YYYY (sem hora) — group1=dia, group2=mês, group3=ano
+
+    // Detecta qual segmento é dia e qual é mês, suportando BR (DD/MM) e US (MM/DD)
+    function resolveSegments(seg1: string, seg2: string): { day: string; month: string } | null {
+      const a = parseInt(seg1, 10);
+      const b = parseInt(seg2, 10);
+      if (a > 31 || b > 31 || a === 0 || b === 0) return null;
+      if (a > 12) return { day: seg1.padStart(2, '0'), month: seg2.padStart(2, '0') }; // BR: DD/MM
+      if (b > 12) return { day: seg2.padStart(2, '0'), month: seg1.padStart(2, '0') }; // US: MM/DD
+      return { day: seg1.padStart(2, '0'), month: seg2.padStart(2, '0') }; // ambíguo → assume BR
+    }
+
+    // DD/MM/YYYY ou DD-MM-YYYY (sem hora)
     const br = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
     if (br) {
-      const day = br[1].padStart(2, '0');
-      const month = br[2].padStart(2, '0');
+      const resolved = resolveSegments(br[1], br[2]);
+      if (!resolved) return undefined;
       const year = br[3].length === 2 ? `20${br[3]}` : br[3];
-      return `${year}-${month}-${day}`;
+      return `${year}-${resolved.month}-${resolved.day}`;
     }
-    // DD/MM/YYYY HH:mm ou DD/MM/YYYY HH:mm:ss (com hora) — group1=dia, group2=mês, group3=ano, group4=HH:mm[:ss]
-    // IMPORTANTE: order dos grupos é idêntica ao branch sem hora acima para evitar troca dia/mês.
+    // DD/MM/YYYY HH:mm ou MM/DD/YYYY HH:mm (com hora)
     const brWithTime = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})[T ](\d{2}:\d{2}(?::\d{2})?)/);
     if (brWithTime) {
-      const day = brWithTime[1].padStart(2, '0');
-      const month = brWithTime[2].padStart(2, '0');
+      const resolved = resolveSegments(brWithTime[1], brWithTime[2]);
+      if (!resolved) return undefined;
       const year = brWithTime[3].length === 2 ? `20${brWithTime[3]}` : brWithTime[3];
-      const time = brWithTime[4].substring(0, 5); // trunca para HH:mm
-      const isoDate = `${year}-${month}-${day}`;
-      // Validação pós-conversão: new Date(isoDate) deve devolver o mesmo dia e mês extraídos
-      const check = new Date(isoDate);
-      if (
-        isNaN(check.getTime()) ||
-        check.getUTCMonth() + 1 !== parseInt(month, 10) ||
-        check.getUTCDate() !== parseInt(day, 10)
-      ) {
-        throw new Error(`data inválida: ${str}`);
-      }
-      return `${isoDate}T${time}`;
+      const time = brWithTime[4].substring(0, 5);
+      return `${year}-${resolved.month}-${resolved.day}T${time}`;
     }
     const iso = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
     if (iso) {

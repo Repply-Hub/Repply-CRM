@@ -35,14 +35,12 @@ function slugify(str: string): string {
     .slice(0, 40) || `coluna ${Date.now()}`;
 }
 
-export function useKanbanColunas() {
+export function useKanbanColunas(empresaId?: string | null) {
   return useQuery<KanbanColuna[]>({
-    queryKey: ['kanban_colunas'],
+    queryKey: ['kanban_colunas', empresaId ?? null],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('kanban_colunas')
-        .select('*')
-        .order('ordem', { ascending: true });
+      const base = supabase.from('kanban_colunas').select('*').order('ordem', { ascending: true });
+      const { data, error } = await (empresaId ? base.eq('empresa_id', empresaId) : base);
       if (error) throw error;
       return (data ?? []) as KanbanColuna[];
     },

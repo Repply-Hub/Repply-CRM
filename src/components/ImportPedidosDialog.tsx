@@ -421,7 +421,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           ...r,
           campos_extras,
           data_pedido: r.data_pedido || new Date().toLocaleDateString('en-CA'),
-          created_at: r.data_pedido ? `${r.data_pedido}T12:00:00.000Z` : new Date().toISOString(),
+          created_at: r.data_pedido ? `${r.data_pedido.slice(0, 10)}T12:00:00.000Z` : new Date().toISOString(),
           prazo_resposta: r.prazo_resposta || (r.status === 'fechamento' ? (r.data_pedido || new Date().toLocaleDateString('en-CA')) : null),
           usuario_id: resolvedUserId || vid,
         };
@@ -839,7 +839,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
         {step === 'done' && (
           <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
-            <Button onClick={() => onOpenChange(false)} className="h-10 px-6 font-bold">
+            <Button onClick={() => { reset(); onOpenChange(false); }} className="h-10 px-6 font-bold">
               Fechar
             </Button>
           </div>
