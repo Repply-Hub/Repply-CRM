@@ -147,6 +147,31 @@ serve(async (req) => {
       return json({ success: true, instanceName: existingCfg.instance_name, alreadyProvisioned: true });
     }
 
+    // Reutilizar instância já existente da empresa em vez de criar nova
+    if (empresaId) {
+      const { data: instanciasEmpresa } = await supabase
+        .from("configuracoes_wapi")
+        .select("id, instance_name")
+        .eq("empresa_id", empresaId)
+        .eq("provisionada", true)
+        .order("created_at", { ascending: true })
+        .limit(1);
+
+      const instanciaExistente = instanciasEmpresa?.[0];
+      if (instanciaExistente) {
+        const { error: linkError } = await supabase
+          .from("wapi_instancia_usuarios")
+          .insert({ instancia_id: instanciaExistente.id, usuario_auth_id: targetAuthId });
+
+        if (linkError && !linkError.message.includes("duplicate")) {
+          console.error("[whatsapp-provision] erro ao vincular à instância existente", linkError);
+          return json({ error: "Erro ao vincular à instância existente", detail: linkError.message }, 500);
+        }
+
+        return json({ success: true, instanceName: instanciaExistente.instance_name, reused: true });
+      }
+    }
+
     const UAZAPI_BASE_URL = (Deno.env.get("UAZAPI_BASE_URL") ?? "").replace(/\/$/, "");
     const UAZAPI_ADMIN_TOKEN = Deno.env.get("UAZAPI_ADMIN_TOKEN") ?? "";
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
