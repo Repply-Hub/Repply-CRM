@@ -13,10 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useVendedores } from '@/hooks/use-clientes';
+import { useVendedores, useVendedoresRemovidos } from '@/hooks/use-clientes';
 import { useCreateVendedor } from '@/hooks/use-mutations';
 import { usePermissoes, useUpsertPermissao, MODULOS, type Permissao, type Funcionalidade } from '@/hooks/use-permissoes';
-import { Plus, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, ChevronRight, History, CalendarIcon, Search, Building2, Crown, UserPlus, X, ChevronDown, ChevronUp, Mail, Phone, Info, Import, FileDown, Filter, ArrowRightLeft, MessageCircle, FileText, ToggleLeft, UserCheck, UsersRound, FileUp, Key, Globe, DollarSign } from 'lucide-react';
+import { Plus, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, ChevronRight, History, CalendarIcon, Search, Building2, Crown, UserPlus, X, ChevronDown, ChevronUp, Mail, Phone, Info, Import, FileDown, Filter, ArrowRightLeft, MessageCircle, FileText, ToggleLeft, UserCheck, UsersRound, FileUp, Key, Globe, DollarSign, RotateCcw, UserX } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -582,12 +582,13 @@ function AuditLog() {
 }
 
 // ─── User Detail Panel ───
-function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId }: {
+function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId, empresaNome }: {
   vendedor: { id: string; nome: string; email: string; telefone: string | null; role: string; user_id: string | null; avatar_url?: string | null };
   isGestor: boolean;
   onEdit: () => void;
   onDelete: () => void;
   currentUserId?: string;
+  empresaNome?: string | null;
 }) {
   const [activeSection, setActiveSection] = useState<'permissoes' | 'historico'>('permissoes');
   const roleConfig = getRoleConfig(vendedor.role);
@@ -625,6 +626,11 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId }
                   </span>
                 )}
               </div>
+              {empresaNome && (
+                <span className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
+                  <Building2 className="h-3.5 w-3.5" /> {empresaNome}
+                </span>
+              )}
             </div>
           </div>
           {!isSelf && (
@@ -710,6 +716,9 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId }
 // ─── Main Usuarios Tab ───
 export function UsuariosTab() {
   const { data: vendedoresData, isLoading: loadV } = useVendedores();
+  const { data: vendedoresRemovidos } = useVendedoresRemovidos();
+  const [showRemovidos, setShowRemovidos] = useState(false);
+  const [reativarDialog, setReativarDialog] = useState(false);
   const createVendedor = useCreateVendedor();
   const [vendedorDialog, setVendedorDialog] = useState(false);
   const [editingVendedor, setEditingVendedor] = useState<null | { id: string; nome: string; email: string; telefone: string | null; role: string }>(null);
@@ -741,7 +750,7 @@ export function UsuariosTab() {
   const { data: empresasData } = useQuery({
     queryKey: ['empresas_list'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('empresas').select('id, nome').order('nome');
+      const { data, error } = await supabase.from('empresas').select('id, nome, nome_fantasia, cnpj').order('nome');
       if (error) throw error;
       return data ?? [];
     },
@@ -775,13 +784,55 @@ export function UsuariosTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('usuarios').delete().eq('id', id);
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['usuarios'] });
+      qc.invalidateQueries({ queryKey: ['usuarios_removidos'] });
       toast.success('Usuário removido!');
       setSelectedVendedor(null);
+    },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ deleted_at: null })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['usuarios'] });
+      qc.invalidateQueries({ queryKey: ['usuarios_removidos'] });
+      toast.success('Usuário restaurado com sucesso!');
+    },
+  });
+
+  const reativarMutation = useMutation({
+    mutationFn: async (data: { email: string; nome: string; role: string; empresa_id: string }) => {
+      const { data: result, error } = await supabase.rpc('restaurar_usuario_por_email', {
+        p_email: data.email,
+        p_nome: data.nome,
+        p_role: data.role,
+        p_empresa_id: data.empresa_id || null,
+      });
+      if (error) throw error;
+      if ((result as any)?.error) throw new Error((result as any).error);
+      return result;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['usuarios'] });
+      qc.invalidateQueries({ queryKey: ['usuarios_removidos'] });
+      toast.success('Usuário reativado com sucesso!');
+      setReativarDialog(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.message ?? 'Erro ao reativar usuário');
     },
   });
 
@@ -865,6 +916,70 @@ export function UsuariosTab() {
         </div>
 
         <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Dialog open={reativarDialog} onOpenChange={setReativarDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reativar conta
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Reativar usuário por email</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground -mt-2">
+                  Use quando o usuário foi removido mas ainda tem conta de acesso. O sistema vai localizar a conta pelo email e reativar o perfil.
+                </p>
+                <form
+                  className="space-y-4 mt-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const form = new FormData(e.currentTarget);
+                    reativarMutation.mutate({
+                      email: form.get('email') as string,
+                      nome: form.get('nome') as string,
+                      role: form.get('role') as string,
+                      empresa_id: form.get('empresa_id') as string,
+                    });
+                  }}
+                >
+                  <div className="space-y-1.5">
+                    <Label>Email <span className="text-destructive">*</span></Label>
+                    <Input name="email" type="email" required placeholder="email@usuario.com" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Nome</Label>
+                    <Input name="nome" placeholder="Nome completo" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Perfil</Label>
+                    <PerfilSelect name="role" defaultValue="vendedor" />
+                  </div>
+                  {empresasData && empresasData.length > 0 && (
+                    <div className="space-y-1.5">
+                      <Label>Empresa</Label>
+                      <Select name="empresa_id">
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar empresa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {empresasData.map(emp => (
+                            <SelectItem key={emp.id} value={emp.id}>{emp.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <DialogFooter>
+                    <Button type="submit" disabled={reativarMutation.isPending} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                      {reativarMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Reativando...</> : 'Reativar usuário'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
           <CodigoAcessoButton />
         </div>
       </div>
@@ -887,13 +1002,121 @@ export function UsuariosTab() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todas as empresas</SelectItem>
-              {empresasData.map(emp => (
-                <SelectItem key={emp.id} value={emp.id}>{emp.nome}</SelectItem>
-              ))}
+              {(() => {
+                const nomeCounts = empresasData.reduce<Record<string, number>>((acc, e) => {
+                  const key = e.nome ?? '';
+                  acc[key] = (acc[key] || 0) + 1;
+                  return acc;
+                }, {});
+                return empresasData.map(emp => {
+                  const isDuplicate = (nomeCounts[emp.nome ?? ''] ?? 0) > 1;
+                  const subtitulo = emp.cnpj ?? emp.nome_fantasia ?? null;
+                  return (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      <span className="flex flex-col">
+                        <span>{emp.nome}</span>
+                        {isDuplicate && subtitulo && (
+                          <span className="text-[11px] text-muted-foreground">{subtitulo}</span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  );
+                });
+              })()}
             </SelectContent>
           </Select>
         )}
       </div>
+
+      {/* Usuários removidos (somente admin) */}
+      {isAdmin && (vendedoresRemovidos?.length ?? 0) > 0 && (
+        <Card className="border-destructive/20">
+          <CardHeader className="pb-2 cursor-pointer" onClick={() => setShowRemovidos(v => !v)}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <UserX className="h-4 w-4 text-destructive" />
+                <CardTitle className="text-sm font-medium text-destructive">
+                  Usuários Removidos
+                </CardTitle>
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">
+                  {vendedoresRemovidos?.length}
+                </Badge>
+              </div>
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', showRemovidos && 'rotate-180')} />
+            </div>
+            <CardDescription className="text-xs">
+              Usuários removidos ainda possuem conta de acesso. Restaure para reativar.
+            </CardDescription>
+          </CardHeader>
+          {showRemovidos && (
+            <CardContent className="pt-0">
+              <div className="divide-y divide-border rounded-md border border-border overflow-hidden">
+                {vendedoresRemovidos?.map(v => {
+                  const iniciais = (v.nome ?? v.email).split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
+                  const roleConfig = getRoleConfig(v.role);
+                  return (
+                    <div key={v.id} className="flex items-center gap-3 px-4 py-3 bg-muted/20 hover:bg-muted/40 transition-colors">
+                      <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                        {v.avatar_url ? (
+                          <img src={v.avatar_url} alt={v.nome ?? ''} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-sm font-bold text-muted-foreground">{iniciais}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate text-muted-foreground">{v.nome ?? '—'}</p>
+                          <Badge variant="outline" className="text-[10px] shrink-0">{roleConfig.label}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground/70 truncate">{v.email}</p>
+                        {v.deleted_at && (
+                          <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+                            Removido em {new Date(v.deleted_at).toLocaleDateString('pt-BR')}
+                          </p>
+                        )}
+                      </div>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0 gap-1.5 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                            disabled={restoreMutation.isPending}
+                          >
+                            {restoreMutation.isPending ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            )}
+                            Restaurar
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Restaurar usuário?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              "{v.nome ?? v.email}" voltará a ter acesso ao sistema com o perfil e permissões anteriores.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => restoreMutation.mutate(v.id)}
+                              className="bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              Restaurar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Main content: list + detail */}
       <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4">
@@ -960,6 +1183,12 @@ export function UsuariosTab() {
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium truncate">{v.nome}</p>
                                 <p className="text-xs text-muted-foreground truncate">{v.email}</p>
+                                {isAdmin && v.empresa_id && (
+                                  <p className="text-[11px] text-muted-foreground/70 truncate flex items-center gap-1 mt-0.5">
+                                    <Building2 className="h-3 w-3 shrink-0" />
+                                    {empresasData?.find(e => e.id === v.empresa_id)?.nome ?? '—'}
+                                  </p>
+                                )}
                               </div>
                               <ChevronRight className={cn(
                                 'h-4 w-4 shrink-0 transition-colors',
@@ -992,6 +1221,7 @@ export function UsuariosTab() {
                 onEdit={() => setEditingVendedor(activeVendedor)}
                 onDelete={() => deleteMutation.mutate(activeVendedor.id)}
                 currentUserId={user?.id}
+                empresaNome={isAdmin && activeVendedor.empresa_id ? (empresasData?.find(e => e.id === activeVendedor.empresa_id)?.nome ?? null) : null}
               />
             </>
           ) : (

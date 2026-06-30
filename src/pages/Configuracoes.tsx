@@ -22,6 +22,7 @@ import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
 import { DominioTab } from '@/components/configuracoes/DominioTab';
 import { GmailSettings } from '@/components/email/GmailSettings';
 import { WhatsAppInstanciasTab } from '@/components/configuracoes/WhatsAppInstanciasTab';
+import { EmpresasTab } from '@/components/configuracoes/EmpresasTab';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -428,11 +429,22 @@ const Configuracoes = () => {
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get('tab') === 'usuarios' ? 'vendedores' : (searchParams.get('tab') || 'perfil');
   const [alertDays, setAlertDays] = useState('5');
+  const { profile } = useAuth();
+  const isEmpresaRole = profile?.role === 'empresa';
 
   const { data: isGestor } = useQuery({
     queryKey: ['is_gestor'],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('is_gestor');
+      if (error) throw error;
+      return data as boolean;
+    },
+  });
+
+  const { data: isAdmin } = useQuery({
+    queryKey: ['is_admin'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('is_admin');
       if (error) throw error;
       return data as boolean;
     },
@@ -452,6 +464,9 @@ const Configuracoes = () => {
             )}
             {isGestor && (
               <TabsTrigger value="automacao">Automação</TabsTrigger>
+            )}
+            {(isAdmin || isEmpresaRole) && (
+              <TabsTrigger value="empresas" className="gap-1.5"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
             )}
           </TabsList>
 
@@ -500,6 +515,11 @@ const Configuracoes = () => {
                   </CardContent>
                 </Card>
               </div>
+            </TabsContent>
+          )}
+          {(isAdmin || isEmpresaRole) && (
+            <TabsContent value="empresas" className="mt-4">
+              <EmpresasTab mode={isAdmin ? 'admin' : 'empresa'} />
             </TabsContent>
           )}
         </Tabs>
