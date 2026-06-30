@@ -35,15 +35,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const profileLoadedRef = useRef(false);
   const fetchingRef = useRef(false);
 
+  const isJwtExpiredError = (err: any) =>
+    !!err && (err.message?.includes("JWT expired") || err.code === "PGRST301" || err.status === 401);
+
   const fetchProfile = async (userId: string) => {
-    if (fetchingRef.current) return;
+    console.log("[AUTH] fetchProfile ENTER — fetchingRef:", fetchingRef.current, "profileLoadedRef:", profileLoadedRef.current);
+    if (fetchingRef.current) {
+      console.log("[AUTH] fetchProfile EARLY RETURN — já está buscando");
+      return;
+    }
     fetchingRef.current = true;
     try {
-      const { data, error } = await supabase
+      console.log("[AUTH] fetchProfile — iniciando query para userId:", userId);
+      let { data, error } = await supabase
         .from("usuarios")
         .select("*, empresas(*)")
         .eq("user_id", userId)
         .maybeSingle();
+
+      console.log("[AUTH] fetchProfile — resposta recebida:", { data: !!data, error: error?.message });
+
+      if (error && isJwtExpiredError(error)) {
+        console.log("[AUTH] fetchProfile — JWT expirado, forçando refreshSession() e tentando novamente");
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError) {
+          const retry = await supabase
+            .from("usuarios")
+            .select("*, empresas(*)")
+            .eq("user_id", userId)
+            .maybeSingle();
+          data = retry.data;
+          error = retry.error;
+          console.log("[AUTH] fetchProfile — retry após refresh:", { data: !!data, error: error?.message });
+        } else {
+          console.log("[AUTH] fetchProfile — refreshSession falhou:", refreshError.message);
+        }
+      }
 
       if (error) {
         console.error("Erro ao buscar perfil:", error);
@@ -55,44 +82,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Exceção ao buscar perfil:", err);
       setProfile(null);
     } finally {
+      console.log("[AUTH] fetchProfile FINALLY — setProfileLoaded(true), setLoading(false)");
       setProfileLoaded(true);
       setProfileAttempted(true);
       profileLoadedRef.current = true;
       fetchingRef.current = false;
+      setLoading(false);
+      console.log("[AUTH] fetchProfile EXIT");
     }
   };
 
   useEffect(() => {
     let mounted = true;
 
+    // Timeout de segurança: libera a UI do estado de loading visual mesmo se
+    // fetchProfile nunca resolver (deadlock, rede travada, etc). NÃO marca
+    // profileAttempted=true — esse flag só pode vir de uma tentativa real de
+    // fetchProfile (sucesso ou erro), para não disparar o auto-signout de
+    // "sessão órfã" em App.tsx por causa de um timeout genérico.
     const safetyTimer = setTimeout(() => {
       if (mounted && !profileLoadedRef.current) {
+        console.log("[AUTH] safetyTimer disparado — fetchProfile não concluiu em 10s, liberando loading visual sem marcar profileAttempted");
         setLoading(false);
         setProfileLoaded(true);
-        setProfileAttempted(true);
       }
     }, 10000);
 
     // Usa onAuthStateChange como única fonte de verdade.
     // O evento INITIAL_SESSION é disparado automaticamente na inicialização
     // com a sessão do localStorage, sem race condition.
+    // IMPORTANTE: o callback NÃO usa await em fetchProfile — dispara fire-and-forget
+    // e retorna imediatamente. Isso evita bloquear o dispatcher de eventos do Supabase
+    // (ex: TOKEN_REFRESHED chegando enquanto INITIAL_SESSION ainda estava em andamento).
+    // loading/profileLoaded são geridos inteiramente dentro do finally de fetchProfile.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!mounted) return;
+      (_event, session) => {
+        console.log("[AUTH] onAuthStateChange EVENTO:", _event, "| session:", !!session?.user, "| mounted:", mounted);
+        if (!mounted) {
+          console.log("[AUTH] onAuthStateChange IGNORADO — componente desmontado");
+          return;
+        }
 
         if (session?.user) {
           setSession(session);
+          console.log("[AUTH] onAuthStateChange — session set, profileLoadedRef:", profileLoadedRef.current, "| fetchingRef:", fetchingRef.current);
           if (!profileLoadedRef.current) {
-            await fetchProfile(session.user.id);
+            console.log("[AUTH] onAuthStateChange — disparando fetchProfile (fire-and-forget)");
+            fetchProfile(session.user.id);
+          } else {
+            console.log("[AUTH] onAuthStateChange — fetchProfile já concluído anteriormente, nada a fazer");
           }
-          if (mounted) setLoading(false);
         } else {
+          console.log("[AUTH] onAuthStateChange — sem sessão, limpando estado e setLoading(false)");
           setSession(null);
           setProfile(null);
           setProfileLoaded(false);
+          setProfileAttempted(false);
           profileLoadedRef.current = false;
           fetchingRef.current = false;
-          if (mounted) setLoading(false);
+          setLoading(false);
         }
       }
     );

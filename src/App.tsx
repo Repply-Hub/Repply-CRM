@@ -44,7 +44,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     window.location.href = "/";
   };
 
-  // Sessão órfã (usuário deletado do banco mas sessão ainda no localStorage): faz logout automático
+  // Sessão órfã (usuário deletado do banco mas sessão ainda no localStorage): faz logout automático.
+  // profileAttempted só vira true dentro do finally de fetchProfile (sucesso ou erro real) — o
+  // safetyTimer do AuthProvider nunca seta esse flag, então um timeout genérico de rede/deadlock
+  // não dispara este auto-signout indevidamente.
   if (profileAttempted && session && profile === null) {
     handleSignOut();
     return (
