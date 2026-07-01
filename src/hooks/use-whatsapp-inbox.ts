@@ -17,6 +17,7 @@ export interface WaConversa {
   nome_contato: string | null;
   cliente_id: string | null;
   contato_id: string | null;
+  foto_perfil_url: string | null;
   ultima_mensagem: string | null;
   ultima_mensagem_at: string | null;
   nao_lidas: number;
@@ -552,6 +553,28 @@ export function useWaArquivarConversa() {
     },
     onError: (err: any) => {
       toast.error(err?.message ?? 'Erro ao atualizar conversa');
+    },
+  });
+}
+
+// --- Foto de perfil do contato ---
+
+export function useWaFetchContactPhoto() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversaId: string) => {
+      const { data, error } = await supabase.functions.invoke('whatsapp-contact-photo', {
+        body: { conversa_id: conversaId },
+      });
+      if (error) throw error;
+      return { conversaId, fotoPerfilUrl: data?.foto_perfil_url as string | null };
+    },
+    onSuccess: ({ conversaId, fotoPerfilUrl }) => {
+      if (!fotoPerfilUrl) return;
+      qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
+        (old ?? []).map((c) => c.id === conversaId ? { ...c, foto_perfil_url: fotoPerfilUrl } : c)
+      );
     },
   });
 }

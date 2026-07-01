@@ -19,6 +19,7 @@ import {
   useWaSyncStatus,
   useWaDisconnect,
   useWaProvision,
+  useWaFetchContactPhoto,
   uploadWaMedia,
   type WaConversa,
   type WaMensagem,
@@ -30,7 +31,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1153,6 +1154,16 @@ export default function WhatsAppInbox() {
   const arquivarConversa = useWaArquivarConversa();
   const deletarConversa = useWaDeletarConversa();
   const deletarEmMassa = useWaDeletarConversasEmMassa();
+  const fetchContactPhoto = useWaFetchContactPhoto();
+  const fotoRequestedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    conversas.forEach((c) => {
+      if (!c.foto_perfil_url && !c.telefone.includes("@g.us") && !fotoRequestedRef.current.has(c.id)) {
+        fotoRequestedRef.current.add(c.id);
+        fetchContactPhoto.mutate(c.id);
+      }
+    });
+  }, [conversas, fetchContactPhoto]);
   const [confirmLimpar, setConfirmLimpar] = useState(false);
   const [confirmDeletar, setConfirmDeletar] = useState(false);
   const [modoSelecao, setModoSelecao] = useState(false);
@@ -1581,6 +1592,9 @@ export default function WhatsAppInbox() {
                       title={conv.nome_contato ?? formatPhone(conv.telefone)}
                     >
                       <Avatar className="h-7 w-7 border border-primary/10">
+                        {conv.foto_perfil_url && (
+                          <AvatarImage src={conv.foto_perfil_url} alt="" />
+                        )}
                         <AvatarFallback
                           className={cn(
                             colorForPhone(conv.telefone),
@@ -1838,6 +1852,9 @@ export default function WhatsAppInbox() {
                         </div>
                       ) : (
                         <Avatar className="h-8 w-8 border border-primary/10">
+                          {conv.foto_perfil_url && (
+                            <AvatarImage src={conv.foto_perfil_url} alt="" />
+                          )}
                           <AvatarFallback
                             className={cn(
                               colorForPhone(conv.telefone),
@@ -2199,6 +2216,9 @@ export default function WhatsAppInbox() {
                   title="Ver detalhes do lead"
                 >
                   <Avatar className="h-8 w-8 border border-primary/10 shrink-0">
+                    {conversaAtiva.foto_perfil_url && (
+                      <AvatarImage src={conversaAtiva.foto_perfil_url} alt="" />
+                    )}
                     <AvatarFallback
                       className={cn(
                         colorForPhone(conversaAtiva.telefone),
@@ -2236,6 +2256,33 @@ export default function WhatsAppInbox() {
                     <Phone className="h-3.5 w-3.5" />
                     Abrir no WhatsApp
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                    onClick={() => {
+                      const novaArquivada = !conversaAtiva.arquivada;
+                      arquivarConversa.mutate({
+                        conversaId: conversaAtiva.id,
+                        arquivada: novaArquivada,
+                      });
+                      if (
+                        (novaArquivada && filtroStatus === "aberto") ||
+                        (!novaArquivada && filtroStatus === "fechado")
+                      ) {
+                        setConversaAtivaId(null);
+                      }
+                    }}
+                  >
+                    {conversaAtiva.arquivada ? (
+                      <ArchiveRestore className="h-3.5 w-3.5" />
+                    ) : (
+                      <Archive className="h-3.5 w-3.5" />
+                    )}
+                    {conversaAtiva.arquivada
+                      ? "Reabrir conversa"
+                      : "Marcar como fechada"}
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -2247,31 +2294,6 @@ export default function WhatsAppInbox() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        className="gap-2"
-                        onClick={() => {
-                          const novaArquivada = !conversaAtiva.arquivada;
-                          arquivarConversa.mutate({
-                            conversaId: conversaAtiva.id,
-                            arquivada: novaArquivada,
-                          });
-                          if (
-                            (novaArquivada && filtroStatus === "aberto") ||
-                            (!novaArquivada && filtroStatus === "fechado")
-                          ) {
-                            setConversaAtivaId(null);
-                          }
-                        }}
-                      >
-                        {conversaAtiva.arquivada ? (
-                          <ArchiveRestore className="h-4 w-4" />
-                        ) : (
-                          <Archive className="h-4 w-4" />
-                        )}
-                        {conversaAtiva.arquivada
-                          ? "Reabrir conversa"
-                          : "Marcar como fechada"}
-                      </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive gap-2"
                         onClick={() => setConfirmLimpar(true)}

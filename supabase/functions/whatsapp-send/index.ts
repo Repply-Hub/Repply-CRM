@@ -116,36 +116,23 @@ serve(async (req) => {
         wapiStatus = res.status;
         responseText = await res.text().catch(() => "");
       } catch (e) { fetchError = String(e); }
-    } else if (ptt && tipo === 'audio') {
-      // --- PTT / voice note ---
-      wapiUrl = `${baseUrl}/send/ptt`;
-      try {
-        const res = await fetch(wapiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", token: config.api_key },
-          body: JSON.stringify({ instanceName: uazapiInstance, number: phone, audio: media_url }),
-        });
-        wapiStatus = res.status;
-        responseText = await res.text().catch(() => "");
-      } catch (e) { fetchError = String(e); }
     } else {
       // --- Mídia: POST /send/media ---
       const typeMap: Record<string, string> = {
         imagem: 'image',
-        audio: 'audio',
+        audio: ptt ? 'ptt' : 'audio',
         video: 'video',
         documento: 'document',
       };
       wapiUrl = `${baseUrl}/send/media`;
       const wapiBody: Record<string, unknown> = {
-        instanceName: uazapiInstance,
         number: phone,
-        to: phone,
         type: typeMap[tipo] ?? 'document',
         file: media_url,
       };
-      if (mensagem) wapiBody.caption = mensagem;
-      if (tipo === 'documento' && nome_arquivo) wapiBody.fileName = nome_arquivo;
+      if (mensagem) wapiBody.text = mensagem;
+      if (tipo === 'documento' && nome_arquivo) wapiBody.docName = nome_arquivo;
+      if (media_mime) wapiBody.mimetype = media_mime;
 
       try {
         const res = await fetch(wapiUrl, {

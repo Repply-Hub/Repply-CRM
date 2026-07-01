@@ -545,17 +545,28 @@ const AdminWhatsAppInstancias = () => {
         { data: usuarios, error: errU },
         { data: empresas, error: errE },
         { data: configs, error: errC },
+        { data: links, error: errL },
       ] = await Promise.all([
         supabase.from('usuarios').select('id, nome, role, empresa_id, user_id').neq('role', 'admin'),
         supabase.from('empresas').select('id, nome'),
         supabase.from('configuracoes_wapi').select('*'),
+        supabase.from('wapi_instancia_usuarios').select('instancia_id, usuario_auth_id'),
       ]);
 
       if (errU) throw errU;
       if (errE) throw errE;
       if (errC) throw errC;
+      if (errL) throw errL;
 
+      const configById = new Map((configs ?? []).map(c => [c.id, c]));
+      // Legado: configuracoes_wapi.usuario_id ainda é usado por instâncias criadas antes do
+      // desacoplamento (migration 20260620_wapi_instancia_desacoplada). A tabela de vínculo
+      // wapi_instancia_usuarios é a fonte de verdade para instâncias criadas depois.
       const configByAuthId = new Map((configs ?? []).map(c => [c.usuario_id, c]));
+      for (const link of links ?? []) {
+        const config = configById.get(link.instancia_id);
+        if (config) configByAuthId.set(link.usuario_auth_id, config);
+      }
       const empresaMap = new Map((empresas ?? []).map(e => [e.id, e.nome]));
 
       const rows: UsuarioComInstancia[] = (usuarios ?? [])
