@@ -2447,10 +2447,15 @@ export default function WhatsAppInbox() {
                                       : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
                                   )}
                                 >
-                                  {!isSaida && msg.usuario && (
-                                    <p className="text-[10px] font-medium text-muted-foreground mb-0.5 ml-1">
+                                  {isSaida && msg.usuario && (
+                                    <span
+                                      className={cn(
+                                        "block w-fit text-[10px] font-semibold text-emerald-900 bg-white/85 rounded-full px-2 py-0.5 mb-1",
+                                        msg.tipo === "audio" && "ml-1.5 mt-1.5",
+                                      )}
+                                    >
                                       {msg.usuario.nome}
-                                    </p>
+                                    </span>
                                   )}
                                   <MessageContent
                                     msg={msg}
