@@ -62,6 +62,11 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { FilterButton } from "@/components/FilterButton";
@@ -103,6 +108,7 @@ import {
   ExternalLink,
   Building2,
   CalendarDays,
+  Mail,
 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -131,6 +137,147 @@ function colorForPhone(phone: string) {
   let hash = 0;
   for (const c of phone) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
   return colors[hash % colors.length];
+}
+
+function hashSeed(seed: string) {
+  let hash = 0;
+  for (const c of seed) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
+  return hash;
+}
+
+// Tons frios: bom contraste sobre a bolha laranja (bg-orange-500) das mensagens enviadas.
+const OUTGOING_NAME_COLORS = [
+  "text-sky-200",
+  "text-teal-200",
+  "text-cyan-200",
+  "text-violet-200",
+  "text-fuchsia-200",
+  "text-blue-200",
+];
+
+// Paleta ampla: usada sobre a bolha escura/neutra das mensagens recebidas.
+const INCOMING_NAME_COLORS = [
+  "text-amber-400",
+  "text-sky-400",
+  "text-pink-400",
+  "text-violet-400",
+  "text-orange-400",
+  "text-cyan-400",
+  "text-rose-400",
+  "text-fuchsia-400",
+];
+
+function senderNameColor(seed: string, isSaida: boolean) {
+  const palette = isSaida ? OUTGOING_NAME_COLORS : INCOMING_NAME_COLORS;
+  return palette[hashSeed(seed) % palette.length];
+}
+
+function roleLabel(role: string | null | undefined) {
+  if (role === "empresa") return "Principal";
+  if (role === "gestor") return "Gestor";
+  if (role === "admin") return "Admin";
+  if (role === "vendedor") return "Vendedor";
+  return role ?? null;
+}
+
+function UserPreviewPopover({
+  usuario,
+  nameClassName,
+}: {
+  usuario: NonNullable<WaMensagem["usuario"]>;
+  nameClassName: string;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(nameClassName, "text-left hover:underline underline-offset-2 cursor-pointer")}
+        >
+          {usuario.nome}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="start" className="w-64">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-10 w-10 border border-border/60">
+            <AvatarImage src={usuario.avatar_url ?? undefined} />
+            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+              {initials(usuario.nome, "")}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold truncate">{usuario.nome}</p>
+            {roleLabel(usuario.role) && (
+              <span className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
+                {roleLabel(usuario.role)}
+              </span>
+            )}
+          </div>
+        </div>
+        {(usuario.email || usuario.telefone) && (
+          <div className="mt-3 space-y-1.5">
+            {usuario.email && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{usuario.email}</span>
+              </div>
+            )}
+            {usuario.telefone && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Phone className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{formatPhone(usuario.telefone)}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ContactPreviewPopover({
+  conversa,
+  nameClassName,
+}: {
+  conversa: WaConversa;
+  nameClassName: string;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(nameClassName, "text-left hover:underline underline-offset-2 cursor-pointer")}
+        >
+          {conversa.nome_contato || formatPhone(conversa.telefone)}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="start" className="w-64">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-10 w-10 border border-border/60">
+            <AvatarImage src={conversa.foto_perfil_url ?? undefined} />
+            <AvatarFallback className={cn(colorForPhone(conversa.telefone), "text-white font-semibold")}>
+              {initials(conversa.nome_contato, conversa.telefone)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold truncate">
+              {conversa.nome_contato || "Sem nome salvo"}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {formatPhone(conversa.telefone)}
+            </p>
+          </div>
+        </div>
+        {conversa.cliente_id && (
+          <Badge variant="outline" className="mt-3 gap-1 text-[11px]">
+            <Building2 className="h-3 w-3" />
+            Cliente cadastrado
+          </Badge>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function initials(nome: string | null, telefone: string) {
@@ -2443,19 +2590,31 @@ export default function WhatsAppInbox() {
                                       : "px-3 py-2",
                                     "break-words",
                                     isSaida
-                                      ? "bg-green-500 text-white rounded-2xl rounded-tr-sm"
+                                      ? "bg-orange-500 text-white rounded-2xl rounded-tr-sm"
                                       : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
                                   )}
                                 >
                                   {isSaida && msg.usuario && (
-                                    <span
-                                      className={cn(
-                                        "block w-fit text-[10px] font-semibold text-emerald-900 bg-white/85 rounded-full px-2 py-0.5 mb-1",
-                                        msg.tipo === "audio" && "ml-1.5 mt-1.5",
+                                    <UserPreviewPopover
+                                      usuario={msg.usuario}
+                                      nameClassName={cn(
+                                        "block w-full truncate text-[13px] font-semibold leading-tight mb-0.5",
+                                        senderNameColor(msg.usuario.id, true),
+                                        msg.tipo === "audio" &&
+                                          "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
                                       )}
-                                    >
-                                      {msg.usuario.nome}
-                                    </span>
+                                    />
+                                  )}
+                                  {!isSaida && (
+                                    <ContactPreviewPopover
+                                      conversa={conversaAtiva}
+                                      nameClassName={cn(
+                                        "block w-full truncate text-[13px] font-semibold leading-tight mb-0.5",
+                                        senderNameColor(conversaAtiva.id, false),
+                                        msg.tipo === "audio" &&
+                                          "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                      )}
+                                    />
                                   )}
                                   <MessageContent
                                     msg={msg}

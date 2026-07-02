@@ -41,7 +41,14 @@ export interface WaMensagem {
   usuario_id: string | null;
   lida: boolean;
   created_at: string;
-  usuario?: { id: string; nome: string; avatar_url: string | null } | null;
+  usuario?: {
+    id: string;
+    nome: string;
+    avatar_url: string | null;
+    email: string | null;
+    role: string | null;
+    telefone: string | null;
+  } | null;
 }
 
 export interface WaConfig {
@@ -130,7 +137,7 @@ export function useWaMensagens(conversaId: string | null) {
       if (!conversaId) return [];
       const { data, error } = await supabase
         .from('whatsapp_mensagens')
-        .select('*, usuario:usuarios(id, nome, avatar_url)')
+        .select('*, usuario:usuarios(id, nome, avatar_url, email, role, telefone)')
         .eq('conversa_id', conversaId)
         .order('created_at', { ascending: true })
         .limit(200);
