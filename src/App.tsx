@@ -196,6 +196,16 @@ const DashboardWrapper = () => {
   return <Dashboard />;
 };
 
+// Admin master não tem acesso à página de Negócios (ver AppSidebar), então a
+// rota raiz precisa cair no dashboard administrativo em vez do pipeline.
+const RootRoute = () => {
+  const { profile } = useAuth();
+  if (profile?.role === "admin") {
+    return <AdminDashboard />;
+  }
+  return <Negocios defaultView="pipeline" />;
+};
+
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
   if (profile && profile.role !== "admin") return <Navigate to="/" replace />;
@@ -225,7 +235,7 @@ const AppRoutes = () => (
       path="/"
       element={
         <ProtectedRoute>
-          <Negocios defaultView="pipeline" />
+          <RootRoute />
         </ProtectedRoute>
       }
     />

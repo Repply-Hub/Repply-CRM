@@ -145,16 +145,6 @@ function hashSeed(seed: string) {
   return hash;
 }
 
-// Tons frios: bom contraste sobre a bolha laranja (bg-orange-500) das mensagens enviadas.
-const OUTGOING_NAME_COLORS = [
-  "text-sky-200",
-  "text-teal-200",
-  "text-cyan-200",
-  "text-violet-200",
-  "text-fuchsia-200",
-  "text-blue-200",
-];
-
 // Paleta ampla: usada sobre a bolha escura/neutra das mensagens recebidas.
 const INCOMING_NAME_COLORS = [
   "text-amber-400",
@@ -167,9 +157,8 @@ const INCOMING_NAME_COLORS = [
   "text-fuchsia-400",
 ];
 
-function senderNameColor(seed: string, isSaida: boolean) {
-  const palette = isSaida ? OUTGOING_NAME_COLORS : INCOMING_NAME_COLORS;
-  return palette[hashSeed(seed) % palette.length];
+function senderNameColor(seed: string) {
+  return INCOMING_NAME_COLORS[hashSeed(seed) % INCOMING_NAME_COLORS.length];
 }
 
 function roleLabel(role: string | null | undefined) {
@@ -2598,8 +2587,7 @@ export default function WhatsAppInbox() {
                                     <UserPreviewPopover
                                       usuario={msg.usuario}
                                       nameClassName={cn(
-                                        "block w-full truncate text-[13px] font-semibold leading-tight mb-0.5",
-                                        senderNameColor(msg.usuario.id, true),
+                                        "block w-full truncate text-[13px] font-semibold leading-tight mb-0.5 text-white",
                                         msg.tipo === "audio" &&
                                           "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
                                       )}
@@ -2610,7 +2598,7 @@ export default function WhatsAppInbox() {
                                       conversa={conversaAtiva}
                                       nameClassName={cn(
                                         "block w-full truncate text-[13px] font-semibold leading-tight mb-0.5",
-                                        senderNameColor(conversaAtiva.id, false),
+                                        senderNameColor(conversaAtiva.id),
                                         msg.tipo === "audio" &&
                                           "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
                                       )}
