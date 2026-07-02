@@ -8,7 +8,8 @@ import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { KanbanColunasDialog } from '@/components/kanban/KanbanColunasDialog';
-import { usePedidos, useHistoricoContatos, useUpdatePedidoStatus } from '@/hooks/use-pedidos';
+import { usePedidos, usePedidosStats, useHistoricoContatos, useUpdatePedidoStatus, useBulkDeletePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
+import { mapPedidoToOrder } from '@/lib/pedido-to-order';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,12 +33,12 @@ import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettin
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ImportPedidosDialog } from '@/components/ImportPedidosDialog';
 import { ImportDialog } from '@/components/ImportDialog';
 import { ListPagination } from '@/components/ListPagination';
 import { KanbanColumn } from '@/components/kanban/KanbanColumn';
 import { FilterButton } from '@/components/FilterButton';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -334,8 +335,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteAllFilteredMode, setDeleteAllFilteredMode] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
+  const bulkDeleteMutation = useBulkDeletePedidos();
+  const isDeleting = bulkDeleteMutation.isPending;
 
   // Column settings are now managed by useTableSettings hook
 
@@ -346,17 +350,39 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   });
 
   // Todos os useState declarados — agora seguro referenciar selectedStages no hook
-  const [serverPage, setServerPage] = useState(0);
-  const SERVER_PAGE_SIZE = 50;
+  // Kanban: cada coluna busca só o seu status, com seu próprio limit (ver KanbanColumn.tsx).
+  // "Exibir" só define o limit INICIAL/por-clique de cada coluna — não existe mais um
+  // fetch único compartilhado para o board inteiro.
+  const KANBAN_PAGE_SIZE_OPTIONS = [10, 50, 100, 200, 500, 1000];
+  const [kanbanPageSize, setKanbanPageSize] = useState(50);
+
+  const activeStages = selectedStages.length > 0 ? selectedStages : undefined;
+  const pedidosFilters: PedidosFilters = useMemo(() => ({
+    vendedorIds: selectedVendedores.length > 0 ? selectedVendedores : undefined,
+    fabricanteIds: selectedFabricantes.length > 0 ? selectedFabricantes : undefined,
+    dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
+    dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
+    onlyAttention: showOnlyAttention || undefined,
+    // Usado só pela query de stats (header) — o fetch paginado da lista/kanban continua
+    // filtrando a busca no cliente sobre o que já foi carregado.
+    search: deferredSearch.trim() || undefined,
+  }), [selectedVendedores, selectedFabricantes, dateFrom, dateTo, showOnlyAttention, deferredSearch]);
+
+  // Essa query só serve a view Lista agora — desabilitada no Kanban, já que cada coluna
+  // busca seus próprios dados de forma independente.
   const { data: pedidosData, isLoading: isPedidosLoading } = usePedidos(
     empresaId,
-    serverPage,
-    SERVER_PAGE_SIZE,
-    selectedStages.length > 0 ? selectedStages : undefined,
+    page - 1,
+    pageSize,
+    activeStages,
+    pedidosFilters,
+    !showKanban,
   );
-  const isLoading = isUserLoading || isPedidosLoading;
+  const { data: pedidosStats } = usePedidosStats(empresaId, activeStages, pedidosFilters);
+  const isLoading = isUserLoading || (!showKanban && isPedidosLoading);
   const pedidos = useMemo(() => pedidosData?.data ?? [], [pedidosData]);
-  const totalCount = pedidosData?.count ?? 0;
+  const totalCount = pedidosStats?.count ?? 0;
+  const totalValor = pedidosStats?.valor ?? 0;
 
   useEffect(() => {
     if (!kanbanColunas) return;
@@ -460,11 +486,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     });
   }, [baseListPedidos, deferredSearch, selectedStages]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = useMemo(
-    () => filtered.slice((page - 1) * pageSize, page * pageSize),
-    [filtered, page, pageSize]
-  );
+  // A Lista já vem paginada diretamente do servidor (dataPageSize = pageSize),
+  // então `filtered` já representa a página atual — sem re-fatiar localmente.
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const paginated = filtered;
   const visibleColumnCount = Math.max(
     1,
     tableVisibleColumns.filter(id => id !== 'acoes').length + (tableVisibleColumns.includes('acoes') ? 2 : 0) + 1
@@ -474,64 +499,33 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     localStorage.setItem('negocios_search', search);
   }, [search]);
 
-  // Volta para a primeira página do servidor quando filtros mudam
+  // Volta para a primeira página da Lista quando filtros mudam (o Kanban reseta o próprio
+  // lote de cada coluna sozinho, dentro do KanbanColumn, ao ver os filtros mudarem).
   useEffect(() => {
-    setServerPage(0);
+    setPage(1);
   }, [empresaId, deferredSearch, selectedStages, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  const allOrders = useMemo(() => pedidos.map(p => ({
-    id: p.id,
-    clientName: p.cliente?.empresa ?? 'Sem cliente',
-    obra: p.obra?.nome_obra ?? '-',
-    fabricante: p.fabricante?.nome ?? '-',
-    fabricanteId: p.fabricante_id,
-    valor: p.valor_total ?? 0,
-    stage: p.status as any,
-    daysInStage: Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000),
-    alertDays: 7,
-    vendedor: p.vendedor?.nome ?? '-',
-    vendedorId: p.usuario_id,
-    createdAt: p.data_pedido,
-    campos_extras: p.campos_extras || {},
-  })), [pedidos]);
+  // Cada KanbanColumn busca só o seu próprio status (ver KanbanColumn.tsx) — os filtros de
+  // vendedor/fabricante/período/atenção/busca já são aplicados lá (server-side, exceto a busca
+  // livre que é client-side). Este estado só agrega o que cada coluna já buscou, para as
+  // funções que precisam do pipeline inteiro: rolar até um card ao buscar e exportar PDF.
+  const [kanbanPedidosByStage, setKanbanPedidosByStage] = useState<Record<string, PedidoWithRelations[]>>({});
+  const handleKanbanColumnData = useCallback((stageKey: string, rows: PedidoWithRelations[]) => {
+    setKanbanPedidosByStage(prev => (prev[stageKey] === rows ? prev : { ...prev, [stageKey]: rows }));
+  }, []);
+  const kanbanPedidosFlat = useMemo(
+    () => Object.values(kanbanPedidosByStage).flat(),
+    [kanbanPedidosByStage]
+  );
+  const pipelineOrders = useMemo(
+    () => kanbanPedidosFlat.map(mapPedidoToOrder),
+    [kanbanPedidosFlat]
+  );
 
-  const pipelineOrders = useMemo(() => {
-    const q = deferredSearch.trim().toLowerCase();
-    return allOrders.filter(o => {
-      if (selectedVendedores.length > 0 && !selectedVendedores.includes(o.vendedorId)) return false;
-      if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(o.fabricanteId)) return false;
-      if (showOnlyAttention && o.daysInStage < o.alertDays) return false;
-      if (o.createdAt) {
-        const pedidoDate = parseISO(o.createdAt);
-        if (dateFrom && startOfDay(pedidoDate) < startOfDay(dateFrom)) return false;
-        if (dateTo && startOfDay(pedidoDate) > endOfDay(dateTo)) return false;
-      } else if (dateFrom || dateTo) {
-        return false;
-      }
-      if (q) {
-        const clientName = (o.clientName || '').toLowerCase();
-        const obra = (o.obra || '').toLowerCase();
-        const fabricante = (o.fabricante || '').toLowerCase();
-        if (!clientName.includes(q) && !obra.includes(q) && !fabricante.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [allOrders, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo, deferredSearch]);
-
-  const ordersByStage = useMemo(() => {
-    const map: Record<string, typeof pipelineOrders> = {};
-    for (const stage of KANBAN_STAGES) map[stage.key] = [];
-    for (const o of pipelineOrders) {
-      if (map[o.stage]) map[o.stage].push(o);
-    }
-    return map;
-  }, [pipelineOrders, KANBAN_STAGES]);
-
-  const totalPipeline = useMemo(() => pipelineOrders.reduce((acc, o) => acc + (Number(o.valor) || 0), 0), [pipelineOrders]);
   const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || selectedStages.length > 0;
   const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (selectedStages.length > 0 ? 1 : 0);
 
@@ -559,9 +553,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const currentPageIds = paginated.map(p => p.id);
   const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selected.has(id));
-  const someSelected = selected.size > 0;
+  const someSelected = selected.size > 0 || deleteAllFilteredMode;
 
   const toggleOne = (id: string) => {
+    setDeleteAllFilteredMode(false);
     setSelected(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -570,13 +565,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   const toggleAll = () => {
-    if (allPageSelected) {
+    if (allPageSelected || deleteAllFilteredMode) {
+      setDeleteAllFilteredMode(false);
       setSelected(prev => {
         const next = new Set(prev);
         currentPageIds.forEach(id => next.delete(id));
         return next;
       });
-    } else if (filtered.length > currentPageIds.length) {
+    } else if (totalCount > currentPageIds.length) {
       setSelectAllDialogOpen(true);
     } else {
       setSelected(prev => {
@@ -588,6 +584,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   const selectPageOnly = () => {
+    setDeleteAllFilteredMode(false);
     setSelected(prev => {
       const next = new Set(prev);
       currentPageIds.forEach(id => next.add(id));
@@ -597,61 +594,38 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   const selectAllFiltered = () => {
-    setSelected(new Set(filtered.map(p => p.id)));
+    // Não carregamos milhares de ids no cliente: a exclusão em massa, nesse modo,
+    // roda uma única query no servidor com os mesmos filtros ativos (empresa/funil/etapa).
+    setSelected(new Set());
+    setDeleteAllFilteredMode(true);
     setSelectAllDialogOpen(false);
   };
 
   const handleBulkDelete = async () => {
-    const ids = Array.from(selected);
-    if (ids.length === 0) {
-      setConfirmDeleteOpen(false);
-      return;
-    }
+    if (deleteConfirmText.trim().toUpperCase() !== 'APAGAR' || !empresaId) return;
 
-    setIsDeleting(true);
-    let successCount = 0;
-    
     try {
-      // Para acelerar a exclusão, processamos lotes maiores se possível,
-      // mas mantemos a segurança deletando apenas a tabela principal 'pedidos'.
-      // As tabelas vinculadas (itens_pedido, historico_contatos, etc.) já possuem CASCADE no banco,
-      // então deletar o pedido removerá automaticamente seus vínculos de forma muito mais rápida.
-      const BATCH_SIZE = 500;
-      
-      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-        const batch = ids.slice(i, i + BATCH_SIZE);
-        
-        // Deleta os pedidos em massa diretamente. O banco de dados cuida dos itens vinculados (CASCADE).
-        const { error } = await supabase.from('pedidos').delete().in('id', batch);
-        
-        if (error) {
-          console.error('[bulk-delete error]', error);
-          toast.error(`Erro ao remover lote: ${error.message}`);
-          break; // Para em caso de erro crítico de permissão
-        } else {
-          successCount += batch.length;
-        }
+      const removed = deleteAllFilteredMode
+        ? await bulkDeleteMutation.mutateAsync({ empresaId, stages: activeStages, filters: pedidosFilters })
+        : await bulkDeleteMutation.mutateAsync({ ids: Array.from(selected) });
+
+      if (removed > 0) {
+        toast.success(`${removed} negócio(s) removido(s) com sucesso!`);
       }
-      
-      queryClient.invalidateQueries({ queryKey: ['pedidos'] });
-      
-      if (successCount > 0) {
-        toast.success(`${successCount} negócio(s) removido(s) com sucesso!`);
-      }
-      
+
       setSelected(new Set());
+      setDeleteAllFilteredMode(false);
+      setDeleteConfirmText('');
       setConfirmDeleteOpen(false);
     } catch (err: any) {
       console.error('[bulk-delete pedidos]', err);
       toast.error(err?.message || 'Erro inesperado ao remover negócios');
-    } finally {
-      setIsDeleting(false);
     }
   };
 
   const handleExportPdf = async (specificPedidoId?: string) => {
     if (specificPedidoId) {
-      const p = pedidos.find(p => p.id === specificPedidoId);
+      const p = (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === specificPedidoId);
       if (!p) return;
       await generatePedidosPdf(
         [{
@@ -779,13 +753,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             />
           )}
 
-          <ColumnSettingsItem 
-            label="Excluir Selecionados" 
-            icon={Trash2} 
+          <ColumnSettingsItem
+            label="Excluir Selecionados"
+            icon={Trash2}
             variant="destructive"
-            disabled={selected.size === 0}
-            onClick={() => setConfirmDeleteOpen(true)} 
-            badge={selected.size > 0 ? selected.size : undefined}
+            disabled={!someSelected}
+            onClick={() => setConfirmDeleteOpen(true)}
+            badge={someSelected ? (deleteAllFilteredMode ? totalCount : selected.size) : undefined}
           />
         </ColumnSettingsPopover>
       </div>
@@ -809,6 +783,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     toggleKanbanStage,
     handleKanbanStagesChange,
     selected.size,
+    deleteAllFilteredMode,
+    totalCount,
+    someSelected,
     setImportOpen,
     setColunasDialogOpen,
     setConfirmDeleteOpen
@@ -986,9 +963,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </div>
     </FilterButton>
   ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention]);
-  const selectedViewOrder = useMemo(() =>
-    pedidos.find(p => p.id === viewOrderId),
-  [pedidos, viewOrderId]);
+  const selectedViewOrder = useMemo(
+    () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === viewOrderId),
+    [showKanban, kanbanPedidosFlat, pedidos, viewOrderId]
+  );
 
   const viewOrderSheet = (
     <Sheet open={!!viewOrderId} onOpenChange={(open) => !open && setViewOrderId(null)}>
@@ -1193,7 +1171,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <Button variant="outline" onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
               <Pencil className="h-4 w-4 mr-2" /> Editar
             </Button>
-            <Button variant="destructive" onClick={() => { setViewOrderId(null); setConfirmDeleteOpen(true); setSelected(new Set([viewOrderId!])); }}>
+            <Button variant="destructive" onClick={() => { setViewOrderId(null); setDeleteAllFilteredMode(false); setSelected(new Set([viewOrderId!])); setConfirmDeleteOpen(true); }}>
               <Trash2 className="h-4 w-4 mr-2" /> Excluir
             </Button>
           </div>
@@ -1205,9 +1183,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const isFiltered = hasPipelineFilters || deferredSearch.trim() !== '';
 
-  const subtitle = isPipelineMode
-    ? `${pipelineOrders.length} negócios${isFiltered ? ' (filtrados)' : ''} · Total: ${(totalPipeline || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-    : `${filtered.length} negócios${isFiltered ? ' (filtrados)' : ''} · Total: ${(filtered.reduce((acc, p) => acc + (Number(p.valor_total) || 0), 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+  // Contagem e soma vêm de usePedidosStats (query dedicada no servidor), refletindo
+  // TODOS os registros que atendem ao filtro atual — não apenas o lote carregado localmente.
+  const subtitle = `${totalCount} negócios${isFiltered ? ' (filtrados)' : ''} · Total: ${totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
 
   return (
     <AppLayout title="Negócios" subtitle={subtitle} mainClassName={showKanban ? 'flex-1 overflow-hidden flex flex-col' : 'flex-1 overflow-auto'}>
@@ -1236,7 +1214,26 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </Button>
               </div>
             )}
-            
+
+            {showKanban && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">Exibir</span>
+                <Select
+                  value={String(kanbanPageSize)}
+                  onValueChange={(value) => setKanbanPageSize(Number(value))}
+                >
+                  <SelectTrigger className="h-8 w-fit min-w-[70px] shrink-0 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {KANBAN_PAGE_SIZE_OPTIONS.map(option => (
+                      <SelectItem key={option} value={String(option)}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <SearchWithRecent
               placeholder="Buscar por cliente, obra ou fabricante..."
               value={search}
@@ -1274,10 +1271,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   stageKey={stage.key as any}
                   label={stage.label}
                   colorClass={stage.color}
-                  orders={ordersByStage[stage.key] ?? []}
                   onCardClick={setViewOrderId}
                   visibleColumns={visibleColumns}
                   columns={columns}
+                  pageSize={kanbanPageSize}
+                  empresaId={empresaId}
+                  filters={pedidosFilters}
+                  etapaFilter={activeStages}
+                  onOrdersChange={handleKanbanColumnData}
                 />
               ))}
               <div className="self-start mt-[52px] shrink-0">
@@ -1294,14 +1295,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             </div>
           </DragDropContext>
-        ) : (
+        ) : null}
+        {!isLoading && !showKanban && (
           <div className="flex min-w-0 flex-col gap-6 xl:flex-row">
             <div className="min-w-0 flex-1">
               <div className="mb-4">
                 {someSelected && (
                   <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
                     <Trash2 className="h-4 w-4" />
-                    Excluir {selected.size}
+                    Excluir {deleteAllFilteredMode ? totalCount : selected.size}
                   </Button>
                 )}
               </div>
@@ -1354,7 +1356,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <ListPagination
                   page={page}
                   totalPages={totalPages}
-                  totalItems={filtered.length}
+                  totalItems={totalCount}
                   pageSize={pageSize}
                   onPageChange={setPage}
                   onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setPage(1); }}
@@ -1362,34 +1364,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   itemLabelPlural="negócios"
                   className="border-t border-border/60 bg-card px-3 py-3 sm:px-4"
                 />
-                {totalCount > SERVER_PAGE_SIZE && (
-                  <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
-                    <span className="text-sm text-muted-foreground">
-                      {totalCount} negócios no total
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setServerPage(p => Math.max(0, p - 1))}
-                        disabled={serverPage === 0}
-                      >
-                        Anterior
-                      </Button>
-                      <span className="text-sm px-2">
-                        Página {serverPage + 1} de {Math.ceil(totalCount / SERVER_PAGE_SIZE)}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setServerPage(p => p + 1)}
-                        disabled={serverPage >= Math.ceil(totalCount / SERVER_PAGE_SIZE) - 1}
-                      >
-                        Próxima
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
             {selectedOrder && (
@@ -1434,15 +1408,41 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         )}
       </div>
 
-      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={(open) => { setConfirmDeleteOpen(open); if (!open) setDeleteConfirmText(''); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir {selected.size} negócio(s)?</AlertDialogTitle>
-            <AlertDialogDescription>Esta ação não pode ser desfeita. Todos os itens e histórico de contatos vinculados também serão removidos.</AlertDialogDescription>
+            <AlertDialogTitle>
+              Excluir {deleteAllFilteredMode ? totalCount : selected.size} negócio(s)?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todos os itens e histórico de contatos vinculados também serão removidos.
+            </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteAllFilteredMode && (
+            <p className="text-sm font-medium text-foreground -mt-2">
+              {totalCount} negócios · Total: {totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </p>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="delete-confirm-input" className="text-xs text-muted-foreground">
+              Para confirmar, digite <strong className="text-foreground">APAGAR</strong>
+            </Label>
+            <Input
+              id="delete-confirm-input"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="APAGAR"
+              disabled={isDeleting}
+              autoComplete="off"
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeleting}>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={isDeleting || deleteConfirmText.trim().toUpperCase() !== 'APAGAR'}
+            >
               {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir'}
             </Button>
           </AlertDialogFooter>
@@ -1454,13 +1454,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <AlertDialogHeader>
             <AlertDialogTitle>Selecionar negócios</AlertDialogTitle>
             <AlertDialogDescription>
-              Deseja selecionar apenas os {currentPageIds.length} negócio(s) desta página ou todos os {filtered.length} negócio(s) filtrados?
+              Deseja selecionar apenas os {currentPageIds.length} negócio(s) desta página ou todos os {totalCount} negócio(s) filtrados?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <Button variant="outline" onClick={selectPageOnly}>Apenas esta página ({currentPageIds.length})</Button>
-            <Button variant="default" onClick={selectAllFiltered}>Todos ({filtered.length})</Button>
+            <Button variant="default" onClick={selectAllFiltered}>Todos ({totalCount})</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

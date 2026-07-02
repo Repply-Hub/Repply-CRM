@@ -2006,6 +2006,18 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_gestor: { Args: never; Returns: boolean }
+      pedidos_stats: {
+        Args: {
+          p_date_from?: string | null
+          p_date_to?: string | null
+          p_fabricante_ids?: string[] | null
+          p_only_attention?: boolean
+          p_search?: string | null
+          p_stages?: string[] | null
+          p_usuario_ids?: string[] | null
+        }
+        Returns: { total_count: number; total_valor: number }[]
+      }
       seed_default_status_obras: {
         Args: { target_empresa_id: string }
         Returns: undefined
