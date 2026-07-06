@@ -291,6 +291,7 @@ async function handleIncomingMessage(
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
         nao_lidas: 1,
+        arquivada: false,
       },
       { onConflict: "empresa_id,telefone" }
     )
