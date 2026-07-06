@@ -22,7 +22,7 @@ serve(async (req) => {
   try {
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
     const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
-    const redirectUri = `https://hukeirrmsoiowvvrhivx.supabase.co/functions/v1/gmail-callback`
+    const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/gmail-callback`
 
     // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -65,8 +65,8 @@ serve(async (req) => {
     if (error) throw error
 
     // Redirect back to settings page
-    // Note: Adjust the redirect URL to match your app's settings route
-    const appUrl = Deno.env.get('APP_URL') || 'https://mdrepresentacoes.grupoclimb.ai'
+    const appUrl = Deno.env.get('APP_URL')
+    if (!appUrl) throw new Error('APP_URL não configurado')
     return Response.redirect(`${appUrl}/configuracoes?tab=perfil`, 303)
   } catch (error) {
     console.error('Callback error:', error)
