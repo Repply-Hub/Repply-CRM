@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, createElement } from 'react';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
 
@@ -83,19 +84,20 @@ export function useUnreadEmails() {
 
 export function useUnreadChatMessages() {
   const qc = useQueryClient();
-  const { user } = useAuth();
-  
+  const { user, profile } = useAuth();
+  const meId = profile?.id;
+
   const query = useQuery({
     queryKey: ['unread_chat_count', user?.id],
     queryFn: async () => {
       if (!user) return 0;
-      
+
       const { data: me } = await supabase
         .from('usuarios')
         .select('id, empresa_id')
         .eq('user_id', user.id)
         .single();
-        
+
       if (!me) return 0;
 
       const { count, error } = await supabase
@@ -104,23 +106,36 @@ export function useUnreadChatMessages() {
         .eq('lida', false)
         .neq('usuario_id', me.id)
         .or(`recipient_id.eq.${me.id},and(recipient_id.is.null,grupo_id.is.null,empresa_id.eq.${me.empresa_id}),and(grupo_id.not.is.null,empresa_id.eq.${me.empresa_id})`);
-      
+
       if (error) throw error;
       return count || 0;
     },
     enabled: !!user,
   });
 
+  // Assinatura global (sempre montada via AppSidebar) para garantir que o toast
+  // dispare mesmo se o usuário não estiver com a tela de chat aberta no momento.
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
       .channel(`chat-unread-rt-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, (payload) => {
         qc.invalidateQueries({ queryKey: ['unread_chat_count'] });
+
+        if (payload.eventType === 'INSERT' && meId && payload.new.usuario_id !== meId) {
+          const members = qc.getQueryData<any[]>(['chat-members']) || [];
+          const sender = members.find((m) => m.id === payload.new.usuario_id);
+          const nomeConversa = sender?.nome || 'Alguém';
+          toast(createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
+            description: payload.new.conteudo?.slice(0, 120) || 'Enviou um arquivo',
+            style: { background: '#f97316', color: '#fff', border: 'none' },
+            descriptionClassName: '!text-white/90',
+          });
+        }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [qc, user?.id]);
+  }, [qc, user?.id, meId]);
 
   return query;
 }
@@ -128,7 +143,7 @@ export function useUnreadChatMessages() {
 export function useUnreadChatByTarget() {
   const qc = useQueryClient();
   const { user } = useAuth();
-  
+
   const query = useQuery({
     queryKey: ['unread_chat_by_target', user?.id],
     queryFn: async () => {

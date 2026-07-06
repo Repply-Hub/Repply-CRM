@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, createElement } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -108,9 +108,14 @@ export function useWaConversas() {
         });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'whatsapp_conversas' }, (payload) => {
+        const updated = payload.new as WaConversa;
+
         qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
           (old ?? [])
-            .map((c) => c.id === (payload.new as WaConversa).id ? payload.new as WaConversa : c)
+            // O payload do realtime só traz as colunas da própria tabela — sem o
+            // join de responsaveis — então preserva o que já estava no cache para
+            // não sumir com a conversa dos filtros "Meu"/"Geral".
+            .map((c) => c.id === updated.id ? { ...updated, responsaveis: c.responsaveis } : c)
             .sort((a, b) => {
               const ta = a.ultima_mensagem_at ?? a.created_at;
               const tb = b.ultima_mensagem_at ?? b.created_at;
@@ -119,7 +124,9 @@ export function useWaConversas() {
         );
         qc.invalidateQueries({ queryKey: ['unread_wa_count'] });
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.error('[wa_conversas] falha na subscription realtime:', status, err);
+      });
     return () => { supabase.removeChannel(channel); };
   }, [qc]);
 
@@ -385,6 +392,9 @@ export function useWaProvision() {
 
 export function useUnreadWaMessages() {
   const qc = useQueryClient();
+  // Guarda o último nao_lidas conhecido por conversa para detectar incrementos
+  // (chegada de mensagem nova) mesmo com a tela de WhatsApp fechada.
+  const prevNaoLidasRef = useRef<Record<string, number>>({});
 
   const query = useQuery<number>({
     queryKey: ['unread_wa_count'],
@@ -393,21 +403,45 @@ export function useUnreadWaMessages() {
       if (!empresaId) return 0;
       const { data } = await supabase
         .from('whatsapp_conversas')
-        .select('nao_lidas')
+        .select('id, nao_lidas')
         .eq('empresa_id', empresaId)
         .eq('arquivada', false)
         .gt('nao_lidas', 0);
+      (data ?? []).forEach((r) => {
+        prevNaoLidasRef.current[r.id] = r.nao_lidas ?? 0;
+      });
       return (data ?? []).reduce((sum, r) => sum + (r.nao_lidas ?? 0), 0);
     },
   });
 
+  // Assinatura global (sempre montada via AppSidebar) para garantir que o toast
+  // dispare mesmo se o usuário não estiver com a tela de WhatsApp aberta no momento.
   useEffect(() => {
     const channel = supabase
       .channel(`wa-unread-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversas' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversas' }, (payload) => {
         qc.invalidateQueries({ queryKey: ['unread_wa_count'] });
+
+        if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+          const row = payload.new as WaConversa;
+          const prevCount = prevNaoLidasRef.current[row.id] ?? 0;
+          const currentCount = row.nao_lidas ?? 0;
+
+          if (currentCount > prevCount) {
+            const nomeConversa = row.nome_contato || row.telefone;
+            toast(createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
+              description: row.ultima_mensagem?.slice(0, 120) || 'Nova mensagem',
+              style: { background: '#f97316', color: '#fff', border: 'none' },
+              descriptionClassName: '!text-white/90',
+            });
+          }
+
+          prevNaoLidasRef.current[row.id] = currentCount;
+        }
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.error('[unread_wa_count] falha na subscription realtime:', status, err);
+      });
     return () => { supabase.removeChannel(channel); };
   }, [qc]);
 
