@@ -477,6 +477,7 @@ export type Database = {
       configuracoes_automacao: {
         Row: {
           chave: string
+          empresa_id: string
           id: string
           updated_at: string
           updated_by: string | null
@@ -484,6 +485,7 @@ export type Database = {
         }
         Insert: {
           chave: string
+          empresa_id: string
           id?: string
           updated_at?: string
           updated_by?: string | null
@@ -491,6 +493,7 @@ export type Database = {
         }
         Update: {
           chave?: string
+          empresa_id?: string
           id?: string
           updated_at?: string
           updated_by?: string | null
