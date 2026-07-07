@@ -52,7 +52,7 @@
 **Escopo:** Por deploy (uma API Key compartilhada por todos os usuários do cliente)
 
 **Credenciais:**
-- `.env`: `VITE_GOOGLE_MAPS_API_KEY` = `AIzaSyD-EE-YsoPG_ssquPOzmcfMTGyFP4Li92Q`
+- `.env`: `VITE_GOOGLE_MAPS_API_KEY` = `[ROTACIONADA — ver Google Cloud Console]` (valor real removido deste arquivo; a chave anterior foi exposta em texto plano no histórico do git e deve ser tratada como comprometida)
 
 **Arquivos:**
 - `src/components/obras/MapaObras.tsx` — usa `@react-google-maps/api`

@@ -108,6 +108,12 @@ CREATE TABLE IF NOT EXISTS public.debug_logs (id UUID PRIMARY KEY DEFAULT gen_ra
 CREATE TABLE IF NOT EXISTS public.emails (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), usuario_id UUID REFERENCES public.usuarios(id), para TEXT, assunto TEXT, corpo TEXT, status TEXT, metadata JSONB, created_at TIMESTAMP WITH TIME ZONE DEFAULT now());
 CREATE TABLE IF NOT EXISTS public.emails_recebidos (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), usuario_id UUID REFERENCES public.usuarios(id), de TEXT, assunto TEXT, corpo_html TEXT, message_id TEXT, data_recebimento TIMESTAMP WITH TIME ZONE, created_at TIMESTAMP WITH TIME ZONE DEFAULT now());
 CREATE TABLE IF NOT EXISTS public.eventos (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID REFERENCES auth.users(id), titulo TEXT NOT NULL, descricao TEXT, data_inicio TIMESTAMP WITH TIME ZONE NOT NULL, data_fim TIMESTAMP WITH TIME ZONE, cor TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT now());
+-- NO-OP: gmail_tokens já existia (criada pela migration 20260430170853_98772703-...sql com
+-- coluna user_id, não usuario_id). Por causa do IF NOT EXISTS, este CREATE TABLE nunca chegou
+-- a rodar e o schema conflitante abaixo (usuario_id em vez de user_id, sem empresa_id) nunca
+-- teve efeito. O schema real em produção é o de 20260430170853 — ver
+-- src/integrations/supabase/types.ts e docs/integracoes-gmail-maps.md para o estado confirmado.
+-- Mantido aqui sem alteração por ser histórico de migration já aplicado; não reflete a estrutura vigente.
 CREATE TABLE IF NOT EXISTS public.gmail_tokens (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), usuario_id UUID REFERENCES public.usuarios(id) UNIQUE, access_token TEXT, refresh_token TEXT, expiry_date BIGINT, created_at TIMESTAMP WITH TIME ZONE DEFAULT now());
 CREATE TABLE IF NOT EXISTS public.historico_contatos (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), cliente_id UUID REFERENCES public.clientes(id), usuario_id UUID REFERENCES public.usuarios(id), tipo TEXT, descricao TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT now());
 CREATE TABLE IF NOT EXISTS public.itens_pedido (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), pedido_id UUID REFERENCES public.pedidos(id) ON DELETE CASCADE, descricao TEXT, quantidade INTEGER DEFAULT 1, valor_unitario NUMERIC DEFAULT 0, created_at TIMESTAMP WITH TIME ZONE DEFAULT now());

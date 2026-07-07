@@ -1,210 +1,222 @@
-# Configuração das integrações Gmail (OAuth2 por usuário) e Google Maps
+# Integrações Google: Gmail OAuth2 e Google Maps
 
-> Documento gerado a partir da leitura direta do código-fonte deste repositório (hooks, Edge Functions,
-> migrations e `INTEGRATION_AUDIT.md`) em 2026-07-06. Nenhum valor real de chave/segredo é citado — apenas
-> nomes de variáveis, com o path do arquivo onde cada uma é consumida.
->
-> ⚠️ **Alerta de segurança encontrado durante a investigação**: `INTEGRATION_AUDIT.md` (versionado no git)
-> contém o valor real da `VITE_GOOGLE_MAPS_API_KEY` em texto plano. Essa chave deve ser considerada
-> comprometida — rotacione-a no Google Cloud Console e remova o valor literal desse arquivo (o histórico do
-> git também deve ser tratado, já que a chave permanece nos commits antigos).
+> Documento gerado a partir de leitura direta do código em `supabase/functions/`, `supabase/migrations/` e
+> `src/` nesta data (2026-07-07). Todas as afirmações abaixo citam o arquivo e a linha de onde foram
+> extraídas. Não reutiliza conteúdo de `INTEGRATION_AUDIT.md` ou de documentos anteriores sem
+> reconfirmação — divergências encontradas em relação a esse documento estão sinalizadas na seção 8.
 
-## 1. Visão geral das duas integrações
+> ⚠️ **Alerta de segurança (reconfirmado nesta investigação)**: `INTEGRATION_AUDIT.md:55` (versionado no
+> git) ainda contém o valor real de `VITE_GOOGLE_MAPS_API_KEY` em texto plano
+> (`AIzaSyD-EE-YsoPG_ssquPOzmcfMTGyFP4Li92Q`). Essa chave deve ser considerada comprometida — rotacione-a
+> no Google Cloud Console e remova o valor literal desse arquivo (o histórico do git também expõe a
+> chave nos commits antigos).
 
-### Gmail OAuth2 por usuário
-Cada usuário do CRM pode conectar sua própria conta Gmail para enviar e-mails e sincronizar mensagens
-recebidas diretamente pela interface do sistema (página `Emails` e card `GmailSettings` em Configurações).
-O fluxo é o clássico OAuth2 "Authorization Code" do Google:
+## 1. Visão geral
 
-1. Frontend chama a Edge Function `gmail-auth-url`, que monta a URL de consentimento do Google.
-2. Usuário autoriza no Google; o Google redireciona para a Edge Function `gmail-callback`, que troca o
-   `code` por `access_token`/`refresh_token` e persiste na tabela `gmail_tokens`, associados ao usuário.
-3. As Edge Functions `gmail-send` e `gmail-sync-inbox` usam o `refresh_token` salvo para renovar o
-   `access_token` automaticamente quando expira, e chamam a Gmail API para enviar/ler mensagens.
+Existem duas integrações Google independentes neste projeto:
 
-Como é "por usuário", cada usuário da empresa tem sua própria linha em `gmail_tokens` — as credenciais
-OAuth (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`) são únicas por deploy/projeto Google Cloud, mas os tokens
-de acesso são individuais.
-
-### Google Maps
-Usado para exibir um mapa de obras (canteiros de obra/construction sites) e para geocodificar endereços
-digitados pelo usuário (converter texto de endereço em latitude/longitude). É uma integração "por deploy":
-uma única API Key compartilhada por todos os usuários do cliente, consumida inteiramente no frontend
-(nunca em Edge Functions). Há fallback automático para Nominatim/OpenStreetMap (sem credencial) quando o
-Google atinge rate limit.
+- **Gmail OAuth2** — autenticação por usuário individual (não há conexão "compartilhada por empresa").
+  Cada `usuario` conecta sua própria conta Gmail para enviar e-mails e sincronizar a caixa de entrada
+  dentro do CRM. **Não existe** roteamento por tipo de conexão (pessoal vs. empresa): a fase de
+  consolidação multi-tenant do Gmail (schema dual `gmail_tokens` com `empresa_id`/`tipo`) **não foi
+  aplicada** — ver seção 4 e seção 8 para o estado exato.
+- **Google Maps** — usada apenas no frontend, para exibir o mapa de obras (`MapaObras.tsx`) e para
+  geocodificação de endereços (`use-geocode-obras.ts`). Sem componente server-side.
 
 ## 2. Pré-requisitos no Google Cloud Console
 
-| Integração | API a habilitar | Tipo de credencial |
-|---|---|---|
-| Gmail OAuth2 | **Gmail API** | OAuth Client ID (tipo "Web application") |
-| Google Maps (renderização) | **Maps JavaScript API** | API Key restrita por referrer HTTP |
-| Google Maps (geocodificação) | **Geocoding API** | Mesma API Key acima (restrita também a essa API) |
+Não houve mudança de código nesta área — segue o que já era necessário:
 
-**Places API não é usada** — a investigação no código não encontrou nenhuma referência a
-`places.googleapis.com`, `Autocomplete` ou `PlacesService`. Não é necessário habilitá-la.
+- Um projeto no Google Cloud Console com as APIs **Gmail API** e **Maps JavaScript API** / **Geocoding
+  API** habilitadas.
+- Credenciais **OAuth 2.0 Client ID** (tipo "Web application") para o Gmail, com uma **Redirect URI**
+  autorizada apontando para `https://<SUPABASE_URL>/functions/v1/gmail-callback` (ver seção 5).
+- Uma **API Key** de Maps (sem OAuth, chave simples) com restrição de domínio recomendada.
 
-Ambas as APIs de Maps (JavaScript + Geocoding) podem compartilhar a mesma API Key, desde que ela seja
-autorizada para as duas no console.
+## 3. Variáveis de ambiente / secrets
 
-## 3. Variáveis de ambiente / secrets necessárias
-
-### Frontend (`.env`, prefixo `VITE_`, expostas no bundle do navegador)
-
-| Variável | Onde é consumida |
-|---|---|
-| `VITE_GOOGLE_MAPS_API_KEY` | [src/components/obras/MapaObras.tsx](../src/components/obras/MapaObras.tsx) (linhas 33 e 119), [src/hooks/use-geocode-obras.ts](../src/hooks/use-geocode-obras.ts) (linha 29) |
-| `VITE_SUPABASE_URL` | cliente Supabase (`src/integrations/supabase/client.ts`) |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | cliente Supabase |
-| `VITE_SUPABASE_PROJECT_ID` | cliente Supabase |
-
-Não há variável de frontend para o Gmail — todo o fluxo OAuth do Gmail roda em Edge Functions (o frontend só
-chama `supabase.functions.invoke(...)` via [src/hooks/useGmail.ts](../src/hooks/useGmail.ts)).
-
-### Backend (Supabase secrets — configurados via `supabase secrets set NOME=valor`)
+### Secrets do Supabase (Edge Functions), confirmados por `grep -rn "Deno.env.get" supabase/functions/`:
 
 | Secret | Onde é consumido |
 |---|---|
-| `GOOGLE_CLIENT_ID` | [supabase/functions/gmail-auth-url/index.ts](../supabase/functions/gmail-auth-url/index.ts), [supabase/functions/gmail-callback/index.ts](../supabase/functions/gmail-callback/index.ts), [supabase/functions/gmail-send/index.ts](../supabase/functions/gmail-send/index.ts), [supabase/functions/gmail-sync-inbox/index.ts](../supabase/functions/gmail-sync-inbox/index.ts), [supabase/functions/gmail-debug/index.ts](../supabase/functions/gmail-debug/index.ts) |
-| `GOOGLE_CLIENT_SECRET` | mesmas Edge Functions acima |
-| `APP_URL` | [supabase/functions/gmail-callback/index.ts](../supabase/functions/gmail-callback/index.ts) (linha ~69) — usada para redirecionar o usuário de volta ao app após o consentimento. Tem fallback hardcoded para `https://mdrepresentacoes.grupoclimb.ai` se a secret não estiver definida |
-| `SUPABASE_URL` | todas as Edge Functions `gmail-*` |
-| `SUPABASE_SERVICE_ROLE_KEY` | todas as Edge Functions `gmail-*` (necessário para ler/gravar `gmail_tokens` ignorando RLS) |
-| `SUPABASE_ANON_KEY` | apenas [supabase/functions/gmail-debug/index.ts](../supabase/functions/gmail-debug/index.ts) (usada para validar o JWT do usuário que chama a função de debug) |
+| `GOOGLE_CLIENT_ID` | `gmail-auth-url/index.ts:23`, `gmail-callback/index.ts:23`, `gmail-send/index.ts:57`, `gmail-sync-inbox/index.ts:45,103`, `gmail-debug/index.ts:67` |
+| `GOOGLE_CLIENT_SECRET` | `gmail-callback/index.ts:24`, `gmail-send/index.ts:58`, `gmail-sync-inbox/index.ts:46,104`, `gmail-debug/index.ts:68` |
+| `SUPABASE_URL` | usado para montar o `redirect_uri` do OAuth em `gmail-auth-url/index.ts:24` e `gmail-callback/index.ts:25`; também usado (com `SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_ANON_KEY`) para criar o client Supabase nas 5 funções |
+| `SUPABASE_SERVICE_ROLE_KEY` | client admin em `gmail-callback`, `gmail-send`, `gmail-sync-inbox`, `gmail-debug` (bypassa RLS para ler/gravar `gmail_tokens`) |
+| `SUPABASE_ANON_KEY` | client de usuário em `gmail-debug/index.ts:17`, usado só para validar o JWT do chamador via `auth.getUser()` |
+| `APP_URL` | consumido **apenas** em `gmail-callback/index.ts:68-70`, para montar o redirect final de volta ao app após o OAuth. **Não tem mais fallback hardcoded**: se ausente, a função lança `Error('APP_URL não configurado')` antes do redirect. |
 
-Não existe um `GOOGLE_MAPS_API_KEY` (sem prefixo `VITE_`) — a chave do Maps nunca é usada no backend.
+Não há `GOOGLE_MAPS_API_KEY` (server-side) em nenhuma Edge Function — Maps é 100% client-side.
 
-### ⚠️ Redirect URI hardcoded no código (não é uma env var)
+### Variáveis `VITE_` (frontend), confirmadas por `grep -rn "VITE_GOOGLE" src/`:
 
-As Edge Functions `gmail-auth-url` (linha 24) e `gmail-callback` (linha 25) têm o redirect URI **escrito
-diretamente no código-fonte**, não lido de uma variável de ambiente:
-
-```
-https://hukeirrmsoiowvvrhivx.supabase.co/functions/v1/gmail-callback
-```
-
-Isso significa que, ao clonar este projeto para um novo cliente/deploy com um projeto Supabase diferente,
-essas duas linhas **precisam ser editadas manualmente no código** (não basta trocar secrets) para apontar
-para o novo `SUPABASE_URL`. Vale considerar migrar isso para `Deno.env.get('SUPABASE_URL')` em uma correção
-futura, mas isso está fora do escopo deste documento (que não altera código).
-
-## 4. OAuth Consent Screen — escopos usados hoje
-
-Os únicos escopos solicitados pelo sistema, definidos em
-[supabase/functions/gmail-auth-url/index.ts](../supabase/functions/gmail-auth-url/index.ts) (linha 26):
-
-- `https://www.googleapis.com/auth/gmail.send` — enviar e-mails em nome do usuário
-- `https://www.googleapis.com/auth/gmail.readonly` — ler mensagens da caixa de entrada
-- `https://www.googleapis.com/auth/userinfo.email` — obter o e-mail da conta conectada
-
-Esses escopos (`gmail.send`, `gmail.readonly`) são classificados pelo Google como **escopos restritos/
-sensíveis**, o que normalmente exige passar pelo processo de **verificação de app** do Google (incluindo,
-para uso em produção com muitos usuários, uma avaliação de segurança CASA).
-
-**Possível inconsistência de escopo identificada no código**: a Edge Function `gmail-sync-inbox`
-(linha ~62) chama `POST .../messages/{id}/modify` com `removeLabelIds: ['UNREAD']` para marcar mensagens
-como lidas — essa é uma operação de escrita que tipicamente exige o escopo `gmail.modify`, não apenas
-`gmail.readonly`. Vale confirmar em produção se essa chamada funciona (o código não trata explicitamente um
-possível erro dessa chamada) ou se é necessário adicionar `gmail.modify` ao consent screen e reautorizar os
-usuários já conectados.
-
-Ao configurar a tela de consentimento no Google Cloud Console, adicione exatamente os três escopos acima
-(mais `gmail.modify` se a inconsistência acima for corrigida no futuro).
-
-## 5. Redirect URIs necessárias
-
-| Ambiente | Redirect URI a cadastrar no OAuth Client (Google Cloud Console) |
+| Variável | Onde é consumida |
 |---|---|
-| Produção (atual) | `https://hukeirrmsoiowvvrhivx.supabase.co/functions/v1/gmail-callback` |
-| Novo deploy/cliente | `https://<SEU-PROJECT-REF>.supabase.co/functions/v1/gmail-callback` — **e** editar manualmente essa string no código das duas Edge Functions citadas na seção 3 |
+| `VITE_GOOGLE_MAPS_API_KEY` | `src/components/obras/MapaObras.tsx:33` (renderização do mapa via `@react-google-maps/api`) e `src/hooks/use-geocode-obras.ts:29` (chamadas à Geocoding API). Se ausente, `MapaObras.tsx` cai em "modo de demonstração" (linha 119) em vez de falhar. |
 
-Não há um redirect URI separado para "dev" no código — como o callback é uma Edge Function hospedada no
-Supabase (não localhost), o mesmo redirect URI de produção do projeto Supabase é usado mesmo durante testes
-locais do frontend (o `npm run dev` do frontend não intercepta o callback OAuth).
+## 4. Estrutura de `gmail_tokens` (estado atual)
 
-A variável `APP_URL` (seção 3) controla apenas para onde o usuário é levado *depois* que o backend já
-processou o callback — ou seja, é o destino final de UX (`{APP_URL}/configuracoes?tab=perfil`), não o
-redirect URI do OAuth em si.
+A tabela foi criada em [`20260430170853_98772703-...sql`](../supabase/migrations/20260430170853_98772703-d3ad-489e-a062-051d06d444d0.sql):
 
-## 6. Status da verificação do app junto ao Google
+```sql
+CREATE TABLE public.gmail_tokens (
+    user_id UUID NOT NULL PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at BIGINT NOT NULL,
+    email TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+```
 
-A investigação no repositório (código, migrations, `README.md`, `INTEGRATION_AUDIT.md`) **não encontrou
-nenhum registro** sobre o status atual do processo de verificação do app OAuth no Google — não há menção a
-"app verificado", "unverified app warning", limite de usuários de teste, branding verification, domínio
-verificado no Search Console, ou política de privacidade vinculada ao projeto GCP.
+- **PK**: `user_id` (referencia `auth.users(id)`, não `usuarios(id)`) — ou seja, a tabela é 1:1 com o
+  usuário do Supabase Auth, e **não tem `empresa_id`**. Não há suporte a "conexão compartilhada por
+  empresa": cada linha é uma conta Gmail conectada por um único usuário, sem qualquer coluna de tipo.
+- **RLS**: 4 policies (`SELECT`/`INSERT`/`UPDATE`/`DELETE`), todas `USING/WITH CHECK (auth.uid() =
+  user_id)` — mesmo arquivo, linhas 16-34. Reconfirmadas (sem alteração de lógica, apenas limpeza/
+  reordenação de policies) em `20260506172117_6b826a32-.../index.ts:31-36`.
+- Existe uma migration posterior,
+  [`20260504172116_d58aba56-...sql:111`](../supabase/migrations/20260504172116_d58aba56-3ac8-4d4c-8aeb-e14b7af32eb9.sql#L111),
+  que contém `CREATE TABLE IF NOT EXISTS public.gmail_tokens (id UUID PRIMARY KEY ..., usuario_id UUID
+  REFERENCES usuarios(id) UNIQUE, ...)` — uma definição **diferente e conflitante** (coluna `usuario_id`
+  em vez de `user_id`, sem `email` obrigatório). Como usa `IF NOT EXISTS` e a tabela já existia desde
+  20260430170853, esse `CREATE TABLE` é um **no-op**: nunca substituiu o schema real. É resíduo de um
+  script de "bootstrap defensivo" mais amplo naquela migration (que recria dezenas de tabelas com
+  `IF NOT EXISTS`) e não reflete a estrutura vigente. `src/integrations/supabase/types.ts:842-870`
+  confirma o schema real em produção: coluna `user_id`, sem `usuario_id`, sem `empresa_id`.
+- **Trigger**: `update_gmail_tokens_updated_at` mantém `updated_at` em cada `UPDATE` (mesmo arquivo de
+  criação, linhas 37-48).
 
-`INTEGRATION_AUDIT.md` apenas instrui genericamente "Configurar OAuth consent screen" como passo de setup,
-sem detalhar se isso deve ser feito em modo de teste ou produção.
+**Conclusão sobre a "fase dual"**: a estrutura dual pessoal/empresa mencionada como possível estado deste
+projeto **não foi implementada** — nem no schema, nem nas Edge Functions, nem no frontend. `gmail_tokens`
+continua sendo puramente por `user_id` do Supabase Auth.
 
-**Não invente esse status.** Se este documento for consultado para decidir se novos usuários podem se
-conectar sem ver a tela de aviso "app não verificado" do Google, confirme diretamente no
-[Google Cloud Console → APIs & Services → OAuth consent screen](https://console.cloud.google.com/) do
-projeto em uso, já que essa informação não existe documentada neste repositório.
+## 5. Fluxo OAuth2 (estado atual)
 
-## 7. Restrições recomendadas para a API Key do Google Maps
+1. **Frontend inicia o fluxo** — `src/hooks/useGmail.ts:30-32` chama a function `gmail-auth-url` passando
+   `{ userId: user.id, timestamp: ... }`. Não há parâmetro de "tipo" de conexão.
+2. **`gmail-auth-url`** (`supabase/functions/gmail-auth-url/index.ts`) monta a URL de consentimento do
+   Google:
+   - `redirect_uri` = `` `${Deno.env.get('SUPABASE_URL')}/functions/v1/gmail-callback` `` (linha 24) —
+     **não é hardcoded**, é derivado do secret `SUPABASE_URL` em runtime.
+   - `scope` (linha 26): `gmail.send`, `gmail.readonly`, `userinfo.email`.
+   - `state` = `userId` (linha 35) — usado só para carregar o `user_id` de volta no callback; **não
+     codifica tipo/empresa**.
+3. **Usuário autoriza no Google** → Google redireciona para `gmail-callback` com
+   `?code=...&state=<userId>`.
+4. **`gmail-callback`** (`supabase/functions/gmail-callback/index.ts`):
+   - Lê `code` e `userId` (de `state`) da query string (linhas 15-16); se algum faltar, retorna 400
+     (linha 19).
+   - Recalcula o mesmo `redirect_uri` via `SUPABASE_URL` (linha 25) — precisa bater exatamente com o
+     usado no passo 2 e com o registrado no Google Cloud Console.
+   - Troca `code` por tokens na Google (linhas 28-38), busca o e-mail do usuário via
+     `userinfo/v2/userinfo` (linhas 44-47).
+   - Faz `upsert` em `gmail_tokens` com `user_id`, `access_token`, `refresh_token`, `expires_at`, `email`
+     (linhas 55-63) usando o client `SUPABASE_SERVICE_ROLE_KEY` (bypassa RLS).
+   - Lê `APP_URL` (linha 68) e **lança erro se estiver ausente** (linha 69) — sem fallback hardcoded para
+     nenhum domínio. Se presente, redireciona (303) para `${APP_URL}/configuracoes?tab=perfil` (linha 70).
+5. **Roteamento por `tipo`** (pessoal vs. empresa): **ainda não implementado**. Não há parâmetro `tipo` em
+   nenhum ponto do fluxo (frontend, `gmail-auth-url`, `gmail-callback`) nem coluna correspondente no
+   schema. Se esse roteamento é um requisito planejado, ele ainda não tem nenhum código associado neste
+   repositório — não confundir com a fase de consolidação de `configuracoes_automacao` (seção 6), que é
+   uma migration diferente e já aplicada.
 
-A chave (`VITE_GOOGLE_MAPS_API_KEY`) é injetada no bundle JavaScript do frontend e fica **publicamente
-visível** no navegador de qualquer usuário. A mitigação correta — já recomendada em
-`INTEGRATION_AUDIT.md`, mas não verificável a partir do código se está de fato aplicada no console — é:
+### Consumo do token nas demais funções
 
-- Restringir a chave por **HTTP referrer**, autorizando apenas os domínios legítimos, por exemplo:
-  - `https://mdrepresentacoes.grupoclimb.ai/*` (produção)
-  - `http://localhost:8080/*` (dev local, porta padrão do Vite neste projeto)
-  - qualquer domínio de preview/staging usado
-- Restringir a chave às APIs efetivamente usadas: **Maps JavaScript API** e **Geocoding API** apenas
-  (não habilitar Places API ou outras, já que não são usadas — reduz superfície de abuso caso a chave
-  vaze).
-- Definir cota diária (quota) razoável no console para conter custos em caso de uso indevido da chave
-  vazada.
+Todas buscam/atualizam por `user_id`, sem qualquer lógica de fallback para nível de empresa:
 
-Isso vale tanto para a chave já exposta (que deve ser rotacionada, ver alerta no topo do documento) quanto
-para qualquer chave nova criada para um novo deploy.
+- **`gmail-send`** — `select('*').eq('user_id', userId)` (linha 26); refresh e `update` também por
+  `user_id` (linhas 51-76).
+- **`gmail-sync-inbox`** — dois usos: (a) marcar mensagem como lida, busca token por
+  `user_id = user.id` do JWT autenticado (linha 34); (b) job de sync geral, itera **todos** os registros
+  de `gmail_tokens` sem filtro (`select('*')` na linha 80) — ou seja, sincroniza a inbox de todo usuário
+  conectado, não só o chamador.
+- **`gmail-debug`** — autentica o chamador via JWT (`supabaseClient.auth.getUser()`, linha 21) e busca o
+  token por `user_id = user.id` (linha 38); todo o restante do diagnóstico (refresh, profile, contagem de
+  `emails_recebidos`) é escopado a esse único usuário.
 
-## 8. Checklist final de setup para um novo ambiente
+Nenhuma dessas três funções foi ajustada para uma eventual fase dual — não há branch de código para
+"empresa" em nenhuma delas.
 
-Use esta lista ao dar onboarding a um novo dev ou ao clonar o sistema para um novo cliente/deploy.
+## 6. Estrutura de `configuracoes_automacao` (pós-fix multi-tenant)
 
-### Google Cloud Console
-- [ ] Criar (ou reusar) um projeto no Google Cloud Console
-- [ ] Habilitar **Gmail API**
-- [ ] Habilitar **Maps JavaScript API**
-- [ ] Habilitar **Geocoding API**
-- [ ] Configurar **OAuth consent screen** com os escopos: `gmail.send`, `gmail.readonly`,
-      `userinfo.email` (ver seção 4 sobre possível necessidade de `gmail.modify`)
-- [ ] Verificar/decidir o status de publicação do consent screen (teste vs. produção vs. verificado —
-      ver seção 6, esta decisão não está documentada no repo e precisa ser tomada manualmente)
-- [ ] Criar **OAuth Client ID** (tipo "Web application") e cadastrar o redirect URI
-      `https://<SEU-PROJECT-REF>.supabase.co/functions/v1/gmail-callback` (seção 5)
-- [ ] Criar **API Key** para Maps, restrita por HTTP referrer aos domínios do deploy e às duas APIs de
-      Maps habilitadas (seção 7)
+Migration
+[`20260706190000_configuracoes_automacao_multi_empresa.sql`](../supabase/migrations/20260706190000_configuracoes_automacao_multi_empresa.sql)
+(mais recente que toca essa tabela) aplicou a consolidação multi-tenant:
 
-### Código (apenas se for um novo deploy/projeto Supabase — não altera este PR)
-- [ ] Atualizar o redirect URI hardcoded em
-      [supabase/functions/gmail-auth-url/index.ts](../supabase/functions/gmail-auth-url/index.ts) (linha 24)
-      e [supabase/functions/gmail-callback/index.ts](../supabase/functions/gmail-callback/index.ts)
-      (linha 25) para o novo `SUPABASE_URL`
+- Adicionou `empresa_id UUID REFERENCES public.empresas(id)` (linha 18), com backfill (linhas 26-46) e
+  `NOT NULL` condicional (linhas 50-55) — só vira `NOT NULL` se o backfill conseguiu popular todas as
+  linhas (protege projetos recém-provisionados sem nenhuma `empresa` ainda).
+- Trocou a constraint `UNIQUE(chave)` global por `UNIQUE(empresa_id, chave)` (linhas 57-61):
+  ```sql
+  ALTER TABLE public.configuracoes_automacao DROP CONSTRAINT IF EXISTS configuracoes_automacao_chave_key;
+  ALTER TABLE public.configuracoes_automacao
+    ADD CONSTRAINT configuracoes_automacao_empresa_chave_key UNIQUE (empresa_id, chave);
+  ```
+- Recriou as 3 policies de RLS usando o padrão `is_admin()` / `is_gestor()` / `get_my_empresa_id()` já em
+  uso no resto do schema desde a migration `20260413223933` (linhas 66-79):
+  ```sql
+  CREATE POLICY "automacao_config_select" ON public.configuracoes_automacao
+    FOR SELECT TO authenticated
+    USING (is_admin() OR empresa_id = get_my_empresa_id());
 
-### Supabase secrets (backend)
-- [ ] `supabase secrets set GOOGLE_CLIENT_ID=...`
-- [ ] `supabase secrets set GOOGLE_CLIENT_SECRET=...`
-- [ ] `supabase secrets set APP_URL=https://<dominio-do-novo-cliente>`
-- [ ] Confirmar que `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já estão disponíveis (normalmente
-      provisionadas automaticamente pelo Supabase para toda Edge Function)
+  CREATE POLICY "automacao_config_upsert" ON public.configuracoes_automacao
+    FOR INSERT TO authenticated
+    WITH CHECK (is_admin() OR (is_gestor() AND empresa_id = get_my_empresa_id()));
 
-### `.env` do frontend (não versionado — `.gitignore` já ignora `.env`/`.env.*`)
-- [ ] `VITE_GOOGLE_MAPS_API_KEY=...`
-- [ ] `VITE_SUPABASE_URL=...`
-- [ ] `VITE_SUPABASE_PUBLISHABLE_KEY=...`
-- [ ] `VITE_SUPABASE_PROJECT_ID=...`
+  CREATE POLICY "automacao_config_update" ON public.configuracoes_automacao
+    FOR UPDATE TO authenticated
+    USING (is_admin() OR (is_gestor() AND empresa_id = get_my_empresa_id()));
+  ```
+  Isso substitui o estado anterior (`SELECT` com `USING (true)` — leitura global sem isolamento — vindo de
+  `20260306171805`), fechando o bloqueador de isolamento entre empresas nessa tabela.
 
-### Banco de dados
-- [ ] Confirmar que a migration que cria `gmail_tokens`
-      (`supabase/migrations/20260430170853_98772703-d3ad-489e-a062-051d06d444d0.sql`) foi aplicada
-      (`user_id`, `access_token`, `refresh_token`, `expires_at`, `email`, RLS habilitado)
-- [ ] Confirmar que `emails_recebidos` existe com as colunas usadas por `gmail-sync-inbox`
-      (`gmail_message_id`, `user_id`, `remetente`, `assunto`, `corpo_html`, `lido`)
+Essa consolidação é **independente** da tabela `gmail_tokens` — não alterou nem referencia
+`gmail_tokens`. As duas tabelas seguem em estágios diferentes: `configuracoes_automacao` já é
+multi-tenant por empresa; `gmail_tokens` continua puramente por usuário individual (seção 4).
 
-### Segurança
-- [ ] Rotacionar a `VITE_GOOGLE_MAPS_API_KEY` atual (valor real está exposto em `INTEGRATION_AUDIT.md`
-      versionado no git — ver alerta no topo deste documento)
-- [ ] Remover o valor literal da chave de `INTEGRATION_AUDIT.md` após a rotação
+## 7. Checklist de setup para novo ambiente/cliente
+
+**Gmail OAuth2:**
+- [ ] Criar (ou reutilizar) projeto no Google Cloud Console com Gmail API habilitada.
+- [ ] Criar credencial OAuth 2.0 Client ID, tipo Web application.
+- [ ] Registrar a Redirect URI: `https://<novo-SUPABASE_URL>/functions/v1/gmail-callback` (o path é fixo;
+  `SUPABASE_URL` é o único componente que muda por ambiente — não há mais domínio hardcoded a ajustar).
+- [ ] Configurar secrets no projeto Supabase: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `APP_URL`
+  (domínio do frontend do novo cliente — **obrigatório**, a função falha sem ele).
+- [ ] Nenhuma migração de dados de `gmail_tokens` é necessária entre clientes — cada usuário reconecta a
+  própria conta Gmail pelo fluxo OAuth normal (tokens são por `user_id`, não portáveis entre projetos).
+- [ ] Se o requisito de negócio for "conexão Gmail compartilhada por empresa" (um único Gmail usado por
+  todos os vendedores de uma empresa), isso **precisa ser desenvolvido do zero** — não existe hoje nem
+  como schema, nem como Edge Function, nem como opção de UI.
+
+**Google Maps:**
+- [ ] Gerar API Key de Maps no Google Cloud Console do novo cliente, com restrição de domínio.
+- [ ] Definir `VITE_GOOGLE_MAPS_API_KEY` no `.env` (build time) do novo deploy.
+- [ ] Sem key configurada, `MapaObras.tsx` degrada para modo de demonstração em vez de quebrar — não é
+  bloqueante para o restante do app, mas os recursos de mapa/geocodificação de obras ficam inoperantes.
+
+**`configuracoes_automacao` (multi-tenant):**
+- [ ] Nenhuma ação manual necessária num ambiente novo — a tabela já nasce com `empresa_id NOT NULL` e as
+  policies corrigidas a partir da migration `20260706190000`. O backfill condicional só é relevante para
+  bases que já tinham dados antes dessa migration.
+
+## 8. Divergências encontradas em `INTEGRATION_AUDIT.md`
+
+Comparado ao código lido nesta investigação, `INTEGRATION_AUDIT.md` está desatualizado/incorreto em três
+pontos:
+
+1. **Linha 55**: expõe o valor real de `VITE_GOOGLE_MAPS_API_KEY` em texto plano — ver alerta de segurança
+   no topo deste documento.
+2. **Linha 76** afirma: `APP_URL = ... (redirect URI hardcoded no callback)`. Isso está incorreto para o
+   estado atual: o *redirect URI do OAuth* (`redirect_uri` enviado ao Google) é derivado de
+   `SUPABASE_URL`, não de `APP_URL` — `APP_URL` só é usado para o redirect final pós-callback de volta ao
+   app (seção 5, passo 4). Não há valor hardcoded em nenhum dos dois.
+3. **Linha 226** (checklist) menciona "fallback `APP_URL` (linha ~69)" em `gmail-callback/index.ts`. Isso
+   também está incorreto: a linha correspondente hoje (68-69) **lança um erro** se `APP_URL` estiver
+   ausente — não existe fallback hardcoded para `mdrepresentacoes.grupoclimb.ai` nem para nenhum outro
+   domínio.
+
+Recomenda-se atualizar `INTEGRATION_AUDIT.md` para refletir isso e, principalmente, remover a chave real
+exposta na linha 55.
