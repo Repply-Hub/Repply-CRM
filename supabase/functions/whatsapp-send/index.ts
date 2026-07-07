@@ -13,6 +13,39 @@ const PLACEHOLDER: Record<string, string> = {
   documento: '[Documento]',
 };
 
+// Mesma normalização usada no whatsapp-webhook: garante que o número BR sempre
+// inclua o 9º dígito para casar com a conversa já existente do mesmo contato.
+function normalizeWhatsappPhone(raw: string): string {
+  let digits = (raw ?? "").replace(/\D/g, "");
+  // só remove o "55" se for código de país (DDD 55 do RS também começa com "55")
+  if (digits.length > 11 && digits.startsWith("55")) digits = digits.slice(2);
+  if (digits.length === 10) {
+    digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
+  }
+  return `55${digits}`;
+}
+
+// Garante que o usuário que enviou a mensagem esteja em whatsapp_conversa_responsaveis
+// para a conversa, independente de ser grupo ou chat individual, sem duplicar a linha
+// caso ele já seja responsável (não há constraint única na tabela para usar upsert).
+async function ensureResponsavel(
+  supabase: ReturnType<typeof createClient>,
+  conversaId: string,
+  usuarioId: string
+) {
+  const { data: existing } = await supabase
+    .from("whatsapp_conversa_responsaveis")
+    .select("usuario_id")
+    .eq("conversa_id", conversaId)
+    .eq("usuario_id", usuarioId)
+    .maybeSingle();
+  if (!existing) {
+    await supabase
+      .from("whatsapp_conversa_responsaveis")
+      .insert({ conversa_id: conversaId, usuario_id: usuarioId });
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -90,7 +123,7 @@ serve(async (req) => {
     const isGroup = telefone.includes("@g.us") || digits.length > 14;
     const phone = isGroup
       ? (telefone.includes("@g.us") ? telefone : `${digits}@g.us`)
-      : (digits.startsWith("55") ? digits : `55${digits}`);
+      : normalizeWhatsappPhone(telefone);
     const uazapiInstance = config.api_instance_name ?? config.instance_name;
     const baseUrl = config.instance_url.replace(/\/$/, "");
 
@@ -193,12 +226,14 @@ serve(async (req) => {
       if (media_url) insertData.media_url = media_url;
       if (media_mime) insertData.media_mime = media_mime;
 
-      // Atualiza conversa e insere mensagem em paralelo
+      // Atualiza conversa, insere mensagem e garante que quem enviou vire responsável
+      // pela conversa (aparece em "Meus chats"), tanto em grupo quanto em chat individual.
       await Promise.all([
         supabase.from("whatsapp_conversas")
           .update({ ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now })
           .eq("id", conversaId),
         supabase.from("whatsapp_mensagens").insert(insertData),
+        ensureResponsavel(supabase, conversaId, userData.id),
       ]);
     }
 

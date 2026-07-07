@@ -154,6 +154,14 @@
   }
 }
 
+/* O Radix ScrollArea envolve o conteúdo num div com display:table inline,
+   que cresce para acomodar texto sem quebra (ex: truncate/whitespace-nowrap),
+   estourando a largura do container. Forçamos display:block para respeitar
+   a largura do pai e permitir truncamento correto dos filhos. */
+[data-radix-scroll-area-viewport] > div {
+  display: block !important;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

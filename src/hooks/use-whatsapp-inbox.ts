@@ -4,6 +4,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 
+// WhatsApp/uazapi às vezes usa o JID de celulares BR sem o 9º dígito (número antigo).
+// Normaliza para o formato canônico (55 + DDD + 9 + número), igual ao whatsapp-webhook,
+// para casar com conversas já existentes do mesmo contato e evitar duplicidade.
+function normalizeWhatsappPhone(raw: string): string {
+  let digits = (raw ?? '').replace(/\D/g, '');
+  // só remove o "55" se for código de país (DDD 55 do RS também começa com "55")
+  if (digits.length > 11 && digits.startsWith('55')) digits = digits.slice(2);
+  if (digits.length === 10) {
+    digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
+  }
+  return `55${digits}`;
+}
+
 export interface WaResponsavel {
   id: string;
   nome: string;
@@ -22,9 +35,17 @@ export interface WaConversa {
   ultima_mensagem_at: string | null;
   nao_lidas: number;
   arquivada: boolean;
+  is_group: boolean;
+  participantes: { nome: string | null; telefone: string }[];
   created_at: string;
   updated_at: string;
   responsaveis?: WaResponsavel[];
+}
+
+function compareConversas(a: WaConversa, b: WaConversa): number {
+  const ta = a.ultima_mensagem_at ?? a.created_at;
+  const tb = b.ultima_mensagem_at ?? b.created_at;
+  return tb.localeCompare(ta);
 }
 
 export interface WaMensagem {
@@ -41,6 +62,10 @@ export interface WaMensagem {
   usuario_id: string | null;
   lida: boolean;
   created_at: string;
+  // Preenchido só em mensagens de entrada vindas de grupo — quem enviou dentro do grupo
+  // (o nome/telefone da conversa em si é o do grupo, não de um participante específico).
+  remetente_nome?: string | null;
+  remetente_telefone?: string | null;
   usuario?: {
     id: string;
     nome: string;
@@ -87,13 +112,14 @@ export function useWaConversas() {
       const { data, error } = await supabase
         .from('whatsapp_conversas')
         .select('*, responsaveis:whatsapp_conversa_responsaveis(usuario:usuarios(id, nome, avatar_url))')
-        .eq('empresa_id', empresaId)
-        .order('ultima_mensagem_at', { ascending: false, nullsFirst: false });
+        .eq('empresa_id', empresaId);
       if (error) throw error;
-      return ((data ?? []) as any[]).map(c => ({
-        ...c,
-        responsaveis: (c.responsaveis ?? []).map((r: any) => r.usuario).filter(Boolean),
-      })) as WaConversa[];
+      return ((data ?? []) as any[])
+        .map(c => ({
+          ...c,
+          responsaveis: (c.responsaveis ?? []).map((r: any) => r.usuario).filter(Boolean),
+        }) as WaConversa)
+        .sort(compareConversas);
     },
   });
 
@@ -104,7 +130,7 @@ export function useWaConversas() {
         qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) => {
           const prev = old ?? [];
           const exists = prev.some((c) => c.id === (payload.new as WaConversa).id);
-          return exists ? prev : [payload.new as WaConversa, ...prev];
+          return exists ? prev : [...prev, payload.new as WaConversa].sort(compareConversas);
         });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'whatsapp_conversas' }, (payload) => {
@@ -116,11 +142,7 @@ export function useWaConversas() {
             // join de responsaveis — então preserva o que já estava no cache para
             // não sumir com a conversa dos filtros "Meu"/"Geral".
             .map((c) => c.id === updated.id ? { ...updated, responsaveis: c.responsaveis } : c)
-            .sort((a, b) => {
-              const ta = a.ultima_mensagem_at ?? a.created_at;
-              const tb = b.ultima_mensagem_at ?? b.created_at;
-              return tb.localeCompare(ta);
-            })
+            .sort(compareConversas)
         );
         qc.invalidateQueries({ queryKey: ['unread_wa_count'] });
       })
@@ -217,6 +239,7 @@ export type WaMidiaTipo = 'texto' | 'imagem' | 'audio' | 'video' | 'documento';
 
 export function useWaSendMessage() {
   const qc = useQueryClient();
+  const { profile } = useAuth();
 
   return useMutation({
     mutationFn: async (params: {
@@ -278,13 +301,18 @@ export function useWaSendMessage() {
         msgOtimista,
       ]);
 
-      // Atualiza preview da conversa imediatamente
+      // Atualiza preview da conversa imediatamente — e garante que quem enviou a
+      // mensagem apareça em "Meus chats" sem esperar o refetch (o servidor também
+      // grava isso em whatsapp_conversa_responsaveis, isso aqui é só otimista).
       qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
-        (old ?? []).map((c) =>
-          c.id === vars.conversa_id
-            ? { ...c, ultima_mensagem: vars.mensagem, ultima_mensagem_at: new Date().toISOString() }
-            : c
-        )
+        (old ?? []).map((c) => {
+          if (c.id !== vars.conversa_id) return c;
+          const jaResponsavel = profile?.id && c.responsaveis?.some((r) => r.id === profile.id);
+          const responsaveis = profile?.id && !jaResponsavel
+            ? [...(c.responsaveis ?? []), { id: profile.id, nome: profile.nome, avatar_url: profile.avatar_url ?? null }]
+            : c.responsaveis;
+          return { ...c, ultima_mensagem: vars.mensagem, ultima_mensagem_at: new Date().toISOString(), responsaveis };
+        })
       );
 
       return { msgOtimista };
@@ -620,6 +648,47 @@ export function useWaFetchContactPhoto() {
   });
 }
 
+// --- Participantes de grupo (backfill para grupos criados antes do rastreio, ou
+// fora do CRM, cuja uazapi só devolve a lista completa via /group/list) ---
+
+export function useWaFetchGroupParticipantes() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversaId: string) => {
+      const { data, error } = await supabase.functions.invoke('whatsapp-group-participants', {
+        body: { conversa_id: conversaId },
+      });
+      if (error) throw error;
+      return { conversaId, participantes: (data?.participantes ?? []) as { nome: string | null; telefone: string }[] };
+    },
+    onSuccess: ({ conversaId, participantes }) => {
+      if (participantes.length === 0) return;
+      qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
+        (old ?? []).map((c) => c.id === conversaId ? { ...c, participantes } : c)
+      );
+    },
+  });
+}
+
+// --- Foto de perfil por número (participantes de grupo, cacheada no back-end por
+// telefone em vez de por conversa) ---
+
+export function useWaParticipantePhoto(telefone: string | null | undefined) {
+  return useQuery({
+    queryKey: ['wa_participante_foto', telefone],
+    enabled: !!telefone,
+    staleTime: 60 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('whatsapp-participant-photo', {
+        body: { telefone },
+      });
+      if (error) throw error;
+      return (data?.foto_perfil_url ?? null) as string | null;
+    },
+  });
+}
+
 // --- Conectar instância via QR code ---
 
 export function useWaConnect() {
@@ -737,8 +806,7 @@ export function useWaNovaConversa() {
       const empresaId = await getEmpresaId();
       if (!empresaId) throw new Error('Empresa não encontrada');
 
-      const digits = params.telefone.replace(/\D/g, '');
-      const telefone = digits.startsWith('55') ? digits : `55${digits}`;
+      const telefone = normalizeWhatsappPhone(params.telefone);
 
       const { data, error } = await supabase
         .from('whatsapp_conversas')
@@ -757,6 +825,34 @@ export function useWaNovaConversa() {
     },
     onError: (err: any) => {
       toast.error(err?.message ?? 'Erro ao iniciar conversa');
+    },
+  });
+}
+
+// --- Criar grupo ---
+
+export function useWaCriarGrupo() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { nome: string; participantes: string[] }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada');
+
+      const res = await supabase.functions.invoke('whatsapp-group-create', {
+        body: { nome: params.nome, participantes: params.participantes },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (res.error) throw res.error;
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data.conversa as WaConversa;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wa_conversas'] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao criar grupo');
     },
   });
 }

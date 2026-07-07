@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import {
   useWaMarcarLida,
   useWaConfig,
   useWaNovaConversa,
+  useWaCriarGrupo,
   useWaLimparConversa,
   useWaArquivarConversa,
   useWaDeletarConversa,
@@ -20,6 +21,8 @@ import {
   useWaDisconnect,
   useWaProvision,
   useWaFetchContactPhoto,
+  useWaFetchGroupParticipantes,
+  useWaParticipantePhoto,
   uploadWaMedia,
   type WaConversa,
   type WaMensagem,
@@ -100,10 +103,12 @@ import {
   Pause,
   MoreVertical,
   Trash2,
+  Eraser,
   Archive,
   ArchiveRestore,
   CheckSquare,
   UserPlus,
+  Users,
   User,
   ExternalLink,
   Building2,
@@ -181,7 +186,10 @@ function UserPreviewPopover({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={cn(nameClassName, "text-left hover:underline underline-offset-2 cursor-pointer")}
+          className={cn(
+            nameClassName,
+            "text-left hover:underline underline-offset-2 cursor-pointer",
+          )}
         >
           {usuario.nome}
         </button>
@@ -214,7 +222,9 @@ function UserPreviewPopover({
             {usuario.telefone && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Phone className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{formatPhone(usuario.telefone)}</span>
+                <span className="truncate">
+                  {formatPhone(usuario.telefone)}
+                </span>
               </div>
             )}
           </div>
@@ -227,38 +237,61 @@ function UserPreviewPopover({
 function ContactPreviewPopover({
   conversa,
   nameClassName,
+  remetenteNome,
+  remetenteTelefone,
 }: {
   conversa: WaConversa;
   nameClassName: string;
+  // Em grupos, quem enviou aquela mensagem específica (participante), não o grupo.
+  remetenteNome?: string | null;
+  remetenteTelefone?: string | null;
 }) {
+  const isParticipante =
+    conversa.is_group && (remetenteNome || remetenteTelefone);
+  const nome = isParticipante ? remetenteNome : conversa.nome_contato;
+  const telefone = isParticipante
+    ? (remetenteTelefone ?? conversa.telefone)
+    : conversa.telefone;
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={cn(nameClassName, "text-left hover:underline underline-offset-2 cursor-pointer")}
+          className={cn(
+            nameClassName,
+            isParticipante && senderNameColor(telefone),
+            "text-left hover:underline underline-offset-2 cursor-pointer",
+          )}
         >
-          {conversa.nome_contato || formatPhone(conversa.telefone)}
+          {nome || formatPhone(telefone)}
         </button>
       </PopoverTrigger>
       <PopoverContent side="top" align="start" className="w-64">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 border border-border/60">
-            <AvatarImage src={conversa.foto_perfil_url ?? undefined} />
-            <AvatarFallback className={cn(colorForPhone(conversa.telefone), "text-white font-semibold")}>
-              {initials(conversa.nome_contato, conversa.telefone)}
+            {!isParticipante && (
+              <AvatarImage src={conversa.foto_perfil_url ?? undefined} />
+            )}
+            <AvatarFallback
+              className={cn(
+                colorForPhone(telefone),
+                "text-white font-semibold",
+              )}
+            >
+              {initials(nome, telefone)}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
             <p className="text-sm font-semibold truncate">
-              {conversa.nome_contato || "Sem nome salvo"}
+              {nome || "Sem nome salvo"}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-              {formatPhone(conversa.telefone)}
+              {formatPhone(telefone)}
             </p>
           </div>
         </div>
-        {conversa.cliente_id && (
+        {!isParticipante && conversa.cliente_id && (
           <Badge variant="outline" className="mt-3 gap-1 text-[11px]">
             <Building2 className="h-3 w-3" />
             Cliente cadastrado
@@ -277,6 +310,120 @@ function initials(nome: string | null, telefone: string) {
       : parts[0].slice(0, 2).toUpperCase();
   }
   return telefone.replace(/\D/g, "").slice(-2);
+}
+
+// Avatar de um participante de grupo (não é usuário do CRM, então busca a foto de
+// perfil sob demanda por telefone — cacheada no back-end — em vez de já vir pronta
+// na conversa).
+function ParticipanteAvatar({
+  nome,
+  telefone,
+  className,
+}: {
+  nome: string | null;
+  telefone: string;
+  className?: string;
+}) {
+  const { data: fotoUrl } = useWaParticipantePhoto(telefone);
+  return (
+    <Avatar className={className}>
+      {fotoUrl && <AvatarImage src={fotoUrl} alt="" />}
+      <AvatarFallback
+        className={cn(
+          colorForPhone(telefone),
+          "text-white text-[9px] font-semibold",
+        )}
+      >
+        {initials(nome, telefone)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
+// Avatar principal da conversa na sidebar: foto/iniciais do contato, ou a foto/ícone
+// do grupo quando for uma conversa em grupo.
+function ConversaAvatar({ conv }: { conv: WaConversa }) {
+  if (conv.is_group) {
+    return (
+      <Avatar className="h-8 w-8 border border-primary/10 shrink-0">
+        {conv.foto_perfil_url && (
+          <AvatarImage src={conv.foto_perfil_url} alt="" />
+        )}
+        <AvatarFallback
+          className={cn(colorForPhone(conv.telefone), "text-white")}
+        >
+          <Users className="h-3.5 w-3.5" />
+        </AvatarFallback>
+      </Avatar>
+    );
+  }
+  return (
+    <Avatar className="h-8 w-8 border border-primary/10 shrink-0">
+      {conv.foto_perfil_url && (
+        <AvatarImage src={conv.foto_perfil_url} alt="" />
+      )}
+      <AvatarFallback
+        className={cn(
+          colorForPhone(conv.telefone),
+          "text-white text-[10px] font-semibold",
+        )}
+      >
+        {initials(conv.nome_contato, conv.telefone)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
+// Stack de avatares dos atendentes atribuídos + participantes do WhatsApp de um grupo,
+// exibido à direita da linha da conversa. Mostra no máximo 3 avatares; acima disso
+// mostra um indicador "+N".
+function ConversaParticipantesStack({ conv }: { conv: WaConversa }) {
+  if (!conv.is_group) return null;
+
+  const membros = [
+    ...(conv.responsaveis ?? []).map((r) => ({
+      nome: r.nome,
+      chave: r.id,
+      foto: r.avatar_url,
+    })),
+    ...(conv.participantes ?? []).map((p) => ({
+      nome: p.nome,
+      chave: p.telefone,
+      foto: null as string | null,
+    })),
+  ];
+  if (membros.length === 0) return null;
+
+  const visiveis = membros.slice(0, 3);
+  const restantes = membros.length - visiveis.length;
+
+  return (
+    <div className="flex -space-x-2 overflow-hidden shrink-0">
+      {visiveis.map((m, i) => (
+        <Avatar
+          key={`${m.chave}-${i}`}
+          className="inline-block h-5 w-5 rounded-full ring-2 ring-background"
+        >
+          {m.foto && <AvatarImage src={m.foto} alt="" />}
+          <AvatarFallback
+            className={cn(
+              colorForPhone(m.chave),
+              "text-white text-[7px] font-semibold",
+            )}
+          >
+            {initials(m.nome, m.chave)}
+          </AvatarFallback>
+        </Avatar>
+      ))}
+      {restantes > 0 && (
+        <Avatar className="inline-block h-5 w-5 rounded-full ring-2 ring-background">
+          <AvatarFallback className="bg-muted text-muted-foreground text-[7px] font-semibold">
+            +{restantes}
+          </AvatarFallback>
+        </Avatar>
+      )}
+    </div>
+  );
 }
 
 function formatTime(dateStr: string) {
@@ -307,14 +454,14 @@ function AttachmentIcon({
 }
 
 function MessageStatus({ status }: { status: string }) {
-  if (status === "enviando")
-    return <Clock className="h-3 w-3 text-muted-foreground" />;
-  if (status === "enviado")
-    return <Check className="h-3 w-3 text-muted-foreground" />;
+  // Só é renderizado em mensagens enviadas (bolha laranja), por isso os tons
+  // padrão são brancos translúcidos — só "lido" usa azul, como no WhatsApp.
+  if (status === "enviando") return <Clock className="h-3 w-3 text-white/70" />;
+  if (status === "enviado") return <Check className="h-3 w-3 text-white/70" />;
   if (status === "entregue")
-    return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
+    return <CheckCheck className="h-3 w-3 text-white/70" />;
   if (status === "lido")
-    return <CheckCheck className="h-3 w-3 text-blue-500" />;
+    return <CheckCheck className="h-3 w-3 text-blue-300" />;
   return null;
 }
 
@@ -403,29 +550,6 @@ function WaAudioPlayer({
     40, 65, 30, 20, 45, 55, 40, 30, 50, 45, 35,
   ];
 
-  let avatarUrl: string | null = null;
-  let fallbackInitials = "";
-  let avatarColorClass = "bg-primary";
-
-  if (isSaida) {
-    if (msg.usuario) {
-      avatarUrl = msg.usuario.avatar_url;
-      const parts = msg.usuario.nome.trim().split(" ");
-      fallbackInitials =
-        parts.length >= 2
-          ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-          : parts[0].slice(0, 2).toUpperCase();
-    } else {
-      fallbackInitials = "EU";
-    }
-  } else {
-    fallbackInitials = initials(
-      conversaAtiva.nome_contato,
-      conversaAtiva.telefone,
-    );
-    avatarColorClass = colorForPhone(conversaAtiva.telefone);
-  }
-
   return (
     <div className="flex items-center gap-3 w-[260px] sm:w-[280px] py-1.5 px-2">
       <audio ref={audioRef} src={src} preload="metadata" />
@@ -489,30 +613,6 @@ function WaAudioPlayer({
           <span className={isSaida ? "text-white/90" : "text-muted-foreground"}>
             {formatAudioTime(currentTime || duration)}
           </span>
-        </div>
-      </div>
-
-      <div className="relative shrink-0 select-none">
-        <Avatar className="h-8.5 w-8.5 border border-black/5 dark:border-white/5 shadow-sm">
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt="avatar"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <AvatarFallback
-              className={cn(
-                avatarColorClass,
-                "text-[10px] font-semibold text-white",
-              )}
-            >
-              {fallbackInitials}
-            </AvatarFallback>
-          )}
-        </Avatar>
-        <div className="absolute -bottom-1 -left-1 bg-background dark:bg-zinc-800 rounded-full p-0.5 shadow-sm border border-border">
-          <Mic className="h-2.5 w-2.5 text-green-500 fill-green-500" />
         </div>
       </div>
     </div>
@@ -638,6 +738,17 @@ function MessageContent({
   return (
     <span className="text-sm whitespace-pre-wrap break-words">
       {msg.conteudo}
+      <span
+        className={cn(
+          "float-right flex items-center gap-1 select-none ml-2 mt-1 translate-y-0.5",
+          isSaida ? "text-white/70" : "text-muted-foreground",
+        )}
+      >
+        <span className="text-[9px]">
+          {format(new Date(msg.created_at), "HH:mm")}
+        </span>
+        {isSaida && <MessageStatus status={msg.status} />}
+      </span>
     </span>
   );
 }
@@ -660,7 +771,10 @@ function PendingAudioPlayer({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const totalBars = 30;
-  const heights = [30, 45, 20, 60, 40, 75, 30, 50, 80, 35, 25, 45, 65, 55, 35, 70, 45, 25, 50, 40, 65, 30, 20, 45, 55, 40, 30, 50, 45, 35];
+  const heights = [
+    30, 45, 20, 60, 40, 75, 30, 50, 80, 35, 25, 45, 65, 55, 35, 70, 45, 25, 50,
+    40, 65, 30, 20, 45, 55, 40, 30, 50, 45, 35,
+  ];
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   useEffect(() => {
@@ -669,31 +783,37 @@ function PendingAudioPlayer({
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onTime = () => setCurrentTime(audio.currentTime);
-    const onMeta = () => { if (audio.duration && !isNaN(audio.duration)) setDuration(audio.duration); };
-    const onEnd = () => { setIsPlaying(false); setCurrentTime(0); };
-    audio.addEventListener('play', onPlay);
-    audio.addEventListener('pause', onPause);
-    audio.addEventListener('timeupdate', onTime);
-    audio.addEventListener('loadedmetadata', onMeta);
-    audio.addEventListener('ended', onEnd);
+    const onMeta = () => {
+      if (audio.duration && !isNaN(audio.duration)) setDuration(audio.duration);
+    };
+    const onEnd = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("ended", onEnd);
     return () => {
-      audio.removeEventListener('play', onPlay);
-      audio.removeEventListener('pause', onPause);
-      audio.removeEventListener('timeupdate', onTime);
-      audio.removeEventListener('loadedmetadata', onMeta);
-      audio.removeEventListener('ended', onEnd);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("ended", onEnd);
     };
   }, [src]);
 
   const formatT = (t: number) => {
-    if (isNaN(t) || !isFinite(t)) return '0:00';
-    return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+    if (isNaN(t) || !isFinite(t)) return "0:00";
+    return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   };
 
   const handleScrub = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!audioRef.current || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    audioRef.current.currentTime = (Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1)) * duration;
+    audioRef.current.currentTime =
+      Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1) * duration;
   };
 
   return (
@@ -713,15 +833,24 @@ function PendingAudioPlayer({
       {/* Play/Pause */}
       <button
         type="button"
-        onClick={() => isPlaying ? audioRef.current?.pause() : audioRef.current?.play()}
+        onClick={() =>
+          isPlaying ? audioRef.current?.pause() : audioRef.current?.play()
+        }
         className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 bg-green-500 hover:bg-green-600 text-white transition-colors shadow-sm"
       >
-        {isPlaying ? <Pause className="h-3 w-3 fill-current" /> : <Play className="h-3 w-3 fill-current ml-0.5" />}
+        {isPlaying ? (
+          <Pause className="h-3 w-3 fill-current" />
+        ) : (
+          <Play className="h-3 w-3 fill-current ml-0.5" />
+        )}
       </button>
 
       {/* Waveform + tempo */}
       <div className="flex-1 flex items-center gap-2 min-w-0">
-        <div onClick={handleScrub} className="relative flex-1 h-5 flex items-center cursor-pointer">
+        <div
+          onClick={handleScrub}
+          className="relative flex-1 h-5 flex items-center cursor-pointer"
+        >
           <div className="flex items-end gap-[2px] w-full h-3.5 justify-between">
             {Array.from({ length: totalBars }).map((_, i) => {
               const barProgress = (i / totalBars) * 100;
@@ -729,7 +858,10 @@ function PendingAudioPlayer({
               return (
                 <div
                   key={i}
-                  className={cn('w-[3px] rounded-full transition-all duration-150', isPlayed ? 'bg-green-500' : 'bg-muted-foreground/25')}
+                  className={cn(
+                    "w-[3px] rounded-full transition-all duration-150",
+                    isPlayed ? "bg-green-500" : "bg-muted-foreground/25",
+                  )}
                   style={{ height: `${heights[i % heights.length]}%` }}
                 />
               );
@@ -753,7 +885,11 @@ function PendingAudioPlayer({
         className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white transition-colors shadow-sm"
         title="Enviar áudio"
       >
-        {isSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+        {isSending ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <Send className="h-3 w-3" />
+        )}
       </button>
     </div>
   );
@@ -819,6 +955,121 @@ function NovaConversaDialog({
                 <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
               )}
               Iniciar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// --- Dialog criar grupo ---
+function CriarGrupoDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: (conversaId?: string) => void;
+}) {
+  const [nome, setNome] = useState("");
+  const [participantes, setParticipantes] = useState<string[]>([""]);
+  const criarGrupo = useWaCriarGrupo();
+
+  function resetAndClose(conversaId?: string) {
+    setNome("");
+    setParticipantes([""]);
+    onClose(conversaId);
+  }
+
+  function updateParticipante(index: number, value: string) {
+    setParticipantes((prev) => prev.map((p, i) => (i === index ? value : p)));
+  }
+
+  function removerParticipante(index: number) {
+    setParticipantes((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const lista = participantes.map((p) => p.trim()).filter(Boolean);
+    if (!nome.trim() || lista.length === 0) return;
+    const conv = await criarGrupo.mutateAsync({
+      nome: nome.trim(),
+      participantes: lista,
+    });
+    resetAndClose(conv.id);
+  }
+
+  const listaValida = participantes.some((p) => p.trim());
+
+  return (
+    <Dialog open={open} onOpenChange={() => resetAndClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Novo grupo</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Nome do grupo</Label>
+            <Input
+              placeholder="Ex: Equipe de Obras"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Participantes (com DDD)</Label>
+            <div className="space-y-2">
+              {participantes.map((valor, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <Input
+                    placeholder="(84) 99999-9999"
+                    value={valor}
+                    onChange={(e) => updateParticipante(i, e.target.value)}
+                  />
+                  {participantes.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => removerParticipante(i)}
+                      title="Remover"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5"
+              onClick={() => setParticipantes((prev) => [...prev, ""])}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Adicionar participante
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => resetAndClose()}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={criarGrupo.isPending || !nome.trim() || !listaValida}
+            >
+              {criarGrupo.isPending && (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              )}
+              Criar grupo
             </Button>
           </DialogFooter>
         </form>
@@ -1024,10 +1275,12 @@ function ConfigDialog({
 // --- Sheet de resumo do lead com responsáveis ---
 function LeadSheet({
   conversa,
+  participantesGrupo,
   open,
   onOpenChange,
 }: {
   conversa: WaConversa;
+  participantesGrupo: { nome: string | null; telefone: string }[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
@@ -1072,8 +1325,7 @@ function LeadSheet({
     setResponsaveis.mutate({ conversaId: conversa.id, usuarioIds: novosIds });
   }
 
-  const displayName =
-    conversa.nome_contato ?? formatPhone(conversa.telefone);
+  const displayName = conversa.nome_contato ?? formatPhone(conversa.telefone);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -1169,10 +1421,51 @@ function LeadSheet({
                 <CalendarDays className="h-3 w-3" /> Início
               </Label>
               <p className="text-sm font-medium">
-                {format(new Date(conversa.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                {format(
+                  new Date(conversa.created_at),
+                  "dd/MM/yyyy 'às' HH:mm",
+                  { locale: ptBR },
+                )}
               </p>
             </div>
           </div>
+
+          {conversa.is_group && (
+            <>
+              <Separator />
+              {/* Participantes do grupo no WhatsApp */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Users className="h-3 w-3" /> Participantes do grupo
+                  {participantesGrupo.length > 0 &&
+                    ` (${participantesGrupo.length})`}
+                </p>
+                {participantesGrupo.length > 0 ? (
+                  <ul className="space-y-0.5">
+                    {participantesGrupo.map((p) => (
+                      <li
+                        key={p.telefone}
+                        className="w-full flex items-center gap-2.5 rounded-md px-2 py-2 text-sm"
+                      >
+                        <ParticipanteAvatar
+                          nome={p.nome}
+                          telefone={p.telefone}
+                          className="h-6 w-6 shrink-0"
+                        />
+                        <span className="flex-1 text-left truncate">
+                          {p.nome || formatPhone(p.telefone)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted-foreground px-2">
+                    Nenhum participante identificado ainda.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
 
           <Separator />
 
@@ -1252,7 +1545,9 @@ function LeadSheet({
                           </AvatarFallback>
                         )}
                       </Avatar>
-                      <span className="flex-1 text-left truncate">{v.nome}</span>
+                      <span className="flex-1 text-left truncate">
+                        {v.nome}
+                      </span>
                       {checked && (
                         <CheckSquare className="h-3.5 w-3.5 text-primary shrink-0" />
                       )}
@@ -1275,6 +1570,7 @@ function LeadSheet({
 
 // --- Componente principal ---
 export default function WhatsAppInbox() {
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const { data: conversas = [], isLoading: loadingConversas } =
     useWaConversas();
@@ -1284,6 +1580,42 @@ export default function WhatsAppInbox() {
   const { data: mensagens = [], isLoading: loadingMensagens } = useWaMensagens(
     conversaAtiva?.id ?? null,
   );
+  // Participantes do grupo: os salvos na criação (via CRM) somados aos remetentes
+  // distintos vistos nas mensagens (cobre membros que entraram depois ou grupos
+  // criados fora do CRM, onde a uazapi não devolveu a lista completa).
+  const participantesGrupo = useMemo(() => {
+    if (!conversaAtiva?.is_group) return [];
+    const vistos = new Map<string, { nome: string | null; telefone: string }>();
+    for (const p of conversaAtiva.participantes ?? []) {
+      if (!p.telefone) continue;
+      vistos.set(p.telefone, p);
+    }
+    for (const msg of mensagens) {
+      if (!msg.remetente_telefone) continue;
+      if (!vistos.has(msg.remetente_telefone)) {
+        vistos.set(msg.remetente_telefone, {
+          nome: msg.remetente_nome ?? null,
+          telefone: msg.remetente_telefone,
+        });
+      }
+    }
+    return Array.from(vistos.values());
+  }, [conversaAtiva?.is_group, conversaAtiva?.participantes, mensagens]);
+  // Nomes exibidos no subtítulo do grupo: responsáveis do CRM + todos os participantes
+  // do grupo no WhatsApp (não só quem está atribuído), sem duplicar nomes iguais.
+  const nomesGrupo = useMemo(() => {
+    const vistos = new Set<string>();
+    const nomes: string[] = [];
+    const add = (nome: string | null | undefined) => {
+      const limpo = nome?.trim();
+      if (!limpo || vistos.has(limpo)) return;
+      vistos.add(limpo);
+      nomes.push(limpo);
+    };
+    for (const r of conversaAtiva?.responsaveis ?? []) add(r.nome);
+    for (const p of participantesGrupo) add(p.nome || formatPhone(p.telefone));
+    return nomes;
+  }, [conversaAtiva?.responsaveis, participantesGrupo]);
   const sendMessage = useWaSendMessage();
   const marcarLida = useWaMarcarLida();
   const limparConversa = useWaLimparConversa();
@@ -1294,12 +1626,33 @@ export default function WhatsAppInbox() {
   const fotoRequestedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     conversas.forEach((c) => {
-      if (!c.foto_perfil_url && !c.telefone.includes("@g.us") && !fotoRequestedRef.current.has(c.id)) {
+      if (
+        !c.foto_perfil_url &&
+        !c.telefone.includes("@g.us") &&
+        !fotoRequestedRef.current.has(c.id)
+      ) {
         fotoRequestedRef.current.add(c.id);
         fetchContactPhoto.mutate(c.id);
       }
     });
   }, [conversas, fetchContactPhoto]);
+  // Backfill dos participantes de grupos criados antes do rastreio existir (ou fora
+  // do CRM): a uazapi só devolve a lista completa de membros via /group/list, então
+  // buscamos uma vez por grupo sem participantes salvos.
+  const fetchGroupParticipantes = useWaFetchGroupParticipantes();
+  const participantesRequestedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    conversas.forEach((c) => {
+      if (
+        c.is_group &&
+        (c.participantes?.length ?? 0) === 0 &&
+        !participantesRequestedRef.current.has(c.id)
+      ) {
+        participantesRequestedRef.current.add(c.id);
+        fetchGroupParticipantes.mutate(c.id);
+      }
+    });
+  }, [conversas, fetchGroupParticipantes]);
   const [confirmLimpar, setConfirmLimpar] = useState(false);
   const [confirmDeletar, setConfirmDeletar] = useState(false);
   const [modoSelecao, setModoSelecao] = useState(false);
@@ -1312,10 +1665,15 @@ export default function WhatsAppInbox() {
   const [filtroStatus, setFiltroStatus] = useState<"aberto" | "fechado">(
     "aberto",
   );
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | "contatos" | "empresa">("todos");
-  const [filtroConversa, setFiltroConversa] = useState<"todos" | "geral" | "meu">("todos");
+  const [filtroTipo, setFiltroTipo] = useState<
+    "todos" | "contatos" | "empresa"
+  >("todos");
+  const [filtroConversa, setFiltroConversa] = useState<
+    "todos" | "geral" | "meu"
+  >("todos");
   const [showConfig, setShowConfig] = useState(false);
   const [showNovaConversa, setShowNovaConversa] = useState(false);
+  const [showCriarGrupo, setShowCriarGrupo] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [attachments, setAttachments] = useState<
@@ -1454,14 +1812,26 @@ export default function WhatsAppInbox() {
   const conversasPorTipoEBusca = conversas.filter((c) => {
     if (filtroTipo === "empresa" && !c.cliente_id) return false;
     if (filtroTipo === "contatos" && !c.contato_id) return false;
-    if (filtroConversa === "geral" && (c.responsaveis?.length ?? 0) > 0) return false;
-    if (filtroConversa === "meu" && (!profile?.id || !c.responsaveis?.some((r) => r.id === profile.id))) return false;
+    if (filtroConversa === "geral" && (c.responsaveis?.length ?? 0) > 0)
+      return false;
+    if (
+      filtroConversa === "meu" &&
+      (!profile?.id || !c.responsaveis?.some((r) => r.id === profile.id))
+    )
+      return false;
 
     if (!busca) return true;
     const term = busca.toLowerCase();
     return (
       (c.nome_contato ?? "").toLowerCase().includes(term) ||
-      c.telefone.includes(term)
+      c.telefone.includes(term) ||
+      (c.ultima_mensagem ?? "").toLowerCase().includes(term) ||
+      (c.responsaveis ?? []).some((r) => r.nome.toLowerCase().includes(term)) ||
+      (c.participantes ?? []).some(
+        (p) =>
+          (p.nome ?? "").toLowerCase().includes(term) ||
+          p.telefone.includes(term),
+      )
     );
   });
 
@@ -1703,15 +2073,34 @@ export default function WhatsAppInbox() {
         {sidebarCollapsed ? (
           <div className="hidden md:flex w-12 border-r border-border flex flex-col h-full shrink-0 items-center gap-1 transition-all duration-300">
             <div className="relative mt-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowNovaConversa(true)}
-                title="Nova conversa"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    title="Criar"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem
+                    className="gap-2"
+                    onClick={() => setShowNovaConversa(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nova conversa
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="gap-2"
+                    onClick={() => setShowCriarGrupo(true)}
+                  >
+                    <Users className="h-4 w-4" />
+                    Novo grupo
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <ScrollArea className="flex-1 w-full pt-2">
               <div className="flex flex-col items-center gap-2 px-1">
@@ -1742,7 +2131,7 @@ export default function WhatsAppInbox() {
                       </Avatar>
                     </button>
                     {conv.nao_lidas > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-green-500 text-[7px] font-bold text-white ring-1 ring-background">
+                      <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
                         {conv.nao_lidas > 9 ? "9+" : conv.nao_lidas}
                       </span>
                     )}
@@ -1763,8 +2152,9 @@ export default function WhatsAppInbox() {
         ) : (
           <div className="hidden md:flex w-72 lg:w-80 border-r border-border flex-col h-full shrink-0 transition-all duration-300">
             <div className="px-3 py-3 border-b border-border flex items-center gap-1 h-[4rem]">
-              <MessageCircle className="h-4 w-4 text-green-600 shrink-0" />
-              <span className="text-sm font-semibold text-foreground flex-1 truncate">Conversas</span>
+              <span className="text-sm font-semibold text-foreground flex-1 truncate">
+                Conversas
+              </span>
               {config && !modoSelecao && (
                 <span
                   className={cn(
@@ -1774,21 +2164,45 @@ export default function WhatsAppInbox() {
                       : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
                   )}
                 >
-                  {isConnected ? <Wifi className="h-2.5 w-2.5" /> : <WifiOff className="h-2.5 w-2.5" />}
+                  {isConnected ? (
+                    <Wifi className="h-2.5 w-2.5" />
+                  ) : (
+                    <WifiOff className="h-2.5 w-2.5" />
+                  )}
                   {isConnected ? "Online" : "Offline"}
                 </span>
               )}
               {!modoSelecao ? (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowNovaConversa(true)}
-                    title="Nova conversa"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 shrink-0 gap-1 text-muted-foreground hover:text-foreground"
+                        title="Criar"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Criar
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem
+                        className="gap-2"
+                        onClick={() => setShowNovaConversa(true)}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Nova conversa
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="gap-2"
+                        onClick={() => setShowCriarGrupo(true)}
+                      >
+                        <Users className="h-4 w-4" />
+                        Novo grupo
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -1802,7 +2216,7 @@ export default function WhatsAppInbox() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowConfig(true)}
+                    onClick={() => navigate("/configuracoes?tab=whatsapp")}
                     title="Configurações"
                   >
                     <Settings className="h-4 w-4" />
@@ -1867,15 +2281,31 @@ export default function WhatsAppInbox() {
                   </button>
                 </div>
                 <FilterButton
-                  hasFilters={filtroTipo !== "todos" || filtroConversa !== "todos"}
-                  activeFilterCount={(filtroTipo !== "todos" ? 1 : 0) + (filtroConversa !== "todos" ? 1 : 0)}
-                  onClear={() => { setFiltroTipo("todos"); setFiltroConversa("todos"); }}
+                  hasFilters={
+                    filtroTipo !== "todos" || filtroConversa !== "todos"
+                  }
+                  activeFilterCount={
+                    (filtroTipo !== "todos" ? 1 : 0) +
+                    (filtroConversa !== "todos" ? 1 : 0)
+                  }
+                  onClear={() => {
+                    setFiltroTipo("todos");
+                    setFiltroConversa("todos");
+                  }}
                   align="start"
                   popoverClassName="w-56"
                 >
                   <div className="flex flex-col gap-0.5">
-                    <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Tipos de clientes</p>
-                    {([["todos", "Todos"], ["contatos", "Contatos"], ["empresa", "Empresa"]] as const).map(([val, label]) => (
+                    <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                      Tipos de clientes
+                    </p>
+                    {(
+                      [
+                        ["todos", "Todos"],
+                        ["contatos", "Contatos"],
+                        ["empresa", "Empresa"],
+                      ] as const
+                    ).map(([val, label]) => (
                       <button
                         key={val}
                         type="button"
@@ -1886,23 +2316,36 @@ export default function WhatsAppInbox() {
                         )}
                       >
                         {label}
-                        {filtroTipo === val && <Check className="h-3.5 w-3.5" />}
+                        {filtroTipo === val && (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
                       </button>
                     ))}
                     <div className="mx-3 my-1 border-t border-border/50" />
-                    <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Conversa</p>
-                    {([["todos", "Todos"], ["geral", "Não atribuído"], ["meu", "Meus chats"]] as const).map(([val, label]) => (
+                    <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                      Conversa
+                    </p>
+                    {(
+                      [
+                        ["todos", "Todos"],
+                        ["geral", "Não atribuído"],
+                        ["meu", "Meus chats"],
+                      ] as const
+                    ).map(([val, label]) => (
                       <button
                         key={val}
                         type="button"
                         onClick={() => setFiltroConversa(val)}
                         className={cn(
                           "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                          filtroConversa === val && "bg-primary/10 text-primary",
+                          filtroConversa === val &&
+                            "bg-primary/10 text-primary",
                         )}
                       >
                         {label}
-                        {filtroConversa === val && <Check className="h-3.5 w-3.5" />}
+                        {filtroConversa === val && (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
                       </button>
                     ))}
                   </div>
@@ -1912,7 +2355,7 @@ export default function WhatsAppInbox() {
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:ring-1"
-                  placeholder="Buscar conversa..."
+                  placeholder="Buscar por nome, telefone, mensagem ou responsável..."
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                 />
@@ -1925,28 +2368,33 @@ export default function WhatsAppInbox() {
                   onClick={toggleTodas}
                   className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <div className={cn(
-                    "h-4 w-4 rounded border flex items-center justify-center transition-colors",
-                    selecionadas.size === conversasFiltradas.length
-                      ? "bg-primary border-primary"
-                      : "border-border bg-background",
-                  )}>
+                  <div
+                    className={cn(
+                      "h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                      selecionadas.size === conversasFiltradas.length
+                        ? "bg-primary border-primary"
+                        : "border-border bg-background",
+                    )}
+                  >
                     {selecionadas.size === conversasFiltradas.length && (
                       <Check className="h-2.5 w-2.5 text-primary-foreground" />
                     )}
                   </div>
-                  {selecionadas.size === conversasFiltradas.length ? "Desmarcar todas" : "Selecionar todas"}
+                  {selecionadas.size === conversasFiltradas.length
+                    ? "Desmarcar todas"
+                    : "Selecionar todas"}
                 </button>
                 {selecionadas.size > 0 && (
                   <span className="ml-auto text-[11px] font-medium text-primary">
-                    {selecionadas.size} selecionada{selecionadas.size > 1 ? "s" : ""}
+                    {selecionadas.size} selecionada
+                    {selecionadas.size > 1 ? "s" : ""}
                   </span>
                 )}
               </div>
             )}
 
             <ScrollArea className="flex-1">
-              <div className="p-2 space-y-0.5">
+              <div className="p-2 space-y-0.5 w-full">
                 {loadingConversas ? (
                   <div className="flex items-center justify-center py-8 text-muted-foreground text-sm gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1964,68 +2412,66 @@ export default function WhatsAppInbox() {
                     <button
                       key={conv.id}
                       onClick={() =>
-                        modoSelecao ? toggleSelecao(conv.id) : setConversaAtivaId(conv.id)
+                        modoSelecao
+                          ? toggleSelecao(conv.id)
+                          : setConversaAtivaId(conv.id)
                       }
                       className={cn(
                         "flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left",
                         modoSelecao && selecionadas.has(conv.id)
                           ? "bg-primary/10 ring-1 ring-primary/20"
                           : conversaAtiva?.id === conv.id && !modoSelecao
-                          ? "bg-primary/10"
-                          : "hover:bg-muted/50",
+                            ? "bg-primary/10"
+                            : "hover:bg-muted/50",
                       )}
                     >
                       {modoSelecao ? (
-                        <div className={cn(
-                          "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
-                          selecionadas.has(conv.id)
-                            ? "bg-primary border-primary"
-                            : "border-border bg-background",
-                        )}>
+                        <div
+                          className={cn(
+                            "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                            selecionadas.has(conv.id)
+                              ? "bg-primary border-primary"
+                              : "border-border bg-background",
+                          )}
+                        >
                           {selecionadas.has(conv.id) && (
                             <Check className="h-2.5 w-2.5 text-primary-foreground" />
                           )}
                         </div>
                       ) : (
-                        <Avatar className="h-8 w-8 border border-primary/10">
-                          {conv.foto_perfil_url && (
-                            <AvatarImage src={conv.foto_perfil_url} alt="" />
-                          )}
-                          <AvatarFallback
-                            className={cn(
-                              colorForPhone(conv.telefone),
-                              "text-white text-[10px] font-semibold",
-                            )}
-                          >
-                            {initials(conv.nome_contato, conv.telefone)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <ConversaAvatar conv={conv} />
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <p
-                            className={cn(
-                              "text-xs font-medium text-foreground truncate",
-                              conv.nao_lidas > 0 && !modoSelecao && "font-bold",
-                            )}
-                          >
-                            {conv.nome_contato ?? formatPhone(conv.telefone)}
-                          </p>
-                          {conv.ultima_mensagem_at && !modoSelecao && (
-                            <span className="text-[9px] text-muted-foreground shrink-0 font-medium">
-                              {formatTime(conv.ultima_mensagem_at)}
-                            </span>
+                        <p
+                          className={cn(
+                            "text-xs font-medium text-foreground truncate",
+                            conv.nao_lidas > 0 && !modoSelecao && "font-bold",
                           )}
-                        </div>
+                        >
+                          {conv.nome_contato ?? formatPhone(conv.telefone)}
+                        </p>
                         <p className="text-[10px] text-muted-foreground truncate mt-0.5">
                           {conv.ultima_mensagem ?? "Nenhuma mensagem"}
                         </p>
                       </div>
-                      {conv.nao_lidas > 0 && !modoSelecao && (
-                        <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-green-500 px-1 text-[9px] font-bold text-white shadow-sm shrink-0">
-                          {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
-                        </span>
+                      {!modoSelecao && (
+                        <ConversaParticipantesStack conv={conv} />
                       )}
+                      {!modoSelecao &&
+                        (conv.ultima_mensagem_at || conv.nao_lidas > 0) && (
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            {conv.nao_lidas > 0 && (
+                              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
+                                {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
+                              </span>
+                            )}
+                            {conv.ultima_mensagem_at && (
+                              <span className="text-[9px] text-muted-foreground font-medium">
+                                {formatTime(conv.ultima_mensagem_at)}
+                              </span>
+                            )}
+                          </div>
+                        )}
                     </button>
                   ))
                 )}
@@ -2040,11 +2486,15 @@ export default function WhatsAppInbox() {
                   disabled={selecionadas.size === 0 || deletarEmMassa.isPending}
                   onClick={() => setConfirmDeletarMassa(true)}
                 >
-                  {deletarEmMassa.isPending
-                    ? <Loader2 className="h-4 w-4 animate-spin" />
-                    : <Trash2 className="h-4 w-4" />
-                  }
-                  Excluir {selecionadas.size > 0 ? `(${selecionadas.size})` : "selecionadas"}
+                  {deletarEmMassa.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Excluir{" "}
+                  {selecionadas.size > 0
+                    ? `(${selecionadas.size})`
+                    : "selecionadas"}
                 </Button>
               ) : (
                 <button
@@ -2151,42 +2601,72 @@ export default function WhatsAppInbox() {
                       </button>
                     </div>
                     <FilterButton
-                      hasFilters={filtroTipo !== "todos" || filtroConversa !== "todos"}
-                      activeFilterCount={(filtroTipo !== "todos" ? 1 : 0) + (filtroConversa !== "todos" ? 1 : 0)}
-                      onClear={() => { setFiltroTipo("todos"); setFiltroConversa("todos"); }}
+                      hasFilters={
+                        filtroTipo !== "todos" || filtroConversa !== "todos"
+                      }
+                      activeFilterCount={
+                        (filtroTipo !== "todos" ? 1 : 0) +
+                        (filtroConversa !== "todos" ? 1 : 0)
+                      }
+                      onClear={() => {
+                        setFiltroTipo("todos");
+                        setFiltroConversa("todos");
+                      }}
                       align="end"
                       popoverClassName="w-56"
                     >
                       <div className="flex flex-col gap-0.5">
-                        <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Tipos de clientes</p>
-                        {([["todos", "Todos"], ["contatos", "Contatos"], ["empresa", "Empresa"]] as const).map(([val, label]) => (
+                        <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                          Tipos de clientes
+                        </p>
+                        {(
+                          [
+                            ["todos", "Todos"],
+                            ["contatos", "Contatos"],
+                            ["empresa", "Empresa"],
+                          ] as const
+                        ).map(([val, label]) => (
                           <button
                             key={val}
                             type="button"
                             onClick={() => setFiltroTipo(val)}
                             className={cn(
                               "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                              filtroTipo === val && "bg-primary/10 text-primary",
+                              filtroTipo === val &&
+                                "bg-primary/10 text-primary",
                             )}
                           >
                             {label}
-                            {filtroTipo === val && <Check className="h-3.5 w-3.5" />}
+                            {filtroTipo === val && (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
                           </button>
                         ))}
                         <div className="mx-3 my-1 border-t border-border/50" />
-                        <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Conversa</p>
-                        {([["todos", "Todos"], ["geral", "Não atribuído"], ["meu", "Meus chats"]] as const).map(([val, label]) => (
+                        <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                          Conversa
+                        </p>
+                        {(
+                          [
+                            ["todos", "Todos"],
+                            ["geral", "Não atribuído"],
+                            ["meu", "Meus chats"],
+                          ] as const
+                        ).map(([val, label]) => (
                           <button
                             key={val}
                             type="button"
                             onClick={() => setFiltroConversa(val)}
                             className={cn(
                               "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                              filtroConversa === val && "bg-primary/10 text-primary",
+                              filtroConversa === val &&
+                                "bg-primary/10 text-primary",
                             )}
                           >
                             {label}
-                            {filtroConversa === val && <Check className="h-3.5 w-3.5" />}
+                            {filtroConversa === val && (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
                           </button>
                         ))}
                       </div>
@@ -2197,7 +2677,7 @@ export default function WhatsAppInbox() {
                   <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:ring-1"
-                    placeholder="Buscar conversa..."
+                    placeholder="Buscar por nome, telefone, mensagem ou responsável..."
                     value={busca}
                     onChange={(e) => setBusca(e.target.value)}
                   />
@@ -2210,28 +2690,33 @@ export default function WhatsAppInbox() {
                     onClick={toggleTodas}
                     className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <div className={cn(
-                      "h-4 w-4 rounded border flex items-center justify-center transition-colors",
-                      selecionadas.size === conversasFiltradas.length
-                        ? "bg-primary border-primary"
-                        : "border-border bg-background",
-                    )}>
+                    <div
+                      className={cn(
+                        "h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                        selecionadas.size === conversasFiltradas.length
+                          ? "bg-primary border-primary"
+                          : "border-border bg-background",
+                      )}
+                    >
                       {selecionadas.size === conversasFiltradas.length && (
                         <Check className="h-2.5 w-2.5 text-primary-foreground" />
                       )}
                     </div>
-                    {selecionadas.size === conversasFiltradas.length ? "Desmarcar todas" : "Selecionar todas"}
+                    {selecionadas.size === conversasFiltradas.length
+                      ? "Desmarcar todas"
+                      : "Selecionar todas"}
                   </button>
                   {selecionadas.size > 0 && (
                     <span className="ml-auto text-[11px] font-medium text-primary">
-                      {selecionadas.size} selecionada{selecionadas.size > 1 ? "s" : ""}
+                      {selecionadas.size} selecionada
+                      {selecionadas.size > 1 ? "s" : ""}
                     </span>
                   )}
                 </div>
               )}
 
               <ScrollArea className="flex-1">
-                <div className="p-2 space-y-0.5">
+                <div className="p-2 space-y-0.5 w-full">
                   {loadingConversas ? (
                     <div className="flex items-center justify-center py-8 text-muted-foreground text-sm gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -2261,58 +2746,57 @@ export default function WhatsAppInbox() {
                           modoSelecao && selecionadas.has(conv.id)
                             ? "bg-primary/10 ring-1 ring-primary/20"
                             : conversaAtiva?.id === conv.id && !modoSelecao
-                            ? "bg-primary/10"
-                            : "hover:bg-muted/50",
+                              ? "bg-primary/10"
+                              : "hover:bg-muted/50",
                         )}
                       >
                         {modoSelecao ? (
-                          <div className={cn(
-                            "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
-                            selecionadas.has(conv.id)
-                              ? "bg-primary border-primary"
-                              : "border-border bg-background",
-                          )}>
+                          <div
+                            className={cn(
+                              "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                              selecionadas.has(conv.id)
+                                ? "bg-primary border-primary"
+                                : "border-border bg-background",
+                            )}
+                          >
                             {selecionadas.has(conv.id) && (
                               <Check className="h-2.5 w-2.5 text-primary-foreground" />
                             )}
                           </div>
                         ) : (
-                          <Avatar className="h-8 w-8 border border-primary/10">
-                            <AvatarFallback
-                              className={cn(
-                                colorForPhone(conv.telefone),
-                                "text-white text-[10px] font-semibold",
-                              )}
-                            >
-                              {initials(conv.nome_contato, conv.telefone)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <ConversaAvatar conv={conv} />
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <p
-                              className={cn(
-                                "text-xs font-medium text-foreground truncate",
-                                conv.nao_lidas > 0 && !modoSelecao && "font-bold",
-                              )}
-                            >
-                              {conv.nome_contato ?? formatPhone(conv.telefone)}
-                            </p>
-                            {conv.ultima_mensagem_at && !modoSelecao && (
-                              <span className="text-[9px] text-muted-foreground shrink-0 font-medium">
-                                {formatTime(conv.ultima_mensagem_at)}
-                              </span>
+                          <p
+                            className={cn(
+                              "text-xs font-medium text-foreground truncate",
+                              conv.nao_lidas > 0 && !modoSelecao && "font-bold",
                             )}
-                          </div>
+                          >
+                            {conv.nome_contato ?? formatPhone(conv.telefone)}
+                          </p>
                           <p className="text-[10px] text-muted-foreground truncate mt-0.5">
                             {conv.ultima_mensagem ?? "Nenhuma mensagem"}
                           </p>
                         </div>
-                        {conv.nao_lidas > 0 && !modoSelecao && (
-                          <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-green-500 px-1 text-[9px] font-bold text-white shadow-sm shrink-0">
-                            {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
-                          </span>
+                        {!modoSelecao && (
+                          <ConversaParticipantesStack conv={conv} />
                         )}
+                        {!modoSelecao &&
+                          (conv.ultima_mensagem_at || conv.nao_lidas > 0) && (
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              {conv.nao_lidas > 0 && (
+                                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
+                                  {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
+                                </span>
+                              )}
+                              {conv.ultima_mensagem_at && (
+                                <span className="text-[9px] text-muted-foreground font-medium">
+                                  {formatTime(conv.ultima_mensagem_at)}
+                                </span>
+                              )}
+                            </div>
+                          )}
                       </button>
                     ))
                   )}
@@ -2325,14 +2809,20 @@ export default function WhatsAppInbox() {
                     variant="destructive"
                     size="sm"
                     className="w-full gap-2"
-                    disabled={selecionadas.size === 0 || deletarEmMassa.isPending}
+                    disabled={
+                      selecionadas.size === 0 || deletarEmMassa.isPending
+                    }
                     onClick={() => setConfirmDeletarMassa(true)}
                   >
-                    {deletarEmMassa.isPending
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : <Trash2 className="h-4 w-4" />
-                    }
-                    Excluir {selecionadas.size > 0 ? `(${selecionadas.size})` : "selecionadas"}
+                    {deletarEmMassa.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Excluir{" "}
+                    {selecionadas.size > 0
+                      ? `(${selecionadas.size})`
+                      : "selecionadas"}
                   </Button>
                 </div>
               )}
@@ -2373,25 +2863,17 @@ export default function WhatsAppInbox() {
                         formatPhone(conversaAtiva.telefone)}
                     </p>
                     <p className="text-[10px] text-muted-foreground capitalize truncate">
-                      {conversaAtiva.nome_contato
-                        ? formatPhone(conversaAtiva.telefone)
-                        : "WhatsApp"}
+                      {conversaAtiva.is_group
+                        ? nomesGrupo.length > 0
+                          ? nomesGrupo.join(", ")
+                          : "Grupo"
+                        : conversaAtiva.nome_contato
+                          ? formatPhone(conversaAtiva.telefone)
+                          : "WhatsApp"}
                     </p>
                   </div>
                 </button>
                 <div className="ml-auto flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
-                    onClick={() => {
-                      const phone = conversaAtiva.telefone.replace(/\D/g, "");
-                      window.open(`https://wa.me/${phone}`, "_blank");
-                    }}
-                  >
-                    <Phone className="h-3.5 w-3.5" />
-                    Abrir no WhatsApp
-                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -2431,10 +2913,23 @@ export default function WhatsAppInbox() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
+                        className="gap-2"
+                        onClick={() => {
+                          const phone = conversaAtiva.telefone.replace(
+                            /\D/g,
+                            "",
+                          );
+                          window.open(`https://wa.me/${phone}`, "_blank");
+                        }}
+                      >
+                        <Phone className="h-4 w-4" />
+                        Abrir no WhatsApp
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
                         className="text-destructive focus:text-destructive gap-2"
                         onClick={() => setConfirmLimpar(true)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Eraser className="h-4 w-4" />
                         Limpar conversa
                       </DropdownMenuItem>
                       <DropdownMenuItem
@@ -2536,6 +3031,17 @@ export default function WhatsAppInbox() {
                           new Date(msg.created_at).toDateString() !==
                             new Date(prevMsg.created_at).toDateString();
                         const isLast = i === mensagens.length - 1;
+                        // Empilha mensagens consecutivas do mesmo remetente sem repetir o
+                        // nome/número acima de cada bolha — só mostra na primeira da leva.
+                        const isFirstDoRemetente =
+                          !prevMsg ||
+                          showDate ||
+                          prevMsg.direcao !== msg.direcao ||
+                          (isSaida
+                            ? (prevMsg.usuario?.id ?? null) !==
+                              (msg.usuario?.id ?? null)
+                            : (prevMsg.remetente_telefone ?? null) !==
+                              (msg.remetente_telefone ?? null));
 
                         return (
                           <div
@@ -2583,21 +3089,25 @@ export default function WhatsAppInbox() {
                                       : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
                                   )}
                                 >
-                                  {isSaida && msg.usuario && (
-                                    <UserPreviewPopover
-                                      usuario={msg.usuario}
-                                      nameClassName={cn(
-                                        "block w-full truncate text-[13px] font-semibold leading-tight mb-0.5 text-white",
-                                        msg.tipo === "audio" &&
-                                          "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
-                                      )}
-                                    />
-                                  )}
-                                  {!isSaida && (
+                                  {isSaida &&
+                                    msg.usuario &&
+                                    isFirstDoRemetente && (
+                                      <UserPreviewPopover
+                                        usuario={msg.usuario}
+                                        nameClassName={cn(
+                                          "block w-full truncate text-[13px] font-semibold leading-tight mb-2 text-white",
+                                          msg.tipo === "audio" &&
+                                            "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                        )}
+                                      />
+                                    )}
+                                  {!isSaida && isFirstDoRemetente && (
                                     <ContactPreviewPopover
                                       conversa={conversaAtiva}
+                                      remetenteNome={msg.remetente_nome}
+                                      remetenteTelefone={msg.remetente_telefone}
                                       nameClassName={cn(
-                                        "block w-full truncate text-[13px] font-semibold leading-tight mb-0.5",
+                                        "block w-full truncate text-[13px] font-semibold leading-tight mb-2",
                                         senderNameColor(conversaAtiva.id),
                                         msg.tipo === "audio" &&
                                           "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
@@ -2611,21 +3121,26 @@ export default function WhatsAppInbox() {
                                     conversaAtiva={conversaAtiva}
                                   />
                                 </div>
-                                <div
-                                  className={cn(
-                                    "flex items-center gap-1 mt-0.5",
-                                    isSaida
-                                      ? "justify-end mr-1"
-                                      : "justify-start ml-1",
-                                  )}
-                                >
-                                  <span className="text-[9px] text-muted-foreground">
-                                    {format(new Date(msg.created_at), "HH:mm")}
-                                  </span>
-                                  {isSaida && (
-                                    <MessageStatus status={msg.status} />
-                                  )}
-                                </div>
+                                {msg.tipo !== "texto" && (
+                                  <div
+                                    className={cn(
+                                      "flex items-center gap-1 mt-0.5",
+                                      isSaida
+                                        ? "justify-end mr-1"
+                                        : "justify-start ml-1",
+                                    )}
+                                  >
+                                    <span className="text-[9px] text-muted-foreground">
+                                      {format(
+                                        new Date(msg.created_at),
+                                        "HH:mm",
+                                      )}
+                                    </span>
+                                    {isSaida && (
+                                      <MessageStatus status={msg.status} />
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -2855,6 +3370,16 @@ export default function WhatsAppInbox() {
           }
         }}
       />
+      <CriarGrupoDialog
+        open={showCriarGrupo}
+        onClose={(id) => {
+          setShowCriarGrupo(false);
+          if (id) {
+            const conv = conversas.find((c) => c.id === id);
+            if (conv) setConversaAtivaId(conv.id);
+          }
+        }}
+      />
       <ConfigDialog open={showConfig} onClose={() => setShowConfig(false)} />
 
       <Dialog
@@ -2886,7 +3411,10 @@ export default function WhatsAppInbox() {
       </Dialog>
 
       {/* Confirmação de exclusão em massa */}
-      <AlertDialog open={confirmDeletarMassa} onOpenChange={setConfirmDeletarMassa}>
+      <AlertDialog
+        open={confirmDeletarMassa}
+        onOpenChange={setConfirmDeletarMassa}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir conversas selecionadas?</AlertDialogTitle>
@@ -2909,7 +3437,10 @@ export default function WhatsAppInbox() {
               {deletarEmMassa.isPending && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
-              Excluir {selecionadas.size > 1 ? `${selecionadas.size} conversas` : "conversa"}
+              Excluir{" "}
+              {selecionadas.size > 1
+                ? `${selecionadas.size} conversas`
+                : "conversa"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -2918,6 +3449,7 @@ export default function WhatsAppInbox() {
       {conversaAtiva && (
         <LeadSheet
           conversa={conversaAtiva}
+          participantesGrupo={participantesGrupo}
           open={leadSheetOpen}
           onOpenChange={setLeadSheetOpen}
         />
