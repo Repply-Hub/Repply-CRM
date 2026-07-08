@@ -10,7 +10,32 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -499,7 +524,15 @@ export type Database = {
           updated_by?: string | null
           valor?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "configuracoes_automacao_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       configuracoes_tabelas: {
         Row: {
@@ -541,6 +574,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "configuracoes_tabelas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      configuracoes_wapi: {
+        Row: {
+          api_instance_name: string | null
+          api_key: string
+          created_at: string
+          empresa_id: string
+          id: string
+          instance_name: string
+          instance_url: string
+          provisionada: boolean
+          status: string
+          updated_at: string
+          webhook_secret: string | null
+        }
+        Insert: {
+          api_instance_name?: string | null
+          api_key: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          instance_name?: string
+          instance_url: string
+          provisionada?: boolean
+          status?: string
+          updated_at?: string
+          webhook_secret?: string | null
+        }
+        Update: {
+          api_instance_name?: string | null
+          api_key?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          instance_name?: string
+          instance_url?: string
+          provisionada?: boolean
+          status?: string
+          updated_at?: string
+          webhook_secret?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configuracoes_wapi_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
@@ -629,6 +712,57 @@ export type Database = {
           created_at?: string | null
           id?: string
           message?: string | null
+        }
+        Relationships: []
+      }
+      dom_licencas: {
+        Row: {
+          acao: string | null
+          atividade: string | null
+          criado_em: string | null
+          data_edicao: string | null
+          endereco: string | null
+          id: string
+          numero_edicao: string | null
+          processo: string | null
+          renovacao: boolean | null
+          requerente: string | null
+          texto_bloco: string | null
+          tipo_edicao: string | null
+          tipos_licenca: string[]
+          url_pdf: string
+        }
+        Insert: {
+          acao?: string | null
+          atividade?: string | null
+          criado_em?: string | null
+          data_edicao?: string | null
+          endereco?: string | null
+          id?: string
+          numero_edicao?: string | null
+          processo?: string | null
+          renovacao?: boolean | null
+          requerente?: string | null
+          texto_bloco?: string | null
+          tipo_edicao?: string | null
+          tipos_licenca?: string[]
+          url_pdf: string
+        }
+        Update: {
+          acao?: string | null
+          atividade?: string | null
+          criado_em?: string | null
+          data_edicao?: string | null
+          endereco?: string | null
+          id?: string
+          numero_edicao?: string | null
+          processo?: string | null
+          renovacao?: boolean | null
+          requerente?: string | null
+          texto_bloco?: string | null
+          tipo_edicao?: string | null
+          tipos_licenca?: string[]
+          url_pdf?: string
         }
         Relationships: []
       }
@@ -1083,16 +1217,23 @@ export type Database = {
           cnpj: string | null
           created_at: string
           data_emissao: string | null
+          data_formacao: string | null
           data_validade: string | null
           empreendimento: string | null
+          fato_gerador: string | null
+          fonte: string | null
           id: string
+          interessado: string | null
           municipio: string | null
           numero_licenca: string | null
+          numero_processo: string | null
           pdf_link: string | null
           porte: string | null
           potencial_poluidor: string | null
           razao_social: string | null
           tipo_licenca: string | null
+          updated_at: string | null
+          url_licenca: string | null
         }
         Insert: {
           atividade?: string | null
@@ -1100,16 +1241,23 @@ export type Database = {
           cnpj?: string | null
           created_at?: string
           data_emissao?: string | null
+          data_formacao?: string | null
           data_validade?: string | null
           empreendimento?: string | null
+          fato_gerador?: string | null
+          fonte?: string | null
           id?: string
+          interessado?: string | null
           municipio?: string | null
           numero_licenca?: string | null
+          numero_processo?: string | null
           pdf_link?: string | null
           porte?: string | null
           potencial_poluidor?: string | null
           razao_social?: string | null
           tipo_licenca?: string | null
+          updated_at?: string | null
+          url_licenca?: string | null
         }
         Update: {
           atividade?: string | null
@@ -1117,16 +1265,23 @@ export type Database = {
           cnpj?: string | null
           created_at?: string
           data_emissao?: string | null
+          data_formacao?: string | null
           data_validade?: string | null
           empreendimento?: string | null
+          fato_gerador?: string | null
+          fonte?: string | null
           id?: string
+          interessado?: string | null
           municipio?: string | null
           numero_licenca?: string | null
+          numero_processo?: string | null
           pdf_link?: string | null
           porte?: string | null
           potencial_poluidor?: string | null
           razao_social?: string | null
           tipo_licenca?: string | null
+          updated_at?: string | null
+          url_licenca?: string | null
         }
         Relationships: []
       }
@@ -1196,6 +1351,7 @@ export type Database = {
           dados_originais: Json
           id: string
           motivo_ignorado: string | null
+          nome_arquivo: string | null
           tipo_importacao: string
           usuario_id: string
         }
@@ -1204,6 +1360,7 @@ export type Database = {
           dados_originais: Json
           id?: string
           motivo_ignorado?: string | null
+          nome_arquivo?: string | null
           tipo_importacao: string
           usuario_id: string
         }
@@ -1212,6 +1369,7 @@ export type Database = {
           dados_originais?: Json
           id?: string
           motivo_ignorado?: string | null
+          nome_arquivo?: string | null
           tipo_importacao?: string
           usuario_id?: string
         }
@@ -1434,6 +1592,7 @@ export type Database = {
           endereco_entrega: string | null
           fabricante_id: string
           id: string
+          import_hash: string | null
           obra_id: string | null
           observacoes: string | null
           origem_lead: string | null
@@ -1452,6 +1611,7 @@ export type Database = {
           endereco_entrega?: string | null
           fabricante_id: string
           id?: string
+          import_hash?: string | null
           obra_id?: string | null
           observacoes?: string | null
           origem_lead?: string | null
@@ -1470,6 +1630,7 @@ export type Database = {
           endereco_entrega?: string | null
           fabricante_id?: string
           id?: string
+          import_hash?: string | null
           obra_id?: string | null
           observacoes?: string | null
           origem_lead?: string | null
@@ -1895,6 +2056,295 @@ export type Database = {
           },
         ]
       }
+      wapi_instancia_usuarios: {
+        Row: {
+          instancia_id: string
+          usuario_auth_id: string
+        }
+        Insert: {
+          instancia_id: string
+          usuario_auth_id: string
+        }
+        Update: {
+          instancia_id?: string
+          usuario_auth_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wapi_instancia_usuarios_instancia_id_fkey"
+            columns: ["instancia_id"]
+            isOneToOne: false
+            referencedRelation: "configuracoes_wapi"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_debug: {
+        Row: {
+          created_at: string | null
+          id: string
+          payload: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          payload?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          payload?: Json | null
+        }
+        Relationships: []
+      }
+      whatsapp_contatos_fotos: {
+        Row: {
+          empresa_id: string
+          foto_perfil_url: string | null
+          id: string
+          telefone: string
+          updated_at: string
+        }
+        Insert: {
+          empresa_id: string
+          foto_perfil_url?: string | null
+          id?: string
+          telefone: string
+          updated_at?: string
+        }
+        Update: {
+          empresa_id?: string
+          foto_perfil_url?: string | null
+          id?: string
+          telefone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_contatos_fotos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_conversa_responsaveis: {
+        Row: {
+          conversa_id: string
+          created_at: string
+          id: string
+          usuario_id: string
+        }
+        Insert: {
+          conversa_id: string
+          created_at?: string
+          id?: string
+          usuario_id: string
+        }
+        Update: {
+          conversa_id?: string
+          created_at?: string
+          id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversa_responsaveis_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversa_responsaveis_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversa_responsaveis_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_usuario"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversa_responsaveis_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["usuario_id"]
+          },
+        ]
+      }
+      whatsapp_conversas: {
+        Row: {
+          arquivada: boolean
+          cliente_id: string | null
+          contato_id: string | null
+          created_at: string
+          empresa_id: string
+          foto_perfil_url: string | null
+          id: string
+          is_group: boolean
+          nao_lidas: number
+          nome_contato: string | null
+          participantes: Json
+          telefone: string
+          ultima_mensagem: string | null
+          ultima_mensagem_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          arquivada?: boolean
+          cliente_id?: string | null
+          contato_id?: string | null
+          created_at?: string
+          empresa_id: string
+          foto_perfil_url?: string | null
+          id?: string
+          is_group?: boolean
+          nao_lidas?: number
+          nome_contato?: string | null
+          participantes?: Json
+          telefone: string
+          ultima_mensagem?: string | null
+          ultima_mensagem_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          arquivada?: boolean
+          cliente_id?: string | null
+          contato_id?: string | null
+          created_at?: string
+          empresa_id?: string
+          foto_perfil_url?: string | null
+          id?: string
+          is_group?: boolean
+          nao_lidas?: number
+          nome_contato?: string | null
+          participantes?: Json
+          telefone?: string
+          ultima_mensagem?: string | null
+          ultima_mensagem_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversas_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_mensagens: {
+        Row: {
+          conteudo: string
+          conversa_id: string
+          created_at: string
+          direcao: string
+          empresa_id: string
+          id: string
+          lida: boolean
+          media_mime: string | null
+          media_url: string | null
+          remetente_nome: string | null
+          remetente_telefone: string | null
+          status: string
+          tipo: string
+          usuario_id: string | null
+          wamid: string | null
+        }
+        Insert: {
+          conteudo: string
+          conversa_id: string
+          created_at?: string
+          direcao: string
+          empresa_id: string
+          id?: string
+          lida?: boolean
+          media_mime?: string | null
+          media_url?: string | null
+          remetente_nome?: string | null
+          remetente_telefone?: string | null
+          status?: string
+          tipo?: string
+          usuario_id?: string | null
+          wamid?: string | null
+        }
+        Update: {
+          conteudo?: string
+          conversa_id?: string
+          created_at?: string
+          direcao?: string
+          empresa_id?: string
+          id?: string
+          lida?: boolean
+          media_mime?: string | null
+          media_url?: string | null
+          remetente_nome?: string | null
+          remetente_telefone?: string | null
+          status?: string
+          tipo?: string
+          usuario_id?: string | null
+          wamid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_mensagens_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_mensagens_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_mensagens_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_mensagens_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_usuario"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_mensagens_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["usuario_id"]
+          },
+        ]
+      }
     }
     Views: {
       vw_faturamento_mensal: {
@@ -2009,17 +2459,30 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_gestor: { Args: never; Returns: boolean }
+      normalize_whatsapp_phone: { Args: { raw: string }; Returns: string }
       pedidos_stats: {
         Args: {
-          p_date_from?: string | null
-          p_date_to?: string | null
-          p_fabricante_ids?: string[] | null
+          p_date_from?: string
+          p_date_to?: string
+          p_fabricante_ids?: string[]
           p_only_attention?: boolean
-          p_search?: string | null
-          p_stages?: string[] | null
-          p_usuario_ids?: string[] | null
+          p_search?: string
+          p_stages?: string[]
+          p_usuario_ids?: string[]
         }
-        Returns: { total_count: number; total_valor: number }[]
+        Returns: {
+          total_count: number
+          total_valor: number
+        }[]
+      }
+      restaurar_usuario_por_email: {
+        Args: {
+          p_email: string
+          p_empresa_id: string
+          p_nome: string
+          p_role: string
+        }
+        Returns: Json
       }
       seed_default_status_obras: {
         Args: { target_empresa_id: string }
@@ -2159,6 +2622,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
