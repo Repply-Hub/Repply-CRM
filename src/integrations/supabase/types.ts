@@ -869,6 +869,7 @@ export type Database = {
           nome_fantasia: string | null
           owner_id: string
           subtitulo_header: string | null
+          whatsapp_assinar_remetente: boolean
         }
         Insert: {
           banner_url?: string | null
@@ -882,6 +883,7 @@ export type Database = {
           nome_fantasia?: string | null
           owner_id: string
           subtitulo_header?: string | null
+          whatsapp_assinar_remetente?: boolean
         }
         Update: {
           banner_url?: string | null
@@ -895,6 +897,7 @@ export type Database = {
           nome_fantasia?: string | null
           owner_id?: string
           subtitulo_header?: string | null
+          whatsapp_assinar_remetente?: boolean
         }
         Relationships: []
       }

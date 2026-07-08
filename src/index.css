@@ -152,6 +152,12 @@
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  button:disabled, [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 /* O Radix ScrollArea envolve o conteúdo num div com display:table inline,

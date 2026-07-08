@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -15,6 +15,8 @@ import type { WaConfig } from '@/hooks/use-whatsapp-inbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Command,
   CommandEmpty,
@@ -526,10 +528,14 @@ export function WhatsAppInstanciasTab() {
       const [
         { data: instancias, error: errI },
         { data: usuarios, error: errU },
+        { data: empresa, error: errE },
       ] = await Promise.all([
         supabase.from('configuracoes_wapi').select('*').eq('empresa_id', empresaId).order('instance_name'),
         supabase.from('usuarios').select('id, nome, role, user_id').eq('empresa_id', empresaId).neq('role', 'admin').order('nome'),
+        supabase.from('empresas').select('whatsapp_assinar_remetente').eq('id', empresaId).single(),
       ]);
+
+      if (errE) throw errE;
 
       if (errI) throw errI;
       if (errU) throw errU;
@@ -571,9 +577,29 @@ export function WhatsAppInstanciasTab() {
       const desconectadas = rows.filter(r => r.provisionada && r.status !== 'connected').length;
       const semUsuario = rows.filter(r => r.usuarios.length === 0).length;
 
-      return { rows, todosUsuarios, usuariosSemInstancia, conectadas, desconectadas, semUsuario };
+      return {
+        rows, todosUsuarios, usuariosSemInstancia, conectadas, desconectadas, semUsuario,
+        empresaId, assinarRemetente: empresa?.whatsapp_assinar_remetente ?? true,
+      };
     },
     enabled: !!user,
+  });
+
+  const queryClient = useQueryClient();
+  const toggleAssinarRemetente = useMutation({
+    mutationFn: async (novoValor: boolean) => {
+      if (!data?.empresaId) throw new Error('Empresa não encontrada');
+      const { error } = await supabase
+        .from('empresas')
+        .update({ whatsapp_assinar_remetente: novoValor })
+        .eq('id', data.empresaId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
+      toast.success('Preferência atualizada');
+    },
+    onError: () => toast.error('Erro ao atualizar preferência'),
   });
 
   if (isLoading) {
@@ -625,6 +651,28 @@ export function WhatsAppInstanciasTab() {
               <span className={cn('text-xl font-bold', (data?.semUsuario ?? 0) > 0 ? 'text-amber-700' : 'text-muted-foreground')}>{data?.semUsuario ?? 0}</span>
               <span className="text-[11px] text-muted-foreground">Sem usuário</span>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Assinatura do remetente nas mensagens enviadas */}
+      <Card>
+        <CardContent className="pt-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label htmlFor="assinar-remetente" className="text-sm font-medium">
+                Assinar remetente nas mensagens enviadas
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Inclui "*Nome - Cargo*" na primeira linha das mensagens enviadas pelo CRM, para que o contato saiba quem está falando.
+              </p>
+            </div>
+            <Switch
+              id="assinar-remetente"
+              checked={data?.assinarRemetente ?? true}
+              disabled={toggleAssinarRemetente.isPending || isLoading}
+              onCheckedChange={(checked) => toggleAssinarRemetente.mutate(checked)}
+            />
           </div>
         </CardContent>
       </Card>

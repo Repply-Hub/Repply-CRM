@@ -13,6 +13,27 @@ const PLACEHOLDER: Record<string, string> = {
   documento: '[Documento]',
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  gestor: 'Gestor',
+  vendedor: 'Vendedor',
+  empresa: 'Empresa',
+};
+
+function capitalize(text: string): string {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
+// Prefixa a mensagem enviada ao WhatsApp com "*Nome - Cargo*" para que quem
+// recebe saiba qual usuário do CRM está falando. O conteúdo salvo em
+// whatsapp_mensagens permanece sem o prefixo (ver `conteudo` mais abaixo).
+function withRemetente(nome: string | null, role: string | null, mensagem: string): string {
+  if (!nome) return mensagem;
+  const cargo = role ? (ROLE_LABELS[role] ?? capitalize(role)) : null;
+  const header = `*${nome}${cargo ? ` - ${cargo}` : ''}*`;
+  return mensagem ? `${header}\n${mensagem}` : header;
+}
+
 // Mesma normalização usada no whatsapp-webhook: garante que o número BR sempre
 // inclua o 9º dígito para casar com a conversa já existente do mesmo contato.
 function normalizeWhatsappPhone(raw: string): string {
@@ -90,12 +111,16 @@ serve(async (req) => {
     }
 
     const { data: userData } = await supabase
-      .from("usuarios").select("id, empresa_id").eq("user_id", user.id).single();
+      .from("usuarios")
+      .select("id, empresa_id, nome, role, empresas:empresa_id(whatsapp_assinar_remetente)")
+      .eq("user_id", user.id).single();
     if (!userData) {
       return new Response(JSON.stringify({ error: "User not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const assinarRemetente = (userData.empresas as { whatsapp_assinar_remetente: boolean } | null)
+      ?.whatsapp_assinar_remetente ?? true;
 
     const { data: instLink } = await supabase
       .from("wapi_instancia_usuarios")
@@ -144,7 +169,11 @@ serve(async (req) => {
         const res = await fetch(wapiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", token: config.api_key },
-          body: JSON.stringify({ instanceName: uazapiInstance, number: phone, text: mensagem }),
+          body: JSON.stringify({
+            instanceName: uazapiInstance,
+            number: phone,
+            text: assinarRemetente ? withRemetente(userData.nome, userData.role, mensagem) : mensagem,
+          }),
         });
         wapiStatus = res.status;
         responseText = await res.text().catch(() => "");
@@ -163,7 +192,7 @@ serve(async (req) => {
         type: typeMap[tipo] ?? 'document',
         file: media_url,
       };
-      if (mensagem) wapiBody.text = mensagem;
+      if (mensagem) wapiBody.text = assinarRemetente ? withRemetente(userData.nome, userData.role, mensagem) : mensagem;
       if (tipo === 'documento' && nome_arquivo) wapiBody.docName = nome_arquivo;
       if (media_mime) wapiBody.mimetype = media_mime;
 
@@ -230,7 +259,7 @@ serve(async (req) => {
       // pela conversa (aparece em "Meus chats"), tanto em grupo quanto em chat individual.
       await Promise.all([
         supabase.from("whatsapp_conversas")
-          .update({ ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now })
+          .update({ ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, arquivada: false })
           .eq("id", conversaId),
         supabase.from("whatsapp_mensagens").insert(insertData),
         ensureResponsavel(supabase, conversaId, userData.id),

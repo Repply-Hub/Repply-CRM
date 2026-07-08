@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +33,7 @@ import { useVendedores } from "@/hooks/use-clientes";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -73,6 +74,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { FilterButton } from "@/components/FilterButton";
+import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from "@/components/FilePreviewDialog";
 import { Label } from "@/components/ui/label";
 import {
   MessageCircle,
@@ -117,7 +119,7 @@ import {
 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, autoResizeTextarea } from "@/lib/utils";
 import { toast } from "sonner";
 
 function formatPhone(phone: string) {
@@ -631,11 +633,13 @@ function MessageContent({
   msg,
   isSaida,
   onImageClick,
+  onPreviewFile,
   conversaAtiva,
 }: {
   msg: WaMensagem;
   isSaida: boolean;
   onImageClick?: (url: string) => void;
+  onPreviewFile?: (file: FilePreviewTarget) => void;
   conversaAtiva: WaConversa;
 }) {
   const textCls = isSaida ? "text-white" : "text-foreground";
@@ -696,16 +700,13 @@ function MessageContent({
     const label = !PLACEHOLDERS.includes(msg.conteudo)
       ? msg.conteudo
       : "Documento anexado";
-    return (
-      <a
-        href={msg.media_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn(
-          "flex items-center gap-3 p-2.5 rounded-lg border hover:opacity-80 transition-colors w-[220px] sm:w-[260px]",
-          isSaida ? "bg-white/10 border-white/20" : "bg-muted/50 border-border",
-        )}
-      >
+    const previewable = onPreviewFile && isPreviewable(label, msg.media_mime);
+    const sharedClassName = cn(
+      "flex items-center gap-3 p-2.5 rounded-lg border hover:opacity-80 transition-colors w-[220px] sm:w-[260px]",
+      isSaida ? "bg-white/10 border-white/20" : "bg-muted/50 border-border",
+    );
+    const content = (
+      <>
         <div
           className={cn(
             "p-2 rounded-md shrink-0",
@@ -731,6 +732,24 @@ function MessageContent({
           </span>
         </div>
         <Download className={cn("h-4 w-4 shrink-0 opacity-70", textCls)} />
+      </>
+    );
+
+    if (previewable) {
+      return (
+        <button
+          type="button"
+          className={sharedClassName}
+          onClick={() => onPreviewFile!({ url: msg.media_url!, nome: label, mime: msg.media_mime })}
+        >
+          {content}
+        </button>
+      );
+    }
+
+    return (
+      <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className={sharedClassName}>
+        {content}
       </a>
     );
   }
@@ -1688,10 +1707,15 @@ export default function WhatsAppInbox() {
     previewUrl: string;
   } | null>(null);
   const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<FilePreviewTarget | null>(null);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const msgScrollRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    autoResizeTextarea(inputRef.current);
+  }, [texto]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
@@ -2026,7 +2050,7 @@ export default function WhatsAppInbox() {
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend(e as any);
@@ -3118,6 +3142,7 @@ export default function WhatsAppInbox() {
                                     msg={msg}
                                     isSaida={isSaida}
                                     onImageClick={setViewingImage}
+                                    onPreviewFile={setPreviewFile}
                                     conversaAtiva={conversaAtiva}
                                   />
                                 </div>
@@ -3301,9 +3326,10 @@ export default function WhatsAppInbox() {
                       </span>
                     </div>
                   ) : (
-                    <Input
+                    <Textarea
                       ref={inputRef}
-                      className="flex-1"
+                      className="flex-1 min-h-9 resize-none py-2 overflow-hidden"
+                      rows={1}
                       placeholder={
                         attachments.length > 0
                           ? "Legenda (opcional)..."
@@ -3409,6 +3435,8 @@ export default function WhatsAppInbox() {
           )}
         </DialogContent>
       </Dialog>
+
+      <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
 
       {/* Confirmação de exclusão em massa */}
       <AlertDialog

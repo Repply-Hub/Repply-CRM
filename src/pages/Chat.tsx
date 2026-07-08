@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, ChatGrupo, ChatMessage, useMarkChatAsRead } from '@/hooks/use-chat';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
@@ -14,9 +15,10 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, autoResizeTextarea } from '@/lib/utils';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
 import { validateFile } from '@/lib/file-validation';
+import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/components/FilePreviewDialog';
 import {
   Sheet,
   SheetContent,
@@ -290,11 +292,16 @@ const Chat = () => {
   const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
   const [teamCollapsed, setTeamCollapsed] = useState(false);
   const [text, setText] = useState('');
+  const [previewFile, setPreviewFile] = useState<FilePreviewTarget | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    autoResizeTextarea(inputRef.current);
+  }, [text]);
 
   const activeGrupoId = target.type === 'grupo' ? target.grupoId : null;
   const activeRecipientId = target.type === 'dm' ? target.recipientId : null;
@@ -562,8 +569,16 @@ const Chat = () => {
                         <div className="space-y-3">
                           {messages?.filter(m => m.arquivo_url).map((msg) => {
                             const isImage = msg.arquivo_tipo?.startsWith('image/');
+                            const previewable = !isImage && isPreviewable(msg.arquivo_nome ?? 'arquivo', msg.arquivo_tipo);
                             return (
-                              <div key={msg.id} className="flex flex-col gap-2 p-3 rounded-lg border bg-muted/30 group hover:bg-muted/50 transition-colors">
+                              <div
+                                key={msg.id}
+                                className={cn(
+                                  "flex flex-col gap-2 p-3 rounded-lg border bg-muted/30 group hover:bg-muted/50 transition-colors",
+                                  previewable && "cursor-pointer"
+                                )}
+                                onClick={previewable ? () => setPreviewFile({ url: msg.arquivo_url!, nome: msg.arquivo_nome ?? 'Arquivo', mime: msg.arquivo_tipo }) : undefined}
+                              >
                                 <div className="flex items-start gap-3">
                                   <div className="h-10 w-10 shrink-0 rounded bg-background border flex items-center justify-center text-primary overflow-hidden">
                                     {isImage ? (
@@ -586,11 +601,12 @@ const Chat = () => {
                                       </p>
                                     </div>
                                   </div>
-                                  <a 
-                                    href={msg.arquivo_url!} 
-                                    download={msg.arquivo_nome!} 
-                                    target="_blank" 
+                                  <a
+                                    href={msg.arquivo_url!}
+                                    download={msg.arquivo_nome!}
+                                    target="_blank"
                                     rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
                                     className="p-2 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
                                   >
                                     <Download className="h-4 w-4" />
@@ -683,6 +699,17 @@ const Chat = () => {
                                           <Download className="h-3.5 w-3.5 text-foreground" />
                                         </a>
                                       </div>
+                                    ) : isPreviewable(msg.arquivo_nome || 'arquivo', msg.arquivo_tipo) ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewFile({ url: msg.arquivo_url!, nome: msg.arquivo_nome || 'Arquivo', mime: msg.arquivo_tipo })}
+                                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors w-full text-left ${
+                                          isMe ? 'bg-primary-foreground/10 hover:bg-primary-foreground/20' : 'bg-background/50 hover:bg-background/80'
+                                        }`}
+                                      >
+                                        <FileText className="h-5 w-5 shrink-0" />
+                                        <span className="text-xs truncate max-w-[180px]">{msg.arquivo_nome || 'Arquivo'}</span>
+                                      </button>
                                     ) : (
                                       <a
                                         href={msg.arquivo_url}
@@ -767,13 +794,14 @@ const Chat = () => {
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
-              <Input
+              <Textarea
                 ref={inputRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Digite sua mensagem..."
-                className="flex-1"
+                className="flex-1 min-h-9 resize-none py-2 overflow-hidden"
+                rows={1}
                 disabled={sending}
                 autoFocus
               />
@@ -784,6 +812,7 @@ const Chat = () => {
           </div>
         </div>
       </div>
+      <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
     </AppLayout>
   );
 };
