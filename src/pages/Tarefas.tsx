@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useTarefas, useCreateTarefa, useUpdateTarefa, useDeleteTarefa, Tarefa } from '@/hooks/use-tarefas';
+import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
+import { useAuth } from '@/hooks/use-auth';
 import { UserProfilePopover } from '@/components/UserProfilePopover';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useObras } from '@/hooks/use-obras';
@@ -15,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Trash2, Pencil, Eye, Loader2, Calendar, User } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, Eye, Loader2, Calendar, User, LayoutGrid, List as ListIcon, Settings2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -24,12 +26,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
 import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
 import { ProjetoSelect } from '@/components/tarefas/ProjetoSelect';
+import { TarefaKanbanColumn } from '@/components/tarefas/TarefaKanbanColumn';
+import { TarefaKanbanColunasDialog } from '@/components/tarefas/TarefaKanbanColunasDialog';
 import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { FilterButton } from '@/components/FilterButton';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/SearchableSelect';
 import { SearchWithRecent } from '@/components/SearchWithRecent';
+import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 
 const TAREFA_COLUMNS: ColumnDefinition[] = [
   { id: 'titulo', label: 'Tarefa', locked: false },
@@ -40,17 +45,29 @@ const TAREFA_COLUMNS: ColumnDefinition[] = [
 ];
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-  pendente: { label: 'Pendente', className: 'bg-destructive/15 text-destructive border-destructive/30' },
+  pendente: { label: 'A fazer', className: 'bg-destructive/15 text-destructive border-destructive/30' },
   'em andamento': { label: 'Em andamento', className: 'bg-warning/15 text-warning border-warning/30' },
-  concluida: { label: 'Concluída', className: 'bg-success/15 text-success border-success/30' },
+  concluida: { label: 'Concluído', className: 'bg-success/15 text-success border-success/30' },
 };
 
-function getStatusInfo(s: string) {
-  return statusConfig[s] ?? { label: s, className: 'bg-muted text-muted-foreground' };
-}
+// Badge equivalente às cores usadas nas colunas do Kanban (mesma paleta de use-tarefas-kanban-colunas.ts).
+const KANBAN_COLOR_BADGE: Record<string, string> = {
+  'kanban-new': 'bg-kanban-new/15 text-kanban-new border-kanban-new/30',
+  'kanban-budget': 'bg-kanban-budget/15 text-kanban-budget border-kanban-budget/30',
+  'kanban-sent': 'bg-kanban-sent/15 text-kanban-sent border-kanban-sent/30',
+  'kanban-negotiation': 'bg-kanban-negotiation/15 text-kanban-negotiation border-kanban-negotiation/30',
+  'kanban-closed': 'bg-kanban-closed/15 text-kanban-closed border-kanban-closed/30',
+  destructive: 'bg-destructive/15 text-destructive border-destructive/30',
+  'muted-foreground': 'bg-muted text-muted-foreground border-border',
+};
+
+type TarefasView = 'kanban' | 'lista';
 
 export default function Tarefas() {
+  const { profile } = useAuth();
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: tarefas = [], isLoading } = useTarefas();
+  const { data: kanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
   const { data: vendedores = [] } = useVendedores();
   const { data: obras = [] } = useObras();
   const queryClient = useQueryClient();
@@ -58,9 +75,32 @@ export default function Tarefas() {
   const updateTarefa = useUpdateTarefa();
   const deleteTarefa = useDeleteTarefa();
 
+  const KANBAN_STAGES = useMemo(
+    () => kanbanColunas.map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
+    [kanbanColunas]
+  );
+
+  const getStatusInfo = (s: string) => {
+    const stage = KANBAN_STAGES.find(k => k.key === s);
+    if (stage) {
+      return { label: stage.label, className: KANBAN_COLOR_BADGE[stage.color] ?? 'bg-muted text-muted-foreground border-border' };
+    }
+    return statusConfig[s] ?? { label: s, className: 'bg-muted text-muted-foreground border-border' };
+  };
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const [page, setPage] = useState(1);
+
+  const [view, setView] = useState<TarefasView>(() => {
+    const saved = localStorage.getItem('tarefas_view') as TarefasView | null;
+    return saved === 'kanban' || saved === 'lista' ? saved : 'lista';
+  });
+  const handleViewChange = (next: TarefasView) => {
+    setView(next);
+    localStorage.setItem('tarefas_view', next);
+  };
+  const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
@@ -126,9 +166,9 @@ export default function Tarefas() {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  function openNew() {
+  function openNew(initialStatus?: string) {
     setEditingTarefa(null);
-    setForm({ titulo: '', descricao: '', status: 'pendente', prazo_final: '', responsavel: '', participantes: '', observadores: '', projeto: '', marcadores: '' });
+    setForm({ titulo: '', descricao: '', status: initialStatus || KANBAN_STAGES[0]?.key || 'pendente', prazo_final: '', responsavel: '', participantes: '', observadores: '', projeto: '', marcadores: '' });
     setDialogOpen(true);
   }
 
@@ -166,6 +206,19 @@ export default function Tarefas() {
       await deleteTarefa.mutateAsync(id);
       toast.success('Tarefa excluída');
     } catch { toast.error('Erro ao excluir'); }
+  }
+
+  async function handleDragEnd(result: DropResult) {
+    if (!result.destination) return;
+    const { draggableId, source, destination } = result;
+    if (source.droppableId === destination.droppableId) return;
+    try {
+      await updateTarefa.mutateAsync({ id: draggableId, status: destination.droppableId });
+      const label = KANBAN_STAGES.find(s => s.key === destination.droppableId)?.label ?? destination.droppableId;
+      toast.success(`Tarefa movida para "${label}"`);
+    } catch {
+      toast.error('Erro ao mover tarefa');
+    }
   }
 
   // Bulk selection helpers
@@ -236,10 +289,46 @@ export default function Tarefas() {
   };
 
   return (
-    <AppLayout title="Tarefas" subtitle={`${filtered.length} tarefa(s)`}>
-      <div className="p-3 sm:p-4 md:p-6 w-full space-y-4 md:space-y-6">
+    <AppLayout
+      title="Tarefas"
+      subtitle={`${filtered.length} tarefa(s)`}
+      mainClassName={view === 'kanban' ? 'flex-1 overflow-hidden flex flex-col' : 'flex-1 overflow-auto'}
+    >
+      <div className={view === 'kanban' ? 'flex flex-col flex-1 min-h-0 p-3 sm:p-4 md:p-6' : 'p-3 sm:p-4 md:p-6 w-full space-y-4 md:space-y-6'}>
         {/* Filters & Actions */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className={cn('flex flex-wrap items-center gap-2 sm:gap-3', view === 'kanban' && 'mb-3 shrink-0')}>
+          <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
+            <Button
+              variant={view === 'kanban' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => handleViewChange('kanban')}
+              className="h-8 gap-1.5 px-3"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Kanban
+            </Button>
+            <Button
+              variant={view === 'lista' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => handleViewChange('lista')}
+              className="h-8 gap-1.5 px-3"
+            >
+              <ListIcon className="h-4 w-4" />
+              Lista
+            </Button>
+          </div>
+
+          {view === 'kanban' && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground"
+              title="Gerenciar colunas do Kanban"
+              onClick={() => setColunasDialogOpen(true)}
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          )}
           <SearchWithRecent
             placeholder="Buscar tarefas..."
             value={search}
@@ -264,36 +353,38 @@ export default function Tarefas() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os status</SelectItem>
-                  <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="em andamento">Em andamento</SelectItem>
-                  <SelectItem value="concluida">Concluída</SelectItem>
+                  {KANBAN_STAGES.map(stage => (
+                    <SelectItem key={stage.key} value={stage.key}>{stage.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </FilterButton>
 
-          {someSelected && (
+          {someSelected && view === 'lista' && (
             <Button variant="destructive" size="sm" className="gap-2 shrink-0" onClick={() => setConfirmDeleteOpen(true)}>
               <Trash2 className="h-4 w-4" />
               Excluir {selected.size}
             </Button>
           )}
-          <ColumnSettings
-            columns={columns}
-            visibleColumns={visibleColumns}
-            onChange={setVisibleColumns}
-            onRename={handleRename}
-            onTypeChange={handleTypeChange}
-            onReorder={handleReorder}
-            onAdd={handleAddColumn}
-            onRemove={handleRemoveColumn}
-            presets={presets}
-            onSavePreset={savePreset}
-            onLoadPreset={loadPreset}
-            onDeletePreset={deletePreset}
-            onReset={resetToDefaults}
-          />
-          <Button onClick={openNew} size="sm" className="shrink-0">
+          {view === 'lista' && (
+            <ColumnSettings
+              columns={columns}
+              visibleColumns={visibleColumns}
+              onChange={setVisibleColumns}
+              onRename={handleRename}
+              onTypeChange={handleTypeChange}
+              onReorder={handleReorder}
+              onAdd={handleAddColumn}
+              onRemove={handleRemoveColumn}
+              presets={presets}
+              onSavePreset={savePreset}
+              onLoadPreset={loadPreset}
+              onDeletePreset={deletePreset}
+              onReset={resetToDefaults}
+            />
+          )}
+          <Button onClick={() => openNew()} size="sm" className="shrink-0">
             <Plus className="h-4 w-4 mr-1" />Nova Tarefa
           </Button>
         </div>
@@ -302,6 +393,34 @@ export default function Tarefas() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : view === 'kanban' ? (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="flex-1 min-h-0 pb-4 flex gap-2 sm:gap-3 lg:gap-4 overflow-x-auto items-stretch">
+              {KANBAN_STAGES.map(stage => (
+                <TarefaKanbanColumn
+                  key={stage.key}
+                  stageKey={stage.key}
+                  label={stage.label}
+                  colorClass={stage.color}
+                  tarefas={filtered.filter(t => t.status === stage.key)}
+                  onCardClick={(t) => { setViewTarefa(t); setViewOpen(true); }}
+                  onAddTarefa={openNew}
+                />
+              ))}
+              <div className="self-start mt-[38px] w-40 sm:w-48 min-w-[160px] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setColunasDialogOpen(true)}
+                  className="flex flex-col items-center justify-center w-full h-[180px] rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-primary/40 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary gap-2 group"
+                >
+                  <div className="h-10 w-10 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                    <Plus className="h-5 w-5" />
+                  </div>
+                  <span className="font-medium text-sm">Adicionar Etapa</span>
+                </button>
+              </div>
+            </div>
+          </DragDropContext>
         ) : (
           <div className="space-y-3 md:space-y-0">
             {/* Mobile: card layout */}
@@ -465,9 +584,9 @@ export default function Tarefas() {
                 <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pendente">Pendente</SelectItem>
-                    <SelectItem value="em andamento">Em andamento</SelectItem>
-                    <SelectItem value="concluida">Concluída</SelectItem>
+                    {KANBAN_STAGES.map(stage => (
+                      <SelectItem key={stage.key} value={stage.key}>{stage.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -615,6 +734,8 @@ export default function Tarefas() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <TarefaKanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} empresaId={empresaId} />
     </AppLayout>
   );
 }
