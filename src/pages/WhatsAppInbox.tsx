@@ -73,6 +73,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterButton } from "@/components/FilterButton";
 import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from "@/components/FilePreviewDialog";
 import { Label } from "@/components/ui/label";
@@ -116,6 +117,7 @@ import {
   Building2,
   CalendarDays,
   Mail,
+  Link2,
 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -1297,17 +1299,170 @@ function LeadSheet({
   participantesGrupo,
   open,
   onOpenChange,
+  onImageClick,
+  onPreviewFile,
 }: {
   conversa: WaConversa;
   participantesGrupo: { nome: string | null; telefone: string }[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  onImageClick: (url: string) => void;
+  onPreviewFile: (file: FilePreviewTarget) => void;
 }) {
   const navigate = useNavigate();
   const { data: vendedores = [] } = useVendedores();
   const setResponsaveis = useWaSetResponsaveis();
+  const { data: mensagens = [] } = useWaMensagens(conversa.id);
   const atuais = conversa.responsaveis ?? [];
   const atuaisIds = new Set(atuais.map((r) => r.id));
+
+  const midia = useMemo(() => {
+    const imagens = mensagens.filter((m) => m.tipo === "imagem" && m.media_url);
+    const videos = mensagens.filter((m) => m.tipo === "video" && m.media_url);
+    const documentos = mensagens.filter((m) => m.tipo === "documento" && m.media_url);
+
+    const urlRegex = /https?:\/\/[^\s]+/g;
+    const links: { id: string; url: string; created_at: string }[] = [];
+    for (const m of mensagens) {
+      if (!m.conteudo) continue;
+      const matches = m.conteudo.match(urlRegex);
+      if (!matches) continue;
+      matches.forEach((raw, i) => {
+        const url = raw.replace(/[.,;:!?)\]]+$/, "");
+        links.push({ id: `${m.id}-${i}`, url, created_at: m.created_at });
+      });
+    }
+
+    return { imagens, videos, documentos, links };
+  }, [mensagens]);
+
+  const [expandedMediaTab, setExpandedMediaTab] = useState<
+    "imagens" | "videos" | "documentos" | "links" | null
+  >(null);
+
+  const MEDIA_PREVIEW_LIMIT = 3;
+
+  const renderImagens = (items: typeof midia.imagens) => (
+    <div className="grid grid-cols-3 gap-1.5">
+      {items.map((m) => (
+        <button
+          key={m.id}
+          type="button"
+          className="aspect-square rounded-md overflow-hidden border border-border hover:opacity-80 transition-opacity"
+          onClick={() => onImageClick(m.media_url!)}
+          title={format(new Date(m.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+        >
+          <img src={m.media_url!} alt="imagem" className="h-full w-full object-cover" />
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderVideos = (items: typeof midia.videos) => (
+    <div className="grid grid-cols-3 gap-1.5">
+      {items.map((m) => (
+        <button
+          key={m.id}
+          type="button"
+          className="relative aspect-square rounded-md overflow-hidden border border-border bg-black/5 hover:opacity-80 transition-opacity"
+          onClick={() => window.open(m.media_url!, "_blank", "noopener,noreferrer")}
+          title={format(new Date(m.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+        >
+          <video src={m.media_url!} className="h-full w-full object-cover" muted />
+          <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <Play className="h-5 w-5 text-white fill-white" />
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderDocumentos = (items: typeof midia.documentos) => (
+    <ul className="space-y-1.5">
+      {items.map((m) => {
+        const label = !PLACEHOLDERS.includes(m.conteudo) ? m.conteudo : "Documento anexado";
+        const previewable = isPreviewable(label, m.media_mime);
+        return (
+          <li key={m.id}>
+            <div
+              className={cn(
+                "flex items-center gap-2.5 p-2 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors",
+                previewable && "cursor-pointer",
+              )}
+              onClick={
+                previewable
+                  ? () => onPreviewFile({ url: m.media_url!, nome: label, mime: m.media_mime })
+                  : undefined
+              }
+            >
+              <div className="p-1.5 rounded-md bg-background text-primary shrink-0">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium truncate" title={label}>
+                  {label}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {format(new Date(m.created_at), "dd MMM, HH:mm", { locale: ptBR })}
+                </p>
+              </div>
+              <a
+                href={m.media_url!}
+                download={label}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="p-1.5 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </a>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  const renderLinks = (items: typeof midia.links) => (
+    <ul className="space-y-1.5">
+      {items.map((l) => {
+        let host = l.url;
+        try {
+          host = new URL(l.url).hostname.replace(/^www\./, "");
+        } catch {
+          // mantém a URL bruta se não for parseável
+        }
+        return (
+          <li key={l.id}>
+            <a
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5 p-2 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+            >
+              <div className="p-1.5 rounded-md bg-background text-primary shrink-0">
+                <Link2 className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium truncate" title={l.url}>
+                  {host}
+                </p>
+                <p className="text-[10px] text-muted-foreground truncate">{l.url}</p>
+              </div>
+              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  const MEDIA_TAB_LABELS: Record<"imagens" | "videos" | "documentos" | "links", string> = {
+    imagens: "Imagens",
+    videos: "Vídeos",
+    documentos: "Documentos",
+    links: "Links",
+  };
 
   const { data: cliente } = useQuery({
     queryKey: ["wa_lead_cliente", conversa.cliente_id],
@@ -1448,6 +1603,131 @@ function LeadSheet({
               </p>
             </div>
           </div>
+
+          <Separator />
+
+          {/* Mídia, links e documentos */}
+          <div className="space-y-3">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <ImageIcon className="h-3 w-3" /> Mídia, links e documentos
+            </p>
+            <Tabs defaultValue="imagens" className="w-full">
+              <TabsList className="grid w-full grid-cols-4 h-8">
+                <TabsTrigger value="imagens" className="text-[10px] px-1">
+                  Imagens{midia.imagens.length > 0 && ` (${midia.imagens.length})`}
+                </TabsTrigger>
+                <TabsTrigger value="videos" className="text-[10px] px-1">
+                  Vídeos{midia.videos.length > 0 && ` (${midia.videos.length})`}
+                </TabsTrigger>
+                <TabsTrigger value="documentos" className="text-[10px] px-1">
+                  Docs{midia.documentos.length > 0 && ` (${midia.documentos.length})`}
+                </TabsTrigger>
+                <TabsTrigger value="links" className="text-[10px] px-1">
+                  Links{midia.links.length > 0 && ` (${midia.links.length})`}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="imagens" className="mt-3">
+                {midia.imagens.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-1 py-6 text-center">
+                    Nenhuma imagem trocada nesta conversa.
+                  </p>
+                ) : (
+                  <>
+                    {renderImagens(midia.imagens.slice(0, MEDIA_PREVIEW_LIMIT))}
+                    {midia.imagens.length > MEDIA_PREVIEW_LIMIT && (
+                      <button
+                        type="button"
+                        className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
+                        onClick={() => setExpandedMediaTab("imagens")}
+                      >
+                        +{midia.imagens.length - MEDIA_PREVIEW_LIMIT} mais
+                      </button>
+                    )}
+                  </>
+                )}
+              </TabsContent>
+
+              <TabsContent value="videos" className="mt-3">
+                {midia.videos.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-1 py-6 text-center">
+                    Nenhum vídeo trocado nesta conversa.
+                  </p>
+                ) : (
+                  <>
+                    {renderVideos(midia.videos.slice(0, MEDIA_PREVIEW_LIMIT))}
+                    {midia.videos.length > MEDIA_PREVIEW_LIMIT && (
+                      <button
+                        type="button"
+                        className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
+                        onClick={() => setExpandedMediaTab("videos")}
+                      >
+                        +{midia.videos.length - MEDIA_PREVIEW_LIMIT} mais
+                      </button>
+                    )}
+                  </>
+                )}
+              </TabsContent>
+
+              <TabsContent value="documentos" className="mt-3">
+                {midia.documentos.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-1 py-6 text-center">
+                    Nenhum documento trocado nesta conversa.
+                  </p>
+                ) : (
+                  <>
+                    {renderDocumentos(midia.documentos.slice(0, MEDIA_PREVIEW_LIMIT))}
+                    {midia.documentos.length > MEDIA_PREVIEW_LIMIT && (
+                      <button
+                        type="button"
+                        className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
+                        onClick={() => setExpandedMediaTab("documentos")}
+                      >
+                        +{midia.documentos.length - MEDIA_PREVIEW_LIMIT} mais
+                      </button>
+                    )}
+                  </>
+                )}
+              </TabsContent>
+
+              <TabsContent value="links" className="mt-3">
+                {midia.links.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-1 py-6 text-center">
+                    Nenhum link compartilhado nesta conversa.
+                  </p>
+                ) : (
+                  <>
+                    {renderLinks(midia.links.slice(0, MEDIA_PREVIEW_LIMIT))}
+                    {midia.links.length > MEDIA_PREVIEW_LIMIT && (
+                      <button
+                        type="button"
+                        className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
+                        onClick={() => setExpandedMediaTab("links")}
+                      >
+                        +{midia.links.length - MEDIA_PREVIEW_LIMIT} mais
+                      </button>
+                    )}
+                  </>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <Dialog open={!!expandedMediaTab} onOpenChange={(v) => !v && setExpandedMediaTab(null)}>
+            <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>
+                  {expandedMediaTab ? MEDIA_TAB_LABELS[expandedMediaTab] : ""}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto pr-1">
+                {expandedMediaTab === "imagens" && renderImagens(midia.imagens)}
+                {expandedMediaTab === "videos" && renderVideos(midia.videos)}
+                {expandedMediaTab === "documentos" && renderDocumentos(midia.documentos)}
+                {expandedMediaTab === "links" && renderLinks(midia.links)}
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {conversa.is_group && (
             <>
@@ -3480,6 +3760,8 @@ export default function WhatsAppInbox() {
           participantesGrupo={participantesGrupo}
           open={leadSheetOpen}
           onOpenChange={setLeadSheetOpen}
+          onImageClick={setViewingImage}
+          onPreviewFile={setPreviewFile}
         />
       )}
     </AppLayout>

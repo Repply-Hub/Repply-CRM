@@ -9,9 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { 
-  Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen, 
-  Paperclip, FileText, Image, X, Download, Users2, Info, Calendar, Eraser, ChevronDown
+import {
+  Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen,
+  Paperclip, FileText, Image, X, Download, Users2, Info, Calendar, Eraser, ChevronDown,
+  Video, Link2, ExternalLink, Play
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -26,6 +27,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -311,6 +320,155 @@ const Chat = () => {
   const { data: grupos = [] } = useChatGrupos();
   const markAsRead = useMarkChatAsRead();
   const { data: unreadCounts = {} } = useUnreadChatByTarget();
+  const [expandedMediaTab, setExpandedMediaTab] = useState<
+    'imagens' | 'videos' | 'documentos' | 'links' | null
+  >(null);
+
+  const MEDIA_PREVIEW_LIMIT = 3;
+
+  const midia = useMemo(() => {
+    const imagens = (messages ?? []).filter((m) => m.arquivo_url && m.arquivo_tipo?.startsWith('image/'));
+    const videos = (messages ?? []).filter((m) => m.arquivo_url && m.arquivo_tipo?.startsWith('video/'));
+    const documentos = (messages ?? []).filter(
+      (m) => m.arquivo_url && !m.arquivo_tipo?.startsWith('image/') && !m.arquivo_tipo?.startsWith('video/')
+    );
+
+    const urlRegex = /https?:\/\/[^\s]+/g;
+    const links: { id: string; url: string; created_at: string }[] = [];
+    for (const m of messages ?? []) {
+      if (m.arquivo_url || !m.conteudo) continue;
+      const matches = m.conteudo.match(urlRegex);
+      if (!matches) continue;
+      matches.forEach((raw, i) => {
+        const url = raw.replace(/[.,;:!?)\]]+$/, '');
+        links.push({ id: `${m.id}-${i}`, url, created_at: m.created_at });
+      });
+    }
+
+    return { imagens, videos, documentos, links };
+  }, [messages]);
+
+  const renderImagens = (items: typeof midia.imagens) => (
+    <div className="grid grid-cols-3 gap-1.5">
+      {items.map((m) => (
+        <a
+          key={m.id}
+          href={m.arquivo_url!}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="aspect-square rounded-md overflow-hidden border border-border hover:opacity-80 transition-opacity"
+          title={format(new Date(m.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+        >
+          <img src={m.arquivo_url!} alt={m.arquivo_nome ?? 'imagem'} className="h-full w-full object-cover" />
+        </a>
+      ))}
+    </div>
+  );
+
+  const renderVideos = (items: typeof midia.videos) => (
+    <div className="grid grid-cols-3 gap-1.5">
+      {items.map((m) => (
+        <a
+          key={m.id}
+          href={m.arquivo_url!}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="relative aspect-square rounded-md overflow-hidden border border-border bg-black/5 hover:opacity-80 transition-opacity"
+          title={format(new Date(m.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+        >
+          <video src={m.arquivo_url!} className="h-full w-full object-cover" muted />
+          <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <Play className="h-5 w-5 text-white fill-white" />
+          </span>
+        </a>
+      ))}
+    </div>
+  );
+
+  const renderDocumentos = (items: typeof midia.documentos) => (
+    <div className="space-y-2">
+      {items.map((m) => {
+        const isPreviewableDoc = isPreviewable(m.arquivo_nome ?? 'arquivo', m.arquivo_tipo);
+        return (
+          <div
+            key={m.id}
+            className={cn(
+              'flex items-center gap-3 p-2.5 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors',
+              isPreviewableDoc && 'cursor-pointer'
+            )}
+            onClick={
+              isPreviewableDoc
+                ? () => setPreviewFile({ url: m.arquivo_url!, nome: m.arquivo_nome ?? 'Arquivo', mime: m.arquivo_tipo })
+                : undefined
+            }
+          >
+            <div className="p-1.5 rounded-md bg-background text-primary shrink-0">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium truncate" title={m.arquivo_nome ?? 'Arquivo'}>
+                {m.arquivo_nome ?? 'Arquivo'}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {m.vendedor?.nome} • {format(new Date(m.created_at), 'dd MMM, HH:mm', { locale: ptBR })}
+              </p>
+            </div>
+            <a
+              href={m.arquivo_url!}
+              download={m.arquivo_nome!}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="p-1.5 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderLinks = (items: typeof midia.links) => (
+    <ul className="space-y-1.5">
+      {items.map((l) => {
+        let host = l.url;
+        try {
+          host = new URL(l.url).hostname.replace(/^www\./, '');
+        } catch {
+          // mantém a URL bruta se não for parseável
+        }
+        return (
+          <li key={l.id}>
+            <a
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5 p-2 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+            >
+              <div className="p-1.5 rounded-md bg-background text-primary shrink-0">
+                <Link2 className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium truncate" title={l.url}>
+                  {host}
+                </p>
+                <p className="text-[10px] text-muted-foreground truncate">{l.url}</p>
+              </div>
+              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  const MEDIA_TAB_LABELS: Record<'imagens' | 'videos' | 'documentos' | 'links', string> = {
+    imagens: 'Imagens',
+    videos: 'Vídeos',
+    documentos: 'Documentos',
+    links: 'Links',
+  };
 
   const { data: myVendedor } = useQuery({
     queryKey: ['my-vendedor'],
@@ -336,6 +494,21 @@ const Chat = () => {
         .order('nome');
       if (error) throw error;
       return (data as Vendedor[]) ?? [];
+    },
+  });
+
+  const { data: grupoMembros = [] } = useQuery({
+    queryKey: ['chat-grupo-membros', activeGrupoId],
+    enabled: !!activeGrupoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('chat_grupo_membros')
+        .select('usuario:usuarios(id, nome, email, role, avatar_url)')
+        .eq('grupo_id', activeGrupoId!);
+      if (error) throw error;
+      return ((data ?? []) as unknown as { usuario: Vendedor | null }[])
+        .map((r) => r.usuario)
+        .filter((u): u is Vendedor => !!u);
     },
   });
 
@@ -554,73 +727,166 @@ const Chat = () => {
                   <SheetHeader className="p-4 border-b">
                     <SheetTitle className="flex items-center gap-2">
                       <Paperclip className="h-4 w-4 text-primary" />
-                      Arquivos da Conversa
+                      Mídia, links e documentos
                     </SheetTitle>
                   </SheetHeader>
-                  
+
                   <ScrollArea className="flex-1">
-                    <div className="p-4 space-y-4">
-                      {messages?.filter(m => m.arquivo_url).length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                          <p className="text-sm">Nenhum arquivo enviado nesta conversa.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {messages?.filter(m => m.arquivo_url).map((msg) => {
-                            const isImage = msg.arquivo_tipo?.startsWith('image/');
-                            const previewable = !isImage && isPreviewable(msg.arquivo_nome ?? 'arquivo', msg.arquivo_tipo);
-                            return (
-                              <div
-                                key={msg.id}
-                                className={cn(
-                                  "flex flex-col gap-2 p-3 rounded-lg border bg-muted/30 group hover:bg-muted/50 transition-colors",
-                                  previewable && "cursor-pointer"
-                                )}
-                                onClick={previewable ? () => setPreviewFile({ url: msg.arquivo_url!, nome: msg.arquivo_nome ?? 'Arquivo', mime: msg.arquivo_tipo }) : undefined}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="h-10 w-10 shrink-0 rounded bg-background border flex items-center justify-center text-primary overflow-hidden">
-                                    {isImage ? (
-                                      <img src={msg.arquivo_url!} alt={msg.arquivo_nome!} className="h-full w-full object-cover" />
-                                    ) : (
-                                      <FileText className="h-5 w-5" />
-                                    )}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium text-foreground truncate" title={msg.arquivo_nome ?? 'Arquivo'}>
-                                      {msg.arquivo_nome ?? 'Arquivo'}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                      <Avatar className="h-4 w-4 shrink-0">
-                                        {msg.vendedor?.avatar_url && <img src={msg.vendedor.avatar_url} className="object-cover" />}
-                                        <AvatarFallback className="text-[6px]">{getInitials(msg.vendedor?.nome || '?')}</AvatarFallback>
-                                      </Avatar>
-                                      <p className="text-[10px] text-muted-foreground truncate">
-                                        {msg.vendedor?.nome} • {format(new Date(msg.created_at), "dd MMM, HH:mm", { locale: ptBR })}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <a
-                                    href={msg.arquivo_url!}
-                                    download={msg.arquivo_nome!}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="p-2 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                    <div className="p-4">
+                      {target.type === 'grupo' && (
+                        <>
+                          <div className="space-y-2 mb-4">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                              <Users2 className="h-3 w-3" /> Participantes do grupo
+                              {grupoMembros.length > 0 && ` (${grupoMembros.length})`}
+                            </p>
+                            {grupoMembros.length > 0 ? (
+                              <ul className="space-y-0.5">
+                                {grupoMembros.map((m) => (
+                                  <li
+                                    key={m.id}
+                                    className="w-full flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm"
                                   >
-                                    <Download className="h-4 w-4" />
-                                  </a>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                                    <Avatar className="h-6 w-6 shrink-0 border border-primary/10">
+                                      {m.avatar_url && (
+                                        <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+                                      )}
+                                      <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
+                                        {getInitials(m.nome)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="flex-1 truncate">
+                                      {m.nome} {m.id === myVendedor && <span className="text-muted-foreground font-normal">(você)</span>}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground capitalize shrink-0">{m.role}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-xs text-muted-foreground px-1">Nenhum participante encontrado.</p>
+                            )}
+                          </div>
+                          <Separator className="mb-4" />
+                        </>
                       )}
+                      <Tabs defaultValue="imagens" className="w-full">
+                        <TabsList className="grid w-full grid-cols-4 h-8">
+                          <TabsTrigger value="imagens" className="text-[10px] px-1">
+                            Imagens{midia.imagens.length > 0 && ` (${midia.imagens.length})`}
+                          </TabsTrigger>
+                          <TabsTrigger value="videos" className="text-[10px] px-1">
+                            Vídeos{midia.videos.length > 0 && ` (${midia.videos.length})`}
+                          </TabsTrigger>
+                          <TabsTrigger value="documentos" className="text-[10px] px-1">
+                            Docs{midia.documentos.length > 0 && ` (${midia.documentos.length})`}
+                          </TabsTrigger>
+                          <TabsTrigger value="links" className="text-[10px] px-1">
+                            Links{midia.links.length > 0 && ` (${midia.links.length})`}
+                          </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="imagens" className="mt-3">
+                          {midia.imagens.length === 0 ? (
+                            <p className="text-xs text-muted-foreground px-1 py-6 text-center">
+                              Nenhuma imagem trocada nesta conversa.
+                            </p>
+                          ) : (
+                            <>
+                              {renderImagens(midia.imagens.slice(0, MEDIA_PREVIEW_LIMIT))}
+                              {midia.imagens.length > MEDIA_PREVIEW_LIMIT && (
+                                <button
+                                  type="button"
+                                  className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
+                                  onClick={() => setExpandedMediaTab('imagens')}
+                                >
+                                  +{midia.imagens.length - MEDIA_PREVIEW_LIMIT} mais
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="videos" className="mt-3">
+                          {midia.videos.length === 0 ? (
+                            <p className="text-xs text-muted-foreground px-1 py-6 text-center">
+                              Nenhum vídeo trocado nesta conversa.
+                            </p>
+                          ) : (
+                            <>
+                              {renderVideos(midia.videos.slice(0, MEDIA_PREVIEW_LIMIT))}
+                              {midia.videos.length > MEDIA_PREVIEW_LIMIT && (
+                                <button
+                                  type="button"
+                                  className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
+                                  onClick={() => setExpandedMediaTab('videos')}
+                                >
+                                  +{midia.videos.length - MEDIA_PREVIEW_LIMIT} mais
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="documentos" className="mt-3">
+                          {midia.documentos.length === 0 ? (
+                            <p className="text-xs text-muted-foreground px-1 py-6 text-center">
+                              Nenhum documento trocado nesta conversa.
+                            </p>
+                          ) : (
+                            <>
+                              {renderDocumentos(midia.documentos.slice(0, MEDIA_PREVIEW_LIMIT))}
+                              {midia.documentos.length > MEDIA_PREVIEW_LIMIT && (
+                                <button
+                                  type="button"
+                                  className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
+                                  onClick={() => setExpandedMediaTab('documentos')}
+                                >
+                                  +{midia.documentos.length - MEDIA_PREVIEW_LIMIT} mais
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="links" className="mt-3">
+                          {midia.links.length === 0 ? (
+                            <p className="text-xs text-muted-foreground px-1 py-6 text-center">
+                              Nenhum link compartilhado nesta conversa.
+                            </p>
+                          ) : (
+                            <>
+                              {renderLinks(midia.links.slice(0, MEDIA_PREVIEW_LIMIT))}
+                              {midia.links.length > MEDIA_PREVIEW_LIMIT && (
+                                <button
+                                  type="button"
+                                  className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
+                                  onClick={() => setExpandedMediaTab('links')}
+                                >
+                                  +{midia.links.length - MEDIA_PREVIEW_LIMIT} mais
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </TabsContent>
+                      </Tabs>
                     </div>
                   </ScrollArea>
                 </SheetContent>
               </Sheet>
+
+              <Dialog open={!!expandedMediaTab} onOpenChange={(v) => !v && setExpandedMediaTab(null)}>
+                <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle>{expandedMediaTab ? MEDIA_TAB_LABELS[expandedMediaTab] : ''}</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex-1 overflow-y-auto pr-1">
+                    {expandedMediaTab === 'imagens' && renderImagens(midia.imagens)}
+                    {expandedMediaTab === 'videos' && renderVideos(midia.videos)}
+                    {expandedMediaTab === 'documentos' && renderDocumentos(midia.documentos)}
+                    {expandedMediaTab === 'links' && renderLinks(midia.links)}
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 
