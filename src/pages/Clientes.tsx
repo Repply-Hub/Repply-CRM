@@ -20,7 +20,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown, ChevronDown, FileWarning } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/ImportClientesDialog';
-import { ImportDialog } from '@/components/ImportDialog';
 import { EmpresaSelector } from '@/components/EmpresaSelector';
 import { SearchableSelect } from '@/components/SearchableSelect';
 import { SearchWithRecent } from '@/components/SearchWithRecent';
@@ -171,8 +170,7 @@ const Clientes = () => {
   const [typedConfirmText, setTypedConfirmText] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [importAiOpen, setImportAiOpen] = useState(false);
-  
+
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
   const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
@@ -675,18 +673,6 @@ const Clientes = () => {
           </ColumnSettings>
 
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
-
-          <Button variant="outline" size="sm" onClick={() => setImportAiOpen(true)}>
-            <Upload className="h-4 w-4 mr-1" /> Importar
-          </Button>
-          <ImportDialog
-            open={importAiOpen}
-            importType="clientes"
-            onOpenChange={(v) => {
-              setImportAiOpen(v);
-              if (!v) queryClient.invalidateQueries({ queryKey: [activeTab === 'empresas' ? 'clientes' : 'contatos'] });
-            }}
-          />
 
           {/* Novo tipo dialog — criação + gerenciamento */}
           <Dialog open={newTipoOpen} onOpenChange={(o) => { setNewTipoOpen(o); if (!o) setNewTipoName(''); }}>

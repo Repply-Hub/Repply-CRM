@@ -330,6 +330,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
   const [selectedFabricantes, setSelectedFabricantes] = useState<string[]>([]);
   const [showOnlyAttention, setShowOnlyAttention] = useState(false);
+  const [hideImportados, setHideImportados] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
@@ -366,7 +367,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     // Usado só pela query de stats (header) — o fetch paginado da lista/kanban continua
     // filtrando a busca no cliente sobre o que já foi carregado.
     search: deferredSearch.trim() || undefined,
-  }), [selectedVendedores, selectedFabricantes, dateFrom, dateTo, showOnlyAttention, deferredSearch]);
+    // Filtro puramente visual: usePedidosStats ignora esse campo de propósito, então os
+    // totais do cabeçalho continuam somando negócios importados mesmo com o filtro ligado.
+    hideImportados: hideImportados || undefined,
+  }), [selectedVendedores, selectedFabricantes, dateFrom, dateTo, showOnlyAttention, deferredSearch, hideImportados]);
 
   // Essa query só serve a view Lista agora — desabilitada no Kanban, já que cada coluna
   // busca seus próprios dados de forma independente.
@@ -503,7 +507,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // lote de cada coluna sozinho, dentro do KanbanColumn, ao ver os filtros mudarem).
   useEffect(() => {
     setPage(1);
-  }, [empresaId, deferredSearch, selectedStages, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
+  }, [empresaId, deferredSearch, selectedStages, selectedVendedores, selectedFabricantes, showOnlyAttention, hideImportados, dateFrom, dateTo]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -526,8 +530,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     [kanbanPedidosFlat]
   );
 
-  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || !!dateFrom || !!dateTo || selectedStages.length > 0;
-  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (selectedStages.length > 0 ? 1 : 0);
+  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || hideImportados || !!dateFrom || !!dateTo || selectedStages.length > 0;
+  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (hideImportados ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (selectedStages.length > 0 ? 1 : 0);
 
   const toggleFilter = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
     setList(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -537,6 +541,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setSelectedVendedores([]);
     setSelectedFabricantes([]);
     setShowOnlyAttention(false);
+    setHideImportados(false);
     setDateFrom(undefined);
     setDateTo(undefined);
     setSelectedStages([]);
@@ -960,9 +965,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             Atenção (7+ dias)
           </label>
         </div>
+
+        <div className="h-px bg-border/50 my-1" />
+
+        <div className="space-y-2 py-1">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3">Importação</p>
+          <label className="flex items-center gap-2 px-3 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+            <Checkbox checked={hideImportados} onCheckedChange={() => setHideImportados(prev => !prev)} />
+            Ocultar negócios importados
+          </label>
+        </div>
       </div>
     </FilterButton>
-  ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention]);
+  ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention, hideImportados, setHideImportados]);
   const selectedViewOrder = useMemo(
     () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === viewOrderId),
     [showKanban, kanbanPedidosFlat, pedidos, viewOrderId]

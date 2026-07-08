@@ -30,6 +30,10 @@ export interface PedidosFilters {
   onlyAttention?: boolean;
   /** Busca por cliente/fabricante — hoje usada só na query de stats (RPC), não no fetch paginado da lista/kanban. */
   search?: string;
+  /** Oculta negócios criados via importação em massa (import_hash preenchido). Não é enviado à
+   *  query de stats (usePedidosStats) de propósito — os totais do cabeçalho continuam contando
+   *  todos os negócios independente deste filtro visual. */
+  hideImportados?: boolean;
 }
 
 async function resolveUsuarioIds(empresaId: string, vendedorIds?: string[]): Promise<string[]> {
@@ -49,10 +53,10 @@ export function usePedidos(
   filters?: PedidosFilters,
   enabled = true,
 ) {
-  const { vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention } = filters ?? {};
+  const { vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, hideImportados } = filters ?? {};
 
   return useQuery({
-    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention],
+    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, hideImportados],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
@@ -98,6 +102,10 @@ export function usePedidos(
       if (onlyAttention) {
         const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
         query = query.lte('created_at', cutoff);
+      }
+
+      if (hideImportados) {
+        query = query.is('import_hash', null);
       }
 
       const { data, error, count } = await query;
@@ -230,6 +238,9 @@ export function useBulkDeletePedidos() {
       if (filters?.onlyAttention) {
         const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
         query = query.lte('created_at', cutoff);
+      }
+      if (filters?.hideImportados) {
+        query = query.is('import_hash', null);
       }
 
       const { error, count } = await query;
