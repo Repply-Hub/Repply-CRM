@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Trash2, Pencil, Eye, Loader2, Calendar, User, LayoutGrid, List as ListIcon, Settings2 } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, Eye, Loader2, Calendar, User, LayoutGrid, List as ListIcon, Settings2, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -325,17 +325,6 @@ export default function Tarefas() {
             </Button>
           </div>
 
-          {view === 'kanban' && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground"
-              title="Gerenciar colunas do Kanban"
-              onClick={() => setColunasDialogOpen(true)}
-            >
-              <Settings2 className="h-4 w-4" />
-            </Button>
-          )}
           <SearchWithRecent
             placeholder="Buscar tarefas..."
             value={search}
@@ -372,6 +361,19 @@ export default function Tarefas() {
             <Button variant="destructive" size="sm" className="gap-2 shrink-0" onClick={() => setConfirmDeleteOpen(true)}>
               <Trash2 className="h-4 w-4" />
               Excluir {selected.size}
+            </Button>
+          )}
+          {view === 'kanban' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 gap-2.5 rounded-lg border-border/60 bg-background px-4 font-medium transition-all hover:border-primary/50 hover:bg-primary/[0.02] active:scale-[0.98] shadow-sm group"
+              title="Gerenciar colunas do Kanban"
+              onClick={() => setColunasDialogOpen(true)}
+            >
+              <Settings2 className="h-4 w-4" />
+              <span>Opções</span>
+              <ChevronDown className="h-3.5 w-3.5 opacity-50" />
             </Button>
           )}
           {view === 'lista' && (
