@@ -196,6 +196,89 @@ export function useUpdateChatGrupo() {
   });
 }
 
+export interface ChatGeralConfig {
+  id: string;
+  empresa_id: string;
+  nome: string;
+  foto_url?: string | null;
+}
+
+export function useChatGeralConfig() {
+  const qc = useQueryClient();
+
+  const query = useQuery<ChatGeralConfig | null>({
+    queryKey: ['chat-geral-config'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('chat_geral_config')
+        .select('*')
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any) ?? null;
+    },
+  });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`chat-geral-config-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_geral_config' }, () => {
+        qc.invalidateQueries({ queryKey: ['chat-geral-config'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc]);
+
+  return query;
+}
+
+export function useUpdateChatGeralConfig() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ nome, foto }: { nome?: string, foto?: File | null }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Usuário não autenticado');
+
+      const { data: me } = await supabase.from('usuarios').select('empresa_id').eq('user_id', userData.user.id).single();
+      if (!me?.empresa_id) throw new Error('Empresa não encontrada');
+
+      const updates: { nome?: string; foto_url?: string } = {};
+      if (nome !== undefined) updates.nome = nome;
+
+      if (foto) {
+        const safeName = sanitizeFileName(foto.name);
+        const path = `${userData.user.id}/group-photos/geral-${Date.now()}-${safeName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('chat-files')
+          .upload(path, foto, { contentType: foto.type || 'application/octet-stream' });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('chat-files')
+          .getPublicUrl(path);
+
+        updates.foto_url = urlData.publicUrl;
+      }
+
+      const { error } = await supabase
+        .from('chat_geral_config')
+        .upsert({ empresa_id: me.empresa_id, ...updates } as any, { onConflict: 'empresa_id' });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['chat-geral-config'] });
+      toast.success('Chat Geral atualizado com sucesso!');
+    },
+    onError: (err: any) => {
+      console.error('Erro ao atualizar Chat Geral:', err);
+      toast.error(`Erro ao atualizar Chat Geral: ${err.message || 'Você não tem permissão para editar'}`);
+    }
+  });
+}
+
 export function useSendMessage() {
   const qc = useQueryClient();
   const [sending, setSending] = useState(false);

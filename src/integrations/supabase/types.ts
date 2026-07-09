@@ -249,6 +249,41 @@ export type Database = {
           },
         ]
       }
+      chat_geral_config: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          foto_url: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          foto_url?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          foto_url?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_geral_config_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_mensagens: {
         Row: {
           arquivo_nome: string | null

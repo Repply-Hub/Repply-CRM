@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, ChatGrupo, ChatMessage, useMarkChatAsRead } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, ChatGrupo, ChatMessage, useMarkChatAsRead, useChatGeralConfig, useUpdateChatGeralConfig } from '@/hooks/use-chat';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -83,6 +83,8 @@ function MembersList({
   onToggle,
   grupos,
   unreadCounts,
+  geralNome,
+  geralFotoUrl,
 }: {
   members: Vendedor[];
   myId: string | null;
@@ -92,6 +94,8 @@ function MembersList({
   onToggle: () => void;
   grupos: ChatGrupo[];
   unreadCounts: Record<string, number>;
+  geralNome: string;
+  geralFotoUrl?: string | null;
 }) {
   if (collapsed) {
     return (
@@ -100,9 +104,12 @@ function MembersList({
           <button
             onClick={() => onSelect({ type: 'geral' })}
             className={cn('p-1 rounded-lg transition-colors', target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50')}
-            title="Chat Geral"
+            title={geralNome}
           >
             <Avatar className="h-7 w-7">
+              {geralFotoUrl && (
+                <img src={geralFotoUrl} alt={geralNome} className="h-full w-full object-cover" />
+              )}
               <AvatarFallback className="bg-primary text-primary-foreground text-[8px]">
                 <Users className="h-3.5 w-3.5" />
               </AvatarFallback>
@@ -195,12 +202,15 @@ function MembersList({
             )}
           >
             <Avatar className="h-8 w-8">
+              {geralFotoUrl && (
+                <img src={geralFotoUrl} alt={geralNome} className="h-full w-full object-cover" />
+              )}
               <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
                 <Users className="h-4 w-4" />
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-foreground truncate">Chat Geral</p>
+              <p className="text-xs font-medium text-foreground truncate">{geralNome}</p>
               <p className="text-[10px] text-muted-foreground">Toda a equipe</p>
             </div>
             {unreadCounts['geral'] > 0 && (
@@ -328,6 +338,12 @@ const Chat = () => {
   const [editingGrupoNome, setEditingGrupoNome] = useState(false);
   const [grupoNomeInput, setGrupoNomeInput] = useState('');
   const grupoFotoInputRef = useRef<HTMLInputElement>(null);
+  const { data: geralConfig } = useChatGeralConfig();
+  const updateGeralConfig = useUpdateChatGeralConfig();
+  const [editingGeralNome, setEditingGeralNome] = useState(false);
+  const [geralNomeInput, setGeralNomeInput] = useState('');
+  const geralFotoInputRef = useRef<HTMLInputElement>(null);
+  const geralNome = geralConfig?.nome || 'Chat Geral';
   const markAsRead = useMarkChatAsRead();
   const { data: unreadCounts = {} } = useUnreadChatByTarget();
   const [expandedMediaTab, setExpandedMediaTab] = useState<
@@ -612,6 +628,20 @@ const Chat = () => {
     setEditingGrupoNome(false);
   };
 
+  const handleGeralFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    updateGeralConfig.mutate({ foto: file });
+  };
+
+  const handleSaveGeralNome = () => {
+    const nome = geralNomeInput.trim();
+    if (!nome) return;
+    updateGeralConfig.mutate({ nome });
+    setEditingGeralNome(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -638,7 +668,7 @@ const Chat = () => {
   const activeGrupo = grupos.find(g => g.id === activeGrupoId);
   const selectedMemberData = target.type === 'dm' ? members.find(m => m.id === target.memberId) : null;
   
-  let chatHeaderName = 'Chat Geral';
+  let chatHeaderName = geralNome;
   let chatHeaderSub = `${members.length} membros`;
   if (target.type === 'grupo' && activeGrupo) {
     chatHeaderName = activeGrupo.nome;
@@ -670,12 +700,18 @@ const Chat = () => {
           onToggle={() => setTeamCollapsed(prev => !prev)}
           grupos={grupos}
           unreadCounts={unreadCounts}
+          geralNome={geralNome}
+          geralFotoUrl={geralConfig?.foto_url}
         />
 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Chat header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
-            <Sheet onOpenChange={(v) => { if (v && target.type === 'grupo') setGrupoNomeInput(activeGrupo?.nome ?? ''); if (!v) setEditingGrupoNome(false); }}>
+            <Sheet onOpenChange={(v) => {
+              if (v && target.type === 'grupo') setGrupoNomeInput(activeGrupo?.nome ?? '');
+              if (v && target.type === 'geral') setGeralNomeInput(geralNome);
+              if (!v) { setEditingGrupoNome(false); setEditingGeralNome(false); }
+            }}>
               <SheetTrigger asChild>
                 <button
                   type="button"
@@ -715,12 +751,15 @@ const Chat = () => {
                   ) : (
                     <>
                       <Avatar className="h-8 w-8">
+                        {geralConfig?.foto_url && (
+                          <img src={geralConfig.foto_url} alt={geralNome} className="h-full w-full object-cover" />
+                        )}
                         <AvatarFallback className="bg-primary text-primary-foreground">
                           <Users className="h-4 w-4" />
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">Chat Geral</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{geralNome}</p>
                         <p className="text-[10px] text-muted-foreground">{chatHeaderSub}</p>
                       </div>
                     </>
@@ -758,8 +797,14 @@ const Chat = () => {
               <SheetContent className="w-full sm:max-w-md flex flex-col p-0">
                 <SheetHeader className="p-4 border-b">
                   <SheetTitle className="flex items-center gap-2">
-                    <Paperclip className="h-4 w-4 text-primary" />
-                    Mídia, links e documentos
+                    {target.type === 'grupo' ? (
+                      <Users2 className="h-4 w-4 text-primary" />
+                    ) : target.type === 'dm' ? (
+                      <MessageCircle className="h-4 w-4 text-primary" />
+                    ) : (
+                      <Users className="h-4 w-4 text-primary" />
+                    )}
+                    {target.type === 'grupo' ? 'Detalhes do grupo' : target.type === 'dm' ? 'Detalhes da conversa' : 'Detalhes do Chat Geral'}
                   </SheetTitle>
                 </SheetHeader>
 
@@ -854,6 +899,98 @@ const Chat = () => {
                           <Separator className="mb-4" />
                         </>
                       )}
+                      {target.type === 'geral' && (
+                        <>
+                          <div className="flex items-center gap-3 mb-4">
+                            <input
+                              ref={geralFotoInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleGeralFotoSelect}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => geralFotoInputRef.current?.click()}
+                              className="relative group shrink-0"
+                              title="Trocar foto do Chat Geral"
+                            >
+                              <Avatar className="h-14 w-14">
+                                {geralConfig?.foto_url && (
+                                  <img src={geralConfig.foto_url} alt={geralNome} className="h-full w-full object-cover" />
+                                )}
+                                <AvatarFallback className="bg-primary text-primary-foreground">
+                                  <Users className="h-6 w-6" />
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Camera className="h-4 w-4 text-white" />
+                              </span>
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              {editingGeralNome ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Input
+                                    autoFocus
+                                    value={geralNomeInput}
+                                    onChange={(e) => setGeralNomeInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveGeralNome()}
+                                    className="h-8 text-sm"
+                                  />
+                                  <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveGeralNome}>
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => { setGeralNomeInput(geralNome); setEditingGeralNome(true); }}
+                                  className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary transition-colors"
+                                >
+                                  <span className="truncate">{geralNome}</span>
+                                  <Pencil className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                </button>
+                              )}
+                              <p className="text-[10px] text-muted-foreground mt-0.5">Toda a equipe</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2 mb-4">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                              <Users2 className="h-3 w-3" /> Participantes
+                              {members.length > 0 && ` (${members.length})`}
+                            </p>
+                            {members.length > 0 ? (
+                              <ul className="space-y-0.5">
+                                {members.map((m) => (
+                                  <li
+                                    key={m.id}
+                                    className="w-full flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm"
+                                  >
+                                    <Avatar className="h-6 w-6 shrink-0 border border-primary/10">
+                                      {m.avatar_url && (
+                                        <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+                                      )}
+                                      <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
+                                        {getInitials(m.nome)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="flex-1 truncate">
+                                      {m.nome} {m.id === myVendedor && <span className="text-muted-foreground font-normal">(você)</span>}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground capitalize shrink-0">{m.role}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-xs text-muted-foreground px-1">Nenhum participante encontrado.</p>
+                            )}
+                          </div>
+                          <Separator className="mb-4" />
+                        </>
+                      )}
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                        <Paperclip className="h-3 w-3" /> Mídia, links e documentos
+                      </p>
                       <Tabs defaultValue="imagens" className="w-full">
                         <TabsList className="grid w-full grid-cols-4 h-8">
                           <TabsTrigger value="imagens" className="text-[10px] px-1">
