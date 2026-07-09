@@ -24,12 +24,13 @@ export const TarefaKanbanCard = memo(function TarefaKanbanCard({ tarefa, index, 
             <div
               ref={provided.innerRef}
               {...provided.draggableProps}
+              {...provided.dragHandleProps}
               role="listitem"
               aria-roledescription="item arrastável"
               aria-label={`Tarefa ${tarefa.titulo}`}
               className={cn(
                 'bg-card rounded-xl p-3 shadow-card border border-border/60 mb-2 group relative',
-                'transition-all duration-200 ease-out cursor-pointer',
+                'transition-all duration-200 ease-out cursor-grab active:cursor-grabbing',
                 snapshot.isDragging && 'shadow-brand ring-2 ring-primary/30 rotate-[1.5deg] scale-[1.03] z-50 opacity-95 cursor-grabbing',
                 isOverdue && 'border-destructive/40 bg-destructive/[0.02]',
                 !snapshot.isDragging && 'hover:shadow-card-hover hover:border-border hover:-translate-y-0.5'
@@ -43,10 +44,8 @@ export const TarefaKanbanCard = memo(function TarefaKanbanCard({ tarefa, index, 
               onClick={() => onClick?.(tarefa)}
             >
               <div
-                {...provided.dragHandleProps}
-                onClick={(e) => e.stopPropagation()}
                 className={cn(
-                  'absolute top-2.5 right-1.5 text-muted-foreground/30 transition-opacity duration-150 cursor-grab active:cursor-grabbing p-1 rounded-md hover:bg-muted/60',
+                  'absolute top-2.5 left-1.5 text-muted-foreground/30 transition-opacity duration-150 pointer-events-none',
                   'group-hover:text-muted-foreground/60',
                   snapshot.isDragging && 'text-primary/50'
                 )}
@@ -55,13 +54,13 @@ export const TarefaKanbanCard = memo(function TarefaKanbanCard({ tarefa, index, 
               </div>
 
               {isOverdue && (
-                <div className="flex items-center gap-1 text-destructive text-[10px] font-semibold mb-2 bg-destructive/10 rounded-md px-1.5 py-0.5 w-fit">
+                <div className="flex items-center gap-1 text-destructive text-[10px] font-semibold mb-2 bg-destructive/10 rounded-md px-1.5 py-0.5 w-fit ml-4">
                   <AlertTriangle className="h-2.5 w-2.5" />
                   Atrasada
                 </div>
               )}
 
-              <h4 className="font-semibold text-xs sm:text-sm text-card-foreground leading-snug pr-5">{tarefa.titulo}</h4>
+              <h4 className="font-semibold text-xs sm:text-sm text-card-foreground leading-snug pl-4">{tarefa.titulo}</h4>
 
               <div className="mt-2 space-y-1">
                 {tarefa.projeto && (

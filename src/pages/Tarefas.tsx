@@ -106,6 +106,7 @@ export default function Tarefas() {
   const [viewOpen, setViewOpen] = useState(false);
   const [viewTarefa, setViewTarefa] = useState<Tarefa | null>(null);
   const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
+  const [deleteTarefaTarget, setDeleteTarefaTarget] = useState<Tarefa | null>(null);
 
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -206,6 +207,12 @@ export default function Tarefas() {
       await deleteTarefa.mutateAsync(id);
       toast.success('Tarefa excluída');
     } catch { toast.error('Erro ao excluir'); }
+  }
+
+  async function confirmDeleteTarefaSingle() {
+    if (!deleteTarefaTarget) return;
+    await handleDelete(deleteTarefaTarget.id);
+    setDeleteTarefaTarget(null);
   }
 
   async function handleDragEnd(result: DropResult) {
@@ -690,7 +697,7 @@ export default function Tarefas() {
             )}
           </div>
           <DialogFooter className="mt-6 flex-row gap-2">
-            <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => { if (viewTarefa) handleDelete(viewTarefa.id); setViewOpen(false); }}>
+            <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => { if (viewTarefa) setDeleteTarefaTarget(viewTarefa); setViewOpen(false); }}>
               <Trash2 className="h-4 w-4 mr-2" /> Excluir
             </Button>
             <div className="flex-1" />
@@ -701,6 +708,22 @@ export default function Tarefas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Single delete confirmation */}
+      <AlertDialog open={!!deleteTarefaTarget} onOpenChange={(o) => !o && setDeleteTarefaTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tarefa "{deleteTarefaTarget?.titulo}"?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita. Todos os dados da tarefa serão removidos permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteTarefa.isPending}>Cancelar</AlertDialogCancel>
+            <Button variant="destructive" onClick={confirmDeleteTarefaSingle} disabled={deleteTarefa.isPending}>
+              {deleteTarefa.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Bulk delete confirmation */}
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
