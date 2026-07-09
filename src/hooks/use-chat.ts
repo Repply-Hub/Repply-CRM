@@ -196,6 +196,29 @@ export function useUpdateChatGrupo() {
   });
 }
 
+export function useDeleteChatGrupo() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (grupoId: string) => {
+      const { error } = await supabase
+        .from('chat_grupos')
+        .delete()
+        .eq('id', grupoId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['chat-grupos'] });
+      toast.success('Grupo excluído com sucesso!');
+    },
+    onError: (err: any) => {
+      console.error('Erro ao excluir grupo:', err);
+      toast.error(`Erro ao excluir grupo: ${err.message || 'Você não tem permissão para excluir este grupo'}`);
+    }
+  });
+}
+
 export interface ChatGeralConfig {
   id: string;
   empresa_id: string;

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, ChatGrupo, ChatMessage, useMarkChatAsRead, useChatGeralConfig, useUpdateChatGeralConfig } from '@/hooks/use-chat';
+import { useAuth } from '@/hooks/use-auth';
+import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, ChatGrupo, ChatMessage, useMarkChatAsRead, useChatGeralConfig, useUpdateChatGeralConfig } from '@/hooks/use-chat';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -12,7 +13,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen,
   Paperclip, FileText, Image, X, Download, Users2, Calendar, Eraser, ChevronDown,
-  Video, Link2, ExternalLink, Play, Camera, Pencil, Check
+  Video, Link2, ExternalLink, Play, Camera, Pencil, Check, Search, Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -97,6 +98,12 @@ function MembersList({
   geralNome: string;
   geralFotoUrl?: string | null;
 }) {
+  const [memberSearch, setMemberSearch] = useState('');
+  const searching = memberSearch.trim().length > 0;
+  const searchTerm = memberSearch.trim().toLowerCase();
+  const filteredMembers = members.filter(m => m.id !== myId && m.nome.toLowerCase().includes(searchTerm));
+  const filteredGrupos = grupos.filter(g => g.nome.toLowerCase().includes(searchTerm));
+
   if (collapsed) {
     return (
       <div className="w-12 border-r border-border flex flex-col h-full shrink-0 items-center gap-1">
@@ -191,42 +198,58 @@ function MembersList({
           <span className="text-[10px] text-muted-foreground font-normal">{members.length}</span>
         </h2>
       </div>
+      <div className="px-2 pt-2">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar conversas ou membros..."
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
+      </div>
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-0.5">
-          {/* Chat geral */}
-          <button
-            onClick={() => onSelect({ type: 'geral' })}
-            className={cn(
-              'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
-              target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50'
-            )}
-          >
-            <Avatar className="h-8 w-8">
-              {geralFotoUrl && (
-                <img src={geralFotoUrl} alt={geralNome} className="h-full w-full object-cover" />
-              )}
-              <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
-                <Users className="h-4 w-4" />
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-foreground truncate">{geralNome}</p>
-              <p className="text-[10px] text-muted-foreground">Toda a equipe</p>
-            </div>
-            {unreadCounts['geral'] > 0 && (
-              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-                {unreadCounts['geral']}
-              </span>
-            )}
-          </button>
+          {!searching && (
+            <>
+              {/* Chat geral */}
+              <button
+                onClick={() => onSelect({ type: 'geral' })}
+                className={cn(
+                  'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
+                  target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50'
+                )}
+              >
+                <Avatar className="h-8 w-8">
+                  {geralFotoUrl && (
+                    <img src={geralFotoUrl} alt={geralNome} className="h-full w-full object-cover" />
+                  )}
+                  <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
+                    <Users className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-foreground truncate">{geralNome}</p>
+                  <p className="text-[10px] text-muted-foreground">Toda a equipe</p>
+                </div>
+                {unreadCounts['geral'] > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                    {unreadCounts['geral']}
+                  </span>
+                )}
+              </button>
+
+            </>
+          )}
 
           {/* Grupos */}
-          {grupos.length > 0 && (
+          {(searching ? filteredGrupos : grupos).length > 0 && (
             <div className="pt-2 pb-1 px-3">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Grupos</p>
             </div>
           )}
-          {grupos.map(g => (
+          {(searching ? filteredGrupos : grupos).map(g => (
             <button
               key={g.id}
               onClick={() => onSelect({ type: 'grupo', grupoId: g.id })}
@@ -255,16 +278,26 @@ function MembersList({
             </button>
           ))}
 
-          {/* Criar grupo */}
-          <div className="pt-1">
-            <CreateGroupDialog members={members} myId={myId} />
-          </div>
+          {!searching && (
+            <div className="pt-1">
+              <CreateGroupDialog members={members} myId={myId} />
+            </div>
+          )}
+
+          {searching && filteredGrupos.length === 0 && filteredMembers.length === 0 && (
+            <div className="flex flex-col items-center justify-center text-muted-foreground gap-2 py-8">
+              <Search className="h-8 w-8 opacity-30" />
+              <p className="text-xs text-center">Nenhuma conversa encontrada para "{memberSearch}".</p>
+            </div>
+          )}
 
           {/* Membros */}
-          <div className="pt-2 pb-1 px-3">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Membros</p>
-          </div>
-          {members.filter(m => m.id !== myId).map((m) => {
+          {(!searching || filteredMembers.length > 0) && (
+            <div className="pt-2 pb-1 px-3">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Membros</p>
+            </div>
+          )}
+          {(searching ? filteredMembers : members.filter(m => m.id !== myId)).map((m) => {
             const isMe = m.id === myId;
             const isSelected = target.type === 'dm' && target.memberId === m.id;
             return (
@@ -314,6 +347,8 @@ function MembersList({
 }
 
 const Chat = () => {
+  const { profile } = useAuth();
+  const isAdminEmpresa = profile?.role === 'empresa' || profile?.role === 'admin';
   const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
   const [teamCollapsed, setTeamCollapsed] = useState(false);
   const [text, setText] = useState('');
@@ -335,6 +370,8 @@ const Chat = () => {
   const clearChat = useClearChat();
   const { data: grupos = [] } = useChatGrupos();
   const updateGrupo = useUpdateChatGrupo();
+  const deleteGrupo = useDeleteChatGrupo();
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [editingGrupoNome, setEditingGrupoNome] = useState(false);
   const [grupoNomeInput, setGrupoNomeInput] = useState('');
   const grupoFotoInputRef = useRef<HTMLInputElement>(null);
@@ -628,6 +665,16 @@ const Chat = () => {
     setEditingGrupoNome(false);
   };
 
+  const handleDeleteGrupo = () => {
+    if (!activeGrupoId) return;
+    deleteGrupo.mutate(activeGrupoId, {
+      onSuccess: () => {
+        setSheetOpen(false);
+        setTarget({ type: 'geral' });
+      }
+    });
+  };
+
   const handleGeralFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -666,6 +713,7 @@ const Chat = () => {
 
   // Resolve header info
   const activeGrupo = grupos.find(g => g.id === activeGrupoId);
+  const canDeleteGrupo = !!activeGrupo && (isAdminEmpresa || activeGrupo.criado_por === myVendedor);
   const selectedMemberData = target.type === 'dm' ? members.find(m => m.id === target.memberId) : null;
   
   let chatHeaderName = geralNome;
@@ -707,7 +755,8 @@ const Chat = () => {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Chat header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
-            <Sheet onOpenChange={(v) => {
+            <Sheet open={sheetOpen} onOpenChange={(v) => {
+              setSheetOpen(v);
               if (v && target.type === 'grupo') setGrupoNomeInput(activeGrupo?.nome ?? '');
               if (v && target.type === 'geral') setGeralNomeInput(geralNome);
               if (!v) { setEditingGrupoNome(false); setEditingGeralNome(false); }
@@ -767,32 +816,34 @@ const Chat = () => {
                 </button>
               </SheetTrigger>
 
-              <div className="ml-auto flex items-center gap-1">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Limpar chat">
-                      <Eraser className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Limpar conversa?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Isso removerá permanentemente todas as mensagens deste chat para todos os participantes. Esta ação não pode ser desfeita.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => clearChat.mutate({ grupoId: activeGrupoId, recipientId: activeRecipientId })}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Limpar
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
+              {isAdminEmpresa && (
+                <div className="ml-auto flex items-center gap-1">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Limpar chat">
+                        <Eraser className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Limpar conversa?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Isso removerá permanentemente todas as mensagens deste chat para todos os participantes. Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => clearChat.mutate({ grupoId: activeGrupoId, recipientId: activeRecipientId })}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Limpar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              )}
 
               <SheetContent className="w-full sm:max-w-md flex flex-col p-0">
                 <SheetHeader className="p-4 border-b">
@@ -1093,6 +1144,39 @@ const Chat = () => {
                       </Tabs>
                     </div>
                   </ScrollArea>
+                  {canDeleteGrupo && (
+                    <div className="p-4 border-t shrink-0">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Excluir grupo
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir grupo?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Isso removerá permanentemente o grupo "{activeGrupo?.nome}" e todas as suas mensagens para todos os participantes. Esta ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={handleDeleteGrupo}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
                 </SheetContent>
               </Sheet>
 
