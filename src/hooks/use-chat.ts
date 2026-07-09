@@ -24,6 +24,7 @@ export interface ChatGrupo {
   id: string;
   nome: string;
   descricao?: string | null;
+  foto_url?: string | null;
   empresa_id: string;
   criado_por: string;
   created_at: string;
@@ -147,6 +148,52 @@ export function useChatGrupos() {
   }, [qc]);
 
   return query;
+}
+
+export function useUpdateChatGrupo() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ grupoId, nome, foto }: { grupoId: string, nome?: string, foto?: File | null }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Usuário não autenticado');
+
+      const updates: { nome?: string; foto_url?: string } = {};
+      if (nome !== undefined) updates.nome = nome;
+
+      if (foto) {
+        const safeName = sanitizeFileName(foto.name);
+        const path = `${userData.user.id}/group-photos/${Date.now()}-${safeName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('chat-files')
+          .upload(path, foto, { contentType: foto.type || 'application/octet-stream' });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('chat-files')
+          .getPublicUrl(path);
+
+        updates.foto_url = urlData.publicUrl;
+      }
+
+      const { error } = await supabase
+        .from('chat_grupos')
+        .update(updates as any)
+        .eq('id', grupoId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['chat-grupos'] });
+      toast.success('Grupo atualizado com sucesso!');
+    },
+    onError: (err: any) => {
+      console.error('Erro ao atualizar grupo:', err);
+      toast.error(`Erro ao atualizar grupo: ${err.message || 'Você não tem permissão para editar este grupo'}`);
+    }
+  });
 }
 
 export function useSendMessage() {

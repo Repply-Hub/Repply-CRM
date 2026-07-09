@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Plus, Loader2, Users2 } from 'lucide-react';
+import { Plus, Loader2, Users2, Camera } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { sanitizeFileName } from '@/lib/file-validation';
 
 function getInitials(name: string) {
   return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -39,7 +40,18 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
   const [nome, setNome] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
+  const [foto, setFoto] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+
+  const handleFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setFoto(file);
+    setFotoPreview(URL.createObjectURL(file));
+  };
 
   const toggleMember = (id: string) => {
     setSelectedMembers(prev =>
@@ -77,6 +89,25 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
         .single();
       if (gErr) throw gErr;
 
+      if (foto) {
+        const userId = (await supabase.auth.getUser()).data.user?.id ?? '';
+        const safeName = sanitizeFileName(foto.name);
+        const path = `${userId}/group-photos/${(grupo as any).id}-${Date.now()}-${safeName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('chat-files')
+          .upload(path, foto, { contentType: foto.type || 'application/octet-stream' });
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from('chat-files').getPublicUrl(path);
+
+        const { error: updateError } = await supabase
+          .from('chat_grupos')
+          .update({ foto_url: urlData.publicUrl } as any)
+          .eq('id', (grupo as any).id);
+        if (updateError) throw updateError;
+      }
+
       // Add creator + selected members
       const allMembers = [...new Set([vendedor.id, ...selectedMembers])];
       const { error: mErr } = await supabase
@@ -92,6 +123,8 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
       setOpen(false);
       setNome('');
       setSelectedMembers([]);
+      setFoto(null);
+      setFotoPreview(null);
     } catch (err: any) {
       toast.error('Erro ao criar grupo: ' + err.message);
     } finally {
@@ -115,6 +148,31 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="flex justify-center">
+            <input
+              ref={fotoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFotoSelect}
+            />
+            <button
+              type="button"
+              onClick={() => fotoInputRef.current?.click()}
+              className="relative group"
+              title="Adicionar foto do grupo"
+            >
+              <Avatar className="h-16 w-16">
+                {fotoPreview && <img src={fotoPreview} alt="Foto do grupo" className="h-full w-full object-cover" />}
+                <AvatarFallback className="bg-chart-2 text-white">
+                  <Users2 className="h-6 w-6" />
+                </AvatarFallback>
+              </Avatar>
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="h-5 w-5 text-white" />
+              </span>
+            </button>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="group-name">Nome do grupo</Label>
             <Input

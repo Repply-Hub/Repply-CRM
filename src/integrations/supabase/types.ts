@@ -196,6 +196,7 @@ export type Database = {
           criado_por: string
           descricao: string | null
           empresa_id: string
+          foto_url: string | null
           id: string
           nome: string | null
         }
@@ -204,6 +205,7 @@ export type Database = {
           criado_por: string
           descricao?: string | null
           empresa_id: string
+          foto_url?: string | null
           id?: string
           nome?: string | null
         }
@@ -212,6 +214,7 @@ export type Database = {
           criado_por?: string
           descricao?: string | null
           empresa_id?: string
+          foto_url?: string | null
           id?: string
           nome?: string | null
         }

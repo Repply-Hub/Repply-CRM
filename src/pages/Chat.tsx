@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, ChatGrupo, ChatMessage, useMarkChatAsRead } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, ChatGrupo, ChatMessage, useMarkChatAsRead } from '@/hooks/use-chat';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -11,8 +11,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen,
-  Paperclip, FileText, Image, X, Download, Users2, Info, Calendar, Eraser, ChevronDown,
-  Video, Link2, ExternalLink, Play
+  Paperclip, FileText, Image, X, Download, Users2, Calendar, Eraser, ChevronDown,
+  Video, Link2, ExternalLink, Play, Camera, Pencil, Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -124,6 +124,9 @@ function MembersList({
                 title={g.nome}
               >
                 <Avatar className="h-7 w-7">
+                  {g.foto_url && (
+                    <img src={g.foto_url} alt={g.nome} className="h-full w-full object-cover" />
+                  )}
                   <AvatarFallback className="bg-chart-2 text-white text-[8px] font-semibold">
                     <Users2 className="h-3.5 w-3.5" />
                   </AvatarFallback>
@@ -223,6 +226,9 @@ function MembersList({
               )}
             >
               <Avatar className="h-8 w-8">
+                {g.foto_url && (
+                  <img src={g.foto_url} alt={g.nome} className="h-full w-full object-cover" />
+                )}
                 <AvatarFallback className="bg-chart-2 text-white text-[10px] font-semibold">
                   <Users2 className="h-4 w-4" />
                 </AvatarFallback>
@@ -318,6 +324,10 @@ const Chat = () => {
   const { send, sending } = useSendMessage();
   const clearChat = useClearChat();
   const { data: grupos = [] } = useChatGrupos();
+  const updateGrupo = useUpdateChatGrupo();
+  const [editingGrupoNome, setEditingGrupoNome] = useState(false);
+  const [grupoNomeInput, setGrupoNomeInput] = useState('');
+  const grupoFotoInputRef = useRef<HTMLInputElement>(null);
   const markAsRead = useMarkChatAsRead();
   const { data: unreadCounts = {} } = useUnreadChatByTarget();
   const [expandedMediaTab, setExpandedMediaTab] = useState<
@@ -587,6 +597,21 @@ const Chat = () => {
     setSelectedFiles(prev => [...prev, ...validFiles]);
   };
 
+  const handleGrupoFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !activeGrupoId) return;
+    updateGrupo.mutate({ grupoId: activeGrupoId, foto: file });
+  };
+
+  const handleSaveGrupoNome = () => {
+    if (!activeGrupoId) return;
+    const nome = grupoNomeInput.trim();
+    if (!nome) return;
+    updateGrupo.mutate({ grupoId: activeGrupoId, nome });
+    setEditingGrupoNome(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -650,92 +675,152 @@ const Chat = () => {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Chat header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
-            {target.type === 'grupo' ? (
-              <>
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-chart-2 text-white text-xs">
-                    <Users2 className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{chatHeaderName}</p>
-                  <p className="text-[10px] text-muted-foreground capitalize">{chatHeaderSub}</p>
-                </div>
-              </>
-            ) : target.type === 'dm' ? (
-              <>
-                <Avatar className="h-8 w-8 border border-primary/10">
-                  {selectedMemberData.avatar_url && (
-                    <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="h-full w-full object-cover" />
+            <Sheet onOpenChange={(v) => { if (v && target.type === 'grupo') setGrupoNomeInput(activeGrupo?.nome ?? ''); if (!v) setEditingGrupoNome(false); }}>
+              <SheetTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-3 min-w-0 rounded-lg -mx-2 px-2 py-1.5 hover:bg-muted/50 transition-colors text-left"
+                  title="Ver detalhes da conversa"
+                >
+                  {target.type === 'grupo' ? (
+                    <>
+                      <Avatar className="h-8 w-8">
+                        {activeGrupo?.foto_url && (
+                          <img src={activeGrupo.foto_url} alt={chatHeaderName} className="h-full w-full object-cover" />
+                        )}
+                        <AvatarFallback className="bg-chart-2 text-white text-xs">
+                          <Users2 className="h-4 w-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{chatHeaderName}</p>
+                        <p className="text-[10px] text-muted-foreground capitalize">{chatHeaderSub}</p>
+                      </div>
+                    </>
+                  ) : target.type === 'dm' ? (
+                    <>
+                      <Avatar className="h-8 w-8 border border-primary/10">
+                        {selectedMemberData.avatar_url && (
+                          <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="h-full w-full object-cover" />
+                        )}
+                        <AvatarFallback className={`${colorForId(target.memberId)} text-white text-xs`}>
+                          {getInitials(chatHeaderName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{chatHeaderName}</p>
+                        <p className="text-[10px] text-muted-foreground capitalize">{chatHeaderSub}</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-primary text-primary-foreground">
+                          <Users className="h-4 w-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">Chat Geral</p>
+                        <p className="text-[10px] text-muted-foreground">{chatHeaderSub}</p>
+                      </div>
+                    </>
                   )}
-                  <AvatarFallback className={`${colorForId(target.memberId)} text-white text-xs`}>
-                    {getInitials(chatHeaderName)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{chatHeaderName}</p>
-                  <p className="text-[10px] text-muted-foreground capitalize">{chatHeaderSub}</p>
-                </div>
-              </>
-            ) : (
-              <>
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    <Users className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Chat Geral</p>
-                  <p className="text-[10px] text-muted-foreground">{chatHeaderSub}</p>
-                </div>
-              </>
-            )}
-            
-            <div className="ml-auto flex items-center gap-1">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Limpar chat">
-                    <Eraser className="h-4 w-4" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Limpar conversa?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Isso removerá permanentemente todas as mensagens deste chat para todos os participantes. Esta ação não pode ser desfeita.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={() => clearChat.mutate({ grupoId: activeGrupoId, recipientId: activeRecipientId })}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Limpar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                </button>
+              </SheetTrigger>
 
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                    <Info className="h-4 w-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent className="w-full sm:max-w-md flex flex-col p-0">
-                  <SheetHeader className="p-4 border-b">
-                    <SheetTitle className="flex items-center gap-2">
-                      <Paperclip className="h-4 w-4 text-primary" />
-                      Mídia, links e documentos
-                    </SheetTitle>
-                  </SheetHeader>
+              <div className="ml-auto flex items-center gap-1">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Limpar chat">
+                      <Eraser className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Limpar conversa?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Isso removerá permanentemente todas as mensagens deste chat para todos os participantes. Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => clearChat.mutate({ grupoId: activeGrupoId, recipientId: activeRecipientId })}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Limpar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
 
-                  <ScrollArea className="flex-1">
-                    <div className="p-4">
-                      {target.type === 'grupo' && (
-                        <>
-                          <div className="space-y-2 mb-4">
+              <SheetContent className="w-full sm:max-w-md flex flex-col p-0">
+                <SheetHeader className="p-4 border-b">
+                  <SheetTitle className="flex items-center gap-2">
+                    <Paperclip className="h-4 w-4 text-primary" />
+                    Mídia, links e documentos
+                  </SheetTitle>
+                </SheetHeader>
+
+                <ScrollArea className="flex-1">
+                  <div className="p-4">
+                    {target.type === 'grupo' && (
+                      <>
+                        <div className="flex items-center gap-3 mb-4">
+                          <input
+                            ref={grupoFotoInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleGrupoFotoSelect}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => grupoFotoInputRef.current?.click()}
+                            className="relative group shrink-0"
+                            title="Trocar foto do grupo"
+                          >
+                            <Avatar className="h-14 w-14">
+                              {activeGrupo?.foto_url && (
+                                <img src={activeGrupo.foto_url} alt={chatHeaderName} className="h-full w-full object-cover" />
+                              )}
+                              <AvatarFallback className="bg-chart-2 text-white">
+                                <Users2 className="h-6 w-6" />
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Camera className="h-4 w-4 text-white" />
+                            </span>
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            {editingGrupoNome ? (
+                              <div className="flex items-center gap-1.5">
+                                <Input
+                                  autoFocus
+                                  value={grupoNomeInput}
+                                  onChange={(e) => setGrupoNomeInput(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleSaveGrupoNome()}
+                                  className="h-8 text-sm"
+                                />
+                                <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveGrupoNome}>
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => { setGrupoNomeInput(activeGrupo?.nome ?? ''); setEditingGrupoNome(true); }}
+                                className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary transition-colors"
+                              >
+                                <span className="truncate">{chatHeaderName}</span>
+                                <Pencil className="h-3 w-3 shrink-0 text-muted-foreground" />
+                              </button>
+                            )}
+                            <p className="text-[10px] text-muted-foreground mt-0.5">Grupo</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2 mb-4">
                             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                               <Users2 className="h-3 w-3" /> Participantes do grupo
                               {grupoMembros.length > 0 && ` (${grupoMembros.length})`}
@@ -887,7 +972,6 @@ const Chat = () => {
                   </div>
                 </DialogContent>
               </Dialog>
-            </div>
           </div>
 
           {/* Messages */}
