@@ -125,6 +125,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
         if (error) throw error;
       } catch (err) {
         console.error('Erro ao salvar configurações da tabela:', err);
+        toast.error('Não foi possível sincronizar as configurações da tabela com o servidor. Elas continuam salvas apenas neste navegador.');
       }
     }, 1000);
 

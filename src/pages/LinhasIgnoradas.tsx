@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { AlertTriangle, Trash2, Eye, ChevronDown, ChevronUp, FileSpreadsheet, RotateCcw, Loader2 } from 'lucide-react';
+import { AlertTriangle, Trash2, Eye, ChevronDown, ChevronUp, ChevronRight, FileSpreadsheet, RotateCcw, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -61,6 +61,7 @@ export default function LinhasIgnoradas() {
   const [selectedRow, setSelectedRow] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [openFiles, setOpenFiles] = useState<Set<string>>(new Set());
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const [retryRow, setRetryRow] = useState<any>(null);
@@ -122,6 +123,15 @@ export default function LinhasIgnoradas() {
     });
   };
 
+  const toggleFile = (fileKey: string) => {
+    setOpenFiles(prev => {
+      const next = new Set(prev);
+      if (next.has(fileKey)) next.delete(fileKey);
+      else next.add(fileKey);
+      return next;
+    });
+  };
+
   const handleShowDetails = (linha: any) => {
     setSelectedRow(linha);
     setIsDetailsOpen(true);
@@ -168,6 +178,13 @@ export default function LinhasIgnoradas() {
 
   const requiredForType = (tipo: string) => REQUIRED_FIELDS[tipo] ?? new Set<string>();
 
+  const fileGroups = (linhas?.data ?? []).reduce((acc, linha) => {
+    const key = linha.nome_arquivo || 'Sem arquivo de origem';
+    if (!acc.has(key)) acc.set(key, []);
+    acc.get(key)!.push(linha);
+    return acc;
+  }, new Map<string, NonNullable<typeof linhas>['data']>());
+
   return (
     <AppLayout
       title="Linhas Ignoradas na Importação"
@@ -200,100 +217,128 @@ export default function LinhasIgnoradas() {
           </div>
         ) : (
           <div className="space-y-3">
-            {linhas?.data?.map((linha) => {
-              const isExpanded = expandedIds.has(linha.id);
-              const entries = Object.entries(linha.dados_originais ?? {});
-              const preview = entries.slice(0, 3);
+            {Array.from(fileGroups.entries()).map(([fileKey, fileLinhas]) => {
+              const isFileOpen = openFiles.has(fileKey);
+              const tipos = Array.from(new Set(fileLinhas.map(l => l.tipo_importacao)));
 
               return (
-                <div key={linha.id} className="border rounded-lg bg-card overflow-hidden">
-                  <div className="flex items-start justify-between gap-4 p-4">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className="capitalize text-xs">
-                            {linha.tipo_importacao}
-                          </Badge>
-                          {linha.nome_arquivo && (
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <FileSpreadsheet className="h-3 w-3 shrink-0" />
-                              {linha.nome_arquivo}
-                            </span>
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            {format(new Date(linha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                          </span>
-                        </div>
-                        <p className="text-sm text-destructive font-medium">
-                          {linha.motivo_ignorado || 'Campo obrigatório ausente'}
-                        </p>
-                        <div className="text-xs text-muted-foreground font-mono space-y-0.5">
-                          {preview.map(([key, value]) => (
-                            <div key={key} className="truncate">
-                              <span className="font-semibold text-foreground/70">{key}:</span>{' '}
-                              {String(value ?? '—')}
+                <div key={fileKey} className="border rounded-lg bg-card overflow-hidden">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between gap-4 p-4 text-left hover:bg-muted/40 transition-colors"
+                    onClick={() => toggleFile(fileKey)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {isFileOpen ? (
+                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <FileSpreadsheet className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="font-medium truncate">{fileKey}</span>
+                      {tipos.map(tipo => (
+                        <Badge key={tipo} variant="outline" className="capitalize text-xs shrink-0">
+                          {tipo}
+                        </Badge>
+                      ))}
+                    </div>
+                    <Badge variant="secondary" className="shrink-0">
+                      {fileLinhas.length} linha{fileLinhas.length !== 1 ? 's' : ''}
+                    </Badge>
+                  </button>
+
+                  {isFileOpen && (
+                    <div className="border-t bg-muted/20 p-3 space-y-3">
+                      {fileLinhas.map((linha) => {
+                        const isExpanded = expandedIds.has(linha.id);
+                        const entries = Object.entries(linha.dados_originais ?? {});
+                        const preview = entries.slice(0, 3);
+
+                        return (
+                          <div key={linha.id} className="border rounded-lg bg-card overflow-hidden">
+                            <div className="flex items-start justify-between gap-4 p-4">
+                              <div className="flex items-start gap-3 min-w-0">
+                                <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                                <div className="min-w-0 space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs text-muted-foreground">
+                                      {format(new Date(linha.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-destructive font-medium">
+                                    {linha.motivo_ignorado || 'Campo obrigatório ausente'}
+                                  </p>
+                                  <div className="text-xs text-muted-foreground font-mono space-y-0.5">
+                                    {preview.map(([key, value]) => (
+                                      <div key={key} className="truncate">
+                                        <span className="font-semibold text-foreground/70">{key}:</span>{' '}
+                                        {String(value ?? '—')}
+                                      </div>
+                                    ))}
+                                    {entries.length > 3 && !isExpanded && (
+                                      <span className="text-muted-foreground/60">
+                                        +{entries.length - 3} campo(s) oculto(s)
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => toggleExpand(linha.id)}
+                                  title={isExpanded ? 'Recolher' : 'Expandir dados'}
+                                >
+                                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                                  onClick={() => handleOpenRetry(linha)}
+                                  title="Tentar importar novamente"
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleShowDetails(linha)}
+                                  title="Ver detalhes"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => deleteMutation.mutate(linha.id)}
+                                  title="Remover"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
-                          ))}
-                          {entries.length > 3 && !isExpanded && (
-                            <span className="text-muted-foreground/60">
-                              +{entries.length - 3} campo(s) oculto(s)
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => toggleExpand(linha.id)}
-                        title={isExpanded ? 'Recolher' : 'Expandir dados'}
-                      >
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
-                        onClick={() => handleOpenRetry(linha)}
-                        title="Tentar importar novamente"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleShowDetails(linha)}
-                        title="Ver detalhes"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => deleteMutation.mutate(linha.id)}
-                        title="Remover"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="border-t bg-muted/40 px-4 py-3">
-                      <div className="font-mono text-xs space-y-1.5">
-                        {entries.map(([key, value]) => (
-                          <div key={key} className="flex gap-2 border-b border-muted-foreground/10 pb-1 last:border-0">
-                            <span className="font-bold text-foreground/70 w-1/3 shrink-0">{key}:</span>
-                            <span className="break-all text-foreground/90">{String(value ?? '—')}</span>
+                            {isExpanded && (
+                              <div className="border-t bg-muted/40 px-4 py-3">
+                                <div className="font-mono text-xs space-y-1.5">
+                                  {entries.map(([key, value]) => (
+                                    <div key={key} className="flex gap-2 border-b border-muted-foreground/10 pb-1 last:border-0">
+                                      <span className="font-bold text-foreground/70 w-1/3 shrink-0">{key}:</span>
+                                      <span className="break-all text-foreground/90">{String(value ?? '—')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

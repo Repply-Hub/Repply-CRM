@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/AppLayout';
+import { useAuth } from '@/hooks/use-auth';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { useCreateCliente, useCreateContato, useDeleteCliente, useDeleteContato } from '@/hooks/use-mutations';
 import { Button } from '@/components/ui/button';
@@ -148,6 +149,12 @@ type ViewTab = 'empresas' | 'contatos';
 const Clientes = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  // Espelha a checagem de public.is_gestor() no banco (única role que passa nas
+  // policies clientes_delete/contatos_delete além de admin). É só para esconder a
+  // ação na UI — a RLS continua sendo a autoridade real, checada de novo no retorno
+  // do delete em handleBulkDelete.
+  const canDelete = ['gestor', 'admin', 'empresa'].includes(profile?.role);
   const { data: clients, isLoading: loadingClientes } = useClientes();
   const { data: contatosList, isLoading: loadingContatos } = useContatos();
   const createCliente = useCreateCliente();
@@ -501,14 +508,28 @@ const Clientes = () => {
       const ids = Array.from(selected);
       const table = activeTab === 'empresas' ? 'clientes' : 'contatos';
       const BATCH_SIZE = 500;
+      let removedCount = 0;
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
-        const { error } = await supabase.from(table).delete().in('id', batch);
+        // .select('id') é obrigatório aqui: a RLS de DELETE filtra silenciosamente as
+        // linhas sem permissão em vez de retornar erro, então sem isso o delete "funciona"
+        // (sem error) mesmo removendo 0 linhas.
+        const { data: removed, error } = await supabase.from(table).delete().in('id', batch).select('id');
         if (error) throw error;
+        removedCount += removed?.length ?? 0;
       }
+
       queryClient.invalidateQueries({ queryKey: [activeTab === 'empresas' ? 'clientes' : 'contatos'] });
-      toast.success(`${ids.length} ${activeTab === 'empresas' ? 'empresa(s)' : 'contato(s)'} removido(s)!`);
       setSelected(new Set());
+
+      const label = activeTab === 'empresas' ? 'empresa(s)' : 'contato(s)';
+      if (removedCount === ids.length) {
+        toast.success(`${removedCount} ${label} removido(s)!`);
+      } else if (removedCount === 0) {
+        toast.error(`Nenhum registro removido — você não tem permissão para excluir ${label}.`);
+      } else {
+        toast.warning(`${removedCount} de ${ids.length} ${label} removido(s). Os demais não puderam ser excluídos por falta de permissão.`);
+      }
     } catch (err: any) {
       toast.error(err.message || 'Erro ao remover');
     } finally {
@@ -659,12 +680,12 @@ const Clientes = () => {
                   onClick={() => navigate('/importacao/ignoradas')}
                 />
 
-                {selected.size > 0 && (
-                  <ColumnSettingsItem 
-                    label="Excluir Selecionados" 
-                    icon={Trash2} 
+                {selected.size > 0 && canDelete && (
+                  <ColumnSettingsItem
+                    label="Excluir Selecionados"
+                    icon={Trash2}
                     variant="destructive"
-                    onClick={openTypedConfirm} 
+                    onClick={openTypedConfirm}
                     badge={selected.size}
                   />
                 )}
@@ -822,9 +843,11 @@ const Clientes = () => {
         {someSelected && (
           <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
             <span className="text-sm font-medium text-foreground">{selected.size} selecionado(s)</span>
-            <Button variant="destructive" size="sm" className="gap-1.5" onClick={openTypedConfirm}>
-              <Trash2 className="h-4 w-4" /> Remover selecionados
-            </Button>
+            {canDelete && (
+              <Button variant="destructive" size="sm" className="gap-1.5" onClick={openTypedConfirm}>
+                <Trash2 className="h-4 w-4" /> Remover selecionados
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Limpar seleção</Button>
           </div>
         )}

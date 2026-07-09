@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Trash2, Pencil, Eye, Loader2, Calendar, User, LayoutGrid, List as ListIcon, Settings2, ChevronDown } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, Loader2, Calendar, User, LayoutGrid, List as ListIcon, Settings2, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -90,6 +90,9 @@ export default function Tarefas() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
+  const [responsavelFilter, setResponsavelFilter] = useState('todos');
+  const [prazoDe, setPrazoDe] = useState('');
+  const [prazoAte, setPrazoAte] = useState('');
   const [page, setPage] = useState(1);
 
   const [view, setView] = useState<TarefasView>(() => {
@@ -103,8 +106,6 @@ export default function Tarefas() {
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [viewOpen, setViewOpen] = useState(false);
-  const [viewTarefa, setViewTarefa] = useState<Tarefa | null>(null);
   const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
   const [deleteTarefaTarget, setDeleteTarefaTarget] = useState<Tarefa | null>(null);
 
@@ -144,6 +145,9 @@ export default function Tarefas() {
   const filtered = useMemo(() => {
     let list = tarefas;
     if (statusFilter !== 'todos') list = list.filter(t => t.status === statusFilter);
+    if (responsavelFilter !== 'todos') list = list.filter(t => t.responsavel === responsavelFilter);
+    if (prazoDe) list = list.filter(t => t.prazo_final && t.prazo_final.slice(0, 10) >= prazoDe);
+    if (prazoAte) list = list.filter(t => t.prazo_final && t.prazo_final.slice(0, 10) <= prazoAte);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(t =>
@@ -154,10 +158,10 @@ export default function Tarefas() {
       );
     }
     return list;
-  }, [tarefas, statusFilter, search]);
+  }, [tarefas, statusFilter, responsavelFilter, prazoDe, prazoAte, search]);
 
-  const hasFilters = statusFilter !== 'todos' || search !== '';
-  const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0);
+  const hasFilters = statusFilter !== 'todos' || responsavelFilter !== 'todos' || prazoDe !== '' || prazoAte !== '' || search !== '';
+  const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0) + (responsavelFilter !== 'todos' ? 1 : 0) + (prazoDe || prazoAte ? 1 : 0);
 
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -333,27 +337,67 @@ export default function Tarefas() {
             className="min-w-[200px]"
           />
 
-          <FilterButton 
+          <FilterButton
             hasFilters={hasFilters}
             activeFilterCount={activeFilterCount}
+            popoverClassName="min-w-[260px]"
             onClear={() => {
               setStatusFilter('todos');
+              setResponsavelFilter('todos');
+              setPrazoDe('');
+              setPrazoAte('');
               setSearch('');
             }}
           >
-            <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground font-semibold">Status</Label>
-              <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
-                <SelectTrigger className="w-full h-9">
-                  <SelectValue placeholder="Todos os status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os status</SelectItem>
-                  {KANBAN_STAGES.map(stage => (
-                    <SelectItem key={stage.key} value={stage.key}>{stage.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground font-semibold">Status</Label>
+                <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
+                  <SelectTrigger className="w-full h-9">
+                    <SelectValue placeholder="Todos os status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os status</SelectItem>
+                    {KANBAN_STAGES.map(stage => (
+                      <SelectItem key={stage.key} value={stage.key}>{stage.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground font-semibold">Responsável</Label>
+                <Select value={responsavelFilter} onValueChange={v => { setResponsavelFilter(v); setPage(1); }}>
+                  <SelectTrigger className="w-full h-9">
+                    <SelectValue placeholder="Todos os responsáveis" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os responsáveis</SelectItem>
+                    {vendedores.map(v => (
+                      <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground font-semibold">Prazo</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    className="h-9"
+                    value={prazoDe}
+                    onChange={e => { setPrazoDe(e.target.value); setPage(1); }}
+                  />
+                  <span className="text-xs text-muted-foreground shrink-0">até</span>
+                  <Input
+                    type="date"
+                    className="h-9"
+                    value={prazoAte}
+                    onChange={e => { setPrazoAte(e.target.value); setPage(1); }}
+                  />
+                </div>
+              </div>
             </div>
           </FilterButton>
 
@@ -412,7 +456,7 @@ export default function Tarefas() {
                   label={stage.label}
                   colorClass={stage.color}
                   tarefas={filtered.filter(t => t.status === stage.key)}
-                  onCardClick={(t) => { setViewTarefa(t); setViewOpen(true); }}
+                  onCardClick={openEdit}
                   onAddTarefa={openNew}
                 />
               ))}
@@ -440,10 +484,10 @@ export default function Tarefas() {
                 const si = getStatusInfo(t.status);
                 const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                 return (
-                  <div key={t.id} className={`rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200 ${selected.has(t.id) ? 'ring-1 ring-primary/30 bg-primary/5' : ''}`}>
+                  <div key={t.id} onClick={() => openEdit(t)} className={`rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200 cursor-pointer ${selected.has(t.id) ? 'ring-1 ring-primary/30 bg-primary/5' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} className="mt-0.5" aria-label={`Selecionar ${t.titulo}`} />
+                        <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} onClick={(e) => e.stopPropagation()} className="mt-0.5" aria-label={`Selecionar ${t.titulo}`} />
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm text-card-foreground line-clamp-2">{t.titulo}</p>
                           {visibleColumns.includes('projeto') && t.projeto && <p className="text-xs text-muted-foreground mt-1">{t.projeto}</p>}
@@ -454,7 +498,7 @@ export default function Tarefas() {
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       {visibleColumns.includes('responsavel') && t.responsavel && (
                         <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" /><UserProfilePopover name={t.responsavel} className="text-xs" />
+                          <User className="h-3 w-3" /><span onClick={(e) => e.stopPropagation()}><UserProfilePopover name={t.responsavel} className="text-xs" /></span>
                         </span>
                       )}
                       {visibleColumns.includes('prazo_final') && t.prazo_final && (
@@ -465,10 +509,7 @@ export default function Tarefas() {
                       )}
                     </div>
                     <div className="flex gap-1 pt-2 border-t border-border/40">
-                      <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 hover:bg-primary/5" onClick={() => { setViewTarefa(t); setViewOpen(true); }}>
-                        <Eye className="h-3.5 w-3.5 mr-1" />Ver
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 hover:bg-primary/5" onClick={() => openEdit(t)}>
+                      <Button variant="ghost" size="sm" className="h-8 text-xs flex-1 hover:bg-primary/5" onClick={(e) => { e.stopPropagation(); openEdit(t); }}>
                         <Pencil className="h-3.5 w-3.5 mr-1" />Editar
                       </Button>
                     </div>
@@ -500,8 +541,8 @@ export default function Tarefas() {
                     const si = getStatusInfo(t.status);
                     const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                     return (
-                      <TableRow key={t.id} className={`hover:bg-muted/30 transition-colors ${selected.has(t.id) ? 'bg-primary/5' : ''}`}>
-                        <TableCell className="w-10">
+                      <TableRow key={t.id} onClick={() => openEdit(t)} className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(t.id) ? 'bg-primary/5' : ''}`}>
+                        <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
                           <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} aria-label={`Selecionar ${t.titulo}`} />
                         </TableCell>
                         {visibleColumns.map(colId => {
@@ -517,7 +558,7 @@ export default function Tarefas() {
 
                           if (colId === 'responsavel') {
                             return (
-                              <TableCell key={colId} className="hidden lg:table-cell text-sm whitespace-nowrap">{t.responsavel ? <UserProfilePopover name={t.responsavel} /> : '—'}</TableCell>
+                              <TableCell key={colId} className="hidden lg:table-cell text-sm whitespace-nowrap" onClick={(e) => t.responsavel && e.stopPropagation()}>{t.responsavel ? <UserProfilePopover name={t.responsavel} /> : '—'}</TableCell>
                             );
                           }
 
@@ -545,11 +586,8 @@ export default function Tarefas() {
 
                           return null;
                         })}
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-0.5">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5" onClick={() => { setViewTarefa(t); setViewOpen(true); }}>
-                              <Eye className="h-4 w-4 text-muted-foreground" />
-                            </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5" onClick={() => openEdit(t)}>
                               <Pencil className="h-4 w-4 text-muted-foreground" />
                             </Button>
@@ -638,78 +676,6 @@ export default function Tarefas() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog visualização */}
-      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <div className="flex items-center justify-between pr-8">
-              <DialogTitle className="text-foreground font-bold text-lg">{viewTarefa?.titulo}</DialogTitle>
-              <Badge className={getStatusInfo(viewTarefa?.status || '').className}>
-                {getStatusInfo(viewTarefa?.status || '').label}
-              </Badge>
-            </div>
-          </DialogHeader>
-          <div className="space-y-6 mt-4">
-            {viewTarefa?.descricao && (
-              <div className="bg-muted/30 p-4 rounded-lg">
-                <p className="text-sm text-foreground whitespace-pre-wrap">{viewTarefa.descricao}</p>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-2 gap-y-4 text-sm">
-              <div className="space-y-1">
-                <p className="text-muted-foreground text-xs uppercase font-semibold">Responsável</p>
-                <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-3 w-3 text-primary" />
-                  </div>
-                  <span className="font-medium">{viewTarefa?.responsavel || 'Não definido'}</span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground text-xs uppercase font-semibold">Prazo</p>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">
-                    {viewTarefa?.prazo_final ? format(new Date(viewTarefa.prazo_final), "dd/MM/yyyy HH:mm", { locale: ptBR }) : 'Sem prazo'}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground text-xs uppercase font-semibold">Projeto</p>
-                <p className="font-medium">{viewTarefa?.projeto || '—'}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground text-xs uppercase font-semibold">Criada em</p>
-                <p className="font-medium">
-                  {viewTarefa?.created_at ? format(new Date(viewTarefa.created_at), "dd/MM/yyyy", { locale: ptBR }) : '—'}
-                </p>
-              </div>
-            </div>
-
-            {viewTarefa?.marcadores && (
-              <div className="space-y-2">
-                <p className="text-muted-foreground text-xs uppercase font-semibold">Marcadores</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {viewTarefa.marcadores.split(',').map(m => (
-                    <Badge key={m} variant="secondary" className="font-normal text-[11px]">{m.trim()}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter className="mt-6 flex-row gap-2">
-            <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => { if (viewTarefa) setDeleteTarefaTarget(viewTarefa); setViewOpen(false); }}>
-              <Trash2 className="h-4 w-4 mr-2" /> Excluir
-            </Button>
-            <div className="flex-1" />
-            <Button variant="outline" onClick={() => setViewOpen(false)}>Fechar</Button>
-            <Button onClick={() => { if (viewTarefa) openEdit(viewTarefa); setViewOpen(false); }}>
-              <Pencil className="h-4 w-4 mr-2" /> Editar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Single delete confirmation */}
       <AlertDialog open={!!deleteTarefaTarget} onOpenChange={(o) => !o && setDeleteTarefaTarget(null)}>
