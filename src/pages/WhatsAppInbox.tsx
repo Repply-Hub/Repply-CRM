@@ -23,6 +23,7 @@ import {
   useWaFetchContactPhoto,
   useWaFetchGroupParticipantes,
   useWaParticipantePhoto,
+  useWaInstancias,
   uploadWaMedia,
   type WaConversa,
   type WaMensagem,
@@ -75,6 +76,15 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterButton } from "@/components/FilterButton";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from "@/components/FilePreviewDialog";
 import { Label } from "@/components/ui/label";
 import {
@@ -118,8 +128,18 @@ import {
   CalendarDays,
   Mail,
   Link2,
+  Smartphone,
 } from "lucide-react";
-import { format, isToday, isYesterday } from "date-fns";
+import {
+  format,
+  isToday,
+  isYesterday,
+  subDays,
+  subMonths,
+  subYears,
+  startOfDay,
+  endOfDay,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn, autoResizeTextarea } from "@/lib/utils";
 import { toast } from "sonner";
@@ -378,35 +398,44 @@ function ConversaAvatar({ conv }: { conv: WaConversa }) {
   );
 }
 
-// Stack de avatares dos atendentes atribuídos + participantes do WhatsApp de um grupo,
-// exibido à direita da linha da conversa. Mostra no máximo 3 avatares; acima disso
-// mostra um indicador "+N".
-function ConversaParticipantesStack({ conv }: { conv: WaConversa }) {
-  if (!conv.is_group) return null;
-
-  const membros = [
-    ...(conv.responsaveis ?? []).map((r) => ({
-      nome: r.nome,
-      chave: r.id,
-      foto: r.avatar_url,
-    })),
-    ...(conv.participantes ?? []).map((p) => ({
-      nome: p.nome,
-      chave: p.telefone,
-      foto: null as string | null,
-    })),
-  ];
+// Stack de avatares dos atendentes atribuídos (responsáveis pelo atendimento no
+// CRM), exibido à direita da linha da conversa — mesmo em grupos, mostra só os
+// responsáveis, não os participantes do WhatsApp. Mostra no máximo 3 avatares;
+// acima disso mostra um indicador "+N". `spacing="overlap"` (padrão, usado na
+// lista lateral) sobrepõe os avatares; `spacing="gap"` (usado no header da
+// conversa) mostra cada um separado, sem colar um no outro.
+function ConversaParticipantesStack({
+  conv,
+  spacing = "overlap",
+}: {
+  conv: WaConversa;
+  spacing?: "overlap" | "gap";
+}) {
+  const membros = (conv.responsaveis ?? []).map((r) => ({
+    nome: r.nome,
+    chave: r.id,
+    foto: r.avatar_url,
+  }));
   if (membros.length === 0) return null;
 
   const visiveis = membros.slice(0, 3);
   const restantes = membros.length - visiveis.length;
+  const overlap = spacing === "overlap";
 
   return (
-    <div className="flex -space-x-2 overflow-hidden shrink-0">
+    <div
+      className={cn(
+        "flex overflow-hidden shrink-0",
+        overlap ? "-space-x-2" : "gap-1.5",
+      )}
+    >
       {visiveis.map((m, i) => (
         <Avatar
           key={`${m.chave}-${i}`}
-          className="inline-block h-5 w-5 rounded-full ring-2 ring-background"
+          className={cn(
+            "inline-block h-5 w-5 rounded-full",
+            overlap && "ring-2 ring-background",
+          )}
         >
           {m.foto && <AvatarImage src={m.foto} alt="" />}
           <AvatarFallback
@@ -420,12 +449,32 @@ function ConversaParticipantesStack({ conv }: { conv: WaConversa }) {
         </Avatar>
       ))}
       {restantes > 0 && (
-        <Avatar className="inline-block h-5 w-5 rounded-full ring-2 ring-background">
+        <Avatar
+          className={cn(
+            "inline-block h-5 w-5 rounded-full",
+            overlap && "ring-2 ring-background",
+          )}
+        >
           <AvatarFallback className="bg-muted text-muted-foreground text-[7px] font-semibold">
             +{restantes}
           </AvatarFallback>
         </Avatar>
       )}
+    </div>
+  );
+}
+
+// Cabeçalho de seção na sidebar de conversas, separando visualmente por instância
+// WhatsApp (apelido) quando o filtro "Instância" está em "Todas" e a empresa tem
+// mais de uma instância conectada.
+function ConversaGroupHeader({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 px-3 pt-3 pb-1 first:pt-1">
+      <Smartphone className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 truncate">
+        {label}
+      </p>
+      <div className="flex-1 border-t border-border/50" />
     </div>
   );
 }
@@ -1314,7 +1363,18 @@ function LeadSheet({
   const setResponsaveis = useWaSetResponsaveis();
   const { data: mensagens = [] } = useWaMensagens(conversa.id);
   const atuais = conversa.responsaveis ?? [];
-  const atuaisIds = new Set(atuais.map((r) => r.id));
+  const atuaisIds = useMemo(
+    () => new Set(atuais.map((r) => r.id)),
+    [atuais],
+  );
+  const [addResponsavelOpen, setAddResponsavelOpen] = useState(false);
+  const [buscaResponsavel, setBuscaResponsavel] = useState("");
+  const vendedoresDisponiveis = useMemo(() => {
+    const disponiveis = vendedores.filter((v) => !atuaisIds.has(v.id));
+    if (!buscaResponsavel.trim()) return disponiveis;
+    const termo = buscaResponsavel.trim().toLowerCase();
+    return disponiveis.filter((v) => v.nome.toLowerCase().includes(termo));
+  }, [vendedores, atuaisIds, buscaResponsavel]);
 
   const midia = useMemo(() => {
     const imagens = mensagens.filter((m) => m.tipo === "imagem" && m.media_url);
@@ -1770,12 +1830,80 @@ function LeadSheet({
 
           {/* Responsáveis */}
           <div className="space-y-3">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <UserPlus className="h-3 w-3" /> Responsáveis pelo atendimento
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <UserPlus className="h-3 w-3" /> Responsáveis pelo atendimento
+              </p>
+              <Popover
+                open={addResponsavelOpen}
+                onOpenChange={(v) => {
+                  setAddResponsavelOpen(v);
+                  if (!v) setBuscaResponsavel("");
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                    title="Adicionar responsável"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Adicionar
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="end">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Buscar colega..."
+                      value={buscaResponsavel}
+                      onValueChange={setBuscaResponsavel}
+                    />
+                    <CommandList>
+                      <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                        {vendedores.length === atuais.length
+                          ? "Todos os colegas já são responsáveis."
+                          : "Nenhum usuário encontrado."}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {vendedoresDisponiveis.map((v) => (
+                          <CommandItem
+                            key={v.id}
+                            value={v.id}
+                            onSelect={() => toggle(v.id)}
+                            className="gap-2.5"
+                          >
+                            <Avatar className="h-6 w-6 shrink-0">
+                              {v.avatar_url ? (
+                                <img
+                                  src={v.avatar_url}
+                                  alt={v.nome}
+                                  className="h-full w-full object-cover rounded-full"
+                                />
+                              ) : (
+                                <AvatarFallback className="text-[9px] bg-muted-foreground/20">
+                                  {v.nome
+                                    .trim()
+                                    .split(" ")
+                                    .map((p: string) => p[0])
+                                    .slice(0, 2)
+                                    .join("")
+                                    .toUpperCase()}
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                            <span className="flex-1 truncate">{v.nome}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
 
-            {atuais.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-2">
+            {atuais.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
                 {atuais.map((r) => (
                   <Badge
                     key={r.id}
@@ -1811,55 +1939,16 @@ function LeadSheet({
                   </Badge>
                 ))}
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddResponsavelOpen(true)}
+                className="w-full flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border px-2 py-2.5 text-xs text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Nenhum responsável — adicionar
+              </button>
             )}
-
-            <ul className="space-y-0.5">
-              {vendedores.map((v) => {
-                const checked = atuaisIds.has(v.id);
-                return (
-                  <li key={v.id}>
-                    <button
-                      onClick={() => toggle(v.id)}
-                      className={cn(
-                        "w-full flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors hover:bg-muted",
-                        checked && "bg-primary/8",
-                      )}
-                    >
-                      <Avatar className="h-6 w-6 shrink-0">
-                        {v.avatar_url ? (
-                          <img
-                            src={v.avatar_url}
-                            alt={v.nome}
-                            className="h-full w-full object-cover rounded-full"
-                          />
-                        ) : (
-                          <AvatarFallback className="text-[9px] bg-muted-foreground/20">
-                            {v.nome
-                              .trim()
-                              .split(" ")
-                              .map((p: string) => p[0])
-                              .slice(0, 2)
-                              .join("")
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <span className="flex-1 text-left truncate">
-                        {v.nome}
-                      </span>
-                      {checked && (
-                        <CheckSquare className="h-3.5 w-3.5 text-primary shrink-0" />
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-              {vendedores.length === 0 && (
-                <p className="text-xs text-muted-foreground px-2">
-                  Nenhum usuário encontrado.
-                </p>
-              )}
-            </ul>
           </div>
         </div>
       </SheetContent>
@@ -1874,6 +1963,8 @@ export default function WhatsAppInbox() {
   const { data: conversas = [], isLoading: loadingConversas } =
     useWaConversas();
   const { data: config } = useWaConfig();
+  const { data: instancias = [] } = useWaInstancias();
+  const temMultiplasInstancias = instancias.length > 1;
   const [conversaAtivaId, setConversaAtivaId] = useState<string | null>(null);
   const conversaAtiva = conversas.find((c) => c.id === conversaAtivaId) ?? null;
   const { data: mensagens = [], isLoading: loadingMensagens } = useWaMensagens(
@@ -1900,8 +1991,8 @@ export default function WhatsAppInbox() {
     }
     return Array.from(vistos.values());
   }, [conversaAtiva?.is_group, conversaAtiva?.participantes, mensagens]);
-  // Nomes exibidos no subtítulo do grupo: responsáveis do CRM + todos os participantes
-  // do grupo no WhatsApp (não só quem está atribuído), sem duplicar nomes iguais.
+  // Nomes exibidos no subtítulo do grupo: apenas os responsáveis pelo atendimento
+  // atribuídos no CRM, sem duplicar nomes iguais.
   const nomesGrupo = useMemo(() => {
     const vistos = new Set<string>();
     const nomes: string[] = [];
@@ -1912,9 +2003,8 @@ export default function WhatsAppInbox() {
       nomes.push(limpo);
     };
     for (const r of conversaAtiva?.responsaveis ?? []) add(r.nome);
-    for (const p of participantesGrupo) add(p.nome || formatPhone(p.telefone));
     return nomes;
-  }, [conversaAtiva?.responsaveis, participantesGrupo]);
+  }, [conversaAtiva?.responsaveis]);
   const sendMessage = useWaSendMessage();
   const marcarLida = useWaMarcarLida();
   const limparConversa = useWaLimparConversa();
@@ -1964,12 +2054,17 @@ export default function WhatsAppInbox() {
   const [filtroStatus, setFiltroStatus] = useState<"aberto" | "fechado">(
     "aberto",
   );
-  const [filtroTipo, setFiltroTipo] = useState<
-    "todos" | "contatos" | "empresa"
-  >("todos");
   const [filtroConversa, setFiltroConversa] = useState<
     "todos" | "geral" | "meu"
   >("todos");
+  const [filtroPeriodo, setFiltroPeriodo] = useState<
+    "todos" | "semana" | "mes" | "ano" | "personalizado"
+  >("todos");
+  const [filtroInstancia, setFiltroInstancia] = useState<string>("todos");
+  const [periodoCustom, setPeriodoCustom] = useState<{
+    from?: Date;
+    to?: Date;
+  }>({});
   const [showConfig, setShowConfig] = useState(false);
   const [showNovaConversa, setShowNovaConversa] = useState(false);
   const [showCriarGrupo, setShowCriarGrupo] = useState(false);
@@ -2114,8 +2209,6 @@ export default function WhatsAppInbox() {
   }
 
   const conversasPorTipoEBusca = conversas.filter((c) => {
-    if (filtroTipo === "empresa" && !c.cliente_id) return false;
-    if (filtroTipo === "contatos" && !c.contato_id) return false;
     if (filtroConversa === "geral" && (c.responsaveis?.length ?? 0) > 0)
       return false;
     if (
@@ -2123,6 +2216,27 @@ export default function WhatsAppInbox() {
       (!profile?.id || !c.responsaveis?.some((r) => r.id === profile.id))
     )
       return false;
+
+    if (filtroInstancia !== "todos" && c.instancia_id !== filtroInstancia)
+      return false;
+
+    if (filtroPeriodo !== "todos") {
+      const dataRefRaw = c.ultima_mensagem_at ?? c.created_at;
+      if (!dataRefRaw) return false;
+      const dataRef = new Date(dataRefRaw);
+      if (filtroPeriodo === "semana" && dataRef < subDays(new Date(), 7))
+        return false;
+      if (filtroPeriodo === "mes" && dataRef < subMonths(new Date(), 1))
+        return false;
+      if (filtroPeriodo === "ano" && dataRef < subYears(new Date(), 1))
+        return false;
+      if (filtroPeriodo === "personalizado") {
+        if (periodoCustom.from && dataRef < startOfDay(periodoCustom.from))
+          return false;
+        if (periodoCustom.to && dataRef > endOfDay(periodoCustom.to))
+          return false;
+      }
+    }
 
     if (!busca) return true;
     const term = busca.toLowerCase();
@@ -2151,6 +2265,56 @@ export default function WhatsAppInbox() {
     if (filtroStatus === "fechado" && !c.arquivada) return false;
     return true;
   });
+
+  // Só agrupa/rotula a sidebar por instância quando a empresa realmente tem mais
+  // de uma instância — caso contrário mantém a lista simples de sempre. Com o
+  // filtro "Instância" numa instância específica, mostra um único grupo com o
+  // apelido dela (senão o cabeçalho some justo ao filtrar, que é o dado mais
+  // relevante nesse momento). Toda mensagem sempre vem/vai por alguma instância,
+  // então não existe um grupo "sem instância" — conversas legadas sem
+  // instancia_id conhecida (dados de antes do backfill, ou instância já
+  // removida) só entram soltas no fim, sem cabeçalho, pra não sumir.
+  const conversasAgrupadasPorInstancia = useMemo(() => {
+    if (!temMultiplasInstancias) return null;
+
+    if (filtroInstancia !== "todos") {
+      const inst = instancias.find((i) => i.id === filtroInstancia);
+      if (!inst) return null;
+      return {
+        grupos: [{
+          key: inst.id,
+          label: inst.apelido || inst.instance_name,
+          conversas: conversasFiltradas,
+        }],
+        avulsas: [] as WaConversa[],
+      };
+    }
+
+    const idsConhecidos = new Set(instancias.map((i) => i.id));
+    const porInstancia = new Map<string, WaConversa[]>();
+    const avulsas: WaConversa[] = [];
+    for (const c of conversasFiltradas) {
+      if (c.instancia_id && idsConhecidos.has(c.instancia_id)) {
+        if (!porInstancia.has(c.instancia_id)) porInstancia.set(c.instancia_id, []);
+        porInstancia.get(c.instancia_id)!.push(c);
+      } else {
+        avulsas.push(c);
+      }
+    }
+
+    const grupos: { key: string; label: string; conversas: WaConversa[] }[] = [];
+    for (const inst of instancias) {
+      const conversasDaInstancia = porInstancia.get(inst.id);
+      if (conversasDaInstancia?.length) {
+        grupos.push({
+          key: inst.id,
+          label: inst.apelido || inst.instance_name,
+          conversas: conversasDaInstancia,
+        });
+      }
+    }
+    return { grupos, avulsas };
+  }, [conversasFiltradas, temMultiplasInstancias, filtroInstancia, instancias]);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -2335,6 +2499,93 @@ export default function WhatsAppInbox() {
       e.preventDefault();
       handleSend(e as any);
     }
+  }
+
+  // Item da lista de conversas, compartilhado entre a sidebar (desktop) e o
+  // Dialog de conversas (mobile) — só o onClick muda entre os dois.
+  function renderConvButton(conv: WaConversa, onSelect: () => void) {
+    return (
+      <button
+        key={conv.id}
+        onClick={onSelect}
+        className={cn(
+          "flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left",
+          modoSelecao && selecionadas.has(conv.id)
+            ? "bg-primary/10 ring-1 ring-primary/20"
+            : conversaAtiva?.id === conv.id && !modoSelecao
+              ? "bg-primary/10"
+              : "hover:bg-muted/50",
+        )}
+      >
+        {modoSelecao ? (
+          <div
+            className={cn(
+              "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+              selecionadas.has(conv.id)
+                ? "bg-primary border-primary"
+                : "border-border bg-background",
+            )}
+          >
+            {selecionadas.has(conv.id) && (
+              <Check className="h-2.5 w-2.5 text-primary-foreground" />
+            )}
+          </div>
+        ) : (
+          <ConversaAvatar conv={conv} />
+        )}
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              "text-xs font-medium text-foreground truncate",
+              conv.nao_lidas > 0 && !modoSelecao && "font-bold",
+            )}
+          >
+            {conv.nome_contato ?? formatPhone(conv.telefone)}
+          </p>
+          <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+            {conv.ultima_mensagem ?? "Nenhuma mensagem"}
+          </p>
+        </div>
+        {!modoSelecao && <ConversaParticipantesStack conv={conv} />}
+        {!modoSelecao &&
+          (conv.ultima_mensagem_at || conv.nao_lidas > 0) && (
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              {conv.nao_lidas > 0 && (
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
+                  {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
+                </span>
+              )}
+              {conv.ultima_mensagem_at && (
+                <span className="text-[9px] text-muted-foreground font-medium">
+                  {formatTime(conv.ultima_mensagem_at)}
+                </span>
+              )}
+            </div>
+          )}
+      </button>
+    );
+  }
+
+  function renderConvList(onSelect: (conv: WaConversa) => void) {
+    if (conversasAgrupadasPorInstancia) {
+      const { grupos, avulsas } = conversasAgrupadasPorInstancia;
+      return (
+        <>
+          {grupos.map((grupo) => (
+            <div key={grupo.key}>
+              <ConversaGroupHeader label={grupo.label} />
+              {grupo.conversas.map((conv) =>
+                renderConvButton(conv, () => onSelect(conv)),
+              )}
+            </div>
+          ))}
+          {avulsas.map((conv) => renderConvButton(conv, () => onSelect(conv)))}
+        </>
+      );
+    }
+    return conversasFiltradas.map((conv) =>
+      renderConvButton(conv, () => onSelect(conv)),
+    );
   }
 
   const isConnected = config?.status === "connected";
@@ -2586,72 +2837,153 @@ export default function WhatsAppInbox() {
                 </div>
                 <FilterButton
                   hasFilters={
-                    filtroTipo !== "todos" || filtroConversa !== "todos"
+                    filtroConversa !== "todos" ||
+                    filtroPeriodo !== "todos" ||
+                    filtroInstancia !== "todos"
                   }
                   activeFilterCount={
-                    (filtroTipo !== "todos" ? 1 : 0) +
-                    (filtroConversa !== "todos" ? 1 : 0)
+                    (filtroConversa !== "todos" ? 1 : 0) +
+                    (filtroPeriodo !== "todos" ? 1 : 0) +
+                    (filtroInstancia !== "todos" ? 1 : 0)
                   }
                   onClear={() => {
-                    setFiltroTipo("todos");
                     setFiltroConversa("todos");
+                    setFiltroPeriodo("todos");
+                    setPeriodoCustom({});
+                    setFiltroInstancia("todos");
                   }}
                   align="start"
-                  popoverClassName="w-56"
+                  popoverClassName="w-auto"
                 >
-                  <div className="flex flex-col gap-0.5">
-                    <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                      Tipos de clientes
-                    </p>
-                    {(
-                      [
-                        ["todos", "Todos"],
-                        ["contatos", "Contatos"],
-                        ["empresa", "Empresa"],
-                      ] as const
-                    ).map(([val, label]) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setFiltroTipo(val)}
-                        className={cn(
-                          "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                          filtroTipo === val && "bg-primary/10 text-primary",
-                        )}
-                      >
-                        {label}
-                        {filtroTipo === val && (
-                          <Check className="h-3.5 w-3.5" />
-                        )}
-                      </button>
-                    ))}
-                    <div className="mx-3 my-1 border-t border-border/50" />
-                    <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                      Conversa
-                    </p>
-                    {(
-                      [
-                        ["todos", "Todos"],
-                        ["geral", "Não atribuído"],
-                        ["meu", "Meus chats"],
-                      ] as const
-                    ).map(([val, label]) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => setFiltroConversa(val)}
-                        className={cn(
-                          "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                          filtroConversa === val &&
-                            "bg-primary/10 text-primary",
-                        )}
-                      >
-                        {label}
-                        {filtroConversa === val && (
-                          <Check className="h-3.5 w-3.5" />
-                        )}
-                      </button>
-                    ))}
+                  <div className="flex">
+                    <div className="flex flex-col gap-0.5 w-44">
+                      <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                        Conversa
+                      </p>
+                      {(
+                        [
+                          ["todos", "Todos"],
+                          ["geral", "Não atribuído"],
+                          ["meu", "Meus chats"],
+                        ] as const
+                      ).map(([val, label]) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setFiltroConversa(val)}
+                          className={cn(
+                            "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                            filtroConversa === val &&
+                              "bg-primary/10 text-primary",
+                          )}
+                        >
+                          {label}
+                          {filtroConversa === val && (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      ))}
+                      <div className="mx-3 my-1 border-t border-border/50" />
+                      <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                        Período
+                      </p>
+                      {(
+                        [
+                          ["semana", "Última semana"],
+                          ["mes", "Último mês"],
+                          ["ano", "Último ano"],
+                        ] as const
+                      ).map(([val, label]) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() =>
+                            setFiltroPeriodo(
+                              filtroPeriodo === val ? "todos" : val,
+                            )
+                          }
+                          className={cn(
+                            "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                            filtroPeriodo === val &&
+                              "bg-primary/10 text-primary",
+                          )}
+                        >
+                          {label}
+                          {filtroPeriodo === val && (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      ))}
+                      {/* Só aparece quando a empresa tem mais de uma instância WhatsApp
+                          conectada com usuários diferentes — separa visualmente qual
+                          número está por trás de cada conversa. */}
+                      {temMultiplasInstancias && (
+                        <>
+                          <div className="mx-3 my-1 border-t border-border/50" />
+                          <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                            Instância
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setFiltroInstancia("todos")}
+                            className={cn(
+                              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                              filtroInstancia === "todos" &&
+                                "bg-primary/10 text-primary",
+                            )}
+                          >
+                            Todas
+                            {filtroInstancia === "todos" && (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          {instancias.map((inst) => (
+                            <button
+                              key={inst.id}
+                              type="button"
+                              onClick={() => setFiltroInstancia(inst.id)}
+                              className={cn(
+                                "flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                filtroInstancia === inst.id &&
+                                  "bg-primary/10 text-primary",
+                              )}
+                            >
+                              <span className="truncate text-xs">
+                                {inst.apelido || inst.instance_name}
+                              </span>
+                              {filtroInstancia === inst.id && (
+                                <Check className="h-3.5 w-3.5 shrink-0" />
+                              )}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                    <div className="border-l border-border/50 p-2">
+                      <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                        Personalizado
+                      </p>
+                      <Calendar
+                        mode="range"
+                        selected={{
+                          from: periodoCustom.from,
+                          to: periodoCustom.to,
+                        }}
+                        onSelect={(range) => {
+                          setPeriodoCustom({
+                            from: range?.from,
+                            to: range?.to,
+                          });
+                          setFiltroPeriodo("personalizado");
+                        }}
+                        numberOfMonths={1}
+                        locale={ptBR}
+                        captionLayout="dropdown-buttons"
+                        fromYear={1950}
+                        toYear={new Date().getFullYear()}
+                        className="pointer-events-auto"
+                      />
+                    </div>
                   </div>
                 </FilterButton>
               </div>
@@ -2712,72 +3044,11 @@ export default function WhatsAppInbox() {
                       : "Nenhuma conversa ainda"}
                   </div>
                 ) : (
-                  conversasFiltradas.map((conv) => (
-                    <button
-                      key={conv.id}
-                      onClick={() =>
-                        modoSelecao
-                          ? toggleSelecao(conv.id)
-                          : setConversaAtivaId(conv.id)
-                      }
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left",
-                        modoSelecao && selecionadas.has(conv.id)
-                          ? "bg-primary/10 ring-1 ring-primary/20"
-                          : conversaAtiva?.id === conv.id && !modoSelecao
-                            ? "bg-primary/10"
-                            : "hover:bg-muted/50",
-                      )}
-                    >
-                      {modoSelecao ? (
-                        <div
-                          className={cn(
-                            "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
-                            selecionadas.has(conv.id)
-                              ? "bg-primary border-primary"
-                              : "border-border bg-background",
-                          )}
-                        >
-                          {selecionadas.has(conv.id) && (
-                            <Check className="h-2.5 w-2.5 text-primary-foreground" />
-                          )}
-                        </div>
-                      ) : (
-                        <ConversaAvatar conv={conv} />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className={cn(
-                            "text-xs font-medium text-foreground truncate",
-                            conv.nao_lidas > 0 && !modoSelecao && "font-bold",
-                          )}
-                        >
-                          {conv.nome_contato ?? formatPhone(conv.telefone)}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                          {conv.ultima_mensagem ?? "Nenhuma mensagem"}
-                        </p>
-                      </div>
-                      {!modoSelecao && (
-                        <ConversaParticipantesStack conv={conv} />
-                      )}
-                      {!modoSelecao &&
-                        (conv.ultima_mensagem_at || conv.nao_lidas > 0) && (
-                          <div className="flex flex-col items-end gap-1 shrink-0">
-                            {conv.nao_lidas > 0 && (
-                              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
-                                {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
-                              </span>
-                            )}
-                            {conv.ultima_mensagem_at && (
-                              <span className="text-[9px] text-muted-foreground font-medium">
-                                {formatTime(conv.ultima_mensagem_at)}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                    </button>
-                  ))
+                  renderConvList((conv) =>
+                    modoSelecao
+                      ? toggleSelecao(conv.id)
+                      : setConversaAtivaId(conv.id),
+                  )
                 )}
               </div>
             </ScrollArea>
@@ -2906,73 +3177,150 @@ export default function WhatsAppInbox() {
                     </div>
                     <FilterButton
                       hasFilters={
-                        filtroTipo !== "todos" || filtroConversa !== "todos"
+                        filtroConversa !== "todos" ||
+                        filtroPeriodo !== "todos" ||
+                        filtroInstancia !== "todos"
                       }
                       activeFilterCount={
-                        (filtroTipo !== "todos" ? 1 : 0) +
-                        (filtroConversa !== "todos" ? 1 : 0)
+                        (filtroConversa !== "todos" ? 1 : 0) +
+                        (filtroPeriodo !== "todos" ? 1 : 0) +
+                        (filtroInstancia !== "todos" ? 1 : 0)
                       }
                       onClear={() => {
-                        setFiltroTipo("todos");
                         setFiltroConversa("todos");
+                        setFiltroPeriodo("todos");
+                        setPeriodoCustom({});
+                        setFiltroInstancia("todos");
                       }}
                       align="end"
-                      popoverClassName="w-56"
+                      popoverClassName="w-auto"
                     >
-                      <div className="flex flex-col gap-0.5">
-                        <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                          Tipos de clientes
-                        </p>
-                        {(
-                          [
-                            ["todos", "Todos"],
-                            ["contatos", "Contatos"],
-                            ["empresa", "Empresa"],
-                          ] as const
-                        ).map(([val, label]) => (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => setFiltroTipo(val)}
-                            className={cn(
-                              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                              filtroTipo === val &&
-                                "bg-primary/10 text-primary",
-                            )}
-                          >
-                            {label}
-                            {filtroTipo === val && (
-                              <Check className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        ))}
-                        <div className="mx-3 my-1 border-t border-border/50" />
-                        <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                          Conversa
-                        </p>
-                        {(
-                          [
-                            ["todos", "Todos"],
-                            ["geral", "Não atribuído"],
-                            ["meu", "Meus chats"],
-                          ] as const
-                        ).map(([val, label]) => (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => setFiltroConversa(val)}
-                            className={cn(
-                              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                              filtroConversa === val &&
-                                "bg-primary/10 text-primary",
-                            )}
-                          >
-                            {label}
-                            {filtroConversa === val && (
-                              <Check className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        ))}
+                      <div className="flex">
+                        <div className="flex flex-col gap-0.5 w-44">
+                          <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                            Conversa
+                          </p>
+                          {(
+                            [
+                              ["todos", "Todos"],
+                              ["geral", "Não atribuído"],
+                              ["meu", "Meus chats"],
+                            ] as const
+                          ).map(([val, label]) => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setFiltroConversa(val)}
+                              className={cn(
+                                "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                filtroConversa === val &&
+                                  "bg-primary/10 text-primary",
+                              )}
+                            >
+                              {label}
+                              {filtroConversa === val && (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          ))}
+                          <div className="mx-3 my-1 border-t border-border/50" />
+                          <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                            Período
+                          </p>
+                          {(
+                            [
+                              ["semana", "Última semana"],
+                              ["mes", "Último mês"],
+                              ["ano", "Último ano"],
+                            ] as const
+                          ).map(([val, label]) => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() =>
+                                setFiltroPeriodo(
+                                  filtroPeriodo === val ? "todos" : val,
+                                )
+                              }
+                              className={cn(
+                                "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                filtroPeriodo === val &&
+                                  "bg-primary/10 text-primary",
+                              )}
+                            >
+                              {label}
+                              {filtroPeriodo === val && (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          ))}
+                          {temMultiplasInstancias && (
+                            <>
+                              <div className="mx-3 my-1 border-t border-border/50" />
+                              <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                Instância
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => setFiltroInstancia("todos")}
+                                className={cn(
+                                  "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                  filtroInstancia === "todos" &&
+                                    "bg-primary/10 text-primary",
+                                )}
+                              >
+                                Todas
+                                {filtroInstancia === "todos" && (
+                                  <Check className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                              {instancias.map((inst) => (
+                                <button
+                                  key={inst.id}
+                                  type="button"
+                                  onClick={() => setFiltroInstancia(inst.id)}
+                                  className={cn(
+                                    "flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                    filtroInstancia === inst.id &&
+                                      "bg-primary/10 text-primary",
+                                  )}
+                                >
+                                  <span className="truncate font-mono text-xs">
+                                    {inst.instance_name}
+                                  </span>
+                                  {filtroInstancia === inst.id && (
+                                    <Check className="h-3.5 w-3.5 shrink-0" />
+                                  )}
+                                </button>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                        <div className="border-l border-border/50 p-2">
+                          <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                            Personalizado
+                          </p>
+                          <Calendar
+                            mode="range"
+                            selected={{
+                              from: periodoCustom.from,
+                              to: periodoCustom.to,
+                            }}
+                            onSelect={(range) => {
+                              setPeriodoCustom({
+                                from: range?.from,
+                                to: range?.to,
+                              });
+                              setFiltroPeriodo("personalizado");
+                            }}
+                            numberOfMonths={1}
+                            locale={ptBR}
+                            captionLayout="dropdown-buttons"
+                            fromYear={1950}
+                            toYear={new Date().getFullYear()}
+                            className="pointer-events-auto"
+                          />
+                        </div>
                       </div>
                     </FilterButton>
                   </div>
@@ -3034,75 +3382,14 @@ export default function WhatsAppInbox() {
                         : "Nenhuma conversa ainda"}
                     </div>
                   ) : (
-                    conversasFiltradas.map((conv) => (
-                      <button
-                        key={conv.id}
-                        onClick={() => {
-                          if (modoSelecao) {
-                            toggleSelecao(conv.id);
-                          } else {
-                            setConversaAtivaId(conv.id);
-                            setShowMobileSidebar(false);
-                          }
-                        }}
-                        className={cn(
-                          "flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left",
-                          modoSelecao && selecionadas.has(conv.id)
-                            ? "bg-primary/10 ring-1 ring-primary/20"
-                            : conversaAtiva?.id === conv.id && !modoSelecao
-                              ? "bg-primary/10"
-                              : "hover:bg-muted/50",
-                        )}
-                      >
-                        {modoSelecao ? (
-                          <div
-                            className={cn(
-                              "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
-                              selecionadas.has(conv.id)
-                                ? "bg-primary border-primary"
-                                : "border-border bg-background",
-                            )}
-                          >
-                            {selecionadas.has(conv.id) && (
-                              <Check className="h-2.5 w-2.5 text-primary-foreground" />
-                            )}
-                          </div>
-                        ) : (
-                          <ConversaAvatar conv={conv} />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className={cn(
-                              "text-xs font-medium text-foreground truncate",
-                              conv.nao_lidas > 0 && !modoSelecao && "font-bold",
-                            )}
-                          >
-                            {conv.nome_contato ?? formatPhone(conv.telefone)}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                            {conv.ultima_mensagem ?? "Nenhuma mensagem"}
-                          </p>
-                        </div>
-                        {!modoSelecao && (
-                          <ConversaParticipantesStack conv={conv} />
-                        )}
-                        {!modoSelecao &&
-                          (conv.ultima_mensagem_at || conv.nao_lidas > 0) && (
-                            <div className="flex flex-col items-end gap-1 shrink-0">
-                              {conv.nao_lidas > 0 && (
-                                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
-                                  {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
-                                </span>
-                              )}
-                              {conv.ultima_mensagem_at && (
-                                <span className="text-[9px] text-muted-foreground font-medium">
-                                  {formatTime(conv.ultima_mensagem_at)}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                      </button>
-                    ))
+                    renderConvList((conv) => {
+                      if (modoSelecao) {
+                        toggleSelecao(conv.id);
+                      } else {
+                        setConversaAtivaId(conv.id);
+                        setShowMobileSidebar(false);
+                      }
+                    })
                   )}
                 </div>
               </ScrollArea>
@@ -3177,6 +3464,7 @@ export default function WhatsAppInbox() {
                     </p>
                   </div>
                 </button>
+                <ConversaParticipantesStack conv={conversaAtiva} spacing="gap" />
                 <div className="ml-auto flex items-center gap-1">
                   <Button
                     variant="ghost"

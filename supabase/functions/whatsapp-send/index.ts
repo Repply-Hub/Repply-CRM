@@ -13,24 +13,12 @@ const PLACEHOLDER: Record<string, string> = {
   documento: '[Documento]',
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: 'Admin',
-  gestor: 'Gestor',
-  vendedor: 'Vendedor',
-  empresa: 'Empresa',
-};
-
-function capitalize(text: string): string {
-  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
-}
-
-// Prefixa a mensagem enviada ao WhatsApp com "*Nome - Cargo*" para que quem
-// recebe saiba qual usuário do CRM está falando. O conteúdo salvo em
-// whatsapp_mensagens permanece sem o prefixo (ver `conteudo` mais abaixo).
-function withRemetente(nome: string | null, role: string | null, mensagem: string): string {
+// Prefixa a mensagem enviada ao WhatsApp com "*Nome*" para que quem recebe saiba
+// qual usuário do CRM está falando. O conteúdo salvo em whatsapp_mensagens
+// permanece sem o prefixo (ver `conteudo` mais abaixo).
+function withRemetente(nome: string | null, mensagem: string): string {
   if (!nome) return mensagem;
-  const cargo = role ? (ROLE_LABELS[role] ?? capitalize(role)) : null;
-  const header = `*${nome}${cargo ? ` - ${cargo}` : ''}*`;
+  const header = `*${nome}*`;
   return mensagem ? `${header}\n${mensagem}` : header;
 }
 
@@ -112,7 +100,7 @@ serve(async (req) => {
 
     const { data: userData } = await supabase
       .from("usuarios")
-      .select("id, empresa_id, nome, role, empresas:empresa_id(whatsapp_assinar_remetente)")
+      .select("id, empresa_id, nome, empresas:empresa_id(whatsapp_assinar_remetente)")
       .eq("user_id", user.id).single();
     if (!userData) {
       return new Response(JSON.stringify({ error: "User not found" }), {
@@ -124,12 +112,12 @@ serve(async (req) => {
 
     const { data: instLink } = await supabase
       .from("wapi_instancia_usuarios")
-      .select("configuracoes_wapi:instancia_id(instance_url, api_key, instance_name, api_instance_name, status)")
+      .select("configuracoes_wapi:instancia_id(id, instance_url, api_key, instance_name, api_instance_name, status)")
       .eq("usuario_auth_id", user.id)
       .limit(1)
       .maybeSingle();
     const config = (instLink?.configuracoes_wapi ?? null) as {
-      instance_url: string; api_key: string; instance_name: string;
+      id: string; instance_url: string; api_key: string; instance_name: string;
       api_instance_name: string | null; status: string;
     } | null;
     if (!config) {
@@ -172,7 +160,7 @@ serve(async (req) => {
           body: JSON.stringify({
             instanceName: uazapiInstance,
             number: phone,
-            text: assinarRemetente ? withRemetente(userData.nome, userData.role, mensagem) : mensagem,
+            text: assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem,
           }),
         });
         wapiStatus = res.status;
@@ -192,7 +180,7 @@ serve(async (req) => {
         type: typeMap[tipo] ?? 'document',
         file: media_url,
       };
-      if (mensagem) wapiBody.text = assinarRemetente ? withRemetente(userData.nome, userData.role, mensagem) : mensagem;
+      if (mensagem) wapiBody.text = assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem;
       if (tipo === 'documento' && nome_arquivo) wapiBody.docName = nome_arquivo;
       if (media_mime) wapiBody.mimetype = media_mime;
 
@@ -240,7 +228,7 @@ serve(async (req) => {
     if (!conversaId) {
       const { data: conv } = await supabase.from("whatsapp_conversas")
         .upsert(
-          { empresa_id: userData.empresa_id, telefone: phone, ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now },
+          { empresa_id: userData.empresa_id, telefone: phone, ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, instancia_id: config.id },
           { onConflict: "empresa_id,telefone" }
         ).select("id").single();
       conversaId = conv?.id;
@@ -259,7 +247,7 @@ serve(async (req) => {
       // pela conversa (aparece em "Meus chats"), tanto em grupo quanto em chat individual.
       await Promise.all([
         supabase.from("whatsapp_conversas")
-          .update({ ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, arquivada: false })
+          .update({ ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, arquivada: false, instancia_id: config.id })
           .eq("id", conversaId),
         supabase.from("whatsapp_mensagens").insert(insertData),
         ensureResponsavel(supabase, conversaId, userData.id),

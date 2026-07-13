@@ -154,6 +154,15 @@ serve(async (req) => {
       });
     }
 
+    // Quem criou o grupo vira responsável — sem isso a conversa (agora restrita a
+    // admins e responsáveis) some da própria lista de quem acabou de criá-la.
+    await supabase
+      .from("whatsapp_conversa_responsaveis")
+      .upsert(
+        { conversa_id: conversa.id, usuario_id: userData.id },
+        { onConflict: "conversa_id,usuario_id", ignoreDuplicates: true }
+      );
+
     return new Response(JSON.stringify({ ok: true, conversa }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

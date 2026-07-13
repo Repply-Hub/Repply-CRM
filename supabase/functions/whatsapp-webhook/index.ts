@@ -53,7 +53,7 @@ serve(async (req) => {
 
     const { data: config } = await supabase
       .from("configuracoes_wapi")
-      .select("empresa_id, webhook_secret, instance_url, api_key, api_instance_name")
+      .select("id, empresa_id, webhook_secret, instance_url, api_key, api_instance_name")
       .eq("instance_name", instanceName)
       .single();
 
@@ -331,6 +331,7 @@ async function handleIncomingMessage(
         nao_lidas: (existente.nao_lidas ?? 0) + 1,
         arquivada: false,
         is_group: isGroup,
+        instancia_id: config.id,
       })
       .eq("id", existente.id)
       .select("id, nao_lidas")
@@ -352,6 +353,7 @@ async function handleIncomingMessage(
         nao_lidas: 1,
         arquivada: false,
         is_group: isGroup,
+        instancia_id: config.id,
       })
       .select("id, nao_lidas")
       .single();

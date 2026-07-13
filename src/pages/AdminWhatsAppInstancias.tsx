@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,9 @@ import {
   RefreshCw,
   QrCode,
   PlugZap,
+  Pencil,
+  Check as CheckIcon,
+  X as XIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -46,6 +50,7 @@ import {
   useAdminConnect,
   useAdminSyncStatus,
   useAdminDisconnect,
+  useAdminSetApelido,
 } from '@/hooks/use-admin-whatsapp';
 import type { WaConfig } from '@/hooks/use-whatsapp-inbox';
 
@@ -123,6 +128,79 @@ function RoleBadge({ role }: { role: string }) {
       <User className="h-2.5 w-2.5" />
       Vendedor
     </span>
+  );
+}
+
+// Nome amigável da instância + edição inline do apelido. Sem apelido, cai no
+// instance_name técnico (ex: "bb5fce8c_ohdsdv") só pra não ficar em branco.
+function InstanceLabel({ config }: { config: WaConfig }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(config.apelido ?? '');
+  const setApelido = useAdminSetApelido();
+
+  function startEdit() {
+    setValue(config.apelido ?? '');
+    setEditing(true);
+  }
+
+  function save() {
+    const trimmed = value.trim();
+    setApelido.mutate(
+      { instanceId: config.id, apelido: trimmed || null },
+      { onSuccess: () => setEditing(false) },
+    );
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 mt-0.5">
+        <Input
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+          placeholder={config.instance_name}
+          className="h-6 text-[11px] px-1.5 py-0 max-w-[160px]"
+          disabled={setApelido.isPending}
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0 text-emerald-600 hover:text-emerald-700"
+          onClick={save}
+          disabled={setApelido.isPending}
+        >
+          <CheckIcon className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0 text-muted-foreground"
+          onClick={() => setEditing(false)}
+          disabled={setApelido.isPending}
+        >
+          <XIcon className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={startEdit}
+      className="group flex items-center gap-1 mt-0.5 text-left"
+      title="Editar apelido da instância"
+    >
+      <Smartphone className="h-3 w-3 text-muted-foreground shrink-0" />
+      <span className="text-[11px] text-muted-foreground truncate">
+        {config.apelido || <span className="font-mono">{config.instance_name}</span>}
+      </span>
+      <Pencil className="h-2.5 w-2.5 text-muted-foreground/0 group-hover:text-muted-foreground/70 transition-colors shrink-0" />
+    </button>
   );
 }
 
@@ -322,13 +400,8 @@ function UsuarioRow({
             <span className="text-sm font-medium truncate">{usuario.usuario_nome}</span>
             <RoleBadge role={usuario.role} />
           </div>
-          {config?.instance_name ? (
-            <div className="flex items-center gap-1 mt-0.5">
-              <Smartphone className="h-3 w-3 text-muted-foreground shrink-0" />
-              <span className="text-[11px] text-muted-foreground font-mono truncate">
-                {config.instance_name}
-              </span>
-            </div>
+          {config ? (
+            <InstanceLabel config={config} />
           ) : (
             <span className="text-[11px] text-muted-foreground/60 italic">sem instância</span>
           )}
@@ -430,7 +503,7 @@ function UsuarioRow({
           <AlertDialogHeader>
             <AlertDialogTitle>Remover instância?</AlertDialogTitle>
             <AlertDialogDescription>
-              A instância <span className="font-mono font-semibold">{config?.instance_name}</span> de{' '}
+              A instância <span className="font-semibold">{config?.apelido || config?.instance_name}</span> de{' '}
               <span className="font-semibold">{usuario.usuario_nome}</span> será removida da uazapi e do banco de dados.
               Esta ação não pode ser desfeita.
             </AlertDialogDescription>
@@ -471,6 +544,35 @@ function EmpresaCard({
     .filter(u => u.role !== 'empresa')
     .sort((a, b) => a.usuario_nome.localeCompare(b.usuario_nome));
 
+  // Cada instância (configuracoes_wapi) pode ter vários usuários vinculados via
+  // wapi_instancia_usuarios. A maioria das empresas usa uma única instância
+  // compartilhada, mas algumas já têm duas ou mais instâncias distintas — nesse
+  // caso agrupamos visualmente por instância para deixar isso explícito.
+  const instanciasDistintas = new Set(
+    group.usuarios
+      .map(u => u.config?.id)
+      .filter((id): id is string => !!id),
+  );
+  const temMultiplasInstancias = instanciasDistintas.size > 1;
+
+  const gruposPorInstancia = temMultiplasInstancias
+    ? [...instanciasDistintas]
+        .map(instanciaId => {
+          const usuarios = group.usuarios.filter(u => u.config?.id === instanciaId);
+          return {
+            instanciaId,
+            instanceName: usuarios[0]?.config?.apelido || usuarios[0]?.config?.instance_name || instanciaId,
+            usuarios: usuarios.sort((a, b) => {
+              if (a.role === 'empresa' && b.role !== 'empresa') return -1;
+              if (b.role === 'empresa' && a.role !== 'empresa') return 1;
+              return a.usuario_nome.localeCompare(b.usuario_nome);
+            }),
+          };
+        })
+        .sort((a, b) => a.instanceName.localeCompare(b.instanceName))
+    : [];
+  const semInstancia = group.usuarios.filter(u => !u.config?.id);
+
   return (
     <Card className="border-border/60 shadow-sm overflow-hidden">
       <button onClick={() => setExpanded(v => !v)} className="w-full text-left">
@@ -484,7 +586,15 @@ function EmpresaCard({
                 <Building2 className={cn('h-4 w-4', hasIssue ? 'text-amber-600' : 'text-emerald-600')} />
               </div>
               <div className="min-w-0">
-                <CardTitle className="text-base font-semibold truncate">{group.empresa_nome}</CardTitle>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <CardTitle className="text-base font-semibold truncate">{group.empresa_nome}</CardTitle>
+                  {temMultiplasInstancias && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 border border-blue-200 shrink-0">
+                      <Smartphone className="h-2.5 w-2.5" />
+                      {instanciasDistintas.size} instâncias
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {connected}/{total} instâncias conectadas · {total} usuário{total !== 1 ? 's' : ''}
                 </p>
@@ -506,27 +616,66 @@ function EmpresaCard({
 
       {expanded && (
         <CardContent className="px-5 pb-4 pt-0">
-          <div className="border-l-2 border-border/40 ml-4 pl-4 space-y-2">
-            {principal && (
-              <div className="space-y-2">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider pt-1">
-                  Instância principal
-                </p>
-                <UsuarioRow usuario={principal} onRefresh={onRefresh} />
-              </div>
-            )}
+          {temMultiplasInstancias ? (
+            <div className="space-y-4">
+              {gruposPorInstancia.map((grupo) => (
+                <div
+                  key={grupo.instanciaId}
+                  className="rounded-lg border border-border/60 bg-muted/10 p-3 space-y-2"
+                >
+                  <div className="flex items-center gap-2 pb-1 border-b border-border/40">
+                    <Smartphone className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <p className="text-[11px] font-semibold truncate">
+                      {grupo.instanceName}
+                    </p>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      · {grupo.usuarios.length} usuário{grupo.usuarios.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {grupo.usuarios.map(u => (
+                      <UsuarioRow key={u.usuario_id} usuario={u} onRefresh={onRefresh} />
+                    ))}
+                  </div>
+                </div>
+              ))}
 
-            {funcionarios.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider pt-2">
-                  Funcionários ({funcionarios.length})
-                </p>
-                {funcionarios.map(u => (
-                  <UsuarioRow key={u.usuario_id} usuario={u} onRefresh={onRefresh} />
-                ))}
-              </div>
-            )}
-          </div>
+              {semInstancia.length > 0 && (
+                <div className="border-l-2 border-border/40 ml-4 pl-4 space-y-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider pt-1">
+                    Sem instância ({semInstancia.length})
+                  </p>
+                  {semInstancia
+                    .sort((a, b) => a.usuario_nome.localeCompare(b.usuario_nome))
+                    .map(u => (
+                      <UsuarioRow key={u.usuario_id} usuario={u} onRefresh={onRefresh} />
+                    ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="border-l-2 border-border/40 ml-4 pl-4 space-y-2">
+              {principal && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider pt-1">
+                    Instância principal
+                  </p>
+                  <UsuarioRow usuario={principal} onRefresh={onRefresh} />
+                </div>
+              )}
+
+              {funcionarios.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider pt-2">
+                    Funcionários ({funcionarios.length})
+                  </p>
+                  {funcionarios.map(u => (
+                    <UsuarioRow key={u.usuario_id} usuario={u} onRefresh={onRefresh} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       )}
     </Card>

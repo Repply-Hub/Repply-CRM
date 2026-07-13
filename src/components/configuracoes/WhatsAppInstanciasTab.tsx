@@ -10,7 +10,9 @@ import {
   useAdminDisconnect,
   useAdminLinkInstance,
   useAdminUnlinkInstance,
+  useAdminSetApelido,
 } from '@/hooks/use-admin-whatsapp';
+import { Input } from '@/components/ui/input';
 import type { WaConfig } from '@/hooks/use-whatsapp-inbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +28,14 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +68,8 @@ import {
   PlugZap,
   Link2,
   X,
+  Pencil,
+  MoreVertical,
   ChevronsUpDown,
   Check,
 } from 'lucide-react';
@@ -372,6 +384,87 @@ function NovaInstanciaDialog({
   );
 }
 
+// ─── Apelido da instância (edição inline) ──────────────────────────────────────
+
+function InstanciaApelido({ instancia }: { instancia: InstanciaRow }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(instancia.apelido ?? '');
+  const setApelido = useAdminSetApelido();
+
+  function startEdit() {
+    setValue(instancia.apelido ?? '');
+    setEditing(true);
+  }
+
+  function save() {
+    const trimmed = value.trim();
+    if (trimmed === (instancia.apelido ?? '')) {
+      setEditing(false);
+      return;
+    }
+    setApelido.mutate(
+      { instanceId: instancia.id, apelido: trimmed || null },
+      { onSuccess: () => setEditing(false) },
+    );
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+          onBlur={save}
+          placeholder="Ex: WhatsApp Vendas"
+          className="h-7 text-xs px-2 max-w-[180px]"
+          disabled={setApelido.isPending}
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 shrink-0"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={save}
+          disabled={setApelido.isPending}
+        >
+          {setApelido.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-7 p-0 text-muted-foreground shrink-0"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setEditing(false)}
+          disabled={setApelido.isPending}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={startEdit}
+      className="group flex items-center gap-1.5 min-w-0 text-left"
+      title="Editar apelido da instância"
+    >
+      {instancia.apelido ? (
+        <span className="text-sm font-medium truncate">{instancia.apelido}</span>
+      ) : (
+        <span className="text-xs text-muted-foreground/70 italic truncate">Sem apelido — clique para nomear</span>
+      )}
+      <Pencil className="h-3 w-3 text-muted-foreground/0 group-hover:text-muted-foreground/70 transition-colors shrink-0" />
+    </button>
+  );
+}
+
 // ─── Card de Instância ────────────────────────────────────────────────────────
 
 function InstanciaCard({
@@ -417,62 +510,83 @@ function InstanciaCard({
           </div>
 
           <div className="flex-1 min-w-0">
-            <span className="text-xs font-mono text-muted-foreground truncate block">
+            <InstanciaApelido instancia={instancia} />
+            <span className="text-[11px] font-mono text-muted-foreground/70 truncate block mt-0.5">
               {instancia.instance_name}
             </span>
-            {instancia.usuarios.length === 0 && (
-              <span className="text-xs text-muted-foreground/60 italic">sem usuários vinculados</span>
-            )}
           </div>
 
           <StatusBadge config={instancia} />
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {!isConnected && (
-              <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1 border-green-300 text-green-700 hover:bg-green-50" onClick={() => setShowQr(true)} disabled={isBusy}>
-                <QrCode className="h-3 w-3" /> Conectar
+              <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1.5 border-green-300 text-green-700 hover:bg-green-50" onClick={() => setShowQr(true)} disabled={isBusy}>
+                <QrCode className="h-3.5 w-3.5" /> Conectar
               </Button>
             )}
             {isConnected && (
-              <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1 border-red-300 text-red-700 hover:bg-red-50" onClick={() => disconnect.mutate(instancia, { onSuccess: invalidate })} disabled={isBusy}>
-                {disconnect.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <PlugZap className="h-3 w-3" />}
+              <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1.5 border-red-300 text-red-700 hover:bg-red-50" onClick={() => disconnect.mutate(instancia, { onSuccess: invalidate })} disabled={isBusy}>
+                {disconnect.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlugZap className="h-3.5 w-3.5" />}
                 Desconectar
               </Button>
             )}
-            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-primary" onClick={() => setShowVincular(true)} disabled={isBusy} title="Vincular usuário">
-              <Link2 className="h-3.5 w-3.5" /> Vincular
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleSync} disabled={isBusy} title="Sincronizar status">
-              {syncStatus.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => setConfirmDelete(true)} disabled={isBusy} title="Remover instância">
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleSync} disabled={isBusy}>
+                  {syncStatus.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Sincronizar status</TooltipContent>
+            </Tooltip>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" disabled={isBusy}>
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => setShowVincular(true)} className="gap-2 text-sm">
+                  <Link2 className="h-3.5 w-3.5" /> Vincular usuário
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setConfirmDelete(true)} className="gap-2 text-sm text-destructive focus:text-destructive">
+                  <Trash2 className="h-3.5 w-3.5" /> Remover instância
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         {/* Chips de usuários vinculados */}
-        {instancia.usuarios.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pl-12">
-            {instancia.usuarios.map(u => (
-              <span
-                key={u.usuario_id}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary border border-primary/20"
+        <div className="flex flex-wrap items-center gap-1.5 pl-12">
+          {instancia.usuarios.map(u => (
+            <span
+              key={u.usuario_id}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary border border-primary/20"
+            >
+              <User className="h-2.5 w-2.5 shrink-0" />
+              {u.nome}
+              <button
+                className="ml-0.5 hover:text-destructive transition-colors"
+                onClick={() => unlink.mutate({ instanceId: instancia.id, targetUsuarioId: u.usuario_id }, { onSuccess: invalidate })}
+                disabled={isBusy}
+                title={`Desvincular ${u.nome}`}
               >
-                <User className="h-2.5 w-2.5 shrink-0" />
-                {u.nome}
-                <button
-                  className="ml-0.5 hover:text-destructive transition-colors"
-                  onClick={() => unlink.mutate({ instanceId: instancia.id, targetUsuarioId: u.usuario_id }, { onSuccess: invalidate })}
-                  disabled={isBusy}
-                  title={`Desvincular ${u.nome}`}
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => setShowVincular(true)}
+            disabled={isBusy}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+          >
+            <Link2 className="h-2.5 w-2.5" /> Vincular
+          </button>
+        </div>
       </div>
 
       {showQr && <QrDialog open={showQr} config={instancia} onClose={() => setShowQr(false)} />}
@@ -664,7 +778,7 @@ export function WhatsAppInstanciasTab() {
                 Assinar remetente nas mensagens enviadas
               </Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Inclui "*Nome - Cargo*" na primeira linha das mensagens enviadas pelo CRM, para que o contato saiba quem está falando.
+                Inclui "*Nome*" na primeira linha das mensagens enviadas pelo CRM, para que o contato saiba quem está falando.
               </p>
             </div>
             <Switch

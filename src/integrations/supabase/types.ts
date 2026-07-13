@@ -621,6 +621,7 @@ export type Database = {
       }
       configuracoes_wapi: {
         Row: {
+          apelido: string | null
           api_instance_name: string | null
           api_key: string
           created_at: string
@@ -634,6 +635,7 @@ export type Database = {
           webhook_secret: string | null
         }
         Insert: {
+          apelido?: string | null
           api_instance_name?: string | null
           api_key: string
           created_at?: string
@@ -647,6 +649,7 @@ export type Database = {
           webhook_secret?: string | null
         }
         Update: {
+          apelido?: string | null
           api_instance_name?: string | null
           api_key?: string
           created_at?: string
@@ -2265,6 +2268,7 @@ export type Database = {
           empresa_id: string
           foto_perfil_url: string | null
           id: string
+          instancia_id: string | null
           is_group: boolean
           nao_lidas: number
           nome_contato: string | null
@@ -2282,6 +2286,7 @@ export type Database = {
           empresa_id: string
           foto_perfil_url?: string | null
           id?: string
+          instancia_id?: string | null
           is_group?: boolean
           nao_lidas?: number
           nome_contato?: string | null
@@ -2299,6 +2304,7 @@ export type Database = {
           empresa_id?: string
           foto_perfil_url?: string | null
           id?: string
+          instancia_id?: string | null
           is_group?: boolean
           nao_lidas?: number
           nome_contato?: string | null
@@ -2328,6 +2334,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversas_instancia_id_fkey"
+            columns: ["instancia_id"]
+            isOneToOne: false
+            referencedRelation: "configuracoes_wapi"
             referencedColumns: ["id"]
           },
         ]

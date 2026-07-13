@@ -207,6 +207,30 @@ export function useAdminDisconnect() {
   });
 }
 
+// --- Definir apelido de exibição da instância (identificador técnico continua o mesmo) ---
+
+export function useAdminSetApelido() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { instanceId: string; apelido: string | null }) => {
+      const { error } = await supabase
+        .from('configuracoes_wapi')
+        .update({ apelido: params.apelido })
+        .eq('id', params.instanceId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin_wa_instancias'] });
+      qc.invalidateQueries({ queryKey: ['wa_instancias'] });
+      toast.success('Apelido atualizado');
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao salvar apelido');
+    },
+  });
+}
+
 // Mantido por compatibilidade com código legado que ainda usa useAdminProvision
 /** @deprecated Use useAdminCreateInstance */
 export const useAdminProvision = useAdminCreateInstance;

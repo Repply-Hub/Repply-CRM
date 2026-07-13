@@ -39,6 +39,7 @@ export interface WaConversa {
   participantes: { nome: string | null; telefone: string }[];
   created_at: string;
   updated_at: string;
+  instancia_id: string | null;
   responsaveis?: WaResponsavel[];
 }
 
@@ -82,9 +83,16 @@ export interface WaConfig {
   instance_url: string;
   api_key: string;
   instance_name: string;
+  apelido: string | null;
   status: 'connected' | 'disconnected' | 'connecting';
   webhook_secret: string | null;
   provisionada: boolean;
+}
+
+export interface WaInstanciaOption {
+  id: string;
+  instance_name: string;
+  apelido: string | null;
 }
 
 async function getEmpresaId(): Promise<string | null> {
@@ -153,6 +161,26 @@ export function useWaConversas() {
   }, [qc]);
 
   return query;
+}
+
+// --- Instâncias WhatsApp da empresa (para o filtro "Instância" na caixa de entrada) ---
+
+export function useWaInstancias() {
+  return useQuery<WaInstanciaOption[]>({
+    queryKey: ['wa_instancias'],
+    queryFn: async () => {
+      const empresaId = await getEmpresaId();
+      if (!empresaId) return [];
+      const { data, error } = await supabase
+        .from('configuracoes_wapi')
+        .select('id, instance_name, apelido')
+        .eq('empresa_id', empresaId)
+        .eq('provisionada', true)
+        .order('instance_name');
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 }
 
 // --- Mensagens de uma conversa ---
@@ -578,16 +606,34 @@ export function useWaSetResponsaveis() {
 
   return useMutation({
     mutationFn: async ({ conversaId, usuarioIds }: { conversaId: string; usuarioIds: string[] }) => {
-      const { error: delErr } = await supabase
+      // Faz diff em vez de apagar tudo e reinserir: um usuário não-admin só continua
+      // com permissão para editar essa conversa (RLS) enquanto ele mesmo seguir como
+      // responsável, então remover-e-recriar em massa derrubaria a própria permissão
+      // no meio da operação sempre que ele não estivesse se auto-removendo.
+      const { data: existentes, error: fetchErr } = await supabase
         .from('whatsapp_conversa_responsaveis')
-        .delete()
+        .select('usuario_id')
         .eq('conversa_id', conversaId);
-      if (delErr) throw delErr;
+      if (fetchErr) throw fetchErr;
 
-      if (usuarioIds.length > 0) {
+      const existentesIds = new Set((existentes ?? []).map(r => r.usuario_id));
+      const novosIds = new Set(usuarioIds);
+      const paraRemover = [...existentesIds].filter(id => !novosIds.has(id));
+      const paraAdicionar = [...novosIds].filter(id => !existentesIds.has(id));
+
+      if (paraRemover.length > 0) {
+        const { error: delErr } = await supabase
+          .from('whatsapp_conversa_responsaveis')
+          .delete()
+          .eq('conversa_id', conversaId)
+          .in('usuario_id', paraRemover);
+        if (delErr) throw delErr;
+      }
+
+      if (paraAdicionar.length > 0) {
         const { error: insErr } = await supabase
           .from('whatsapp_conversa_responsaveis')
-          .insert(usuarioIds.map(uid => ({ conversa_id: conversaId, usuario_id: uid })));
+          .insert(paraAdicionar.map(uid => ({ conversa_id: conversaId, usuario_id: uid })));
         if (insErr) throw insErr;
       }
     },
