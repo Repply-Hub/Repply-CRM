@@ -192,6 +192,32 @@ async function downloadAndStoreMedia(
   }
 }
 
+// Mensagens recebidas criam/atualizam a conversa via service role, que não passa
+// pelo trigger de auto-atribuição de responsável (esse só roda para inserts feitos
+// pelo client autenticado, ver 20260709190000_whatsapp_conversas_restringe_admin_e_responsaveis.sql).
+// Sem isso, a RLS de whatsapp_conversas/whatsapp_mensagens esconde a conversa de
+// qualquer usuário que não seja admin/role=empresa, mesmo a mensagem estando no banco.
+async function ensureResponsaveisDaInstancia(supabase: any, conversaId: string, instanciaId: string) {
+  const { data: links, error: linksError } = await supabase
+    .from("wapi_instancia_usuarios")
+    .select("usuario_auth_id")
+    .eq("instancia_id", instanciaId);
+  if (linksError || !links?.length) return;
+
+  const authIds = links.map((l: any) => l.usuario_auth_id);
+  const { data: usuarios, error: usuariosError } = await supabase
+    .from("usuarios")
+    .select("id")
+    .in("user_id", authIds);
+  if (usuariosError || !usuarios?.length) return;
+
+  const rows = usuarios.map((u: any) => ({ conversa_id: conversaId, usuario_id: u.id }));
+  const { error } = await supabase
+    .from("whatsapp_conversa_responsaveis")
+    .upsert(rows, { onConflict: "conversa_id,usuario_id", ignoreDuplicates: true });
+  if (error) console.error("[webhook] ensureResponsaveisDaInstancia:", error);
+}
+
 async function handleIncomingMessage(
   supabase: any,
   empresaId: string,
@@ -363,6 +389,8 @@ async function handleIncomingMessage(
     }
     conversa = data;
   }
+
+  await ensureResponsaveisDaInstancia(supabase, conversa.id, config.id);
 
   const insertData: any = {
     conversa_id: conversa.id,
