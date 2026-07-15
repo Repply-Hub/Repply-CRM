@@ -58,6 +58,7 @@ export function useAdminLinkInstance() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
+      qc.invalidateQueries({ queryKey: ['admin_wa_instancias'] });
       toast.success('Instância vinculada ao usuário');
     },
     onError: (err: any) => {
@@ -81,6 +82,7 @@ export function useAdminUnlinkInstance() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
+      qc.invalidateQueries({ queryKey: ['admin_wa_instancias'] });
       toast.success('Usuário desvinculado da instância');
     },
     onError: (err: any) => {

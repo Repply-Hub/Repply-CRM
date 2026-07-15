@@ -23,6 +23,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Loader2,
   Wifi,
   WifiOff,
@@ -39,6 +46,8 @@ import {
   QrCode,
   PlugZap,
   Pencil,
+  Link2,
+  Unlink,
   Check as CheckIcon,
   X as XIcon,
 } from 'lucide-react';
@@ -47,6 +56,8 @@ import { toast } from 'sonner';
 import {
   useAdminProvision,
   useAdminDeleteInstance,
+  useAdminLinkInstance,
+  useAdminUnlinkInstance,
   useAdminConnect,
   useAdminSyncStatus,
   useAdminDisconnect,
@@ -69,6 +80,7 @@ interface EmpresaGroup {
   empresa_id: string;
   empresa_nome: string;
   usuarios: UsuarioComInstancia[];
+  instancias: WaConfig[];
 }
 
 // ─── Helpers visuais ──────────────────────────────────────────────────────────
@@ -339,16 +351,22 @@ function QrDialog({
 
 function UsuarioRow({
   usuario,
+  instanciasDaEmpresa,
   onRefresh,
 }: {
   usuario: UsuarioComInstancia;
+  instanciasDaEmpresa: WaConfig[];
   onRefresh: () => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [selectedInstanceId, setSelectedInstanceId] = useState('');
 
   const provision = useAdminProvision();
   const deleteInstance = useAdminDeleteInstance();
+  const linkInstance = useAdminLinkInstance();
+  const unlinkInstance = useAdminUnlinkInstance();
   const syncStatus = useAdminSyncStatus();
   const disconnect = useAdminDisconnect();
 
@@ -356,8 +374,31 @@ function UsuarioRow({
   const isProvisioned = !!config?.provisionada;
   const isConnected = config?.status === 'connected';
 
+  // Instâncias da mesma empresa que este usuário ainda não está vinculado
+  const outrasInstancias = instanciasDaEmpresa.filter(i => i.id !== config?.id);
+
   async function handleProvision() {
-    await provision.mutateAsync(usuario.usuario_id);
+    await provision.mutateAsync({ targetUsuarioId: usuario.usuario_id });
+    onRefresh();
+  }
+
+  async function handleLink() {
+    if (!selectedInstanceId) return;
+    await linkInstance.mutateAsync({
+      instanceId: selectedInstanceId,
+      targetUsuarioId: usuario.usuario_id,
+    });
+    setLinking(false);
+    setSelectedInstanceId('');
+    onRefresh();
+  }
+
+  async function handleUnlink() {
+    if (!config) return;
+    await unlinkInstance.mutateAsync({
+      instanceId: config.id,
+      targetUsuarioId: usuario.usuario_id,
+    });
     onRefresh();
   }
 
@@ -375,7 +416,8 @@ function UsuarioRow({
   }
 
   async function handleDelete() {
-    await deleteInstance.mutateAsync(usuario.usuario_id);
+    if (!config) return;
+    await deleteInstance.mutateAsync(config.id);
     setConfirmDelete(false);
     onRefresh();
   }
@@ -383,6 +425,8 @@ function UsuarioRow({
   const isBusy =
     provision.isPending ||
     deleteInstance.isPending ||
+    linkInstance.isPending ||
+    unlinkInstance.isPending ||
     syncStatus.isPending ||
     disconnect.isPending;
 
@@ -412,7 +456,59 @@ function UsuarioRow({
 
         {/* Ações */}
         <div className="flex items-center gap-1 shrink-0">
-          {!isProvisioned && (
+          {!isProvisioned && linking && (
+            <div className="flex items-center gap-1">
+              <Select value={selectedInstanceId} onValueChange={setSelectedInstanceId}>
+                <SelectTrigger className="h-7 w-40 text-xs px-2">
+                  <SelectValue placeholder="Escolha a instância" />
+                </SelectTrigger>
+                <SelectContent>
+                  {outrasInstancias.map(inst => (
+                    <SelectItem key={inst.id} value={inst.id} className="text-xs">
+                      {inst.apelido || inst.instance_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700"
+                onClick={handleLink}
+                disabled={isBusy || !selectedInstanceId}
+              >
+                {linkInstance.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <CheckIcon className="h-3.5 w-3.5" />
+                }
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-muted-foreground"
+                onClick={() => { setLinking(false); setSelectedInstanceId(''); }}
+                disabled={isBusy}
+              >
+                <XIcon className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+
+          {!isProvisioned && !linking && outrasInstancias.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={() => setLinking(true)}
+              disabled={isBusy}
+              title="Vincular a uma instância já existente na empresa"
+            >
+              <Link2 className="h-3 w-3" />
+              Vincular
+            </Button>
+          )}
+
+          {!isProvisioned && !linking && (
             <Button
               size="sm"
               variant="outline"
@@ -425,6 +521,22 @@ function UsuarioRow({
                 : <Plus className="h-3 w-3" />
               }
               Criar
+            </Button>
+          )}
+
+          {isProvisioned && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-amber-600"
+              onClick={handleUnlink}
+              disabled={isBusy}
+              title="Desvincular usuário desta instância (a instância continua existindo para os demais)"
+            >
+              {unlinkInstance.isPending
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Unlink className="h-3.5 w-3.5" />
+              }
             </Button>
           )}
 
@@ -480,7 +592,7 @@ function UsuarioRow({
               className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
               onClick={() => setConfirmDelete(true)}
               disabled={isBusy}
-              title="Remover instância"
+              title="Excluir instância da uazapi (remove para todos os usuários vinculados)"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -634,7 +746,7 @@ function EmpresaCard({
                   </div>
                   <div className="space-y-2">
                     {grupo.usuarios.map(u => (
-                      <UsuarioRow key={u.usuario_id} usuario={u} onRefresh={onRefresh} />
+                      <UsuarioRow key={u.usuario_id} usuario={u} instanciasDaEmpresa={group.instancias} onRefresh={onRefresh} />
                     ))}
                   </div>
                 </div>
@@ -648,7 +760,7 @@ function EmpresaCard({
                   {semInstancia
                     .sort((a, b) => a.usuario_nome.localeCompare(b.usuario_nome))
                     .map(u => (
-                      <UsuarioRow key={u.usuario_id} usuario={u} onRefresh={onRefresh} />
+                      <UsuarioRow key={u.usuario_id} usuario={u} instanciasDaEmpresa={group.instancias} onRefresh={onRefresh} />
                     ))}
                 </div>
               )}
@@ -660,7 +772,7 @@ function EmpresaCard({
                   <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider pt-1">
                     Instância principal
                   </p>
-                  <UsuarioRow usuario={principal} onRefresh={onRefresh} />
+                  <UsuarioRow usuario={principal} instanciasDaEmpresa={group.instancias} onRefresh={onRefresh} />
                 </div>
               )}
 
@@ -670,7 +782,7 @@ function EmpresaCard({
                     Funcionários ({funcionarios.length})
                   </p>
                   {funcionarios.map(u => (
-                    <UsuarioRow key={u.usuario_id} usuario={u} onRefresh={onRefresh} />
+                    <UsuarioRow key={u.usuario_id} usuario={u} instanciasDaEmpresa={group.instancias} onRefresh={onRefresh} />
                   ))}
                 </div>
               )}
@@ -718,6 +830,14 @@ const AdminWhatsAppInstancias = () => {
       }
       const empresaMap = new Map((empresas ?? []).map(e => [e.id, e.nome]));
 
+      const instanciasPorEmpresa = new Map<string, WaConfig[]>();
+      for (const c of (configs ?? []) as WaConfig[]) {
+        if (!c.empresa_id) continue;
+        const list = instanciasPorEmpresa.get(c.empresa_id) ?? [];
+        list.push(c);
+        instanciasPorEmpresa.set(c.empresa_id, list);
+      }
+
       const rows: UsuarioComInstancia[] = (usuarios ?? [])
         .filter(u => u.empresa_id)
         .map(u => ({
@@ -738,6 +858,7 @@ const AdminWhatsAppInstancias = () => {
             empresa_id: eid,
             empresa_nome: empresaMap.get(eid) ?? 'Empresa desconhecida',
             usuarios: [],
+            instancias: instanciasPorEmpresa.get(eid) ?? [],
           });
         }
         groupMap.get(eid)!.usuarios.push(row);

@@ -129,6 +129,10 @@ import {
   Mail,
   Link2,
   Smartphone,
+  UserCheck,
+  UserX,
+  List,
+  type LucideIcon,
 } from "lucide-react";
 import {
   format,
@@ -465,17 +469,116 @@ function ConversaParticipantesStack({
 }
 
 // Cabeçalho de seção na sidebar de conversas, separando visualmente por instância
-// WhatsApp (apelido) quando o filtro "Instância" está em "Todas" e a empresa tem
-// mais de uma instância conectada.
-function ConversaGroupHeader({ label }: { label: string }) {
+// WhatsApp (apelido) ou por responsável ("Meus chats" / "Não atribuídos").
+function ConversaGroupHeader({
+  label,
+  icon: Icon = Smartphone,
+}: {
+  label: string;
+  icon?: LucideIcon;
+}) {
   return (
     <div className="flex items-center gap-1.5 px-3 pt-3 pb-1 first:pt-1">
-      <Smartphone className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+      <Icon className="h-3 w-3 text-muted-foreground/70 shrink-0" />
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 truncate">
         {label}
       </p>
       <div className="flex-1 border-t border-border/50" />
     </div>
+  );
+}
+
+// Aba "Meus chats": lista espaçosa (sem o painel de mensagens ao lado) só com
+// as conversas atribuídas ao usuário logado.
+function MeusChatsList({
+  conversas,
+  apelidoPorInstanciaId,
+  onOpen,
+}: {
+  conversas: WaConversa[];
+  apelidoPorInstanciaId: Map<string, string>;
+  onOpen: (id: string) => void;
+}) {
+  if (conversas.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+        <UserCheck className="h-8 w-8 text-muted-foreground/40" />
+        <p className="text-sm font-medium text-foreground">
+          Nenhuma conversa atribuída a você
+        </p>
+        <p className="max-w-xs text-xs text-muted-foreground">
+          Conversas que você assumir ou que forem direcionadas para você
+          aparecem aqui.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="flex-1">
+      <div className="divide-y divide-border">
+        {conversas.map((conv) => {
+          const apelidoInstancia = conv.instancia_id
+            ? apelidoPorInstanciaId.get(conv.instancia_id)
+            : undefined;
+          return (
+            <button
+              key={conv.id}
+              onClick={() => onOpen(conv.id)}
+              className="flex w-full items-center gap-3 px-6 py-3 text-left transition-colors hover:bg-muted/50"
+            >
+              <ConversaAvatar conv={conv} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p
+                    className={cn(
+                      "truncate text-sm font-medium text-foreground",
+                      conv.nao_lidas > 0 && "font-bold",
+                    )}
+                  >
+                    {conv.nome_contato ?? formatPhone(conv.telefone)}
+                  </p>
+                  {conv.arquivada && (
+                    <Badge
+                      variant="secondary"
+                      className="h-4 shrink-0 px-1.5 py-0 text-[9px]"
+                    >
+                      Arquivada
+                    </Badge>
+                  )}
+                </div>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {conv.ultima_mensagem ?? "Nenhuma mensagem"}
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <div className="flex items-center gap-1.5">
+                  <ConversaParticipantesStack conv={conv} />
+                  {conv.nao_lidas > 0 && (
+                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
+                      {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
+                    </span>
+                  )}
+                </div>
+                {conv.ultima_mensagem_at && (
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    {formatTime(conv.ultima_mensagem_at)}
+                  </span>
+                )}
+                {apelidoInstancia && (
+                  <Badge
+                    variant="outline"
+                    className="h-4 max-w-[88px] truncate px-1.5 py-0 text-[9px] font-medium leading-none text-muted-foreground"
+                  >
+                    <span className="truncate">{apelidoInstancia}</span>
+                  </Badge>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </ScrollArea>
   );
 }
 
@@ -1964,9 +2067,47 @@ export default function WhatsAppInbox() {
     useWaConversas();
   const { data: config } = useWaConfig();
   const { data: instancias = [] } = useWaInstancias();
+  // Controla o badge de apelido e o filtro "Instância" — aparecem já com 1
+  // instância cadastrada, desde que ela tenha apelido/nome conhecido.
+  const temInstanciaConhecida = instancias.length > 0;
+  // Controla só o agrupamento por cabeçalho na sidebar — agrupar com um único
+  // grupo não agrega nada visualmente, por isso continua exigindo 2+.
   const temMultiplasInstancias = instancias.length > 1;
+  // Admin/gestor ("empresa") podem direcionar uma conversa não atribuída para
+  // qualquer colega — vendedor comum só pode assumir para si mesmo.
+  const isGestor = profile?.role === "empresa" || profile?.role === "admin";
+  const { data: vendedores = [] } = useVendedores();
+  const setResponsaveis = useWaSetResponsaveis();
+
+  function assumirConversa(conv: WaConversa) {
+    if (!profile?.id) return;
+    setResponsaveis.mutate({ conversaId: conv.id, usuarioIds: [profile.id] });
+  }
+
+  function direcionarConversa(conv: WaConversa, usuarioId: string) {
+    setResponsaveis.mutate({ conversaId: conv.id, usuarioIds: [usuarioId] });
+  }
   const [conversaAtivaId, setConversaAtivaId] = useState<string | null>(null);
   const conversaAtiva = conversas.find((c) => c.id === conversaAtivaId) ?? null;
+  const [atribuicaoModalOpen, setAtribuicaoModalOpen] = useState(false);
+  const [dismissedAtribuicaoId, setDismissedAtribuicaoId] = useState<
+    string | null
+  >(null);
+
+  // Abre automaticamente o modal de atribuição sempre que a conversa selecionada
+  // não tiver responsável — e fecha assim que ela for assumida/direcionada
+  // (responsaveis deixa de estar vazio). Um "dismiss" manual não reabre o modal
+  // para a mesma conversa até ela mudar de estado de responsável de novo.
+  useEffect(() => {
+    if (!conversaAtiva) {
+      setAtribuicaoModalOpen(false);
+      return;
+    }
+    const semResponsavel = (conversaAtiva.responsaveis?.length ?? 0) === 0;
+    setAtribuicaoModalOpen(
+      semResponsavel && dismissedAtribuicaoId !== conversaAtiva.id,
+    );
+  }, [conversaAtiva, dismissedAtribuicaoId]);
   const { data: mensagens = [], isLoading: loadingMensagens } = useWaMensagens(
     conversaAtiva?.id ?? null,
   );
@@ -2048,6 +2189,9 @@ export default function WhatsAppInbox() {
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [confirmDeletarMassa, setConfirmDeletarMassa] = useState(false);
   const [leadSheetOpen, setLeadSheetOpen] = useState(false);
+  const [abaInbox, setAbaInbox] = useState<"conversas" | "meus-chats">(
+    "conversas",
+  );
 
   const [texto, setTexto] = useState("");
   const [busca, setBusca] = useState("");
@@ -2266,6 +2410,17 @@ export default function WhatsAppInbox() {
     return true;
   });
 
+  // Lista da aba "Meus chats": todas as conversas em que o usuário logado é
+  // responsável, independente dos filtros de busca/status/instância da aba
+  // "Conversas" — é um atalho fixo, não outra visão dos mesmos filtros.
+  const meusChats = useMemo(
+    () =>
+      conversas.filter((c) =>
+        (c.responsaveis ?? []).some((r) => r.id === profile?.id),
+      ),
+    [conversas, profile?.id],
+  );
+
   // Só agrupa/rotula a sidebar por instância quando a empresa realmente tem mais
   // de uma instância — caso contrário mantém a lista simples de sempre. Com o
   // filtro "Instância" numa instância específica, mostra um único grupo com o
@@ -2315,6 +2470,52 @@ export default function WhatsAppInbox() {
     }
     return { grupos, avulsas };
   }, [conversasFiltradas, temMultiplasInstancias, filtroInstancia, instancias]);
+
+  // Divide a sidebar em "Meus chats" / "Não atribuídos" / "Outros atendentes"
+  // quando o filtro "Conversa" está em "Todos" — mesmo padrão visual usado para
+  // separar por instância. Só grupos com conversas aparecem. Mostra mesmo com um
+  // único grupo (ex: vendedor comum, que por causa da RLS só enxerga "Meus
+  // chats") para manter a mesma UI em qualquer perfil, não só quem vê tudo
+  // (admin/empresa).
+  const conversasAgrupadasPorResponsavel = useMemo(() => {
+    if (filtroConversa !== "todos" || !profile?.id) return null;
+
+    const meus: WaConversa[] = [];
+    const naoAtribuidos: WaConversa[] = [];
+    const outros: WaConversa[] = [];
+    for (const c of conversasFiltradas) {
+      const responsaveis = c.responsaveis ?? [];
+      if (responsaveis.length === 0) naoAtribuidos.push(c);
+      else if (responsaveis.some((r) => r.id === profile.id)) meus.push(c);
+      else outros.push(c);
+    }
+
+    const grupos: {
+      key: string;
+      label: string;
+      icon: LucideIcon;
+      conversas: WaConversa[];
+    }[] = [];
+    if (meus.length)
+      grupos.push({ key: "meus", label: "Meus chats", icon: UserCheck, conversas: meus });
+    if (naoAtribuidos.length)
+      grupos.push({ key: "nao-atribuidos", label: "Não atribuídos", icon: UserX, conversas: naoAtribuidos });
+    if (outros.length)
+      grupos.push({ key: "outros", label: "Outros atendentes", icon: Users, conversas: outros });
+
+    if (grupos.length === 0) return null;
+    return grupos;
+  }, [conversasFiltradas, filtroConversa, profile?.id]);
+
+  // Mapa id → apelido da instância, para exibir o badge na linha da conversa
+  // independente do agrupamento ativo (por responsável ou por instância).
+  const apelidoPorInstanciaId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const inst of instancias) {
+      map.set(inst.id, inst.apelido || inst.instance_name);
+    }
+    return map;
+  }, [instancias]);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -2504,6 +2705,10 @@ export default function WhatsAppInbox() {
   // Item da lista de conversas, compartilhado entre a sidebar (desktop) e o
   // Dialog de conversas (mobile) — só o onClick muda entre os dois.
   function renderConvButton(conv: WaConversa, onSelect: () => void) {
+    const apelidoInstancia =
+      temInstanciaConhecida && conv.instancia_id
+        ? apelidoPorInstanciaId.get(conv.instancia_id)
+        : undefined;
     return (
       <button
         key={conv.id}
@@ -2546,19 +2751,32 @@ export default function WhatsAppInbox() {
             {conv.ultima_mensagem ?? "Nenhuma mensagem"}
           </p>
         </div>
-        {!modoSelecao && <ConversaParticipantesStack conv={conv} />}
         {!modoSelecao &&
-          (conv.ultima_mensagem_at || conv.nao_lidas > 0) && (
+          (conv.ultima_mensagem_at ||
+            conv.nao_lidas > 0 ||
+            apelidoInstancia ||
+            (conv.responsaveis ?? []).length > 0) && (
             <div className="flex flex-col items-end gap-1 shrink-0">
-              {conv.nao_lidas > 0 && (
-                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
-                  {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
-                </span>
-              )}
+              <div className="flex items-center gap-1.5">
+                <ConversaParticipantesStack conv={conv} />
+                {conv.nao_lidas > 0 && (
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
+                    {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
+                  </span>
+                )}
+              </div>
               {conv.ultima_mensagem_at && (
                 <span className="text-[9px] text-muted-foreground font-medium">
                   {formatTime(conv.ultima_mensagem_at)}
                 </span>
+              )}
+              {apelidoInstancia && (
+                <Badge
+                  variant="outline"
+                  className="h-4 max-w-[88px] truncate px-1.5 py-0 text-[9px] font-medium leading-none text-muted-foreground"
+                >
+                  <span className="truncate">{apelidoInstancia}</span>
+                </Badge>
               )}
             </div>
           )}
@@ -2567,6 +2785,20 @@ export default function WhatsAppInbox() {
   }
 
   function renderConvList(onSelect: (conv: WaConversa) => void) {
+    if (conversasAgrupadasPorResponsavel) {
+      return (
+        <>
+          {conversasAgrupadasPorResponsavel.map((grupo) => (
+            <div key={grupo.key}>
+              <ConversaGroupHeader label={grupo.label} icon={grupo.icon} />
+              {grupo.conversas.map((conv) =>
+                renderConvButton(conv, () => onSelect(conv)),
+              )}
+            </div>
+          ))}
+        </>
+      );
+    }
     if (conversasAgrupadasPorInstancia) {
       const { grupos, avulsas } = conversasAgrupadasPorInstancia;
       return (
@@ -2622,6 +2854,18 @@ export default function WhatsAppInbox() {
       headerContent={headerContent}
       mainClassName="flex-1 overflow-hidden"
     >
+      {abaInbox === "meus-chats" ? (
+        <div className="flex h-full flex-col">
+          <MeusChatsList
+            conversas={meusChats}
+            apelidoPorInstanciaId={apelidoPorInstanciaId}
+            onOpen={(id) => {
+              setConversaAtivaId(id);
+              setAbaInbox("conversas");
+            }}
+          />
+        </div>
+      ) : (
       <div className="flex h-full">
         {/* Sidebar de conversas */}
         {/* Em telas pequenas escondemos a sidebar fixa e usamos um Dialog móvel */}
@@ -2858,6 +3102,33 @@ export default function WhatsAppInbox() {
                   <div className="flex">
                     <div className="flex flex-col gap-0.5 w-44">
                       <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                        Visualizar
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAbaInbox(
+                            abaInbox === "meus-chats"
+                              ? "conversas"
+                              : "meus-chats",
+                          )
+                        }
+                        className={cn(
+                          "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                          abaInbox === "meus-chats" &&
+                            "bg-primary/10 text-primary",
+                        )}
+                      >
+                        <span className="flex items-center gap-2">
+                          <List className="h-3.5 w-3.5" />
+                          Meus chats em lista
+                        </span>
+                        {abaInbox === "meus-chats" && (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                      <div className="mx-3 my-1 border-t border-border/50" />
+                      <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                         Conversa
                       </p>
                       {(
@@ -2914,10 +3185,10 @@ export default function WhatsAppInbox() {
                           )}
                         </button>
                       ))}
-                      {/* Só aparece quando a empresa tem mais de uma instância WhatsApp
-                          conectada com usuários diferentes — separa visualmente qual
-                          número está por trás de cada conversa. */}
-                      {temMultiplasInstancias && (
+                      {/* Aparece já com 1 instância WhatsApp conectada — mostra qual
+                          número está por trás de cada conversa mesmo sem ter que
+                          escolher entre múltiplas. */}
+                      {temInstanciaConhecida && (
                         <>
                           <div className="mx-3 my-1 border-t border-border/50" />
                           <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
@@ -3198,6 +3469,33 @@ export default function WhatsAppInbox() {
                       <div className="flex">
                         <div className="flex flex-col gap-0.5 w-44">
                           <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                            Visualizar
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAbaInbox(
+                                abaInbox === "meus-chats"
+                                  ? "conversas"
+                                  : "meus-chats",
+                              )
+                            }
+                            className={cn(
+                              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                              abaInbox === "meus-chats" &&
+                                "bg-primary/10 text-primary",
+                            )}
+                          >
+                            <span className="flex items-center gap-2">
+                              <List className="h-3.5 w-3.5" />
+                              Meus chats em lista
+                            </span>
+                            {abaInbox === "meus-chats" && (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          <div className="mx-3 my-1 border-t border-border/50" />
+                          <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                             Conversa
                           </p>
                           {(
@@ -3254,7 +3552,7 @@ export default function WhatsAppInbox() {
                               )}
                             </button>
                           ))}
-                          {temMultiplasInstancias && (
+                          {temInstanciaConhecida && (
                             <>
                               <div className="mx-3 my-1 border-t border-border/50" />
                               <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
@@ -3422,9 +3720,84 @@ export default function WhatsAppInbox() {
         </Dialog>
 
         {/* Área de mensagens */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 relative">
           {conversaAtiva ? (
             <>
+              {/* Modal de atribuição: cobre só o painel da conversa (não a página
+                  inteira), centralizado sobre a área de mensagens. Aparece ao
+                  abrir uma conversa sem responsável. */}
+              {atribuicaoModalOpen && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+                  <div className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg flex flex-col gap-4">
+                    <div className="flex flex-col items-center gap-2 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/40">
+                        <UserX className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <p className="text-lg font-semibold leading-none tracking-tight">
+                        Conversa sem responsável!
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Ninguém está atendendo{" "}
+                        {conversaAtiva.nome_contato ??
+                          formatPhone(conversaAtiva.telefone)}{" "}
+                        ainda. Assuma a conversa ou direcione para um colega.
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        className="gap-1.5"
+                        onClick={() => assumirConversa(conversaAtiva)}
+                        disabled={setResponsaveis.isPending}
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        Assumir esta conversa
+                      </Button>
+                      {isGestor && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="gap-1.5"
+                              disabled={setResponsaveis.isPending}
+                            >
+                              <Users className="h-4 w-4" />
+                              Direcionar para um colega
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="center" className="w-56">
+                            {vendedores.length === 0 && (
+                              <DropdownMenuItem disabled>
+                                Nenhum colega disponível
+                              </DropdownMenuItem>
+                            )}
+                            {vendedores.map((v) => (
+                              <DropdownMenuItem
+                                key={v.id}
+                                onClick={() =>
+                                  direcionarConversa(conversaAtiva, v.id)
+                                }
+                              >
+                                {v.nome}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setAtribuicaoModalOpen(false);
+                          setDismissedAtribuicaoId(conversaAtiva.id);
+                        }}
+                      >
+                        Agora não
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Header da conversa */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
                 <button
@@ -3953,6 +4326,7 @@ export default function WhatsAppInbox() {
           )}
         </div>
       </div>
+      )}
 
       <NovaConversaDialog
         open={showNovaConversa}
@@ -4052,6 +4426,7 @@ export default function WhatsAppInbox() {
           onPreviewFile={setPreviewFile}
         />
       )}
+
     </AppLayout>
   );
 }
