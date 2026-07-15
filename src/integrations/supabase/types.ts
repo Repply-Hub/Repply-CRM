@@ -2578,6 +2578,10 @@ export type Database = {
         Args: { target_empresa_id: string }
         Returns: undefined
       }
+      set_whatsapp_assinar_remetente_global: {
+        Args: { p_valor: boolean }
+        Returns: number
+      }
       usuario_in_my_empresa: { Args: { _usuario_id: string }; Returns: boolean }
       validar_codigo_empresa: { Args: { p_codigo: string }; Returns: Json }
       vendedor_in_my_empresa: {

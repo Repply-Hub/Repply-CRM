@@ -702,16 +702,17 @@ export function WhatsAppInstanciasTab() {
   const queryClient = useQueryClient();
   const toggleAssinarRemetente = useMutation({
     mutationFn: async (novoValor: boolean) => {
-      if (!data?.empresaId) throw new Error('Empresa não encontrada');
-      const { error } = await supabase
-        .from('empresas')
-        .update({ whatsapp_assinar_remetente: novoValor })
-        .eq('id', data.empresaId);
+      // Aplica a preferência a TODAS as empresas de uma vez (RPC SECURITY DEFINER),
+      // independentemente da conta logada. Ver migration
+      // 20260715120000_wapi_assinar_remetente_global_rpc.sql
+      const { error } = await supabase.rpc('set_whatsapp_assinar_remetente_global', {
+        p_valor: novoValor,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
-      toast.success('Preferência atualizada');
+      toast.success('Preferência aplicada a todas as empresas');
     },
     onError: () => toast.error('Erro ao atualizar preferência'),
   });
@@ -779,6 +780,7 @@ export function WhatsAppInstanciasTab() {
               </Label>
               <p className="text-xs text-muted-foreground mt-1">
                 Inclui "*Nome*" na primeira linha das mensagens enviadas pelo CRM, para que o contato saiba quem está falando.
+                Esta preferência é aplicada a <strong>todas as empresas</strong>.
               </p>
             </div>
             <Switch
