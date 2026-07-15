@@ -2073,9 +2073,12 @@ export default function WhatsAppInbox() {
   // Controla só o agrupamento por cabeçalho na sidebar — agrupar com um único
   // grupo não agrega nada visualmente, por isso continua exigindo 2+.
   const temMultiplasInstancias = instancias.length > 1;
-  // Admin/gestor ("empresa") podem direcionar uma conversa não atribuída para
+  // Admin/gestor/"empresa" podem direcionar uma conversa não atribuída para
   // qualquer colega — vendedor comum só pode assumir para si mesmo.
-  const isGestor = profile?.role === "empresa" || profile?.role === "admin";
+  const isGestor =
+    profile?.role === "empresa" ||
+    profile?.role === "gestor" ||
+    profile?.role === "admin";
   const { data: vendedores = [] } = useVendedores();
   const setResponsaveis = useWaSetResponsaveis();
 
