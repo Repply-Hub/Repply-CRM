@@ -422,30 +422,48 @@ function ConversaParticipantesStack({
   }));
   if (membros.length === 0) return null;
 
-  // Mostra só a imagem do responsável atual — mesmo que a conversa acumule mais
-  // de uma linha em whatsapp_conversa_responsaveis (ex: vários colegas responderam
-  // um grupo movimentado), a UI trata responsabilidade como um cargo único.
-  const responsavel = membros[0];
+  const visiveis = membros.slice(0, 3);
+  const restantes = membros.length - visiveis.length;
   const overlap = spacing === "overlap";
 
   return (
-    <div className="flex shrink-0">
-      <Avatar
-        className={cn(
-          "inline-block h-5 w-5 rounded-full",
-          overlap && "ring-2 ring-background",
-        )}
-      >
-        {responsavel.foto && <AvatarImage src={responsavel.foto} alt="" />}
-        <AvatarFallback
+    <div
+      className={cn(
+        "flex overflow-hidden shrink-0",
+        overlap ? "-space-x-2" : "gap-1.5",
+      )}
+    >
+      {visiveis.map((m, i) => (
+        <Avatar
+          key={`${m.chave}-${i}`}
           className={cn(
-            colorForPhone(responsavel.chave),
-            "text-white text-[7px] font-semibold",
+            "inline-block h-5 w-5 rounded-full",
+            overlap && "ring-2 ring-background",
           )}
         >
-          {initials(responsavel.nome, responsavel.chave)}
-        </AvatarFallback>
-      </Avatar>
+          {m.foto && <AvatarImage src={m.foto} alt="" />}
+          <AvatarFallback
+            className={cn(
+              colorForPhone(m.chave),
+              "text-white text-[7px] font-semibold",
+            )}
+          >
+            {initials(m.nome, m.chave)}
+          </AvatarFallback>
+        </Avatar>
+      ))}
+      {restantes > 0 && (
+        <Avatar
+          className={cn(
+            "inline-block h-5 w-5 rounded-full",
+            overlap && "ring-2 ring-background",
+          )}
+        >
+          <AvatarFallback className="bg-muted text-muted-foreground text-[7px] font-semibold">
+            +{restantes}
+          </AvatarFallback>
+        </Avatar>
+      )}
     </div>
   );
 }
