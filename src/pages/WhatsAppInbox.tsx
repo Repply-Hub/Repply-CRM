@@ -2800,7 +2800,11 @@ export default function WhatsAppInbox() {
         <>
           {conversasAgrupadasPorResponsavel.map((grupo) => (
             <div key={grupo.key}>
-              <ConversaGroupHeader label={grupo.label} icon={grupo.icon} />
+              <ConversaGroupHeader
+                label={grupo.label}
+                icon={grupo.icon}
+                count={grupo.conversas.length}
+              />
               {grupo.conversas.map((conv) =>
                 renderConvButton(conv, () => onSelect(conv)),
               )}
@@ -2815,7 +2819,10 @@ export default function WhatsAppInbox() {
         <>
           {grupos.map((grupo) => (
             <div key={grupo.key}>
-              <ConversaGroupHeader label={grupo.label} />
+              <ConversaGroupHeader
+                label={grupo.label}
+                count={grupo.conversas.length}
+              />
               {grupo.conversas.map((conv) =>
                 renderConvButton(conv, () => onSelect(conv)),
               )}
