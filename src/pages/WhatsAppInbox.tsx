@@ -3741,44 +3741,46 @@ export default function WhatsAppInbox() {
           {conversaAtiva ? (
             <>
               {/* Modal de atribuição: cobre só o painel da conversa (não a página
-                  inteira), centralizado sobre a área de mensagens. Aparece ao
-                  abrir uma conversa sem responsável. */}
+                  inteira), ancorado acima do campo de digitação e centralizado
+                  horizontalmente. Aparece ao abrir uma conversa sem responsável. */}
               {atribuicaoModalOpen && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-                  <div className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg flex flex-col gap-4">
-                    <div className="flex flex-col items-center gap-2 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/40">
-                        <UserX className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                      </div>
-                      <p className="text-lg font-semibold leading-none tracking-tight">
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center p-4 pb-24">
+                  <div className="pointer-events-auto flex w-full max-w-xl items-center gap-4 rounded-lg border bg-background p-4 shadow-lg">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/40">
+                      <UserX className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold leading-none tracking-tight">
                         Conversa sem responsável!
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="mt-1.5 text-xs text-muted-foreground">
                         Ninguém está atendendo{" "}
                         {conversaAtiva.nome_contato ??
                           formatPhone(conversaAtiva.telefone)}{" "}
                         ainda. Assuma a conversa ou direcione para um colega.
                       </p>
                     </div>
-                    <div className="flex flex-col gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       <Button
+                        size="sm"
                         className="gap-1.5"
                         onClick={() => assumirConversa(conversaAtiva)}
                         disabled={setResponsaveis.isPending}
                       >
                         <UserCheck className="h-4 w-4" />
-                        Assumir esta conversa
+                        Assumir
                       </Button>
                       {isGestor && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
+                              size="sm"
                               className="gap-1.5"
                               disabled={setResponsaveis.isPending}
                             >
                               <Users className="h-4 w-4" />
-                              Direcionar para um colega
+                              Direcionar
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="center" className="w-56">
