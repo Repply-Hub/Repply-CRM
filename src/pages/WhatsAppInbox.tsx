@@ -473,17 +473,24 @@ function ConversaParticipantesStack({
 function ConversaGroupHeader({
   label,
   icon: Icon = Smartphone,
+  count,
 }: {
   label: string;
   icon?: LucideIcon;
+  count?: number;
 }) {
   return (
-    <div className="flex items-center gap-1.5 px-3 pt-3 pb-1 first:pt-1">
-      <Icon className="h-3 w-3 text-muted-foreground/70 shrink-0" />
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 truncate">
+    <div className="sticky top-0 z-10 flex items-center gap-1.5 bg-orange-500 px-3 pt-3 pb-1 text-white first:pt-1">
+      <Icon className="h-3 w-3 text-white/80 shrink-0" />
+      <p className="text-[10px] font-bold uppercase tracking-wider text-white/90 truncate">
         {label}
       </p>
-      <div className="flex-1 border-t border-border/50" />
+      <div className="flex-1 border-t border-white/30" />
+      {typeof count === "number" && (
+        <span className="text-[10px] font-bold tabular-nums text-white/90 shrink-0">
+          {count}
+        </span>
+      )}
     </div>
   );
 }
