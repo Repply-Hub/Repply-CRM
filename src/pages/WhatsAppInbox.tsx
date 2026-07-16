@@ -73,6 +73,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { ListPagination } from "@/components/ListPagination";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterButton } from "@/components/FilterButton";
@@ -109,6 +111,7 @@ import {
   Video,
   Image as ImageIcon,
   ChevronDown,
+  ChevronUp,
   Mic,
   Square,
   Download,
@@ -370,31 +373,40 @@ function ParticipanteAvatar({
 }
 
 // Avatar principal da conversa na sidebar: foto/iniciais do contato, ou a foto/ícone
-// do grupo quando for uma conversa em grupo.
-function ConversaAvatar({ conv }: { conv: WaConversa }) {
+// do grupo quando for uma conversa em grupo. `size="lg"` é usado na lista espaçosa
+// de "Meus chats" (mais espaço disponível que a sidebar estreita).
+function ConversaAvatar({
+  conv,
+  size = "sm",
+}: {
+  conv: WaConversa;
+  size?: "sm" | "lg";
+}) {
+  const dimensionClass = size === "lg" ? "h-12 w-12" : "h-8 w-8";
   if (conv.is_group) {
     return (
-      <Avatar className="h-8 w-8 border border-primary/10 shrink-0">
+      <Avatar className={cn(dimensionClass, "border border-primary/10 shrink-0")}>
         {conv.foto_perfil_url && (
           <AvatarImage src={conv.foto_perfil_url} alt="" />
         )}
         <AvatarFallback
           className={cn(colorForPhone(conv.telefone), "text-white")}
         >
-          <Users className="h-3.5 w-3.5" />
+          <Users className={size === "lg" ? "h-5 w-5" : "h-3.5 w-3.5"} />
         </AvatarFallback>
       </Avatar>
     );
   }
   return (
-    <Avatar className="h-8 w-8 border border-primary/10 shrink-0">
+    <Avatar className={cn(dimensionClass, "border border-primary/10 shrink-0")}>
       {conv.foto_perfil_url && (
         <AvatarImage src={conv.foto_perfil_url} alt="" />
       )}
       <AvatarFallback
         className={cn(
           colorForPhone(conv.telefone),
-          "text-white text-[10px] font-semibold",
+          "text-white font-semibold",
+          size === "lg" ? "text-sm" : "text-[10px]",
         )}
       >
         {initials(conv.nome_contato, conv.telefone)}
@@ -412,9 +424,11 @@ function ConversaAvatar({ conv }: { conv: WaConversa }) {
 function ConversaParticipantesStack({
   conv,
   spacing = "overlap",
+  size = "sm",
 }: {
   conv: WaConversa;
   spacing?: "overlap" | "gap";
+  size?: "sm" | "lg";
 }) {
   const membros = (conv.responsaveis ?? []).map((r) => ({
     nome: r.nome,
@@ -426,6 +440,8 @@ function ConversaParticipantesStack({
   const visiveis = membros.slice(0, 3);
   const restantes = membros.length - visiveis.length;
   const overlap = spacing === "overlap";
+  const dimensionClass = size === "lg" ? "h-6 w-6" : "h-5 w-5";
+  const textClass = size === "lg" ? "text-[8px]" : "text-[7px]";
 
   return (
     <div
@@ -438,7 +454,8 @@ function ConversaParticipantesStack({
         <Avatar
           key={`${m.chave}-${i}`}
           className={cn(
-            "inline-block h-5 w-5 rounded-full",
+            "inline-block rounded-full",
+            dimensionClass,
             overlap && "ring-2 ring-background",
           )}
         >
@@ -446,7 +463,8 @@ function ConversaParticipantesStack({
           <AvatarFallback
             className={cn(
               colorForPhone(m.chave),
-              "text-white text-[7px] font-semibold",
+              "text-white font-semibold",
+              textClass,
             )}
           >
             {initials(m.nome, m.chave)}
@@ -456,11 +474,12 @@ function ConversaParticipantesStack({
       {restantes > 0 && (
         <Avatar
           className={cn(
-            "inline-block h-5 w-5 rounded-full",
+            "inline-block rounded-full",
+            dimensionClass,
             overlap && "ring-2 ring-background",
           )}
         >
-          <AvatarFallback className="bg-muted text-muted-foreground text-[7px] font-semibold">
+          <AvatarFallback className={cn("bg-muted text-muted-foreground font-semibold", textClass)}>
             +{restantes}
           </AvatarFallback>
         </Avatar>
@@ -502,11 +521,20 @@ function MeusChatsList({
   conversas,
   apelidoPorInstanciaId,
   onOpen,
+  onVoltarNormal,
 }: {
   conversas: WaConversa[];
   apelidoPorInstanciaId: Map<string, string>;
   onOpen: (id: string) => void;
+  onVoltarNormal: () => void;
 }) {
+  const [busca, setBusca] = useState("");
+  const [filtroLeitura, setFiltroLeitura] = useState<
+    "todas" | "nao_lidas" | "lidas"
+  >("todas");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+
   if (conversas.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
@@ -518,75 +546,250 @@ function MeusChatsList({
           Conversas que você assumir ou que forem direcionadas para você
           aparecem aqui.
         </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-2 gap-1.5"
+          onClick={onVoltarNormal}
+        >
+          <PanelLeftOpen className="h-3.5 w-3.5" />
+          Voltar para visualização normal
+        </Button>
       </div>
     );
   }
 
+  const termo = busca.trim().toLowerCase();
+  const conversasPorBusca = !termo
+    ? conversas
+    : conversas.filter((c) => {
+        const apelidoInstancia = c.instancia_id
+          ? apelidoPorInstanciaId.get(c.instancia_id)
+          : undefined;
+        return (
+          (c.nome_contato ?? "").toLowerCase().includes(termo) ||
+          c.telefone.includes(termo) ||
+          (c.ultima_mensagem ?? "").toLowerCase().includes(termo) ||
+          (c.responsaveis ?? []).some((r) =>
+            r.nome.toLowerCase().includes(termo),
+          ) ||
+          (apelidoInstancia ?? "").toLowerCase().includes(termo)
+        );
+      });
+
+  const countNaoLidas = conversasPorBusca.filter((c) => c.nao_lidas > 0).length;
+  const countLidas = conversasPorBusca.length - countNaoLidas;
+
+  const conversasFiltradas = conversasPorBusca.filter((c) => {
+    if (filtroLeitura === "nao_lidas") return c.nao_lidas > 0;
+    if (filtroLeitura === "lidas") return c.nao_lidas === 0;
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(conversasFiltradas.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginadas = conversasFiltradas.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+
   return (
-    <ScrollArea className="flex-1">
-      <div className="divide-y divide-border">
-        {conversas.map((conv) => {
-          const apelidoInstancia = conv.instancia_id
-            ? apelidoPorInstanciaId.get(conv.instancia_id)
-            : undefined;
-          return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 px-4 pt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 w-fit shrink-0">
+          {(
+            [
+              { key: "todas", label: "Todas", count: conversasPorBusca.length },
+              { key: "nao_lidas", label: "Não lidas", count: countNaoLidas },
+              { key: "lidas", label: "Lidas", count: countLidas },
+            ] as const
+          ).map((opt) => (
             <button
-              key={conv.id}
-              onClick={() => onOpen(conv.id)}
-              className="flex w-full items-center gap-3 px-6 py-3 text-left transition-colors hover:bg-muted/50"
+              key={opt.key}
+              type="button"
+              onClick={() => {
+                setFiltroLeitura(opt.key);
+                setPage(1);
+              }}
+              className={cn(
+                "flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md px-3 py-1.5 transition-colors",
+                filtroLeitura === opt.key
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
             >
-              <ConversaAvatar conv={conv} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p
-                    className={cn(
-                      "truncate text-sm font-medium text-foreground",
-                      conv.nao_lidas > 0 && "font-bold",
-                    )}
-                  >
-                    {conv.nome_contato ?? formatPhone(conv.telefone)}
-                  </p>
-                  {conv.arquivada && (
-                    <Badge
-                      variant="secondary"
-                      className="h-4 shrink-0 px-1.5 py-0 text-[9px]"
-                    >
-                      Arquivada
-                    </Badge>
-                  )}
-                </div>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {conv.ultima_mensagem ?? "Nenhuma mensagem"}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <div className="flex items-center gap-1.5">
-                  <ConversaParticipantesStack conv={conv} />
-                  {conv.nao_lidas > 0 && (
-                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
-                      {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
-                    </span>
-                  )}
-                </div>
-                {conv.ultima_mensagem_at && (
-                  <span className="text-[10px] font-medium text-muted-foreground">
-                    {formatTime(conv.ultima_mensagem_at)}
-                  </span>
+              {opt.label}
+              <span
+                className={cn(
+                  "text-[9px] px-1 rounded-full font-semibold",
+                  filtroLeitura === opt.key
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted-foreground/10",
                 )}
-                {apelidoInstancia && (
-                  <Badge
-                    variant="outline"
-                    className="h-4 max-w-[88px] truncate px-1.5 py-0 text-[9px] font-medium leading-none text-muted-foreground"
-                  >
-                    <span className="truncate">{apelidoInstancia}</span>
-                  </Badge>
-                )}
-              </div>
+              >
+                {opt.count}
+              </span>
             </button>
-          );
-        })}
+          ))}
+        </div>
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:ring-1"
+            placeholder="Buscar por nome, telefone, mensagem ou responsável..."
+            value={busca}
+            onChange={(e) => {
+              setBusca(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 shrink-0"
+          onClick={onVoltarNormal}
+        >
+          <PanelLeftOpen className="h-3.5 w-3.5" />
+          Visualização normal
+        </Button>
       </div>
-    </ScrollArea>
+      <div className="flex-1 min-h-0 p-4">
+        <div className="flex h-full min-h-0 flex-col rounded-xl border border-border overflow-hidden">
+        {conversasFiltradas.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+            <Search className="h-8 w-8 text-muted-foreground/40" />
+            <p className="text-sm font-medium text-foreground">
+              Nenhuma conversa encontrada
+            </p>
+            <p className="max-w-xs text-xs text-muted-foreground">
+              Tente buscar por outro nome, telefone ou responsável.
+            </p>
+          </div>
+        ) : (
+        <Table wrapperClassName="flex-1 min-h-0 overflow-auto">
+              <TableHeader>
+                <TableRow className="bg-muted hover:bg-muted">
+                  <TableHead className="sticky top-0 z-10 bg-muted min-w-[220px] whitespace-nowrap px-4 py-3 text-xs font-semibold">
+                    Contato
+                  </TableHead>
+                  <TableHead className="sticky top-0 z-10 bg-muted min-w-[240px] whitespace-nowrap px-4 py-3 text-xs font-semibold">
+                    Última mensagem
+                  </TableHead>
+                  <TableHead className="sticky top-0 z-10 bg-muted w-[140px] whitespace-nowrap px-4 py-3 text-xs font-semibold">
+                    Responsáveis
+                  </TableHead>
+                  <TableHead className="sticky top-0 z-10 bg-muted w-[120px] whitespace-nowrap px-4 py-3 text-xs font-semibold">
+                    Instância
+                  </TableHead>
+                  <TableHead className="sticky top-0 z-10 bg-muted w-[90px] whitespace-nowrap px-4 py-3 text-right text-xs font-semibold">
+                    Horário
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginadas.map((conv) => {
+                  const apelidoInstancia = conv.instancia_id
+                    ? apelidoPorInstanciaId.get(conv.instancia_id)
+                    : undefined;
+                  return (
+                    <TableRow
+                      key={conv.id}
+                      onClick={() => onOpen(conv.id)}
+                      className="cursor-pointer hover:bg-muted/30"
+                    >
+                      <TableCell className="px-4 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <ConversaAvatar conv={conv} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  "truncate text-sm text-foreground",
+                                  conv.nao_lidas > 0 ? "font-bold" : "font-semibold",
+                                )}
+                              >
+                                {conv.nome_contato ?? formatPhone(conv.telefone)}
+                              </span>
+                              {conv.arquivada && (
+                                <Badge
+                                  variant="secondary"
+                                  className="h-4 shrink-0 px-1.5 py-0 text-[9px]"
+                                >
+                                  Arquivada
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {formatPhone(conv.telefone)}
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 max-w-[320px]">
+                        <span
+                          className={cn(
+                            "block truncate text-sm text-muted-foreground",
+                            conv.nao_lidas > 0 && "text-foreground font-medium",
+                          )}
+                        >
+                          {conv.ultima_mensagem ?? "Nenhuma mensagem"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5">
+                        <ConversaParticipantesStack conv={conv} />
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5">
+                        {apelidoInstancia ? (
+                          <Badge
+                            variant="outline"
+                            className="max-w-[100px] truncate px-1.5 py-0 text-[10px] font-medium text-muted-foreground"
+                          >
+                            <span className="truncate">{apelidoInstancia}</span>
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {conv.nao_lidas > 0 && (
+                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
+                              {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
+                            </span>
+                          )}
+                          {conv.ultima_mensagem_at && (
+                            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                              {formatTime(conv.ultima_mensagem_at)}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+        )}
+        {conversasFiltradas.length > 0 && (
+          <div className="shrink-0 border-t border-border px-4 py-3">
+            <ListPagination
+              page={safePage}
+              totalPages={totalPages}
+              totalItems={conversasFiltradas.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(nextPageSize) => {
+                setPageSize(nextPageSize);
+                setPage(1);
+              }}
+              itemLabel="conversa"
+            />
+          </div>
+        )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1823,6 +2026,9 @@ function LeadSheet({
         <SheetHeader className="px-6 py-5 border-b">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border border-primary/10">
+              {conversa.foto_perfil_url && (
+                <AvatarImage src={conversa.foto_perfil_url} alt="" />
+              )}
               <AvatarFallback
                 className={cn(
                   colorForPhone(conversa.telefone),
@@ -2233,6 +2439,13 @@ export default function WhatsAppInbox() {
     profile?.role === "admin";
   const { data: vendedores = [] } = useVendedores();
   const setResponsaveis = useWaSetResponsaveis();
+  const [direcionarOpen, setDirecionarOpen] = useState(false);
+  const [buscaDirecionar, setBuscaDirecionar] = useState("");
+  const vendedoresDirecionar = useMemo(() => {
+    if (!buscaDirecionar.trim()) return vendedores;
+    const termo = buscaDirecionar.trim().toLowerCase();
+    return vendedores.filter((v) => v.nome.toLowerCase().includes(termo));
+  }, [vendedores, buscaDirecionar]);
 
   function assumirConversa(conv: WaConversa) {
     if (!profile?.id) return;
@@ -2241,6 +2454,8 @@ export default function WhatsAppInbox() {
 
   function direcionarConversa(conv: WaConversa, usuarioId: string) {
     setResponsaveis.mutate({ conversaId: conv.id, usuarioIds: [usuarioId] });
+    setDirecionarOpen(false);
+    setBuscaDirecionar("");
   }
   const [conversaAtivaId, setConversaAtivaId] = useState<string | null>(null);
   const conversaAtiva = conversas.find((c) => c.id === conversaAtivaId) ?? null;
@@ -3057,16 +3272,15 @@ export default function WhatsAppInbox() {
       mainClassName="flex-1 overflow-hidden"
     >
       {abaInbox === "meus-chats" ? (
-        <div className="flex h-full flex-col">
-          <MeusChatsList
-            conversas={meusChats}
-            apelidoPorInstanciaId={apelidoPorInstanciaId}
-            onOpen={(id) => {
-              setConversaAtivaId(id);
-              setAbaInbox("conversas");
-            }}
-          />
-        </div>
+        <MeusChatsList
+          conversas={meusChats}
+          apelidoPorInstanciaId={apelidoPorInstanciaId}
+          onOpen={(id) => {
+            setConversaAtivaId(id);
+            setAbaInbox("conversas");
+          }}
+          onVoltarNormal={() => setAbaInbox("conversas")}
+        />
       ) : (
       <div className="flex h-full">
         {/* Sidebar de conversas */}
@@ -3956,8 +4170,14 @@ export default function WhatsAppInbox() {
                         Assumir
                       </Button>
                       {isGestor && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+                        <Popover
+                          open={direcionarOpen}
+                          onOpenChange={(v) => {
+                            setDirecionarOpen(v);
+                            if (!v) setBuscaDirecionar("");
+                          }}
+                        >
+                          <PopoverTrigger asChild>
                             <Button
                               variant="outline"
                               size="sm"
@@ -3966,26 +4186,61 @@ export default function WhatsAppInbox() {
                             >
                               <Users className="h-4 w-4" />
                               Direcionar
+                              {direcionarOpen ? (
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              )}
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="center" className="w-56">
-                            {vendedores.length === 0 && (
-                              <DropdownMenuItem disabled>
-                                Nenhum colega disponível
-                              </DropdownMenuItem>
-                            )}
-                            {vendedores.map((v) => (
-                              <DropdownMenuItem
-                                key={v.id}
-                                onClick={() =>
-                                  direcionarConversa(conversaAtiva, v.id)
-                                }
-                              >
-                                {v.nome}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                          </PopoverTrigger>
+                          <PopoverContent align="center" className="w-64 p-0">
+                            <Command shouldFilter={false}>
+                              <CommandInput
+                                placeholder="Buscar colega..."
+                                value={buscaDirecionar}
+                                onValueChange={setBuscaDirecionar}
+                              />
+                              <CommandList>
+                                <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                                  Nenhum colega encontrado.
+                                </CommandEmpty>
+                                <CommandGroup>
+                                  {vendedoresDirecionar.map((v) => (
+                                    <CommandItem
+                                      key={v.id}
+                                      value={v.id}
+                                      onSelect={() =>
+                                        direcionarConversa(conversaAtiva, v.id)
+                                      }
+                                      className="gap-2.5"
+                                    >
+                                      <Avatar className="h-6 w-6 shrink-0">
+                                        {v.avatar_url ? (
+                                          <img
+                                            src={v.avatar_url}
+                                            alt={v.nome}
+                                            className="h-full w-full object-cover rounded-full"
+                                          />
+                                        ) : (
+                                          <AvatarFallback className="text-[9px] bg-muted-foreground/20">
+                                            {v.nome
+                                              .trim()
+                                              .split(" ")
+                                              .map((p: string) => p[0])
+                                              .slice(0, 2)
+                                              .join("")
+                                              .toUpperCase()}
+                                          </AvatarFallback>
+                                        )}
+                                      </Avatar>
+                                      <span className="flex-1 truncate">{v.nome}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       )}
                       <Button
                         variant="ghost"
@@ -4354,7 +4609,7 @@ export default function WhatsAppInbox() {
               </div>
 
               {/* Input de envio */}
-              <div className="border-t border-border px-4 py-3">
+              <div className="border-t border-border px-4 py-3 min-h-[4rem] flex flex-col justify-center">
                 {!isConnected && config && (
                   <div className="mb-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 px-2">
                     <WifiOff className="h-3.5 w-3.5" />
