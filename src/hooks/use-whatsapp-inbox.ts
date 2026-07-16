@@ -67,6 +67,12 @@ export interface WaMensagem {
   // (o nome/telefone da conversa em si é o do grupo, não de um participante específico).
   remetente_nome?: string | null;
   remetente_telefone?: string | null;
+  // Snapshot da mensagem citada (reply) — guardado por valor em vez de referenciar o
+  // id da mensagem original, para a citação sobreviver mesmo se a original for apagada.
+  quoted_wamid?: string | null;
+  quoted_conteudo?: string | null;
+  quoted_tipo?: string | null;
+  quoted_remetente_nome?: string | null;
   usuario?: {
     id: string;
     nome: string;
@@ -279,6 +285,10 @@ export function useWaSendMessage() {
       media_mime?: string | null;
       nome_arquivo?: string;
       ptt?: boolean;
+      quoted_wamid?: string | null;
+      quoted_conteudo?: string | null;
+      quoted_tipo?: string | null;
+      quoted_remetente_nome?: string | null;
     }) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão expirada');
@@ -293,6 +303,10 @@ export function useWaSendMessage() {
           media_mime: params.media_mime ?? null,
           nome_arquivo: params.nome_arquivo ?? null,
           ptt: params.ptt ?? false,
+          quoted_wamid: params.quoted_wamid ?? null,
+          quoted_conteudo: params.quoted_conteudo ?? null,
+          quoted_tipo: params.quoted_tipo ?? null,
+          quoted_remetente_nome: params.quoted_remetente_nome ?? null,
         },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
@@ -322,6 +336,10 @@ export function useWaSendMessage() {
         usuario_id: null,
         lida: true,
         created_at: new Date().toISOString(),
+        quoted_wamid: vars.quoted_wamid ?? null,
+        quoted_conteudo: vars.quoted_conteudo ?? null,
+        quoted_tipo: vars.quoted_tipo ?? null,
+        quoted_remetente_nome: vars.quoted_remetente_nome ?? null,
       };
 
       qc.setQueryData<WaMensagem[]>(['wa_mensagens', vars.conversa_id], (old) => [

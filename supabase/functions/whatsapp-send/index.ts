@@ -22,6 +22,15 @@ function withRemetente(nome: string | null, mensagem: string): string {
   return mensagem ? `${header}\n${mensagem}` : header;
 }
 
+// O wamid salvo em whatsapp_mensagens para mensagens enviadas às vezes vem como
+// "<telefone>:<messageid>" (ver comentário em whatsapp-webhook/handleStatusUpdate,
+// que já precisa fazer match por sufixo por causa disso). A uazapi espera só o
+// messageid puro no campo `replyid`, então extrai a parte depois do último ":".
+function rawMessageId(wamid: string): string {
+  const idx = wamid.lastIndexOf(":");
+  return idx !== -1 ? wamid.slice(idx + 1) : wamid;
+}
+
 // Mesma normalização usada no whatsapp-webhook: garante que o número BR sempre
 // inclua o 9º dígito para casar com a conversa já existente do mesmo contato.
 function normalizeWhatsappPhone(raw: string): string {
@@ -90,7 +99,10 @@ serve(async (req) => {
       });
     }
 
-    const { telefone, mensagem, conversa_id, tipo = 'texto', media_url, media_mime, nome_arquivo, ptt = false } = body;
+    const {
+      telefone, mensagem, conversa_id, tipo = 'texto', media_url, media_mime, nome_arquivo, ptt = false,
+      quoted_wamid, quoted_conteudo, quoted_tipo, quoted_remetente_nome,
+    } = body;
 
     if (!telefone) {
       return new Response(JSON.stringify({ error: "telefone obrigatório" }), {
@@ -161,6 +173,7 @@ serve(async (req) => {
             instanceName: uazapiInstance,
             number: phone,
             text: assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem,
+            ...(quoted_wamid ? { replyid: rawMessageId(quoted_wamid) } : {}),
           }),
         });
         wapiStatus = res.status;
@@ -183,6 +196,7 @@ serve(async (req) => {
       if (mensagem) wapiBody.text = assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem;
       if (tipo === 'documento' && nome_arquivo) wapiBody.docName = nome_arquivo;
       if (media_mime) wapiBody.mimetype = media_mime;
+      if (quoted_wamid) wapiBody.replyid = rawMessageId(quoted_wamid);
 
       try {
         const res = await fetch(wapiUrl, {
@@ -197,7 +211,10 @@ serve(async (req) => {
 
     // Debug — aguardado para garantir que erros sejam registrados antes do retorno
     await supabase.from("webhook_debug").insert({
-      payload: { _debug: true, url: wapiUrl, status: wapiStatus, response: responseText, fetch_error: fetchError || null }
+      payload: {
+        _debug: true, url: wapiUrl, status: wapiStatus, response: responseText, fetch_error: fetchError || null,
+        replyid_enviado: quoted_wamid ? rawMessageId(quoted_wamid) : null,
+      }
     });
 
     if (fetchError) {
@@ -242,6 +259,10 @@ serve(async (req) => {
       };
       if (media_url) insertData.media_url = media_url;
       if (media_mime) insertData.media_mime = media_mime;
+      if (quoted_wamid) insertData.quoted_wamid = quoted_wamid;
+      if (quoted_conteudo) insertData.quoted_conteudo = quoted_conteudo;
+      if (quoted_tipo) insertData.quoted_tipo = quoted_tipo;
+      if (quoted_remetente_nome) insertData.quoted_remetente_nome = quoted_remetente_nome;
 
       // Atualiza conversa, insere mensagem e garante que quem enviou vire responsável
       // pela conversa (aparece em "Meus chats"), tanto em grupo quanto em chat individual.

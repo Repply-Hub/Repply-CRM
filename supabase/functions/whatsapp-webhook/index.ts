@@ -306,6 +306,19 @@ async function handleIncomingMessage(
 
   if (!conteudo) conteudo = `[${tipo}]`;
 
+  // Mensagem citada (reply) — a uazapi expõe isso tanto em `msg.quoted` (formato mais
+  // recente) quanto em `content.contextInfo.quotedMessage`/`stanzaId` (baileys "cru").
+  // Guarda um snapshot (não uma FK) porque a mensagem original pode já ter sido apagada.
+  const quotedRaw = msg.quoted ?? content?.contextInfo?.quotedMessage ?? null;
+  const quotedWamid: string | null =
+    msg.quoted?.id ?? msg.quoted?.messageid ?? content?.contextInfo?.stanzaId ?? null;
+  const quotedConteudo: string | null = quotedRaw
+    ? (quotedRaw.text ?? quotedRaw.conversation ?? quotedRaw.caption ?? null)
+    : null;
+  const quotedTipo: string | null = msg.quoted?.messageType ?? msg.quoted?.type ?? null;
+  const quotedRemetenteNome: string | null =
+    msg.quoted?.senderName ?? content?.contextInfo?.participant ?? null;
+
   const inlineB64: string | null =
     msg.base64 ?? content?.base64 ?? msg.data ?? content?.data ?? null;
   const mediaKey: string | null =
@@ -388,6 +401,10 @@ async function handleIncomingMessage(
   if (mediaMime) insertData.media_mime = mediaMime;
   if (remetenteNome) insertData.remetente_nome = remetenteNome;
   if (remetenteTelefone) insertData.remetente_telefone = remetenteTelefone;
+  if (quotedWamid) insertData.quoted_wamid = quotedWamid;
+  if (quotedConteudo) insertData.quoted_conteudo = quotedConteudo;
+  if (quotedTipo) insertData.quoted_tipo = quotedTipo;
+  if (quotedRemetenteNome) insertData.quoted_remetente_nome = quotedRemetenteNome;
 
   const { error: msgError } = await supabase
     .from("whatsapp_mensagens")

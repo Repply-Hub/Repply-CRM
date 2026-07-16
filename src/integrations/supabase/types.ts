@@ -2356,6 +2356,10 @@ export type Database = {
           lida: boolean
           media_mime: string | null
           media_url: string | null
+          quoted_conteudo: string | null
+          quoted_remetente_nome: string | null
+          quoted_tipo: string | null
+          quoted_wamid: string | null
           remetente_nome: string | null
           remetente_telefone: string | null
           status: string
@@ -2373,6 +2377,10 @@ export type Database = {
           lida?: boolean
           media_mime?: string | null
           media_url?: string | null
+          quoted_conteudo?: string | null
+          quoted_remetente_nome?: string | null
+          quoted_tipo?: string | null
+          quoted_wamid?: string | null
           remetente_nome?: string | null
           remetente_telefone?: string | null
           status?: string
@@ -2390,6 +2398,10 @@ export type Database = {
           lida?: boolean
           media_mime?: string | null
           media_url?: string | null
+          quoted_conteudo?: string | null
+          quoted_remetente_nome?: string | null
+          quoted_tipo?: string | null
+          quoted_wamid?: string | null
           remetente_nome?: string | null
           remetente_telefone?: string | null
           status?: string

@@ -132,6 +132,7 @@ import {
   UserCheck,
   UserX,
   List,
+  Reply,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -789,6 +790,150 @@ const PLACEHOLDERS = [
   "[Documento]",
   "[Sticker]",
 ];
+
+// Preview compacto da mensagem citada, tanto dentro da bolha (mensagem já enviada
+// com reply) quanto acima do textarea (enquanto o usuário está respondendo).
+function QuotedPreview({
+  remetenteNome,
+  conteudo,
+  tipo,
+  isSaida,
+  onClick,
+  onCancel,
+}: {
+  remetenteNome: string | null | undefined;
+  conteudo: string | null | undefined;
+  tipo: string | null | undefined;
+  isSaida?: boolean;
+  onClick?: () => void;
+  onCancel?: () => void;
+}) {
+  const label = remetenteNome || "Você";
+  const texto = conteudo && !PLACEHOLDERS.includes(conteudo) ? conteudo : (conteudo || "");
+  return (
+    <div
+      className={cn(
+        "flex items-stretch gap-2 rounded-md pl-2 pr-2 py-1.5 mb-1.5 cursor-pointer overflow-hidden",
+        isSaida ? "bg-white/10" : "bg-black/5 dark:bg-white/5",
+        onClick && "hover:opacity-80",
+      )}
+      onClick={onClick}
+    >
+      <div className={cn("w-[3px] rounded-full shrink-0", isSaida ? "bg-white/60" : "bg-primary/70")} />
+      <div className="min-w-0 flex-1">
+        <p className={cn("text-xs font-semibold truncate", isSaida ? "text-white" : "text-primary")}>
+          {label}
+        </p>
+        <p className={cn("text-xs truncate", isSaida ? "text-white/80" : "text-muted-foreground")}>
+          {texto}
+        </p>
+      </div>
+      {onCancel && (
+        <button
+          type="button"
+          className="shrink-0 self-start text-muted-foreground hover:text-foreground"
+          onClick={(e) => { e.stopPropagation(); onCancel(); }}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Envolve a bolha de mensagem com o gesto de "puxar para responder" (arrastar
+// horizontalmente, como no WhatsApp) e um botão de responder que aparece no hover —
+// funciona igual em grupos e conversas individuais, já que ambos usam o mesmo bloco
+// de renderização de mensagens.
+function DraggableBubble({
+  msg,
+  isSaida,
+  onReply,
+  children,
+}: {
+  msg: WaMensagem;
+  isSaida: boolean;
+  onReply: (msg: WaMensagem) => void;
+  children: React.ReactNode;
+}) {
+  const [dragX, setDragX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const startXRef = useRef(0);
+  const triggeredRef = useRef(false);
+  const THRESHOLD = 56;
+  const MAX_DRAG = 72;
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("a, button, video, audio, img")) return;
+    setDragging(true);
+    triggeredRef.current = false;
+    startXRef.current = e.clientX;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragging) return;
+    const delta = e.clientX - startXRef.current;
+    // Só reage ao arraste "puxando" a bolha para o centro da tela (como no WhatsApp):
+    // mensagens enviadas (alinhadas à direita) puxam para a esquerda, recebidas para a direita.
+    const relevant = isSaida ? Math.min(0, Math.max(-MAX_DRAG, delta)) : Math.max(0, Math.min(MAX_DRAG, delta));
+    setDragX(relevant);
+    if (!triggeredRef.current && Math.abs(relevant) >= THRESHOLD) {
+      triggeredRef.current = true;
+    }
+  }
+
+  function endDrag() {
+    if (!dragging) return;
+    setDragging(false);
+    if (triggeredRef.current) onReply(msg);
+    setDragX(0);
+  }
+
+  const dragProgress = Math.min(1, Math.abs(dragX) / THRESHOLD);
+
+  return (
+    <div
+      className="relative group/bubble touch-pan-y"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+    >
+      <div
+        className="absolute inset-y-0 flex items-center text-muted-foreground pointer-events-none"
+        style={{
+          [isSaida ? "right" : "left"]: 0,
+          opacity: dragProgress,
+          transform: `scale(${0.6 + dragProgress * 0.4})`,
+        }}
+      >
+        <Reply className="h-4 w-4" />
+      </div>
+      <div
+        style={{
+          transform: `translateX(${dragX}px)`,
+          transition: dragging ? "none" : "transform 0.15s ease-out",
+        }}
+      >
+        {children}
+      </div>
+      <button
+        type="button"
+        title="Responder"
+        onClick={() => onReply(msg)}
+        className={cn(
+          "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground opacity-0 group-hover/bubble:opacity-100 transition-opacity",
+          isSaida ? "-left-8" : "-right-8",
+        )}
+      >
+        <Reply className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
 
 function MessageContent({
   msg,
@@ -2121,6 +2266,13 @@ export default function WhatsAppInbox() {
   const { data: mensagens = [], isLoading: loadingMensagens } = useWaMensagens(
     conversaAtiva?.id ?? null,
   );
+  // Lookup de wamid -> id da mensagem, usado para rolar até a mensagem original ao
+  // clicar em uma citação (reply).
+  const idPorWamid = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of mensagens) if (m.wamid) map.set(m.wamid, m.id);
+    return map;
+  }, [mensagens]);
   // Participantes do grupo: os salvos na criação (via CRM) somados aos remetentes
   // distintos vistos nas mensagens (cobre membros que entraram depois ou grupos
   // criados fora do CRM, onde a uazapi não devolveu a lista completa).
@@ -2204,6 +2356,7 @@ export default function WhatsAppInbox() {
   );
 
   const [texto, setTexto] = useState("");
+  const [respondendoA, setRespondendoA] = useState<WaMensagem | null>(null);
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<"aberto" | "fechado">(
     "aberto",
@@ -2293,7 +2446,14 @@ export default function WhatsAppInbox() {
     if (conversaAtiva && conversaAtiva.nao_lidas > 0)
       marcarLida.mutate(conversaAtiva.id);
     inputRef.current?.focus();
+    setRespondendoA(null);
   }, [conversaAtiva?.id]);
+
+  // Ao marcar uma mensagem para responder, já deixa o campo de texto pronto pra digitar.
+  function handleReply(msg: WaMensagem) {
+    setRespondendoA(msg);
+    inputRef.current?.focus();
+  }
 
   useEffect(() => {
     const handleKeyDownGlobal = (e: KeyboardEvent) => {
@@ -2615,10 +2775,30 @@ export default function WhatsAppInbox() {
     setPendingAudio(null);
   }
 
+  // Nome a exibir na citação de quem mandou a mensagem original: em conversa
+  // individual usa o nome do contato/o próprio usuário; em grupo usa o remetente
+  // real dentro do grupo (msg.remetente_nome), igual ao que já aparece na bolha.
+  function quotedNomeFor(msg: WaMensagem): string | null {
+    if (msg.direcao === "saida") return msg.usuario?.nome ?? profile?.nome ?? null;
+    return msg.remetente_nome ?? conversaAtiva?.nome_contato ?? null;
+  }
+
+  function quotedParamsFor(msg: WaMensagem | null) {
+    if (!msg) return {};
+    return {
+      quoted_wamid: msg.wamid,
+      quoted_conteudo: msg.conteudo,
+      quoted_tipo: msg.tipo,
+      quoted_remetente_nome: quotedNomeFor(msg),
+    };
+  }
+
   async function confirmSendAudio() {
     if (!pendingAudio || !conversaAtiva) return;
     const { file } = pendingAudio;
     cancelPendingAudio();
+    const quoted = quotedParamsFor(respondendoA);
+    setRespondendoA(null);
     setIsUploading(true);
     try {
       const mediaUrl = await uploadWaMedia(file, conversaAtiva.id);
@@ -2631,6 +2811,7 @@ export default function WhatsAppInbox() {
         media_mime: file.type || null,
         nome_arquivo: file.name,
         ptt: true,
+        ...quoted,
       });
     } catch {
       toast.error("Erro ao enviar áudio");
@@ -2651,8 +2832,10 @@ export default function WhatsAppInbox() {
     }
 
     const currentAttachments = attachments;
+    const quoted = quotedParamsFor(respondendoA);
     setTexto("");
     clearAttachments();
+    setRespondendoA(null);
 
     try {
       // Somente texto
@@ -2662,6 +2845,7 @@ export default function WhatsAppInbox() {
           mensagem: msg,
           conversa_id: conversaAtiva.id,
           tipo: "texto",
+          ...quoted,
         });
         return;
       }
@@ -2696,6 +2880,7 @@ export default function WhatsAppInbox() {
           media_url: uploadedUrls[i],
           media_mime: file.type || null,
           nome_arquivo: file.name,
+          ...(i === 0 ? quoted : {}),
         });
       }
     } catch (err: any) {
@@ -4030,6 +4215,7 @@ export default function WhatsAppInbox() {
                         return (
                           <div
                             key={msg.id}
+                            id={`wa-msg-${msg.id}`}
                             ref={isLast ? msgScrollRef : undefined}
                           >
                             {showDate && (
@@ -4062,70 +4248,91 @@ export default function WhatsAppInbox() {
                                   isSaida ? "items-end" : "items-start",
                                 )}
                               >
-                                <div
-                                  className={cn(
-                                    msg.tipo === "audio"
-                                      ? "p-0.5"
-                                      : "px-3 py-2",
-                                    "break-words",
-                                    isSaida
-                                      ? "bg-orange-500 text-white rounded-2xl rounded-tr-sm"
-                                      : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
-                                  )}
+                                <DraggableBubble
+                                  msg={msg}
+                                  isSaida={isSaida}
+                                  onReply={handleReply}
                                 >
-                                  {isSaida &&
-                                    msg.usuario &&
-                                    isFirstDoRemetente && (
-                                      <UserPreviewPopover
-                                        usuario={msg.usuario}
+                                  <div
+                                    className={cn(
+                                      msg.tipo === "audio"
+                                        ? "p-0.5"
+                                        : "px-3 py-2",
+                                      "break-words",
+                                      isSaida
+                                        ? "bg-orange-500 text-white rounded-2xl rounded-tr-sm"
+                                        : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
+                                    )}
+                                  >
+                                    {isSaida &&
+                                      msg.usuario &&
+                                      isFirstDoRemetente && (
+                                        <UserPreviewPopover
+                                          usuario={msg.usuario}
+                                          nameClassName={cn(
+                                            "block w-full truncate text-[13px] font-semibold leading-tight mb-2 text-white",
+                                            msg.tipo === "audio" &&
+                                              "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                          )}
+                                        />
+                                      )}
+                                    {!isSaida && isFirstDoRemetente && (
+                                      <ContactPreviewPopover
+                                        conversa={conversaAtiva}
+                                        remetenteNome={msg.remetente_nome}
+                                        remetenteTelefone={msg.remetente_telefone}
                                         nameClassName={cn(
-                                          "block w-full truncate text-[13px] font-semibold leading-tight mb-2 text-white",
+                                          "block w-full truncate text-[13px] font-semibold leading-tight mb-2",
+                                          senderNameColor(conversaAtiva.id),
                                           msg.tipo === "audio" &&
                                             "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
                                         )}
                                       />
                                     )}
-                                  {!isSaida && isFirstDoRemetente && (
-                                    <ContactPreviewPopover
-                                      conversa={conversaAtiva}
-                                      remetenteNome={msg.remetente_nome}
-                                      remetenteTelefone={msg.remetente_telefone}
-                                      nameClassName={cn(
-                                        "block w-full truncate text-[13px] font-semibold leading-tight mb-2",
-                                        senderNameColor(conversaAtiva.id),
-                                        msg.tipo === "audio" &&
-                                          "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
-                                      )}
+                                    {msg.quoted_wamid && (
+                                      <QuotedPreview
+                                        remetenteNome={msg.quoted_remetente_nome}
+                                        conteudo={msg.quoted_conteudo}
+                                        tipo={msg.quoted_tipo}
+                                        isSaida={isSaida}
+                                        onClick={() => {
+                                          const originalId = idPorWamid.get(msg.quoted_wamid!);
+                                          if (!originalId) return;
+                                          document
+                                            .getElementById(`wa-msg-${originalId}`)
+                                            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                        }}
+                                      />
+                                    )}
+                                    <MessageContent
+                                      msg={msg}
+                                      isSaida={isSaida}
+                                      onImageClick={setViewingImage}
+                                      onPreviewFile={setPreviewFile}
+                                      conversaAtiva={conversaAtiva}
                                     />
-                                  )}
-                                  <MessageContent
-                                    msg={msg}
-                                    isSaida={isSaida}
-                                    onImageClick={setViewingImage}
-                                    onPreviewFile={setPreviewFile}
-                                    conversaAtiva={conversaAtiva}
-                                  />
-                                </div>
-                                {msg.tipo !== "texto" && (
-                                  <div
-                                    className={cn(
-                                      "flex items-center gap-1 mt-0.5",
-                                      isSaida
-                                        ? "justify-end mr-1"
-                                        : "justify-start ml-1",
-                                    )}
-                                  >
-                                    <span className="text-[9px] text-muted-foreground">
-                                      {format(
-                                        new Date(msg.created_at),
-                                        "HH:mm",
-                                      )}
-                                    </span>
-                                    {isSaida && (
-                                      <MessageStatus status={msg.status} />
-                                    )}
                                   </div>
-                                )}
+                                  {msg.tipo !== "texto" && (
+                                    <div
+                                      className={cn(
+                                        "flex items-center gap-1 mt-0.5",
+                                        isSaida
+                                          ? "justify-end mr-1"
+                                          : "justify-start ml-1",
+                                      )}
+                                    >
+                                      <span className="text-[9px] text-muted-foreground">
+                                        {format(
+                                          new Date(msg.created_at),
+                                          "HH:mm",
+                                        )}
+                                      </span>
+                                      {isSaida && (
+                                        <MessageStatus status={msg.status} />
+                                      )}
+                                    </div>
+                                  )}
+                                </DraggableBubble>
                               </div>
                             </div>
                           </div>
@@ -4172,6 +4379,18 @@ export default function WhatsAppInbox() {
                     >
                       Configurar
                     </Button>
+                  </div>
+                )}
+
+                {/* Preview da mensagem em resposta */}
+                {respondendoA && (
+                  <div className="max-w-sm">
+                    <QuotedPreview
+                      remetenteNome={quotedNomeFor(respondendoA)}
+                      conteudo={respondendoA.conteudo}
+                      tipo={respondendoA.tipo}
+                      onCancel={() => setRespondendoA(null)}
+                    />
                   </div>
                 )}
 
