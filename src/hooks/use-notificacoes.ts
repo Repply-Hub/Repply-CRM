@@ -201,10 +201,9 @@ export function useUnreadChatByTarget() {
 export function useUnreadCount() {
   const { data: notificacoes } = useNotificacoes();
   const { data: unreadEmails = 0 } = useUnreadEmails();
-  const { data: unreadChat = 0 } = useUnreadChatMessages();
 
   const unreadNotifs = (notificacoes ?? []).filter(n => !n.lida).length;
-  return unreadNotifs + unreadEmails + unreadChat;
+  return unreadNotifs + unreadEmails;
 }
 
 export { useUnreadWaMessages } from '@/hooks/use-whatsapp-inbox';

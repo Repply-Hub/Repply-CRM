@@ -1939,6 +1939,7 @@ export type Database = {
       tarefas: {
         Row: {
           campos_extras: Json
+          conversa_id: string | null
           created_at: string
           criado_por: string | null
           descricao: string | null
@@ -1956,6 +1957,7 @@ export type Database = {
         }
         Insert: {
           campos_extras?: Json
+          conversa_id?: string | null
           created_at?: string
           criado_por?: string | null
           descricao?: string | null
@@ -1973,6 +1975,7 @@ export type Database = {
         }
         Update: {
           campos_extras?: Json
+          conversa_id?: string | null
           created_at?: string
           criado_por?: string | null
           descricao?: string | null
@@ -1988,7 +1991,15 @@ export type Database = {
           updated_at?: string
           usuario_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tarefas_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tarefas_kanban_colunas: {
         Row: {
@@ -2352,7 +2363,9 @@ export type Database = {
           created_at: string
           direcao: string
           empresa_id: string
+          fixada: boolean
           id: string
+          is_nota_interna: boolean
           lida: boolean
           media_mime: string | null
           media_url: string | null
@@ -2373,7 +2386,9 @@ export type Database = {
           created_at?: string
           direcao: string
           empresa_id: string
+          fixada?: boolean
           id?: string
+          is_nota_interna?: boolean
           lida?: boolean
           media_mime?: string | null
           media_url?: string | null
@@ -2394,7 +2409,9 @@ export type Database = {
           created_at?: string
           direcao?: string
           empresa_id?: string
+          fixada?: boolean
           id?: string
+          is_nota_interna?: boolean
           lida?: boolean
           media_mime?: string | null
           media_url?: string | null

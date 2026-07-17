@@ -63,6 +63,12 @@ export interface WaMensagem {
   usuario_id: string | null;
   lida: boolean;
   created_at: string;
+  // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca enviada ao
+  // WhatsApp, renderizada como chip central em vez de bolha de mensagem.
+  is_nota_interna?: boolean;
+  // Notas fixadas aparecem numa faixa fixa no topo do chat, além da posição
+  // cronológica normal — só tem efeito quando is_nota_interna também é true.
+  fixada?: boolean;
   // Preenchido só em mensagens de entrada vindas de grupo — quem enviou dentro do grupo
   // (o nome/telefone da conversa em si é o do grupo, não de um participante específico).
   remetente_nome?: string | null;
@@ -660,6 +666,76 @@ export function useWaSetResponsaveis() {
     },
     onError: (err: any) => {
       toast.error(err?.message ?? 'Erro ao atualizar responsáveis');
+    },
+  });
+}
+
+// Nota de sistema no timeline do chat (ex: "Fulano assumiu esta conversa") — grava
+// direto em whatsapp_mensagens com is_nota_interna=true, sem passar pela edge function
+// whatsapp-send, então nunca é entregue ao WhatsApp. A RLS de whatsapp_mensagens já
+// restringe leitura a usuários internos da empresa (ver can_access_wa_conversa), então
+// não precisa de tratamento extra pra esconder de um lead/portal.
+export function useWaAddNota() {
+  const qc = useQueryClient();
+  const { profile } = useAuth();
+
+  return useMutation({
+    mutationFn: async (
+      { conversaId, texto, fixada = false }: { conversaId: string; texto: string; fixada?: boolean },
+    ) => {
+      if (!profile?.empresa_id) throw new Error('Empresa não identificada');
+      const { data, error } = await supabase
+        .from('whatsapp_mensagens')
+        .insert({
+          conversa_id: conversaId,
+          empresa_id: profile.empresa_id,
+          direcao: 'saida',
+          conteudo: texto,
+          tipo: 'texto',
+          status: 'enviado',
+          usuario_id: profile.id,
+          lida: true,
+          is_nota_interna: true,
+          fixada,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as WaMensagem;
+    },
+    onSuccess: (nota) => {
+      qc.setQueryData<WaMensagem[]>(['wa_mensagens', nota.conversa_id], (old) =>
+        old ? [...old, nota] : old,
+      );
+    },
+    onError: (err: any) => {
+      console.error('[wa] erro ao registrar nota interna:', err);
+    },
+  });
+}
+
+// Fixa/desfixa uma nota interna já existente no topo do chat.
+export function useWaSetNotaFixada() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ notaId, fixada }: { notaId: string; fixada: boolean }) => {
+      const { data, error } = await supabase
+        .from('whatsapp_mensagens')
+        .update({ fixada })
+        .eq('id', notaId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as WaMensagem;
+    },
+    onSuccess: (nota) => {
+      qc.setQueryData<WaMensagem[]>(['wa_mensagens', nota.conversa_id], (old) =>
+        (old ?? []).map((m) => (m.id === nota.id ? nota : m)),
+      );
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao atualizar nota');
     },
   });
 }

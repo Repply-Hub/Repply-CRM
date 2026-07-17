@@ -212,7 +212,15 @@ async function handleIncomingMessage(
   const msg = payload.message;
   if (!msg) return;
 
-  if (msg.fromMe === true || msg.wasSentByApi === true) return;
+  // `wasSentByApi` = true significa que essa mensagem já foi inserida de forma
+  // síncrona pelo whatsapp-send (CRM chamou a API da uazapi) — ignora pra não duplicar.
+  // `fromMe` sozinho só indica que a mensagem saiu deste número, não quem a originou:
+  // mensagens enviadas pelo WhatsApp Web ou pelo celular físico conectado à mesma
+  // instância também chegam com fromMe=true, mas precisam ser salvas (direcao "saida")
+  // porque nunca passaram pelo whatsapp-send.
+  if (msg.wasSentByApi === true) return;
+
+  const sentByOtherChannel = msg.fromMe === true;
 
   const isGroup = msg.isGroup === true || payload.chat?.wa_isGroup === true;
 
@@ -351,7 +359,7 @@ async function handleIncomingMessage(
         nome_contato: pushName || existente.nome_contato,
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
-        nao_lidas: (existente.nao_lidas ?? 0) + 1,
+        nao_lidas: sentByOtherChannel ? (existente.nao_lidas ?? 0) : (existente.nao_lidas ?? 0) + 1,
         arquivada: false,
         is_group: isGroup,
         instancia_id: config.id,
@@ -373,7 +381,7 @@ async function handleIncomingMessage(
         nome_contato: pushName || null,
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
-        nao_lidas: 1,
+        nao_lidas: sentByOtherChannel ? 0 : 1,
         arquivada: false,
         is_group: isGroup,
         instancia_id: config.id,
@@ -390,11 +398,11 @@ async function handleIncomingMessage(
   const insertData: any = {
     conversa_id: conversa.id,
     empresa_id: empresaId,
-    direcao: "entrada",
+    direcao: sentByOtherChannel ? "saida" : "entrada",
     conteudo,
     tipo,
-    status: "entregue",
-    lida: false,
+    status: sentByOtherChannel ? "enviado" : "entregue",
+    lida: sentByOtherChannel ? true : false,
   };
   if (wamid) insertData.wamid = wamid;
   if (mediaUrl) insertData.media_url = mediaUrl;

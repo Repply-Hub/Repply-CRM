@@ -14,6 +14,7 @@ export interface Tarefa {
   projeto: string | null;
   marcadores: string | null;
   usuario_id: string | null;
+  conversa_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +26,24 @@ export function useTarefas() {
       const { data, error } = await supabase
         .from('tarefas' as any)
         .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data as unknown as Tarefa[]) ?? [];
+    },
+  });
+}
+
+// Histórico de tarefas criadas a partir de uma conversa do WhatsApp Inbox
+// (ver botão "Nova tarefa" em src/pages/WhatsAppInbox.tsx).
+export function useTarefasPorConversa(conversaId: string | null) {
+  return useQuery({
+    queryKey: ['tarefas_por_conversa', conversaId],
+    enabled: !!conversaId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tarefas' as any)
+        .select('*')
+        .eq('conversa_id', conversaId as string)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return (data as unknown as Tarefa[]) ?? [];
@@ -53,7 +72,12 @@ export function useCreateTarefa() {
       const { error } = await supabase.from('tarefas' as any).insert(payload as any);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tarefas'] }),
+    onSuccess: (_data, tarefa) => {
+      qc.invalidateQueries({ queryKey: ['tarefas'] });
+      if (tarefa.conversa_id) {
+        qc.invalidateQueries({ queryKey: ['tarefas_por_conversa', tarefa.conversa_id] });
+      }
+    },
   });
 }
 
