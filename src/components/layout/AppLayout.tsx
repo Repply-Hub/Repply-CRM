@@ -1,7 +1,7 @@
 import { AppSidebar } from './AppSidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { NotificationCenter } from '@/components/NotificationCenter';
+import { NotificationCenter } from '@/components/layout/NotificationCenter';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';

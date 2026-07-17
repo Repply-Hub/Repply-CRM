@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { useCreateCliente, useCreateContato, useDeleteCliente, useDeleteContato } from '@/hooks/use-mutations';
@@ -20,21 +20,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown, ChevronDown, FileWarning } from 'lucide-react';
-import { ImportClientesDialog } from '@/components/ImportClientesDialog';
-import { EmpresaSelector } from '@/components/EmpresaSelector';
-import { SearchableSelect } from '@/components/SearchableSelect';
-import { SearchWithRecent } from '@/components/SearchWithRecent';
+import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
+import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 
 import { toast } from 'sonner';
-import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsPopover } from '@/components/ColumnSettings';
+import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsPopover } from '@/components/shared/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
-import { EnderecoForm } from '@/components/EnderecoForm';
+import { EnderecoForm } from '@/components/clientes/EnderecoForm';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
-import { ListPagination } from '@/components/ListPagination';
+import { ListPagination } from '@/components/shared/ListPagination';
 import { cn, slugify } from '@/lib/utils';
-import { ExportClientesButton } from '@/components/ExportClientesButton';
-import { FilterButton } from '@/components/FilterButton';
+import { ExportClientesButton } from '@/components/clientes/ExportClientesButton';
+import { FilterButton } from '@/components/shared/FilterButton';
 import { StandardPopoverMenu } from '@/components/ui/standard-popover-menu';
 
 

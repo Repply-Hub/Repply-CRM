@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { AppLayout } from "@/components/AppLayout";
+import { AppLayout } from "@/components/layout/AppLayout";
 import {
   useWaConversas,
   useWaMensagens,
@@ -35,7 +35,7 @@ import {
 import { useVendedores } from "@/hooks/use-clientes";
 import { useCreateTarefa, useTarefasPorConversa } from "@/hooks/use-tarefas";
 import { useTarefasKanbanColunas } from "@/hooks/use-tarefas-kanban-colunas";
-import { SearchableSelect } from "@/components/SearchableSelect";
+import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { ProjetoSelect } from "@/components/tarefas/ProjetoSelect";
 import { ParticipantesMultiSelect } from "@/components/tarefas/ParticipantesMultiSelect";
 import { MarcadoresMultiSelect } from "@/components/tarefas/MarcadoresMultiSelect";
@@ -83,10 +83,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { ListPagination } from "@/components/ListPagination";
+import { ListPagination } from "@/components/shared/ListPagination";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FilterButton } from "@/components/FilterButton";
+import { FilterButton } from "@/components/shared/FilterButton";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Command,
@@ -96,7 +96,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from "@/components/FilePreviewDialog";
+import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from "@/components/chat/FilePreviewDialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {

@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { useTarefas, useCreateTarefa, useUpdateTarefa, useDeleteTarefa, Tarefa } from '@/hooks/use-tarefas';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
-import { UserProfilePopover } from '@/components/UserProfilePopover';
+import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useObras } from '@/hooks/use-obras';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -21,19 +21,19 @@ import { Plus, Search, Trash2, Pencil, Loader2, Calendar, User, LayoutGrid, List
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { ListPagination } from '@/components/ListPagination';
+import { ListPagination } from '@/components/shared/ListPagination';
 import { supabase } from '@/integrations/supabase/client';
 import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
 import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
 import { ProjetoSelect } from '@/components/tarefas/ProjetoSelect';
 import { TarefaKanbanColumn } from '@/components/tarefas/TarefaKanbanColumn';
 import { TarefaKanbanColunasDialog } from '@/components/tarefas/TarefaKanbanColunasDialog';
-import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
-import { FilterButton } from '@/components/FilterButton';
+import { FilterButton } from '@/components/shared/FilterButton';
 import { cn } from '@/lib/utils';
-import { SearchableSelect } from '@/components/SearchableSelect';
-import { SearchWithRecent } from '@/components/SearchWithRecent';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 
 const TAREFA_COLUMNS: ColumnDefinition[] = [

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, ChatGrupo, ChatMessage, useMarkChatAsRead, useChatGeralConfig, useUpdateChatGeralConfig } from '@/hooks/use-chat';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
@@ -20,7 +20,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn, autoResizeTextarea } from '@/lib/utils';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
 import { validateFile } from '@/lib/file-validation';
-import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/components/FilePreviewDialog';
+import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
 import {
   Sheet,
   SheetContent,

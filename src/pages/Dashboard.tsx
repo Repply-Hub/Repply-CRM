@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { subMonths, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -13,9 +13,9 @@ import { usePedidos } from '@/hooks/use-pedidos';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
-import { DateRangePicker, type DateRange } from '@/components/DateRangePicker';
-import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/ChartTooltip';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePicker';
+import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/DashboardChartTooltip';
+import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 

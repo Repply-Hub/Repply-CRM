@@ -25,7 +25,7 @@ import Emails from "./pages/Emails";
 import WhatsAppInbox from "./pages/WhatsAppInbox";
 import LinhasIgnoradas from "./pages/LinhasIgnoradas";
 import AdminWhatsAppInstancias from "./pages/AdminWhatsAppInstancias";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 
 import Login from "./pages/Login";
 import EsqueciSenha from "./pages/EsqueciSenha";

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { useObras } from '@/hooks/use-obras';
 import { useStatusObras } from '@/hooks/use-status-obras';
 import { useClientes } from '@/hooks/use-clientes';
@@ -27,17 +27,17 @@ import { useCreateObra, useUpdateObra, useDeleteObra, useDeleteObrasBulk } from 
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { formatCnpj, isValidCnpj } from '@/utils/cnpj';
-import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
-import { ListPagination } from '@/components/ListPagination';
+import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
+import { ListPagination } from '@/components/shared/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { MapaObras } from '@/components/obras/MapaObras';
 import { StatusObrasDialog } from '@/components/obras/StatusObrasDialog';
 import { cn } from '@/lib/utils';
-import { FilterButton } from '@/components/FilterButton';
+import { FilterButton } from '@/components/shared/FilterButton';
 import { supabase } from '@/integrations/supabase/client';
-import { EmpresaSelector } from '@/components/EmpresaSelector';
-import { EnderecoAutocomplete } from '@/components/EnderecoAutocomplete';
-import { SearchWithRecent } from '@/components/SearchWithRecent';
+import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
+import { EnderecoAutocomplete } from '@/components/obras/EnderecoAutocomplete';
+import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 import {
   AlertDialog,
   AlertDialogAction,

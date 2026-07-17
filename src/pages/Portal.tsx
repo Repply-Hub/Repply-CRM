@@ -22,16 +22,16 @@ const formatDataEdicao = (raw: string): string => {
   return raw;
 };
 import { CalendarIcon } from 'lucide-react';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ColumnSettings } from '@/components/ColumnSettings';
+import { ColumnSettings } from '@/components/shared/ColumnSettings';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { ListPagination } from '@/components/ListPagination';
+import { ListPagination } from '@/components/shared/ListPagination';
 
 import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronDown, ChevronUp, CloudDownload, List, Settings2, Calendar as CalendarLucide } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';

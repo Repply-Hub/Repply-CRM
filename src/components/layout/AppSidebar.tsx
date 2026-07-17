@@ -5,11 +5,11 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { useAuth } from '@/hooks/use-auth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { NavLink } from '@/components/NavLink';
+import { NavLink } from '@/components/layout/NavLink';
 import { useSidebarPreferences, SidebarItem } from '@/hooks/use-sidebar-preferences';
 import { usePermissoes } from '@/hooks/use-permissoes';
 import { getIconComponent } from '@/lib/sidebar-icons';
-import { SidebarAddItemDialog } from '@/components/SidebarAddItemDialog';
+import { SidebarAddItemDialog } from '@/components/layout/SidebarAddItemDialog';
 import { useUnreadEmails, useUnreadChatMessages, useUnreadWaMessages } from '@/hooks/use-notificacoes';
 import logoSidebar from '@/assets/logo-sidebar.svg';
 import { toast } from 'sonner';

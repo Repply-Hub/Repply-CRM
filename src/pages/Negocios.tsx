@@ -4,10 +4,10 @@ import { parse, isValid, startOfDay, endOfDay, parseISO } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
-import { KanbanColunasDialog } from '@/components/kanban/KanbanColunasDialog';
+import { KanbanColunasDialog } from '@/components/pedidos/kanban/KanbanColunasDialog';
 import { usePedidos, usePedidosStats, useHistoricoContatos, useUpdatePedidoStatus, useBulkDeletePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
@@ -29,21 +29,21 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { generatePedidosPdf } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsHeader, ColumnSettingsPopover } from '@/components/ColumnSettings';
+import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsHeader, ColumnSettingsPopover } from '@/components/shared/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ImportPedidosDialog } from '@/components/ImportPedidosDialog';
+import { ImportPedidosDialog } from '@/components/pedidos/ImportPedidosDialog';
 import { ImportDialog } from '@/components/ImportDialog';
-import { ListPagination } from '@/components/ListPagination';
-import { KanbanColumn } from '@/components/kanban/KanbanColumn';
-import { FilterButton } from '@/components/FilterButton';
+import { ListPagination } from '@/components/shared/ListPagination';
+import { KanbanColumn } from '@/components/pedidos/kanban/KanbanColumn';
+import { FilterButton } from '@/components/shared/FilterButton';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { SearchWithRecent } from '@/components/SearchWithRecent';
+import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'negocio', label: 'Negócio', locked: false },

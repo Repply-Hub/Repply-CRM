@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import type { ColumnDefinition, ColumnDataType } from '@/components/ColumnSettings';
+import type { ColumnDefinition, ColumnDataType } from '@/components/shared/ColumnSettings';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';

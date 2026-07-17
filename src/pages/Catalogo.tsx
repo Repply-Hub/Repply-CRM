@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -14,8 +14,8 @@ import { useFabricantes } from '@/hooks/use-clientes';
 import { Search, Package, ImageIcon, Loader2, Trash2, Folder, ChevronLeft, ArrowLeft, Eye, Plus, CheckSquare, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProductForm } from '@/components/catalogo/ProductForm';
-import { SearchableSelect } from '@/components/SearchableSelect';
-import { SearchWithRecent } from '@/components/SearchWithRecent';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 
 const Catalogo = () => {
   const { data: produtos, isLoading } = useCatalogoGlobal();

@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import logoLogin from "@/assets/logo-dark.svg";
-import { Logo } from "@/components/Logo";
+import { Logo } from "@/components/layout/Logo";
 
 type RegisterType = "empresa" | "funcionario" | null;
 

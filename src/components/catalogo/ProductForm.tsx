@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useCreatePreco, useUpdatePreco, useCategorias } from '@/hooks/use-fabricantes';
 import { useFabricantes } from '@/hooks/use-clientes';
 import { ProductImageUpload } from './ProductImageUpload';
-import { SearchableSelect } from '@/components/SearchableSelect';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 
 interface ProductFormProps {
   open: boolean;

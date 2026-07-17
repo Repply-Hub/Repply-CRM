@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from "react";
 import { addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AppLayout } from "@/components/AppLayout";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,7 @@ import { EventDialog } from "@/components/calendar/EventDialog";
 import { getWeekDays } from "@/components/calendar/calendarUtils";
 import type { ViewMode, CalendarType, EventoForm, CalendarEvent } from "@/components/calendar/types";
 import { CALENDAR_COLORS } from "@/components/calendar/types";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import {
   useCalendarEvents,
   useCreateEvento,

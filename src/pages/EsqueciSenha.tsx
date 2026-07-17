@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ArrowLeft, Mail } from "lucide-react";
-import { Logo } from "@/components/Logo";
+import { Logo } from "@/components/layout/Logo";
 
 export default function EsqueciSenha() {
   const [loading, setLoading] = useState(false);

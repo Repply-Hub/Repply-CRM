@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,13 +20,13 @@ import { useCreateObra } from '@/hooks/use-mutations';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText } from 'lucide-react';
-import { EmpresaSelector } from '@/components/EmpresaSelector';
-import { FabricanteSelector } from '@/components/FabricanteSelector';
+import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
+import { FabricanteSelector } from '@/components/pedidos/FabricanteSelector';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { SearchableSelect } from '@/components/SearchableSelect';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 
 const DEFAULT_ORIGENS = [
   { value: 'recompra', label: 'Recompra' },

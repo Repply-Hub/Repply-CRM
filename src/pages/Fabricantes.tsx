@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { AppLayout } from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -14,22 +14,22 @@ import { useCreateFabricante } from '@/hooks/use-mutations';
 import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante, useCategorias } from '@/hooks/use-fabricantes';
 import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash, Upload, ImageIcon, Eye } from 'lucide-react';
 import { toast } from 'sonner';
-import { ColumnSettings, type ColumnDefinition } from '@/components/ColumnSettings';
+import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ListPagination } from '@/components/ListPagination';
+import { ListPagination } from '@/components/shared/ListPagination';
 import { ProductImageUpload } from '@/components/catalogo/ProductImageUpload';
 import { ImportCatalogoDialog } from '@/components/catalogo/ImportCatalogoDialog';
 import { GlobalImportCatalogoDialog } from '@/components/catalogo/GlobalImportCatalogoDialog';
 import { cn } from '@/lib/utils';
-import { FilterButton } from '@/components/FilterButton';
+import { FilterButton } from '@/components/shared/FilterButton';
 import { Filter } from 'lucide-react';
-import { SearchableSelect } from '@/components/SearchableSelect';
-import { SearchWithRecent } from '@/components/SearchWithRecent';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 import { ProductForm } from '@/components/catalogo/ProductForm';
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
