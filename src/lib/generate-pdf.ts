@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logoUrl from '@/assets/logo-md.webp';
 
-interface PedidoRow {
+export interface PedidoRow {
   cliente: string;
   obra: string;
   fabricante: string;

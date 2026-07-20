@@ -21,13 +21,15 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight, FileWarning
+  ChevronRight, FileWarning, FileSpreadsheet
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { generatePedidosPdf } from '@/lib/generate-pdf';
+import { generatePedidosPdf, type PedidoRow } from '@/lib/generate-pdf';
+import { generatePedidosExcel } from '@/lib/generate-excel';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsHeader, ColumnSettingsPopover } from '@/components/shared/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
@@ -326,6 +328,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder || viewOrderId);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportTargetId, setExportTargetId] = useState<string | undefined>(undefined);
 
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
   const [selectedFabricantes, setSelectedFabricantes] = useState<string[]>([]);
@@ -628,12 +632,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
-  const handleExportPdf = async (specificPedidoId?: string) => {
+  const buildExportRows = (specificPedidoId?: string): { rows: PedidoRow[]; titulo: string } => {
     if (specificPedidoId) {
       const p = (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === specificPedidoId);
-      if (!p) return;
-      await generatePedidosPdf(
-        [{
+      if (!p) return { rows: [], titulo: '' };
+      return {
+        rows: [{
           cliente: p.cliente?.empresa ?? '-',
           obra: p.obra?.nome_obra ?? '-',
           fabricante: p.fabricante?.nome ?? '-',
@@ -642,14 +646,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           etapa: stageLabel(p.status),
           data: p.data_pedido,
         }],
-        `Negócio - ${p.cliente?.empresa ?? p.id}`
-      );
-      return;
+        titulo: `Negócio - ${p.cliente?.empresa ?? p.id}`,
+      };
     }
 
     if (showKanban) {
-      await generatePedidosPdf(
-        pipelineOrders.map(o => ({
+      return {
+        rows: pipelineOrders.map(o => ({
           cliente: o.clientName,
           obra: o.obra,
           fabricante: o.fabricante,
@@ -658,21 +661,47 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           etapa: stageLabel(o.stage),
           data: o.createdAt,
         })),
-        hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo'
-      );
+        titulo: hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo',
+      };
+    }
+
+    return {
+      rows: filtered.map(p => ({
+        cliente: p.cliente?.empresa ?? '-',
+        obra: p.obra?.nome_obra ?? '-',
+        fabricante: p.fabricante?.nome ?? '-',
+        vendedor: p.vendedor?.nome ?? '-',
+        valor: p.valor_total ?? 0,
+        etapa: stageLabel(p.status),
+        data: p.data_pedido,
+      })),
+      titulo: selectedStages.length > 0 ? `Orçamentos - Filtrado` : 'Orçamentos - Todos',
+    };
+  };
+
+  const handleExportPdf = async (specificPedidoId?: string) => {
+    const { rows, titulo } = buildExportRows(specificPedidoId);
+    if (rows.length === 0) return;
+    await generatePedidosPdf(rows, titulo);
+  };
+
+  const handleExportExcel = async (specificPedidoId?: string) => {
+    const { rows, titulo } = buildExportRows(specificPedidoId);
+    if (rows.length === 0) return;
+    generatePedidosExcel(rows, titulo);
+  };
+
+  const openExportDialog = (specificPedidoId?: string) => {
+    setExportTargetId(specificPedidoId);
+    setExportDialogOpen(true);
+  };
+
+  const handleExportFormatChoice = async (formatoEscolhido: 'pdf' | 'xlsx') => {
+    setExportDialogOpen(false);
+    if (formatoEscolhido === 'pdf') {
+      await handleExportPdf(exportTargetId);
     } else {
-      await generatePedidosPdf(
-        filtered.map(p => ({
-          cliente: p.cliente?.empresa ?? '-',
-          obra: p.obra?.nome_obra ?? '-',
-          fabricante: p.fabricante?.nome ?? '-',
-          vendedor: p.vendedor?.nome ?? '-',
-          valor: p.valor_total ?? 0,
-          etapa: stageLabel(p.status),
-          data: p.data_pedido,
-        })),
-        selectedStages.length > 0 ? `Orçamentos - Filtrado` : 'Orçamentos - Todos'
-      );
+      await handleExportExcel(exportTargetId);
     }
   };
 
@@ -745,9 +774,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           />
 
           <ColumnSettingsItem
-            label="Exportar PDF"
-            icon={FileDown} 
-            onClick={() => handleExportPdf()} 
+            label="Exportar"
+            icon={FileDown}
+            onClick={() => openExportDialog()}
           />
 
           {showKanban && (
@@ -1178,8 +1207,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
         <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
           <div className="flex flex-1 gap-2">
-            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => handleExportPdf(viewOrderId || undefined)}>
-              <FileDown className="h-4 w-4 mr-2" /> PDF
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => openExportDialog(viewOrderId || undefined)}>
+              <FileDown className="h-4 w-4 mr-2" /> Exportar
             </Button>
           </div>
           <div className="flex gap-2">
@@ -1491,6 +1520,34 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       />
       
       <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} empresaId={empresaId} />
+
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Exportar negócios</DialogTitle>
+            <DialogDescription>Escolha o formato do arquivo a ser gerado.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => handleExportFormatChoice('pdf')}
+              className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium hover:bg-muted/80 hover:border-primary/50 transition-all"
+            >
+              <FileDown className="h-6 w-6 text-muted-foreground" />
+              PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExportFormatChoice('xlsx')}
+              className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium hover:bg-muted/80 hover:border-primary/50 transition-all"
+            >
+              <FileSpreadsheet className="h-6 w-6 text-muted-foreground" />
+              Excel
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {viewOrderSheet}
     </AppLayout>
   );
