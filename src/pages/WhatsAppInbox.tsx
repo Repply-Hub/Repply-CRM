@@ -2686,6 +2686,9 @@ export default function WhatsAppInbox() {
   function assumirConversa(conv: WaConversa) {
     if (!profile?.id) return;
     setResponsaveis.mutate({ conversaId: conv.id, usuarioIds: [profile.id] });
+    // Assumir uma conversa fechada reabre — não faz sentido ficar "atribuída"
+    // mas escondida na aba Fechado.
+    if (conv.arquivada) arquivarConversa.mutate({ conversaId: conv.id, arquivada: false });
     addNota.mutate({
       conversaId: conv.id,
       texto: `${profile.nome ?? "Alguém"} assumiu esta conversa`,
@@ -2694,6 +2697,7 @@ export default function WhatsAppInbox() {
 
   function direcionarConversa(conv: WaConversa, usuarioId: string) {
     setResponsaveis.mutate({ conversaId: conv.id, usuarioIds: [usuarioId] });
+    if (conv.arquivada) arquivarConversa.mutate({ conversaId: conv.id, arquivada: false });
     setDirecionarOpen(false);
     setBuscaDirecionar("");
     const nomeDestino = vendedores.find((v) => v.id === usuarioId)?.nome ?? "um colega";
