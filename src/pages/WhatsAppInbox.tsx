@@ -2645,10 +2645,11 @@ export default function WhatsAppInbox() {
     profile?.role === "empresa" ||
     profile?.role === "gestor" ||
     profile?.role === "admin";
-  // "Meus chats" só faz sentido pro vendedor, que só enxerga o que é dele por
-  // causa da RLS — admin/gestor enxergam a empresa toda, então o mesmo filtro
-  // (ainda "atribuído a mim", sem nova distinção nos dados) ganha outro nome
-  // pra não parecer que só ele/ela usa o WhatsApp.
+  // Para vendedor, "Meus chats" = atribuídos a ele mesmo (é tudo que a RLS
+  // deixa enxergar). Admin/gestor enxergam a empresa toda, então "Atribuídos"
+  // pra eles mostra qualquer conversa com responsável (de qualquer um) — pra
+  // filtrar só as próprias, usam o filtro "Responsável" e selecionam a si
+  // mesmos (useVendedores traz todos os usuários da empresa, sem filtro de role).
   const meuChatsLabel = isGestor ? "Atribuídos" : "Meus chats";
   const { data: vendedores = [] } = useVendedores();
   const setResponsaveis = useWaSetResponsaveis();
@@ -2893,7 +2894,9 @@ export default function WhatsAppInbox() {
     "todos" | "semana" | "mes" | "ano" | "personalizado"
   >("todos");
   const [filtroInstancia, setFiltroInstancia] = useState<string>("todos");
-  const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
+  // Array vazio = "Todos". Permite selecionar mais de um responsável ao mesmo
+  // tempo (ex: admin/gestor filtrando por si mesmo + um colega).
+  const [filtroResponsavel, setFiltroResponsavel] = useState<string[]>([]);
   const [buscaFiltroResponsavel, setBuscaFiltroResponsavel] = useState("");
   const [filtroResponsavelOpenDesktop, setFiltroResponsavelOpenDesktop] =
     useState(false);
@@ -2904,7 +2907,15 @@ export default function WhatsAppInbox() {
     const termo = buscaFiltroResponsavel.trim().toLowerCase();
     return vendedores.filter((v) => v.nome.toLowerCase().includes(termo));
   }, [vendedores, buscaFiltroResponsavel]);
-  const responsavelSelecionado = vendedores.find((v) => v.id === filtroResponsavel);
+  const vendedoresResponsavelSelecionados = useMemo(
+    () => vendedores.filter((v) => filtroResponsavel.includes(v.id)),
+    [vendedores, filtroResponsavel],
+  );
+  function toggleFiltroResponsavel(id: string) {
+    setFiltroResponsavel((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
   const [periodoCustom, setPeriodoCustom] = useState<{
     from?: Date;
     to?: Date;
@@ -2915,18 +2926,18 @@ export default function WhatsAppInbox() {
     filtroConversa !== "todos" ||
     filtroPeriodo !== "todos" ||
     filtroInstancia !== "todos" ||
-    filtroResponsavel !== "todos";
+    filtroResponsavel.length > 0;
   const activeFiltrosConversaCount =
     (filtroConversa !== "todos" ? 1 : 0) +
     (filtroPeriodo !== "todos" ? 1 : 0) +
     (filtroInstancia !== "todos" ? 1 : 0) +
-    (filtroResponsavel !== "todos" ? 1 : 0);
+    (filtroResponsavel.length > 0 ? 1 : 0);
   function limparFiltrosConversa() {
     setFiltroConversa("todos");
     setFiltroPeriodo("todos");
     setPeriodoCustom({});
     setFiltroInstancia("todos");
-    setFiltroResponsavel("todos");
+    setFiltroResponsavel([]);
   }
   // Conteúdo do dropdown "Filtros" — extraído pra ser reaproveitado tanto na
   // sidebar (desktop) quanto na visualização em lista (MeusChatsList), que
@@ -3041,22 +3052,22 @@ export default function WhatsAppInbox() {
                   type="button"
                   className={cn(
                     "mx-1 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                    filtroResponsavel !== "todos" && "bg-primary/10 text-primary",
+                    filtroResponsavel.length > 0 && "bg-primary/10 text-primary",
                   )}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    {responsavelSelecionado ? (
+                    {vendedoresResponsavelSelecionados.length === 1 ? (
                       <>
                         <Avatar className="h-5 w-5 shrink-0">
-                          {responsavelSelecionado.avatar_url ? (
+                          {vendedoresResponsavelSelecionados[0].avatar_url ? (
                             <img
-                              src={responsavelSelecionado.avatar_url}
-                              alt={responsavelSelecionado.nome}
+                              src={vendedoresResponsavelSelecionados[0].avatar_url}
+                              alt={vendedoresResponsavelSelecionados[0].nome}
                               className="h-full w-full object-cover rounded-full"
                             />
                           ) : (
                             <AvatarFallback className="text-[9px] bg-muted-foreground/20">
-                              {responsavelSelecionado.nome
+                              {vendedoresResponsavelSelecionados[0].nome
                                 .trim()
                                 .split(" ")
                                 .map((p: string) => p[0])
@@ -3067,9 +3078,13 @@ export default function WhatsAppInbox() {
                           )}
                         </Avatar>
                         <span className="truncate">
-                          {responsavelSelecionado.nome}
+                          {vendedoresResponsavelSelecionados[0].nome}
                         </span>
                       </>
+                    ) : vendedoresResponsavelSelecionados.length > 1 ? (
+                      <span className="truncate">
+                        {vendedoresResponsavelSelecionados.length} selecionados
+                      </span>
                     ) : (
                       <span>Todos</span>
                     )}
@@ -3096,13 +3111,13 @@ export default function WhatsAppInbox() {
                       <CommandItem
                         value="todos"
                         onSelect={() => {
-                          setFiltroResponsavel("todos");
+                          setFiltroResponsavel([]);
                           setFiltroResponsavelOpenDesktop(false);
                         }}
                         className="gap-2.5"
                       >
                         <span className="flex-1">Todos</span>
-                        {filtroResponsavel === "todos" && (
+                        {filtroResponsavel.length === 0 && (
                           <Check className="h-3.5 w-3.5 shrink-0" />
                         )}
                       </CommandItem>
@@ -3110,10 +3125,7 @@ export default function WhatsAppInbox() {
                         <CommandItem
                           key={v.id}
                           value={v.id}
-                          onSelect={() => {
-                            setFiltroResponsavel(v.id);
-                            setFiltroResponsavelOpenDesktop(false);
-                          }}
+                          onSelect={() => toggleFiltroResponsavel(v.id)}
                           className="gap-2.5"
                         >
                           <Avatar className="h-6 w-6 shrink-0">
@@ -3136,7 +3148,7 @@ export default function WhatsAppInbox() {
                             )}
                           </Avatar>
                           <span className="flex-1 truncate">{v.nome}</span>
-                          {filtroResponsavel === v.id && (
+                          {filtroResponsavel.includes(v.id) && (
                             <Check className="h-3.5 w-3.5 shrink-0" />
                           )}
                         </CommandItem>
@@ -3329,18 +3341,26 @@ export default function WhatsAppInbox() {
   const conversasPorTipoEBusca = conversas.filter((c) => {
     if (filtroConversa === "geral" && (c.responsaveis?.length ?? 0) > 0)
       return false;
-    if (
-      filtroConversa === "meu" &&
-      (!profile?.id || !c.responsaveis?.some((r) => r.id === profile.id))
-    )
-      return false;
+    if (filtroConversa === "meu") {
+      // Admin/gestor: "Atribuídos" = qualquer conversa com responsável
+      // (de qualquer pessoa da empresa) — usam o filtro "Responsável" pra
+      // restringir a si mesmos. Vendedor: só o que é atribuído a ele mesmo.
+      if (isGestor) {
+        if ((c.responsaveis?.length ?? 0) === 0) return false;
+      } else if (
+        !profile?.id ||
+        !c.responsaveis?.some((r) => r.id === profile.id)
+      ) {
+        return false;
+      }
+    }
 
     if (filtroInstancia !== "todos" && c.instancia_id !== filtroInstancia)
       return false;
 
     if (
-      filtroResponsavel !== "todos" &&
-      !(c.responsaveis ?? []).some((r) => r.id === filtroResponsavel)
+      filtroResponsavel.length > 0 &&
+      !(c.responsaveis ?? []).some((r) => filtroResponsavel.includes(r.id))
     )
       return false;
 
@@ -4499,23 +4519,23 @@ export default function WhatsAppInbox() {
                                     type="button"
                                     className={cn(
                                       "mx-1 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                                      filtroResponsavel !== "todos" &&
+                                      filtroResponsavel.length > 0 &&
                                         "bg-primary/10 text-primary",
                                     )}
                                   >
                                     <span className="flex min-w-0 items-center gap-2">
-                                      {responsavelSelecionado ? (
+                                      {vendedoresResponsavelSelecionados.length === 1 ? (
                                         <>
                                           <Avatar className="h-5 w-5 shrink-0">
-                                            {responsavelSelecionado.avatar_url ? (
+                                            {vendedoresResponsavelSelecionados[0].avatar_url ? (
                                               <img
-                                                src={responsavelSelecionado.avatar_url}
-                                                alt={responsavelSelecionado.nome}
+                                                src={vendedoresResponsavelSelecionados[0].avatar_url}
+                                                alt={vendedoresResponsavelSelecionados[0].nome}
                                                 className="h-full w-full object-cover rounded-full"
                                               />
                                             ) : (
                                               <AvatarFallback className="text-[9px] bg-muted-foreground/20">
-                                                {responsavelSelecionado.nome
+                                                {vendedoresResponsavelSelecionados[0].nome
                                                   .trim()
                                                   .split(" ")
                                                   .map((p: string) => p[0])
@@ -4526,9 +4546,13 @@ export default function WhatsAppInbox() {
                                             )}
                                           </Avatar>
                                           <span className="truncate">
-                                            {responsavelSelecionado.nome}
+                                            {vendedoresResponsavelSelecionados[0].nome}
                                           </span>
                                         </>
+                                      ) : vendedoresResponsavelSelecionados.length > 1 ? (
+                                        <span className="truncate">
+                                          {vendedoresResponsavelSelecionados.length} selecionados
+                                        </span>
                                       ) : (
                                         <span>Todos</span>
                                       )}
@@ -4555,13 +4579,13 @@ export default function WhatsAppInbox() {
                                         <CommandItem
                                           value="todos"
                                           onSelect={() => {
-                                            setFiltroResponsavel("todos");
+                                            setFiltroResponsavel([]);
                                             setFiltroResponsavelOpenMobile(false);
                                           }}
                                           className="gap-2.5"
                                         >
                                           <span className="flex-1">Todos</span>
-                                          {filtroResponsavel === "todos" && (
+                                          {filtroResponsavel.length === 0 && (
                                             <Check className="h-3.5 w-3.5 shrink-0" />
                                           )}
                                         </CommandItem>
@@ -4569,10 +4593,7 @@ export default function WhatsAppInbox() {
                                           <CommandItem
                                             key={v.id}
                                             value={v.id}
-                                            onSelect={() => {
-                                              setFiltroResponsavel(v.id);
-                                              setFiltroResponsavelOpenMobile(false);
-                                            }}
+                                            onSelect={() => toggleFiltroResponsavel(v.id)}
                                             className="gap-2.5"
                                           >
                                             <Avatar className="h-6 w-6 shrink-0">
@@ -4595,7 +4616,7 @@ export default function WhatsAppInbox() {
                                               )}
                                             </Avatar>
                                             <span className="flex-1 truncate">{v.nome}</span>
-                                            {filtroResponsavel === v.id && (
+                                            {filtroResponsavel.includes(v.id) && (
                                               <Check className="h-3.5 w-3.5 shrink-0" />
                                             )}
                                           </CommandItem>
