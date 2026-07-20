@@ -70,6 +70,14 @@ const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: st
   observacoes: { desc: 'Notas livres sobre o registro.', example: 'Entrega prevista para 15/12', storage: 'pedidos.observacoes', synonyms: ['observacoes', 'observações', 'obs', 'nota', 'descricao'] },
   status: { desc: 'Etapa do pipeline normalizada.', example: 'novo_lead', storage: 'pedidos.status', synonyms: ['status', 'etapa', 'fase', 'classificacao'], type: 'status' },
   data_pedido: { desc: 'Data do pedido convertida para YYYY-MM-DD.', example: '2024-01-31', storage: 'pedidos.data_pedido', synonyms: ['data', 'data pedido', 'criado em', 'date'], type: 'date' },
+  nome_contato: { desc: 'Primeiro nome do contato principal do cliente.', example: 'João', storage: 'contatos.nome', synonyms: ['nome', 'nome contato', 'contato', 'first name'] },
+  sobrenome_contato: { desc: 'Sobrenome do contato principal do cliente.', example: 'Silva', storage: 'contatos.sobrenome', synonyms: ['sobrenome', 'last name'] },
+  cargo: { desc: 'Cargo ou função do contato na empresa.', example: 'Comprador', storage: 'contatos.cargo', synonyms: ['cargo', 'funcao', 'função', 'role', 'position'] },
+  classificacao: { desc: 'Classificação do cliente (ex: A, B, C).', example: 'A', storage: 'clientes.classificacao', synonyms: ['classificacao', 'classificação', 'rating', 'grau'] },
+  negocio: { desc: 'Nome ou título do negócio/oportunidade.', example: 'Fornecimento de tubos - Edifício Blue Tower', storage: 'pedidos.nome', synonyms: ['negocio', 'negócio', 'titulo', 'título', 'oportunidade', 'deal'] },
+  contato: { desc: 'Nome do contato relacionado ao negócio.', example: 'João Silva', storage: 'pedidos.contato_id', synonyms: ['contato', 'nome contato', 'contact'] },
+  vendedor: { desc: 'Vendedor/usuário responsável pelo negócio.', example: 'Maria Souza', storage: 'pedidos.usuario_id', synonyms: ['vendedor', 'responsavel', 'responsável', 'usuario', 'usuário', 'seller'] },
+  prazo_resposta: { desc: 'Data prevista de fechamento do negócio.', example: '2024-02-28', storage: 'pedidos.prazo_resposta', synonyms: ['prazo resposta', 'fechamento', 'data fechamento', 'deadline'], type: 'date' },
 };
 
 function normalizeText(value: unknown): string {
@@ -346,7 +354,7 @@ function FieldInfo({ fieldKey }: { fieldKey: string }) {
           <Info className="h-3.5 w-3.5" />
         </button>
       </TooltipTrigger>
-      <TooltipContent side="right" className="z-[220] max-w-[280px] space-y-1">
+      <TooltipContent side="right" className="z-[1300] max-w-[280px] space-y-1">
         <p className="text-xs">{hint.desc}</p>
         {hint.example && <p className="text-[10px] text-muted-foreground"><span className="font-semibold">Exemplo:</span> <span className="font-mono">{hint.example}</span></p>}
         {hint.storage && <p className="text-[10px] text-muted-foreground"><span className="font-semibold">Salvo em:</span> <span className="font-mono">{hint.storage}</span></p>}
