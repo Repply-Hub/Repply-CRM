@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { subMonths, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
+import { subMonths, isWithinInterval, parseISO, startOfDay, endOfDay, format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -8,8 +8,7 @@ import {
   Tooltip, Area, AreaChart,
 } from 'recharts';
 import { TrendingUp, DollarSign, Target, Clock, Loader2, Factory } from 'lucide-react';
-import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante } from '@/hooks/use-dashboard';
-import { usePedidos } from '@/hooks/use-pedidos';
+import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante, useDashboardStats } from '@/hooks/use-dashboard';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -83,25 +82,17 @@ const Dashboard = () => {
   const fabricantes = useMemo(() => (fabricantesRaw || []) as { id: string; nome: string }[], [fabricantesRaw]);
 
 
-  const { data: pedidosResult } = usePedidos(empresaId, 0, 500);
-  const pedidos = pedidosResult?.data ?? [];
+  // KPIs, segmentação e rendimento por fábrica/vendedor vêm agregados do servidor
+  // (RPC dashboard_stats) em vez de puxar centenas de linhas de `pedidos` com joins
+  // pro cliente só pra somar — ver supabase/migrations/20260722100000_dashboard_stats_rpc.sql.
+  const { data: stats, isLoading: loadStats } = useDashboardStats(empresaId, {
+    usuarioId: vendedorId !== 'todos' ? vendedorId : undefined,
+    fabricanteId: fabricanteId !== 'todos' ? fabricanteId : undefined,
+    dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
+    dateTo: format(dateRange.to, 'yyyy-MM-dd'),
+  });
 
-  const isLoading = loadFat;
-
-  const filteredPedidos = useMemo(() => {
-    const list = pedidos;
-    const from = startOfDay(dateRange.from);
-    const to = endOfDay(dateRange.to);
-    
-    return list.filter(p => {
-      const d = parseISO(p.data_pedido);
-      const isWithinRange = isWithinInterval(d, { start: from, end: to });
-      const matchesVendedor = vendedorId === 'todos' || p.usuario_id === vendedorId;
-      const matchesFabricante = fabricanteId === 'todos' || p.fabricante_id === fabricanteId;
-      return isWithinRange && matchesVendedor && matchesFabricante;
-    });
-  }, [pedidos, dateRange.from, dateRange.to, vendedorId, fabricanteId]);
-
+  const isLoading = loadFat || loadStats;
 
   const filteredFaturamento = useMemo(() => {
     if (!faturamento) return [];
@@ -122,15 +113,11 @@ const Dashboard = () => {
     : '0';
 
 
-  const totalPedidos = filteredPedidos.length;
-  const fechados = filteredPedidos.filter(p => p.status === 'fechamento').length;
-  const taxaConversao = totalPedidos > 0 ? ((fechados / totalPedidos) * 100).toFixed(0) : '0';
+  const totalPedidos = stats?.total_pedidos ?? 0;
+  const totalPedidosFechados = stats?.pedidos_fechados ?? 0;
+  const taxaConversao = totalPedidos > 0 ? ((totalPedidosFechados / totalPedidos) * 100).toFixed(0) : '0';
 
-  const totalFaturamento = filteredPedidos
-    .filter(p => p.status === 'fechamento')
-    .reduce((sum, p) => sum + (p.valor_total ?? 0), 0);
-    
-  const totalPedidosFechados = filteredPedidos.filter(p => p.status === 'fechamento').length;
+  const totalFaturamento = stats?.total_faturamento ?? 0;
   const ticketMedioGeral = totalPedidosFechados > 0 ? totalFaturamento / totalPedidosFechados : 0;
 
   const kpis = [
@@ -163,46 +150,26 @@ const Dashboard = () => {
     dias: 0, // A coluna tempo_medio_ate_orcamento_dias não existe na view atual
   }));
 
-  const rendimentoFabrica = useMemo(() => {
-    const map = new Map<string, number>();
-    filteredPedidos.forEach(p => {
-      if (p.fabricante?.nome && p.status === 'fechamento') {
-        map.set(p.fabricante.nome, (map.get(p.fabricante.nome) ?? 0) + (p.valor_total ?? 0));
-      }
-    });
-    const arr = Array.from(map.entries()).map(([fabrica, valor]) => ({ fabrica, valor }));
-    // No sorting here anymore, we do it in useMemo
-    return arr;
-  }, [filteredPedidos]);
+  // Já vem agregado e ordenado (desc) da RPC — só reordena/recorta pra UI.
+  const rendimentoFabrica = useMemo(
+    () => stats?.rendimento_fabricante ?? [],
+    [stats],
+  );
 
   const rendimentoFabricaSorted = useMemo(() => {
     return [...rendimentoFabrica].sort((a, b) => fabricaSort === 'maior' ? b.valor - a.valor : a.valor - b.valor);
   }, [rendimentoFabrica, fabricaSort]);
 
   const faturamentoPorFabricaPizza = useMemo(() => {
-    return rendimentoFabrica
-      .sort((a, b) => b.valor - a.valor)
-      .slice(0, 5);
+    return [...rendimentoFabrica].slice(0, 5);
   }, [rendimentoFabrica]);
 
-  const rendimentoVendedor = useMemo(() => {
-    const map = new Map<string, number>();
-    filteredPedidos.forEach(p => {
-      if (p.vendedor?.nome && p.status === 'fechamento') {
-        map.set(p.vendedor.nome, (map.get(p.vendedor.nome) ?? 0) + (p.valor_total ?? 0));
-      }
-    });
-    const arr = Array.from(map.entries()).map(([vendedor, valor]) => ({ vendedor, valor }));
-    arr.sort((a, b) => b.valor - a.valor);
-    return arr;
-  }, [filteredPedidos]);
-
-
+  const rendimentoVendedor = stats?.rendimento_vendedor ?? [];
 
   const segmentacao = [
-    { name: 'Alto (>100k)', value: filteredPedidos.filter(p => (p.valor_total ?? 0) > 100000).length, color: 'hsl(24, 100%, 47%)' },
-    { name: 'Médio (30-100k)', value: filteredPedidos.filter(p => (p.valor_total ?? 0) >= 30000 && (p.valor_total ?? 0) <= 100000).length, color: 'hsl(42, 95%, 52%)' },
-    { name: 'Baixo (<30k)', value: filteredPedidos.filter(p => (p.valor_total ?? 0) < 30000).length, color: 'hsl(152, 60%, 38%)' },
+    { name: 'Alto (>100k)', value: stats?.segmentacao_alto ?? 0, color: 'hsl(24, 100%, 47%)' },
+    { name: 'Médio (30-100k)', value: stats?.segmentacao_medio ?? 0, color: 'hsl(42, 95%, 52%)' },
+    { name: 'Baixo (<30k)', value: stats?.segmentacao_baixo ?? 0, color: 'hsl(152, 60%, 38%)' },
   ];
 
   if (isLoading) {

@@ -2617,6 +2617,24 @@ export type Database = {
       }
     }
     Functions: {
+      dashboard_stats: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_fabricante_id?: string
+          p_usuario_id?: string
+        }
+        Returns: {
+          pedidos_fechados: number
+          rendimento_fabricante: Json
+          rendimento_vendedor: Json
+          segmentacao_alto: number
+          segmentacao_baixo: number
+          segmentacao_medio: number
+          total_faturamento: number
+          total_pedidos: number
+        }[]
+      }
       delete_current_user: { Args: never; Returns: undefined }
       delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
       get_my_empresa_id: { Args: never; Returns: string }

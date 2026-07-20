@@ -1,22 +1,31 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+// staleTime/gcTime/refetchOnWindowFocus no mesmo padrão de usePedidos (src/hooks/use-pedidos.ts)
+// — sem isso, toda vez que a aba do Dashboard ganha foco essas agregações eram refeitas do zero.
+const DASHBOARD_QUERY_OPTS = {
+  staleTime: 1000 * 60 * 5,
+  gcTime: 1000 * 60 * 10,
+  refetchOnWindowFocus: false,
+} as const;
+
 export function useFaturamentoMensal(empresaId?: string) {
   return useQuery({
     queryKey: ['vw_faturamento_mensal', empresaId],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('vw_faturamento_mensal')
-        .select('*');
-      
-      if (empresaId) {
-        query = query.eq('empresa_id', empresaId);
-      }
-      
-      const { data, error } = await query.order('mes', { ascending: true });
+        .select('*')
+        .eq('empresa_id', empresaId as string)
+        .order('mes', { ascending: true });
       if (error) throw error;
       return data || [];
     },
+    // Sem isso a query disparava no mount com empresaId ainda undefined (RLS mascarava
+    // o resultado errado, mas fazia a agregação rodar em dobro — uma vez "vazia" e de
+    // novo assim que empresaId chegava).
+    enabled: !!empresaId,
+    ...DASHBOARD_QUERY_OPTS,
   });
 }
 
@@ -24,18 +33,15 @@ export function useIndicadoresVendedor(empresaId?: string) {
   return useQuery({
     queryKey: ['vw_indicadores_usuario', empresaId],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('vw_indicadores_usuario')
-        .select('*');
-      
-      if (empresaId) {
-        query = query.eq('empresa_id', empresaId);
-      }
-      
-      const { data, error } = await query;
+        .select('*')
+        .eq('empresa_id', empresaId as string);
       if (error) throw error;
       return data || [];
     },
+    enabled: !!empresaId,
+    ...DASHBOARD_QUERY_OPTS,
   });
 }
 
@@ -43,17 +49,62 @@ export function useVelocidadeFabricante(empresaId?: string) {
   return useQuery({
     queryKey: ['vw_velocidade_por_fabricante', empresaId],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('vw_velocidade_por_fabricante')
-        .select('*');
-      
-      if (empresaId) {
-        query = query.eq('empresa_id', empresaId);
-      }
-      
-      const { data, error } = await query;
+        .select('*')
+        .eq('empresa_id', empresaId as string);
       if (error) throw error;
       return data || [];
     },
+    enabled: !!empresaId,
+    ...DASHBOARD_QUERY_OPTS,
+  });
+}
+
+export interface DashboardStats {
+  total_pedidos: number;
+  pedidos_fechados: number;
+  total_faturamento: number;
+  segmentacao_alto: number;
+  segmentacao_medio: number;
+  segmentacao_baixo: number;
+  rendimento_fabricante: { fabrica: string; valor: number }[];
+  rendimento_vendedor: { vendedor: string; valor: number }[];
+}
+
+// KPIs, segmentação e rendimento por fábrica/vendedor do Dashboard — antes calculados
+// no cliente em cima de até 500 linhas de `pedidos` com 4 joins (usePedidos), o mesmo
+// anti-padrão documentado no CLAUDE.md do projeto. A RPC roda como o usuário chamador
+// (SECURITY INVOKER), então a RLS de pedidos já escopa para a empresa dele sozinha.
+export function useDashboardStats(
+  empresaId?: string,
+  filters?: { usuarioId?: string; fabricanteId?: string; dateFrom?: string; dateTo?: string },
+) {
+  const { usuarioId, fabricanteId, dateFrom, dateTo } = filters ?? {};
+
+  return useQuery({
+    queryKey: ['dashboard_stats', empresaId, usuarioId, fabricanteId, dateFrom, dateTo],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('dashboard_stats', {
+        p_usuario_id: usuarioId ?? null,
+        p_fabricante_id: fabricanteId ?? null,
+        p_date_from: dateFrom ?? null,
+        p_date_to: dateTo ?? null,
+      });
+      if (error) throw error;
+      const row = (data as DashboardStats[] | null)?.[0];
+      return (row ?? {
+        total_pedidos: 0,
+        pedidos_fechados: 0,
+        total_faturamento: 0,
+        segmentacao_alto: 0,
+        segmentacao_medio: 0,
+        segmentacao_baixo: 0,
+        rendimento_fabricante: [],
+        rendimento_vendedor: [],
+      }) as DashboardStats;
+    },
+    enabled: !!empresaId,
+    ...DASHBOARD_QUERY_OPTS,
   });
 }
