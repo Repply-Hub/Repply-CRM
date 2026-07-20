@@ -235,9 +235,17 @@ async function handleIncomingMessage(
   const wamid: string = msg.messageid ?? msg.id ?? "";
   // Para grupos, o nome da conversa é o nome do grupo; para individuais é o nome do contato
   const groupName: string = payload.chat?.wa_name ?? payload.chat?.name ?? "";
+  // Em chat individual, msg.senderName é quem ENVIOU aquela mensagem específica — para
+  // mensagens de saída refletidas de WhatsApp Web/celular físico (sentByOtherChannel),
+  // isso é o próprio nome do perfil da empresa (ex: "MD Representações"), não o do
+  // contato. Usar isso como pushName sobrescrevia nome_contato com o nome da própria
+  // empresa a cada resposta enviada fora do CRM. payload.chat sempre descreve o contato
+  // da conversa, então é a fonte certa quando quem enviou não é o contato.
   const pushName: string = isGroup
     ? (groupName || msg.senderName || "")
-    : (msg.senderName ?? payload.chat?.wa_name ?? payload.chat?.name ?? "");
+    : (sentByOtherChannel
+        ? (payload.chat?.wa_name ?? payload.chat?.name ?? "")
+        : (msg.senderName ?? payload.chat?.wa_name ?? payload.chat?.name ?? ""));
 
   // Em grupos, quem enviou a mensagem é o participante (msg.sender_pn / msg.senderName),
   // não o grupo em si — guarda separado para exibir "quem mandou o quê" na UI.
