@@ -218,6 +218,27 @@ function roleLabel(role: string | null | undefined) {
   return role ?? null;
 }
 
+// Mensagens enviadas fora do CRM (WhatsApp Web/celular físico ligado à mesma
+// instância) chegam via webhook sem usuario_id — quem enviou costuma se
+// identificar manualmente prefixando "*Nome:*" no início do texto (convenção comum
+// em número compartilhado por vários atendentes). Extrai esse prefixo pra não
+// mostrar os asteriscos crus na bolha e pra tentar casar com um usuário do CRM.
+const PREFIXO_REMETENTE_EXTERNO_RE = /^\*([^*\n]{1,60}):?\*[ \t]*\n?/;
+function extrairPrefixoRemetenteExterno(
+  conteudo: string,
+): { nome: string; resto: string } | null {
+  const m = conteudo.match(PREFIXO_REMETENTE_EXTERNO_RE);
+  if (!m) return null;
+  return { nome: m[1].trim(), resto: conteudo.slice(m[0].length) };
+}
+function normalizeNomeBusca(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function UserPreviewPopover({
   usuario,
   nameClassName,
@@ -5094,6 +5115,23 @@ export default function WhatsAppInbox() {
                           new Date(msg.created_at).toDateString() !==
                             new Date(prevMsg.created_at).toDateString();
                         const isLast = i === mensagens.length - 1;
+                        // Mensagem de saída sem usuario_id = veio de fora do CRM (WhatsApp
+                        // Web/celular físico, ver comentário no whatsapp-webhook) — quem
+                        // mandou costuma se identificar com um prefixo manual "*Nome:*".
+                        const prefixoExterno =
+                          isSaida && !msg.usuario
+                            ? extrairPrefixoRemetenteExterno(msg.conteudo)
+                            : null;
+                        const usuarioExterno = prefixoExterno
+                          ? (vendedores.find(
+                              (v) =>
+                                normalizeNomeBusca(v.nome) ===
+                                normalizeNomeBusca(prefixoExterno.nome),
+                            ) ?? null)
+                          : null;
+                        const msgParaExibir = prefixoExterno
+                          ? { ...msg, conteudo: prefixoExterno.resto }
+                          : msg;
                         // Empilha mensagens consecutivas do mesmo remetente sem repetir o
                         // nome/número acima de cada bolha — só mostra na primeira da leva.
                         const isFirstDoRemetente =
@@ -5197,6 +5235,35 @@ export default function WhatsAppInbox() {
                                           )}
                                         />
                                       )}
+                                    {isSaida &&
+                                      !msg.usuario &&
+                                      prefixoExterno &&
+                                      isFirstDoRemetente && (
+                                        <div
+                                          className={cn(
+                                            "flex items-center gap-1 mb-2",
+                                            msg.tipo === "audio" &&
+                                              "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                          )}
+                                        >
+                                          {usuarioExterno ? (
+                                            <UserPreviewPopover
+                                              usuario={usuarioExterno}
+                                              nameClassName="w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight text-white"
+                                            />
+                                          ) : (
+                                            <span className="w-fit max-w-full truncate text-sm font-semibold leading-tight text-white">
+                                              {prefixoExterno.nome}
+                                            </span>
+                                          )}
+                                          <span
+                                            title="Enviado fora do CRM (WhatsApp Web/celular)"
+                                            className="inline-flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded text-[9px] font-medium bg-white/20 text-white"
+                                          >
+                                            <Smartphone className="h-2.5 w-2.5" />
+                                          </span>
+                                        </div>
+                                      )}
                                     {!isSaida && isFirstDoRemetente && (
                                       <ContactPreviewPopover
                                         conversa={conversaAtiva}
@@ -5224,7 +5291,7 @@ export default function WhatsAppInbox() {
                                       />
                                     )}
                                     <MessageContent
-                                      msg={msg}
+                                      msg={msgParaExibir}
                                       isSaida={isSaida}
                                       onImageClick={setViewingImage}
                                       onPreviewFile={setPreviewFile}
