@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
-import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, ChatGrupo, ChatMessage, useMarkChatAsRead, useChatGeralConfig, useUpdateChatGeralConfig } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, ChatGrupo, ChatMessage, useMarkChatAsRead, useChatGeralConfig, useUpdateChatGeralConfig, useChatLastActivity } from '@/hooks/use-chat';
 import { useOnlineUsers } from '@/hooks/use-presence';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { supabase } from '@/integrations/supabase/client';
@@ -389,6 +389,7 @@ const Chat = () => {
   const geralNome = geralConfig?.nome || 'Chat Geral';
   const markAsRead = useMarkChatAsRead();
   const { data: unreadCounts = {} } = useUnreadChatByTarget();
+  const { data: lastActivity = {} } = useChatLastActivity();
   const [expandedMediaTab, setExpandedMediaTab] = useState<
     'imagens' | 'videos' | 'documentos' | 'links' | null
   >(null);
@@ -742,17 +743,39 @@ const Chat = () => {
     </div>
   );
 
+  const sortedMembers = useMemo(() => {
+    return [...members].sort((a, b) => {
+      const ta = lastActivity[`dm_${a.id}`];
+      const tb = lastActivity[`dm_${b.id}`];
+      if (ta && tb) return tb.localeCompare(ta);
+      if (ta) return -1;
+      if (tb) return 1;
+      return a.nome.localeCompare(b.nome);
+    });
+  }, [members, lastActivity]);
+
+  const sortedGrupos = useMemo(() => {
+    return [...grupos].sort((a, b) => {
+      const ta = lastActivity[`grupo_${a.id}`];
+      const tb = lastActivity[`grupo_${b.id}`];
+      if (ta && tb) return tb.localeCompare(ta);
+      if (ta) return -1;
+      if (tb) return 1;
+      return a.created_at.localeCompare(b.created_at);
+    });
+  }, [grupos, lastActivity]);
+
   return (
     <AppLayout headerContent={headerContent} mainClassName="flex-1 overflow-hidden">
       <div className="flex h-full">
         <MembersList
-          members={members}
+          members={sortedMembers}
           myId={myVendedor ?? null}
           target={target}
           onSelect={setTarget}
           collapsed={teamCollapsed}
           onToggle={() => setTeamCollapsed(prev => !prev)}
-          grupos={grupos}
+          grupos={sortedGrupos}
           unreadCounts={unreadCounts}
           geralNome={geralNome}
           geralFotoUrl={geralConfig?.foto_url}

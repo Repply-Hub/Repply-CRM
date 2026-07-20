@@ -358,14 +358,16 @@ export function useWaSendMessage() {
       // mensagem apareça em "Meus chats" sem esperar o refetch (o servidor também
       // grava isso em whatsapp_conversa_responsaveis, isso aqui é só otimista).
       qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
-        (old ?? []).map((c) => {
-          if (c.id !== vars.conversa_id) return c;
-          const jaResponsavel = profile?.id && c.responsaveis?.some((r) => r.id === profile.id);
-          const responsaveis = profile?.id && !jaResponsavel
-            ? [...(c.responsaveis ?? []), { id: profile.id, nome: profile.nome, avatar_url: profile.avatar_url ?? null }]
-            : c.responsaveis;
-          return { ...c, ultima_mensagem: vars.mensagem, ultima_mensagem_at: new Date().toISOString(), responsaveis };
-        })
+        (old ?? [])
+          .map((c) => {
+            if (c.id !== vars.conversa_id) return c;
+            const jaResponsavel = profile?.id && c.responsaveis?.some((r) => r.id === profile.id);
+            const responsaveis = profile?.id && !jaResponsavel
+              ? [...(c.responsaveis ?? []), { id: profile.id, nome: profile.nome, avatar_url: profile.avatar_url ?? null }]
+              : c.responsaveis;
+            return { ...c, ultima_mensagem: vars.mensagem, ultima_mensagem_at: new Date().toISOString(), responsaveis };
+          })
+          .sort(compareConversas)
       );
 
       return { msgOtimista };

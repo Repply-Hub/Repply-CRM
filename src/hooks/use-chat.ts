@@ -302,6 +302,76 @@ export function useUpdateChatGeralConfig() {
   });
 }
 
+// Chave por alvo: 'geral', `grupo_${id}` ou `dm_${outroUsuarioId}` -> timestamp da última mensagem.
+// Usada para ordenar a barra lateral (Grupos/Membros) por atividade recente, como no WhatsApp Inbox.
+function activityKeyFor(me: string, msg: { usuario_id: string; recipient_id?: string | null; grupo_id?: string | null }): string | null {
+  if (msg.grupo_id) return `grupo_${msg.grupo_id}`;
+  if (msg.recipient_id === me) return `dm_${msg.usuario_id}`;
+  if (msg.usuario_id === me && msg.recipient_id) return `dm_${msg.recipient_id}`;
+  if (!msg.recipient_id && !msg.grupo_id) return 'geral';
+  return null;
+}
+
+export function useChatLastActivity() {
+  const qc = useQueryClient();
+  // chat_mensagens.usuario_id/recipient_id referenciam usuarios.id, não o id legado
+  // de vendedores (get_my_vendedor_id/['my-vendedor']) — guarda o id certo aqui pra
+  // o handler de realtime comparar contra a mesma coisa que activityKeyFor espera.
+  const meIdRef = useRef<string | null>(null);
+
+  const query = useQuery<Record<string, string>>({
+    queryKey: ['chat-last-activity'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return {};
+
+      const { data: me } = await supabase.from('usuarios').select('id, empresa_id').eq('user_id', userData.user.id).single();
+      if (!me) return {};
+      meIdRef.current = me.id;
+
+      const { data, error } = await supabase
+        .from('chat_mensagens')
+        .select('usuario_id, recipient_id, grupo_id, created_at')
+        .eq('empresa_id', me.empresa_id)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((msg) => {
+        const key = activityKeyFor(me.id, msg);
+        // Ordem descendente: a primeira ocorrência de cada chave já é a mais recente.
+        if (key && !map[key]) map[key] = msg.created_at;
+      });
+      return map;
+    },
+  });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`chat-last-activity-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensagens' }, (payload) => {
+        const newMsg = payload.new as any;
+        const meId = meIdRef.current;
+        if (!meId) {
+          // Ainda não temos o id do usuário em cache (corrida de montagem) — refetch em vez de ignorar.
+          qc.invalidateQueries({ queryKey: ['chat-last-activity'] });
+          return;
+        }
+        const key = activityKeyFor(meId, newMsg);
+        if (!key) return;
+        qc.setQueryData<Record<string, string>>(['chat-last-activity'], (old) => ({
+          ...(old ?? {}),
+          [key]: newMsg.created_at,
+        }));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc]);
+
+  return query;
+}
+
 export function useSendMessage() {
   const qc = useQueryClient();
   const [sending, setSending] = useState(false);
@@ -382,6 +452,14 @@ export function useSendMessage() {
     onMutate: async ({ conteudo, files, grupoId, recipientId }) => {
       await qc.cancelQueries({ queryKey: ['chat_mensagens', grupoId, recipientId] });
       const previousMessages = qc.getQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId]);
+
+      // Sobe a conversa/grupo para o topo da barra lateral imediatamente, sem esperar o
+      // round-trip do Realtime (mesmo padrão usado no WhatsApp Inbox).
+      const activityKey = grupoId ? `grupo_${grupoId}` : recipientId ? `dm_${recipientId}` : 'geral';
+      qc.setQueryData<Record<string, string>>(['chat-last-activity'], (old) => ({
+        ...(old ?? {}),
+        [activityKey]: new Date().toISOString(),
+      }));
 
       const { data: userData } = await supabase.auth.getUser();
       if (previousMessages && userData.user) {
