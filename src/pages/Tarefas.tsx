@@ -14,11 +14,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Trash2, Pencil, Loader2, Calendar, User, LayoutGrid, List as ListIcon, Settings2, ChevronDown } from 'lucide-react';
-import { format } from 'date-fns';
+import { Calendar as CalendarRangePicker } from '@/components/ui/calendar';
+import { Plus, Search, Trash2, Pencil, Loader2, Calendar, Check, User, LayoutGrid, List as ListIcon, Settings2, ChevronDown, ClipboardList, Tag, FolderKanban } from 'lucide-react';
+import { format, subDays, subMonths, subYears, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { ListPagination } from '@/components/shared/ListPagination';
@@ -33,6 +35,7 @@ import { useTableSettings } from '@/hooks/use-table-settings';
 import { FilterButton } from '@/components/shared/FilterButton';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { MultiSelectSearch } from '@/components/shared/MultiSelectSearch';
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 
@@ -90,9 +93,9 @@ export default function Tarefas() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
-  const [responsavelFilter, setResponsavelFilter] = useState('todos');
-  const [prazoDe, setPrazoDe] = useState('');
-  const [prazoAte, setPrazoAte] = useState('');
+  const [responsavelFilter, setResponsavelFilter] = useState<string[]>([]);
+  const [prazoFiltro, setPrazoFiltro] = useState<'todos' | 'semana' | 'mes' | 'ano' | 'personalizado'>('todos');
+  const [prazoCustom, setPrazoCustom] = useState<{ from?: Date; to?: Date }>({});
   const [page, setPage] = useState(1);
 
   const [view, setView] = useState<TarefasView>(() => {
@@ -108,6 +111,7 @@ export default function Tarefas() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
   const [deleteTarefaTarget, setDeleteTarefaTarget] = useState<Tarefa | null>(null);
+  const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null);
 
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -145,9 +149,21 @@ export default function Tarefas() {
   const filtered = useMemo(() => {
     let list = tarefas;
     if (statusFilter !== 'todos') list = list.filter(t => t.status === statusFilter);
-    if (responsavelFilter !== 'todos') list = list.filter(t => t.responsavel === responsavelFilter);
-    if (prazoDe) list = list.filter(t => t.prazo_final && t.prazo_final.slice(0, 10) >= prazoDe);
-    if (prazoAte) list = list.filter(t => t.prazo_final && t.prazo_final.slice(0, 10) <= prazoAte);
+    if (responsavelFilter.length > 0) list = list.filter(t => responsavelFilter.includes(t.responsavel));
+    if (prazoFiltro !== 'todos') {
+      list = list.filter(t => {
+        if (!t.prazo_final) return false;
+        const dataRef = new Date(t.prazo_final);
+        if (prazoFiltro === 'semana' && dataRef < subDays(new Date(), 7)) return false;
+        if (prazoFiltro === 'mes' && dataRef < subMonths(new Date(), 1)) return false;
+        if (prazoFiltro === 'ano' && dataRef < subYears(new Date(), 1)) return false;
+        if (prazoFiltro === 'personalizado') {
+          if (prazoCustom.from && dataRef < startOfDay(prazoCustom.from)) return false;
+          if (prazoCustom.to && dataRef > endOfDay(prazoCustom.to)) return false;
+        }
+        return true;
+      });
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(t =>
@@ -158,10 +174,10 @@ export default function Tarefas() {
       );
     }
     return list;
-  }, [tarefas, statusFilter, responsavelFilter, prazoDe, prazoAte, search]);
+  }, [tarefas, statusFilter, responsavelFilter, prazoFiltro, prazoCustom, search]);
 
-  const hasFilters = statusFilter !== 'todos' || responsavelFilter !== 'todos' || prazoDe !== '' || prazoAte !== '' || search !== '';
-  const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0) + (responsavelFilter !== 'todos' ? 1 : 0) + (prazoDe || prazoAte ? 1 : 0);
+  const hasFilters = statusFilter !== 'todos' || responsavelFilter.length > 0 || prazoFiltro !== 'todos' || search !== '';
+  const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0) + (responsavelFilter.length > 0 ? 1 : 0) + (prazoFiltro !== 'todos' ? 1 : 0);
 
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -186,6 +202,10 @@ export default function Tarefas() {
       observadores: t.observadores || '', projeto: t.projeto || '', marcadores: t.marcadores || '',
     });
     setDialogOpen(true);
+  }
+
+  function openDetails(t: Tarefa) {
+    setSelectedTarefa(t);
   }
 
   async function handleSave() {
@@ -340,63 +360,89 @@ export default function Tarefas() {
           <FilterButton
             hasFilters={hasFilters}
             activeFilterCount={activeFilterCount}
-            popoverClassName="min-w-[260px]"
+            popoverClassName="w-auto"
             onClear={() => {
               setStatusFilter('todos');
-              setResponsavelFilter('todos');
-              setPrazoDe('');
-              setPrazoAte('');
+              setResponsavelFilter([]);
+              setPrazoFiltro('todos');
+              setPrazoCustom({});
               setSearch('');
             }}
           >
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-semibold">Status</Label>
-                <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
-                  <SelectTrigger className="w-full h-9">
-                    <SelectValue placeholder="Todos os status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os status</SelectItem>
-                    {KANBAN_STAGES.map(stage => (
-                      <SelectItem key={stage.key} value={stage.key}>{stage.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex">
+              <div className="flex flex-col gap-3 w-64 p-1">
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Status</Label>
+                  <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
+                    <SelectTrigger className="w-full h-9">
+                      <SelectValue placeholder="Todos os status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os status</SelectItem>
+                      {KANBAN_STAGES.map(stage => (
+                        <SelectItem key={stage.key} value={stage.key}>{stage.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-semibold">Responsável</Label>
-                <Select value={responsavelFilter} onValueChange={v => { setResponsavelFilter(v); setPage(1); }}>
-                  <SelectTrigger className="w-full h-9">
-                    <SelectValue placeholder="Todos os responsáveis" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os responsáveis</SelectItem>
-                    {vendedores.map(v => (
-                      <SelectItem key={v.id} value={v.nome}>{v.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground font-semibold">Prazo</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="date"
-                    className="h-9"
-                    value={prazoDe}
-                    onChange={e => { setPrazoDe(e.target.value); setPage(1); }}
-                  />
-                  <span className="text-xs text-muted-foreground shrink-0">até</span>
-                  <Input
-                    type="date"
-                    className="h-9"
-                    value={prazoAte}
-                    onChange={e => { setPrazoAte(e.target.value); setPage(1); }}
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Responsável</Label>
+                  <MultiSelectSearch
+                    options={vendedores.map(v => ({ value: v.nome, label: v.nome }))}
+                    value={responsavelFilter}
+                    onValueChange={v => { setResponsavelFilter(v); setPage(1); }}
+                    placeholder="Todos os responsáveis"
+                    emptyMessage="Nenhum responsável encontrado."
                   />
                 </div>
+
+                <div className="space-y-0.5">
+                  <Label className="text-xs uppercase text-muted-foreground font-semibold px-0.5">Prazo</Label>
+                  <div className="flex flex-col gap-0.5 mt-1">
+                    {(
+                      [
+                        ['semana', 'Última semana'],
+                        ['mes', 'Último mês'],
+                        ['ano', 'Último ano'],
+                      ] as const
+                    ).map(([val, label]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => { setPrazoFiltro(prazoFiltro === val ? 'todos' : val); setPage(1); }}
+                        className={cn(
+                          'flex items-center justify-between rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted/80',
+                          prazoFiltro === val && 'bg-primary/10 text-primary',
+                        )}
+                      >
+                        {label}
+                        {prazoFiltro === val && <Check className="h-3.5 w-3.5" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-l border-border/50 p-2">
+                <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                  Personalizado
+                </p>
+                <CalendarRangePicker
+                  mode="range"
+                  selected={{ from: prazoCustom.from, to: prazoCustom.to }}
+                  onSelect={(range) => {
+                    setPrazoCustom({ from: range?.from, to: range?.to });
+                    setPrazoFiltro('personalizado');
+                    setPage(1);
+                  }}
+                  numberOfMonths={1}
+                  locale={ptBR}
+                  captionLayout="dropdown-buttons"
+                  fromYear={1950}
+                  toYear={new Date().getFullYear()}
+                  className="pointer-events-auto"
+                />
               </div>
             </div>
           </FilterButton>
@@ -456,7 +502,7 @@ export default function Tarefas() {
                   label={stage.label}
                   colorClass={stage.color}
                   tarefas={filtered.filter(t => t.status === stage.key)}
-                  onCardClick={openEdit}
+                  onCardClick={openDetails}
                   onAddTarefa={openNew}
                 />
               ))}
@@ -484,7 +530,7 @@ export default function Tarefas() {
                 const si = getStatusInfo(t.status);
                 const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                 return (
-                  <div key={t.id} onClick={() => openEdit(t)} className={`rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200 cursor-pointer ${selected.has(t.id) ? 'ring-1 ring-primary/30 bg-primary/5' : ''}`}>
+                  <div key={t.id} onClick={() => openDetails(t)} className={`rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200 cursor-pointer ${selected.has(t.id) ? 'ring-1 ring-primary/30 bg-primary/5' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-3 min-w-0 flex-1">
                         <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} onClick={(e) => e.stopPropagation()} className="mt-0.5" aria-label={`Selecionar ${t.titulo}`} />
@@ -541,7 +587,7 @@ export default function Tarefas() {
                     const si = getStatusInfo(t.status);
                     const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                     return (
-                      <TableRow key={t.id} onClick={() => openEdit(t)} className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(t.id) ? 'bg-primary/5' : ''}`}>
+                      <TableRow key={t.id} onClick={() => openDetails(t)} className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(t.id) ? 'bg-primary/5' : ''}`}>
                         <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
                           <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} aria-label={`Selecionar ${t.titulo}`} />
                         </TableCell>
@@ -676,6 +722,108 @@ export default function Tarefas() {
         </DialogContent>
       </Dialog>
 
+      {/* Sheet de detalhes da tarefa (lateral) */}
+      <Sheet open={!!selectedTarefa} onOpenChange={(open) => !open && setSelectedTarefa(null)}>
+        {selectedTarefa && (() => {
+          const si = getStatusInfo(selectedTarefa.status);
+          const isOverdue = selectedTarefa.prazo_final && new Date(selectedTarefa.prazo_final) < new Date() && selectedTarefa.status !== 'concluida';
+          return (
+            <SheetContent className="sm:max-w-xl overflow-y-auto">
+              <SheetHeader className="pb-6 border-b">
+                <div className="space-y-1">
+                  <SheetTitle className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5 text-primary" />
+                    <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{selectedTarefa.titulo}</span>
+                  </SheetTitle>
+                  <SheetDescription>Detalhes da tarefa.</SheetDescription>
+                </div>
+              </SheetHeader>
+
+              <div className="py-6 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</Label>
+                    <div className="pt-1">
+                      <Badge className={`border ${si.className}`}>{si.label}</Badge>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3" /> Prazo Final
+                    </Label>
+                    <p className={`text-sm font-medium ${isOverdue ? 'text-destructive' : ''}`}>
+                      {selectedTarefa.prazo_final ? format(new Date(selectedTarefa.prazo_final), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <User className="h-3 w-3" /> Responsável
+                    </Label>
+                    <p className="text-sm font-medium">
+                      {selectedTarefa.responsavel ? <UserProfilePopover name={selectedTarefa.responsavel} /> : '—'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <FolderKanban className="h-3 w-3" /> Projeto / Obra
+                    </Label>
+                    <p className="text-sm font-medium">{selectedTarefa.projeto || '—'}</p>
+                  </div>
+                  {selectedTarefa.participantes && (
+                    <div className="space-y-1 md:col-span-2">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Participantes</Label>
+                      <p className="text-sm font-medium">{selectedTarefa.participantes}</p>
+                    </div>
+                  )}
+                  {selectedTarefa.marcadores && (
+                    <div className="space-y-1 md:col-span-2">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Tag className="h-3 w-3" /> Marcadores
+                      </Label>
+                      <p className="text-sm font-medium">{selectedTarefa.marcadores}</p>
+                    </div>
+                  )}
+                  {selectedTarefa.descricao && (
+                    <div className="space-y-1 md:col-span-2">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Descrição</Label>
+                      <p className="text-sm whitespace-pre-wrap">{selectedTarefa.descricao}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
+                <div className="flex w-full justify-between items-center">
+                  <Button
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
+                    onClick={() => {
+                      setDeleteTarefaTarget(selectedTarefa);
+                      setSelectedTarefa(null);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Excluir
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setSelectedTarefa(null)}>Fechar</Button>
+                    <Button
+                      className="gap-2"
+                      onClick={() => {
+                        openEdit(selectedTarefa);
+                        setSelectedTarefa(null);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </Button>
+                  </div>
+                </div>
+              </SheetFooter>
+            </SheetContent>
+          );
+        })()}
+      </Sheet>
 
       {/* Single delete confirmation */}
       <AlertDialog open={!!deleteTarefaTarget} onOpenChange={(o) => !o && setDeleteTarefaTarget(null)}>
