@@ -2832,8 +2832,14 @@ export default function WhatsAppInbox() {
   const fotoRequestedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     conversas.forEach((c) => {
+      // Links de foto do WhatsApp expiram (ver foto_perfil_expires_at) — sem
+      // expires_at conhecido também conta como vencida, pra revalidar fotos
+      // salvas antes dessa checagem existir.
+      const fotoVencida =
+        !c.foto_perfil_expires_at ||
+        new Date(c.foto_perfil_expires_at).getTime() <= Date.now();
       if (
-        !c.foto_perfil_url &&
+        (!c.foto_perfil_url || fotoVencida) &&
         !c.telefone.includes("@g.us") &&
         !fotoRequestedRef.current.has(c.id)
       ) {

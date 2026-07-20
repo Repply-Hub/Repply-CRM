@@ -2328,6 +2328,7 @@ export type Database = {
           contato_id: string | null
           created_at: string
           empresa_id: string
+          foto_perfil_expires_at: string | null
           foto_perfil_url: string | null
           id: string
           instancia_id: string | null
@@ -2346,6 +2347,7 @@ export type Database = {
           contato_id?: string | null
           created_at?: string
           empresa_id: string
+          foto_perfil_expires_at?: string | null
           foto_perfil_url?: string | null
           id?: string
           instancia_id?: string | null
@@ -2364,6 +2366,7 @@ export type Database = {
           contato_id?: string | null
           created_at?: string
           empresa_id?: string
+          foto_perfil_expires_at?: string | null
           foto_perfil_url?: string | null
           id?: string
           instancia_id?: string | null

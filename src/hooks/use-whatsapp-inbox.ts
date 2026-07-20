@@ -31,6 +31,7 @@ export interface WaConversa {
   cliente_id: string | null;
   contato_id: string | null;
   foto_perfil_url: string | null;
+  foto_perfil_expires_at: string | null;
   ultima_mensagem: string | null;
   ultima_mensagem_at: string | null;
   nao_lidas: number;
@@ -783,12 +784,18 @@ export function useWaFetchContactPhoto() {
         body: { conversa_id: conversaId },
       });
       if (error) throw error;
-      return { conversaId, fotoPerfilUrl: data?.foto_perfil_url as string | null };
+      return {
+        conversaId,
+        fotoPerfilUrl: data?.foto_perfil_url as string | null,
+        fotoPerfilExpiresAt: data?.foto_perfil_expires_at as string | null,
+      };
     },
-    onSuccess: ({ conversaId, fotoPerfilUrl }) => {
+    onSuccess: ({ conversaId, fotoPerfilUrl, fotoPerfilExpiresAt }) => {
       if (!fotoPerfilUrl) return;
       qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
-        (old ?? []).map((c) => c.id === conversaId ? { ...c, foto_perfil_url: fotoPerfilUrl } : c)
+        (old ?? []).map((c) => c.id === conversaId
+          ? { ...c, foto_perfil_url: fotoPerfilUrl, foto_perfil_expires_at: fotoPerfilExpiresAt }
+          : c)
       );
     },
   });

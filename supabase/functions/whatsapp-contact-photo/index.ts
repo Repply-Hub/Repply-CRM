@@ -6,6 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// URLs do CDN da Meta (pps.whatsapp.net) trazem a expiração no parâmetro `oe`,
+// timestamp unix em hex. Sem esse parâmetro (formato inesperado), assume-se sem
+// expiração conhecida — melhor manter a foto do que descartá-la.
+function extractExpiresAt(url: string): string | null {
+  try {
+    const oe = new URL(url).searchParams.get("oe");
+    if (!oe || !/^[0-9a-fA-F]+$/.test(oe)) return null;
+    return new Date(parseInt(oe, 16) * 1000).toISOString();
+  } catch {
+    return null;
+  }
+}
+
 // Procura recursivamente uma URL de imagem em chaves como image/photo/foto/avatar/picture
 function findImageUrl(obj: unknown, depth = 0): string | null {
   if (!obj || depth > 4) return null;
@@ -67,7 +80,7 @@ serve(async (req) => {
 
     const { data: conversa } = await supabase
       .from("whatsapp_conversas")
-      .select("id, telefone, empresa_id, foto_perfil_url")
+      .select("id, telefone, empresa_id, foto_perfil_url, foto_perfil_expires_at")
       .eq("id", conversa_id)
       .single();
     if (!conversa) {
@@ -75,8 +88,17 @@ serve(async (req) => {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (conversa.foto_perfil_url) {
-      return new Response(JSON.stringify({ foto_perfil_url: conversa.foto_perfil_url }), {
+    // foto_perfil_expires_at nulo cobre tanto fotos salvas antes desta coluna
+    // existir quanto respostas da uazapi sem o parâmetro `oe` — em ambos os casos
+    // não sabemos se ainda é válida, então força uma revalidação em vez de
+    // assumir que sim (foi assim que fotos já vencidas ficaram presas por dias).
+    const aindaValida = !!conversa.foto_perfil_expires_at
+      && new Date(conversa.foto_perfil_expires_at).getTime() > Date.now();
+    if (conversa.foto_perfil_url && aindaValida) {
+      return new Response(JSON.stringify({
+        foto_perfil_url: conversa.foto_perfil_url,
+        foto_perfil_expires_at: conversa.foto_perfil_expires_at,
+      }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -134,14 +156,15 @@ serve(async (req) => {
     }
 
     const fotoUrl = findImageUrl(wapiResult);
+    const expiresAt = fotoUrl ? extractExpiresAt(fotoUrl) : null;
     if (fotoUrl) {
       await supabase
         .from("whatsapp_conversas")
-        .update({ foto_perfil_url: fotoUrl })
+        .update({ foto_perfil_url: fotoUrl, foto_perfil_expires_at: expiresAt })
         .eq("id", conversa_id);
     }
 
-    return new Response(JSON.stringify({ foto_perfil_url: fotoUrl }), {
+    return new Response(JSON.stringify({ foto_perfil_url: fotoUrl, foto_perfil_expires_at: expiresAt }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
