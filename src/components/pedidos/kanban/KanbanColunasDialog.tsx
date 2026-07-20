@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, GripVertical, Loader2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, Loader2, ArrowUp, ArrowDown, Lock } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
@@ -59,6 +59,8 @@ export function KanbanColunasDialog({ open, onOpenChange, empresaId }: Props) {
         setEditNome(c.nome);
         setEditCor(c.cor);
     };
+
+    const isProtegida = (c: KanbanColuna) => c.slug === 'perdido' && c.is_sistema;
 
     const startDelete = (c: KanbanColuna) => {
         const outras = (colunas ?? []).filter(x => x.id !== c.id);
@@ -168,16 +170,28 @@ export function KanbanColunasDialog({ open, onOpenChange, empresaId }: Props) {
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(c)} title="Editar">
                                                 <Pencil className="h-3.5 w-3.5" />
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7 text-destructive hover:text-destructive"
-                                                onClick={() => startDelete(c)}
-                                                disabled={(colunas?.length ?? 0) <= 1}
-                                                title={(colunas?.length ?? 0) <= 1 ? 'Não é possível excluir a última coluna' : 'Excluir'}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                                            {isProtegida(c) ? (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground"
+                                                    disabled
+                                                    title='A coluna "Perdido" é padrão do sistema e não pode ser excluída'
+                                                >
+                                                    <Lock className="h-3.5 w-3.5" />
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                                    onClick={() => startDelete(c)}
+                                                    disabled={(colunas?.length ?? 0) <= 1}
+                                                    title={(colunas?.length ?? 0) <= 1 ? 'Não é possível excluir a última coluna' : 'Excluir'}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
                                         </div>
                                     );
                                 })}
