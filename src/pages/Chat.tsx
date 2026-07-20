@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, ChatGrupo, ChatMessage, useMarkChatAsRead, useChatGeralConfig, useUpdateChatGeralConfig } from '@/hooks/use-chat';
+import { useOnlineUsers } from '@/hooks/use-presence';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -86,6 +87,7 @@ function MembersList({
   unreadCounts,
   geralNome,
   geralFotoUrl,
+  onlineIds,
 }: {
   members: Vendedor[];
   myId: string | null;
@@ -97,6 +99,7 @@ function MembersList({
   unreadCounts: Record<string, number>;
   geralNome: string;
   geralFotoUrl?: string | null;
+  onlineIds: Set<string>;
 }) {
   const [memberSearch, setMemberSearch] = useState('');
   const searching = memberSearch.trim().length > 0;
@@ -318,7 +321,9 @@ function MembersList({
                       {getInitials(m.nome)}
                     </AvatarFallback>
                   </Avatar>
-                  <Circle className="absolute -bottom-0.5 -right-0.5 h-3 w-3 fill-emerald-500 text-background stroke-[3]" />
+                  {onlineIds.has(m.id) && (
+                    <Circle className="absolute -bottom-0.5 -right-0.5 h-3 w-3 fill-emerald-500 text-background stroke-[3]" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium text-foreground truncate">
@@ -349,6 +354,7 @@ function MembersList({
 const Chat = () => {
   const { profile } = useAuth();
   const isAdminEmpresa = profile?.role === 'empresa' || profile?.role === 'admin';
+  const onlineIds = useOnlineUsers();
   const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
   const [teamCollapsed, setTeamCollapsed] = useState(false);
   const [text, setText] = useState('');
@@ -750,6 +756,7 @@ const Chat = () => {
           unreadCounts={unreadCounts}
           geralNome={geralNome}
           geralFotoUrl={geralConfig?.foto_url}
+          onlineIds={onlineIds}
         />
 
         <div className="flex-1 flex flex-col min-w-0">
