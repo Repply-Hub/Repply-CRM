@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,7 @@ interface ItemPedido {
 
 const NovoPedido = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: clientes } = useClientes();
   const { data: fabricantes } = useFabricantes();
   const { data: vendedores } = useVendedores();
@@ -114,7 +115,7 @@ const NovoPedido = () => {
   const [origemLead, setOrigemLead] = useState('');
   const [enderecoEntrega, setEnderecoEntrega] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [status, setStatus] = useState('novo_lead');
+  const [status, setStatus] = useState(searchParams.get('status') || 'novo_lead');
   const [isUploading, setIsUploading] = useState(false);
 
   // Step 2 fields

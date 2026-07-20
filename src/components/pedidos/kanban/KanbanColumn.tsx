@@ -141,7 +141,9 @@ export const KanbanColumn = memo(function KanbanColumn({
           ) : (
             <ChevronDown className="h-3.5 w-3.5" />
           )}
-          Ver mais ({stageTotal - rawRows.length})
+          {/* Com busca ativa, o total do servidor não reflete o filtro (aplicado só no
+           *  cliente sobre as linhas já carregadas) — mostra só "Ver mais" sem contagem. */}
+          {q ? 'Ver mais' : `Ver mais (${stageTotal - rawRows.length})`}
         </Button>
       )}
       <Button
