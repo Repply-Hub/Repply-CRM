@@ -5018,8 +5018,7 @@ export default function WhatsAppInbox() {
                         <UserCheck className="h-4 w-4" />
                         Assumir
                       </Button>
-                      {isGestor && (
-                        <Popover
+                      <Popover
                           open={direcionarOpen}
                           onOpenChange={(v) => {
                             setDirecionarOpen(v);
@@ -5090,7 +5089,6 @@ export default function WhatsAppInbox() {
                             </Command>
                           </PopoverContent>
                         </Popover>
-                      )}
                     </div>
                   </div>
                 </div>
