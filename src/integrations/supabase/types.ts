@@ -1819,6 +1819,57 @@ export type Database = {
           },
         ]
       }
+      sidebar_empresa_padrao: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          items: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          items?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          items?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      sidebar_empresa_padrao_historico: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          items: Json
+          salvo_por: string | null
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          items: Json
+          salvo_por?: string | null
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          items?: Json
+          salvo_por?: string | null
+        }
+        Relationships: []
+      }
       sidebar_preferences: {
         Row: {
           created_at: string

@@ -30,11 +30,12 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
 ];
 
 export function useSidebarPreferences() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const queryClient = useQueryClient();
 
   const { data: items, isLoading } = useQuery({
-    queryKey: ['sidebar-preferences', user?.id],
+    queryKey: ['sidebar-preferences', user?.id, empresaId],
     queryFn: async () => {
       const { data } = await supabase
         .from('sidebar_preferences')
@@ -43,6 +44,16 @@ export function useSidebarPreferences() {
         .maybeSingle();
 
       if (!data || !Array.isArray(data.items) || data.items.length === 0) {
+        if (empresaId) {
+          const { data: empresaPadrao } = await supabase
+            .from('sidebar_empresa_padrao')
+            .select('items')
+            .eq('empresa_id', empresaId)
+            .maybeSingle();
+          if (empresaPadrao && Array.isArray(empresaPadrao.items) && empresaPadrao.items.length > 0) {
+            return empresaPadrao.items as unknown as SidebarItem[];
+          }
+        }
         return DEFAULT_SIDEBAR_ITEMS;
       }
 

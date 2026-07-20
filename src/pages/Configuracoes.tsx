@@ -11,7 +11,8 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Globe, Mail, Smartphone } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Globe, Mail, Smartphone, History } from 'lucide-react';
+import { SidebarHistoricoDialog } from '@/components/configuracoes/SidebarHistoricoDialog';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -32,6 +33,10 @@ const themeOptions = [
 
 function CustomizeTab() {
   const { theme, setTheme } = useTheme();
+  const { profile } = useAuth();
+  const isGestor = profile?.role === 'admin' || profile?.role === 'gestor' || profile?.role === 'empresa';
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
+  const [historicoOpen, setHistoricoOpen] = useState(false);
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -70,18 +75,38 @@ function CustomizeTab() {
               <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                 <Pencil className="h-3.5 w-3.5" /> Menu Lateral
               </Label>
-              <p className="text-xs text-muted-foreground">Reorganize, oculte ou adicione itens à sidebar</p>
+              <p className="text-xs text-muted-foreground">
+                Reorganize, oculte ou adicione itens à sidebar
+                {isGestor && ' — ao salvar, você pode escolher entre salvar só para você ou como padrão para todos os funcionários da empresa'}
+              </p>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => window.dispatchEvent(new Event('sidebar-enter-edit'))}
-              className="gap-2 h-8"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Editar
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              {isGestor && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setHistoricoOpen(true)}
+                  className="gap-2 h-8"
+                >
+                  <History className="h-3.5 w-3.5" />
+                  Histórico
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => window.dispatchEvent(new Event('sidebar-enter-edit'))}
+                className="gap-2 h-8"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Editar
+              </Button>
+            </div>
           </div>
+
+          {isGestor && (
+            <SidebarHistoricoDialog open={historicoOpen} onOpenChange={setHistoricoOpen} empresaId={empresaId} />
+          )}
         </div>
       </CardContent>
     </Card>

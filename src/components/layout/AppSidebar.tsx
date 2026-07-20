@@ -1,4 +1,4 @@
-import { LogOut, Pencil, Check, X, Plus, GripVertical, Trash2, Eye, EyeOff, PanelLeftClose, PanelLeftOpen, UserCircle } from 'lucide-react';
+import { LogOut, Pencil, Check, X, Plus, GripVertical, Trash2, Eye, EyeOff, PanelLeftClose, PanelLeftOpen, UserCircle, Building2 } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { useRef, useCallback, useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { NavLink } from '@/components/layout/NavLink';
 import { useSidebarPreferences, SidebarItem } from '@/hooks/use-sidebar-preferences';
+import { useSaveSidebarEmpresaPadrao } from '@/hooks/use-sidebar-empresa-padrao';
 import { usePermissoes } from '@/hooks/use-permissoes';
 import { getIconComponent } from '@/lib/sidebar-icons';
 import { SidebarAddItemDialog } from '@/components/layout/SidebarAddItemDialog';
@@ -25,6 +26,13 @@ import {
   SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 export function AppSidebar() {
   const { state, setOpen, isMobile } = useSidebar();
@@ -33,6 +41,7 @@ export function AppSidebar() {
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState<SidebarItem[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [saveChoiceOpen, setSaveChoiceOpen] = useState(false);
   const { data: unreadEmails = 0 } = useUnreadEmails();
   const { data: unreadChat = 0 } = useUnreadChatMessages();
   const { data: unreadWa = 0 } = useUnreadWaMessages();
@@ -58,7 +67,9 @@ export function AppSidebar() {
 
   const isVendedor = vendedor?.role === 'vendedor';
   const isAdmin = vendedor?.role === 'admin';
+  const isGestor = isAdmin || vendedor?.role === 'gestor' || vendedor?.role === 'empresa';
   const { data: permissoes } = usePermissoes(isVendedor ? vendedor?.id : undefined);
+  const saveEmpresaPadrao = useSaveSidebarEmpresaPadrao();
 
   // Filter visible items, and for vendedores also check permissoes_vendedor
   const visibleItems = items.filter(i => {
@@ -144,10 +155,30 @@ export function AppSidebar() {
     setEditMode(false);
   };
 
-  const saveEdit = () => {
+  const requestSave = () => {
+    if (isGestor) {
+      setSaveChoiceOpen(true);
+    } else {
+      savePersonal();
+    }
+  };
+
+  const savePersonal = () => {
     save(editItems);
     setEditMode(false);
+    setSaveChoiceOpen(false);
     toast.success('Sidebar personalizada!');
+  };
+
+  const saveAsEmpresaPadrao = () => {
+    saveEmpresaPadrao.mutate(editItems, {
+      onSuccess: () => {
+        setEditMode(false);
+        setSaveChoiceOpen(false);
+        toast.success('Sidebar definida como padrão da empresa!');
+      },
+      onError: () => toast.error('Erro ao salvar padrão da empresa'),
+    });
   };
 
   const handleDragEnd = useCallback((result: DropResult) => {
@@ -320,8 +351,8 @@ export function AppSidebar() {
                 <X className="h-4 w-4" /> Cancelar
               </button>
               <button
-                onClick={saveEdit}
-                disabled={isSaving}
+                onClick={requestSave}
+                disabled={isSaving || saveEmpresaPadrao.isPending}
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[13px] bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
               >
                 <Check className="h-4 w-4" /> Salvar
@@ -382,6 +413,41 @@ export function AppSidebar() {
         onOpenChange={setAddDialogOpen}
         onAdd={addCustomItem}
       />
+
+      <Dialog open={saveChoiceOpen} onOpenChange={setSaveChoiceOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Salvar sidebar</DialogTitle>
+            <DialogDescription>
+              Como você quer salvar essas alterações?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 mt-2">
+            <button
+              onClick={savePersonal}
+              disabled={isSaving}
+              className="flex w-full items-start gap-3 rounded-lg border border-border p-3 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors"
+            >
+              <UserCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">Somente para mim</p>
+                <p className="text-xs text-muted-foreground">Salva como sua personalização pessoal.</p>
+              </div>
+            </button>
+            <button
+              onClick={saveAsEmpresaPadrao}
+              disabled={saveEmpresaPadrao.isPending}
+              className="flex w-full items-start gap-3 rounded-lg border border-border p-3 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors"
+            >
+              <Building2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">Padrão da empresa</p>
+                <p className="text-xs text-muted-foreground">Todos os funcionários da empresa vão iniciar com esta sidebar.</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
