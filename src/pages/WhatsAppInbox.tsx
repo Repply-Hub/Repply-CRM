@@ -26,9 +26,11 @@ import {
   useWaFetchGroupParticipantes,
   useWaParticipantePhoto,
   useWaInstancias,
+  useWaBuscarMensagens,
   uploadWaMedia,
   type WaConversa,
   type WaMensagem,
+  type WaMensagemBusca,
   type WaMidiaTipo,
   type WaConfig,
 } from "@/hooks/use-whatsapp-inbox";
@@ -105,6 +107,7 @@ import {
   Settings,
   Plus,
   Search,
+  CalendarSearch,
   Phone,
   CheckCheck,
   Check,
@@ -1680,6 +1683,167 @@ function CriarGrupoDialog({
   );
 }
 
+// --- Busca de mensagens por texto + período, em todas as conversas ---
+function BuscaMensagensDialog({
+  open,
+  onClose,
+  onSelecionarResultado,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelecionarResultado: (r: WaMensagemBusca) => void;
+}) {
+  const buscarMensagens = useWaBuscarMensagens();
+  const [termo, setTermo] = useState("");
+  const [periodo, setPeriodo] = useState<{ from?: Date; to?: Date }>({});
+  const [periodoOpen, setPeriodoOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setTermo("");
+      setPeriodo({});
+      buscarMensagens.reset();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  function buscar() {
+    if (!termo.trim()) return;
+    buscarMensagens.mutate({ termo, from: periodo.from, to: periodo.to });
+  }
+
+  const resultados = buscarMensagens.data ?? [];
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarSearch className="h-4 w-4" />
+            Buscar mensagens
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2.5 shrink-0">
+          <Input
+            placeholder="Texto da mensagem (ex: bom dia)"
+            value={termo}
+            onChange={(e) => setTermo(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && buscar()}
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <Popover open={periodoOpen} onOpenChange={setPeriodoOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 justify-start gap-1.5 font-normal text-muted-foreground"
+                >
+                  <CalendarSearch className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    {periodo.from && periodo.to
+                      ? `${format(periodo.from, "dd/MM/yyyy")} até ${format(periodo.to, "dd/MM/yyyy")}`
+                      : "Período (opcional)"}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="start">
+                <Calendar
+                  mode="range"
+                  selected={{ from: periodo.from, to: periodo.to }}
+                  onSelect={(range) => {
+                    setPeriodo({ from: range?.from, to: range?.to });
+                    if (range?.from && range?.to) setPeriodoOpen(false);
+                  }}
+                  numberOfMonths={1}
+                  locale={ptBR}
+                  captionLayout="dropdown-buttons"
+                  fromYear={2020}
+                  toYear={new Date().getFullYear()}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            {(periodo.from || periodo.to) && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setPeriodo({})}
+              >
+                Limpar
+              </Button>
+            )}
+          </div>
+          <Button
+            type="button"
+            className="w-full gap-1.5"
+            onClick={buscar}
+            disabled={!termo.trim() || buscarMensagens.isPending}
+          >
+            {buscarMensagens.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Search className="h-3.5 w-3.5" />
+            )}
+            Buscar
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1 mt-1">
+          {buscarMensagens.isPending && (
+            <p className="text-xs text-muted-foreground text-center py-6">
+              Buscando...
+            </p>
+          )}
+          {buscarMensagens.isSuccess && resultados.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-6">
+              Nenhuma mensagem encontrada
+              {periodo.from && periodo.to ? " nesse período." : "."}
+            </p>
+          )}
+          {resultados.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => onSelecionarResultado(r)}
+              className="w-full text-left flex items-start gap-2.5 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              <Avatar className="h-8 w-8 shrink-0 mt-0.5 border border-primary/10">
+                {r.conversa?.foto_perfil_url && (
+                  <AvatarImage src={r.conversa.foto_perfil_url} alt="" />
+                )}
+                <AvatarFallback
+                  className={cn(
+                    colorForPhone(r.conversa?.telefone ?? ""),
+                    "text-white text-xs",
+                  )}
+                >
+                  {initials(r.conversa?.nome_contato ?? null, r.conversa?.telefone ?? "")}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium truncate">
+                    {r.conversa?.nome_contato || formatPhone(r.conversa?.telefone ?? "")}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {format(new Date(r.created_at), "dd/MM/yy HH:mm")}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {r.direcao === "saida" ? "Você: " : ""}
+                  {r.conteudo}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // --- Dialog conexão WhatsApp ---
 function ConfigDialog({
   open,
@@ -2853,6 +3017,7 @@ export default function WhatsAppInbox() {
   const arquivarConversa = useWaArquivarConversa();
   const deletarConversa = useWaDeletarConversa();
   const deletarEmMassa = useWaDeletarConversasEmMassa();
+  const buscarMensagens = useWaBuscarMensagens();
   const fetchContactPhoto = useWaFetchContactPhoto();
   const fotoRequestedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -2913,6 +3078,21 @@ export default function WhatsAppInbox() {
     setTimeout(() => {
       setDestacadaMsgId((cur) => (cur === id ? null : cur));
     }, 1600);
+  }
+  // Resultado da busca global de mensagens (BuscaMensagensDialog) pode ser de
+  // qualquer conversa — abre e espera o histórico carregar antes de rolar até ela.
+  // Se a mensagem for mais antiga que o histórico carregado (useWaMensagens limita
+  // as últimas 200), o elemento não existe e cai no aviso.
+  function selecionarResultadoBusca(r: WaMensagemBusca) {
+    setShowBuscaMensagens(false);
+    setConversaAtivaId(r.conversa_id);
+    setTimeout(() => {
+      if (document.getElementById(`wa-msg-${r.id}`)) {
+        irParaMensagem(r.id);
+      } else {
+        toast.info("Mensagem fora do histórico recente carregado desta conversa.");
+      }
+    }, 600);
   }
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<"aberto" | "fechado">(
@@ -3220,6 +3400,7 @@ export default function WhatsAppInbox() {
     </div>
   );
   const [showConfig, setShowConfig] = useState(false);
+  const [showBuscaMensagens, setShowBuscaMensagens] = useState(false);
   const [showNovaConversa, setShowNovaConversa] = useState(false);
   const [showCriarGrupo, setShowCriarGrupo] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -4088,6 +4269,15 @@ export default function WhatsAppInbox() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowBuscaMensagens(true)}
+                    title="Buscar mensagens por período"
+                  >
+                    <CalendarSearch className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -5632,6 +5822,11 @@ export default function WhatsAppInbox() {
         }}
       />
       <ConfigDialog open={showConfig} onClose={() => setShowConfig(false)} />
+      <BuscaMensagensDialog
+        open={showBuscaMensagens}
+        onClose={() => setShowBuscaMensagens(false)}
+        onSelecionarResultado={selecionarResultadoBusca}
+      />
 
       <Dialog
         open={!!viewingImage}

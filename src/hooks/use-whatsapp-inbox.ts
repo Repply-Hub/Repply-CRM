@@ -259,6 +259,58 @@ export function useWaMensagens(conversaId: string | null) {
   return query;
 }
 
+// --- Busca de mensagens por texto + período, em todas as conversas ---
+
+export interface WaMensagemBusca {
+  id: string;
+  conversa_id: string;
+  conteudo: string;
+  created_at: string;
+  direcao: 'entrada' | 'saida';
+  conversa: {
+    id: string;
+    nome_contato: string | null;
+    telefone: string;
+    foto_perfil_url: string | null;
+    is_group: boolean;
+  } | null;
+}
+
+// RLS de whatsapp_mensagens (wa_mensagens_access) já restringe o resultado às
+// conversas que o usuário pode acessar — não precisa filtrar usuário aqui.
+export function useWaBuscarMensagens() {
+  return useMutation({
+    mutationFn: async ({ termo, from, to }: { termo: string; from?: Date; to?: Date }) => {
+      const empresaId = await getEmpresaId();
+      if (!empresaId || !termo.trim()) return [] as WaMensagemBusca[];
+
+      let query = supabase
+        .from('whatsapp_mensagens')
+        .select('id, conversa_id, conteudo, created_at, direcao, conversa:whatsapp_conversas(id, nome_contato, telefone, foto_perfil_url, is_group)')
+        .eq('empresa_id', empresaId)
+        .eq('is_nota_interna', false)
+        .ilike('conteudo', `%${termo.trim()}%`)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (from) {
+        const inicio = new Date(from);
+        inicio.setHours(0, 0, 0, 0);
+        query = query.gte('created_at', inicio.toISOString());
+      }
+      if (to) {
+        const fim = new Date(to);
+        fim.setHours(23, 59, 59, 999);
+        query = query.lte('created_at', fim.toISOString());
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data as any) as WaMensagemBusca[];
+    },
+  });
+}
+
 // --- Upload de mídia para Storage ---
 
 export async function uploadWaMedia(file: File, conversaId: string): Promise<string> {
