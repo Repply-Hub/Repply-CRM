@@ -694,7 +694,7 @@ function MeusChatsList({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-9 h-10 bg-muted/50 border-transparent focus-visible:ring-1"
-            placeholder="Buscar por nome, telefone, mensagem ou responsável..."
+            placeholder="Buscar por nome, telefone ou mensagem..."
             value={busca}
             onChange={(e) => {
               setBusca(e.target.value);
@@ -3388,7 +3388,6 @@ export default function WhatsAppInbox() {
       (c.nome_contato ?? "").toLowerCase().includes(term) ||
       c.telefone.includes(term) ||
       (c.ultima_mensagem ?? "").toLowerCase().includes(term) ||
-      (c.responsaveis ?? []).some((r) => r.nome.toLowerCase().includes(term)) ||
       (c.participantes ?? []).some(
         (p) =>
           (p.nome ?? "").toLowerCase().includes(term) ||
@@ -4163,7 +4162,7 @@ export default function WhatsAppInbox() {
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:ring-1"
-                  placeholder="Buscar por nome, telefone, mensagem ou responsável..."
+                  placeholder="Buscar por nome, telefone ou mensagem..."
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                 />
@@ -4675,7 +4674,7 @@ export default function WhatsAppInbox() {
                   <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:ring-1"
-                    placeholder="Buscar por nome, telefone, mensagem ou responsável..."
+                    placeholder="Buscar por nome, telefone ou mensagem..."
                     value={busca}
                     onChange={(e) => setBusca(e.target.value)}
                   />
@@ -4927,6 +4926,20 @@ export default function WhatsAppInbox() {
                         conversaId: conversaAtiva.id,
                         arquivada: novaArquivada,
                       });
+                      if (novaArquivada) {
+                        // Fechar a conversa remove todos os responsáveis
+                        // automaticamente (trigger no banco); registra isso no
+                        // timeline pra ficar visível quem estava no atendimento.
+                        const autor = profile?.nome ?? "Alguém";
+                        const responsaveisAtuais = conversaAtiva.responsaveis ?? [];
+                        const texto =
+                          responsaveisAtuais.length > 0
+                            ? `${autor} fechou a conversa e removeu ${responsaveisAtuais
+                                .map((r) => r.nome)
+                                .join(", ")} dos responsáveis`
+                            : `${autor} fechou a conversa`;
+                        addNota.mutate({ conversaId: conversaAtiva.id, texto });
+                      }
                       if (
                         (novaArquivada && filtroStatus === "aberto") ||
                         (!novaArquivada && filtroStatus === "fechado")

@@ -755,8 +755,14 @@ export function useWaArquivarConversa() {
       return params;
     },
     onSuccess: ({ conversaId, arquivada }) => {
+      // Fechar a conversa dispara um trigger no banco que remove todos os
+      // responsáveis atribuídos (trg_wa_conversa_remove_responsaveis_ao_fechar) —
+      // reflete isso no cache local junto com o próprio campo `arquivada`.
       qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
-        (old ?? []).map((c) => c.id === conversaId ? { ...c, arquivada } : c)
+        (old ?? []).map((c) => c.id === conversaId
+          ? { ...c, arquivada, ...(arquivada ? { responsaveis: [] } : {}) }
+          : c
+        )
       );
       toast.success(arquivada ? 'Conversa marcada como fechada' : 'Conversa reaberta');
     },
