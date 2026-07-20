@@ -3510,6 +3510,8 @@ export default function WhatsAppInbox() {
       else outros.push(c);
     }
 
+    if (naoAtribuidos.length)
+      grupos.push({ key: "nao-atribuidos", label: "Não atribuídos", icon: UserX, conversas: naoAtribuidos });
     if (meus.length)
       grupos.push({
         key: "meus",
@@ -3517,8 +3519,6 @@ export default function WhatsAppInbox() {
         icon: UserCheck,
         conversas: meus,
       });
-    if (naoAtribuidos.length)
-      grupos.push({ key: "nao-atribuidos", label: "Não atribuídos", icon: UserX, conversas: naoAtribuidos });
     if (outros.length)
       grupos.push({ key: "outros", label: "Outros atendentes", icon: Users, conversas: outros });
 
