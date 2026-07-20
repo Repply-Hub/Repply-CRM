@@ -89,9 +89,11 @@ client-side aggregation well, and tables here (e.g. `pedidos`) can hold thousand
   preview/confirm) with fuzzy header-matching; fully documented in `IMPORT_STRUCTURE.md` — read that before
   touching `src/lib/import/`, `ImportPedidosDialog.tsx`, or the `import-data` edge function.
 - **UI components**: `src/components/ui/` is shadcn-ui (generated, treat as a base layer — extend via props/
-  className rather than editing generated primitives where possible). Feature components live flat or in
-  small per-feature folders under `src/components/` (`kanban/`, `import/`, `catalogo/`, `chat/`, etc.).
+  className rather than editing generated primitives where possible). Feature components are organized by
+  domain under `src/components/` (`layout/` for app shell/sidebar, `shared/` for generic multi-domain
+  components, `pedidos/kanban/` for the pipeline board, plus `clientes/`, `obras/`, `catalogo/`, `chat/`,
+  `tarefas/`, `whatsapp/`, `email/`, `import/`, `configuracoes/`, etc.).
 
 ## Idioma
 
-SEMPRE responda em português do Brasil, mesmo que o código, comentários ou nomes de variáveis estejam em inglês.
+a parttr de agora SEMPRE responda em português do Brasil, mesmo que o código, comentários ou nomes de variáveis estejam em inglês.
