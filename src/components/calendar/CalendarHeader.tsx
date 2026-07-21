@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TOGGLE_LIST_CLASS, TOGGLE_ITEM_CLASS } from '@/lib/toggle-group-styles';
 import type { ViewMode } from './types';
 
 interface CalendarHeaderProps {
@@ -55,6 +56,26 @@ export function CalendarHeader({
   return (
     <>
     <>
+      {/* Seletor de visualização */}
+      <ToggleGroup
+        type="single"
+        value={viewMode}
+        onValueChange={(val) => val && onViewModeChange(val as ViewMode)}
+        className={`${TOGGLE_LIST_CLASS} shrink-0`}
+      >
+        {(Object.keys(VIEW_LABELS) as ViewMode[]).map((mode) => (
+          <ToggleGroupItem
+            key={mode}
+            value={mode}
+            variant="default"
+            size="sm"
+            className={TOGGLE_ITEM_CLASS}
+          >
+            {isMobile ? VIEW_LABELS[mode].short : VIEW_LABELS[mode].full}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+
       {/* Navegação */}
       <div className="flex items-center bg-muted/30 rounded-lg p-0.5 border shrink-0">
         <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md hover:bg-orange-50 hover:text-orange-600" onClick={() => onNavigate('prev')}>
@@ -64,8 +85,8 @@ export function CalendarHeader({
           variant="ghost"
           size="sm"
           className={`h-7 px-2 sm:px-3 text-xs font-bold transition-colors ${
-            isSameDay(currentDate, new Date()) 
-              ? "bg-orange-100 text-orange-600 hover:bg-orange-200" 
+            isSameDay(currentDate, new Date())
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
               : "hover:bg-orange-50 hover:text-orange-600"
           }`}
           onClick={() => onNavigate('today')}
@@ -76,26 +97,6 @@ export function CalendarHeader({
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
-
-      {/* Seletor de visualização */}
-      <ToggleGroup
-        type="single"
-        value={viewMode}
-        onValueChange={(val) => val && onViewModeChange(val as ViewMode)}
-        className="bg-muted/30 p-0.5 rounded-lg border shrink-0"
-      >
-        {(Object.keys(VIEW_LABELS) as ViewMode[]).map((mode) => (
-          <ToggleGroupItem
-            key={mode}
-            value={mode}
-            variant="default"
-            size="sm"
-            className="h-7 px-2 sm:px-4 text-xs font-bold hover:bg-orange-50 hover:text-orange-600 data-[state=on]:bg-background data-[state=on]:shadow-sm data-[state=on]:text-foreground rounded-md transition-all"
-          >
-            {isMobile ? VIEW_LABELS[mode].short : VIEW_LABELS[mode].full}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
 
       {/* Barra de pesquisa adaptável */}
       {onSearchQueryChange !== undefined && (

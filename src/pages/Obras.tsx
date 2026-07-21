@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StandardPopoverMenu, StandardMenuItem } from '@/components/ui/standard-popover-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -277,11 +278,11 @@ export default function Obras() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex flex-1 items-center gap-3">
-              <TabsList className="shrink-0">
-                <TabsTrigger value="lista" className="gap-2">
+              <TabsList className={cn(TOGGLE_LIST_CLASS, 'shrink-0')}>
+                <TabsTrigger value="lista" className={TOGGLE_TRIGGER_CLASS}>
                   <List className="h-4 w-4" /> Lista
                 </TabsTrigger>
-                <TabsTrigger value="mapa" className="gap-2">
+                <TabsTrigger value="mapa" className={TOGGLE_TRIGGER_CLASS}>
                   <MapIcon className="h-4 w-4" /> Mapa
                 </TabsTrigger>
               </TabsList>

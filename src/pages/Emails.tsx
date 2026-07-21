@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from "@/lib/toggle-group-styles";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -349,22 +350,22 @@ const Emails = () => {
                 </Button>
               </div>
             ) : (
-              <TabsList className="bg-muted/50 p-1 h-10">
-                <TabsTrigger 
-                  value="received" 
-                  className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              <TabsList className={TOGGLE_LIST_CLASS}>
+                <TabsTrigger
+                  value="received"
+                  className={TOGGLE_TRIGGER_CLASS}
                 >
-                  <Inbox className="h-4 w-4" /> 
+                  <Inbox className="h-4 w-4" />
                   <span className="hidden sm:inline">Recebidos</span>
                   <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
                     {totalReceived}
                   </Badge>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="sent" 
-                  className="gap-2 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                <TabsTrigger
+                  value="sent"
+                  className={TOGGLE_TRIGGER_CLASS}
                 >
-                  <Send className="h-4 w-4" /> 
+                  <Send className="h-4 w-4" />
                   <span className="hidden sm:inline">Enviados</span>
                   <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
                     {totalSent}

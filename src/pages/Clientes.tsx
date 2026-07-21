@@ -18,6 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown, ChevronDown, FileWarning } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
@@ -586,13 +587,13 @@ const Clientes = () => {
       <div className="p-6 w-full">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <TabsList className="shrink-0">
-            <TabsTrigger value="empresas" className="gap-2">
+          <TabsList className={cn(TOGGLE_LIST_CLASS, 'shrink-0')}>
+            <TabsTrigger value="empresas" className={TOGGLE_TRIGGER_CLASS}>
               <Building2 className="h-4 w-4" />
               Empresas
               <Badge variant="secondary" className="ml-1 text-[10px] h-5 px-1.5">{empresas.length}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="contatos" className="gap-2">
+            <TabsTrigger value="contatos" className={TOGGLE_TRIGGER_CLASS}>
               <Users className="h-4 w-4" />
               Contatos
               <Badge variant="secondary" className="ml-1 text-[10px] h-5 px-1.5">{contatos.length}</Badge>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 import { Button } from '@/components/ui/button';
@@ -479,19 +480,19 @@ const Configuracoes = () => {
     <AppLayout title="Configurações" subtitle={isGestor ? "Gerencie usuários, permissões e automações" : "Gerencie vendedores, permissões e automações"}>
       <div className="p-6">
         <Tabs defaultValue={defaultTab}>
-          <TabsList>
-            <TabsTrigger value="perfil" className="gap-1.5"><UserCircle className="h-4 w-4" /> Perfil</TabsTrigger>
+          <TabsList className={TOGGLE_LIST_CLASS}>
+            <TabsTrigger value="perfil" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><UserCircle className="h-4 w-4" /> Perfil</TabsTrigger>
             {isGestor && (
-              <TabsTrigger value="vendedores" className="gap-1.5"><Users className="h-4 w-4" /> Usuários</TabsTrigger>
+              <TabsTrigger value="vendedores" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Users className="h-4 w-4" /> Usuários</TabsTrigger>
             )}
             {isGestor && (
-              <TabsTrigger value="whatsapp" className="gap-1.5"><Smartphone className="h-4 w-4" /> WhatsApp</TabsTrigger>
+              <TabsTrigger value="whatsapp" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Smartphone className="h-4 w-4" /> WhatsApp</TabsTrigger>
             )}
             {isGestor && (
-              <TabsTrigger value="automacao">Automação</TabsTrigger>
+              <TabsTrigger value="automacao" className={TOGGLE_TRIGGER_CLASS}>Automação</TabsTrigger>
             )}
             {(isAdmin || isEmpresaRole) && (
-              <TabsTrigger value="empresas" className="gap-1.5"><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
+              <TabsTrigger value="empresas" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
             )}
           </TabsList>
 

@@ -183,6 +183,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn, autoResizeTextarea } from "@/lib/utils";
+import { TOGGLE_LIST_CLASS, TOGGLE_BUTTON_CLASS, TOGGLE_BUTTON_ACTIVE, TOGGLE_BUTTON_INACTIVE } from "@/lib/toggle-group-styles";
 import { toast } from "sonner";
 
 function formatPhone(phone: string) {
@@ -646,7 +647,7 @@ function MeusChatsList({
             Filtros + Limpar), pra essa lista deixar de ser restrita só a
             "atribuído a mim" e refletir os mesmos filtros globais. */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 w-fit shrink-0">
+          <div className={cn(TOGGLE_LIST_CLASS, 'w-fit shrink-0')}>
             {(
               [
                 ["aberto", "Em aberto", countAbertas],
@@ -658,10 +659,8 @@ function MeusChatsList({
                 type="button"
                 onClick={() => setFiltroStatus(val)}
                 className={cn(
-                  "flex h-9 items-center justify-center gap-1.5 text-sm font-medium rounded-md px-3 transition-colors",
-                  filtroStatus === val
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                  TOGGLE_BUTTON_CLASS,
+                  filtroStatus === val ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
                 )}
               >
                 {label}
@@ -669,7 +668,7 @@ function MeusChatsList({
                   className={cn(
                     "text-[10px] px-1.5 py-0.5 rounded-full font-semibold",
                     filtroStatus === val
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-primary-foreground/20 text-primary-foreground"
                       : "bg-muted-foreground/10",
                   )}
                 >
@@ -710,7 +709,7 @@ function MeusChatsList({
           </Button>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 w-fit shrink-0">
+          <div className={cn(TOGGLE_LIST_CLASS, 'w-fit shrink-0')}>
             {(
               [
                 { key: "todas", label: "Todas", count: conversas.length },
@@ -726,10 +725,8 @@ function MeusChatsList({
                   setPage(1);
                 }}
                 className={cn(
-                  "flex h-9 items-center justify-center gap-1.5 text-sm font-medium rounded-md px-3 transition-colors",
-                  filtroLeitura === opt.key
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                  TOGGLE_BUTTON_CLASS,
+                  filtroLeitura === opt.key ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
                 )}
               >
                 {opt.label}
@@ -737,7 +734,7 @@ function MeusChatsList({
                   className={cn(
                     "text-[10px] px-1.5 py-0.5 rounded-full font-semibold",
                     filtroLeitura === opt.key
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-primary-foreground/20 text-primary-foreground"
                       : "bg-muted-foreground/10",
                   )}
                 >
@@ -4536,15 +4533,13 @@ export default function WhatsAppInbox() {
 
               <div className="px-2 pt-2 border-b border-border bg-background space-y-2">
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5">
+                  <div className={TOGGLE_LIST_CLASS}>
                     <button
                       type="button"
                       onClick={() => setFiltroStatus("aberto")}
                       className={cn(
                         "flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded-md py-1.5 transition-colors",
-                        filtroStatus === "aberto"
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
+                        filtroStatus === "aberto" ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
                       )}
                     >
                       Em aberto
@@ -4552,7 +4547,7 @@ export default function WhatsAppInbox() {
                         className={cn(
                           "text-[9px] px-1 rounded-full font-semibold",
                           filtroStatus === "aberto"
-                            ? "bg-primary/10 text-primary"
+                            ? "bg-primary-foreground/20 text-primary-foreground"
                             : "bg-muted-foreground/10",
                         )}
                       >
@@ -4564,9 +4559,7 @@ export default function WhatsAppInbox() {
                       onClick={() => setFiltroStatus("fechado")}
                       className={cn(
                         "flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded-md py-1.5 transition-colors",
-                        filtroStatus === "fechado"
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
+                        filtroStatus === "fechado" ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
                       )}
                     >
                       Fechado
@@ -4574,7 +4567,7 @@ export default function WhatsAppInbox() {
                         className={cn(
                           "text-[9px] px-1 rounded-full font-semibold",
                           filtroStatus === "fechado"
-                            ? "bg-primary/10 text-primary"
+                            ? "bg-primary-foreground/20 text-primary-foreground"
                             : "bg-muted-foreground/10",
                         )}
                       >
@@ -4777,15 +4770,13 @@ export default function WhatsAppInbox() {
                 <div className="px-2 pt-2 border-b border-border bg-background space-y-2">
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-1.5">
-                      <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 flex-1">
+                      <div className={cn(TOGGLE_LIST_CLASS, 'flex-1')}>
                         <button
                           type="button"
                           onClick={() => setFiltroStatus("aberto")}
                           className={cn(
                             "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
-                            filtroStatus === "aberto"
-                              ? "bg-background text-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground",
+                            filtroStatus === "aberto" ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
                           )}
                         >
                           Em aberto
@@ -4793,7 +4784,7 @@ export default function WhatsAppInbox() {
                             className={cn(
                               "text-[9px] px-1 rounded-full font-semibold",
                               filtroStatus === "aberto"
-                                ? "bg-primary/10 text-primary"
+                                ? "bg-primary-foreground/20 text-primary-foreground"
                                 : "bg-muted-foreground/10",
                             )}
                           >
@@ -4805,9 +4796,7 @@ export default function WhatsAppInbox() {
                           onClick={() => setFiltroStatus("fechado")}
                           className={cn(
                             "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
-                            filtroStatus === "fechado"
-                              ? "bg-background text-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground",
+                            filtroStatus === "fechado" ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
                           )}
                         >
                           Fechado
@@ -4815,7 +4804,7 @@ export default function WhatsAppInbox() {
                             className={cn(
                               "text-[9px] px-1 rounded-full font-semibold",
                               filtroStatus === "fechado"
-                                ? "bg-primary/10 text-primary"
+                                ? "bg-primary-foreground/20 text-primary-foreground"
                                 : "bg-muted-foreground/10",
                             )}
                           >
