@@ -9,6 +9,7 @@ export interface SidebarItem {
   icon: string; // lucide icon name
   visible: boolean;
   isCustom?: boolean;
+  isExternal?: boolean; // path é uma URL completa (http/https), abre em nova aba
 }
 
 export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [

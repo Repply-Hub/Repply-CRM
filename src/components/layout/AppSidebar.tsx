@@ -9,7 +9,7 @@ import { NavLink } from '@/components/layout/NavLink';
 import { useSidebarPreferences, SidebarItem } from '@/hooks/use-sidebar-preferences';
 import { useSaveSidebarEmpresaPadrao } from '@/hooks/use-sidebar-empresa-padrao';
 import { usePermissoes } from '@/hooks/use-permissoes';
-import { getIconComponent } from '@/lib/sidebar-icons';
+import { getIconComponent, getFaviconUrl, getFaviconFallbackUrl } from '@/lib/sidebar-icons';
 import { SidebarAddItemDialog } from '@/components/layout/SidebarAddItemDialog';
 import { useUnreadEmails, useUnreadChatMessages, useUnreadWaMessages } from '@/hooks/use-notificacoes';
 import logoSidebar from '@/assets/logo-sidebar.svg';
@@ -41,6 +41,7 @@ export function AppSidebar() {
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState<SidebarItem[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<SidebarItem | null>(null);
   const [saveChoiceOpen, setSaveChoiceOpen] = useState(false);
   const { data: unreadEmails = 0 } = useUnreadEmails();
   const { data: unreadChat = 0 } = useUnreadChatMessages();
@@ -199,8 +200,22 @@ export function AppSidebar() {
     setEditItems(prev => prev.filter(item => item.id !== id));
   };
 
-  const addCustomItem = (item: SidebarItem) => {
-    setEditItems(prev => [...prev, item]);
+  const saveCustomItem = (item: SidebarItem) => {
+    setEditItems(prev =>
+      prev.some(i => i.id === item.id)
+        ? prev.map(i => (i.id === item.id ? item : i))
+        : [...prev, item]
+    );
+  };
+
+  const openAddDialog = () => {
+    setEditingItem(null);
+    setAddDialogOpen(true);
+  };
+
+  const openEditDialog = (item: SidebarItem) => {
+    setEditingItem(item);
+    setAddDialogOpen(true);
   };
 
   const displayItems = editMode ? editItems : visibleItems;
@@ -237,6 +252,7 @@ export function AppSidebar() {
                       <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-0.5 px-1">
                         {editItems.map((item, index) => {
                           const Icon = getIconComponent(item.icon);
+                          const faviconUrl = item.isExternal ? getFaviconUrl(item.path) : undefined;
                           return (
                             <Draggable key={item.id} draggableId={item.id} index={index}>
                               {(provided, snapshot) => (
@@ -252,7 +268,25 @@ export function AppSidebar() {
                                   <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing text-sidebar-foreground/40 hover:text-sidebar-foreground/70">
                                     <GripVertical className="h-3.5 w-3.5" />
                                   </div>
-                                  {Icon && <Icon className="h-4 w-4 shrink-0 text-sidebar-foreground/60" />}
+                                  {faviconUrl ? (
+                                    <img
+                                      src={faviconUrl}
+                                      alt=""
+                                      className="h-4 w-4 shrink-0 rounded-sm"
+                                      onError={e => {
+                                        const img = e.currentTarget;
+                                        const fallback = getFaviconFallbackUrl(item.path);
+                                        if (img.dataset.fallback !== '1' && fallback) {
+                                          img.dataset.fallback = '1';
+                                          img.src = fallback;
+                                        } else {
+                                          img.style.visibility = 'hidden';
+                                        }
+                                      }}
+                                    />
+                                  ) : (
+                                    Icon && <Icon className="h-4 w-4 shrink-0 text-sidebar-foreground/60" />
+                                  )}
                                   <span className="flex-1 truncate text-[13px] text-sidebar-foreground">{item.label}</span>
                                   {!item.isCustom && (
                                     <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded border border-sidebar-foreground/15 text-sidebar-foreground/35 font-medium tracking-wide leading-none">
@@ -266,6 +300,15 @@ export function AppSidebar() {
                                   >
                                     {item.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                                   </button>
+                                  {item.isCustom && (
+                                    <button
+                                      onClick={() => openEditDialog(item)}
+                                      className="text-sidebar-foreground/40 hover:text-sidebar-foreground/80 p-0.5"
+                                      title="Editar"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
                                   {item.isCustom && (
                                     <button
                                       onClick={() => removeItem(item.id)}
@@ -289,35 +332,71 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {displayItems.map((item) => {
                     const Icon = getIconComponent(item.icon);
+                    const faviconUrl = item.isExternal ? getFaviconUrl(item.path) : undefined;
                     const showBadge = (item.id === 'emails' && unreadEmails > 0) || (item.id === 'chat' && unreadChat > 0) || (item.id === 'whatsapp' && unreadWa > 0);
                     const badgeCount = item.id === 'emails' ? unreadEmails : item.id === 'whatsapp' ? unreadWa : unreadChat;
-                    
+
+                    const iconEl = (
+                      <div className="relative">
+                        {faviconUrl ? (
+                          <img
+                            src={faviconUrl}
+                            alt=""
+                            className="h-4 w-4 shrink-0 rounded-sm"
+                            onError={e => {
+                              const img = e.currentTarget;
+                              const fallback = getFaviconFallbackUrl(item.path);
+                              if (img.dataset.fallback !== '1' && fallback) {
+                                img.dataset.fallback = '1';
+                                img.src = fallback;
+                              } else {
+                                img.style.visibility = 'hidden';
+                              }
+                            }}
+                          />
+                        ) : (
+                          Icon && <Icon className="h-4 w-4 shrink-0" />
+                        )}
+                        {showBadge && collapsed && (
+                          <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive animate-pulse border-2 border-sidebar shadow-sm" />
+                        )}
+                      </div>
+                    );
+                    const labelEl = !collapsed && (
+                      <div className="flex items-center justify-between flex-1 min-w-0">
+                        <span className="text-[13px] truncate">{item.label}</span>
+                        {showBadge && (
+                          <span className="ml-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
+                            {badgeCount > 99 ? '99+' : badgeCount}
+                          </span>
+                        )}
+                      </div>
+                    );
+
                     return (
                       <SidebarMenuItem key={item.id}>
                         <SidebarMenuButton asChild tooltip={item.label}>
-                          <NavLink
-                            to={item.path}
-                            end={item.path === '/'}
-                            className="hover:bg-sidebar-accent/60 rounded-lg transition-all duration-150 relative"
-                            activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-sm"
-                          >
-                            <div className="relative">
-                              {Icon && <Icon className="h-4 w-4 shrink-0" />}
-                              {showBadge && collapsed && (
-                                <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive animate-pulse border-2 border-sidebar shadow-sm" />
-                              )}
-                            </div>
-                            {!collapsed && (
-                              <div className="flex items-center justify-between flex-1 min-w-0">
-                                <span className="text-[13px] truncate">{item.label}</span>
-                                {showBadge && (
-                                  <span className="ml-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
-                                    {badgeCount > 99 ? '99+' : badgeCount}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </NavLink>
+                          {item.isExternal ? (
+                            <a
+                              href={item.path}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:bg-sidebar-accent/60 rounded-lg transition-all duration-150 relative"
+                            >
+                              {iconEl}
+                              {labelEl}
+                            </a>
+                          ) : (
+                            <NavLink
+                              to={item.path}
+                              end={item.path === '/'}
+                              className="hover:bg-sidebar-accent/60 rounded-lg transition-all duration-150 relative"
+                              activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-sm"
+                            >
+                              {iconEl}
+                              {labelEl}
+                            </NavLink>
+                          )}
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
@@ -328,7 +407,7 @@ export function AppSidebar() {
               {editMode && (
                 <div className="px-1 mt-1">
                   <button
-                    onClick={() => setAddDialogOpen(true)}
+                    onClick={openAddDialog}
                     className="flex items-center gap-1.5 w-full rounded-lg px-1.5 py-1.5 text-[13px] border border-dashed border-sidebar-foreground/20 text-sidebar-foreground/50 hover:text-sidebar-foreground/80 hover:border-sidebar-foreground/40 transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -411,7 +490,8 @@ export function AppSidebar() {
       <SidebarAddItemDialog
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
-        onAdd={addCustomItem}
+        onSave={saveCustomItem}
+        initialItem={editingItem}
       />
 
       <Dialog open={saveChoiceOpen} onOpenChange={setSaveChoiceOpen}>
