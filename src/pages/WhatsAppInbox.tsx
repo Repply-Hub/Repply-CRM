@@ -83,8 +83,21 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import { ListPagination } from "@/components/shared/ListPagination";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -98,7 +111,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from "@/components/chat/FilePreviewDialog";
+import {
+  FilePreviewDialog,
+  isPreviewable,
+  type FilePreviewTarget,
+} from "@/components/chat/FilePreviewDialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -107,7 +124,6 @@ import {
   Settings,
   Plus,
   Search,
-  CalendarSearch,
   Phone,
   CheckCheck,
   Check,
@@ -132,6 +148,7 @@ import {
   Pause,
   MoreVertical,
   Trash2,
+  FilterX,
   Eraser,
   Archive,
   ArchiveRestore,
@@ -151,6 +168,7 @@ import {
   Reply,
   ListTodo,
   StickyNote,
+  MessageSquareText,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -421,7 +439,9 @@ function ConversaAvatar({
   const dimensionClass = size === "lg" ? "h-12 w-12" : "h-10 w-10";
   if (conv.is_group) {
     return (
-      <Avatar className={cn(dimensionClass, "border border-primary/10 shrink-0")}>
+      <Avatar
+        className={cn(dimensionClass, "border border-primary/10 shrink-0")}
+      >
         {conv.foto_perfil_url && (
           <AvatarImage src={conv.foto_perfil_url} alt="" />
         )}
@@ -515,7 +535,12 @@ function ConversaParticipantesStack({
             overlap && "ring-2 ring-background",
           )}
         >
-          <AvatarFallback className={cn("bg-muted text-muted-foreground font-semibold", textClass)}>
+          <AvatarFallback
+            className={cn(
+              "bg-muted text-muted-foreground font-semibold",
+              textClass,
+            )}
+          >
             +{restantes}
           </AvatarFallback>
         </Avatar>
@@ -565,6 +590,7 @@ function MeusChatsList({
   countAbertas,
   countFechadas,
   filtrosDropdownContent,
+  periodoFilterButton,
   hasFiltros,
   activeFiltrosCount,
   onLimparFiltros,
@@ -580,6 +606,7 @@ function MeusChatsList({
   countAbertas: number;
   countFechadas: number;
   filtrosDropdownContent: React.ReactNode;
+  periodoFilterButton: React.ReactNode;
   hasFiltros: boolean;
   activeFiltrosCount: number;
   onLimparFiltros: () => void;
@@ -602,7 +629,10 @@ function MeusChatsList({
     return true;
   });
 
-  const totalPages = Math.max(1, Math.ceil(conversasFiltradas.length / pageSize));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(conversasFiltradas.length / pageSize),
+  );
   const safePage = Math.min(page, totalPages);
   const paginadas = conversasFiltradas.slice(
     (safePage - 1) * pageSize,
@@ -656,6 +686,7 @@ function MeusChatsList({
           >
             {filtrosDropdownContent}
           </FilterButton>
+          {periodoFilterButton}
           {hasFiltros && (
             <Button
               type="button"
@@ -665,7 +696,8 @@ function MeusChatsList({
               onClick={onLimparFiltros}
               title="Limpar filtros"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <FilterX className="h-3.5 w-3.5" />
+              Limpar
             </Button>
           )}
           <Button
@@ -678,70 +710,70 @@ function MeusChatsList({
           </Button>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 w-fit shrink-0">
-          {(
-            [
-              { key: "todas", label: "Todas", count: conversas.length },
-              { key: "nao_lidas", label: "Não lidas", count: countNaoLidas },
-              { key: "lidas", label: "Lidas", count: countLidas },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => {
-                setFiltroLeitura(opt.key);
-                setPage(1);
-              }}
-              className={cn(
-                "flex h-9 items-center justify-center gap-1.5 text-sm font-medium rounded-md px-3 transition-colors",
-                filtroLeitura === opt.key
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {opt.label}
-              <span
+          <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 w-fit shrink-0">
+            {(
+              [
+                { key: "todas", label: "Todas", count: conversas.length },
+                { key: "nao_lidas", label: "Não lidas", count: countNaoLidas },
+                { key: "lidas", label: "Lidas", count: countLidas },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => {
+                  setFiltroLeitura(opt.key);
+                  setPage(1);
+                }}
                 className={cn(
-                  "text-[10px] px-1.5 py-0.5 rounded-full font-semibold",
+                  "flex h-9 items-center justify-center gap-1.5 text-sm font-medium rounded-md px-3 transition-colors",
                   filtroLeitura === opt.key
-                    ? "bg-primary/10 text-primary"
-                    : "bg-muted-foreground/10",
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {opt.count}
-              </span>
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-9 h-10 bg-muted/50 border-transparent focus-visible:ring-1"
-            placeholder="Buscar por nome, telefone ou mensagem..."
-            value={busca}
-            onChange={(e) => {
-              setBusca(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
+                {opt.label}
+                <span
+                  className={cn(
+                    "text-[10px] px-1.5 py-0.5 rounded-full font-semibold",
+                    filtroLeitura === opt.key
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted-foreground/10",
+                  )}
+                >
+                  {opt.count}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-9 h-10 bg-muted/50 border-transparent focus-visible:ring-1"
+              placeholder="Buscar por nome, telefone ou mensagem..."
+              value={busca}
+              onChange={(e) => {
+                setBusca(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
         </div>
       </div>
       <div className="flex-1 min-h-0 p-4 sm:p-6">
         <div className="flex h-full min-h-0 flex-col rounded-xl border border-border overflow-hidden">
-        {conversasFiltradas.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-            <Search className="h-8 w-8 text-muted-foreground/40" />
-            <p className="text-sm font-medium text-foreground">
-              Nenhuma conversa encontrada
-            </p>
-            <p className="max-w-xs text-xs text-muted-foreground">
-              Tente buscar por outro nome, telefone ou responsável.
-            </p>
-          </div>
-        ) : (
-        <Table wrapperClassName="flex-1 min-h-0 overflow-auto">
+          {conversasFiltradas.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+              <Search className="h-8 w-8 text-muted-foreground/40" />
+              <p className="text-sm font-medium text-foreground">
+                Nenhuma conversa encontrada
+              </p>
+              <p className="max-w-xs text-xs text-muted-foreground">
+                Tente buscar por outro nome, telefone ou responsável.
+              </p>
+            </div>
+          ) : (
+            <Table wrapperClassName="flex-1 min-h-0 overflow-auto">
               <TableHeader>
                 <TableRow className="bg-muted hover:bg-muted">
                   <TableHead className="sticky top-0 z-10 bg-muted min-w-[220px] whitespace-nowrap px-4 py-3 text-xs font-semibold">
@@ -780,10 +812,13 @@ function MeusChatsList({
                               <span
                                 className={cn(
                                   "truncate text-sm text-foreground",
-                                  conv.nao_lidas > 0 ? "font-bold" : "font-semibold",
+                                  conv.nao_lidas > 0
+                                    ? "font-bold"
+                                    : "font-semibold",
                                 )}
                               >
-                                {conv.nome_contato ?? formatPhone(conv.telefone)}
+                                {conv.nome_contato ??
+                                  formatPhone(conv.telefone)}
                               </span>
                               {conv.arquivada && (
                                 <Badge
@@ -822,7 +857,9 @@ function MeusChatsList({
                             <span className="truncate">{apelidoInstancia}</span>
                           </Badge>
                         ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
+                          <span className="text-xs text-muted-foreground">
+                            —
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="px-4 py-4 text-right">
@@ -844,23 +881,23 @@ function MeusChatsList({
                 })}
               </TableBody>
             </Table>
-        )}
-        {conversasFiltradas.length > 0 && (
-          <div className="shrink-0 border-t border-border bg-muted px-4 py-3">
-            <ListPagination
-              page={safePage}
-              totalPages={totalPages}
-              totalItems={conversasFiltradas.length}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={(nextPageSize) => {
-                setPageSize(nextPageSize);
-                setPage(1);
-              }}
-              itemLabel="conversa"
-            />
-          </div>
-        )}
+          )}
+          {conversasFiltradas.length > 0 && (
+            <div className="shrink-0 border-t border-border bg-muted px-4 py-3">
+              <ListPagination
+                page={safePage}
+                totalPages={totalPages}
+                totalItems={conversasFiltradas.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(nextPageSize) => {
+                  setPageSize(nextPageSize);
+                  setPage(1);
+                }}
+                itemLabel="conversa"
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1086,7 +1123,8 @@ function QuotedPreview({
   onCancel?: () => void;
 }) {
   const label = remetenteNome || "Você";
-  const texto = conteudo && !PLACEHOLDERS.includes(conteudo) ? conteudo : (conteudo || "");
+  const texto =
+    conteudo && !PLACEHOLDERS.includes(conteudo) ? conteudo : conteudo || "";
   return (
     <div
       data-no-drag={onClick ? true : undefined}
@@ -1097,12 +1135,27 @@ function QuotedPreview({
       )}
       onClick={onClick}
     >
-      <div className={cn("w-[3px] rounded-full shrink-0", isSaida ? "bg-white/60" : "bg-primary/70")} />
+      <div
+        className={cn(
+          "w-[3px] rounded-full shrink-0",
+          isSaida ? "bg-white/60" : "bg-primary/70",
+        )}
+      />
       <div className="min-w-0 flex-1">
-        <p className={cn("text-xs font-semibold truncate", isSaida ? "text-white" : "text-primary")}>
+        <p
+          className={cn(
+            "text-xs font-semibold truncate",
+            isSaida ? "text-white" : "text-primary",
+          )}
+        >
           {label}
         </p>
-        <p className={cn("text-xs truncate", isSaida ? "text-white/80" : "text-muted-foreground")}>
+        <p
+          className={cn(
+            "text-xs truncate",
+            isSaida ? "text-white/80" : "text-muted-foreground",
+          )}
+        >
           {texto}
         </p>
       </div>
@@ -1110,7 +1163,10 @@ function QuotedPreview({
         <button
           type="button"
           className="shrink-0 self-start text-muted-foreground hover:text-foreground"
-          onClick={(e) => { e.stopPropagation(); onCancel(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCancel();
+          }}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -1158,7 +1214,9 @@ function DraggableBubble({
     const delta = e.clientX - startXRef.current;
     // Só reage ao arraste "puxando" a bolha para o centro da tela (como no WhatsApp):
     // mensagens enviadas (alinhadas à direita) puxam para a esquerda, recebidas para a direita.
-    const relevant = isSaida ? Math.min(0, Math.max(-MAX_DRAG, delta)) : Math.max(0, Math.min(MAX_DRAG, delta));
+    const relevant = isSaida
+      ? Math.min(0, Math.max(-MAX_DRAG, delta))
+      : Math.max(0, Math.min(MAX_DRAG, delta));
     setDragX(relevant);
     if (!triggeredRef.current && Math.abs(relevant) >= THRESHOLD) {
       triggeredRef.current = true;
@@ -1224,7 +1282,7 @@ function MessageContent({
 }: {
   msg: WaMensagem;
   isSaida: boolean;
-  onImageClick?: (url: string) => void;
+  onImageClick?: (url: string, msgId?: string) => void;
   onPreviewFile?: (file: FilePreviewTarget) => void;
   conversaAtiva: WaConversa;
 }) {
@@ -1239,7 +1297,7 @@ function MessageContent({
           className="w-full rounded-[14px] cursor-pointer hover:opacity-90 transition-opacity object-cover shadow-sm"
           onClick={() => {
             if (onImageClick) {
-              onImageClick(msg.media_url!);
+              onImageClick(msg.media_url!, msg.id);
             } else {
               window.open(msg.media_url!, "_blank");
             }
@@ -1326,7 +1384,13 @@ function MessageContent({
         <button
           type="button"
           className={sharedClassName}
-          onClick={() => onPreviewFile!({ url: msg.media_url!, nome: label, mime: msg.media_mime })}
+          onClick={() =>
+            onPreviewFile!({
+              url: msg.media_url!,
+              nome: label,
+              mime: msg.media_mime,
+            })
+          }
         >
           {content}
         </button>
@@ -1334,7 +1398,12 @@ function MessageContent({
     }
 
     return (
-      <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className={sharedClassName}>
+      <a
+        href={msg.media_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={sharedClassName}
+      >
         {content}
       </a>
     );
@@ -1683,167 +1752,6 @@ function CriarGrupoDialog({
   );
 }
 
-// --- Busca de mensagens por texto + período, em todas as conversas ---
-function BuscaMensagensDialog({
-  open,
-  onClose,
-  onSelecionarResultado,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSelecionarResultado: (r: WaMensagemBusca) => void;
-}) {
-  const buscarMensagens = useWaBuscarMensagens();
-  const [termo, setTermo] = useState("");
-  const [periodo, setPeriodo] = useState<{ from?: Date; to?: Date }>({});
-  const [periodoOpen, setPeriodoOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) {
-      setTermo("");
-      setPeriodo({});
-      buscarMensagens.reset();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  function buscar() {
-    if (!termo.trim()) return;
-    buscarMensagens.mutate({ termo, from: periodo.from, to: periodo.to });
-  }
-
-  const resultados = buscarMensagens.data ?? [];
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarSearch className="h-4 w-4" />
-            Buscar mensagens
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-2.5 shrink-0">
-          <Input
-            placeholder="Texto da mensagem (ex: bom dia)"
-            value={termo}
-            onChange={(e) => setTermo(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && buscar()}
-            autoFocus
-          />
-          <div className="flex items-center gap-2">
-            <Popover open={periodoOpen} onOpenChange={setPeriodoOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 justify-start gap-1.5 font-normal text-muted-foreground"
-                >
-                  <CalendarSearch className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">
-                    {periodo.from && periodo.to
-                      ? `${format(periodo.from, "dd/MM/yyyy")} até ${format(periodo.to, "dd/MM/yyyy")}`
-                      : "Período (opcional)"}
-                  </span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-2" align="start">
-                <Calendar
-                  mode="range"
-                  selected={{ from: periodo.from, to: periodo.to }}
-                  onSelect={(range) => {
-                    setPeriodo({ from: range?.from, to: range?.to });
-                    if (range?.from && range?.to) setPeriodoOpen(false);
-                  }}
-                  numberOfMonths={1}
-                  locale={ptBR}
-                  captionLayout="dropdown-buttons"
-                  fromYear={2020}
-                  toYear={new Date().getFullYear()}
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-            {(periodo.from || periodo.to) && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setPeriodo({})}
-              >
-                Limpar
-              </Button>
-            )}
-          </div>
-          <Button
-            type="button"
-            className="w-full gap-1.5"
-            onClick={buscar}
-            disabled={!termo.trim() || buscarMensagens.isPending}
-          >
-            {buscarMensagens.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Search className="h-3.5 w-3.5" />
-            )}
-            Buscar
-          </Button>
-        </div>
-        <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1 mt-1">
-          {buscarMensagens.isPending && (
-            <p className="text-xs text-muted-foreground text-center py-6">
-              Buscando...
-            </p>
-          )}
-          {buscarMensagens.isSuccess && resultados.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-6">
-              Nenhuma mensagem encontrada
-              {periodo.from && periodo.to ? " nesse período." : "."}
-            </p>
-          )}
-          {resultados.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => onSelecionarResultado(r)}
-              className="w-full text-left flex items-start gap-2.5 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-            >
-              <Avatar className="h-8 w-8 shrink-0 mt-0.5 border border-primary/10">
-                {r.conversa?.foto_perfil_url && (
-                  <AvatarImage src={r.conversa.foto_perfil_url} alt="" />
-                )}
-                <AvatarFallback
-                  className={cn(
-                    colorForPhone(r.conversa?.telefone ?? ""),
-                    "text-white text-xs",
-                  )}
-                >
-                  {initials(r.conversa?.nome_contato ?? null, r.conversa?.telefone ?? "")}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium truncate">
-                    {r.conversa?.nome_contato || formatPhone(r.conversa?.telefone ?? "")}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground shrink-0">
-                    {format(new Date(r.created_at), "dd/MM/yy HH:mm")}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground truncate">
-                  {r.direcao === "saida" ? "Você: " : ""}
-                  {r.conteudo}
-                </p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // --- Dialog conexão WhatsApp ---
 function ConfigDialog({
   open,
@@ -2046,13 +1954,15 @@ function LeadSheet({
   onOpenChange,
   onImageClick,
   onPreviewFile,
+  onJumpToMessage,
 }: {
   conversa: WaConversa;
   participantesGrupo: { nome: string | null; telefone: string }[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onImageClick: (url: string) => void;
+  onImageClick: (url: string, msgId?: string) => void;
   onPreviewFile: (file: FilePreviewTarget) => void;
+  onJumpToMessage: (id: string) => void;
 }) {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -2072,10 +1982,7 @@ function LeadSheet({
     [mensagens],
   );
   const atuais = conversa.responsaveis ?? [];
-  const atuaisIds = useMemo(
-    () => new Set(atuais.map((r) => r.id)),
-    [atuais],
-  );
+  const atuaisIds = useMemo(() => new Set(atuais.map((r) => r.id)), [atuais]);
   const [addResponsavelOpen, setAddResponsavelOpen] = useState(false);
   const [buscaResponsavel, setBuscaResponsavel] = useState("");
   const vendedoresDisponiveis = useMemo(() => {
@@ -2088,17 +1995,29 @@ function LeadSheet({
   const midia = useMemo(() => {
     const imagens = mensagens.filter((m) => m.tipo === "imagem" && m.media_url);
     const videos = mensagens.filter((m) => m.tipo === "video" && m.media_url);
-    const documentos = mensagens.filter((m) => m.tipo === "documento" && m.media_url);
+    const documentos = mensagens.filter(
+      (m) => m.tipo === "documento" && m.media_url,
+    );
 
     const urlRegex = /https?:\/\/[^\s]+/g;
-    const links: { id: string; url: string; created_at: string }[] = [];
+    const links: {
+      id: string;
+      msgId: string;
+      url: string;
+      created_at: string;
+    }[] = [];
     for (const m of mensagens) {
       if (!m.conteudo) continue;
       const matches = m.conteudo.match(urlRegex);
       if (!matches) continue;
       matches.forEach((raw, i) => {
         const url = raw.replace(/[.,;:!?)\]]+$/, "");
-        links.push({ id: `${m.id}-${i}`, url, created_at: m.created_at });
+        links.push({
+          id: `${m.id}-${i}`,
+          msgId: m.id,
+          url,
+          created_at: m.created_at,
+        });
       });
     }
 
@@ -2129,7 +2048,9 @@ function LeadSheet({
           <div className="min-w-0 flex-1">
             <p className="text-xs break-words">{n.conteudo}</p>
             <p className="text-[10px] text-muted-foreground">
-              {format(new Date(n.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+              {format(new Date(n.created_at), "dd/MM/yyyy HH:mm", {
+                locale: ptBR,
+              })}
               {n.fixada && " · fixada"}
             </p>
           </div>
@@ -2168,10 +2089,16 @@ function LeadSheet({
           key={m.id}
           type="button"
           className="aspect-square rounded-md overflow-hidden border border-border hover:opacity-80 transition-opacity"
-          onClick={() => onImageClick(m.media_url!)}
-          title={format(new Date(m.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+          onClick={() => onImageClick(m.media_url!, m.id)}
+          title={format(new Date(m.created_at), "dd/MM/yyyy HH:mm", {
+            locale: ptBR,
+          })}
         >
-          <img src={m.media_url!} alt="imagem" className="h-full w-full object-cover" />
+          <img
+            src={m.media_url!}
+            alt="imagem"
+            className="h-full w-full object-cover"
+          />
         </button>
       ))}
     </div>
@@ -2184,10 +2111,18 @@ function LeadSheet({
           key={m.id}
           type="button"
           className="relative aspect-square rounded-md overflow-hidden border border-border bg-black/5 hover:opacity-80 transition-opacity"
-          onClick={() => window.open(m.media_url!, "_blank", "noopener,noreferrer")}
-          title={format(new Date(m.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+          onClick={() =>
+            window.open(m.media_url!, "_blank", "noopener,noreferrer")
+          }
+          title={format(new Date(m.created_at), "dd/MM/yyyy HH:mm", {
+            locale: ptBR,
+          })}
         >
-          <video src={m.media_url!} className="h-full w-full object-cover" muted />
+          <video
+            src={m.media_url!}
+            className="h-full w-full object-cover"
+            muted
+          />
           <span className="absolute inset-0 flex items-center justify-center bg-black/20">
             <Play className="h-5 w-5 text-white fill-white" />
           </span>
@@ -2199,7 +2134,9 @@ function LeadSheet({
   const renderDocumentos = (items: typeof midia.documentos) => (
     <ul className="space-y-1.5">
       {items.map((m) => {
-        const label = !PLACEHOLDERS.includes(m.conteudo) ? m.conteudo : "Documento anexado";
+        const label = !PLACEHOLDERS.includes(m.conteudo)
+          ? m.conteudo
+          : "Documento anexado";
         const previewable = isPreviewable(label, m.media_mime);
         return (
           <li key={m.id}>
@@ -2210,7 +2147,13 @@ function LeadSheet({
               )}
               onClick={
                 previewable
-                  ? () => onPreviewFile({ url: m.media_url!, nome: label, mime: m.media_mime })
+                  ? () =>
+                      onPreviewFile({
+                        url: m.media_url!,
+                        nome: label,
+                        mime: m.media_mime,
+                        msgId: m.id,
+                      })
                   : undefined
               }
             >
@@ -2222,9 +2165,27 @@ function LeadSheet({
                   {label}
                 </p>
                 <p className="text-[10px] text-muted-foreground">
-                  {format(new Date(m.created_at), "dd MMM, HH:mm", { locale: ptBR })}
+                  {format(new Date(m.created_at), "dd MMM, HH:mm", {
+                    locale: ptBR,
+                  })}
                 </p>
               </div>
+              {/* Documentos sem pré-visualização não abrem nenhum modal, então
+                  o botão de ir-até-a-mensagem fica aqui mesmo, na linha. Para
+                  os que têm preview, o botão vive dentro do FilePreviewDialog. */}
+              {!previewable && (
+                <button
+                  type="button"
+                  title="Ir para a mensagem na conversa"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onJumpToMessage(m.id);
+                  }}
+                  className="p-1.5 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0"
+                >
+                  <MessageSquareText className="h-3.5 w-3.5" />
+                </button>
+              )}
               <a
                 href={m.media_url!}
                 download={label}
@@ -2253,30 +2214,53 @@ function LeadSheet({
         }
         return (
           <li key={l.id}>
-            <a
-              href={l.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2.5 p-2 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
-            >
-              <div className="p-1.5 rounded-md bg-background text-primary shrink-0">
-                <Link2 className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium truncate" title={l.url}>
-                  {host}
-                </p>
-                <p className="text-[10px] text-muted-foreground truncate">{l.url}</p>
-              </div>
-              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            </a>
+            <div className="flex items-center gap-2.5 p-2 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
+              <a
+                href={l.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2.5 min-w-0 flex-1"
+              >
+                <div className="p-1.5 rounded-md bg-background text-primary shrink-0">
+                  <Link2 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium truncate" title={l.url}>
+                    {host}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground truncate">
+                    {l.url}
+                  </p>
+                </div>
+              </a>
+              <button
+                type="button"
+                title="Ir para a mensagem na conversa"
+                onClick={() => onJumpToMessage(l.msgId)}
+                className="p-1.5 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0"
+              >
+                <MessageSquareText className="h-3.5 w-3.5" />
+              </button>
+              <a
+                href={l.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abrir link"
+                className="shrink-0"
+              >
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-primary transition-colors" />
+              </a>
+            </div>
           </li>
         );
       })}
     </ul>
   );
 
-  const MEDIA_TAB_LABELS: Record<"imagens" | "videos" | "documentos" | "links", string> = {
+  const MEDIA_TAB_LABELS: Record<
+    "imagens" | "videos" | "documentos" | "links",
+    string
+  > = {
     imagens: "Imagens",
     videos: "Vídeos",
     documentos: "Documentos",
@@ -2448,16 +2432,31 @@ function LeadSheet({
             </p>
             <Tabs defaultValue="imagens" className="w-full">
               <TabsList className="grid w-full grid-cols-4 h-9 items-center rounded-lg border border-muted-foreground/25 overflow-hidden">
-                <TabsTrigger value="imagens" className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none">
-                  Imagens{midia.imagens.length > 0 && ` (${midia.imagens.length})`}
+                <TabsTrigger
+                  value="imagens"
+                  className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
+                >
+                  Imagens
+                  {midia.imagens.length > 0 && ` (${midia.imagens.length})`}
                 </TabsTrigger>
-                <TabsTrigger value="videos" className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none">
+                <TabsTrigger
+                  value="videos"
+                  className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
+                >
                   Vídeos{midia.videos.length > 0 && ` (${midia.videos.length})`}
                 </TabsTrigger>
-                <TabsTrigger value="documentos" className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none">
-                  Docs{midia.documentos.length > 0 && ` (${midia.documentos.length})`}
+                <TabsTrigger
+                  value="documentos"
+                  className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
+                >
+                  Docs
+                  {midia.documentos.length > 0 &&
+                    ` (${midia.documentos.length})`}
                 </TabsTrigger>
-                <TabsTrigger value="links" className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none">
+                <TabsTrigger
+                  value="links"
+                  className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
+                >
                   Links{midia.links.length > 0 && ` (${midia.links.length})`}
                 </TabsTrigger>
               </TabsList>
@@ -2511,7 +2510,9 @@ function LeadSheet({
                   </p>
                 ) : (
                   <>
-                    {renderDocumentos(midia.documentos.slice(0, MEDIA_PREVIEW_LIMIT))}
+                    {renderDocumentos(
+                      midia.documentos.slice(0, MEDIA_PREVIEW_LIMIT),
+                    )}
                     {midia.documentos.length > MEDIA_PREVIEW_LIMIT && (
                       <button
                         type="button"
@@ -2548,7 +2549,10 @@ function LeadSheet({
             </Tabs>
           </div>
 
-          <Dialog open={!!expandedMediaTab} onOpenChange={(v) => !v && setExpandedMediaTab(null)}>
+          <Dialog
+            open={!!expandedMediaTab}
+            onOpenChange={(v) => !v && setExpandedMediaTab(null)}
+          >
             <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>
@@ -2558,7 +2562,8 @@ function LeadSheet({
               <div className="flex-1 overflow-y-auto pr-1">
                 {expandedMediaTab === "imagens" && renderImagens(midia.imagens)}
                 {expandedMediaTab === "videos" && renderVideos(midia.videos)}
-                {expandedMediaTab === "documentos" && renderDocumentos(midia.documentos)}
+                {expandedMediaTab === "documentos" &&
+                  renderDocumentos(midia.documentos)}
                 {expandedMediaTab === "links" && renderLinks(midia.links)}
               </div>
             </DialogContent>
@@ -2574,11 +2579,19 @@ function LeadSheet({
             </p>
             <Tabs defaultValue="notas" className="w-full">
               <TabsList className="grid w-full grid-cols-2 h-9 items-center rounded-lg border border-muted-foreground/25 overflow-hidden">
-                <TabsTrigger value="notas" className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none">
-                  Notas{notasConversa.length > 0 && ` (${notasConversa.length})`}
+                <TabsTrigger
+                  value="notas"
+                  className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
+                >
+                  Notas
+                  {notasConversa.length > 0 && ` (${notasConversa.length})`}
                 </TabsTrigger>
-                <TabsTrigger value="tarefas" className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none">
-                  Tarefas{tarefasConversa.length > 0 && ` (${tarefasConversa.length})`}
+                <TabsTrigger
+                  value="tarefas"
+                  className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
+                >
+                  Tarefas
+                  {tarefasConversa.length > 0 && ` (${tarefasConversa.length})`}
                 </TabsTrigger>
               </TabsList>
 
@@ -2589,14 +2602,17 @@ function LeadSheet({
                   </p>
                 ) : (
                   <>
-                    {renderNotasList(notasConversa.slice(0, HISTORICO_PREVIEW_LIMIT))}
+                    {renderNotasList(
+                      notasConversa.slice(0, HISTORICO_PREVIEW_LIMIT),
+                    )}
                     {notasConversa.length > HISTORICO_PREVIEW_LIMIT && (
                       <button
                         type="button"
                         className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
                         onClick={() => setExpandedHistoricoTab("notas")}
                       >
-                        Ver mais... (+{notasConversa.length - HISTORICO_PREVIEW_LIMIT})
+                        Ver mais... (+
+                        {notasConversa.length - HISTORICO_PREVIEW_LIMIT})
                       </button>
                     )}
                   </>
@@ -2610,14 +2626,17 @@ function LeadSheet({
                   </p>
                 ) : (
                   <>
-                    {renderTarefasList(tarefasConversa.slice(0, HISTORICO_PREVIEW_LIMIT))}
+                    {renderTarefasList(
+                      tarefasConversa.slice(0, HISTORICO_PREVIEW_LIMIT),
+                    )}
                     {tarefasConversa.length > HISTORICO_PREVIEW_LIMIT && (
                       <button
                         type="button"
                         className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
                         onClick={() => setExpandedHistoricoTab("tarefas")}
                       >
-                        Ver mais... (+{tarefasConversa.length - HISTORICO_PREVIEW_LIMIT})
+                        Ver mais... (+
+                        {tarefasConversa.length - HISTORICO_PREVIEW_LIMIT})
                       </button>
                     )}
                   </>
@@ -2637,8 +2656,10 @@ function LeadSheet({
                 </DialogTitle>
               </DialogHeader>
               <div className="flex-1 overflow-y-auto pr-1">
-                {expandedHistoricoTab === "notas" && renderNotasList(notasConversa)}
-                {expandedHistoricoTab === "tarefas" && renderTarefasList(tarefasConversa)}
+                {expandedHistoricoTab === "notas" &&
+                  renderNotasList(notasConversa)}
+                {expandedHistoricoTab === "tarefas" &&
+                  renderTarefasList(tarefasConversa)}
               </div>
             </DialogContent>
           </Dialog>
@@ -2852,7 +2873,8 @@ export default function WhatsAppInbox() {
     setResponsaveis.mutate({ conversaId: conv.id, usuarioIds: [profile.id] });
     // Assumir uma conversa fechada reabre — não faz sentido ficar "atribuída"
     // mas escondida na aba Fechado.
-    if (conv.arquivada) arquivarConversa.mutate({ conversaId: conv.id, arquivada: false });
+    if (conv.arquivada)
+      arquivarConversa.mutate({ conversaId: conv.id, arquivada: false });
     addNota.mutate({
       conversaId: conv.id,
       texto: `${profile.nome ?? "Alguém"} assumiu esta conversa`,
@@ -2861,10 +2883,12 @@ export default function WhatsAppInbox() {
 
   function direcionarConversa(conv: WaConversa, usuarioId: string) {
     setResponsaveis.mutate({ conversaId: conv.id, usuarioIds: [usuarioId] });
-    if (conv.arquivada) arquivarConversa.mutate({ conversaId: conv.id, arquivada: false });
+    if (conv.arquivada)
+      arquivarConversa.mutate({ conversaId: conv.id, arquivada: false });
     setDirecionarOpen(false);
     setBuscaDirecionar("");
-    const nomeDestino = vendedores.find((v) => v.id === usuarioId)?.nome ?? "um colega";
+    const nomeDestino =
+      vendedores.find((v) => v.id === usuarioId)?.nome ?? "um colega";
     addNota.mutate({
       conversaId: conv.id,
       texto: `${profile?.nome ?? "Alguém"} direcionou esta conversa para ${nomeDestino}`,
@@ -2878,16 +2902,29 @@ export default function WhatsAppInbox() {
   // o vínculo com o contato desta conversa é só por texto livre no título/descrição.
   // Mesmo padrão de formulário/campos do modal de criação em src/pages/Tarefas.tsx.
   const createTarefa = useCreateTarefa();
-  const empresaIdTarefas = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
-  const { data: kanbanColunasTarefas = [] } = useTarefasKanbanColunas(empresaIdTarefas);
+  const empresaIdTarefas =
+    profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
+  const { data: kanbanColunasTarefas = [] } =
+    useTarefasKanbanColunas(empresaIdTarefas);
   const KANBAN_STAGES_TAREFAS = useMemo(
-    () => kanbanColunasTarefas.map((c) => ({ key: c.slug, label: c.nome, color: c.cor })),
+    () =>
+      kanbanColunasTarefas.map((c) => ({
+        key: c.slug,
+        label: c.nome,
+        color: c.cor,
+      })),
     [kanbanColunasTarefas],
   );
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
   const [tarefaForm, setTarefaForm] = useState({
-    titulo: "", descricao: "", status: "pendente", prazo_final: "",
-    responsavel: "", participantes: "", projeto: "", marcadores: "",
+    titulo: "",
+    descricao: "",
+    status: "pendente",
+    prazo_final: "",
+    responsavel: "",
+    participantes: "",
+    projeto: "",
+    marcadores: "",
   });
 
   function abrirNovaTarefa() {
@@ -3079,18 +3116,21 @@ export default function WhatsAppInbox() {
       setDestacadaMsgId((cur) => (cur === id ? null : cur));
     }, 1600);
   }
-  // Resultado da busca global de mensagens (BuscaMensagensDialog) pode ser de
-  // qualquer conversa — abre e espera o histórico carregar antes de rolar até ela.
-  // Se a mensagem for mais antiga que o histórico carregado (useWaMensagens limita
-  // as últimas 200), o elemento não existe e cai no aviso.
+  // Resultado da busca global de mensagens (barra de busca da sidebar) pode ser
+  // de qualquer conversa — abre e espera o histórico carregar antes de rolar até
+  // ela. Se a mensagem for mais antiga que o histórico carregado (useWaMensagens
+  // limita as últimas 200), o elemento não existe e cai no aviso.
   function selecionarResultadoBusca(r: WaMensagemBusca) {
-    setShowBuscaMensagens(false);
+    setBusca("");
     setConversaAtivaId(r.conversa_id);
+    setShowMobileSidebar(false);
     setTimeout(() => {
       if (document.getElementById(`wa-msg-${r.id}`)) {
         irParaMensagem(r.id);
       } else {
-        toast.info("Mensagem fora do histórico recente carregado desta conversa.");
+        toast.info(
+          "Mensagem fora do histórico recente carregado desta conversa.",
+        );
       }
     }, 600);
   }
@@ -3113,6 +3153,10 @@ export default function WhatsAppInbox() {
     useState(false);
   const [filtroResponsavelOpenMobile, setFiltroResponsavelOpenMobile] =
     useState(false);
+  const [periodoFiltroOpenDesktop, setPeriodoFiltroOpenDesktop] =
+    useState(false);
+  const [periodoFiltroOpenMobile, setPeriodoFiltroOpenMobile] = useState(false);
+  const [periodoFiltroOpenLista, setPeriodoFiltroOpenLista] = useState(false);
   const vendedoresFiltroResponsavel = useMemo(() => {
     if (!buscaFiltroResponsavel.trim()) return vendedores;
     const termo = buscaFiltroResponsavel.trim().toLowerCase();
@@ -3150,40 +3194,53 @@ export default function WhatsAppInbox() {
     setFiltroInstancia("todos");
     setFiltroResponsavel([]);
   }
-  // Conteúdo do dropdown "Filtros" — extraído pra ser reaproveitado tanto na
-  // sidebar (desktop) quanto na visualização em lista (MeusChatsList), que
-  // agora usa exatamente os mesmos filtros em vez de ser restrita a "atribuído
-  // a mim".
-  const filtrosDropdownContent = (
-    <div className="flex">
-      <div className="flex flex-col gap-0.5 w-44">
-        <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-          Conversa
-        </p>
-        {(
-          [
-            ["todos", "Todos"],
-            ["geral", "Não atribuído"],
-            ["meu", meuChatsLabel],
-          ] as const
-        ).map(([val, label]) => (
-          <button
-            key={val}
-            type="button"
-            onClick={() => setFiltroConversa(val)}
-            className={cn(
-              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-              filtroConversa === val && "bg-primary/10 text-primary",
-            )}
-          >
-            {label}
-            {filtroConversa === val && <Check className="h-3.5 w-3.5" />}
-          </button>
-        ))}
-        <div className="mx-3 my-1 border-t border-border/50" />
-        <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-          Período
-        </p>
+  // Busca por conteúdo de mensagem em todo o histórico (não só nas últimas
+  // carregadas): reaproveita a própria barra de busca da sidebar e o filtro de
+  // Período (dropdown "Filtros") em vez de um diálogo à parte com campos
+  // duplicados.
+  const periodoBuscaMensagens = useMemo(() => {
+    if (filtroPeriodo === "semana") return { from: subDays(new Date(), 7) };
+    if (filtroPeriodo === "mes") return { from: subMonths(new Date(), 1) };
+    if (filtroPeriodo === "ano") return { from: subYears(new Date(), 1) };
+    if (filtroPeriodo === "personalizado")
+      return { from: periodoCustom.from, to: periodoCustom.to };
+    return {};
+  }, [filtroPeriodo, periodoCustom]);
+  useEffect(() => {
+    const termo = busca.trim();
+    if (termo.length < 2) {
+      buscarMensagens.reset();
+      return;
+    }
+    const timer = setTimeout(() => {
+      buscarMensagens.mutate({
+        termo,
+        from: periodoBuscaMensagens.from,
+        to: periodoBuscaMensagens.to,
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busca, periodoBuscaMensagens.from, periodoBuscaMensagens.to]);
+  const resultadosMensagens = buscarMensagens.data ?? [];
+  // Filtro de período — ficava dentro do dropdown "Filtros", agora é seu
+  // próprio botão ao lado, pra ficar mais visível/rápido de acessar.
+  const periodoLabel = useMemo(() => {
+    if (filtroPeriodo === "semana") return "Última semana";
+    if (filtroPeriodo === "mes") return "Último mês";
+    if (filtroPeriodo === "ano") return "Último ano";
+    if (filtroPeriodo === "personalizado") {
+      if (periodoCustom.from && periodoCustom.to)
+        return `${format(periodoCustom.from, "dd/MM/yy")} - ${format(periodoCustom.to, "dd/MM/yy")}`;
+      if (periodoCustom.from)
+        return `A partir de ${format(periodoCustom.from, "dd/MM/yy")}`;
+      return "Personalizado";
+    }
+    return;
+  }, [filtroPeriodo, periodoCustom]);
+  const periodoPopoverBody = (
+    <div className="flex flex-col gap-2 p-2 w-[280px]">
+      <div className="flex flex-col gap-0.5">
         {(
           [
             ["semana", "Última semana"],
@@ -3206,173 +3263,8 @@ export default function WhatsAppInbox() {
             {filtroPeriodo === val && <Check className="h-3.5 w-3.5" />}
           </button>
         ))}
-        {temInstanciaConhecida && (
-          <>
-            <div className="mx-3 my-1 border-t border-border/50" />
-            <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-              Instância
-            </p>
-            <button
-              type="button"
-              onClick={() => setFiltroInstancia("todos")}
-              className={cn(
-                "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                filtroInstancia === "todos" && "bg-primary/10 text-primary",
-              )}
-            >
-              Todas
-              {filtroInstancia === "todos" && (
-                <Check className="h-3.5 w-3.5" />
-              )}
-            </button>
-            {instancias.map((inst) => (
-              <button
-                key={inst.id}
-                type="button"
-                onClick={() => setFiltroInstancia(inst.id)}
-                className={cn(
-                  "flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                  filtroInstancia === inst.id && "bg-primary/10 text-primary",
-                )}
-              >
-                <span className="truncate text-xs">
-                  {inst.apelido || inst.instance_name}
-                </span>
-                {filtroInstancia === inst.id && (
-                  <Check className="h-3.5 w-3.5 shrink-0" />
-                )}
-              </button>
-            ))}
-          </>
-        )}
-        {vendedores.length > 0 && (
-          <>
-            <div className="mx-3 my-1 border-t border-border/50" />
-            <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-              Responsável
-            </p>
-            <Popover
-              open={filtroResponsavelOpenDesktop}
-              onOpenChange={(v) => {
-                setFiltroResponsavelOpenDesktop(v);
-                if (!v) setBuscaFiltroResponsavel("");
-              }}
-            >
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    "mx-1 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                    filtroResponsavel.length > 0 && "bg-primary/10 text-primary",
-                  )}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    {vendedoresResponsavelSelecionados.length === 1 ? (
-                      <>
-                        <Avatar className="h-5 w-5 shrink-0">
-                          {vendedoresResponsavelSelecionados[0].avatar_url ? (
-                            <img
-                              src={vendedoresResponsavelSelecionados[0].avatar_url}
-                              alt={vendedoresResponsavelSelecionados[0].nome}
-                              className="h-full w-full object-cover rounded-full"
-                            />
-                          ) : (
-                            <AvatarFallback className="text-[9px] bg-muted-foreground/20">
-                              {vendedoresResponsavelSelecionados[0].nome
-                                .trim()
-                                .split(" ")
-                                .map((p: string) => p[0])
-                                .slice(0, 2)
-                                .join("")
-                                .toUpperCase()}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <span className="truncate">
-                          {vendedoresResponsavelSelecionados[0].nome}
-                        </span>
-                      </>
-                    ) : vendedoresResponsavelSelecionados.length > 1 ? (
-                      <span className="truncate">
-                        {vendedoresResponsavelSelecionados.length} selecionados
-                      </span>
-                    ) : (
-                      <span>Todos</span>
-                    )}
-                  </span>
-                  {filtroResponsavelOpenDesktop ? (
-                    <ChevronUp className="h-3.5 w-3.5 shrink-0" />
-                  ) : (
-                    <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-                  )}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-56 p-0">
-                <Command shouldFilter={false}>
-                  <CommandInput
-                    placeholder="Buscar responsável..."
-                    value={buscaFiltroResponsavel}
-                    onValueChange={setBuscaFiltroResponsavel}
-                  />
-                  <CommandList>
-                    <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
-                      Nenhum usuário encontrado.
-                    </CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        value="todos"
-                        onSelect={() => {
-                          setFiltroResponsavel([]);
-                          setFiltroResponsavelOpenDesktop(false);
-                        }}
-                        className="gap-2.5"
-                      >
-                        <span className="flex-1">Todos</span>
-                        {filtroResponsavel.length === 0 && (
-                          <Check className="h-3.5 w-3.5 shrink-0" />
-                        )}
-                      </CommandItem>
-                      {vendedoresFiltroResponsavel.map((v) => (
-                        <CommandItem
-                          key={v.id}
-                          value={v.id}
-                          onSelect={() => toggleFiltroResponsavel(v.id)}
-                          className="gap-2.5"
-                        >
-                          <Avatar className="h-6 w-6 shrink-0">
-                            {v.avatar_url ? (
-                              <img
-                                src={v.avatar_url}
-                                alt={v.nome}
-                                className="h-full w-full object-cover rounded-full"
-                              />
-                            ) : (
-                              <AvatarFallback className="text-[9px] bg-muted-foreground/20">
-                                {v.nome
-                                  .trim()
-                                  .split(" ")
-                                  .map((p: string) => p[0])
-                                  .slice(0, 2)
-                                  .join("")
-                                  .toUpperCase()}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                          <span className="flex-1 truncate">{v.nome}</span>
-                          {filtroResponsavel.includes(v.id) && (
-                            <Check className="h-3.5 w-3.5 shrink-0" />
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </>
-        )}
       </div>
-      <div className="border-l border-border/50 p-2">
+      <div className="border-t border-border/50 pt-2">
         <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
           Personalizado
         </p>
@@ -3397,10 +3289,263 @@ export default function WhatsAppInbox() {
           className="pointer-events-auto"
         />
       </div>
+      {filtroPeriodo !== "todos" && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full gap-1.5 text-muted-foreground hover:text-destructive"
+          onClick={() => {
+            setFiltroPeriodo("todos");
+            setPeriodoCustom({});
+          }}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Limpar período
+        </Button>
+      )}
+    </div>
+  );
+  function renderPeriodoFilterButton(
+    open: boolean,
+    setOpen: (v: boolean) => void,
+    className?: string,
+    alwaysShowLabel = false,
+  ) {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn(
+              "h-10 shrink-0 max-w-[200px] items-center justify-center gap-1.5 px-3 font-normal",
+              filtroPeriodo !== "todos"
+                ? "border-primary/50 text-primary"
+                : "text-muted-foreground",
+              className,
+            )}
+          >
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+            {/* Na sidebar (288px abaixo do breakpoint lg) não cabe o rótulo do
+                período junto com "Filtros" e a lixeira sem estourar, então some
+                o texto e o botão vira um ícone puro (centralizado nos dois eixos
+                pelo flex do próprio Button). Onde há mais espaço (lista em
+                tabela) o rótulo fica sempre visível. */}
+            <span
+              className={cn(
+                "truncate",
+                !alwaysShowLabel && "hidden lg:inline",
+              )}
+            >
+              {periodoLabel}
+            </span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-0">
+          {periodoPopoverBody}
+        </PopoverContent>
+      </Popover>
+    );
+  }
+  // Conteúdo do dropdown "Filtros" — extraído pra ser reaproveitado tanto na
+  // sidebar (desktop) quanto na visualização em lista (MeusChatsList), que
+  // agora usa exatamente os mesmos filtros em vez de ser restrita a "atribuído
+  // a mim".
+  const filtrosDropdownContent = (
+    <div className="flex flex-col gap-0.5 w-44">
+      <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+        Conversa
+      </p>
+      {(
+        [
+          ["todos", "Todos"],
+          ["geral", "Não atribuído"],
+          ["meu", meuChatsLabel],
+        ] as const
+      ).map(([val, label]) => (
+        <button
+          key={val}
+          type="button"
+          onClick={() => setFiltroConversa(val)}
+          className={cn(
+            "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+            filtroConversa === val && "bg-primary/10 text-primary",
+          )}
+        >
+          {label}
+          {filtroConversa === val && <Check className="h-3.5 w-3.5" />}
+        </button>
+      ))}
+      {temInstanciaConhecida && (
+        <>
+          <div className="mx-3 my-1 border-t border-border/50" />
+          <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            Instância
+          </p>
+          <button
+            type="button"
+            onClick={() => setFiltroInstancia("todos")}
+            className={cn(
+              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+              filtroInstancia === "todos" && "bg-primary/10 text-primary",
+            )}
+          >
+            Todas
+            {filtroInstancia === "todos" && <Check className="h-3.5 w-3.5" />}
+          </button>
+          {instancias.map((inst) => (
+            <button
+              key={inst.id}
+              type="button"
+              onClick={() => setFiltroInstancia(inst.id)}
+              className={cn(
+                "flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                filtroInstancia === inst.id && "bg-primary/10 text-primary",
+              )}
+            >
+              <span className="truncate text-xs">
+                {inst.apelido || inst.instance_name}
+              </span>
+              {filtroInstancia === inst.id && (
+                <Check className="h-3.5 w-3.5 shrink-0" />
+              )}
+            </button>
+          ))}
+        </>
+      )}
+      {vendedores.length > 0 && (
+        <>
+          <div className="mx-3 my-1 border-t border-border/50" />
+          <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            Responsável
+          </p>
+          <Popover
+            open={filtroResponsavelOpenDesktop}
+            onOpenChange={(v) => {
+              setFiltroResponsavelOpenDesktop(v);
+              if (!v) setBuscaFiltroResponsavel("");
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "mx-1 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                  filtroResponsavel.length > 0 && "bg-primary/10 text-primary",
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  {vendedoresResponsavelSelecionados.length === 1 ? (
+                    <>
+                      <Avatar className="h-5 w-5 shrink-0">
+                        {vendedoresResponsavelSelecionados[0].avatar_url ? (
+                          <img
+                            src={
+                              vendedoresResponsavelSelecionados[0].avatar_url
+                            }
+                            alt={vendedoresResponsavelSelecionados[0].nome}
+                            className="h-full w-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <AvatarFallback className="text-[9px] bg-muted-foreground/20">
+                            {vendedoresResponsavelSelecionados[0].nome
+                              .trim()
+                              .split(" ")
+                              .map((p: string) => p[0])
+                              .slice(0, 2)
+                              .join("")
+                              .toUpperCase()}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <span className="truncate">
+                        {vendedoresResponsavelSelecionados[0].nome}
+                      </span>
+                    </>
+                  ) : vendedoresResponsavelSelecionados.length > 1 ? (
+                    <span className="truncate">
+                      {vendedoresResponsavelSelecionados.length} selecionados
+                    </span>
+                  ) : (
+                    <span>Todos</span>
+                  )}
+                </span>
+                {filtroResponsavelOpenDesktop ? (
+                  <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-56 p-0">
+              <Command shouldFilter={false}>
+                <CommandInput
+                  placeholder="Buscar responsável..."
+                  value={buscaFiltroResponsavel}
+                  onValueChange={setBuscaFiltroResponsavel}
+                />
+                <CommandList>
+                  <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                    Nenhum usuário encontrado.
+                  </CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="todos"
+                      onSelect={() => {
+                        setFiltroResponsavel([]);
+                        setFiltroResponsavelOpenDesktop(false);
+                      }}
+                      className="gap-2.5"
+                    >
+                      <span className="flex-1">Todos</span>
+                      {filtroResponsavel.length === 0 && (
+                        <Check className="h-3.5 w-3.5 shrink-0" />
+                      )}
+                    </CommandItem>
+                    {vendedoresFiltroResponsavel.map((v) => (
+                      <CommandItem
+                        key={v.id}
+                        value={v.id}
+                        onSelect={() => toggleFiltroResponsavel(v.id)}
+                        className="gap-2.5"
+                      >
+                        <Avatar className="h-6 w-6 shrink-0">
+                          {v.avatar_url ? (
+                            <img
+                              src={v.avatar_url}
+                              alt={v.nome}
+                              className="h-full w-full object-cover rounded-full"
+                            />
+                          ) : (
+                            <AvatarFallback className="text-[9px] bg-muted-foreground/20">
+                              {v.nome
+                                .trim()
+                                .split(" ")
+                                .map((p: string) => p[0])
+                                .slice(0, 2)
+                                .join("")
+                                .toUpperCase()}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <span className="flex-1 truncate">{v.nome}</span>
+                        {filtroResponsavel.includes(v.id) && (
+                          <Check className="h-3.5 w-3.5 shrink-0" />
+                        )}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </>
+      )}
     </div>
   );
   const [showConfig, setShowConfig] = useState(false);
-  const [showBuscaMensagens, setShowBuscaMensagens] = useState(false);
   const [showNovaConversa, setShowNovaConversa] = useState(false);
   const [showCriarGrupo, setShowCriarGrupo] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -3416,8 +3561,13 @@ export default function WhatsAppInbox() {
     file: File;
     previewUrl: string;
   } | null>(null);
-  const [viewingImage, setViewingImage] = useState<string | null>(null);
-  const [previewFile, setPreviewFile] = useState<FilePreviewTarget | null>(null);
+  const [viewingImage, setViewingImage] = useState<{
+    url: string;
+    msgId?: string;
+  } | null>(null);
+  const [previewFile, setPreviewFile] = useState<FilePreviewTarget | null>(
+    null,
+  );
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -3452,7 +3602,7 @@ export default function WhatsAppInbox() {
         viewport.scrollTop = viewport.scrollHeight;
       }
     }
-  }, [mensagens.length]);
+  }, [mensagens.length, atribuicaoModalOpen]);
 
   const scrollToBottom = () => {
     const viewport = msgScrollRef.current?.closest(
@@ -3636,11 +3786,13 @@ export default function WhatsAppInbox() {
       const inst = instancias.find((i) => i.id === filtroInstancia);
       if (!inst) return null;
       return {
-        grupos: [{
-          key: inst.id,
-          label: inst.apelido || inst.instance_name,
-          conversas: conversasFiltradas,
-        }],
+        grupos: [
+          {
+            key: inst.id,
+            label: inst.apelido || inst.instance_name,
+            conversas: conversasFiltradas,
+          },
+        ],
         avulsas: [] as WaConversa[],
       };
     }
@@ -3650,14 +3802,16 @@ export default function WhatsAppInbox() {
     const avulsas: WaConversa[] = [];
     for (const c of conversasFiltradas) {
       if (c.instancia_id && idsConhecidos.has(c.instancia_id)) {
-        if (!porInstancia.has(c.instancia_id)) porInstancia.set(c.instancia_id, []);
+        if (!porInstancia.has(c.instancia_id))
+          porInstancia.set(c.instancia_id, []);
         porInstancia.get(c.instancia_id)!.push(c);
       } else {
         avulsas.push(c);
       }
     }
 
-    const grupos: { key: string; label: string; conversas: WaConversa[] }[] = [];
+    const grupos: { key: string; label: string; conversas: WaConversa[] }[] =
+      [];
     for (const inst of instancias) {
       const conversasDaInstancia = porInstancia.get(inst.id);
       if (conversasDaInstancia?.length) {
@@ -3723,7 +3877,12 @@ export default function WhatsAppInbox() {
     }
 
     if (naoAtribuidos.length)
-      grupos.push({ key: "nao-atribuidos", label: "Não atribuídos", icon: UserX, conversas: naoAtribuidos });
+      grupos.push({
+        key: "nao-atribuidos",
+        label: "Não atribuídos",
+        icon: UserX,
+        conversas: naoAtribuidos,
+      });
     if (meus.length)
       grupos.push({
         key: "meus",
@@ -3732,7 +3891,12 @@ export default function WhatsAppInbox() {
         conversas: meus,
       });
     if (outros.length)
-      grupos.push({ key: "outros", label: "Outros atendentes", icon: Users, conversas: outros });
+      grupos.push({
+        key: "outros",
+        label: "Outros atendentes",
+        icon: Users,
+        conversas: outros,
+      });
 
     if (grupos.length === 0) return null;
     return grupos;
@@ -3840,7 +4004,8 @@ export default function WhatsAppInbox() {
   // individual usa o nome do contato/o próprio usuário; em grupo usa o remetente
   // real dentro do grupo (msg.remetente_nome), igual ao que já aparece na bolha.
   function quotedNomeFor(msg: WaMensagem): string | null {
-    if (msg.direcao === "saida") return msg.usuario?.nome ?? profile?.nome ?? null;
+    if (msg.direcao === "saida")
+      return msg.usuario?.nome ?? profile?.nome ?? null;
     return msg.remetente_nome ?? conversaAtiva?.nome_contato ?? null;
   }
 
@@ -4080,6 +4245,71 @@ export default function WhatsAppInbox() {
     );
   }
 
+  // Resultados da busca por conteúdo de mensagem (todo o histórico), exibidos
+  // abaixo da lista de conversas quando a barra de busca da sidebar tem texto.
+  function renderResultadosMensagens() {
+    const termo = busca.trim();
+    if (termo.length < 2) return null;
+    return (
+      <div className="border-t border-border/60 mt-1 pt-1">
+        <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+          Mensagens
+        </p>
+        {buscarMensagens.isPending ? (
+          <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Buscando mensagens...
+          </div>
+        ) : resultadosMensagens.length === 0 ? (
+          <p className="px-2 py-3 text-xs text-muted-foreground">
+            Nenhuma mensagem encontrada.
+          </p>
+        ) : (
+          resultadosMensagens.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => selecionarResultadoBusca(r)}
+              className="w-full text-left flex items-start gap-2.5 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              <Avatar className="h-8 w-8 shrink-0 mt-0.5 border border-primary/10">
+                {r.conversa?.foto_perfil_url && (
+                  <AvatarImage src={r.conversa.foto_perfil_url} alt="" />
+                )}
+                <AvatarFallback
+                  className={cn(
+                    colorForPhone(r.conversa?.telefone ?? ""),
+                    "text-white text-xs",
+                  )}
+                >
+                  {initials(
+                    r.conversa?.nome_contato ?? null,
+                    r.conversa?.telefone ?? "",
+                  )}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium truncate">
+                    {r.conversa?.nome_contato ||
+                      formatPhone(r.conversa?.telefone ?? "")}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {format(new Date(r.created_at), "dd/MM/yy HH:mm")}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {r.direcao === "saida" ? "Você: " : ""}
+                  {r.conteudo}
+                </p>
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+    );
+  }
+
   const isConnected = config?.status === "connected";
   const isBusy = sendMessage.isPending || isUploading;
 
@@ -4128,754 +4358,244 @@ export default function WhatsAppInbox() {
           countAbertas={countAbertas}
           countFechadas={countFechadas}
           filtrosDropdownContent={filtrosDropdownContent}
+          periodoFilterButton={renderPeriodoFilterButton(
+            periodoFiltroOpenLista,
+            setPeriodoFiltroOpenLista,
+            undefined,
+            true,
+          )}
           hasFiltros={hasFiltrosConversa}
           activeFiltrosCount={activeFiltrosConversaCount}
           onLimparFiltros={limparFiltrosConversa}
         />
       ) : (
-      <div className="flex h-full">
-        {/* Sidebar de conversas */}
-        {/* Em telas pequenas escondemos a sidebar fixa e usamos um Dialog móvel */}
-        {sidebarCollapsed ? (
-          <div className="hidden md:flex w-12 border-r border-border flex flex-col h-full shrink-0 items-center gap-1 transition-all duration-300">
-            <div className="relative mt-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                    title="Criar"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem
-                    className="gap-2"
-                    onClick={() => setShowNovaConversa(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Nova conversa
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="gap-2"
-                    onClick={() => setShowCriarGrupo(true)}
-                  >
-                    <Users className="h-4 w-4" />
-                    Novo grupo
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <ScrollArea className="flex-1 w-full pt-2">
-              <div className="flex flex-col items-center gap-2 px-1">
-                {conversasFiltradas.map((conv) => (
-                  <div key={conv.id} className="relative">
-                    <button
-                      onClick={() => setConversaAtivaId(conv.id)}
-                      className={cn(
-                        "p-1 rounded-lg transition-colors",
-                        conversaAtiva?.id === conv.id
-                          ? "bg-primary/10"
-                          : "hover:bg-muted/50",
-                      )}
-                      title={conv.nome_contato ?? formatPhone(conv.telefone)}
+        <div className="flex h-full">
+          {/* Sidebar de conversas */}
+          {/* Em telas pequenas escondemos a sidebar fixa e usamos um Dialog móvel */}
+          {sidebarCollapsed ? (
+            <div className="hidden md:flex w-12 border-r border-border flex flex-col h-full shrink-0 items-center gap-1 transition-all duration-300">
+              <div className="relative mt-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      title="Criar"
                     >
-                      <Avatar className="h-7 w-7 border border-primary/10">
-                        {conv.foto_perfil_url && (
-                          <AvatarImage src={conv.foto_perfil_url} alt="" />
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onClick={() => setShowNovaConversa(true)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Nova conversa
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="gap-2"
+                      onClick={() => setShowCriarGrupo(true)}
+                    >
+                      <Users className="h-4 w-4" />
+                      Novo grupo
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <ScrollArea className="flex-1 w-full pt-2">
+                <div className="flex flex-col items-center gap-2 px-1">
+                  {conversasFiltradas.map((conv) => (
+                    <div key={conv.id} className="relative">
+                      <button
+                        onClick={() => setConversaAtivaId(conv.id)}
+                        className={cn(
+                          "p-1 rounded-lg transition-colors",
+                          conversaAtiva?.id === conv.id
+                            ? "bg-primary/10"
+                            : "hover:bg-muted/50",
                         )}
-                        <AvatarFallback
-                          className={cn(
-                            colorForPhone(conv.telefone),
-                            "text-white text-[8px] font-semibold",
+                        title={conv.nome_contato ?? formatPhone(conv.telefone)}
+                      >
+                        <Avatar className="h-7 w-7 border border-primary/10">
+                          {conv.foto_perfil_url && (
+                            <AvatarImage src={conv.foto_perfil_url} alt="" />
                           )}
-                        >
-                          {initials(conv.nome_contato, conv.telefone)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </button>
-                    {conv.nao_lidas > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
-                        {conv.nao_lidas > 9 ? "9+" : conv.nao_lidas}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-            <div className="mt-auto border-t border-border w-full flex justify-center py-2 h-[4rem] items-center bg-muted/30">
-              <button
-                onClick={() => setSidebarCollapsed(false)}
-                className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                title="Expandir conversas"
-              >
-                <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="hidden md:flex w-72 lg:w-80 border-r border-border flex-col h-full shrink-0 transition-all duration-300">
-            <div className="px-3 py-3 border-b border-border flex items-center gap-1 h-[4rem]">
-              <span className="text-sm font-semibold text-foreground flex-1 truncate">
-                Conversas
-              </span>
-              {config && !modoSelecao && (
-                <span
-                  className={cn(
-                    "flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
-                    isConnected
-                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-                  )}
+                          <AvatarFallback
+                            className={cn(
+                              colorForPhone(conv.telefone),
+                              "text-white text-[8px] font-semibold",
+                            )}
+                          >
+                            {initials(conv.nome_contato, conv.telefone)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
+                      {conv.nao_lidas > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
+                          {conv.nao_lidas > 9 ? "9+" : conv.nao_lidas}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+              <div className="mt-auto border-t border-border w-full flex justify-center py-2 h-[4rem] items-center bg-muted/30">
+                <button
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                  title="Expandir conversas"
                 >
-                  {isConnected ? (
-                    <Wifi className="h-2.5 w-2.5" />
-                  ) : (
-                    <WifiOff className="h-2.5 w-2.5" />
-                  )}
-                  {isConnected ? "Online" : "Offline"}
+                  <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="hidden md:flex w-72 lg:w-80 border-r border-border flex-col h-full shrink-0 transition-all duration-300">
+              <div className="px-3 py-3 border-b border-border flex items-center gap-1 h-[4rem]">
+                <span className="text-sm font-semibold text-foreground flex-1 truncate">
+                  Conversas
                 </span>
-              )}
-              {!modoSelecao ? (
-                <>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 shrink-0 gap-1 text-muted-foreground hover:text-foreground"
-                        title="Criar"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Criar
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuItem
-                        className="gap-2"
-                        onClick={() => setShowNovaConversa(true)}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Nova conversa
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="gap-2"
-                        onClick={() => setShowCriarGrupo(true)}
-                      >
-                        <Users className="h-4 w-4" />
-                        Novo grupo
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowBuscaMensagens(true)}
-                    title="Buscar mensagens por período"
-                  >
-                    <CalendarSearch className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => setModoSelecao(true)}
-                    title="Selecionar conversas"
-                  >
-                    <CheckSquare className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => navigate("/configuracoes?tab=whatsapp")}
-                    title="Configurações"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </>
-              ) : (
-                <button
-                  onClick={sairModoSelecao}
-                  className="text-[11px] text-primary font-medium hover:underline shrink-0"
-                >
-                  Cancelar
-                </button>
-              )}
-            </div>
-
-            <div className="px-2 pt-2 border-b border-border bg-background space-y-2">
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setFiltroStatus("aberto")}
+                {config && !modoSelecao && (
+                  <span
                     className={cn(
-                      "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1.5 transition-colors",
-                      filtroStatus === "aberto"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
+                      "flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
+                      isConnected
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
                     )}
                   >
-                    Em aberto
-                    <span
-                      className={cn(
-                        "text-[9px] px-1 rounded-full font-semibold",
-                        filtroStatus === "aberto"
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted-foreground/10",
-                      )}
-                    >
-                      {countAbertas}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFiltroStatus("fechado")}
-                    className={cn(
-                      "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1.5 transition-colors",
-                      filtroStatus === "fechado"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
+                    {isConnected ? (
+                      <Wifi className="h-2.5 w-2.5" />
+                    ) : (
+                      <WifiOff className="h-2.5 w-2.5" />
                     )}
-                  >
-                    Fechado
-                    <span
-                      className={cn(
-                        "text-[9px] px-1 rounded-full font-semibold",
-                        filtroStatus === "fechado"
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted-foreground/10",
-                      )}
-                    >
-                      {countFechadas}
-                    </span>
-                  </button>
-                </div>
-                <div className="flex items-center gap-1.5">
-                <FilterButton
-                  hasFilters={hasFiltrosConversa}
-                  activeFilterCount={activeFiltrosConversaCount}
-                  className="flex-1 min-w-0"
-                  align="start"
-                  popoverClassName="w-auto"
-                >
-                  {filtrosDropdownContent}
-                </FilterButton>
-                {hasFiltrosConversa && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-10 shrink-0 gap-1.5 px-2.5 text-muted-foreground hover:text-destructive"
-                    onClick={limparFiltrosConversa}
-                    title="Limpar filtros"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-                </div>
-              </div>
-              <div className="relative pb-2">
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:ring-1"
-                  placeholder="Buscar por nome, telefone ou mensagem..."
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {modoSelecao && conversasFiltradas.length > 0 && (
-              <div className="px-3 py-1.5 border-b border-border flex items-center gap-2 bg-muted/30">
-                <button
-                  onClick={toggleTodas}
-                  className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <div
-                    className={cn(
-                      "h-4 w-4 rounded border flex items-center justify-center transition-colors",
-                      selecionadas.size === conversasFiltradas.length
-                        ? "bg-primary border-primary"
-                        : "border-border bg-background",
-                    )}
-                  >
-                    {selecionadas.size === conversasFiltradas.length && (
-                      <Check className="h-2.5 w-2.5 text-primary-foreground" />
-                    )}
-                  </div>
-                  {selecionadas.size === conversasFiltradas.length
-                    ? "Desmarcar todas"
-                    : "Selecionar todas"}
-                </button>
-                {selecionadas.size > 0 && (
-                  <span className="ml-auto text-[11px] font-medium text-primary">
-                    {selecionadas.size} selecionada
-                    {selecionadas.size > 1 ? "s" : ""}
+                    {isConnected ? "Online" : "Offline"}
                   </span>
                 )}
-              </div>
-            )}
-
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-0.5 w-full">
-                {loadingConversas ? (
-                  <div className="flex items-center justify-center py-8 text-muted-foreground text-sm gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Carregando...
-                  </div>
-                ) : conversasFiltradas.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm gap-2 px-4 text-center">
-                    <MessageCircle className="h-8 w-8 opacity-30" />
-                    {busca
-                      ? "Nenhuma conversa encontrada"
-                      : "Nenhuma conversa ainda"}
-                  </div>
-                ) : (
-                  renderConvList((conv) =>
-                    modoSelecao
-                      ? toggleSelecao(conv.id)
-                      : setConversaAtivaId(conv.id),
-                  )
-                )}
-              </div>
-            </ScrollArea>
-            <div className="border-t border-border px-3 py-2 mt-auto bg-muted/30 h-[4rem] flex items-center">
-              {modoSelecao ? (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="w-full gap-2"
-                  disabled={selecionadas.size === 0 || deletarEmMassa.isPending}
-                  onClick={() => setConfirmDeletarMassa(true)}
-                >
-                  {deletarEmMassa.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                  Excluir{" "}
-                  {selecionadas.size > 0
-                    ? `(${selecionadas.size})`
-                    : "selecionadas"}
-                </Button>
-              ) : (
-                <div className="flex items-center gap-1 w-full">
-                  <button
-                    onClick={() => setSidebarCollapsed(true)}
-                    className="flex items-center gap-2 flex-1 p-1.5 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground"
-                    title="Recolher conversas"
-                  >
-                    <PanelLeftClose className="h-4 w-4" />
-                    <span className="text-[10px]">Recolher</span>
-                  </button>
-                  <button
-                    onClick={() =>
-                      setAbaInbox(
-                        abaInbox === "meus-chats" ? "conversas" : "meus-chats",
-                      )
-                    }
-                    className={cn(
-                      "flex items-center gap-2 flex-1 p-1.5 rounded-lg transition-colors",
-                      abaInbox === "meus-chats"
-                        ? "bg-primary/10 text-primary"
-                        : "hover:bg-muted/50 text-muted-foreground",
-                    )}
-                    title="Lista"
-                  >
-                    <List className="h-4 w-4" />
-                    <span className="text-[10px]">Lista</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Mobile: Dialog com lista de conversas (full screen) */}
-        <Dialog
-          open={showMobileSidebar}
-          onOpenChange={() => setShowMobileSidebar(false)}
-        >
-          <DialogContent className="p-0 w-full max-w-full h-full m-0 md:hidden">
-            <div className="w-full h-full flex flex-col bg-background">
-              <div className="px-4 py-3 border-b border-border flex items-center h-[4rem]">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 flex-1">
-                  <MessageCircle className="h-4 w-4 text-green-600" />
-                  Conversas
-                </h2>
                 {!modoSelecao ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => setModoSelecao(true)}
-                    title="Selecionar conversas"
-                  >
-                    <CheckSquare className="h-4 w-4" />
-                  </Button>
+                  <>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 shrink-0 gap-1 text-muted-foreground hover:text-foreground"
+                          title="Criar"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Criar
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem
+                          className="gap-2"
+                          onClick={() => setShowNovaConversa(true)}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Nova conversa
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="gap-2"
+                          onClick={() => setShowCriarGrupo(true)}
+                        >
+                          <Users className="h-4 w-4" />
+                          Novo grupo
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => setModoSelecao(true)}
+                      title="Selecionar conversas"
+                    >
+                      <CheckSquare className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => navigate("/configuracoes?tab=whatsapp")}
+                      title="Configurações"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </>
                 ) : (
                   <button
                     onClick={sairModoSelecao}
-                    className="text-[11px] text-primary font-medium hover:underline"
+                    className="text-[11px] text-primary font-medium hover:underline shrink-0"
                   >
                     Cancelar
                   </button>
                 )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground ml-1"
-                  onClick={() => setShowMobileSidebar(false)}
-                  title="Fechar"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
               </div>
 
               <div className="px-2 pt-2 border-b border-border bg-background space-y-2">
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 flex-1">
-                      <button
-                        type="button"
-                        onClick={() => setFiltroStatus("aberto")}
+                  <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setFiltroStatus("aberto")}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded-md py-1.5 transition-colors",
+                        filtroStatus === "aberto"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      Em aberto
+                      <span
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
+                          "text-[9px] px-1 rounded-full font-semibold",
                           filtroStatus === "aberto"
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground",
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted-foreground/10",
                         )}
                       >
-                        Em aberto
-                        <span
-                          className={cn(
-                            "text-[9px] px-1 rounded-full font-semibold",
-                            filtroStatus === "aberto"
-                              ? "bg-primary/10 text-primary"
-                              : "bg-muted-foreground/10",
-                          )}
-                        >
-                          {countAbertas}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFiltroStatus("fechado")}
+                        {countAbertas}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFiltroStatus("fechado")}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded-md py-1.5 transition-colors",
+                        filtroStatus === "fechado"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      Fechado
+                      <span
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
+                          "text-[9px] px-1 rounded-full font-semibold",
                           filtroStatus === "fechado"
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground",
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted-foreground/10",
                         )}
                       >
-                        Fechado
-                        <span
-                          className={cn(
-                            "text-[9px] px-1 rounded-full font-semibold",
-                            filtroStatus === "fechado"
-                              ? "bg-primary/10 text-primary"
-                              : "bg-muted-foreground/10",
-                          )}
-                        >
-                          {countFechadas}
-                        </span>
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-1.5">
+                        {countFechadas}
+                      </span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <FilterButton
                       hasFilters={hasFiltrosConversa}
                       activeFilterCount={activeFiltrosConversaCount}
-                      className="flex-1 min-w-0"
-                      align="end"
+                      className="flex-1"
+                      align="start"
                       popoverClassName="w-auto"
                     >
-                      <div className="flex">
-                        <div className="flex flex-col gap-0.5 w-44">
-                          <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                            Visualizar
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setAbaInbox(
-                                abaInbox === "meus-chats"
-                                  ? "conversas"
-                                  : "meus-chats",
-                              )
-                            }
-                            className={cn(
-                              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                              abaInbox === "meus-chats" &&
-                                "bg-primary/10 text-primary",
-                            )}
-                          >
-                            <span className="flex items-center gap-2">
-                              <List className="h-3.5 w-3.5" />
-                              Lista
-                            </span>
-                            {abaInbox === "meus-chats" && (
-                              <Check className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                          <div className="mx-3 my-1 border-t border-border/50" />
-                          <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                            Conversa
-                          </p>
-                          {(
-                            [
-                              ["todos", "Todos"],
-                              ["geral", "Não atribuído"],
-                              ["meu", meuChatsLabel],
-                            ] as const
-                          ).map(([val, label]) => (
-                            <button
-                              key={val}
-                              type="button"
-                              onClick={() => setFiltroConversa(val)}
-                              className={cn(
-                                "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                                filtroConversa === val &&
-                                  "bg-primary/10 text-primary",
-                              )}
-                            >
-                              {label}
-                              {filtroConversa === val && (
-                                <Check className="h-3.5 w-3.5" />
-                              )}
-                            </button>
-                          ))}
-                          <div className="mx-3 my-1 border-t border-border/50" />
-                          <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                            Período
-                          </p>
-                          {(
-                            [
-                              ["semana", "Última semana"],
-                              ["mes", "Último mês"],
-                              ["ano", "Último ano"],
-                            ] as const
-                          ).map(([val, label]) => (
-                            <button
-                              key={val}
-                              type="button"
-                              onClick={() =>
-                                setFiltroPeriodo(
-                                  filtroPeriodo === val ? "todos" : val,
-                                )
-                              }
-                              className={cn(
-                                "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                                filtroPeriodo === val &&
-                                  "bg-primary/10 text-primary",
-                              )}
-                            >
-                              {label}
-                              {filtroPeriodo === val && (
-                                <Check className="h-3.5 w-3.5" />
-                              )}
-                            </button>
-                          ))}
-                          {temInstanciaConhecida && (
-                            <>
-                              <div className="mx-3 my-1 border-t border-border/50" />
-                              <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                                Instância
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() => setFiltroInstancia("todos")}
-                                className={cn(
-                                  "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                                  filtroInstancia === "todos" &&
-                                    "bg-primary/10 text-primary",
-                                )}
-                              >
-                                Todas
-                                {filtroInstancia === "todos" && (
-                                  <Check className="h-3.5 w-3.5" />
-                                )}
-                              </button>
-                              {instancias.map((inst) => (
-                                <button
-                                  key={inst.id}
-                                  type="button"
-                                  onClick={() => setFiltroInstancia(inst.id)}
-                                  className={cn(
-                                    "flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                                    filtroInstancia === inst.id &&
-                                      "bg-primary/10 text-primary",
-                                  )}
-                                >
-                                  <span className="truncate font-mono text-xs">
-                                    {inst.instance_name}
-                                  </span>
-                                  {filtroInstancia === inst.id && (
-                                    <Check className="h-3.5 w-3.5 shrink-0" />
-                                  )}
-                                </button>
-                              ))}
-                            </>
-                          )}
-                          {vendedores.length > 0 && (
-                            <>
-                              <div className="mx-3 my-1 border-t border-border/50" />
-                              <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                                Responsável
-                              </p>
-                              <Popover
-                                open={filtroResponsavelOpenMobile}
-                                onOpenChange={(v) => {
-                                  setFiltroResponsavelOpenMobile(v);
-                                  if (!v) setBuscaFiltroResponsavel("");
-                                }}
-                              >
-                                <PopoverTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className={cn(
-                                      "mx-1 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                                      filtroResponsavel.length > 0 &&
-                                        "bg-primary/10 text-primary",
-                                    )}
-                                  >
-                                    <span className="flex min-w-0 items-center gap-2">
-                                      {vendedoresResponsavelSelecionados.length === 1 ? (
-                                        <>
-                                          <Avatar className="h-5 w-5 shrink-0">
-                                            {vendedoresResponsavelSelecionados[0].avatar_url ? (
-                                              <img
-                                                src={vendedoresResponsavelSelecionados[0].avatar_url}
-                                                alt={vendedoresResponsavelSelecionados[0].nome}
-                                                className="h-full w-full object-cover rounded-full"
-                                              />
-                                            ) : (
-                                              <AvatarFallback className="text-[9px] bg-muted-foreground/20">
-                                                {vendedoresResponsavelSelecionados[0].nome
-                                                  .trim()
-                                                  .split(" ")
-                                                  .map((p: string) => p[0])
-                                                  .slice(0, 2)
-                                                  .join("")
-                                                  .toUpperCase()}
-                                              </AvatarFallback>
-                                            )}
-                                          </Avatar>
-                                          <span className="truncate">
-                                            {vendedoresResponsavelSelecionados[0].nome}
-                                          </span>
-                                        </>
-                                      ) : vendedoresResponsavelSelecionados.length > 1 ? (
-                                        <span className="truncate">
-                                          {vendedoresResponsavelSelecionados.length} selecionados
-                                        </span>
-                                      ) : (
-                                        <span>Todos</span>
-                                      )}
-                                    </span>
-                                    {filtroResponsavelOpenMobile ? (
-                                      <ChevronUp className="h-3.5 w-3.5 shrink-0" />
-                                    ) : (
-                                      <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-                                    )}
-                                  </button>
-                                </PopoverTrigger>
-                                <PopoverContent align="start" className="w-56 p-0">
-                                  <Command shouldFilter={false}>
-                                    <CommandInput
-                                      placeholder="Buscar responsável..."
-                                      value={buscaFiltroResponsavel}
-                                      onValueChange={setBuscaFiltroResponsavel}
-                                    />
-                                    <CommandList>
-                                      <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
-                                        Nenhum usuário encontrado.
-                                      </CommandEmpty>
-                                      <CommandGroup>
-                                        <CommandItem
-                                          value="todos"
-                                          onSelect={() => {
-                                            setFiltroResponsavel([]);
-                                            setFiltroResponsavelOpenMobile(false);
-                                          }}
-                                          className="gap-2.5"
-                                        >
-                                          <span className="flex-1">Todos</span>
-                                          {filtroResponsavel.length === 0 && (
-                                            <Check className="h-3.5 w-3.5 shrink-0" />
-                                          )}
-                                        </CommandItem>
-                                        {vendedoresFiltroResponsavel.map((v) => (
-                                          <CommandItem
-                                            key={v.id}
-                                            value={v.id}
-                                            onSelect={() => toggleFiltroResponsavel(v.id)}
-                                            className="gap-2.5"
-                                          >
-                                            <Avatar className="h-6 w-6 shrink-0">
-                                              {v.avatar_url ? (
-                                                <img
-                                                  src={v.avatar_url}
-                                                  alt={v.nome}
-                                                  className="h-full w-full object-cover rounded-full"
-                                                />
-                                              ) : (
-                                                <AvatarFallback className="text-[9px] bg-muted-foreground/20">
-                                                  {v.nome
-                                                    .trim()
-                                                    .split(" ")
-                                                    .map((p: string) => p[0])
-                                                    .slice(0, 2)
-                                                    .join("")
-                                                    .toUpperCase()}
-                                                </AvatarFallback>
-                                              )}
-                                            </Avatar>
-                                            <span className="flex-1 truncate">{v.nome}</span>
-                                            {filtroResponsavel.includes(v.id) && (
-                                              <Check className="h-3.5 w-3.5 shrink-0" />
-                                            )}
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
-                            </>
-                          )}
-                        </div>
-                        <div className="border-l border-border/50 p-2">
-                          <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                            Personalizado
-                          </p>
-                          <Calendar
-                            mode="range"
-                            selected={{
-                              from: periodoCustom.from,
-                              to: periodoCustom.to,
-                            }}
-                            onSelect={(range) => {
-                              setPeriodoCustom({
-                                from: range?.from,
-                                to: range?.to,
-                              });
-                              setFiltroPeriodo("personalizado");
-                            }}
-                            numberOfMonths={1}
-                            locale={ptBR}
-                            captionLayout="dropdown-buttons"
-                            fromYear={1950}
-                            toYear={new Date().getFullYear()}
-                            className="pointer-events-auto"
-                          />
-                        </div>
-                      </div>
+                      {filtrosDropdownContent}
                     </FilterButton>
+                    {renderPeriodoFilterButton(
+                      periodoFiltroOpenDesktop,
+                      setPeriodoFiltroOpenDesktop,
+                    )}
                     {hasFiltrosConversa && (
                       <Button
                         type="button"
@@ -4885,10 +4605,10 @@ export default function WhatsAppInbox() {
                         onClick={limparFiltrosConversa}
                         title="Limpar filtros"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <FilterX className="h-3.5 w-3.5" />
+                        <span className="hidden lg:inline">Limpar</span>
                       </Button>
                     )}
-                    </div>
                   </div>
                 </div>
                 <div className="relative pb-2">
@@ -4941,27 +4661,24 @@ export default function WhatsAppInbox() {
                       Carregando...
                     </div>
                   ) : conversasFiltradas.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm gap-2 px-4 text-center">
-                      <MessageCircle className="h-8 w-8 opacity-30" />
-                      {busca
-                        ? "Nenhuma conversa encontrada"
-                        : "Nenhuma conversa ainda"}
-                    </div>
+                    busca.trim().length >= 2 ? null : (
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm gap-2 px-4 text-center">
+                        <MessageCircle className="h-8 w-8 opacity-30" />
+                        Nenhuma conversa ainda
+                      </div>
+                    )
                   ) : (
-                    renderConvList((conv) => {
-                      if (modoSelecao) {
-                        toggleSelecao(conv.id);
-                      } else {
-                        setConversaAtivaId(conv.id);
-                        setShowMobileSidebar(false);
-                      }
-                    })
+                    renderConvList((conv) =>
+                      modoSelecao
+                        ? toggleSelecao(conv.id)
+                        : setConversaAtivaId(conv.id),
+                    )
                   )}
+                  {!modoSelecao && renderResultadosMensagens()}
                 </div>
               </ScrollArea>
-
-              {modoSelecao && (
-                <div className="border-t border-border px-3 py-2 bg-muted/30">
+              <div className="border-t border-border px-3 py-2 mt-auto bg-muted/30 h-[4rem] flex items-center">
+                {modoSelecao ? (
                   <Button
                     variant="destructive"
                     size="sm"
@@ -4981,44 +4698,546 @@ export default function WhatsAppInbox() {
                       ? `(${selecionadas.size})`
                       : "selecionadas"}
                   </Button>
-                </div>
-              )}
+                ) : (
+                  <div className="flex items-center gap-1 w-full">
+                    <button
+                      onClick={() => setSidebarCollapsed(true)}
+                      className="flex items-center gap-2 flex-1 p-1.5 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground"
+                      title="Recolher conversas"
+                    >
+                      <PanelLeftClose className="h-4 w-4" />
+                      <span className="text-xs">Recolher</span>
+                    </button>
+                    <button
+                      onClick={() =>
+                        setAbaInbox(
+                          abaInbox === "meus-chats"
+                            ? "conversas"
+                            : "meus-chats",
+                        )
+                      }
+                      className={cn(
+                        "flex items-center gap-2 flex-1 p-1.5 rounded-lg transition-colors",
+                        abaInbox === "meus-chats"
+                          ? "bg-primary/10 text-primary"
+                          : "hover:bg-muted/50 text-muted-foreground",
+                      )}
+                      title="Lista"
+                    >
+                      <List className="h-4 w-4" />
+                      <span className="text-xs">Lista</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          )}
 
-        {/* Área de mensagens */}
-        <div className="flex-1 flex flex-col min-w-0 relative">
-          {conversaAtiva ? (
-            <>
-              {/* Modal de atribuição: cobre só o painel da conversa (não a página
+          {/* Mobile: Dialog com lista de conversas (full screen) */}
+          <Dialog
+            open={showMobileSidebar}
+            onOpenChange={() => setShowMobileSidebar(false)}
+          >
+            <DialogContent className="p-0 w-full max-w-full h-full m-0 md:hidden">
+              <div className="w-full h-full flex flex-col bg-background">
+                <div className="px-4 py-3 border-b border-border flex items-center h-[4rem]">
+                  <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 flex-1">
+                    <MessageCircle className="h-4 w-4 text-green-600" />
+                    Conversas
+                  </h2>
+                  {!modoSelecao ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => setModoSelecao(true)}
+                      title="Selecionar conversas"
+                    >
+                      <CheckSquare className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <button
+                      onClick={sairModoSelecao}
+                      className="text-[11px] text-primary font-medium hover:underline"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground ml-1"
+                    onClick={() => setShowMobileSidebar(false)}
+                    title="Fechar"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="px-2 pt-2 border-b border-border bg-background space-y-2">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setFiltroStatus("aberto")}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
+                            filtroStatus === "aberto"
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          Em aberto
+                          <span
+                            className={cn(
+                              "text-[9px] px-1 rounded-full font-semibold",
+                              filtroStatus === "aberto"
+                                ? "bg-primary/10 text-primary"
+                                : "bg-muted-foreground/10",
+                            )}
+                          >
+                            {countAbertas}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFiltroStatus("fechado")}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
+                            filtroStatus === "fechado"
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          Fechado
+                          <span
+                            className={cn(
+                              "text-[9px] px-1 rounded-full font-semibold",
+                              filtroStatus === "fechado"
+                                ? "bg-primary/10 text-primary"
+                                : "bg-muted-foreground/10",
+                            )}
+                          >
+                            {countFechadas}
+                          </span>
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <FilterButton
+                          hasFilters={hasFiltrosConversa}
+                          activeFilterCount={activeFiltrosConversaCount}
+                          className="flex-1"
+                          align="end"
+                          popoverClassName="w-auto"
+                        >
+                          <div className="flex flex-col gap-0.5 w-44">
+                            <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                              Visualizar
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAbaInbox(
+                                  abaInbox === "meus-chats"
+                                    ? "conversas"
+                                    : "meus-chats",
+                                )
+                              }
+                              className={cn(
+                                "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                abaInbox === "meus-chats" &&
+                                  "bg-primary/10 text-primary",
+                              )}
+                            >
+                              <span className="flex items-center gap-2">
+                                <List className="h-3.5 w-3.5" />
+                                Lista
+                              </span>
+                              {abaInbox === "meus-chats" && (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                            <div className="mx-3 my-1 border-t border-border/50" />
+                            <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                              Conversa
+                            </p>
+                            {(
+                              [
+                                ["todos", "Todos"],
+                                ["geral", "Não atribuído"],
+                                ["meu", meuChatsLabel],
+                              ] as const
+                            ).map(([val, label]) => (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => setFiltroConversa(val)}
+                                className={cn(
+                                  "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                  filtroConversa === val &&
+                                    "bg-primary/10 text-primary",
+                                )}
+                              >
+                                {label}
+                                {filtroConversa === val && (
+                                  <Check className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            ))}
+                            {temInstanciaConhecida && (
+                              <>
+                                <div className="mx-3 my-1 border-t border-border/50" />
+                                <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                  Instância
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => setFiltroInstancia("todos")}
+                                  className={cn(
+                                    "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                    filtroInstancia === "todos" &&
+                                      "bg-primary/10 text-primary",
+                                  )}
+                                >
+                                  Todas
+                                  {filtroInstancia === "todos" && (
+                                    <Check className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+                                {instancias.map((inst) => (
+                                  <button
+                                    key={inst.id}
+                                    type="button"
+                                    onClick={() => setFiltroInstancia(inst.id)}
+                                    className={cn(
+                                      "flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                      filtroInstancia === inst.id &&
+                                        "bg-primary/10 text-primary",
+                                    )}
+                                  >
+                                    <span className="truncate font-mono text-xs">
+                                      {inst.instance_name}
+                                    </span>
+                                    {filtroInstancia === inst.id && (
+                                      <Check className="h-3.5 w-3.5 shrink-0" />
+                                    )}
+                                  </button>
+                                ))}
+                              </>
+                            )}
+                            {vendedores.length > 0 && (
+                              <>
+                                <div className="mx-3 my-1 border-t border-border/50" />
+                                <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                  Responsável
+                                </p>
+                                <Popover
+                                  open={filtroResponsavelOpenMobile}
+                                  onOpenChange={(v) => {
+                                    setFiltroResponsavelOpenMobile(v);
+                                    if (!v) setBuscaFiltroResponsavel("");
+                                  }}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className={cn(
+                                        "mx-1 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                        filtroResponsavel.length > 0 &&
+                                          "bg-primary/10 text-primary",
+                                      )}
+                                    >
+                                      <span className="flex min-w-0 items-center gap-2">
+                                        {vendedoresResponsavelSelecionados.length ===
+                                        1 ? (
+                                          <>
+                                            <Avatar className="h-5 w-5 shrink-0">
+                                              {vendedoresResponsavelSelecionados[0]
+                                                .avatar_url ? (
+                                                <img
+                                                  src={
+                                                    vendedoresResponsavelSelecionados[0]
+                                                      .avatar_url
+                                                  }
+                                                  alt={
+                                                    vendedoresResponsavelSelecionados[0]
+                                                      .nome
+                                                  }
+                                                  className="h-full w-full object-cover rounded-full"
+                                                />
+                                              ) : (
+                                                <AvatarFallback className="text-[9px] bg-muted-foreground/20">
+                                                  {vendedoresResponsavelSelecionados[0].nome
+                                                    .trim()
+                                                    .split(" ")
+                                                    .map((p: string) => p[0])
+                                                    .slice(0, 2)
+                                                    .join("")
+                                                    .toUpperCase()}
+                                                </AvatarFallback>
+                                              )}
+                                            </Avatar>
+                                            <span className="truncate">
+                                              {
+                                                vendedoresResponsavelSelecionados[0]
+                                                  .nome
+                                              }
+                                            </span>
+                                          </>
+                                        ) : vendedoresResponsavelSelecionados.length >
+                                          1 ? (
+                                          <span className="truncate">
+                                            {
+                                              vendedoresResponsavelSelecionados.length
+                                            }{" "}
+                                            selecionados
+                                          </span>
+                                        ) : (
+                                          <span>Todos</span>
+                                        )}
+                                      </span>
+                                      {filtroResponsavelOpenMobile ? (
+                                        <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                                      ) : (
+                                        <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                                      )}
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    align="start"
+                                    className="w-56 p-0"
+                                  >
+                                    <Command shouldFilter={false}>
+                                      <CommandInput
+                                        placeholder="Buscar responsável..."
+                                        value={buscaFiltroResponsavel}
+                                        onValueChange={
+                                          setBuscaFiltroResponsavel
+                                        }
+                                      />
+                                      <CommandList>
+                                        <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                                          Nenhum usuário encontrado.
+                                        </CommandEmpty>
+                                        <CommandGroup>
+                                          <CommandItem
+                                            value="todos"
+                                            onSelect={() => {
+                                              setFiltroResponsavel([]);
+                                              setFiltroResponsavelOpenMobile(
+                                                false,
+                                              );
+                                            }}
+                                            className="gap-2.5"
+                                          >
+                                            <span className="flex-1">
+                                              Todos
+                                            </span>
+                                            {filtroResponsavel.length === 0 && (
+                                              <Check className="h-3.5 w-3.5 shrink-0" />
+                                            )}
+                                          </CommandItem>
+                                          {vendedoresFiltroResponsavel.map(
+                                            (v) => (
+                                              <CommandItem
+                                                key={v.id}
+                                                value={v.id}
+                                                onSelect={() =>
+                                                  toggleFiltroResponsavel(v.id)
+                                                }
+                                                className="gap-2.5"
+                                              >
+                                                <Avatar className="h-6 w-6 shrink-0">
+                                                  {v.avatar_url ? (
+                                                    <img
+                                                      src={v.avatar_url}
+                                                      alt={v.nome}
+                                                      className="h-full w-full object-cover rounded-full"
+                                                    />
+                                                  ) : (
+                                                    <AvatarFallback className="text-[9px] bg-muted-foreground/20">
+                                                      {v.nome
+                                                        .trim()
+                                                        .split(" ")
+                                                        .map(
+                                                          (p: string) => p[0],
+                                                        )
+                                                        .slice(0, 2)
+                                                        .join("")
+                                                        .toUpperCase()}
+                                                    </AvatarFallback>
+                                                  )}
+                                                </Avatar>
+                                                <span className="flex-1 truncate">
+                                                  {v.nome}
+                                                </span>
+                                                {filtroResponsavel.includes(
+                                                  v.id,
+                                                ) && (
+                                                  <Check className="h-3.5 w-3.5 shrink-0" />
+                                                )}
+                                              </CommandItem>
+                                            ),
+                                          )}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                              </>
+                            )}
+                          </div>
+                        </FilterButton>
+                        {renderPeriodoFilterButton(
+                          periodoFiltroOpenMobile,
+                          setPeriodoFiltroOpenMobile,
+                        )}
+                        {hasFiltrosConversa && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-10 shrink-0 gap-1.5 px-2.5 text-muted-foreground hover:text-destructive"
+                            onClick={limparFiltrosConversa}
+                            title="Limpar filtros"
+                          >
+                            <FilterX className="h-3.5 w-3.5" />
+                            Limpar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="relative pb-2">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:ring-1"
+                      placeholder="Buscar por nome, telefone ou mensagem..."
+                      value={busca}
+                      onChange={(e) => setBusca(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {modoSelecao && conversasFiltradas.length > 0 && (
+                  <div className="px-3 py-1.5 border-b border-border flex items-center gap-2 bg-muted/30">
+                    <button
+                      onClick={toggleTodas}
+                      className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <div
+                        className={cn(
+                          "h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                          selecionadas.size === conversasFiltradas.length
+                            ? "bg-primary border-primary"
+                            : "border-border bg-background",
+                        )}
+                      >
+                        {selecionadas.size === conversasFiltradas.length && (
+                          <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                        )}
+                      </div>
+                      {selecionadas.size === conversasFiltradas.length
+                        ? "Desmarcar todas"
+                        : "Selecionar todas"}
+                    </button>
+                    {selecionadas.size > 0 && (
+                      <span className="ml-auto text-[11px] font-medium text-primary">
+                        {selecionadas.size} selecionada
+                        {selecionadas.size > 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <ScrollArea className="flex-1">
+                  <div className="p-2 space-y-0.5 w-full">
+                    {loadingConversas ? (
+                      <div className="flex items-center justify-center py-8 text-muted-foreground text-sm gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Carregando...
+                      </div>
+                    ) : conversasFiltradas.length === 0 ? (
+                      busca.trim().length >= 2 ? null : (
+                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm gap-2 px-4 text-center">
+                          <MessageCircle className="h-8 w-8 opacity-30" />
+                          Nenhuma conversa ainda
+                        </div>
+                      )
+                    ) : (
+                      renderConvList((conv) => {
+                        if (modoSelecao) {
+                          toggleSelecao(conv.id);
+                        } else {
+                          setConversaAtivaId(conv.id);
+                          setShowMobileSidebar(false);
+                        }
+                      })
+                    )}
+                    {!modoSelecao && renderResultadosMensagens()}
+                  </div>
+                </ScrollArea>
+
+                {modoSelecao && (
+                  <div className="border-t border-border px-3 py-2 bg-muted/30">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full gap-2"
+                      disabled={
+                        selecionadas.size === 0 || deletarEmMassa.isPending
+                      }
+                      onClick={() => setConfirmDeletarMassa(true)}
+                    >
+                      {deletarEmMassa.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      Excluir{" "}
+                      {selecionadas.size > 0
+                        ? `(${selecionadas.size})`
+                        : "selecionadas"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Área de mensagens */}
+          <div className="flex-1 flex flex-col min-w-0 relative">
+            {conversaAtiva ? (
+              <>
+                {/* Modal de atribuição: cobre só o painel da conversa (não a página
                   inteira), ancorado acima do campo de digitação e centralizado
                   horizontalmente. Aparece ao abrir uma conversa sem responsável. */}
-              {atribuicaoModalOpen && (
-                <div className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center p-4 pb-24">
-                  <div className="pointer-events-auto flex w-fit max-w-[92vw] items-center gap-4 rounded-lg border bg-background p-4 shadow-lg">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/40">
-                      <UserX className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div className="shrink-0">
-                      <p className="text-sm font-semibold leading-none tracking-tight whitespace-nowrap">
-                        Conversa sem responsável!
-                      </p>
-                      <p className="mt-1.5 text-xs text-muted-foreground whitespace-nowrap">
-                        Assuma a conversa ou direcione para um colega.
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Button
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => assumirConversa(conversaAtiva)}
-                        disabled={setResponsaveis.isPending}
-                      >
-                        <UserCheck className="h-4 w-4" />
-                        Assumir
-                      </Button>
-                      <Popover
+                {atribuicaoModalOpen && (
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center p-4 pb-24">
+                    <div className="pointer-events-auto flex w-fit max-w-[92vw] items-center gap-4 rounded-lg border bg-background p-4 shadow-lg">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/40">
+                        <UserX className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div className="shrink-0">
+                        <p className="text-sm font-semibold leading-none tracking-tight whitespace-nowrap">
+                          Conversa sem responsável!
+                        </p>
+                        <p className="mt-1.5 text-xs text-muted-foreground whitespace-nowrap">
+                          Assuma a conversa ou direcione para um colega.
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => assumirConversa(conversaAtiva)}
+                          disabled={setResponsaveis.isPending}
+                        >
+                          <UserCheck className="h-4 w-4" />
+                          Assumir
+                        </Button>
+                        <Popover
                           open={direcionarOpen}
                           onOpenChange={(v) => {
                             setDirecionarOpen(v);
@@ -5081,7 +5300,9 @@ export default function WhatsAppInbox() {
                                           </AvatarFallback>
                                         )}
                                       </Avatar>
-                                      <span className="flex-1 truncate">{v.nome}</span>
+                                      <span className="flex-1 truncate">
+                                        {v.nome}
+                                      </span>
                                     </CommandItem>
                                   ))}
                                 </CommandGroup>
@@ -5089,272 +5310,314 @@ export default function WhatsAppInbox() {
                             </Command>
                           </PopoverContent>
                         </Popover>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Header da conversa */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
-                <button
-                  className="flex items-center gap-3 min-w-0 group"
-                  onClick={() => setLeadSheetOpen(true)}
-                  title="Ver detalhes do lead"
-                >
-                  <Avatar className="h-8 w-8 border border-primary/10 shrink-0">
-                    {conversaAtiva.foto_perfil_url && (
-                      <AvatarImage src={conversaAtiva.foto_perfil_url} alt="" />
-                    )}
-                    <AvatarFallback
-                      className={cn(
-                        colorForPhone(conversaAtiva.telefone),
-                        "text-white text-xs font-semibold",
-                      )}
-                    >
-                      {initials(
-                        conversaAtiva.nome_contato,
-                        conversaAtiva.telefone,
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="text-left min-w-0">
-                    <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">
-                      {conversaAtiva.nome_contato ??
-                        formatPhone(conversaAtiva.telefone)}
-                    </p>
-                    <p className="text-xs text-muted-foreground capitalize truncate">
-                      {conversaAtiva.is_group
-                        ? nomesGrupo.length > 0
-                          ? nomesGrupo.join(", ")
-                          : "Grupo"
-                        : conversaAtiva.nome_contato
-                          ? formatPhone(conversaAtiva.telefone)
-                          : "WhatsApp"}
-                    </p>
-                  </div>
-                </button>
-                <ConversaParticipantesStack conv={conversaAtiva} spacing="gap" />
-                <div className="ml-auto flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
-                    onClick={() => {
-                      const novaArquivada = !conversaAtiva.arquivada;
-                      arquivarConversa.mutate({
-                        conversaId: conversaAtiva.id,
-                        arquivada: novaArquivada,
-                      });
-                      if (novaArquivada) {
-                        // Fechar a conversa remove todos os responsáveis
-                        // automaticamente (trigger no banco); registra isso no
-                        // timeline pra ficar visível quem estava no atendimento.
-                        const autor = profile?.nome ?? "Alguém";
-                        const responsaveisAtuais = conversaAtiva.responsaveis ?? [];
-                        const texto =
-                          responsaveisAtuais.length > 0
-                            ? `${autor} fechou a conversa e removeu ${responsaveisAtuais
-                                .map((r) => r.nome)
-                                .join(", ")} dos responsáveis`
-                            : `${autor} fechou a conversa`;
-                        addNota.mutate({ conversaId: conversaAtiva.id, texto });
-                      }
-                      if (
-                        (novaArquivada && filtroStatus === "aberto") ||
-                        (!novaArquivada && filtroStatus === "fechado")
-                      ) {
-                        setConversaAtivaId(null);
-                      }
-                    }}
+                {/* Header da conversa */}
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
+                  <button
+                    className="flex items-center gap-3 min-w-0 group"
+                    onClick={() => setLeadSheetOpen(true)}
+                    title="Ver detalhes do lead"
                   >
-                    {conversaAtiva.arquivada ? (
-                      <ArchiveRestore className="h-3.5 w-3.5" />
-                    ) : (
-                      <Archive className="h-3.5 w-3.5" />
-                    )}
-                    {conversaAtiva.arquivada
-                      ? "Reabrir conversa"
-                      : "Marcar como fechada"}
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        className="gap-2"
-                        onClick={() => {
-                          const phone = conversaAtiva.telefone.replace(
-                            /\D/g,
-                            "",
-                          );
-                          window.open(`https://wa.me/${phone}`, "_blank");
-                        }}
-                      >
-                        <Phone className="h-4 w-4" />
-                        Abrir no WhatsApp
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive gap-2"
-                        onClick={() => setConfirmLimpar(true)}
-                      >
-                        <Eraser className="h-4 w-4" />
-                        Limpar conversa
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive gap-2"
-                        onClick={() => setConfirmDeletar(true)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Deletar conversa
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                {/* Confirmação de limpar conversa */}
-                <AlertDialog
-                  open={confirmLimpar}
-                  onOpenChange={setConfirmLimpar}
-                >
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Limpar conversa?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Todas as mensagens desta conversa serão apagadas
-                        permanentemente. Esta ação não pode ser desfeita.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-destructive hover:bg-destructive/90"
-                        onClick={() => limparConversa.mutate(conversaAtiva.id)}
-                      >
-                        {limparConversa.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          "Limpar"
+                    <Avatar className="h-8 w-8 border border-primary/10 shrink-0">
+                      {conversaAtiva.foto_perfil_url && (
+                        <AvatarImage
+                          src={conversaAtiva.foto_perfil_url}
+                          alt=""
+                        />
+                      )}
+                      <AvatarFallback
+                        className={cn(
+                          colorForPhone(conversaAtiva.telefone),
+                          "text-white text-xs font-semibold",
                         )}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-
-                {/* Confirmação de deletar conversa */}
-                <AlertDialog
-                  open={confirmDeletar}
-                  onOpenChange={setConfirmDeletar}
-                >
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Deletar conversa?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta conversa e todas as suas mensagens serão deletadas
-                        permanentemente. Esta ação não pode ser desfeita.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-destructive hover:bg-destructive/90"
-                        onClick={() => {
-                          deletarConversa.mutate(conversaAtiva.id, {
-                            onSuccess: () => setConversaAtivaId(null),
-                          });
-                          setConfirmDeletar(false);
-                        }}
                       >
-                        {deletarConversa.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          "Deletar"
+                        {initials(
+                          conversaAtiva.nome_contato,
+                          conversaAtiva.telefone,
                         )}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-
-              {/* Notas fixadas — ficam sempre visíveis no topo, fora da rolagem normal */}
-              {/* Mensagens */}
-              <div className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
-                <ScrollArea className="flex-1 px-4" onScroll={handleScroll}>
-                  {loadingMensagens ? (
-                    <div className="flex items-center justify-center h-full">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : mensagens.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 pt-16">
-                      <MessageCircle className="h-12 w-12 opacity-30" />
-                      <p className="text-sm">
-                        Nenhuma mensagem ainda. Comece a conversa!
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="text-left min-w-0">
+                      <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                        {conversaAtiva.nome_contato ??
+                          formatPhone(conversaAtiva.telefone)}
+                      </p>
+                      <p className="text-xs text-muted-foreground capitalize truncate">
+                        {conversaAtiva.is_group
+                          ? nomesGrupo.length > 0
+                            ? nomesGrupo.join(", ")
+                            : "Grupo"
+                          : conversaAtiva.nome_contato
+                            ? formatPhone(conversaAtiva.telefone)
+                            : "WhatsApp"}
                       </p>
                     </div>
-                  ) : (
-                    <div className="py-4 space-y-1">
-                      {mensagens.map((msg, i) => {
-                        const isSaida = msg.direcao === "saida";
-                        const prevMsg = mensagens[i - 1];
-                        const showDate =
-                          !prevMsg ||
-                          new Date(msg.created_at).toDateString() !==
-                            new Date(prevMsg.created_at).toDateString();
-                        const isLast = i === mensagens.length - 1;
-                        // Mensagem de saída sem usuario_id = veio de fora do CRM (WhatsApp
-                        // Web/celular físico, ver comentário no whatsapp-webhook) — quem
-                        // mandou costuma se identificar com um prefixo manual "*Nome:*".
-                        const prefixoExterno =
-                          isSaida && !msg.usuario
-                            ? extrairPrefixoRemetenteExterno(msg.conteudo)
+                  </button>
+                  <ConversaParticipantesStack
+                    conv={conversaAtiva}
+                    spacing="gap"
+                  />
+                  <div className="ml-auto flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                      onClick={() => {
+                        const novaArquivada = !conversaAtiva.arquivada;
+                        arquivarConversa.mutate({
+                          conversaId: conversaAtiva.id,
+                          arquivada: novaArquivada,
+                        });
+                        if (novaArquivada) {
+                          // Fechar a conversa remove todos os responsáveis
+                          // automaticamente (trigger no banco); registra isso no
+                          // timeline pra ficar visível quem estava no atendimento.
+                          const autor = profile?.nome ?? "Alguém";
+                          const responsaveisAtuais =
+                            conversaAtiva.responsaveis ?? [];
+                          const texto =
+                            responsaveisAtuais.length > 0
+                              ? `${autor} fechou a conversa e removeu ${responsaveisAtuais
+                                  .map((r) => r.nome)
+                                  .join(", ")} dos responsáveis`
+                              : `${autor} fechou a conversa`;
+                          addNota.mutate({
+                            conversaId: conversaAtiva.id,
+                            texto,
+                          });
+                        }
+                        if (
+                          (novaArquivada && filtroStatus === "aberto") ||
+                          (!novaArquivada && filtroStatus === "fechado")
+                        ) {
+                          setConversaAtivaId(null);
+                        }
+                      }}
+                    >
+                      {conversaAtiva.arquivada ? (
+                        <ArchiveRestore className="h-3.5 w-3.5" />
+                      ) : (
+                        <Archive className="h-3.5 w-3.5" />
+                      )}
+                      {conversaAtiva.arquivada
+                        ? "Reabrir conversa"
+                        : "Marcar como fechada"}
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="gap-2"
+                          onClick={() => {
+                            const phone = conversaAtiva.telefone.replace(
+                              /\D/g,
+                              "",
+                            );
+                            window.open(`https://wa.me/${phone}`, "_blank");
+                          }}
+                        >
+                          <Phone className="h-4 w-4" />
+                          Abrir no WhatsApp
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive gap-2"
+                          onClick={() => setConfirmLimpar(true)}
+                        >
+                          <Eraser className="h-4 w-4" />
+                          Limpar conversa
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive gap-2"
+                          onClick={() => setConfirmDeletar(true)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Deletar conversa
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  {/* Confirmação de limpar conversa */}
+                  <AlertDialog
+                    open={confirmLimpar}
+                    onOpenChange={setConfirmLimpar}
+                  >
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Limpar conversa?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Todas as mensagens desta conversa serão apagadas
+                          permanentemente. Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive hover:bg-destructive/90"
+                          onClick={() =>
+                            limparConversa.mutate(conversaAtiva.id)
+                          }
+                        >
+                          {limparConversa.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Limpar"
+                          )}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  {/* Confirmação de deletar conversa */}
+                  <AlertDialog
+                    open={confirmDeletar}
+                    onOpenChange={setConfirmDeletar}
+                  >
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Deletar conversa?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta conversa e todas as suas mensagens serão
+                          deletadas permanentemente. Esta ação não pode ser
+                          desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive hover:bg-destructive/90"
+                          onClick={() => {
+                            deletarConversa.mutate(conversaAtiva.id, {
+                              onSuccess: () => setConversaAtivaId(null),
+                            });
+                            setConfirmDeletar(false);
+                          }}
+                        >
+                          {deletarConversa.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Deletar"
+                          )}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+
+                {/* Notas fixadas — ficam sempre visíveis no topo, fora da rolagem normal */}
+                {/* Mensagens */}
+                <div className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
+                  <ScrollArea className="flex-1 px-4" onScroll={handleScroll}>
+                    {loadingMensagens ? (
+                      <div className="flex items-center justify-center h-full">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : mensagens.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 pt-16">
+                        <MessageCircle className="h-12 w-12 opacity-30" />
+                        <p className="text-sm">
+                          Nenhuma mensagem ainda. Comece a conversa!
+                        </p>
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          "py-4 space-y-1",
+                          atribuicaoModalOpen && "pb-40",
+                        )}
+                      >
+                        {mensagens.map((msg, i) => {
+                          const isSaida = msg.direcao === "saida";
+                          const prevMsg = mensagens[i - 1];
+                          const showDate =
+                            !prevMsg ||
+                            new Date(msg.created_at).toDateString() !==
+                              new Date(prevMsg.created_at).toDateString();
+                          const isLast = i === mensagens.length - 1;
+                          // Mensagem de saída sem usuario_id = veio de fora do CRM (WhatsApp
+                          // Web/celular físico, ver comentário no whatsapp-webhook) — quem
+                          // mandou costuma se identificar com um prefixo manual "*Nome:*".
+                          const prefixoExterno =
+                            isSaida && !msg.usuario
+                              ? extrairPrefixoRemetenteExterno(msg.conteudo)
+                              : null;
+                          const usuarioExterno = prefixoExterno
+                            ? (vendedores.find(
+                                (v) =>
+                                  normalizeNomeBusca(v.nome) ===
+                                  normalizeNomeBusca(prefixoExterno.nome),
+                              ) ?? null)
                             : null;
-                        const usuarioExterno = prefixoExterno
-                          ? (vendedores.find(
-                              (v) =>
-                                normalizeNomeBusca(v.nome) ===
-                                normalizeNomeBusca(prefixoExterno.nome),
-                            ) ?? null)
-                          : null;
-                        const msgParaExibir = prefixoExterno
-                          ? { ...msg, conteudo: prefixoExterno.resto }
-                          : msg;
-                        // Empilha mensagens consecutivas do mesmo remetente sem repetir o
-                        // nome/número acima de cada bolha — só mostra na primeira da leva.
-                        const isFirstDoRemetente =
-                          !prevMsg ||
-                          showDate ||
-                          prevMsg.direcao !== msg.direcao ||
-                          (isSaida
-                            ? (prevMsg.usuario?.id ?? null) !==
-                              (msg.usuario?.id ?? null)
-                            : (prevMsg.remetente_telefone ?? null) !==
-                              (msg.remetente_telefone ?? null));
+                          const msgParaExibir = prefixoExterno
+                            ? { ...msg, conteudo: prefixoExterno.resto }
+                            : msg;
+                          // Empilha mensagens consecutivas do mesmo remetente sem repetir o
+                          // nome/número acima de cada bolha — só mostra na primeira da leva.
+                          const isFirstDoRemetente =
+                            !prevMsg ||
+                            showDate ||
+                            prevMsg.direcao !== msg.direcao ||
+                            (isSaida
+                              ? (prevMsg.usuario?.id ?? null) !==
+                                (msg.usuario?.id ?? null)
+                              : (prevMsg.remetente_telefone ?? null) !==
+                                (msg.remetente_telefone ?? null));
 
-                        const dateChip = showDate && (
-                          <div className="flex items-center justify-center my-4">
-                            <span className="text-[10px] bg-muted text-muted-foreground px-3 py-1 rounded-full">
-                              {isToday(new Date(msg.created_at))
-                                ? "Hoje"
-                                : isYesterday(new Date(msg.created_at))
-                                  ? "Ontem"
-                                  : format(
-                                      new Date(msg.created_at),
-                                      "d 'de' MMMM",
-                                      { locale: ptBR },
-                                    )}
-                            </span>
-                          </div>
-                        );
+                          const dateChip = showDate && (
+                            <div className="flex items-center justify-center my-4">
+                              <span className="text-[10px] bg-muted text-muted-foreground px-3 py-1 rounded-full">
+                                {isToday(new Date(msg.created_at))
+                                  ? "Hoje"
+                                  : isYesterday(new Date(msg.created_at))
+                                    ? "Ontem"
+                                    : format(
+                                        new Date(msg.created_at),
+                                        "d 'de' MMMM",
+                                        { locale: ptBR },
+                                      )}
+                              </span>
+                            </div>
+                          );
 
-                        // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca foi
-                        // enviada ao WhatsApp, renderiza como chip central em vez de bolha.
-                        if (msg.is_nota_interna) {
+                          // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca foi
+                          // enviada ao WhatsApp, renderiza como chip central em vez de bolha.
+                          if (msg.is_nota_interna) {
+                            return (
+                              <div
+                                key={msg.id}
+                                id={`wa-msg-${msg.id}`}
+                                ref={isLast ? msgScrollRef : undefined}
+                              >
+                                {dateChip}
+                                <div className="flex items-center justify-center my-2">
+                                  <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/60 px-3 py-1 rounded-full">
+                                    <StickyNote className="h-3 w-3" />
+                                    {msg.conteudo}
+                                    <span className="text-muted-foreground/70">
+                                      ·{" "}
+                                      {format(
+                                        new Date(msg.created_at),
+                                        "HH:mm",
+                                      )}
+                                    </span>
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div
                               key={msg.id}
@@ -5362,441 +5625,437 @@ export default function WhatsAppInbox() {
                               ref={isLast ? msgScrollRef : undefined}
                             >
                               {dateChip}
-                              <div className="flex items-center justify-center my-2">
-                                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/60 px-3 py-1 rounded-full">
-                                  <StickyNote className="h-3 w-3" />
-                                  {msg.conteudo}
-                                  <span className="text-muted-foreground/70">
-                                    · {format(new Date(msg.created_at), "HH:mm")}
-                                  </span>
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div
-                            key={msg.id}
-                            id={`wa-msg-${msg.id}`}
-                            ref={isLast ? msgScrollRef : undefined}
-                          >
-                            {dateChip}
-                            <div
-                              className={cn(
-                                "flex",
-                                isSaida ? "justify-end" : "justify-start",
-                                prevMsg?.direcao !== msg.direcao
-                                  ? "mt-3"
-                                  : "mt-0.5",
-                              )}
-                            >
                               <div
                                 className={cn(
-                                  "max-w-[75%]",
-                                  isSaida ? "items-end" : "items-start",
+                                  "flex",
+                                  isSaida ? "justify-end" : "justify-start",
+                                  prevMsg?.direcao !== msg.direcao
+                                    ? "mt-3"
+                                    : "mt-0.5",
                                 )}
                               >
-                                <DraggableBubble
-                                  msg={msg}
-                                  isSaida={isSaida}
-                                  onReply={handleReply}
+                                <div
+                                  className={cn(
+                                    "max-w-[75%]",
+                                    isSaida ? "items-end" : "items-start",
+                                  )}
                                 >
-                                  <div
-                                    className={cn(
-                                      msg.tipo === "audio"
-                                        ? "p-0.5"
-                                        : "px-3 py-2",
-                                      "break-words transition-shadow duration-500",
-                                      isSaida
-                                        ? "bg-orange-500 text-white rounded-2xl rounded-tr-sm"
-                                        : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
-                                      msg.id === destacadaMsgId &&
-                                        "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                                    )}
+                                  <DraggableBubble
+                                    msg={msg}
+                                    isSaida={isSaida}
+                                    onReply={handleReply}
                                   >
-                                    {isSaida &&
-                                      msg.usuario &&
-                                      isFirstDoRemetente && (
-                                        <UserPreviewPopover
-                                          usuario={msg.usuario}
+                                    <div
+                                      className={cn(
+                                        msg.tipo === "audio"
+                                          ? "p-0.5"
+                                          : "px-3 py-2",
+                                        "break-words transition-shadow duration-500",
+                                        isSaida
+                                          ? "bg-orange-500 text-white rounded-2xl rounded-tr-sm"
+                                          : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
+                                        msg.id === destacadaMsgId &&
+                                          "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                                      )}
+                                    >
+                                      {isSaida &&
+                                        msg.usuario &&
+                                        isFirstDoRemetente && (
+                                          <UserPreviewPopover
+                                            usuario={msg.usuario}
+                                            nameClassName={cn(
+                                              "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2 text-white",
+                                              msg.tipo === "audio" &&
+                                                "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                            )}
+                                          />
+                                        )}
+                                      {isSaida &&
+                                        !msg.usuario &&
+                                        prefixoExterno &&
+                                        isFirstDoRemetente && (
+                                          <div
+                                            className={cn(
+                                              "flex items-center gap-1 mb-2",
+                                              msg.tipo === "audio" &&
+                                                "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                            )}
+                                          >
+                                            {usuarioExterno ? (
+                                              <UserPreviewPopover
+                                                usuario={usuarioExterno}
+                                                nameClassName="w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight text-white"
+                                              />
+                                            ) : (
+                                              <span className="w-fit max-w-full truncate text-sm font-semibold leading-tight text-white">
+                                                {prefixoExterno.nome}
+                                              </span>
+                                            )}
+                                            <span
+                                              title="Enviado fora do CRM (WhatsApp Web/celular)"
+                                              className="inline-flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded text-[9px] font-medium bg-white/20 text-white"
+                                            >
+                                              <Smartphone className="h-2.5 w-2.5" />
+                                            </span>
+                                          </div>
+                                        )}
+                                      {!isSaida && isFirstDoRemetente && (
+                                        <ContactPreviewPopover
+                                          conversa={conversaAtiva}
+                                          remetenteNome={msg.remetente_nome}
+                                          remetenteTelefone={
+                                            msg.remetente_telefone
+                                          }
                                           nameClassName={cn(
-                                            "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2 text-white",
+                                            "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2",
+                                            senderNameColor(conversaAtiva.id),
                                             msg.tipo === "audio" &&
                                               "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
                                           )}
                                         />
                                       )}
-                                    {isSaida &&
-                                      !msg.usuario &&
-                                      prefixoExterno &&
-                                      isFirstDoRemetente && (
-                                        <div
-                                          className={cn(
-                                            "flex items-center gap-1 mb-2",
-                                            msg.tipo === "audio" &&
-                                              "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
-                                          )}
-                                        >
-                                          {usuarioExterno ? (
-                                            <UserPreviewPopover
-                                              usuario={usuarioExterno}
-                                              nameClassName="w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight text-white"
-                                            />
-                                          ) : (
-                                            <span className="w-fit max-w-full truncate text-sm font-semibold leading-tight text-white">
-                                              {prefixoExterno.nome}
-                                            </span>
-                                          )}
-                                          <span
-                                            title="Enviado fora do CRM (WhatsApp Web/celular)"
-                                            className="inline-flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded text-[9px] font-medium bg-white/20 text-white"
-                                          >
-                                            <Smartphone className="h-2.5 w-2.5" />
-                                          </span>
-                                        </div>
+                                      {msg.quoted_wamid && (
+                                        <QuotedPreview
+                                          remetenteNome={
+                                            msg.quoted_remetente_nome
+                                          }
+                                          conteudo={msg.quoted_conteudo}
+                                          tipo={msg.quoted_tipo}
+                                          isSaida={isSaida}
+                                          onClick={() => {
+                                            const originalId = idPorWamid.get(
+                                              msg.quoted_wamid!,
+                                            );
+                                            if (!originalId) return;
+                                            irParaMensagem(originalId);
+                                          }}
+                                        />
                                       )}
-                                    {!isSaida && isFirstDoRemetente && (
-                                      <ContactPreviewPopover
-                                        conversa={conversaAtiva}
-                                        remetenteNome={msg.remetente_nome}
-                                        remetenteTelefone={msg.remetente_telefone}
-                                        nameClassName={cn(
-                                          "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2",
-                                          senderNameColor(conversaAtiva.id),
-                                          msg.tipo === "audio" &&
-                                            "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
-                                        )}
-                                      />
-                                    )}
-                                    {msg.quoted_wamid && (
-                                      <QuotedPreview
-                                        remetenteNome={msg.quoted_remetente_nome}
-                                        conteudo={msg.quoted_conteudo}
-                                        tipo={msg.quoted_tipo}
+                                      <MessageContent
+                                        msg={msgParaExibir}
                                         isSaida={isSaida}
-                                        onClick={() => {
-                                          const originalId = idPorWamid.get(msg.quoted_wamid!);
-                                          if (!originalId) return;
-                                          irParaMensagem(originalId);
-                                        }}
+                                        onImageClick={(url) =>
+                                          setViewingImage({ url })
+                                        }
+                                        onPreviewFile={setPreviewFile}
+                                        conversaAtiva={conversaAtiva}
                                       />
-                                    )}
-                                    <MessageContent
-                                      msg={msgParaExibir}
-                                      isSaida={isSaida}
-                                      onImageClick={setViewingImage}
-                                      onPreviewFile={setPreviewFile}
-                                      conversaAtiva={conversaAtiva}
-                                    />
-                                  </div>
-                                  {msg.tipo !== "texto" && (
-                                    <div
-                                      className={cn(
-                                        "flex items-center gap-1 mt-0.5",
-                                        isSaida
-                                          ? "justify-end mr-1"
-                                          : "justify-start ml-1",
-                                      )}
-                                    >
-                                      <span className="text-[9px] text-muted-foreground">
-                                        {format(
-                                          new Date(msg.created_at),
-                                          "HH:mm",
-                                        )}
-                                      </span>
-                                      {isSaida && (
-                                        <MessageStatus status={msg.status} />
-                                      )}
                                     </div>
-                                  )}
-                                </DraggableBubble>
+                                    {msg.tipo !== "texto" && (
+                                      <div
+                                        className={cn(
+                                          "flex items-center gap-1 mt-0.5",
+                                          isSaida
+                                            ? "justify-end mr-1"
+                                            : "justify-start ml-1",
+                                        )}
+                                      >
+                                        <span className="text-[9px] text-muted-foreground">
+                                          {format(
+                                            new Date(msg.created_at),
+                                            "HH:mm",
+                                          )}
+                                        </span>
+                                        {isSaida && (
+                                          <MessageStatus status={msg.status} />
+                                        )}
+                                      </div>
+                                    )}
+                                  </DraggableBubble>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </ScrollArea>
-                {showScrollBottom && (
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="absolute bottom-4 right-8 rounded-full shadow-lg z-10 h-10 w-10 border border-border opacity-90 hover:opacity-100 transition-opacity"
-                    onClick={scrollToBottom}
-                  >
-                    <ChevronDown className="h-5 w-5" />
-                  </Button>
-                )}
-              </div>
-
-              {/* Notas fixadas — mostradas coladas acima do campo de digitação */}
-              {notasFixadas.length > 0 && (
-                <div className="border-t border-border bg-amber-50 dark:bg-amber-950/20 px-4 py-3 max-h-40 overflow-y-auto space-y-2">
-                  {notasFixadas.map((n) => (
-                    <div key={n.id} className="flex items-start gap-2">
-                      <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                      <p className="text-sm text-amber-900 dark:text-amber-200 flex-1 break-words">
-                        {n.conteudo}
-                        <span className="text-amber-700/70 dark:text-amber-300/60">
-                          {" "}
-                          · {format(new Date(n.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                        </span>
-                      </p>
-                      <button
-                        type="button"
-                        title="Desafixar"
-                        className="shrink-0 text-amber-600/70 dark:text-amber-400/70 hover:text-amber-900 dark:hover:text-amber-200"
-                        onClick={() =>
-                          setNotaFixadaMutation.mutate({ notaId: n.id, fixada: false })
-                        }
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Input de envio */}
-              <div className="border-t border-border px-4 py-3 min-h-[4rem] flex flex-col justify-center">
-                {!isConnected && config && (
-                  <div className="mb-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 px-2">
-                    <WifiOff className="h-3.5 w-3.5" />
-                    WhatsApp desconectado —{" "}
-                    <button
-                      type="button"
-                      className="underline underline-offset-2 hover:opacity-80"
-                      onClick={() => setShowConfig(true)}
-                    >
-                      conectar via QR code
-                    </button>
-                  </div>
-                )}
-                {!config && (
-                  <div className="mb-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 px-2">
-                    <Settings className="h-3.5 w-3.5" />
-                    Configure o uazapi para enviar mensagens
+                          );
+                        })}
+                      </div>
+                    )}
+                  </ScrollArea>
+                  {showScrollBottom && (
                     <Button
-                      variant="link"
-                      className="h-auto p-0 text-xs"
-                      onClick={() => setShowConfig(true)}
+                      variant="secondary"
+                      size="icon"
+                      className="absolute bottom-4 right-8 rounded-full shadow-lg z-10 h-10 w-10 border border-border opacity-90 hover:opacity-100 transition-opacity"
+                      onClick={scrollToBottom}
                     >
-                      Configurar
+                      <ChevronDown className="h-5 w-5" />
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                {/* Preview da mensagem em resposta — clicar rola até a mensagem original */}
-                {respondendoA && (
-                  <div className="max-w-sm">
-                    <QuotedPreview
-                      remetenteNome={quotedNomeFor(respondendoA)}
-                      conteudo={respondendoA.conteudo}
-                      tipo={respondendoA.tipo}
-                      onClick={() => irParaMensagem(respondendoA.id)}
-                      onCancel={() => setRespondendoA(null)}
-                    />
-                  </div>
-                )}
-
-                {/* Preview dos anexos */}
-                {attachments.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-2">
-                    {attachments.map((a, i) => (
-                      <div
-                        key={i}
-                        className="relative flex items-center gap-2 px-2 py-1.5 bg-muted/70 rounded-xl border border-border max-w-[200px]"
-                      >
-                        {a.previewUrl && tipoFromFile(a.file) === "audio" ? (
-                          <audio
-                            src={a.previewUrl}
-                            controls
-                            className="h-8 max-w-[160px]"
-                          />
-                        ) : a.previewUrl ? (
-                          <img
-                            src={a.previewUrl}
-                            alt="preview"
-                            className="h-10 w-10 object-cover rounded-lg shrink-0"
-                          />
-                        ) : (
-                          <div className="h-9 w-9 flex items-center justify-center bg-background rounded-lg shrink-0 border border-border">
-                            <AttachmentIcon
-                              tipo={tipoFromFile(a.file)}
-                              className="h-4 w-4 text-muted-foreground"
-                            />
-                          </div>
-                        )}
-                        {!a.previewUrl && (
-                          <p className="text-xs truncate max-w-[90px]">
-                            {a.file.name}
-                          </p>
-                        )}
+                {/* Notas fixadas — mostradas coladas acima do campo de digitação */}
+                {notasFixadas.length > 0 && (
+                  <div className="border-t border-border bg-amber-50 dark:bg-amber-950/20 px-4 py-3 max-h-40 overflow-y-auto space-y-2">
+                    {notasFixadas.map((n) => (
+                      <div key={n.id} className="flex items-start gap-2">
+                        <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-sm text-amber-900 dark:text-amber-200 flex-1 break-words">
+                          {n.conteudo}
+                          <span className="text-amber-700/70 dark:text-amber-300/60">
+                            {" "}
+                            ·{" "}
+                            {format(
+                              new Date(n.created_at),
+                              "dd/MM/yyyy HH:mm",
+                              { locale: ptBR },
+                            )}
+                          </span>
+                        </p>
                         <button
                           type="button"
-                          className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/80"
-                          onClick={() => removeAttachment(i)}
+                          title="Desafixar"
+                          className="shrink-0 text-amber-600/70 dark:text-amber-400/70 hover:text-amber-900 dark:hover:text-amber-200"
+                          onClick={() =>
+                            setNotaFixadaMutation.mutate({
+                              notaId: n.id,
+                              fixada: false,
+                            })
+                          }
                         >
-                          <X className="h-2.5 w-2.5" />
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Confirmação de envio de áudio gravado */}
-                {pendingAudio && (
-                  <PendingAudioPlayer
-                    src={pendingAudio.previewUrl}
-                    onCancel={cancelPendingAudio}
-                    onSend={confirmSendAudio}
-                    isSending={isUploading}
-                  />
-                )}
-
-                <div className="flex gap-2 items-center">
-                  {/* Input oculto de arquivo */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.rar,.txt"
-                    multiple
-                    onChange={handleFileSelect}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isBusy || isRecording || !!pendingAudio}
-                    title="Anexar arquivo"
-                  >
-                    {isUploading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Paperclip className="h-4 w-4" />
-                    )}
-                  </Button>
-                  {/* Botão de gravação de áudio */}
-                  <Button
-                    type="button"
-                    variant={isRecording ? "destructive" : "ghost"}
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={toggleRecording}
-                    disabled={isBusy || !!pendingAudio}
-                    title={isRecording ? "Parar gravação" : "Gravar áudio"}
-                  >
-                    {isRecording ? (
-                      <Square className="h-4 w-4" />
-                    ) : (
-                      <Mic className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
-                  {/* Nova tarefa (sem FK pra clientes/contatos, ver use-tarefas.ts) ou
-                      nota interna (is_nota_interna, nunca enviada ao WhatsApp) */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
+                {/* Input de envio */}
+                <div className="border-t border-border px-4 py-3 min-h-[4rem] flex flex-col justify-center">
+                  {!isConnected && config && (
+                    <div className="mb-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 px-2">
+                      <WifiOff className="h-3.5 w-3.5" />
+                      WhatsApp desconectado —{" "}
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-                        disabled={isBusy || isRecording || !!pendingAudio}
-                        title="Adicionar"
+                        className="underline underline-offset-2 hover:opacity-80"
+                        onClick={() => setShowConfig(true)}
                       >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuItem onClick={abrirNovaTarefa}>
-                        <ListTodo className="h-4 w-4 mr-2" />
-                        Nova tarefa
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setNovaNotaOpen(true)}>
-                        <StickyNote className="h-4 w-4 mr-2" />
-                        Adicionar nota
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  {isRecording ? (
-                    <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-red-300 bg-red-50 dark:bg-red-950/20">
-                      <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-                      <span className="text-sm text-red-600 dark:text-red-400 font-mono">
-                        {String(Math.floor(recordingSeconds / 60)).padStart(
-                          2,
-                          "0",
-                        )}
-                        :{String(recordingSeconds % 60).padStart(2, "0")}
-                      </span>
-                      <span className="text-sm text-red-500/70">
-                        Gravando...
-                      </span>
+                        conectar via QR code
+                      </button>
                     </div>
-                  ) : (
-                    <Textarea
-                      ref={inputRef}
-                      className="flex-1 min-h-9 resize-none py-2 overflow-hidden"
-                      rows={1}
-                      placeholder={
-                        attachments.length > 0
-                          ? "Legenda (opcional)..."
-                          : isConnected
-                            ? "Digite uma mensagem..."
-                            : "WhatsApp desconectado"
-                      }
-                      value={texto}
-                      onChange={(e) => setTexto(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      disabled={isBusy || !!pendingAudio}
-                      autoFocus
+                  )}
+                  {!config && (
+                    <div className="mb-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 px-2">
+                      <Settings className="h-3.5 w-3.5" />
+                      Configure o uazapi para enviar mensagens
+                      <Button
+                        variant="link"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => setShowConfig(true)}
+                      >
+                        Configurar
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Preview da mensagem em resposta — clicar rola até a mensagem original */}
+                  {respondendoA && (
+                    <div className="max-w-sm">
+                      <QuotedPreview
+                        remetenteNome={quotedNomeFor(respondendoA)}
+                        conteudo={respondendoA.conteudo}
+                        tipo={respondendoA.tipo}
+                        onClick={() => irParaMensagem(respondendoA.id)}
+                        onCancel={() => setRespondendoA(null)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Preview dos anexos */}
+                  {attachments.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {attachments.map((a, i) => (
+                        <div
+                          key={i}
+                          className="relative flex items-center gap-2 px-2 py-1.5 bg-muted/70 rounded-xl border border-border max-w-[200px]"
+                        >
+                          {a.previewUrl && tipoFromFile(a.file) === "audio" ? (
+                            <audio
+                              src={a.previewUrl}
+                              controls
+                              className="h-8 max-w-[160px]"
+                            />
+                          ) : a.previewUrl ? (
+                            <img
+                              src={a.previewUrl}
+                              alt="preview"
+                              className="h-10 w-10 object-cover rounded-lg shrink-0"
+                            />
+                          ) : (
+                            <div className="h-9 w-9 flex items-center justify-center bg-background rounded-lg shrink-0 border border-border">
+                              <AttachmentIcon
+                                tipo={tipoFromFile(a.file)}
+                                className="h-4 w-4 text-muted-foreground"
+                              />
+                            </div>
+                          )}
+                          {!a.previewUrl && (
+                            <p className="text-xs truncate max-w-[90px]">
+                              {a.file.name}
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/80"
+                            onClick={() => removeAttachment(i)}
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Confirmação de envio de áudio gravado */}
+                  {pendingAudio && (
+                    <PendingAudioPlayer
+                      src={pendingAudio.previewUrl}
+                      onCancel={cancelPendingAudio}
+                      onSend={confirmSendAudio}
+                      isSending={isUploading}
                     />
                   )}
-                  <Button
-                    onClick={handleSend}
-                    size="icon"
-                    className="bg-green-500 hover:bg-green-600 text-white shrink-0"
-                    disabled={
-                      (!texto.trim() && attachments.length === 0) ||
-                      isBusy ||
-                      isRecording ||
-                      !!pendingAudio
-                    }
-                  >
-                    {isBusy ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+
+                  <div className="flex gap-2 items-center">
+                    {/* Input oculto de arquivo */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.rar,.txt"
+                      multiple
+                      onChange={handleFileSelect}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isBusy || isRecording || !!pendingAudio}
+                      title="Anexar arquivo"
+                    >
+                      {isUploading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Paperclip className="h-4 w-4" />
+                      )}
+                    </Button>
+                    {/* Botão de gravação de áudio */}
+                    <Button
+                      type="button"
+                      variant={isRecording ? "destructive" : "ghost"}
+                      size="icon"
+                      className="h-9 w-9 shrink-0"
+                      onClick={toggleRecording}
+                      disabled={isBusy || !!pendingAudio}
+                      title={isRecording ? "Parar gravação" : "Gravar áudio"}
+                    >
+                      {isRecording ? (
+                        <Square className="h-4 w-4" />
+                      ) : (
+                        <Mic className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                    {/* Nova tarefa (sem FK pra clientes/contatos, ver use-tarefas.ts) ou
+                      nota interna (is_nota_interna, nunca enviada ao WhatsApp) */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+                          disabled={isBusy || isRecording || !!pendingAudio}
+                          title="Adicionar"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem onClick={abrirNovaTarefa}>
+                          <ListTodo className="h-4 w-4 mr-2" />
+                          Nova tarefa
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setNovaNotaOpen(true)}>
+                          <StickyNote className="h-4 w-4 mr-2" />
+                          Adicionar nota
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    {isRecording ? (
+                      <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-red-300 bg-red-50 dark:bg-red-950/20">
+                        <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                        <span className="text-sm text-red-600 dark:text-red-400 font-mono">
+                          {String(Math.floor(recordingSeconds / 60)).padStart(
+                            2,
+                            "0",
+                          )}
+                          :{String(recordingSeconds % 60).padStart(2, "0")}
+                        </span>
+                        <span className="text-sm text-red-500/70">
+                          Gravando...
+                        </span>
+                      </div>
                     ) : (
-                      <Send className="h-4 w-4" />
+                      <Textarea
+                        ref={inputRef}
+                        className="flex-1 min-h-9 resize-none py-2 overflow-hidden"
+                        rows={1}
+                        placeholder={
+                          attachments.length > 0
+                            ? "Legenda (opcional)..."
+                            : isConnected
+                              ? "Digite uma mensagem..."
+                              : "WhatsApp desconectado"
+                        }
+                        value={texto}
+                        onChange={(e) => setTexto(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={isBusy || !!pendingAudio}
+                        autoFocus
+                      />
                     )}
-                  </Button>
+                    <Button
+                      onClick={handleSend}
+                      size="icon"
+                      className="bg-green-500 hover:bg-green-600 text-white shrink-0"
+                      disabled={
+                        (!texto.trim() && attachments.length === 0) ||
+                        isBusy ||
+                        isRecording ||
+                        !!pendingAudio
+                      }
+                    >
+                      {isBusy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground">
+                <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+                  <MessageCircle className="h-8 w-8 text-green-600" />
+                </div>
+                <div className="text-center">
+                  <p className="font-medium text-foreground">WhatsApp CRM</p>
+                  <p className="text-sm mt-1">
+                    Selecione uma conversa para começar
+                  </p>
+                </div>
+                {!config && (
+                  <Button variant="outline" onClick={() => setShowConfig(true)}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Configurar uazapi
+                  </Button>
+                )}
               </div>
-            </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground">
-              <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-                <MessageCircle className="h-8 w-8 text-green-600" />
-              </div>
-              <div className="text-center">
-                <p className="font-medium text-foreground">WhatsApp CRM</p>
-                <p className="text-sm mt-1">
-                  Selecione uma conversa para começar
-                </p>
-              </div>
-              {!config && (
-                <Button variant="outline" onClick={() => setShowConfig(true)}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Configurar uazapi
-                </Button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
       )}
 
       <NovaConversaDialog
@@ -5820,41 +6079,67 @@ export default function WhatsAppInbox() {
         }}
       />
       <ConfigDialog open={showConfig} onClose={() => setShowConfig(false)} />
-      <BuscaMensagensDialog
-        open={showBuscaMensagens}
-        onClose={() => setShowBuscaMensagens(false)}
-        onSelecionarResultado={selecionarResultadoBusca}
-      />
 
       <Dialog
         open={!!viewingImage}
         onOpenChange={(open) => !open && setViewingImage(null)}
       >
-        <DialogContent className="max-w-5xl bg-transparent border-none shadow-none p-0 flex items-center justify-center [&>button]:hidden">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Visualizar Imagem</DialogTitle>
+        <DialogContent className="max-w-4xl w-full p-0 gap-0 flex flex-col max-h-[90vh]">
+          <DialogHeader className="px-4 py-3 border-b border-border">
+            <DialogTitle>Visualizar imagem</DialogTitle>
           </DialogHeader>
           {viewingImage && (
-            <div className="relative max-h-[90vh] max-w-full flex items-center justify-center p-4">
-              <img
-                src={viewingImage}
-                alt="Visualização"
-                className="max-h-[90vh] w-auto max-w-full object-contain rounded-lg shadow-2xl"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                className="fixed top-4 right-4 sm:top-6 sm:right-6 rounded-full bg-white text-black hover:bg-gray-200 hover:scale-105 transition-all z-[1200] h-10 w-10 sm:h-12 sm:w-12 border border-black/10 shadow-2xl"
-                onClick={() => setViewingImage(null)}
-              >
-                <X className="h-5 w-5 sm:h-6 sm:w-6 text-black" />
-              </Button>
-            </div>
+            <>
+              <div className="flex-1 min-h-0 flex items-center justify-center bg-muted/30 p-4 overflow-auto">
+                <img
+                  src={viewingImage.url}
+                  alt="Visualização"
+                  className="max-h-[65vh] w-auto max-w-full object-contain rounded-lg shadow-md"
+                />
+              </div>
+              <DialogFooter className="px-4 py-3 border-t border-border sm:justify-between">
+                {viewingImage.msgId ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => {
+                      const msgId = viewingImage.msgId!;
+                      setViewingImage(null);
+                      setLeadSheetOpen(false);
+                      setTimeout(() => irParaMensagem(msgId), 300);
+                    }}
+                  >
+                    <MessageSquareText className="h-4 w-4" /> Ver na conversa
+                  </Button>
+                ) : (
+                  <span />
+                )}
+                <a
+                  href={viewingImage.url}
+                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    <Download className="h-4 w-4" /> Baixar
+                  </Button>
+                </a>
+              </DialogFooter>
+            </>
           )}
         </DialogContent>
       </Dialog>
 
-      <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
+      <FilePreviewDialog
+        file={previewFile}
+        onClose={() => setPreviewFile(null)}
+        onJumpToMessage={(id) => {
+          setPreviewFile(null);
+          setLeadSheetOpen(false);
+          setTimeout(() => irParaMensagem(id), 300);
+        }}
+      />
 
       {/* Confirmação de exclusão em massa */}
       <AlertDialog
@@ -5898,8 +6183,12 @@ export default function WhatsAppInbox() {
           participantesGrupo={participantesGrupo}
           open={leadSheetOpen}
           onOpenChange={setLeadSheetOpen}
-          onImageClick={setViewingImage}
+          onImageClick={(url, msgId) => setViewingImage({ url, msgId })}
           onPreviewFile={setPreviewFile}
+          onJumpToMessage={(id) => {
+            setLeadSheetOpen(false);
+            setTimeout(() => irParaMensagem(id), 300);
+          }}
         />
       )}
 
@@ -5913,7 +6202,9 @@ export default function WhatsAppInbox() {
               <Label>Título *</Label>
               <Input
                 value={tarefaForm.titulo}
-                onChange={(e) => setTarefaForm((f) => ({ ...f, titulo: e.target.value }))}
+                onChange={(e) =>
+                  setTarefaForm((f) => ({ ...f, titulo: e.target.value }))
+                }
                 placeholder="Ex: Follow-up com o cliente"
               />
             </div>
@@ -5921,7 +6212,9 @@ export default function WhatsAppInbox() {
               <Label>Descrição</Label>
               <Textarea
                 value={tarefaForm.descricao}
-                onChange={(e) => setTarefaForm((f) => ({ ...f, descricao: e.target.value }))}
+                onChange={(e) =>
+                  setTarefaForm((f) => ({ ...f, descricao: e.target.value }))
+                }
                 rows={3}
                 placeholder="Detalhes da tarefa (opcional)"
               />
@@ -5931,12 +6224,18 @@ export default function WhatsAppInbox() {
                 <Label>Status</Label>
                 <Select
                   value={tarefaForm.status}
-                  onValueChange={(v) => setTarefaForm((f) => ({ ...f, status: v }))}
+                  onValueChange={(v) =>
+                    setTarefaForm((f) => ({ ...f, status: v }))
+                  }
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {KANBAN_STAGES_TAREFAS.map((stage) => (
-                      <SelectItem key={stage.key} value={stage.key}>{stage.label}</SelectItem>
+                      <SelectItem key={stage.key} value={stage.key}>
+                        {stage.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -5946,7 +6245,12 @@ export default function WhatsAppInbox() {
                 <Input
                   type="datetime-local"
                   value={tarefaForm.prazo_final}
-                  onChange={(e) => setTarefaForm((f) => ({ ...f, prazo_final: e.target.value }))}
+                  onChange={(e) =>
+                    setTarefaForm((f) => ({
+                      ...f,
+                      prazo_final: e.target.value,
+                    }))
+                  }
                 />
               </div>
             </div>
@@ -5954,9 +6258,14 @@ export default function WhatsAppInbox() {
               <div className="space-y-1.5">
                 <Label>Responsável</Label>
                 <SearchableSelect
-                  options={vendedores.map((v) => ({ value: v.nome, label: v.nome }))}
+                  options={vendedores.map((v) => ({
+                    value: v.nome,
+                    label: v.nome,
+                  }))}
                   value={tarefaForm.responsavel}
-                  onValueChange={(v) => setTarefaForm((f) => ({ ...f, responsavel: v }))}
+                  onValueChange={(v) =>
+                    setTarefaForm((f) => ({ ...f, responsavel: v }))
+                  }
                   placeholder="Selecione o responsável"
                 />
               </div>
@@ -5972,7 +6281,9 @@ export default function WhatsAppInbox() {
               <Label>Participantes</Label>
               <ParticipantesMultiSelect
                 value={tarefaForm.participantes}
-                onChange={(v) => setTarefaForm((f) => ({ ...f, participantes: v }))}
+                onChange={(v) =>
+                  setTarefaForm((f) => ({ ...f, participantes: v }))
+                }
                 usuarios={vendedores}
               />
             </div>
@@ -5980,7 +6291,9 @@ export default function WhatsAppInbox() {
               <Label>Marcadores</Label>
               <MarcadoresMultiSelect
                 value={tarefaForm.marcadores}
-                onChange={(v) => setTarefaForm((f) => ({ ...f, marcadores: v }))}
+                onChange={(v) =>
+                  setTarefaForm((f) => ({ ...f, marcadores: v }))
+                }
               />
             </div>
           </div>
@@ -5988,8 +6301,13 @@ export default function WhatsAppInbox() {
             <Button variant="outline" onClick={() => setNovaTarefaOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={salvarNovaTarefa} disabled={createTarefa.isPending}>
-              {createTarefa.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            <Button
+              onClick={salvarNovaTarefa}
+              disabled={createTarefa.isPending}
+            >
+              {createTarefa.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
               Criar Tarefa
             </Button>
           </DialogFooter>
@@ -6017,7 +6335,10 @@ export default function WhatsAppInbox() {
               checked={notaFixada}
               onCheckedChange={(v) => setNotaFixada(v === true)}
             />
-            <Label htmlFor="nota-fixada" className="text-sm font-normal cursor-pointer">
+            <Label
+              htmlFor="nota-fixada"
+              className="text-sm font-normal cursor-pointer"
+            >
               Fixar no início do chat
             </Label>
           </div>
@@ -6026,7 +6347,9 @@ export default function WhatsAppInbox() {
               Cancelar
             </Button>
             <Button onClick={salvarNotaManual} disabled={addNota.isPending}>
-              {addNota.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {addNota.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
               Adicionar nota
             </Button>
           </DialogFooter>

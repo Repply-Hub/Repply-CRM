@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, FileText } from 'lucide-react';
+import { Download, Loader2, FileText, MessageSquareText } from 'lucide-react';
 
 export interface FilePreviewTarget {
   url: string;
   nome: string;
   mime?: string | null;
+  msgId?: string;
 }
 
 type Kind = 'pdf' | 'spreadsheet' | 'docx' | 'unsupported';
@@ -122,9 +123,11 @@ function PreviewError() {
 export function FilePreviewDialog({
   file,
   onClose,
+  onJumpToMessage,
 }: {
   file: FilePreviewTarget | null;
   onClose: () => void;
+  onJumpToMessage?: (msgId: string) => void;
 }) {
   const kind = file ? kindOf(file.nome, file.mime) : 'unsupported';
 
@@ -134,13 +137,25 @@ export function FilePreviewDialog({
         <DialogHeader>
           <div className="flex items-center justify-between gap-3 pr-6">
             <DialogTitle className="truncate">{file?.nome}</DialogTitle>
-            {file && (
-              <a href={file.url} download={file.nome} target="_blank" rel="noopener noreferrer">
-                <Button size="sm" variant="outline" className="gap-1.5 shrink-0">
-                  <Download className="h-3.5 w-3.5" /> Baixar
+            <div className="flex items-center gap-2 shrink-0">
+              {file?.msgId && onJumpToMessage && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => onJumpToMessage(file.msgId!)}
+                >
+                  <MessageSquareText className="h-3.5 w-3.5" /> Ver na conversa
                 </Button>
-              </a>
-            )}
+              )}
+              {file && (
+                <a href={file.url} download={file.nome} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="outline" className="gap-1.5 shrink-0">
+                    <Download className="h-3.5 w-3.5" /> Baixar
+                  </Button>
+                </a>
+              )}
+            </div>
           </div>
         </DialogHeader>
         {file && kind === 'pdf' && (
