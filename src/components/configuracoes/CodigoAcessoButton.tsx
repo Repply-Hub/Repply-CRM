@@ -9,22 +9,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export function CodigoAcessoButton() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const empresaId = profile?.empresa_id;
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const qc = useQueryClient();
   const { data: empresa, isLoading } = useQuery({
-    queryKey: ['minha_empresa', user?.id],
+    queryKey: ['minha_empresa', empresaId],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from('empresas')
         .select('id, nome, codigo_acesso, cnpj')
-        .eq('owner_id', user!.id)
+        .eq('id', empresaId)
         .maybeSingle();
       if (error) throw error;
       return data as { id: string; nome: string; codigo_acesso: string; cnpj: string | null } | null;
     },
-    enabled: !!user,
+    enabled: !!user && !!empresaId,
   });
 
   const regenerate = useMutation({
@@ -33,11 +34,11 @@ export function CodigoAcessoButton() {
       const { error } = await (supabase as any)
         .from('empresas')
         .update({ codigo_acesso: newCode })
-        .eq('owner_id', user!.id);
+        .eq('id', empresaId);
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['minha_empresa', user?.id] });
+      qc.invalidateQueries({ queryKey: ['minha_empresa', empresaId] });
       toast.success('Código regenerado!');
     },
   });
