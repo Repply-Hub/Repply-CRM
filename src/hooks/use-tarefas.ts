@@ -15,6 +15,7 @@ export interface Tarefa {
   marcadores: string | null;
   usuario_id: string | null;
   conversa_id: string | null;
+  cliente_id: string | null;
   created_at: string;
   updated_at: string;
 }

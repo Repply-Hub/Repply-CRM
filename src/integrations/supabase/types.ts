@@ -1990,6 +1990,7 @@ export type Database = {
       tarefas: {
         Row: {
           campos_extras: Json
+          cliente_id: string | null
           conversa_id: string | null
           created_at: string
           criado_por: string | null
@@ -2008,6 +2009,7 @@ export type Database = {
         }
         Insert: {
           campos_extras?: Json
+          cliente_id?: string | null
           conversa_id?: string | null
           created_at?: string
           criado_por?: string | null
@@ -2026,6 +2028,7 @@ export type Database = {
         }
         Update: {
           campos_extras?: Json
+          cliente_id?: string | null
           conversa_id?: string | null
           created_at?: string
           criado_por?: string | null
@@ -2043,6 +2046,13 @@ export type Database = {
           usuario_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tarefas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tarefas_conversa_id_fkey"
             columns: ["conversa_id"]

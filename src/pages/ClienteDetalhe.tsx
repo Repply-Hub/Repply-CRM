@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { usePedidos } from '@/hooks/use-pedidos';
+import { useTarefas, useCreateTarefa } from '@/hooks/use-tarefas';
 import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown, Users, X, HardHat } from 'lucide-react';
+import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown, Users, X, HardHat, ListChecks } from 'lucide-react';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { toast } from 'sonner';
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
@@ -49,7 +50,9 @@ const ClienteDetalhe = () => {
   const { data: clientes, isLoading: loadingClientes } = useClientes();
   const { data: pedidosResult, isLoading: loadingPedidos } = usePedidos(undefined, 0, 500);
   const pedidos = pedidosResult?.data ?? [];
-  
+  const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
+  const createTarefa = useCreateTarefa();
+
   // Debug log
   console.log('ClienteDetalhe - slug:', slug, 'extracted id:', id);
   if (clientes) {
@@ -73,6 +76,10 @@ const ClienteDetalhe = () => {
   const [novaObra, setNovaObra] = useState({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
   const [pedidosPage, setPedidosPage] = useState(1);
   const PEDIDOS_PAGE_SIZE = 5;
+  const [addTarefaOpen, setAddTarefaOpen] = useState(false);
+  const [novaTarefa, setNovaTarefa] = useState({ titulo: '', prazo_final: '' });
+  const [tarefasPage, setTarefasPage] = useState(1);
+  const TAREFAS_PAGE_SIZE = 5;
 
   const copyInfo = async (label: string, value?: string | null) => {
     if (!value?.trim()) return;
@@ -85,6 +92,9 @@ const ClienteDetalhe = () => {
   };
 
   const cliente = clientes?.find(c => c.id === id);
+  const selectedViewOrder = useMemo(() =>
+    (pedidos ?? []).find(p => p.id === viewOrderId),
+  [pedidos, viewOrderId]);
   const pedidosCliente = useMemo(() => (pedidos ?? []).filter(p => p.cliente_id === id), [pedidos, id]);
   const totalPedidosPages = Math.max(1, Math.ceil(pedidosCliente.length / PEDIDOS_PAGE_SIZE));
   const paginatedPedidos = useMemo(() => 
@@ -92,6 +102,12 @@ const ClienteDetalhe = () => {
     [pedidosCliente, pedidosPage]
   );
   const contatosExtras = (contatos ?? []).filter((c: any) => cliente && c.empresa === cliente.empresa);
+  const tarefasCliente = useMemo(() => (tarefas ?? []).filter(t => t.cliente_id === id), [tarefas, id]);
+  const totalTarefasPages = Math.max(1, Math.ceil(tarefasCliente.length / TAREFAS_PAGE_SIZE));
+  const paginatedTarefas = useMemo(() =>
+    tarefasCliente.slice((tarefasPage - 1) * TAREFAS_PAGE_SIZE, tarefasPage * TAREFAS_PAGE_SIZE),
+    [tarefasCliente, tarefasPage]
+  );
 
   // Edit form state
   const [editData, setEditData] = useState({
@@ -187,10 +203,6 @@ const ClienteDetalhe = () => {
 
   const Icon = tipoIcons[cliente.tipo] ?? Building2;
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
-
-  const selectedViewOrder = useMemo(() => 
-    (pedidos ?? []).find(p => p.id === viewOrderId),
-  [pedidos, viewOrderId]);
 
   const viewOrderSheet = (
     <Dialog open={!!viewOrderId} onOpenChange={(open) => !open && setViewOrderId(null)}>
@@ -834,6 +846,131 @@ const ClienteDetalhe = () => {
               />
             )}
           </CardContent>
+        </Card>
+
+        {/* Tarefas */}
+        <Card className="border-border/40">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ListChecks className="h-4 w-4 text-primary" />
+              Tarefas Vinculadas
+              {tarefasCliente.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{tarefasCliente.length}</Badge>
+              )}
+            </CardTitle>
+            <Button size="sm" onClick={() => setAddTarefaOpen(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" /> Nova Tarefa
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {loadingTarefas ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Tarefa</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Prazo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tarefasCliente.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                          Nenhuma tarefa vinculada a este cliente.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedTarefas.map(t => (
+                        <TableRow key={t.id} className="cursor-pointer hover:bg-muted/30" onClick={() => navigate('/tarefas')}>
+                          <TableCell className="font-medium">{t.titulo}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">{t.status.replace(/_/g, ' ')}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {t.prazo_final ? new Date(t.prazo_final).toLocaleDateString('pt-BR') : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            {tarefasCliente.length > TAREFAS_PAGE_SIZE && (
+              <ListPagination
+                page={tarefasPage}
+                totalPages={totalTarefasPages}
+                totalItems={tarefasCliente.length}
+                pageSize={TAREFAS_PAGE_SIZE}
+                onPageChange={setTarefasPage}
+                onPageSizeChange={() => {}}
+                itemLabel="tarefa"
+                className="mt-4 border-t pt-4"
+              />
+            )}
+          </CardContent>
+
+          <Dialog open={addTarefaOpen} onOpenChange={setAddTarefaOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Nova Tarefa</DialogTitle>
+              </DialogHeader>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!novaTarefa.titulo.trim()) {
+                    toast.error('O título da tarefa é obrigatório');
+                    return;
+                  }
+                  try {
+                    await createTarefa.mutateAsync({
+                      titulo: novaTarefa.titulo,
+                      status: 'pendente',
+                      prazo_final: novaTarefa.prazo_final ? new Date(novaTarefa.prazo_final).toISOString() : null,
+                      cliente_id: id!,
+                    });
+                    toast.success('Tarefa cadastrada com sucesso!');
+                    setNovaTarefa({ titulo: '', prazo_final: '' });
+                    setAddTarefaOpen(false);
+                  } catch (err: any) {
+                    toast.error('Erro ao cadastrar tarefa: ' + err.message);
+                  }
+                }}
+                className="space-y-4 pt-4"
+              >
+                <div className="space-y-2">
+                  <Label>Título *</Label>
+                  <Input
+                    value={novaTarefa.titulo}
+                    onChange={e => setNovaTarefa(t => ({ ...t, titulo: e.target.value }))}
+                    placeholder="Ex: Ligar para confirmar entrega"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Prazo</Label>
+                  <Input
+                    type="datetime-local"
+                    value={novaTarefa.prazo_final}
+                    onChange={e => setNovaTarefa(t => ({ ...t, prazo_final: e.target.value }))}
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setAddTarefaOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={createTarefa.isPending}>
+                    {createTarefa.isPending ? 'Cadastrando...' : 'Adicionar Tarefa'}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </Card>
 
         {/* Excluir cliente */}
