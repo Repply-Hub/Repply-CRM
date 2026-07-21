@@ -17,6 +17,7 @@ export function useCreateCliente() {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       const { data: created, error } = await supabase.from('clientes').insert({
         ...insertData,
+        data_criacao: new Date().toISOString().slice(0, 10),
         usuario_id: vid,
       }).select('id').single();
       if (error) throw error;
@@ -39,6 +40,7 @@ export function useCreateContato() {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       const { error } = await supabase.from('contatos').insert({
         ...data,
+        data_criacao: new Date().toISOString().slice(0, 10),
         usuario_id: vid,
       });
       if (error) throw error;
