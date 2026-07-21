@@ -1,115 +1,273 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useFabricantes } from '@/hooks/use-clientes';
-import { useCreateFabricante } from '@/hooks/use-mutations';
-import { useTabelaPrecos, useCreatePreco, useUpdatePreco, useDeletePreco, useUpdateFabricante, useDeleteFabricante, useCategorias } from '@/hooks/use-fabricantes';
-import { Plus, Loader2, CheckCircle2, Search, Pencil, Trash2, Factory, Package, Phone, Mail, User, ArrowLeft, Hash, Upload, ImageIcon, Eye } from 'lucide-react';
-import { toast } from 'sonner';
-import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
-import { useTableSettings } from '@/hooks/use-table-settings';
-import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { AppLayout } from "@/components/layout/AppLayout";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { ListPagination } from '@/components/shared/ListPagination';
-import { ProductImageUpload } from '@/components/catalogo/ProductImageUpload';
-import { ImportCatalogoDialog } from '@/components/catalogo/ImportCatalogoDialog';
-import { GlobalImportCatalogoDialog } from '@/components/catalogo/GlobalImportCatalogoDialog';
-import { cn } from '@/lib/utils';
-import { FilterButton } from '@/components/shared/FilterButton';
-import { Filter } from 'lucide-react';
-import { SearchableSelect } from '@/components/shared/SearchableSelect';
-import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
-import { ProductForm } from '@/components/catalogo/ProductForm';
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useFabricantes } from "@/hooks/use-clientes";
+import { useCreateFabricante } from "@/hooks/use-mutations";
+import {
+  useTabelaPrecos,
+  useCreatePreco,
+  useUpdatePreco,
+  useDeletePreco,
+  useUpdateFabricante,
+  useDeleteFabricante,
+  useCategorias,
+} from "@/hooks/use-fabricantes";
+import {
+  Plus,
+  Loader2,
+  CheckCircle2,
+  Search,
+  Pencil,
+  Trash2,
+  Factory,
+  Package,
+  Phone,
+  Mail,
+  User,
+  ArrowLeft,
+  Hash,
+  Upload,
+  ImageIcon,
+  Eye,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  ColumnSettings,
+  type ColumnDefinition,
+} from "@/components/shared/ColumnSettings";
+import { useTableSettings } from "@/hooks/use-table-settings";
+import {
+  maskCnpj,
+  unmaskCnpj,
+  isValidCnpjDigits,
+  fetchCnpjData,
+} from "@/lib/cnpj";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ListPagination } from "@/components/shared/ListPagination";
+import { ProductImageUpload } from "@/components/catalogo/ProductImageUpload";
+import { ImportCatalogoDialog } from "@/components/catalogo/ImportCatalogoDialog";
+import { GlobalImportCatalogoDialog } from "@/components/catalogo/GlobalImportCatalogoDialog";
+import { cn } from "@/lib/utils";
+import { FilterButton } from "@/components/shared/FilterButton";
+import { Filter } from "lucide-react";
+import { SearchableSelect } from "@/components/shared/SearchableSelect";
+import { SearchWithRecent } from "@/components/shared/SearchWithRecent";
+import { ProductForm } from "@/components/catalogo/ProductForm";
 
 const PRECOS_COLUMNS: ColumnDefinition[] = [
-  { id: 'descricao', label: 'Produto', locked: false },
-  { id: 'imagem', label: 'Fotos', locked: false },
-  { id: 'estoque', label: 'Estoque Disponível', locked: false },
-  { id: 'unidade', label: 'Unidade de Medida', locked: false },
-  { id: 'preco', label: 'Preço de Varejo', locked: false },
-  { id: 'categoria', label: 'Categoria', locked: false },
-  { id: 'referencia', label: 'Referência', locked: false },
-  { id: 'status', label: 'Status', locked: false },
-  { id: 'acoes', label: 'Ações', locked: false },
+  { id: "descricao", label: "Produto", locked: false },
+  { id: "imagem", label: "Fotos", locked: false },
+  { id: "estoque", label: "Estoque Disponível", locked: false },
+  { id: "unidade", label: "Unidade de Medida", locked: false },
+  { id: "preco", label: "Preço de Varejo", locked: false },
+  { id: "categoria", label: "Categoria", locked: false },
+  { id: "referencia", label: "Referência", locked: false },
+  { id: "status", label: "Status", locked: false },
+  { id: "acoes", label: "Ações", locked: false },
 ];
 
 // ─── Fabricante Form Dialog ─────────────────────────────────────────
-function FabricanteForm({ open, onOpenChange, editData }: {
+function FabricanteForm({
+  open,
+  onOpenChange,
+  editData,
+}: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  editData?: { id: string; nome: string; cnpj?: string | null; nome_contato?: string | null; telefone?: string | null };
+  editData?: {
+    id: string;
+    nome: string;
+    cnpj?: string | null;
+    nome_contato?: string | null;
+    telefone?: string | null;
+  };
 }) {
   const createFabricante = useCreateFabricante();
   const updateFabricante = useUpdateFabricante();
-  const [cnpj, setCnpj] = useState(editData?.cnpj ?? '');
-  const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
-  const [nome, setNome] = useState(editData?.nome ?? '');
-  const [contato, setContato] = useState(editData?.nome_contato ?? '');
-  const [telefone, setTelefone] = useState(editData?.telefone ?? '');
+  const [cnpj, setCnpj] = useState(editData?.cnpj ?? "");
+  const [cnpjStatus, setCnpjStatus] = useState<
+    "idle" | "loading" | "valid" | "invalid"
+  >("idle");
+  const [nome, setNome] = useState(editData?.nome ?? "");
+  const [contato, setContato] = useState(editData?.nome_contato ?? "");
+  const [telefone, setTelefone] = useState(editData?.telefone ?? "");
 
-  const reset = () => { setCnpj(''); setCnpjStatus('idle'); setNome(''); setContato(''); setTelefone(''); };
+  const reset = () => {
+    setCnpj("");
+    setCnpjStatus("idle");
+    setNome("");
+    setContato("");
+    setTelefone("");
+  };
 
   const handleCnpjBlur = async () => {
     const digits = unmaskCnpj(cnpj);
     if (digits.length !== 14) return;
-    if (!isValidCnpjDigits(digits)) { setCnpjStatus('invalid'); toast.error('CNPJ inválido'); return; }
-    setCnpjStatus('loading');
+    if (!isValidCnpjDigits(digits)) {
+      setCnpjStatus("invalid");
+      toast.error("CNPJ inválido");
+      return;
+    }
+    setCnpjStatus("loading");
     try {
       const data = await fetchCnpjData(digits);
-      setCnpjStatus('valid');
+      setCnpjStatus("valid");
       if (data.razao_social && !nome) setNome(data.razao_social);
       if (data.ddd_telefone_1 && !telefone) setTelefone(data.ddd_telefone_1);
-      toast.success('CNPJ validado!');
-    } catch { setCnpjStatus('invalid'); toast.error('CNPJ não encontrado'); }
+      toast.success("CNPJ validado!");
+    } catch {
+      setCnpjStatus("invalid");
+      toast.error("CNPJ não encontrado");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (unmaskCnpj(cnpj).length === 14 && !isValidCnpjDigits(unmaskCnpj(cnpj))) { toast.error('CNPJ inválido'); return; }
+    if (
+      unmaskCnpj(cnpj).length === 14 &&
+      !isValidCnpjDigits(unmaskCnpj(cnpj))
+    ) {
+      toast.error("CNPJ inválido");
+      return;
+    }
     try {
       if (editData) {
-        await updateFabricante.mutateAsync({ id: editData.id, nome, cnpj: cnpj || undefined, nome_contato: contato || undefined, telefone: telefone || undefined });
-        toast.success('Fabricante atualizado!');
+        await updateFabricante.mutateAsync({
+          id: editData.id,
+          nome,
+          cnpj: cnpj || undefined,
+          nome_contato: contato || undefined,
+          telefone: telefone || undefined,
+        });
+        toast.success("Fabricante atualizado!");
       } else {
-        await createFabricante.mutateAsync({ nome, cnpj: cnpj || undefined, nome_contato: contato || undefined, telefone: telefone || undefined });
-        toast.success('Fabricante cadastrado!');
+        await createFabricante.mutateAsync({
+          nome,
+          cnpj: cnpj || undefined,
+          nome_contato: contato || undefined,
+          telefone: telefone || undefined,
+        });
+        toast.success("Fabricante cadastrado!");
       }
       reset();
       onOpenChange(false);
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
   const isPending = createFabricante.isPending || updateFabricante.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o);
+        if (!o) reset();
+      }}
+    >
       <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader><DialogTitle>{editData ? 'Editar' : 'Cadastrar'} Fabricante</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>
+            {editData ? "Editar" : "Cadastrar"} Fabricante
+          </DialogTitle>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
             <Label>CNPJ</Label>
             <div className="relative">
-              <Input value={cnpj} onChange={e => { setCnpj(maskCnpj(e.target.value)); setCnpjStatus('idle'); }} onBlur={handleCnpjBlur} placeholder="00.000.000/0000-00"
-                className={cnpjStatus === 'invalid' ? 'border-destructive' : cnpjStatus === 'valid' ? 'border-green-500' : ''} />
-              {cnpjStatus === 'loading' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
-              {cnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
+              <Input
+                value={cnpj}
+                onChange={(e) => {
+                  setCnpj(maskCnpj(e.target.value));
+                  setCnpjStatus("idle");
+                }}
+                onBlur={handleCnpjBlur}
+                placeholder="00.000.000/0000-00"
+                className={
+                  cnpjStatus === "invalid"
+                    ? "border-destructive"
+                    : cnpjStatus === "valid"
+                      ? "border-green-500"
+                      : ""
+                }
+              />
+              {cnpjStatus === "loading" && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+              {cnpjStatus === "valid" && (
+                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+              )}
             </div>
           </div>
-          <div><Label>Nome</Label><Input value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome do fabricante" /></div>
-          <div><Label>Contato</Label><Input value={contato} onChange={e => setContato(e.target.value)} placeholder="Nome do contato" /></div>
-          <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000" /></div>
-          <Button type="submit" className="w-full" disabled={isPending}>{isPending ? 'Salvando...' : 'Salvar'}</Button>
+          <div>
+            <Label>Nome</Label>
+            <Input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Nome do fabricante"
+            />
+          </div>
+          <div>
+            <Label>Contato</Label>
+            <Input
+              value={contato}
+              onChange={(e) => setContato(e.target.value)}
+              placeholder="Nome do contato"
+            />
+          </div>
+          <div>
+            <Label>Telefone</Label>
+            <Input
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              placeholder="(00) 0000-0000"
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={isPending}>
+            {isPending ? "Salvando..." : "Salvar"}
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
@@ -119,7 +277,11 @@ function FabricanteForm({ open, onOpenChange, editData }: {
 // ProductForm component is now imported from @/components/catalogo/ProductForm
 
 // ─── Fabricante Card Component ──────────────────────────────────────
-function FabricanteCard({ fab, isSelected, onClick }: {
+function FabricanteCard({
+  fab,
+  isSelected,
+  onClick,
+}: {
   fab: any;
   isSelected: boolean;
   onClick: () => void;
@@ -128,18 +290,23 @@ function FabricanteCard({ fab, isSelected, onClick }: {
     <button
       onClick={onClick}
       className={`w-full text-left p-4 rounded-xl border transition-all duration-200 group
-        ${isSelected
-          ? 'border-primary bg-primary/8 shadow-[var(--shadow-card-hover)] ring-1 ring-primary/20'
-          : 'border-border/60 hover:border-primary/30 hover:bg-muted/40 hover:shadow-[var(--shadow-card)]'
+        ${
+          isSelected
+            ? "border-primary bg-primary/8 shadow-[var(--shadow-card-hover)] ring-1 ring-primary/20"
+            : "border-border/60 hover:border-primary/30 hover:bg-muted/40 hover:shadow-[var(--shadow-card)]"
         }`}
     >
       <div className="flex items-start gap-3">
-        <div className={`flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center transition-colors duration-200
-          ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'}`}>
+        <div
+          className={`flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center transition-colors duration-200
+          ${isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"}`}
+        >
           <Factory className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-foreground truncate">{fab.nome}</p>
+          <p className="font-semibold text-sm text-foreground truncate">
+            {fab.nome}
+          </p>
           <div className="flex items-center gap-2 mt-1">
             {fab.cnpj && (
               <span className="text-xs text-muted-foreground flex items-center gap-1 truncate">
@@ -161,7 +328,11 @@ function FabricanteCard({ fab, isSelected, onClick }: {
 }
 
 // ─── Detail Header Component ────────────────────────────────────────
-function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
+function FabricanteDetailHeader({
+  fab,
+  onEdit,
+  onDelete,
+}: {
   fab: any;
   onEdit: () => void;
   onDelete: () => void;
@@ -176,7 +347,9 @@ function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
               <Factory className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-foreground font-bold text-base sm:text-lg truncate">{fab.nome}</h2>
+              <h2 className="text-foreground font-bold text-base sm:text-lg truncate">
+                {fab.nome}
+              </h2>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 sm:mt-2">
                 {fab.cnpj && (
                   <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
@@ -200,11 +373,21 @@ function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5 h-9">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onEdit}
+              className="gap-1.5 h-9"
+            >
               <Pencil className="h-3.5 w-3.5" />
               <span>Editar</span>
             </Button>
-            <Button variant="destructive" size="sm" onClick={onDelete} className="gap-1.5 h-9">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={onDelete}
+              className="gap-1.5 h-9"
+            >
               <Trash2 className="h-3.5 w-3.5" />
               <span>Excluir</span>
             </Button>
@@ -219,18 +402,21 @@ function FabricanteDetailHeader({ fab, onEdit, onDelete }: {
 const Fabricantes = () => {
   const { data: fabricantes, isLoading } = useFabricantes();
   const [selectedFabId, setSelectedFabId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [fabDialog, setFabDialog] = useState(false);
   const [editFab, setEditFab] = useState<any>(null);
   const [precoDialog, setPrecoDialog] = useState(false);
   const [editPreco, setEditPreco] = useState<any>(null);
   const [importDialog, setImportDialog] = useState(false);
-  const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
+  const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   const [globalImportOpen, setGlobalImportOpen] = useState(false);
-  const [deleteAlert, setDeleteAlert] = useState<{ type: 'fab' | 'preco'; id: string } | null>(null);
+  const [deleteAlert, setDeleteAlert] = useState<{
+    type: "fab" | "preco";
+    id: string;
+  } | null>(null);
 
   const {
     columns: precoColumns,
@@ -247,57 +433,60 @@ const Fabricantes = () => {
     presets: precoPresets,
     savePreset: savePrecoPreset,
     loadPreset: loadPrecoPreset,
-    deletePreset: deletePrecoPreset
+    deletePreset: deletePrecoPreset,
   } = useTableSettings({
-    key: 'fabricantes_precos',
+    key: "fabricantes_precos",
     defaultColumns: PRECOS_COLUMNS,
   });
 
   const deleteFabricante = useDeleteFabricante();
   const deletePreco = useDeletePreco();
-  const { data: precos, isLoading: loadingPrecos } = useTabelaPrecos(selectedFabId);
+  const { data: precos, isLoading: loadingPrecos } =
+    useTabelaPrecos(selectedFabId);
 
-  const selectedFab = fabricantes?.find(f => f.id === selectedFabId);
+  const selectedFab = fabricantes?.find((f) => f.id === selectedFabId);
   const fabricantesList = [...(fabricantes ?? [])]
-    .filter(f => (f.nome || '').toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      if (a.id === selectedFabId) return -1;
-      if (b.id === selectedFabId) return 1;
-      return (a.nome || '').localeCompare(b.nome || '');
-    });
+    .filter((f) => (f.nome || "").toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
 
-  const categoriasPreco = Array.from(new Set((precos ?? []).map((p: any) => p.categoria).filter(Boolean))) as string[];
-  const precosFiltrados = (precos ?? []).filter((p: any) => filtroCategoria === 'todas' || p.categoria === filtroCategoria);
+  const categoriasPreco = Array.from(
+    new Set((precos ?? []).map((p: any) => p.categoria).filter(Boolean)),
+  ) as string[];
+  const precosFiltrados = (precos ?? []).filter(
+    (p: any) => filtroCategoria === "todas" || p.categoria === filtroCategoria,
+  );
 
-  const hasFilters = filtroCategoria !== 'todas';
-  const activeFilterCount = (filtroCategoria !== 'todas' ? 1 : 0);
-
+  const hasFilters = filtroCategoria !== "todas";
+  const activeFilterCount = filtroCategoria !== "todas" ? 1 : 0;
 
   // precoColumns is now handled by the hook
 
-
-  const handleSearchChange = (val: string) => { setSearch(val); };
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+  };
 
   const handleDelete = async () => {
     if (!deleteAlert) return;
     try {
-      if (deleteAlert.type === 'fab') {
+      if (deleteAlert.type === "fab") {
         const { error: precosError } = await supabase
-          .from('tabela_precos')
+          .from("tabela_precos")
           .delete()
-          .eq('fabricante_id', deleteAlert.id);
+          .eq("fabricante_id", deleteAlert.id);
         if (precosError) throw precosError;
         await deleteFabricante.mutateAsync(deleteAlert.id);
         if (selectedFabId === deleteAlert.id) setSelectedFabId(null);
-        toast.success('Fabricante excluído!');
+        toast.success("Fabricante excluído!");
       } else {
         await deletePreco.mutateAsync(deleteAlert.id);
-        toast.success('Item excluído!');
+        toast.success("Item excluído!");
       }
     } catch (err: any) {
-      const msg = err.message || '';
-      if (msg.includes('violates foreign key') || msg.includes('referenced')) {
-        toast.error('Este fabricante possui pedidos vinculados e não pode ser excluído.');
+      const msg = err.message || "";
+      if (msg.includes("violates foreign key") || msg.includes("referenced")) {
+        toast.error(
+          "Este fabricante possui pedidos vinculados e não pode ser excluído.",
+        );
       } else {
         toast.error(msg);
       }
@@ -309,13 +498,17 @@ const Fabricantes = () => {
   const showingDetail = !!selectedFab;
 
   return (
-    <AppLayout title="Fabricantes & Tabelas de Preço" subtitle={`${fabricantes?.length ?? 0} fabricantes cadastrados`} mainClassName="flex-1 overflow-hidden flex flex-col">
+    <AppLayout
+      title="Fabricantes & Tabelas de Preço"
+      subtitle={`${fabricantes?.length ?? 0} fabricantes cadastrados`}
+      mainClassName="flex-1 overflow-hidden flex flex-col"
+    >
       <div className="p-4 md:p-6 w-full flex-1 flex flex-col min-h-0 h-full">
-
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0 h-full lg:grid-rows-1">
-
           {/* ── Left Panel: Fabricantes List ─────────────────────── */}
-          <div className={`lg:col-span-4 xl:col-span-3 flex flex-col min-h-0 self-start ${showingDetail ? 'hidden lg:block' : ''}`}>
+          <div
+            className={`lg:col-span-4 xl:col-span-3 flex flex-col min-h-0 self-start ${showingDetail ? "hidden lg:block" : ""}`}
+          >
             <Card className="rounded-xl border-border/60 flex flex-col overflow-hidden h-[795px] w-full">
               <CardHeader className="pb-3 flex-none">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -324,7 +517,8 @@ const Fabricantes = () => {
                       <Factory className="h-4 w-4 text-primary" /> Fabricantes
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      {fabricantesList.length} cadastrado{fabricantesList.length !== 1 ? 's' : ''}
+                      {fabricantesList.length} cadastrado
+                      {fabricantesList.length !== 1 ? "s" : ""}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -339,7 +533,10 @@ const Fabricantes = () => {
                     </Button>
                     <Button
                       size="sm"
-                      onClick={() => { setEditFab(null); setFabDialog(true); }}
+                      onClick={() => {
+                        setEditFab(null);
+                        setFabDialog(true);
+                      }}
                       className="gap-1.5 h-9 bg-primary hover:bg-primary/90"
                     >
                       <Plus className="h-4 w-4" /> Novo
@@ -364,12 +561,16 @@ const Fabricantes = () => {
                 ) : fabricantesList.length === 0 ? (
                   <div className="flex flex-col items-center justify-center flex-1 text-center">
                     <Factory className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                    <p className="text-sm text-muted-foreground font-medium">Nenhum fabricante cadastrado</p>
-                    <p className="text-xs text-muted-foreground/70 mt-1">Clique em "Novo Fabricante" para adicionar.</p>
+                    <p className="text-sm text-muted-foreground font-medium">
+                      Nenhum fabricante cadastrado
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      Clique em "Novo Fabricante" para adicionar.
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-2 flex-1 overflow-y-auto pr-1">
-                    {fabricantesList.map(f => (
+                    {fabricantesList.map((f) => (
                       <div key={f.id} id={`fab-card-${f.id}`}>
                         <FabricanteCard
                           fab={f}
@@ -385,7 +586,9 @@ const Fabricantes = () => {
           </div>
 
           {/* ── Right Panel: Details + Price Table ───────────────── */}
-          <div className={`lg:col-span-8 xl:col-span-9 flex flex-col gap-4 min-h-0 h-full ${!showingDetail ? 'hidden lg:block' : ''}`}>
+          <div
+            className={`lg:col-span-8 xl:col-span-9 flex flex-col gap-4 min-h-0 h-full ${!showingDetail ? "hidden lg:block" : ""}`}
+          >
             {selectedFab ? (
               <>
                 {/* Mobile back button */}
@@ -401,8 +604,13 @@ const Fabricantes = () => {
                 <div className="flex-none">
                   <FabricanteDetailHeader
                     fab={selectedFab}
-                    onEdit={() => { setEditFab(selectedFab); setFabDialog(true); }}
-                    onDelete={() => setDeleteAlert({ type: 'fab', id: selectedFab.id })}
+                    onEdit={() => {
+                      setEditFab(selectedFab);
+                      setFabDialog(true);
+                    }}
+                    onDelete={() =>
+                      setDeleteAlert({ type: "fab", id: selectedFab.id })
+                    }
                   />
                 </div>
 
@@ -412,25 +620,33 @@ const Fabricantes = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <CardTitle className="text-base font-bold flex items-center gap-2">
-                          <Package className="h-4 w-4 text-primary" /> Catálogo de Produtos
+                          <Package className="h-4 w-4 text-primary" /> Catálogo
+                          de Produtos
                         </CardTitle>
                         <CardDescription className="text-xs mt-0.5">
-                          {precos?.length ?? 0} produto{(precos?.length ?? 0) !== 1 ? 's' : ''} cadastrado{(precos?.length ?? 0) !== 1 ? 's' : ''}
+                          {precos?.length ?? 0} produto
+                          {(precos?.length ?? 0) !== 1 ? "s" : ""} cadastrado
+                          {(precos?.length ?? 0) !== 1 ? "s" : ""}
                         </CardDescription>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <FilterButton
                           hasFilters={hasFilters}
                           activeFilterCount={activeFilterCount}
-                          onClear={() => setFiltroCategoria('todas')}
+                          onClear={() => setFiltroCategoria("todas")}
                           className="h-9"
                         >
                           <div className="space-y-2">
-                            <Label className="text-xs uppercase text-muted-foreground font-semibold">Categoria</Label>
+                            <Label className="text-xs uppercase text-muted-foreground font-semibold">
+                              Categoria
+                            </Label>
                             <SearchableSelect
                               options={[
                                 { value: "todas", label: "Todas categorias" },
-                                ...categoriasPreco.map(c => ({ value: c, label: c }))
+                                ...categoriasPreco.map((c) => ({
+                                  value: c,
+                                  label: c,
+                                })),
                               ]}
                               value={filtroCategoria}
                               onValueChange={setFiltroCategoria}
@@ -476,10 +692,12 @@ const Fabricantes = () => {
                           <span>Importar</span>
                         </Button>
 
-
                         <Button
                           size="sm"
-                          onClick={() => { setEditPreco(null); setPrecoDialog(true); }}
+                          onClick={() => {
+                            setEditPreco(null);
+                            setPrecoDialog(true);
+                          }}
                           className="gap-1.5 h-9 bg-primary hover:bg-primary/90"
                         >
                           <Plus className="h-4 w-4" />
@@ -498,8 +716,15 @@ const Fabricantes = () => {
                         <Table>
                           <TableHeader className="sticky top-0 bg-background/95 backdrop-blur z-10 shadow-sm">
                             <TableRow className="bg-muted/30 hover:bg-muted/30">
-                              {visiblePrecoColumns.map(colId => (
-                                <TableHead key={colId} className={cn("text-xs font-semibold whitespace-nowrap px-4 py-3", colId === 'imagem' && "w-16", colId === 'acoes' && "w-20")}>
+                              {visiblePrecoColumns.map((colId) => (
+                                <TableHead
+                                  key={colId}
+                                  className={cn(
+                                    "text-xs font-semibold whitespace-nowrap px-4 py-3",
+                                    colId === "imagem" && "w-16",
+                                    colId === "acoes" && "w-20",
+                                  )}
+                                >
                                   {getPrecoLabel(colId)}
                                 </TableHead>
                               ))}
@@ -510,58 +735,130 @@ const Fabricantes = () => {
                               const camposExtras = p.campos_extras || {};
                               return (
                                 <TableRow key={p.id} className="group">
-                                  {visiblePrecoColumns.map(colId => {
-                                    const isCustom = colId.startsWith('custom_');
+                                  {visiblePrecoColumns.map((colId) => {
+                                    const isCustom =
+                                      colId.startsWith("custom_");
                                     if (isCustom) {
                                       return (
-                                        <TableCell key={colId} className="text-xs text-muted-foreground">
-                                          {camposExtras[colId] || '—'}
+                                        <TableCell
+                                          key={colId}
+                                          className="text-xs text-muted-foreground"
+                                        >
+                                          {camposExtras[colId] || "—"}
                                         </TableCell>
                                       );
                                     }
 
                                     switch (colId) {
-                                      case 'imagem':
+                                      case "imagem":
                                         return (
                                           <TableCell key={colId}>
                                             <div className="h-10 w-10 rounded-md bg-muted/40 border border-border/40 overflow-hidden flex items-center justify-center">
                                               {p.imagem_url ? (
-                                                <img src={p.imagem_url} alt={p.descricao_material} className="h-full w-full object-cover" loading="lazy" />
+                                                <img
+                                                  src={p.imagem_url}
+                                                  alt={p.descricao_material}
+                                                  className="h-full w-full object-cover"
+                                                  loading="lazy"
+                                                />
                                               ) : (
                                                 <ImageIcon className="h-4 w-4 text-muted-foreground/40" />
                                               )}
                                             </div>
                                           </TableCell>
                                         );
-                                      case 'descricao':
-                                        return <TableCell key={colId} className="font-medium text-sm">{p.descricao_material}</TableCell>;
-                                      case 'estoque':
-                                        return <TableCell key={colId} className="text-sm text-muted-foreground">{p.estoque_disponivel ?? 0}</TableCell>;
-                                      case 'categoria':
+                                      case "descricao":
                                         return (
-                                          <TableCell key={colId} className="text-xs">
-                                            {p.categoria ? <Badge variant="secondary" className="font-normal">{p.categoria}</Badge> : <span className="text-muted-foreground">-</span>}
+                                          <TableCell
+                                            key={colId}
+                                            className="font-medium text-sm"
+                                          >
+                                            {p.descricao_material}
                                           </TableCell>
                                         );
-                                      case 'referencia':
-                                        return <TableCell key={colId} className="text-sm text-muted-foreground">{p.referencia ?? '-'}</TableCell>;
-                                      case 'preco':
+                                      case "estoque":
                                         return (
-                                          <TableCell key={colId} className="text-sm font-semibold text-foreground">
-                                            {Number(p.preco_unitario).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                          <TableCell
+                                            key={colId}
+                                            className="text-sm text-muted-foreground"
+                                          >
+                                            {p.estoque_disponivel ?? 0}
                                           </TableCell>
                                         );
-                                      case 'unidade':
-                                        return <TableCell key={colId} className="text-sm text-muted-foreground">{p.unidade ?? '-'}</TableCell>;
-                                      case 'status':
+                                      case "categoria":
+                                        return (
+                                          <TableCell
+                                            key={colId}
+                                            className="text-xs"
+                                          >
+                                            {p.categoria ? (
+                                              <Badge
+                                                variant="secondary"
+                                                className="font-normal"
+                                              >
+                                                {p.categoria}
+                                              </Badge>
+                                            ) : (
+                                              <span className="text-muted-foreground">
+                                                -
+                                              </span>
+                                            )}
+                                          </TableCell>
+                                        );
+                                      case "referencia":
+                                        return (
+                                          <TableCell
+                                            key={colId}
+                                            className="text-sm text-muted-foreground"
+                                          >
+                                            {p.referencia ?? "-"}
+                                          </TableCell>
+                                        );
+                                      case "preco":
+                                        return (
+                                          <TableCell
+                                            key={colId}
+                                            className="text-sm font-semibold text-foreground"
+                                          >
+                                            {Number(
+                                              p.preco_unitario,
+                                            ).toLocaleString("pt-BR", {
+                                              style: "currency",
+                                              currency: "BRL",
+                                            })}
+                                          </TableCell>
+                                        );
+                                      case "unidade":
+                                        return (
+                                          <TableCell
+                                            key={colId}
+                                            className="text-sm text-muted-foreground"
+                                          >
+                                            {p.unidade ?? "-"}
+                                          </TableCell>
+                                        );
+                                      case "status":
                                         return (
                                           <TableCell key={colId}>
-                                            <Badge variant={p.vigente ? 'default' : 'secondary'} className={p.vigente ? 'bg-success/15 text-success border-success/20 hover:bg-success/20' : ''}>
-                                              {p.vigente ? 'Vigente' : 'Inativo'}
+                                            <Badge
+                                              variant={
+                                                p.vigente
+                                                  ? "default"
+                                                  : "secondary"
+                                              }
+                                              className={
+                                                p.vigente
+                                                  ? "bg-success/15 text-success border-success/20 hover:bg-success/20"
+                                                  : ""
+                                              }
+                                            >
+                                              {p.vigente
+                                                ? "Vigente"
+                                                : "Inativo"}
                                             </Badge>
                                           </TableCell>
                                         );
-                                      case 'acoes':
+                                      case "acoes":
                                         return (
                                           <TableCell key={colId}>
                                             <div className="flex justify-center">
@@ -569,7 +866,10 @@ const Fabricantes = () => {
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
-                                                onClick={() => { setEditPreco(p); setPrecoDialog(true); }}
+                                                onClick={() => {
+                                                  setEditPreco(p);
+                                                  setPrecoDialog(true);
+                                                }}
                                                 title="Visualizar/Editar produto"
                                               >
                                                 <Eye className="h-4 w-4" />
@@ -578,7 +878,9 @@ const Fabricantes = () => {
                                           </TableCell>
                                         );
                                       default:
-                                        return <TableCell key={colId}>—</TableCell>;
+                                        return (
+                                          <TableCell key={colId}>—</TableCell>
+                                        );
                                     }
                                   })}
                                 </TableRow>
@@ -590,8 +892,12 @@ const Fabricantes = () => {
                     ) : (
                       <div className="flex flex-col items-center py-12 text-center">
                         <Package className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                        <p className="text-sm text-muted-foreground font-medium">Nenhum produto cadastrado</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">Adicione produtos ao catálogo deste fabricante</p>
+                        <p className="text-sm text-muted-foreground font-medium">
+                          Nenhum produto cadastrado
+                        </p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">
+                          Adicione produtos ao catálogo deste fabricante
+                        </p>
                         <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
                           <Button
                             variant="outline"
@@ -602,7 +908,10 @@ const Fabricantes = () => {
                           </Button>
                           <Button
                             className="gap-2 h-10 px-6 bg-primary hover:bg-primary/90"
-                            onClick={() => { setEditPreco(null); setPrecoDialog(true); }}
+                            onClick={() => {
+                              setEditPreco(null);
+                              setPrecoDialog(true);
+                            }}
                           >
                             <Plus className="h-4 w-4" /> Adicionar produto
                           </Button>
@@ -618,9 +927,12 @@ const Fabricantes = () => {
                   <div className="h-16 w-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
                     <Factory className="h-8 w-8 text-muted-foreground/40" />
                   </div>
-                  <p className="text-base font-medium text-muted-foreground">Selecione um fabricante</p>
+                  <p className="text-base font-medium text-muted-foreground">
+                    Selecione um fabricante
+                  </p>
                   <p className="text-sm text-muted-foreground/60 mt-1 max-w-sm">
-                    Escolha um fabricante na lista ao lado para visualizar seus detalhes e tabela de preços
+                    Escolha um fabricante na lista ao lado para visualizar seus
+                    detalhes e tabela de preços
                   </p>
                 </CardContent>
               </Card>
@@ -629,7 +941,11 @@ const Fabricantes = () => {
         </div>
       </div>
 
-      <FabricanteForm open={fabDialog} onOpenChange={setFabDialog} editData={editFab} />
+      <FabricanteForm
+        open={fabDialog}
+        onOpenChange={setFabDialog}
+        editData={editFab}
+      />
       {selectedFabId && (
         <ProductForm
           open={precoDialog}
@@ -639,7 +955,7 @@ const Fabricantes = () => {
           initialCategory={newCategoryName}
           onDeleteClick={(id) => {
             setPrecoDialog(false);
-            setDeleteAlert({ type: 'preco', id });
+            setDeleteAlert({ type: "preco", id });
           }}
         />
       )}
@@ -673,15 +989,22 @@ const Fabricantes = () => {
               <Input
                 placeholder="Ex: Cerâmicas, Ferramentas..."
                 value={newCategoryName}
-                onChange={e => setNewCategoryName(e.target.value)}
+                onChange={(e) => setNewCategoryName(e.target.value)}
                 autoFocus
               />
               <p className="text-xs text-muted-foreground">
-                Dica: Você também pode criar categorias diretamente ao adicionar ou editar um produto.
+                Dica: Você também pode criar categorias diretamente ao adicionar
+                ou editar um produto.
               </p>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
-              <Button variant="outline" className="w-full sm:w-auto" onClick={() => setNewCategoryOpen(false)}>Cancelar</Button>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => setNewCategoryOpen(false)}
+              >
+                Cancelar
+              </Button>
               <Button
                 className="w-full sm:w-auto"
                 onClick={() => {
@@ -698,17 +1021,25 @@ const Fabricantes = () => {
         </DialogContent>
       </Dialog>
 
-
-
-      <AlertDialog open={!!deleteAlert} onOpenChange={(o) => !o && setDeleteAlert(null)}>
+      <AlertDialog
+        open={!!deleteAlert}
+        onOpenChange={(o) => !o && setDeleteAlert(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>Esta ação não pode ser desfeita. Deseja continuar?</AlertDialogDescription>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Deseja continuar?
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

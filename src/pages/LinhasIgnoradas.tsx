@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { AlertTriangle, Trash2, Eye, ChevronDown, ChevronUp, ChevronRight, FileSpreadsheet, RotateCcw, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Trash2, Eye, ChevronDown, ChevronUp, ChevronRight, FileSpreadsheet, RotateCcw, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -57,6 +58,7 @@ const FALLBACK_FIELDS: Record<string, string[]> = {
 };
 
 export default function LinhasIgnoradas() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedRow, setSelectedRow] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -191,6 +193,15 @@ export default function LinhasIgnoradas() {
       subtitle="Revise e ajuste dados que não puderam ser importados automaticamente"
     >
       <div className="p-6 space-y-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2"
+          onClick={() => navigate('/')}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Voltar para Negócios
+        </Button>
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 text-muted-foreground">
             <AlertTriangle className="h-5 w-5 text-warning" />

@@ -3599,7 +3599,7 @@ export default function WhatsAppInbox() {
         viewport.scrollTop = viewport.scrollHeight;
       }
     }
-  }, [mensagens.length, atribuicaoModalOpen]);
+  }, [mensagens.length, atribuicaoModalOpen, conversaAtiva?.id]);
 
   const scrollToBottom = () => {
     const viewport = msgScrollRef.current?.closest(
