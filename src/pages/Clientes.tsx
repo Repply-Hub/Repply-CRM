@@ -144,6 +144,51 @@ const getColumnValue = (row: Record<string, any>, column?: ColumnDefinition) => 
   return undefined;
 };
 
+// Formata datas ISO ("aaaa-mm-dd" ou timestamp completo) para o padrão brasileiro
+// dd/mm/aaaa, sem passar por conversão de timezone do navegador (o valor já
+// representa a data correta em horário de Brasília, salva pelo backend).
+const formatDateBR = (value: any) => {
+  if (!value || typeof value !== 'string') return value;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return value;
+  const [, ano, mes, dia] = match;
+  return `${dia}/${mes}/${ano}`;
+};
+
+// Concatena todos os campos da linha (colunas fixas da tabela + campos_extras
+// dinâmicos do import) num único texto pesquisável, pra busca não ficar restrita
+// a empresa/nome/email.
+const buildRowSearchText = (row: Record<string, any>, tipoLabel?: string) => {
+  const staticFields = [
+    row.empresa,
+    row.razao_social,
+    row.nome_contato,
+    row.email,
+    row.telefone,
+    row.cnpj,
+    row.cargo,
+    row.classificacao,
+    tipoLabel,
+    row.tipo,
+    row.endereco,
+    row.logradouro,
+    row.numero,
+    row.complemento,
+    row.bairro,
+    row.cidade,
+    row.uf,
+    row.cep,
+  ];
+  const extraValues =
+    row.campos_extras && typeof row.campos_extras === 'object'
+      ? Object.values(row.campos_extras as Record<string, unknown>)
+      : [];
+  return [...staticFields, ...extraValues]
+    .filter((v) => v !== null && v !== undefined && v !== '')
+    .map((v) => String(v).toLowerCase())
+    .join(' ');
+};
+
 type ViewTab = 'empresas' | 'contatos';
 
 const Clientes = () => {
@@ -309,9 +354,8 @@ const Clientes = () => {
 
   const filteredEmpresas = sortByName(
     empresas.filter(c => {
-      const matchSearch = (c.empresa || '').toLowerCase().includes(search.toLowerCase()) ||
-        (c.nome_contato && c.nome_contato.toLowerCase().includes(search.toLowerCase())) ||
-        (c.email && c.email.toLowerCase().includes(search.toLowerCase()));
+      const s = search.toLowerCase();
+      const matchSearch = !s || buildRowSearchText(c, getTipoLabel(c.tipo, customTipos)).includes(s);
       const matchTipo = tipoFilter === 'todos' || c.tipo === tipoFilter;
       return matchSearch && matchTipo;
     }),
@@ -321,9 +365,7 @@ const Clientes = () => {
   const filteredContatos = sortByName(
     contatos.filter(c => {
       const s = search.toLowerCase();
-      return (c.nome_contato && c.nome_contato.toLowerCase().includes(s)) ||
-        (c.empresa && c.empresa.toLowerCase().includes(s)) ||
-        (c.email && c.email.toLowerCase().includes(s));
+      return !s || buildRowSearchText(c).includes(s);
     }),
     'nome_contato',
   );
@@ -982,6 +1024,10 @@ const Clientes = () => {
                             );
                           }
 
+                          if (colId === 'data_criacao') {
+                            value = formatDateBR(value);
+                          }
+
                           return (
                             <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")} onClick={navigateToDetail}>
                               {value || '—'}
@@ -1046,7 +1092,10 @@ const Clientes = () => {
                         {visibleColumns.map(colId => {
                           const isCustom = colId.startsWith('custom_');
                           const column = columns.find(col => col.id === colId);
-                          const value: any = getColumnValue(contato as any, column);
+                          let value: any = getColumnValue(contato as any, column);
+                          if (colId === 'data_criacao') {
+                            value = formatDateBR(value);
+                          }
 
                           if (colId === 'nome_contato') {
                             const navigateToContatoDetail = () => {
