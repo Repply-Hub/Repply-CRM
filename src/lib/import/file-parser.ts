@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { expandMergedCells } from './expand-merged-cells';
 
 export interface ParsedFile {
   headers: string[];
@@ -30,6 +31,7 @@ export async function parseImportFile(file: File): Promise<ParsedFile> {
 
 function sheetToRows(workbook: XLSX.WorkBook): ParsedFile {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  expandMergedCells(sheet);
   const matrix: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '', blankrows: false });
 
   if (matrix.length === 0) return { headers: [], rawData: [] };

@@ -17,16 +17,32 @@ function obraKey(clienteId: string, nome: string): string {
 }
 
 /**
- * Constrói filtro OR ilike para o Supabase .or().
- * Valores com vírgula são envolvidos em parênteses para não serem interpretados
- * como separadores de condições pelo PostgREST.
+ * Escapa % e _ (wildcards do ILIKE) para que nomes de cliente/fabricante que
+ * contenham esses caracteres literalmente (ex: "100% Acabamentos") não sejam
+ * interpretados como padrão de busca.
  */
+function escapeIlikeWildcards(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/**
+ * Escapa um valor para uso dentro da sintaxe .or() do PostgREST, que trata
+ * `,` `.` `:` `(` `)` como caracteres estruturais do filtro (não só vírgula).
+ * Nomes reais de empresa costumam ter ponto (Ltda.), dois-pontos ou parênteses
+ * (ex: "Azevedo & Coelho (SP)", "Cyrela S.A."), o que sem essa escapagem
+ * corrompe a query inteira e derruba o lote com 400 Bad Request.
+ */
+function escapeOrValue(value: string): string {
+  const needsQuoting = /[,.:()]/.test(value);
+  if (!needsQuoting) return value;
+  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return `"${escaped}"`;
+}
+
+/** Constrói filtro OR ilike para o Supabase .or(), com valores devidamente escapados. */
 function buildOrFilter(column: string, values: string[]): string {
   return values
-    .map(v => {
-      const condition = `${column}.ilike.${v}`;
-      return v.includes(',') ? `(${condition})` : condition;
-    })
+    .map(v => `${column}.ilike.${escapeOrValue(escapeIlikeWildcards(v))}`)
     .join(',');
 }
 
@@ -195,11 +211,11 @@ export async function resolveClienteId(nome: string, usuarioId: string): Promise
   if (cache.clientes.has(key)) return cache.clientes.get(key)!;
 
   const { data: byEmpresa } = await supabase
-    .from('clientes').select('id').ilike('empresa', nome).limit(1).maybeSingle();
+    .from('clientes').select('id').ilike('empresa', escapeIlikeWildcards(nome)).limit(1).maybeSingle();
   if (byEmpresa) { cache.clientes.set(key, byEmpresa.id); return byEmpresa.id; }
 
   const { data: byRazao } = await supabase
-    .from('clientes').select('id').ilike('razao_social', nome).limit(1).maybeSingle();
+    .from('clientes').select('id').ilike('razao_social', escapeIlikeWildcards(nome)).limit(1).maybeSingle();
   if (byRazao) { cache.clientes.set(key, byRazao.id); return byRazao.id; }
 
   const { data: created, error } = await supabase
@@ -218,7 +234,7 @@ export async function resolveFabricanteId(nome: string): Promise<string> {
   if (cache.fabricantes.has(key)) return cache.fabricantes.get(key)!;
 
   const { data: existing } = await supabase
-    .from('fabricantes').select('id').ilike('nome', nome).limit(1).maybeSingle();
+    .from('fabricantes').select('id').ilike('nome', escapeIlikeWildcards(nome)).limit(1).maybeSingle();
   if (existing) { cache.fabricantes.set(key, existing.id); return existing.id; }
 
   const { data: created, error } = await supabase
@@ -236,7 +252,7 @@ export async function resolveObraId(nome: string, clienteId: string): Promise<st
   if (cache.obras.has(key)) return cache.obras.get(key)!;
 
   const { data: existing } = await supabase
-    .from('obras').select('id').eq('cliente_id', clienteId).ilike('nome_obra', nome).limit(1).maybeSingle();
+    .from('obras').select('id').eq('cliente_id', clienteId).ilike('nome_obra', escapeIlikeWildcards(nome)).limit(1).maybeSingle();
   if (existing) { cache.obras.set(key, existing.id); return existing.id; }
 
   const { data: created, error } = await supabase

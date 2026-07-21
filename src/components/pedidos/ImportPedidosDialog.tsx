@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
+import { expandMergedCells } from '@/lib/import/expand-merged-cells';
 import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
 import { useBulkImport } from '@/hooks/use-bulk-import';
 
@@ -128,6 +129,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: 'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
+      expandMergedCells(sheet);
       const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '', raw: false });
 
       if (json.length === 0) {
@@ -204,9 +206,17 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     // Garantir que os campos básicos existam no objeto de retorno para o preview/import
     return (sanitized as any[]).map(item => {
       const { campos_extras, ...rest } = item;
+      const negocio = rest.negocio || '';
+      // Fallback: alguns exports de CRM deixam a coluna Cliente vazia, mas o título
+      // do negócio segue o padrão "Cliente | Fabricante" — resgata o nome daí.
+      let cliente = rest.cliente || '';
+      if (!cliente && negocio.includes('|')) {
+        const possivelCliente = negocio.split('|')[0].trim();
+        if (possivelCliente) cliente = possivelCliente;
+      }
       return {
-        negocio: rest.negocio || '',
-        cliente: rest.cliente || '',
+        negocio,
+        cliente,
         contato: rest.contato || '',
         obra: rest.obra || '',
         fabricante: rest.fabricante || '',
