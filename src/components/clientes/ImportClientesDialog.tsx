@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
 import { MappingStep, sanitizeImportedRows, type ExtraMappingValue } from '@/components/import/MappingStep';
+import { ImportInstructionsStep } from '@/components/import/ImportInstructionsStep';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
@@ -52,6 +53,27 @@ const TIPO_MAP: Record<string, string> = {
   hotel: 'hotel',
   escola: 'escola',
   instalador: 'instalador',
+};
+
+const FIELD_EXAMPLES: Partial<Record<FieldKey, string>> = {
+  empresa: 'Construtora Exemplo Ltda',
+  nome_contato: 'João',
+  sobrenome_contato: 'Silva',
+  razao_social: 'Construtora Exemplo Ltda',
+  tipo: 'construtora',
+  cnpj: '00.000.000/0001-00',
+  email: 'contato@exemplo.com.br',
+  telefone: '(11) 91234-5678',
+  logradouro: 'Rua Exemplo',
+  numero: '123',
+  complemento: 'Sala 4',
+  bairro: 'Centro',
+  cidade: 'São Paulo',
+  uf: 'SP',
+  cep: '01000-000',
+  cargo: 'Comprador',
+  classificacao: 'A',
+  data_criacao: '2026-01-15',
 };
 
 function normalizeText(v: string): string {
@@ -171,7 +193,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
-  const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
+  const [step, setStep] = useState<'instructions' | 'upload' | 'mapping' | 'preview'>('instructions');
   const [previewRowsSnapshot, setPreviewRowsSnapshot] = useState<any[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
@@ -179,6 +201,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const visibleFields = useMemo(
     () => FIELDS.filter(f => target === 'contatos' || !f.forContatos),
     [target]
+  );
+
+  const templateFields = useMemo(
+    () => visibleFields.map(f => ({ label: f.label, example: FIELD_EXAMPLES[f.key] })),
+    [visibleFields]
   );
 
   const reset = () => {
@@ -195,7 +222,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     setExtras({});
     setCustomColumns({});
     setFileName('');
-    setStep('upload');
+    setStep('instructions');
     setPreviewRowsSnapshot([]);
     if (fileRef.current) fileRef.current.value = '';
   };
@@ -603,7 +630,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             </DialogTitle>
           </div>
 
-          {(step !== 'upload' || importing) && (
+          {((step === 'mapping' || step === 'preview') || importing) && (
             <div className="flex items-center justify-between w-full">
               {step !== 'upload' ? (
                 <div className="flex items-center gap-4 bg-background/50 px-4 py-2 rounded-xl border border-border/50 shadow-sm">
@@ -650,6 +677,17 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
 
 
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          {step === 'instructions' && (
+            <ImportInstructionsStep
+              templateFileName={`modelo-importacao-${target === 'contatos' ? 'contatos' : 'empresas'}.xlsx`}
+              templateFields={templateFields}
+              extraTips={target === 'contatos'
+                ? ['Empresa ou Nome do contato precisam estar preenchidos em cada linha.']
+                : ['Empresa, Razão Social ou CNPJ precisam estar preenchidos em cada linha.']}
+              onContinue={() => setStep('upload')}
+            />
+          )}
+
           {step === 'upload' && (
           <div
             className="border-2 border-dashed border-border rounded-xl p-10 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"

@@ -13,6 +13,7 @@ import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
 import { expandMergedCells } from '@/lib/import/expand-merged-cells';
 import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
+import { ImportInstructionsStep } from '@/components/import/ImportInstructionsStep';
 import { useBulkImport } from '@/hooks/use-bulk-import';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
@@ -26,6 +27,21 @@ import {
 } from '@/components/import-pedidos/importPedidosUtils';
 
 const VISIBLE_FIELDS: FieldDef[] = FIELDS.map(f => ({ key: f.key, label: f.label, required: f.required }));
+
+const FIELD_EXAMPLES: Partial<Record<FieldKey, string>> = {
+  negocio: 'Construtora Exemplo | Tigre',
+  cliente: 'Construtora Exemplo Ltda',
+  contato: 'João Silva',
+  obra: 'Rua Exemplo, 123 - Centro',
+  fabricante: 'Tigre',
+  valor: '1500.00',
+  vendedor: 'Nome do Vendedor',
+  status: 'novo lead',
+  data_pedido: '2026-01-15',
+  prazo_resposta: '2026-01-30',
+  observacoes: 'Observação livre',
+};
+const TEMPLATE_FIELDS = FIELDS.map(f => ({ label: f.label, example: FIELD_EXAMPLES[f.key] }));
 
 interface ImportPedidosDialogProps {
   open: boolean;
@@ -47,7 +63,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const [importing, setImporting] = useState(false);
   const { importNegocios, progress } = useBulkImport();
   const [ignoredColumns, setIgnoredColumns] = useState<string[]>([]);
-  const [step, setStep] = useState<'upload' | 'mapping' | 'preview' | 'done'>('upload');
+  const [step, setStep] = useState<'instructions' | 'upload' | 'mapping' | 'preview' | 'done'>('instructions');
   const [importResult, setImportResult] = useState<{
     totalNoArquivo: number;
     totalValidados: number;
@@ -82,7 +98,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setCustomColumns({});
     setFieldLabels({});
     setFileName('');
-    setStep('upload');
+    setStep('instructions');
     setIgnoredColumns([]);
     setImportResult(null);
     if (fileRef.current) fileRef.current.value = '';
@@ -544,6 +560,15 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
 
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          {step === 'instructions' && (
+            <ImportInstructionsStep
+              templateFileName="modelo-importacao-negocios.xlsx"
+              templateFields={TEMPLATE_FIELDS}
+              extraTips={['Cliente e Fabricante são campos obrigatórios, confira se estão preenchidos em todas as linhas antes de importar.']}
+              onContinue={() => setStep('upload')}
+            />
+          )}
+
           {step === 'upload' && (
           <div
             className="border-2 border-dashed border-border rounded-2xl p-16 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/[0.02] transition-all group relative overflow-hidden"
