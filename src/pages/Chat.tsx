@@ -808,6 +808,10 @@ const Chat = () => {
     }
   }, [messages?.length, activeGrupoId, activeRecipientId]);
 
+  useEffect(() => {
+    setRespondendoA(null);
+  }, [activeGrupoId, activeRecipientId]);
+
   const scrollToBottom = () => {
     const scrollContainer = document.querySelector('[data-radix-scroll-area-viewport]');
     if (scrollContainer) {
