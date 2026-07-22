@@ -279,15 +279,20 @@ function VincularDialog({
   onClose: () => void;
 }) {
   const [selectedUsuarioId, setSelectedUsuarioId] = useState('');
+  const [vincularTodos, setVincularTodos] = useState(false);
   const linkMutation = useAdminLinkInstance();
 
-  useEffect(() => { if (!open) setSelectedUsuarioId(''); }, [open]);
+  useEffect(() => { if (!open) { setSelectedUsuarioId(''); setVincularTodos(false); } }, [open]);
 
   // Usuários ainda não vinculados a ESTA instância
   const jaVinculados = new Set(instancia.usuarios.map(u => u.usuario_id));
   const disponiveis = todosUsuarios.filter(u => !jaVinculados.has(u.usuario_id));
 
   function handleVincular() {
+    if (vincularTodos) {
+      linkMutation.mutate({ instanceId: instancia.id, targetUsuarioIds: disponiveis.map(u => u.usuario_id) }, { onSuccess: onClose });
+      return;
+    }
     if (!selectedUsuarioId) return;
     linkMutation.mutate({ instanceId: instancia.id, targetUsuarioId: selectedUsuarioId }, { onSuccess: onClose });
   }
@@ -309,16 +314,38 @@ function VincularDialog({
               Todos os usuários já estão vinculados a esta instância.
             </p>
           ) : (
-            <UsuarioCombobox
-              usuarios={disponiveis}
-              value={selectedUsuarioId}
-              onChange={setSelectedUsuarioId}
-            />
+            <>
+              <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border/40 bg-muted/20">
+                <div>
+                  <Label htmlFor="vincular-todos-existente" className="text-xs font-medium">
+                    Vincular a todos os usuários da empresa
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {disponiveis.length} usuário{disponiveis.length === 1 ? '' : 's'} ainda não vinculado{disponiveis.length === 1 ? '' : 's'}
+                  </p>
+                </div>
+                <Switch
+                  id="vincular-todos-existente"
+                  checked={vincularTodos}
+                  onCheckedChange={setVincularTodos}
+                />
+              </div>
+              {!vincularTodos && (
+                <UsuarioCombobox
+                  usuarios={disponiveis}
+                  value={selectedUsuarioId}
+                  onChange={setSelectedUsuarioId}
+                />
+              )}
+            </>
           )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleVincular} disabled={!selectedUsuarioId || linkMutation.isPending || disponiveis.length === 0}>
+          <Button
+            onClick={handleVincular}
+            disabled={(!vincularTodos && !selectedUsuarioId) || linkMutation.isPending || disponiveis.length === 0}
+          >
             {linkMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
             Vincular
           </Button>
@@ -340,11 +367,19 @@ function NovaInstanciaDialog({
   onClose: () => void;
 }) {
   const [selectedUsuarioId, setSelectedUsuarioId] = useState('');
+  const [vincularTodos, setVincularTodos] = useState(false);
   const createMutation = useAdminCreateInstance();
 
-  useEffect(() => { if (!open) setSelectedUsuarioId(''); }, [open]);
+  useEffect(() => { if (!open) { setSelectedUsuarioId(''); setVincularTodos(false); } }, [open]);
 
   function handleCriar() {
+    if (vincularTodos) {
+      createMutation.mutate(
+        { targetUsuarioIds: todosUsuarios.map(u => u.usuario_id) },
+        { onSuccess: onClose },
+      );
+      return;
+    }
     createMutation.mutate({ targetUsuarioId: selectedUsuarioId || undefined }, { onSuccess: onClose });
   }
 
@@ -360,17 +395,37 @@ function NovaInstanciaDialog({
           <p className="text-sm text-muted-foreground">
             Uma nova instância será criada na uazapi. Você pode vinculá-la a um ou mais usuários agora ou depois.
           </p>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Vincular a usuário <span className="font-normal">(opcional)</span>
-            </label>
-            <UsuarioCombobox
-              usuarios={todosUsuarios}
-              value={selectedUsuarioId}
-              onChange={setSelectedUsuarioId}
-              placeholder="Sem vínculo por enquanto..."
+
+          <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border/40 bg-muted/20">
+            <div>
+              <Label htmlFor="vincular-todos" className="text-xs font-medium">
+                Vincular a todos os usuários da empresa
+              </Label>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {todosUsuarios.length} usuário{todosUsuarios.length === 1 ? '' : 's'} da empresa será{todosUsuarios.length === 1 ? '' : 'ão'} vinculado{todosUsuarios.length === 1 ? '' : 's'} a esta instância
+              </p>
+            </div>
+            <Switch
+              id="vincular-todos"
+              checked={vincularTodos}
+              onCheckedChange={setVincularTodos}
+              disabled={todosUsuarios.length === 0}
             />
           </div>
+
+          {!vincularTodos && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Vincular a usuário <span className="font-normal">(opcional)</span>
+              </label>
+              <UsuarioCombobox
+                usuarios={todosUsuarios}
+                value={selectedUsuarioId}
+                onChange={setSelectedUsuarioId}
+                placeholder="Sem vínculo por enquanto..."
+              />
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>

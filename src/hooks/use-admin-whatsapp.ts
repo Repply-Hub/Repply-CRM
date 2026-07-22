@@ -27,10 +27,11 @@ export function useAdminCreateInstance() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { targetUsuarioId?: string } = {}) => {
+    mutationFn: async (params: { targetUsuarioId?: string; targetUsuarioIds?: string[] } = {}) => {
       return callAdminProvision({
         action: 'create',
         target_usuario_id: params.targetUsuarioId,
+        target_usuario_ids: params.targetUsuarioIds,
       }) as Promise<{ success: boolean; instanceName: string }>;
     },
     onSuccess: () => {
@@ -49,17 +50,18 @@ export function useAdminLinkInstance() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { instanceId: string; targetUsuarioId: string }) => {
+    mutationFn: async (params: { instanceId: string; targetUsuarioId?: string; targetUsuarioIds?: string[] }) => {
       return callAdminProvision({
         action: 'link',
         instance_id: params.instanceId,
         target_usuario_id: params.targetUsuarioId,
+        target_usuario_ids: params.targetUsuarioIds,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
       qc.invalidateQueries({ queryKey: ['admin_wa_instancias'] });
-      toast.success('Instância vinculada ao usuário');
+      toast.success((variables.targetUsuarioIds?.length ?? 0) > 1 ? 'Instância vinculada a todos os usuários' : 'Instância vinculada ao usuário');
     },
     onError: (err: any) => {
       toast.error(err?.message ?? 'Erro ao vincular instância');

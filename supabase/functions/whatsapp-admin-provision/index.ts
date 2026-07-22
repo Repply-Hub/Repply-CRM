@@ -65,7 +65,14 @@ serve(async (req) => {
 
     const { action, instance_id, target_usuario_id } = body;
 
-    // ── CREATE: cria instância na uazapi, vincula opcionalmente a um usuário ──
+    // target_usuario_ids: lista opcional para vincular a MÚLTIPLOS usuários na criação
+    // (ex: "vincular a todos os usuários da empresa"). target_usuario_id (singular)
+    // continua suportado por compatibilidade e é tratado como lista de 1 item.
+    const target_usuario_ids: string[] = Array.isArray(body.target_usuario_ids)
+      ? body.target_usuario_ids
+      : (target_usuario_id ? [target_usuario_id] : []);
+
+    // ── CREATE: cria instância na uazapi, vincula opcionalmente a um ou mais usuários ──
     if (action === "create") {
       const UAZAPI_BASE_URL = (Deno.env.get("UAZAPI_BASE_URL") ?? "").replace(/\/$/, "");
       const UAZAPI_ADMIN_TOKEN = Deno.env.get("UAZAPI_ADMIN_TOKEN") ?? "";
@@ -75,24 +82,25 @@ serve(async (req) => {
         return json({ error: "Configuração do servidor incompleta" }, 500);
       }
 
-      let targetAuthId: string | null = null;
+      let targetAuthIds: string[] = [];
       let empresaId = caller.empresa_id;
 
-      if (target_usuario_id) {
-        const { data: target } = await supabase
+      if (target_usuario_ids.length > 0) {
+        const { data: targets } = await supabase
           .from("usuarios")
           .select("id, user_id, empresa_id")
-          .eq("id", target_usuario_id)
-          .single();
+          .in("id", target_usuario_ids);
 
-        if (!target) return json({ error: "Usuário alvo não encontrado" }, 404);
+        if (!targets || targets.length !== target_usuario_ids.length) {
+          return json({ error: "Usuário alvo não encontrado" }, 404);
+        }
 
-        if (caller.role !== "admin" && target.empresa_id !== caller.empresa_id) {
+        if (caller.role !== "admin" && targets.some(t => t.empresa_id !== caller.empresa_id)) {
           return json({ error: "Forbidden: usuário fora da sua empresa" }, 403);
         }
 
-        targetAuthId = target.user_id;
-        empresaId = target.empresa_id;
+        targetAuthIds = targets.map(t => t.user_id);
+        empresaId = targets[0].empresa_id;
       }
 
       const instanceName = buildInstanceName(empresaId);
@@ -148,14 +156,14 @@ serve(async (req) => {
         return json({ error: "Erro ao salvar configuração", detail: insertError?.message }, 500);
       }
 
-      // Vincular usuário via junction table (se fornecido)
-      if (targetAuthId) {
+      // Vincular usuário(s) via junction table (se fornecido)
+      if (targetAuthIds.length > 0) {
         const { error: linkError } = await supabase
           .from("wapi_instancia_usuarios")
-          .insert({ instancia_id: newInst.id, usuario_auth_id: targetAuthId });
+          .insert(targetAuthIds.map(authId => ({ instancia_id: newInst.id, usuario_auth_id: authId })));
 
         if (linkError) {
-          console.error("[whatsapp-admin-provision] erro ao vincular usuário na criação", linkError);
+          console.error("[whatsapp-admin-provision] erro ao vincular usuário(s) na criação", linkError);
         }
       }
 
@@ -164,8 +172,8 @@ serve(async (req) => {
 
     // ── LINK: vincula um usuário adicional a uma instância existente ───────────
     if (action === "link") {
-      if (!instance_id || !target_usuario_id) {
-        return json({ error: "instance_id e target_usuario_id são obrigatórios" }, 400);
+      if (!instance_id || target_usuario_ids.length === 0) {
+        return json({ error: "instance_id e target_usuario_id(s) são obrigatórios" }, 400);
       }
 
       const { data: instancia } = await supabase
@@ -180,24 +188,28 @@ serve(async (req) => {
         return json({ error: "Forbidden: instância fora da sua empresa" }, 403);
       }
 
-      const { data: target } = await supabase
+      const { data: targets } = await supabase
         .from("usuarios")
         .select("id, user_id, empresa_id")
-        .eq("id", target_usuario_id)
-        .single();
+        .in("id", target_usuario_ids);
 
-      if (!target) return json({ error: "Usuário alvo não encontrado" }, 404);
+      if (!targets || targets.length !== target_usuario_ids.length) {
+        return json({ error: "Usuário alvo não encontrado" }, 404);
+      }
 
-      if (caller.role !== "admin" && target.empresa_id !== caller.empresa_id) {
+      if (caller.role !== "admin" && targets.some(t => t.empresa_id !== caller.empresa_id)) {
         return json({ error: "Forbidden: usuário fora da sua empresa" }, 403);
       }
 
       // Idempotente: ignora se já estiver vinculado
       const { error: linkError } = await supabase
         .from("wapi_instancia_usuarios")
-        .insert({ instancia_id: instance_id, usuario_auth_id: target.user_id });
+        .upsert(
+          targets.map(t => ({ instancia_id: instance_id, usuario_auth_id: t.user_id })),
+          { onConflict: "instancia_id,usuario_auth_id", ignoreDuplicates: true }
+        );
 
-      if (linkError && !linkError.message.includes("duplicate")) {
+      if (linkError) {
         return json({ error: "Erro ao vincular usuário", detail: linkError.message }, 500);
       }
 
