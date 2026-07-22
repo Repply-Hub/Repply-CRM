@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 export interface KanbanColuna {
   id: string;
   empresa_id: string;
+  funil_id: string;
   slug: string;
   nome: string;
   cor: string;
@@ -28,29 +29,32 @@ function slugify(str: string): string {
   return str
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 40) || `coluna ${Date.now()}`;
 }
 
-export function useKanbanColunas(empresaId?: string | null) {
+export function useKanbanColunas(empresaId?: string | null, funilId?: string | null) {
   return useQuery<KanbanColuna[]>({
-    queryKey: ['kanban_colunas', empresaId ?? null],
+    queryKey: ['kanban_colunas', empresaId ?? null, funilId ?? null],
     queryFn: async () => {
-      const base = supabase.from('kanban_colunas').select('*').order('ordem', { ascending: true });
-      const { data, error } = await (empresaId ? base.eq('empresa_id', empresaId) : base);
+      let query = supabase.from('kanban_colunas').select('*').order('ordem', { ascending: true });
+      if (empresaId) query = query.eq('empresa_id', empresaId);
+      if (funilId) query = query.eq('funil_id', funilId);
+      const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as KanbanColuna[];
     },
+    enabled: !!funilId,
   });
 }
 
 export function useCreateKanbanColuna() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { nome: string; cor: string }) => {
+    mutationFn: async (input: { nome: string; cor: string; funilId: string }) => {
       const { data: usuario, error: uErr } = await supabase
         .from('usuarios')
         .select('empresa_id')
@@ -62,7 +66,8 @@ export function useCreateKanbanColuna() {
       const { data: existentes } = await supabase
         .from('kanban_colunas')
         .select('slug, ordem')
-        .eq('empresa_id', usuario.empresa_id);
+        .eq('empresa_id', usuario.empresa_id)
+        .eq('funil_id', input.funilId);
 
       let baseSlug = slugify(input.nome);
       const slugs = new Set((existentes ?? []).map(e => e.slug));
@@ -73,15 +78,17 @@ export function useCreateKanbanColuna() {
       }
       const maxOrdem = (existentes ?? []).reduce((m, e) => Math.max(m, e.ordem), -1);
 
-      const { error } = await supabase.from('kanban_colunas').insert({
+      const { data, error } = await supabase.from('kanban_colunas').insert({
         empresa_id: usuario.empresa_id,
+        funil_id: input.funilId,
         slug,
         nome: input.nome.trim(),
         cor: input.cor,
         ordem: maxOrdem + 1,
         is_sistema: false,
-      });
+      }).select('id').single();
       if (error) throw error;
+      return data.id as string;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kanban_colunas'] });
@@ -112,12 +119,14 @@ export function useUpdateKanbanColuna() {
 export function useDeleteKanbanColuna() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id: string; slug: string; targetSlug: string }) => {
-      // Move pedidos da coluna excluída para a coluna alvo
+    mutationFn: async (input: { id: string; slug: string; targetSlug: string; funilId: string }) => {
+      // Move pedidos da coluna excluída para a coluna alvo — escopado ao mesmo funil,
+      // já que dois funis diferentes podem ter colunas com o mesmo slug.
       const { error: pErr } = await supabase
         .from('pedidos')
         .update({ status: input.targetSlug })
-        .eq('status', input.slug);
+        .eq('status', input.slug)
+        .eq('funil_id', input.funilId);
       if (pErr) throw pErr;
       const { error } = await supabase.from('kanban_colunas').delete().eq('id', input.id);
       if (error) throw error;

@@ -25,6 +25,8 @@ export interface PedidosFilters {
   stages?: string[];
   vendedorIds?: string[];
   fabricanteIds?: string[];
+  /** Escopa a busca a um único funil (pipeline). Sem isso, negócios de todos os funis da empresa aparecem juntos. */
+  funilId?: string;
   dateFrom?: string;
   dateTo?: string;
   onlyAttention?: boolean;
@@ -53,10 +55,10 @@ export function usePedidos(
   filters?: PedidosFilters,
   enabled = true,
 ) {
-  const { vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, hideImportados } = filters ?? {};
+  const { vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId } = filters ?? {};
 
   return useQuery({
-    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, hideImportados],
+    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
@@ -92,6 +94,10 @@ export function usePedidos(
         query = query.in('status', stages);
       }
 
+      if (funilId) {
+        query = query.eq('funil_id', funilId);
+      }
+
       if (fabricanteIds && fabricanteIds.length > 0) {
         query = query.in('fabricante_id', fabricanteIds);
       }
@@ -123,12 +129,12 @@ export function usePedidos(
 }
 
 export function usePedidosStats(empresaId?: string, stages?: string[], filters?: PedidosFilters) {
-  const { vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, search } = filters ?? {};
+  const { vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, search, funilId } = filters ?? {};
 
   return useQuery({
     // Reage a filtros e busca — NUNCA a page/pageSize/"Exibir"/"Ver mais", que não fazem
     // parte da queryKey aqui de propósito (o header precisa do total real, não do carregado).
-    queryKey: ['pedidos_stats', empresaId, stages, vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, search],
+    queryKey: ['pedidos_stats', empresaId, stages, vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, search, funilId],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
@@ -145,6 +151,7 @@ export function usePedidosStats(empresaId?: string, stages?: string[], filters?:
         p_date_to: dateTo ?? null,
         p_search: search?.trim() ? search.trim() : null,
         p_only_attention: !!onlyAttention,
+        p_funil_id: funilId ?? null,
       });
       if (error) throw error;
       const row = data?.[0];
@@ -232,6 +239,7 @@ export function useBulkDeletePedidos() {
 
       let query = supabase.from('pedidos').delete({ count: 'exact' }).in('usuario_id', usuarioIds);
       if (stages && stages.length > 0) query = query.in('status', stages);
+      if (filters?.funilId) query = query.eq('funil_id', filters.funilId);
       if (filters?.fabricanteIds && filters.fabricanteIds.length > 0) query = query.in('fabricante_id', filters.fabricanteIds);
       if (filters?.dateFrom) query = query.gte('data_pedido', filters.dateFrom);
       if (filters?.dateTo) query = query.lte('data_pedido', filters.dateTo);

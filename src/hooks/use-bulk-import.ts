@@ -111,6 +111,18 @@ export function useBulkImport() {
     const vendedorId = await getVendedorId();
     resetResolveCache();
 
+    // Negócios importados sempre entram no funil padrão da empresa — o wizard de
+    // importação ainda não tem seletor de funil.
+    const { data: funilPadrao, error: funilErr } = await supabase
+      .from('funis')
+      .select('id')
+      .eq('is_padrao', true)
+      .maybeSingle();
+    if (funilErr || !funilPadrao) {
+      throw new Error('Não foi possível identificar o funil padrão da empresa para a importação.');
+    }
+    const funilId = funilPadrao.id;
+
     // Computa hashes e pré-carrega entidades em paralelo — são independentes entre si.
     let rowHashes: string[] = [];
     try {
@@ -200,6 +212,7 @@ export function useBulkImport() {
           batchPayloads.push({
             cliente_id: clienteId,
             fabricante_id: fabricanteId,
+            funil_id: funilId,
             obra_id: obraId,
             valor_total: row.valor,
             observacoes: row.observacoes,

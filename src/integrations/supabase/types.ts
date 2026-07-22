@@ -1161,11 +1161,42 @@ export type Database = {
           },
         ]
       }
+      funis: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          is_padrao: boolean
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_padrao?: boolean
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_padrao?: boolean
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       kanban_colunas: {
         Row: {
           cor: string
           created_at: string
           empresa_id: string
+          funil_id: string
           id: string
           is_sistema: boolean
           nome: string | null
@@ -1177,6 +1208,7 @@ export type Database = {
           cor?: string
           created_at?: string
           empresa_id: string
+          funil_id: string
           id?: string
           is_sistema?: boolean
           nome?: string | null
@@ -1188,6 +1220,7 @@ export type Database = {
           cor?: string
           created_at?: string
           empresa_id?: string
+          funil_id?: string
           id?: string
           is_sistema?: boolean
           nome?: string | null
@@ -1195,7 +1228,15 @@ export type Database = {
           slug?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "kanban_colunas_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       licencas_extremoz: {
         Row: {
@@ -1635,6 +1676,7 @@ export type Database = {
           data_pedido: string
           endereco_entrega: string | null
           fabricante_id: string
+          funil_id: string
           id: string
           import_hash: string | null
           obra_id: string | null
@@ -1654,6 +1696,7 @@ export type Database = {
           data_pedido?: string
           endereco_entrega?: string | null
           fabricante_id: string
+          funil_id: string
           id?: string
           import_hash?: string | null
           obra_id?: string | null
@@ -1673,6 +1716,7 @@ export type Database = {
           data_pedido?: string
           endereco_entrega?: string | null
           fabricante_id?: string
+          funil_id?: string
           id?: string
           import_hash?: string | null
           obra_id?: string | null
@@ -1686,6 +1730,13 @@ export type Database = {
           valor_total?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pedidos_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pedidos_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -2645,6 +2696,7 @@ export type Database = {
           total_pedidos: number
         }[]
       }
+      criar_funil: { Args: { p_nome: string }; Returns: string }
       delete_current_user: { Args: never; Returns: undefined }
       delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
       get_my_empresa_id: { Args: never; Returns: string }
@@ -2666,6 +2718,7 @@ export type Database = {
           p_date_from?: string
           p_date_to?: string
           p_fabricante_ids?: string[]
+          p_funil_id?: string
           p_only_attention?: boolean
           p_search?: string
           p_stages?: string[]

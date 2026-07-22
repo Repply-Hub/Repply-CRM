@@ -61,7 +61,7 @@ const EditarPedido = () => {
   const { data: fabricantes } = useFabricantes();
   const { data: vendedores } = useVendedores();
   const { data: isGestor } = useIsGestor();
-  const { data: kanbanColunas } = useKanbanColunas();
+  const { data: kanbanColunas } = useKanbanColunas(undefined, pedidoData?.pedido?.funil_id);
   const updatePedido = useUpdatePedidoCompleto();
   const createObraMutation = useCreateObra();
 

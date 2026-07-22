@@ -14,6 +14,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
+import { useFunis } from '@/hooks/use-funis';
 import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCreatePedidoCompleto, useCreateFabricanteCompleto } from '@/hooks/use-novo-pedido';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,7 +51,11 @@ const NovoPedido = () => {
   const { data: vendedores } = useVendedores();
   const { data: myVendedorId } = useMyVendedorId();
   const { data: isGestor } = useIsGestor();
-  const { data: kanbanColunas } = useKanbanColunas();
+  const { data: funis } = useFunis();
+  // Funil vem do link de origem (ex: "+" numa coluna do Kanban de um funil específico);
+  // sem isso, cai no funil padrão da empresa assim que a lista de funis carrega.
+  const funilId = searchParams.get('funilId') || funis?.find(f => f.is_padrao)?.id;
+  const { data: kanbanColunas } = useKanbanColunas(undefined, funilId);
   const createPedido = useCreatePedidoCompleto();
   const createObraMutation = useCreateObra();
 
@@ -208,6 +213,7 @@ const NovoPedido = () => {
   const handleSubmit = async () => {
     if (!validateStep2()) return;
     if (!pdfFile) { toast.error('Anexe o PDF do pedido (obrigatório)'); return false; }
+    if (!funilId) { toast.error('Não foi possível identificar o funil de destino. Tente novamente em instantes.'); return false; }
 
     setIsUploading(true);
     let pdfUrl = '';
@@ -243,6 +249,7 @@ const NovoPedido = () => {
         cliente_id: clienteId,
         fabricante_id: fabricanteId,
         usuario_id: vendedorId,
+        funil_id: funilId,
         obra_id: obraId || undefined,
         status: status,
         data_pedido: format(dataPedido, 'yyyy-MM-dd'),

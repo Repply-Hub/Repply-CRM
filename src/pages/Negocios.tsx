@@ -8,6 +8,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { KanbanColunasDialog } from '@/components/pedidos/kanban/KanbanColunasDialog';
+import { useFunis } from '@/hooks/use-funis';
 import { usePedidos, usePedidosStats, useHistoricoContatos, useUpdatePedidoStatus, useBulkDeletePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
@@ -21,7 +22,7 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight, FileWarning, FileSpreadsheet
+  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -217,15 +218,32 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const updateStatus = useUpdatePedidoStatus();
   const { data: vendedores } = useVendedores();
   const { data: fabricantes } = useFabricantes();
-  const { data: kanbanColunas } = useKanbanColunas(empresaId);
-  
+
+  // Funil ativo do Kanban/Lista — persistido, com fallback pro funil padrão da empresa
+  // assim que a lista de funis carrega (ou se o funil salvo não existir mais).
+  const { data: funis } = useFunis(empresaId);
+  const [funilId, setFunilId] = useState<string | undefined>(
+    () => localStorage.getItem('negocios_funil_id') || undefined
+  );
+  useEffect(() => {
+    if (!funis || funis.length === 0) return;
+    if (funilId && funis.some(f => f.id === funilId)) return;
+    const padrao = funis.find(f => f.is_padrao) ?? funis[0];
+    setFunilId(padrao.id);
+  }, [funis, funilId]);
+  useEffect(() => {
+    if (funilId) localStorage.setItem('negocios_funil_id', funilId);
+  }, [funilId]);
+
+  const { data: kanbanColunas } = useKanbanColunas(empresaId, funilId);
+
   const KANBAN_STAGES = useMemo(
     () => (kanbanColunas ?? []).map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
     [kanbanColunas]
   );
 
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
-  
+
   // O efeito de limpeza total foi removido para permitir que novas colunas importadas apareçam nas opções.
   // No entanto, vamos garantir que colunas duplicadas sejam limpas se detectadas.
   useEffect(() => {
@@ -350,15 +368,26 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
 
   const [visibleKanbanStages, setVisibleKanbanStages] = useState<string[]>(() => {
-    const saved = localStorage.getItem('pedidos_kanban_stages');
+    if (!funilId) return [];
+    const saved = localStorage.getItem(`pedidos_kanban_stages_${funilId}`);
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Ao trocar de funil, as etapas visíveis/filtradas do funil anterior não existem mais
+  // neste board — reseta em vez de herdar (o efeito de sincronia com kanbanColunas, logo
+  // abaixo, repopula a partir do localStorage específico deste funil).
+  useEffect(() => {
+    if (!funilId) return;
+    const saved = localStorage.getItem(`pedidos_kanban_stages_${funilId}`);
+    setVisibleKanbanStages(saved ? JSON.parse(saved) : []);
+    setSelectedStages([]);
+  }, [funilId]);
 
   // Todos os useState declarados — agora seguro referenciar selectedStages no hook
   // Kanban: cada coluna busca só o seu status, com seu próprio limit (ver KanbanColumn.tsx).
   // "Exibir" só define o limit INICIAL/por-clique de cada coluna — não existe mais um
   // fetch único compartilhado para o board inteiro.
-  const KANBAN_PAGE_SIZE_OPTIONS = [10, 50, 100, 200, 500, 1000];
+  const KANBAN_PAGE_SIZE_OPTIONS = [10, 50, 100];
   const [kanbanPageSize, setKanbanPageSize] = useState(50);
 
   const activeStages = selectedStages.length > 0 ? selectedStages : undefined;
@@ -374,7 +403,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     // Filtro puramente visual: usePedidosStats ignora esse campo de propósito, então os
     // totais do cabeçalho continuam somando negócios importados mesmo com o filtro ligado.
     hideImportados: hideImportados || undefined,
-  }), [selectedVendedores, selectedFabricantes, dateFrom, dateTo, showOnlyAttention, deferredSearch, hideImportados]);
+    funilId,
+  }), [selectedVendedores, selectedFabricantes, dateFrom, dateTo, showOnlyAttention, deferredSearch, hideImportados, funilId]);
 
   // Essa query só serve a view Lista agora — desabilitada no Kanban, já que cada coluna
   // busca seus próprios dados de forma independente.
@@ -393,27 +423,36 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const totalValor = pedidosStats?.valor ?? 0;
 
   useEffect(() => {
-    if (!kanbanColunas) return;
+    if (!kanbanColunas || !funilId) return;
+    const storageKey = `pedidos_kanban_stages_${funilId}`;
     const allKeys = kanbanColunas.map(c => c.slug);
     setVisibleKanbanStages(prev => {
       const filtered = prev.filter(k => allKeys.includes(k));
       const novas = allKeys.filter(k => !prev.includes(k));
       if (prev.length === 0) {
-        localStorage.setItem('pedidos_kanban_stages', JSON.stringify(allKeys));
+        localStorage.setItem(storageKey, JSON.stringify(allKeys));
         return allKeys;
       }
       const next = [...filtered, ...novas];
       if (next.length !== prev.length || next.some((k, i) => k !== prev[i])) {
-        localStorage.setItem('pedidos_kanban_stages', JSON.stringify(next));
+        localStorage.setItem(storageKey, JSON.stringify(next));
         return next;
       }
       return prev;
     });
-  }, [kanbanColunas]);
+  }, [kanbanColunas, funilId]);
 
   const handleKanbanStagesChange = (next: string[]) => {
     setVisibleKanbanStages(next);
-    localStorage.setItem('pedidos_kanban_stages', JSON.stringify(next));
+    if (funilId) localStorage.setItem(`pedidos_kanban_stages_${funilId}`, JSON.stringify(next));
+  };
+
+  const toggleAllKanbanStages = () => {
+    if (visibleKanbanStages.length >= KANBAN_STAGES.length && KANBAN_STAGES.length > 0) {
+      handleKanbanStagesChange([KANBAN_STAGES[0].key]);
+    } else {
+      handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key));
+    }
   };
 
   const toggleKanbanStage = (key: string) => {
@@ -724,40 +763,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     >
       <div className="flex flex-col border-t border-border/50">
         {showKanban && (
-          <ColumnSettingsPopover label="Etapas Kanban" icon={LayoutGrid}>
-            <div className="flex flex-col gap-0.5">
-              <div className="px-3 py-1 flex items-center justify-between border-b border-border/40 mb-1">
-                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Visibilidade</span>
-                <button
-                  type="button"
-                  onClick={() => handleKanbanStagesChange(KANBAN_STAGES.map(s => s.key))}
-                  className="text-[10px] text-primary font-bold hover:underline uppercase tracking-wider"
-                >
-                  Resetar
-                </button>
-              </div>
-              {KANBAN_STAGES.map((stage) => {
-                const checked = visibleKanbanStages.includes(stage.key);
-                const disabled = visibleKanbanStages.length === 1 && checked;
-                return (
-                  <button
-                    key={stage.key}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => toggleKanbanStage(stage.key)}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-xs font-medium transition-all text-left',
-                      'hover:bg-muted/80 disabled:cursor-not-allowed',
-                      !checked && 'opacity-40'
-                    )}
-                  >
-                    <span className={cn('h-3 w-3 rounded-sm shrink-0 border border-border/40', `bg-${stage.color}`)} />
-                    <span className="flex-1 truncate">{stage.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </ColumnSettingsPopover>
+          <ColumnSettingsItem
+            label="Gerenciar colunas Kanban"
+            icon={Columns3}
+            onClick={() => setColunasDialogOpen(true)}
+          />
         )}
 
         <ColumnSettingsPopover label="Ações" icon={Plus}>
@@ -778,14 +788,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             icon={FileDown}
             onClick={() => openExportDialog()}
           />
-
-          {showKanban && (
-            <ColumnSettingsItem 
-              label="Gerenciar colunas Kanban" 
-              icon={Columns3} 
-              onClick={() => setColunasDialogOpen(true)} 
-            />
-          )}
 
           <ColumnSettingsItem
             label="Excluir Selecionados"
@@ -822,6 +824,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     someSelected,
     setImportOpen,
     setColunasDialogOpen,
+    isPipelineMode,
     setConfirmDeleteOpen
   ]);
 
@@ -1236,6 +1239,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       <div className={showKanban ? 'flex flex-col flex-1 min-h-0 px-4 sm:px-6 pt-4 sm:pt-6' : 'p-4 sm:p-6'}>
         <div className={cn('mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between', showKanban ? 'shrink-0' : 'mb-4 md:mb-6')}>
           <div className="flex-1 flex flex-wrap items-center gap-2 min-w-0">
+            {isPipelineMode && funis && funis.length > 1 && (
+              <Select value={funilId} onValueChange={setFunilId}>
+                <SelectTrigger className="h-8 w-fit min-w-[140px] shrink-0 text-sm gap-1.5">
+                  <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {funis.map(f => (
+                    <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             {isPipelineMode && (
               <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
                 <Button
@@ -1296,7 +1313,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             )}
           </div>
           <div className="flex items-center gap-2 sm:justify-end">
-            <Button size="sm" className="w-full sm:w-auto h-10" onClick={() => navigate('/pedidos/novo')}>
+            <Button size="sm" className="w-full sm:w-auto h-10" onClick={() => navigate(funilId ? `/pedidos/novo?funilId=${encodeURIComponent(funilId)}` : '/pedidos/novo')}>
               <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
             </Button>
           </div>
@@ -1519,7 +1536,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         }}
       />
       
-      <KanbanColunasDialog open={colunasDialogOpen} onOpenChange={setColunasDialogOpen} empresaId={empresaId} />
+      <KanbanColunasDialog
+        open={colunasDialogOpen}
+        onOpenChange={setColunasDialogOpen}
+        empresaId={empresaId}
+        funilId={funilId}
+        funilNome={funis?.find(f => f.id === funilId)?.nome}
+        funis={funis}
+        visibleSlugs={visibleKanbanStages}
+        onToggleVisibility={toggleKanbanStage}
+        onResetVisibility={toggleAllKanbanStages}
+      />
 
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
         <DialogContent className="sm:max-w-sm">

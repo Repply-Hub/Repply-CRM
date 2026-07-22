@@ -60,6 +60,7 @@ export interface NovoPedidoPayload {
   cliente_id: string;
   fabricante_id: string;
   usuario_id: string;
+  funil_id: string;
   obra_id?: string;
   status?: string;
   data_pedido: string;
@@ -90,6 +91,7 @@ export function useCreatePedidoCompleto() {
           cliente_id: payload.cliente_id,
           fabricante_id: payload.fabricante_id,
           usuario_id: payload.usuario_id,
+          funil_id: payload.funil_id,
           obra_id: payload.obra_id || null,
           data_pedido: payload.data_pedido,
           status: payload.status || 'novo_lead',
