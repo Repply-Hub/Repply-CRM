@@ -19,6 +19,10 @@ interface TableSettingsOptions {
   defaultPageSize?: number;
 }
 
+const MAX_PAGE_SIZE = 100;
+
+const clampPageSize = (value: number) => Math.min(value, MAX_PAGE_SIZE);
+
 export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: TableSettingsOptions) {
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id;
@@ -56,10 +60,14 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     return saved ? JSON.parse(saved) : {};
   });
 
-  const [pageSize, setPageSize] = useState<number>(() => {
+  const [pageSize, setPageSizeState] = useState<number>(() => {
     const saved = localStorage.getItem(`${key}_page_size`);
-    return saved ? Number(saved) : defaultPageSize;
+    return clampPageSize(saved ? Number(saved) : defaultPageSize);
   });
+
+  const setPageSize = useCallback((value: number) => {
+    setPageSizeState(clampPageSize(value));
+  }, []);
 
   const [presets, setPresets] = useState<TablePreset[]>(() => {
     const saved = localStorage.getItem(`${key}_presets`);
