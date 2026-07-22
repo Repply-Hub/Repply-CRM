@@ -1,20 +1,22 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
-import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, ChatGrupo, ChatMessage, useMarkChatAsRead, useChatGeralConfig, useUpdateChatGeralConfig, useChatLastActivity } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, useDeleteChatMessage, useAddChatGrupoMembros, ChatGrupo, ChatMessage, QuotedMessage, useMarkChatAsRead, useChatGeralConfig, useUpdateChatGeralConfig, useChatLastActivity } from '@/hooks/use-chat';
 import { useOnlineUsers } from '@/hooks/use-presence';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen,
   Paperclip, FileText, Image, X, Download, Users2, Calendar, Eraser, ChevronDown,
-  Video, Link2, ExternalLink, Play, Camera, Pencil, Check, Search, Trash2
+  Video, Link2, ExternalLink, Play, Pause, Camera, Pencil, Check, Search, Trash2, UserPlus, Mic, Square, Reply
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -52,12 +54,18 @@ import {
 const CHAT_ALLOWED_EXT = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv', '.zip', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 const CHAT_ALLOWED_MIME = ['image/', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument', 'application/vnd.ms-excel', 'text/plain', 'text/csv', 'application/zip', 'application/x-zip-compressed'];
 
+// Esconde a imagem quebrada (URL expirada/removida) pra deixar a AvatarFallback
+// (iniciais coloridas) visível em vez do ícone de imagem quebrada do navegador.
+function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
+  e.currentTarget.style.display = 'none';
+}
+
 function getInitials(name: string) {
   return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
 const COLORS = [
-  'bg-primary', 'bg-chart-1', 'bg-chart-2', 'bg-chart-3', 'bg-chart-4', 'bg-chart-5',
+  'bg-primary', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-pink-500', 'bg-amber-500',
 ];
 
 function colorForId(id: string) {
@@ -116,9 +124,9 @@ function MembersList({
             className={cn('p-1 rounded-lg transition-colors', target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50')}
             title={geralNome}
           >
-            <Avatar className="h-7 w-7">
+            <Avatar className="h-7 w-7 border border-border">
               {geralFotoUrl && (
-                <img src={geralFotoUrl} alt={geralNome} className="h-full w-full object-cover" />
+                <img src={geralFotoUrl} alt={geralNome} className="h-full w-full object-cover" onError={hideOnError} />
               )}
               <AvatarFallback className="bg-primary text-primary-foreground text-[8px]">
                 <Users className="h-3.5 w-3.5" />
@@ -140,11 +148,11 @@ function MembersList({
                 className={cn('p-1 rounded-lg transition-colors', target.type === 'grupo' && target.grupoId === g.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
                 title={g.nome}
               >
-                <Avatar className="h-7 w-7">
+                <Avatar className="h-7 w-7 border border-border">
                   {g.foto_url && (
-                    <img src={g.foto_url} alt={g.nome} className="h-full w-full object-cover" />
+                    <img src={g.foto_url} alt={g.nome} className="h-full w-full object-cover" onError={hideOnError} />
                   )}
-                  <AvatarFallback className="bg-chart-2 text-white text-[8px] font-semibold">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-[8px] font-semibold">
                     <Users2 className="h-3.5 w-3.5" />
                   </AvatarFallback>
                 </Avatar>
@@ -166,9 +174,9 @@ function MembersList({
                 className={cn('p-1 rounded-lg transition-colors', target.type === 'dm' && target.memberId === m.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
                 title={m.nome}
               >
-                <Avatar className="h-7 w-7 border border-primary/10">
+                <Avatar className="h-7 w-7 border border-border">
                   {m.avatar_url && (
-                    <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+                    <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" onError={hideOnError} />
                   )}
                   <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                     {getInitials(m.nome)}
@@ -224,9 +232,9 @@ function MembersList({
                   target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50'
                 )}
               >
-                <Avatar className="h-8 w-8">
+                <Avatar className="h-8 w-8 border border-border">
                   {geralFotoUrl && (
-                    <img src={geralFotoUrl} alt={geralNome} className="h-full w-full object-cover" />
+                    <img src={geralFotoUrl} alt={geralNome} className="h-full w-full object-cover" onError={hideOnError} />
                   )}
                   <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
                     <Users className="h-4 w-4" />
@@ -261,11 +269,11 @@ function MembersList({
                 target.type === 'grupo' && target.grupoId === g.id ? 'bg-primary/10' : 'hover:bg-muted/50'
               )}
             >
-              <Avatar className="h-8 w-8">
+              <Avatar className="h-8 w-8 border border-border">
                 {g.foto_url && (
-                  <img src={g.foto_url} alt={g.nome} className="h-full w-full object-cover" />
+                  <img src={g.foto_url} alt={g.nome} className="h-full w-full object-cover" onError={hideOnError} />
                 )}
-                <AvatarFallback className="bg-chart-2 text-white text-[10px] font-semibold">
+                <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
                   <Users2 className="h-4 w-4" />
                 </AvatarFallback>
               </Avatar>
@@ -313,9 +321,9 @@ function MembersList({
                 )}
               >
                 <div className="relative">
-                  <Avatar className="h-8 w-8 border border-primary/10">
+                  <Avatar className="h-8 w-8 border border-border">
                     {m.avatar_url && (
-                      <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+                      <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" onError={hideOnError} />
                     )}
                     <AvatarFallback className={`${colorForId(m.id)} text-white text-[10px] font-semibold`}>
                       {getInitials(m.nome)}
@@ -351,9 +359,192 @@ function MembersList({
   );
 }
 
+const AUDIO_WAVEFORM_HEIGHTS = [
+  30, 45, 20, 60, 40, 75, 30, 50, 80, 35, 25, 45, 65, 55, 35, 70, 45, 25, 50,
+  40, 65, 30, 20, 45, 55, 40, 30, 50, 45, 35,
+];
+
+function formatAudioTime(t: number) {
+  if (isNaN(t) || !isFinite(t)) return '0:00';
+  return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+}
+
+// Player do áudio gravado, exibido antes do envio (permite ouvir e descartar).
+function PendingAudioPlayer({
+  src,
+  onCancel,
+  onSend,
+  isSending,
+}: {
+  src: string;
+  onCancel: () => void;
+  onSend: () => void;
+  isSending: boolean;
+}) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onTime = () => setCurrentTime(audio.currentTime);
+    const onMeta = () => { if (audio.duration && !isNaN(audio.duration)) setDuration(audio.duration); };
+    const onEnd = () => { setIsPlaying(false); setCurrentTime(0); };
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('loadedmetadata', onMeta);
+    audio.addEventListener('ended', onEnd);
+    return () => {
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('loadedmetadata', onMeta);
+      audio.removeEventListener('ended', onEnd);
+    };
+  }, [src]);
+
+  const handleScrub = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    audioRef.current.currentTime = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1) * duration;
+  };
+
+  return (
+    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-border bg-muted/60">
+      <audio ref={audioRef} src={src} preload="metadata" />
+      <button
+        type="button"
+        onClick={onCancel}
+        className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-destructive hover:bg-destructive/10 transition-colors"
+        title="Descartar"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => (isPlaying ? audioRef.current?.pause() : audioRef.current?.play())}
+        className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground transition-colors shadow-sm"
+      >
+        {isPlaying ? <Pause className="h-3 w-3 fill-current" /> : <Play className="h-3 w-3 fill-current ml-0.5" />}
+      </button>
+      <div className="flex-1 flex items-center gap-2 min-w-0">
+        <div onClick={handleScrub} className="relative flex-1 h-5 flex items-center cursor-pointer">
+          <div className="flex items-end gap-[2px] w-full h-3.5 justify-between">
+            {Array.from({ length: 30 }).map((_, i) => {
+              const barProgress = (i / 30) * 100;
+              const isPlayed = progress >= barProgress;
+              return (
+                <div
+                  key={i}
+                  className={cn('w-[3px] rounded-full transition-all duration-150', isPlayed ? 'bg-primary' : 'bg-muted-foreground/25')}
+                  style={{ height: `${AUDIO_WAVEFORM_HEIGHTS[i % AUDIO_WAVEFORM_HEIGHTS.length]}%` }}
+                />
+              );
+            })}
+          </div>
+          <div className="absolute w-2 h-2 rounded-full bg-primary shadow-md -ml-1" style={{ left: `${progress}%` }} />
+        </div>
+        <span className="text-[10px] text-muted-foreground shrink-0">{formatAudioTime(currentTime || duration)}</span>
+      </div>
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={isSending}
+        className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground transition-colors shadow-sm"
+        title="Enviar áudio"
+      >
+        {isSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+      </button>
+    </div>
+  );
+}
+
+// Player de um áudio já enviado, dentro da bolha de mensagem.
+function ChatAudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onTime = () => setCurrentTime(audio.currentTime);
+    const onMeta = () => { if (audio.duration && !isNaN(audio.duration)) setDuration(audio.duration); };
+    const onEnd = () => { setIsPlaying(false); setCurrentTime(0); };
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('loadedmetadata', onMeta);
+    audio.addEventListener('ended', onEnd);
+    return () => {
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('loadedmetadata', onMeta);
+      audio.removeEventListener('ended', onEnd);
+    };
+  }, [src]);
+
+  const handleScrub = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    audioRef.current.currentTime = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1) * duration;
+  };
+
+  return (
+    <div className="flex items-center gap-2 w-[220px] py-0.5">
+      <audio ref={audioRef} src={src} preload="metadata" />
+      <button
+        type="button"
+        onClick={() => (isPlaying ? audioRef.current?.pause() : audioRef.current?.play())}
+        className={cn(
+          'h-8 w-8 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm',
+          isMe ? 'bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground' : 'bg-primary/10 hover:bg-primary/20 text-primary'
+        )}
+      >
+        {isPlaying ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current ml-0.5" />}
+      </button>
+      <div className="flex-1 flex items-center gap-2 min-w-0">
+        <div onClick={handleScrub} className="relative flex-1 h-5 flex items-center cursor-pointer">
+          <div className="flex items-end gap-[2px] w-full h-3.5 justify-between">
+            {Array.from({ length: 30 }).map((_, i) => {
+              const barProgress = (i / 30) * 100;
+              const isPlayed = progress >= barProgress;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'w-[3px] rounded-full transition-all duration-150',
+                    isPlayed ? (isMe ? 'bg-primary-foreground' : 'bg-primary') : (isMe ? 'bg-primary-foreground/30' : 'bg-primary/20')
+                  )}
+                  style={{ height: `${AUDIO_WAVEFORM_HEIGHTS[i % AUDIO_WAVEFORM_HEIGHTS.length]}%` }}
+                />
+              );
+            })}
+          </div>
+        </div>
+        <span className={cn('text-[9px] shrink-0', isMe ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+          {formatAudioTime(currentTime || duration)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 const Chat = () => {
   const { profile } = useAuth();
   const isAdminEmpresa = profile?.role === 'empresa' || profile?.role === 'admin';
+  const canManageGrupos = isAdminEmpresa || profile?.role === 'gestor';
   const onlineIds = useOnlineUsers();
   const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
   const [teamCollapsed, setTeamCollapsed] = useState(false);
@@ -377,6 +568,21 @@ const Chat = () => {
   const { data: grupos = [] } = useChatGrupos();
   const updateGrupo = useUpdateChatGrupo();
   const deleteGrupo = useDeleteChatGrupo();
+  const deleteMessage = useDeleteChatMessage();
+  const [msgToDelete, setMsgToDelete] = useState<ChatMessage | null>(null);
+  const addGrupoMembros = useAddChatGrupoMembros();
+  const [addMembersOpen, setAddMembersOpen] = useState(false);
+  const [addMembersSearch, setAddMembersSearch] = useState('');
+  const [selectedNewMembers, setSelectedNewMembers] = useState<string[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [pendingAudio, setPendingAudio] = useState<{ file: File; previewUrl: string } | null>(null);
+  const [sendingAudio, setSendingAudio] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
+  const [respondendoA, setRespondendoA] = useState<ChatMessage | null>(null);
+  const [destacadaMsgId, setDestacadaMsgId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingGrupoNome, setEditingGrupoNome] = useState(false);
   const [grupoNomeInput, setGrupoNomeInput] = useState('');
@@ -642,8 +848,34 @@ const Chat = () => {
     setText('');
     const files = [...selectedFiles];
     setSelectedFiles([]);
-    await send(trimmed, files, activeGrupoId, activeRecipientId);
+    const quoted = buildQuotedParams(respondendoA);
+    setRespondendoA(null);
+    await send(trimmed, files, activeGrupoId, activeRecipientId, quoted);
   };
+
+  function buildQuotedParams(msg: ChatMessage | null): QuotedMessage | null {
+    if (!msg) return null;
+    return {
+      id: msg.id,
+      conteudo: msg.conteudo,
+      arquivo_nome: msg.arquivo_nome,
+      arquivo_tipo: msg.arquivo_tipo,
+      remetente_nome: msg.vendedor?.nome ?? null,
+    };
+  }
+
+  function handleReply(msg: ChatMessage) {
+    setRespondendoA(msg);
+    inputRef.current?.focus();
+  }
+
+  function irParaMensagem(id: string) {
+    const el = document.getElementById(`chat-msg-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setDestacadaMsgId(id);
+    setTimeout(() => setDestacadaMsgId(null), 1600);
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -656,6 +888,95 @@ const Chat = () => {
     
     setSelectedFiles(prev => [...prev, ...validFiles]);
   };
+
+  // Ctrl+V com uma imagem na área de transferência anexa direto, como qualquer
+  // outro anexo — sem isso o navegador só colaria o texto/nome do arquivo.
+  const handlePasteImage = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const imageFiles = Array.from(e.clipboardData?.items ?? [])
+      .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => !!f);
+    if (imageFiles.length === 0) return;
+    e.preventDefault();
+    // Imagens copiadas da área de transferência costumam vir sem nome útil
+    // (ex: "image.png"); nomeia com timestamp pra não colidir/confundir no preview.
+    const named = imageFiles.map(
+      (file, i) =>
+        new File(
+          [file],
+          `imagem-colada-${Date.now()}-${i}.${file.type.split('/')[1] || 'png'}`,
+          { type: file.type },
+        ),
+    );
+    const validFiles = named.filter(file =>
+      validateFile(file, { allowedExtensions: CHAT_ALLOWED_EXT, allowedMimePrefixes: CHAT_ALLOWED_MIME })
+    );
+    setSelectedFiles(prev => [...prev, ...validFiles]);
+  };
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        const ext = mimeType.includes('webm') ? 'webm' : 'ogg';
+        const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mimeType });
+        stream.getTracks().forEach(t => t.stop());
+        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+        setRecordingSeconds(0);
+        setPendingAudio({ file, previewUrl: URL.createObjectURL(blob) });
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = window.setInterval(() => {
+        setRecordingSeconds(s => s + 1);
+      }, 1000);
+    } catch {
+      toast.error('Não foi possível acessar o microfone');
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  }
+
+  function toggleRecording() {
+    if (isRecording) stopRecording();
+    else startRecording();
+  }
+
+  function cancelPendingAudio() {
+    if (pendingAudio) URL.revokeObjectURL(pendingAudio.previewUrl);
+    setPendingAudio(null);
+  }
+
+  async function confirmSendAudio() {
+    if (!pendingAudio) return;
+    const { file } = pendingAudio;
+    cancelPendingAudio();
+    const quoted = buildQuotedParams(respondendoA);
+    setRespondendoA(null);
+    setSendingAudio(true);
+    try {
+      await send('', [file], activeGrupoId, activeRecipientId, quoted);
+    } catch {
+      toast.error('Erro ao enviar áudio');
+    } finally {
+      setSendingAudio(false);
+    }
+  }
 
   const handleGrupoFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -678,6 +999,27 @@ const Chat = () => {
       onSuccess: () => {
         setSheetOpen(false);
         setTarget({ type: 'geral' });
+      }
+    });
+  };
+
+  const handleDeleteMessage = () => {
+    if (!msgToDelete) return;
+    deleteMessage.mutate({ id: msgToDelete.id, grupoId: activeGrupoId, recipientId: activeRecipientId });
+    setMsgToDelete(null);
+  };
+
+  const toggleNewMember = (id: string) => {
+    setSelectedNewMembers(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
+  };
+
+  const handleAddMembers = () => {
+    if (!activeGrupoId || selectedNewMembers.length === 0) return;
+    addGrupoMembros.mutate({ grupoId: activeGrupoId, usuarioIds: selectedNewMembers }, {
+      onSuccess: () => {
+        setAddMembersOpen(false);
+        setSelectedNewMembers([]);
+        setAddMembersSearch('');
       }
     });
   };
@@ -720,7 +1062,10 @@ const Chat = () => {
 
   // Resolve header info
   const activeGrupo = grupos.find(g => g.id === activeGrupoId);
-  const canDeleteGrupo = !!activeGrupo && (isAdminEmpresa || activeGrupo.criado_por === myVendedor);
+  const canDeleteGrupo = !!activeGrupo && (canManageGrupos || activeGrupo.criado_por === myVendedor);
+  const addMemberEligible = members.filter(m => !grupoMembros.some(gm => gm.id === m.id));
+  const addMemberCandidates = addMemberEligible.filter(m => m.nome.toLowerCase().includes(addMembersSearch.trim().toLowerCase()));
+  const allNewMembersSelected = addMemberEligible.length > 0 && addMemberEligible.every(m => selectedNewMembers.includes(m.id));
   const selectedMemberData = target.type === 'dm' ? members.find(m => m.id === target.memberId) : null;
   
   let chatHeaderName = geralNome;
@@ -799,11 +1144,11 @@ const Chat = () => {
                 >
                   {target.type === 'grupo' ? (
                     <>
-                      <Avatar className="h-8 w-8">
+                      <Avatar className="h-8 w-8 border border-border">
                         {activeGrupo?.foto_url && (
-                          <img src={activeGrupo.foto_url} alt={chatHeaderName} className="h-full w-full object-cover" />
+                          <img src={activeGrupo.foto_url} alt={chatHeaderName} className="h-full w-full object-cover" onError={hideOnError} />
                         )}
-                        <AvatarFallback className="bg-chart-2 text-white text-xs">
+                        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                           <Users2 className="h-4 w-4" />
                         </AvatarFallback>
                       </Avatar>
@@ -814,9 +1159,9 @@ const Chat = () => {
                     </>
                   ) : target.type === 'dm' ? (
                     <>
-                      <Avatar className="h-8 w-8 border border-primary/10">
+                      <Avatar className="h-8 w-8 border border-border">
                         {selectedMemberData.avatar_url && (
-                          <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="h-full w-full object-cover" />
+                          <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="h-full w-full object-cover" onError={hideOnError} />
                         )}
                         <AvatarFallback className={`${colorForId(target.memberId)} text-white text-xs`}>
                           {getInitials(chatHeaderName)}
@@ -829,9 +1174,9 @@ const Chat = () => {
                     </>
                   ) : (
                     <>
-                      <Avatar className="h-8 w-8">
+                      <Avatar className="h-8 w-8 border border-border">
                         {geralConfig?.foto_url && (
-                          <img src={geralConfig.foto_url} alt={geralNome} className="h-full w-full object-cover" />
+                          <img src={geralConfig.foto_url} alt={geralNome} className="h-full w-full object-cover" onError={hideOnError} />
                         )}
                         <AvatarFallback className="bg-primary text-primary-foreground">
                           <Users className="h-4 w-4" />
@@ -889,7 +1234,7 @@ const Chat = () => {
                   </SheetTitle>
                 </SheetHeader>
 
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 min-h-0">
                   <div className="p-4">
                     {target.type === 'grupo' && (
                       <>
@@ -907,11 +1252,11 @@ const Chat = () => {
                             className="relative group shrink-0"
                             title="Trocar foto do grupo"
                           >
-                            <Avatar className="h-14 w-14">
+                            <Avatar className="h-14 w-14 border border-border">
                               {activeGrupo?.foto_url && (
-                                <img src={activeGrupo.foto_url} alt={chatHeaderName} className="h-full w-full object-cover" />
+                                <img src={activeGrupo.foto_url} alt={chatHeaderName} className="h-full w-full object-cover" onError={hideOnError} />
                               )}
-                              <AvatarFallback className="bg-chart-2 text-white">
+                              <AvatarFallback className="bg-primary text-primary-foreground">
                                 <Users2 className="h-6 w-6" />
                               </AvatarFallback>
                             </Avatar>
@@ -947,10 +1292,22 @@ const Chat = () => {
                           </div>
                         </div>
                         <div className="space-y-2 mb-4">
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                              <Users2 className="h-3 w-3" /> Participantes do grupo
-                              {grupoMembros.length > 0 && ` (${grupoMembros.length})`}
-                            </p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                <Users2 className="h-3 w-3" /> Participantes do grupo
+                                {grupoMembros.length > 0 && ` (${grupoMembros.length})`}
+                              </p>
+                              {canDeleteGrupo && (
+                                <button
+                                  type="button"
+                                  onClick={() => setAddMembersOpen(true)}
+                                  className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"
+                                  title="Adicionar participante"
+                                >
+                                  <UserPlus className="h-3 w-3" /> Adicionar
+                                </button>
+                              )}
+                            </div>
                             {grupoMembros.length > 0 ? (
                               <ul className="space-y-0.5">
                                 {grupoMembros.map((m) => (
@@ -958,9 +1315,9 @@ const Chat = () => {
                                     key={m.id}
                                     className="w-full flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm"
                                   >
-                                    <Avatar className="h-6 w-6 shrink-0 border border-primary/10">
+                                    <Avatar className="h-6 w-6 shrink-0 border border-border">
                                       {m.avatar_url && (
-                                        <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+                                        <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" onError={hideOnError} />
                                       )}
                                       <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                                         {getInitials(m.nome)}
@@ -996,9 +1353,9 @@ const Chat = () => {
                               className="relative group shrink-0"
                               title="Trocar foto do Chat Geral"
                             >
-                              <Avatar className="h-14 w-14">
+                              <Avatar className="h-14 w-14 border border-border">
                                 {geralConfig?.foto_url && (
-                                  <img src={geralConfig.foto_url} alt={geralNome} className="h-full w-full object-cover" />
+                                  <img src={geralConfig.foto_url} alt={geralNome} className="h-full w-full object-cover" onError={hideOnError} />
                                 )}
                                 <AvatarFallback className="bg-primary text-primary-foreground">
                                   <Users className="h-6 w-6" />
@@ -1047,9 +1404,9 @@ const Chat = () => {
                                     key={m.id}
                                     className="w-full flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm"
                                   >
-                                    <Avatar className="h-6 w-6 shrink-0 border border-primary/10">
+                                    <Avatar className="h-6 w-6 shrink-0 border border-border">
                                       {m.avatar_url && (
-                                        <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" />
+                                        <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" onError={hideOnError} />
                                       )}
                                       <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                                         {getInitials(m.nome)}
@@ -1256,9 +1613,9 @@ const Chat = () => {
                             className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''} ${showAvatar ? 'mt-3' : 'mt-0.5'}`}
                           >
                             {showAvatar ? (
-                              <Avatar className="h-8 w-8 shrink-0 border border-primary/10">
+                              <Avatar className="h-8 w-8 shrink-0 border border-border">
                                 {msg.vendedor?.avatar_url && (
-                                  <img src={msg.vendedor.avatar_url} alt={name} className="h-full w-full object-cover" />
+                                  <img src={msg.vendedor.avatar_url} alt={name} className="h-full w-full object-cover" onError={hideOnError} />
                                 )}
                                 <AvatarFallback className={`${colorForId(msg.usuario_id)} text-white text-xs`}>
                                   {getInitials(name)}
@@ -1267,12 +1624,22 @@ const Chat = () => {
                             ) : (
                               <div className="w-8 shrink-0" />
                             )}
-                            <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
+                            <div className={`group/msg relative max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
+                              {isMe && !msg.id.startsWith('temp-') && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMsgToDelete(msg)}
+                                  className="absolute right-full top-1/2 -translate-y-1/2 mr-0.5 p-1 opacity-0 group-hover/msg:opacity-100 text-muted-foreground/60 hover:text-destructive transition-opacity"
+                                  title="Excluir mensagem"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
                               {showAvatar && !isMe && (
                                 <p className="text-[10px] font-medium text-muted-foreground mb-0.5 ml-1">{name}</p>
                               )}
                               <div
-                                className={`px-3 py-2 rounded-2xl text-sm break-words ${
+                                className={`px-3 py-2 rounded-2xl text-sm break-words whitespace-pre-wrap ${
                                   isMe
                                     ? 'bg-primary text-primary-foreground rounded-tr-sm'
                                     : 'bg-muted text-foreground rounded-tl-sm'
@@ -1280,7 +1647,9 @@ const Chat = () => {
                               >
                                 {msg.arquivo_url && (
                                   <div className="mb-1">
-                                    {msg.arquivo_tipo?.startsWith('image/') ? (
+                                    {msg.arquivo_tipo?.startsWith('audio/') ? (
+                                      <ChatAudioPlayer src={msg.arquivo_url} isMe={isMe} />
+                                    ) : msg.arquivo_tipo?.startsWith('image/') ? (
                                       <div className="relative group/img">
                                         <a href={msg.arquivo_url} target="_blank" rel="noopener noreferrer">
                                           <img
@@ -1355,6 +1724,110 @@ const Chat = () => {
             )}
           </div>
 
+          <AlertDialog open={!!msgToDelete} onOpenChange={(open) => !open && setMsgToDelete(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Essa mensagem será removida permanentemente para todos os participantes. Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteMessage}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <Dialog open={addMembersOpen} onOpenChange={(v) => { setAddMembersOpen(v); if (!v) { setSelectedNewMembers([]); setAddMembersSearch(''); } }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Adicionar participante</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {addMemberEligible.length > 0 ? `${addMemberEligible.length} disponíveis` : ''}
+                  </span>
+                  {addMemberEligible.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedNewMembers(allNewMembersSelected ? [] : addMemberEligible.map(m => m.id))}
+                      className="text-[11px] font-semibold text-primary hover:underline"
+                    >
+                      {allNewMembersSelected ? 'Remover todos' : 'Selecionar todos'}
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar membro..."
+                    value={addMembersSearch}
+                    onChange={e => setAddMembersSearch(e.target.value)}
+                    className="h-8 pl-8 text-xs"
+                  />
+                </div>
+                <ScrollArea className="h-[240px] border rounded-lg p-2">
+                  <div className="space-y-1">
+                    {(() => {
+                      if (addMemberCandidates.length === 0) {
+                        return (
+                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 py-8">
+                            <Users2 className="h-8 w-8 opacity-30" />
+                            <p className="text-xs text-center">
+                              {addMemberEligible.length === 0
+                                ? 'Todos os membros da empresa já estão neste grupo.'
+                                : `Nenhum membro encontrado para "${addMembersSearch}".`}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return addMemberCandidates.map(m => (
+                        <label
+                          key={m.id}
+                          className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted/50 cursor-pointer transition-colors"
+                        >
+                          <Checkbox
+                            checked={selectedNewMembers.includes(m.id)}
+                            onCheckedChange={() => toggleNewMember(m.id)}
+                          />
+                          <Avatar className="h-7 w-7 border border-border">
+                            {m.avatar_url && (
+                              <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                            )}
+                            <AvatarFallback className={`${colorForId(m.id)} text-white text-[9px] font-semibold`}>
+                              {getInitials(m.nome)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm truncate">{m.nome}</p>
+                            <p className="text-[10px] text-muted-foreground capitalize">{m.role}</p>
+                          </div>
+                        </label>
+                      ));
+                    })()}
+                  </div>
+                </ScrollArea>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setAddMembersOpen(false)}>Cancelar</Button>
+                <Button
+                  size="sm"
+                  disabled={selectedNewMembers.length === 0 || addGrupoMembros.isPending}
+                  onClick={handleAddMembers}
+                >
+                  {addGrupoMembros.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Adicionar${selectedNewMembers.length > 0 ? ` (${selectedNewMembers.length})` : ''}`}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <div className="border-t border-border px-4 py-3">
             {selectedFiles.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-2">
@@ -1366,14 +1839,24 @@ const Chat = () => {
                       <FileText className="h-4 w-4 text-primary shrink-0" />
                     )}
                     <span className="truncate flex-1 text-xs text-foreground">{file.name}</span>
-                    <button 
-                      onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))} 
+                    <button
+                      onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
                       className="p-0.5 hover:bg-background rounded"
                     >
                       <X className="h-3.5 w-3.5 text-muted-foreground" />
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+            {pendingAudio && (
+              <div className="mb-2">
+                <PendingAudioPlayer
+                  src={pendingAudio.previewUrl}
+                  onCancel={cancelPendingAudio}
+                  onSend={confirmSendAudio}
+                  isSending={sendingAudio}
+                />
               </div>
             )}
             <div className="flex gap-2">
@@ -1389,24 +1872,50 @@ const Chat = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={sending}
+                disabled={sending || isRecording || !!pendingAudio}
                 className="shrink-0"
                 title="Anexar arquivo"
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
-              <Textarea
-                ref={inputRef}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Digite sua mensagem..."
-                className="flex-1 min-h-9 resize-none py-2 overflow-hidden"
-                rows={1}
-                disabled={sending}
-                autoFocus
-              />
-              <Button onClick={handleSend} disabled={sending || (!text.trim() && selectedFiles.length === 0)} size="icon">
+              <Button
+                type="button"
+                variant={isRecording ? 'destructive' : 'ghost'}
+                size="icon"
+                onClick={toggleRecording}
+                disabled={sending || !!pendingAudio}
+                className="shrink-0"
+                title={isRecording ? 'Parar gravação' : 'Gravar áudio'}
+              >
+                {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </Button>
+              {isRecording ? (
+                <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-red-300 bg-red-50 dark:bg-red-950/20">
+                  <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                  <span className="text-sm text-red-600 dark:text-red-400 font-mono">
+                    {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}
+                  </span>
+                  <span className="text-sm text-red-500/70">Gravando...</span>
+                </div>
+              ) : (
+                <Textarea
+                  ref={inputRef}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePasteImage}
+                  placeholder="Digite sua mensagem..."
+                  className="flex-1 min-h-9 resize-none py-2 overflow-hidden"
+                  rows={1}
+                  disabled={sending || !!pendingAudio}
+                  autoFocus
+                />
+              )}
+              <Button
+                onClick={handleSend}
+                disabled={sending || isRecording || !!pendingAudio || (!text.trim() && selectedFiles.length === 0)}
+                size="icon"
+              >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>

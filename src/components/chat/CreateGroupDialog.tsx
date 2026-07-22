@@ -16,7 +16,7 @@ function getInitials(name: string) {
   return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
-const COLORS = ['bg-primary', 'bg-chart-1', 'bg-chart-2', 'bg-chart-3', 'bg-chart-4', 'bg-chart-5'];
+const COLORS = ['bg-primary', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-pink-500', 'bg-amber-500'];
 function colorForId(id: string) {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
@@ -59,6 +59,9 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
       prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
     );
   };
+
+  const otherMembers = members.filter(m => m.id !== myId);
+  const allSelected = otherMembers.length > 0 && otherMembers.every(m => selectedMembers.includes(m.id));
 
   const handleCreate = async () => {
     if (!nome.trim()) {
@@ -166,7 +169,7 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
             >
               <Avatar className="h-16 w-16">
                 {fotoPreview && <img src={fotoPreview} alt="Foto do grupo" className="h-full w-full object-cover" />}
-                <AvatarFallback className="bg-chart-2 text-white">
+                <AvatarFallback className="bg-primary text-primary-foreground">
                   <Users2 className="h-6 w-6" />
                 </AvatarFallback>
               </Avatar>
@@ -188,7 +191,18 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
             />
           </div>
           <div className="space-y-2">
-            <Label>Membros</Label>
+            <div className="flex items-center justify-between">
+              <Label>Membros</Label>
+              {otherMembers.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMembers(allSelected ? [] : otherMembers.map(m => m.id))}
+                  className="text-[11px] font-semibold text-primary hover:underline"
+                >
+                  {allSelected ? 'Remover todos' : 'Selecionar todos'}
+                </button>
+              )}
+            </div>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input

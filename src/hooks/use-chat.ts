@@ -17,7 +17,20 @@ export interface ChatMessage {
   arquivo_tipo?: string | null;
   lida: boolean;
   lida_em?: string | null;
+  quoted_mensagem_id?: string | null;
+  quoted_conteudo?: string | null;
+  quoted_arquivo_nome?: string | null;
+  quoted_arquivo_tipo?: string | null;
+  quoted_remetente_nome?: string | null;
   vendedor?: { id: string; nome: string; email: string; avatar_url?: string | null };
+}
+
+export interface QuotedMessage {
+  id: string;
+  conteudo: string | null;
+  arquivo_nome?: string | null;
+  arquivo_tipo?: string | null;
+  remetente_nome: string | null;
 }
 
 export interface ChatGrupo {
@@ -114,6 +127,16 @@ export function useChatMessages(grupoId: string | null = null, recipientId: stri
           qc.invalidateQueries({ queryKey: ['unread_chat_by_target'] });
         }
       })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'chat_mensagens'
+      }, (payload) => {
+        const oldMsg = payload.old as any;
+        qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId], (old) =>
+          (old || []).filter(m => m.id !== oldMsg.id)
+        );
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -192,6 +215,27 @@ export function useUpdateChatGrupo() {
     onError: (err: any) => {
       console.error('Erro ao atualizar grupo:', err);
       toast.error(`Erro ao atualizar grupo: ${err.message || 'Você não tem permissão para editar este grupo'}`);
+    }
+  });
+}
+
+export function useAddChatGrupoMembros() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ grupoId, usuarioIds }: { grupoId: string; usuarioIds: string[] }) => {
+      const { error } = await supabase
+        .from('chat_grupo_membros')
+        .insert(usuarioIds.map(usuario_id => ({ grupo_id: grupoId, usuario_id })) as any);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ['chat-grupo-membros', variables.grupoId] });
+      toast.success('Participante adicionado com sucesso!');
+    },
+    onError: (err: any) => {
+      console.error('Erro ao adicionar participante:', err);
+      toast.error(`Erro ao adicionar participante: ${err.message || 'Você não tem permissão para isso'}`);
     }
   });
 }
@@ -377,7 +421,7 @@ export function useSendMessage() {
   const [sending, setSending] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: async ({ conteudo, files, grupoId, recipientId }: { conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null }) => {
+    mutationFn: async ({ conteudo, files, grupoId, recipientId, quoted }: { conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null, quoted?: QuotedMessage | null }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Usuário não autenticado');
 
@@ -386,8 +430,16 @@ export function useSendMessage() {
         .select('id, empresa_id, nome, avatar_url')
         .eq('user_id', userData.user.id)
         .single();
-      
+
       if (vErr || !vendedor) throw new Error('Vendedor não encontrado');
+
+      const quotedFields = quoted ? {
+        quoted_mensagem_id: quoted.id,
+        quoted_conteudo: quoted.conteudo,
+        quoted_arquivo_nome: quoted.arquivo_nome ?? null,
+        quoted_arquivo_tipo: quoted.arquivo_tipo ?? null,
+        quoted_remetente_nome: quoted.remetente_nome,
+      } : {};
 
       // Se não houver arquivos, envia apenas a mensagem de texto
       if (!files || files.length === 0) {
@@ -397,6 +449,7 @@ export function useSendMessage() {
           empresa_id: vendedor.empresa_id!,
           grupo_id: grupoId || null,
           recipient_id: recipientId || null,
+          ...quotedFields,
         };
 
         const { data: savedMsg, error } = await supabase
@@ -410,17 +463,17 @@ export function useSendMessage() {
       }
 
       // Se houver arquivos, envia cada um como uma mensagem separada
-      // A primeira mensagem também leva o conteúdo de texto se houver
+      // A primeira mensagem também leva o conteúdo de texto e a citação, se houver
       const results = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const safeName = sanitizeFileName(file.name);
         const path = `${userData.user.id}/${Date.now()}-${i}-${safeName}`;
-        
+
         const { error: uploadError } = await supabase.storage
           .from('chat-files')
           .upload(path, file, { contentType: file.type || 'application/octet-stream' });
-        
+
         if (uploadError) throw uploadError;
 
         const { data: urlData } = supabase.storage
@@ -436,6 +489,7 @@ export function useSendMessage() {
           arquivo_tipo: file.type,
           grupo_id: grupoId || null,
           recipient_id: recipientId || null,
+          ...(i === 0 ? quotedFields : {}),
         };
 
         const { data: savedMsg, error } = await supabase
@@ -449,7 +503,7 @@ export function useSendMessage() {
       }
       return results;
     },
-    onMutate: async ({ conteudo, files, grupoId, recipientId }) => {
+    onMutate: async ({ conteudo, files, grupoId, recipientId, quoted }) => {
       await qc.cancelQueries({ queryKey: ['chat_mensagens', grupoId, recipientId] });
       const previousMessages = qc.getQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId]);
 
@@ -465,6 +519,14 @@ export function useSendMessage() {
       if (previousMessages && userData.user) {
         const myVendedor = qc.getQueryData<any>(['meu_perfil', userData.user.id]);
         
+        const quotedFields = quoted ? {
+          quoted_mensagem_id: quoted.id,
+          quoted_conteudo: quoted.conteudo,
+          quoted_arquivo_nome: quoted.arquivo_nome ?? null,
+          quoted_arquivo_tipo: quoted.arquivo_tipo ?? null,
+          quoted_remetente_nome: quoted.remetente_nome,
+        } : {};
+
         const optimisticMsgs: ChatMessage[] = [];
         if (!files || files.length === 0) {
           optimisticMsgs.push({
@@ -476,6 +538,7 @@ export function useSendMessage() {
             grupo_id: grupoId || null,
             recipient_id: recipientId || null,
             lida: false,
+            ...quotedFields,
             vendedor: myVendedor ? {
               id: myVendedor.id,
               nome: myVendedor.nome,
@@ -497,6 +560,7 @@ export function useSendMessage() {
               arquivo_nome: file.name,
               arquivo_tipo: file.type,
               lida: false,
+              ...(i === 0 ? quotedFields : {}),
               vendedor: myVendedor ? {
                 id: myVendedor.id,
                 nome: myVendedor.nome,
@@ -525,10 +589,10 @@ export function useSendMessage() {
     }
   });
 
-  const send = useCallback(async (conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null) => {
+  const send = useCallback(async (conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null, quoted?: QuotedMessage | null) => {
     setSending(true);
     try {
-      await mutation.mutateAsync({ conteudo, files, grupoId, recipientId });
+      await mutation.mutateAsync({ conteudo, files, grupoId, recipientId, quoted });
     } finally {
       setSending(false);
     }
@@ -603,6 +667,31 @@ export function useClearChat() {
     onError: (err: any) => {
       console.error('Erro ao limpar chat:', err);
       toast.error(`Erro ao limpar chat: ${err.message}`);
+    }
+  });
+}
+
+export function useDeleteChatMessage() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id }: { id: string; grupoId?: string | null; recipientId?: string | null }) => {
+      const { data, error } = await supabase.from('chat_mensagens').delete().eq('id', id).select('id');
+      if (error) throw error;
+      // RLS bloqueia silenciosamente (error null, 0 linhas) em vez de lançar erro de permissão.
+      if (!data || data.length === 0) {
+        throw new Error('Você não tem permissão para excluir esta mensagem');
+      }
+    },
+    onSuccess: (_, variables) => {
+      qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId ?? null, variables.recipientId ?? null], (old) =>
+        (old || []).filter(m => m.id !== variables.id)
+      );
+      toast.success('Mensagem excluída.');
+    },
+    onError: (err: any) => {
+      console.error('Erro ao excluir mensagem:', err);
+      toast.error(`Erro ao excluir mensagem: ${err.message || 'Você não tem permissão para excluir esta mensagem'}`);
     }
   });
 }
