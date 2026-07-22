@@ -151,7 +151,10 @@ export function KanbanColunasDialog({
         setEditCor(c.cor);
     };
 
-    const isProtegida = (c: DraftColuna) => (c.slug === 'perdido' || c.slug === 'fechamento') && c.is_sistema;
+    // A proteção (não pode excluir/renomear slug) só vale no funil padrão da empresa —
+    // em funis criados pelo usuário, essas colunas podem ser removidas normalmente.
+    const isProtegida = (c: DraftColuna) =>
+        (c.slug === 'perdido' || c.slug === 'fechamento') && c.is_sistema && (!selectedFunil || selectedFunil.is_padrao);
 
     const startDelete = (c: DraftColuna) => {
         const outras = draft.filter(x => x.id !== c.id && !x.isNew);
