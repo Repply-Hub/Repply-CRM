@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import {
   Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen,
   Paperclip, FileText, Image, X, Download, Users2, Calendar, Eraser, ChevronDown,
@@ -537,6 +538,62 @@ function ChatAudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
           {formatAudioTime(currentTime || duration)}
         </span>
       </div>
+    </div>
+  );
+}
+
+// Cartão de citação: usado tanto no preview acima do input (com onCancel) quanto
+// dentro da bolha da mensagem que é resposta a outra (sem onCancel, com onClick
+// pra pular até a mensagem original).
+function QuotedPreview({
+  remetenteNome,
+  conteudo,
+  arquivoNome,
+  arquivoTipo,
+  isMe,
+  onClick,
+  onCancel,
+}: {
+  remetenteNome: string | null;
+  conteudo: string | null;
+  arquivoNome?: string | null;
+  arquivoTipo?: string | null;
+  isMe?: boolean;
+  onClick?: () => void;
+  onCancel?: () => void;
+}) {
+  const isAttachmentOnly = !!arquivoNome && (!conteudo || conteudo === arquivoNome);
+  const label = isAttachmentOnly
+    ? arquivoTipo?.startsWith('audio/') ? '🎤 Áudio' : arquivoTipo?.startsWith('image/') ? '📷 Imagem' : `📎 ${arquivoNome}`
+    : conteudo;
+
+  return (
+    <div
+      onClick={onClick}
+      className={cn(
+        'flex items-start gap-2 rounded-lg pl-2.5 pr-2 py-1.5 border-l-2 min-w-0',
+        onClick && 'cursor-pointer',
+        isMe ? 'bg-primary-foreground/10 border-primary-foreground/60' : 'bg-muted border-primary/60'
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className={cn('text-xs font-semibold truncate', isMe ? 'text-primary-foreground' : 'text-primary')}>
+          {remetenteNome ?? 'Alguém'}
+        </p>
+        <p className={cn('text-xs truncate', isMe ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+          {label}
+        </p>
+      </div>
+      {onCancel && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onCancel(); }}
+          className="shrink-0 p-0.5 rounded hover:bg-foreground/10"
+          title="Cancelar resposta"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -1614,6 +1671,7 @@ const Chat = () => {
                         return (
                           <div
                             key={msg.id}
+                            id={`chat-msg-${msg.id}`}
                             className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''} ${showAvatar ? 'mt-3' : 'mt-0.5'}`}
                           >
                             {showAvatar ? (
@@ -1629,26 +1687,70 @@ const Chat = () => {
                               <div className="w-8 shrink-0" />
                             )}
                             <div className={`group/msg relative max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
-                              {isMe && !msg.id.startsWith('temp-') && (
-                                <button
-                                  type="button"
-                                  onClick={() => setMsgToDelete(msg)}
-                                  className="absolute right-full top-1/2 -translate-y-1/2 mr-0.5 p-1 opacity-0 group-hover/msg:opacity-100 text-muted-foreground/60 hover:text-destructive transition-opacity"
-                                  title="Excluir mensagem"
+                              {!msg.id.startsWith('temp-') && (
+                                <div
+                                  className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity ${
+                                    isMe ? 'right-full mr-0.5' : 'left-full ml-0.5'
+                                  }`}
                                 >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReply(msg)}
+                                    className="p-1 text-muted-foreground/60 hover:text-primary"
+                                    title="Responder"
+                                  >
+                                    <Reply className="h-3 w-3" />
+                                  </button>
+                                </div>
                               )}
                               {showAvatar && !isMe && (
                                 <p className="text-[10px] font-medium text-muted-foreground mb-0.5 ml-1">{name}</p>
                               )}
                               <div
-                                className={`px-3 py-2 rounded-2xl text-sm break-words whitespace-pre-wrap ${
+                                className={`relative px-3 py-2 rounded-2xl text-sm break-words whitespace-pre-wrap transition-[padding] duration-150 ${
                                   isMe
                                     ? 'bg-primary text-primary-foreground rounded-tr-sm'
                                     : 'bg-muted text-foreground rounded-tl-sm'
-                                } ${msg.id.startsWith('temp-') ? 'opacity-50 grayscale-[0.5]' : ''}`}
+                                } ${isMe && !msg.id.startsWith('temp-') ? 'group-hover/msg:pr-8' : ''} ${
+                                  msg.id.startsWith('temp-') ? 'opacity-50 grayscale-[0.5]' : ''
+                                } ${
+                                  destacadaMsgId === msg.id ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
+                                }`}
                               >
+                                {isMe && !msg.id.startsWith('temp-') && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="absolute top-1/2 -translate-y-1/2 right-1 p-1 rounded-full text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 opacity-0 group-hover/msg:opacity-100 transition-opacity"
+                                        title="Mais opções"
+                                      >
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        className="text-destructive focus:text-destructive"
+                                        onClick={() => setMsgToDelete(msg)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                        Excluir mensagem
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                                {msg.quoted_remetente_nome && (
+                                  <div className="mb-1.5">
+                                    <QuotedPreview
+                                      remetenteNome={msg.quoted_remetente_nome}
+                                      conteudo={msg.quoted_conteudo ?? null}
+                                      arquivoNome={msg.quoted_arquivo_nome}
+                                      arquivoTipo={msg.quoted_arquivo_tipo}
+                                      isMe={isMe}
+                                      onClick={msg.quoted_mensagem_id ? () => irParaMensagem(msg.quoted_mensagem_id!) : undefined}
+                                    />
+                                  </div>
+                                )}
                                 {msg.arquivo_url && (
                                   <div className="mb-1">
                                     {msg.arquivo_tipo?.startsWith('audio/') ? (
@@ -1833,6 +1935,17 @@ const Chat = () => {
           </Dialog>
 
           <div className="border-t border-border px-4 py-3">
+            {respondendoA && (
+              <div className="mb-2">
+                <QuotedPreview
+                  remetenteNome={respondendoA.usuario_id === myVendedor ? 'Você' : (respondendoA.vendedor?.nome ?? 'Alguém')}
+                  conteudo={respondendoA.conteudo}
+                  arquivoNome={respondendoA.arquivo_nome}
+                  arquivoTipo={respondendoA.arquivo_tipo}
+                  onCancel={() => setRespondendoA(null)}
+                />
+              </div>
+            )}
             {selectedFiles.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-2">
                 {selectedFiles.map((file, idx) => (
