@@ -185,6 +185,28 @@ const MODULOS: ModuloDescricao[] = [
     ],
   },
   {
+    key: 'whatsapp',
+    label: 'WhatsApp',
+    descricoes: {
+      ver: 'Visualizar conversas de WhatsApp com clientes',
+      criar: 'Iniciar novas conversas e enviar mensagens',
+      editar: 'Arquivar conversas e gerenciar responsáveis',
+      excluir: 'Não aplicável ao WhatsApp',
+    },
+    funcionalidades: [],
+  },
+  {
+    key: 'emails',
+    label: 'E-mails',
+    descricoes: {
+      ver: 'Visualizar caixa de e-mails recebidos e enviados',
+      criar: 'Compor e enviar novos e-mails',
+      editar: 'Não aplicável a E-mails',
+      excluir: 'Excluir e-mails',
+    },
+    funcionalidades: [],
+  },
+  {
     key: 'configuracoes',
     label: 'Configurações',
     descricoes: {

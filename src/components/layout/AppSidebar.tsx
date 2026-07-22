@@ -66,16 +66,17 @@ export function AppSidebar() {
 
   const vendedor = profile || vendedorLocal;
 
-  const isVendedor = vendedor?.role === 'vendedor';
   const isAdmin = vendedor?.role === 'admin';
   const isGestor = isAdmin || vendedor?.role === 'gestor' || vendedor?.role === 'empresa';
-  const { data: permissoes } = usePermissoes(isVendedor ? vendedor?.id : undefined);
+  // Qualquer cargo que não seja gestor/admin/empresa (inclui 'vendedor' e perfis
+  // customizados criados em Configurações) passa pelo crivo de permissoes_usuario.
+  const { data: permissoes } = usePermissoes(!isGestor ? vendedor?.id : undefined);
   const saveEmpresaPadrao = useSaveSidebarEmpresaPadrao();
 
-  // Filter visible items, and for vendedores also check permissoes_vendedor
+  // Filter visible items, and for non-gestores also check permissoes_usuario
   const visibleItems = items.filter(i => {
     if (!i.visible) return false;
-    
+
     // Admin vê Dashboard para métricas e Configurações para permissões
     if (isAdmin) {
       return i.id === 'dashboard' || i.id === 'usuarios_admin' || i.id === 'configuracoes' || i.id === 'admin_wa_instancias';
@@ -84,8 +85,8 @@ export function AppSidebar() {
     // Itens exclusivos do admin master nunca aparecem para outros perfis
     if (i.id === 'admin_wa_instancias' || i.id === 'usuarios_admin') return false;
 
-    if (!isVendedor) return true; // gestores/empresa see all visible items
-    // For vendedores: check if they have pode_ver permission for this module
+    if (isGestor) return true; // gestores/empresa see all visible items
+    // For vendedores e cargos customizados: check if they have pode_ver permission for this module
     if (!permissoes || permissoes.length === 0) return true; // no permissions set = show all (default)
     const perm = permissoes.find(p => p.modulo === i.id);
     if (!perm) return true; // no specific permission = default visible
