@@ -107,21 +107,24 @@ export function useBulkImport() {
     }
   }
 
-  async function importNegocios(payload: Record<string, unknown>[], nomeArquivo?: string): Promise<ImportSummary> {
+  async function importNegocios(payload: Record<string, unknown>[], nomeArquivo?: string, funilIdParam?: string): Promise<ImportSummary> {
     const vendedorId = await getVendedorId();
     resetResolveCache();
 
-    // Negócios importados sempre entram no funil padrão da empresa — o wizard de
-    // importação ainda não tem seletor de funil.
-    const { data: funilPadrao, error: funilErr } = await supabase
-      .from('funis')
-      .select('id')
-      .eq('is_padrao', true)
-      .maybeSingle();
-    if (funilErr || !funilPadrao) {
-      throw new Error('Não foi possível identificar o funil padrão da empresa para a importação.');
+    // Funil escolhido no wizard (quando a empresa tem mais de um); sem seleção,
+    // cai no funil padrão da empresa.
+    let funilId = funilIdParam;
+    if (!funilId) {
+      const { data: funilPadrao, error: funilErr } = await supabase
+        .from('funis')
+        .select('id')
+        .eq('is_padrao', true)
+        .maybeSingle();
+      if (funilErr || !funilPadrao) {
+        throw new Error('Não foi possível identificar o funil padrão da empresa para a importação.');
+      }
+      funilId = funilPadrao.id;
     }
-    const funilId = funilPadrao.id;
 
     // Computa hashes e pré-carrega entidades em paralelo — são independentes entre si.
     let rowHashes: string[] = [];

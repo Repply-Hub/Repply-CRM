@@ -1,10 +1,11 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X, ArrowRight, Plus, Pencil, EyeOff } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X, ArrowRight, Plus, Pencil, EyeOff, FolderKanban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +16,8 @@ import { expandMergedCells } from '@/lib/import/expand-merged-cells';
 import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
 import { ImportInstructionsStep } from '@/components/import/ImportInstructionsStep';
 import { useBulkImport } from '@/hooks/use-bulk-import';
+import { useAuth } from '@/hooks/use-auth';
+import { useFunis } from '@/hooks/use-funis';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 import {
@@ -64,6 +67,14 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const { importNegocios, progress } = useBulkImport();
   const [ignoredColumns, setIgnoredColumns] = useState<string[]>([]);
   const [step, setStep] = useState<'instructions' | 'upload' | 'mapping' | 'preview' | 'done'>('instructions');
+  const { profile } = useAuth();
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
+  const { data: funis } = useFunis(empresaId);
+  const [funilId, setFunilId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!funis || funis.length === 0 || funilId) return;
+    setFunilId((funis.find(f => f.is_padrao) ?? funis[0]).id);
+  }, [funis, funilId]);
   const [importResult, setImportResult] = useState<{
     totalNoArquivo: number;
     totalValidados: number;
@@ -101,6 +112,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     setStep('instructions');
     setIgnoredColumns([]);
     setImportResult(null);
+    setFunilId(funis?.find(f => f.is_padrao)?.id ?? funis?.[0]?.id);
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -453,7 +465,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         };
       });
 
-      const summary = await importNegocios(enrichedRows);
+      const summary = await importNegocios(enrichedRows, undefined, funilId);
 
       // Log linhas com data inválida (filtradas antes do hook — não chegam ao importNegocios)
       if (userId) {
@@ -683,6 +695,28 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               </Button>
             </div>
 
+            {funis && funis.length > 1 && (
+              <div className="flex items-center gap-3 bg-card p-4 rounded-xl border border-border/50 shadow-sm">
+                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <FolderKanban className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex flex-col gap-1 flex-1">
+                  <span className="text-xs font-bold text-foreground">Em qual funil importar?</span>
+                  <span className="text-[11px] text-muted-foreground">Este sistema tem mais de um funil de vendas — escolha onde os negócios importados devem entrar.</span>
+                </div>
+                <Select value={funilId} onValueChange={setFunilId}>
+                  <SelectTrigger className="h-9 w-fit min-w-[160px] shrink-0 text-sm">
+                    <SelectValue placeholder="Selecione o funil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {funis.map(f => (
+                      <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
                 <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
@@ -862,7 +896,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         {step === 'preview' && (
           <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
             <Button variant="ghost" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
-            <Button onClick={handleImport} disabled={importing} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
+            <Button onClick={handleImport} disabled={importing || !funilId} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
               {importing ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
               ) : (
