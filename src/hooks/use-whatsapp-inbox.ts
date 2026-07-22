@@ -35,6 +35,10 @@ export interface WaConversa {
   ultima_mensagem: string | null;
   ultima_mensagem_at: string | null;
   nao_lidas: number;
+  // Marcação manual de "não lida" via menu "..." — sobrepõe a supressão automática
+  // do estado "não lida" em conversas já atribuídas (ver `conversaNaoLida` em
+  // WhatsAppInbox.tsx).
+  nao_lidas_forcada: boolean;
   arquivada: boolean;
   is_group: boolean;
   participantes: { nome: string | null; telefone: string }[];
@@ -464,12 +468,33 @@ export function useWaMarcarLida() {
 
       await supabase
         .from('whatsapp_conversas')
-        .update({ nao_lidas: 0 })
+        .update({ nao_lidas: 0, nao_lidas_forcada: false })
         .eq('id', conversaId);
     },
     onSuccess: (_, conversaId) => {
       qc.invalidateQueries({ queryKey: ['wa_conversas'] });
       qc.invalidateQueries({ queryKey: ['wa_mensagens', conversaId] });
+      qc.invalidateQueries({ queryKey: ['unread_wa_count'] });
+    },
+  });
+}
+
+// Marcação manual de "não lida" via menu "..." — única forma de uma conversa já
+// atribuída a um responsável voltar a exibir o estado "não lida" (ver
+// `conversaNaoLida` em WhatsAppInbox.tsx). Some sozinha quando o usuário
+// responde a conversa ou clica em "marcar como lida" de novo.
+export function useWaMarcarNaoLida() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversaId: string) => {
+      await supabase
+        .from('whatsapp_conversas')
+        .update({ nao_lidas_forcada: true })
+        .eq('id', conversaId);
+    },
+    onSuccess: (_, conversaId) => {
+      qc.invalidateQueries({ queryKey: ['wa_conversas'] });
       qc.invalidateQueries({ queryKey: ['unread_wa_count'] });
     },
   });

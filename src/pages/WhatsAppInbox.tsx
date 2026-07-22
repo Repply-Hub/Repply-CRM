@@ -8,6 +8,7 @@ import {
   useWaMensagens,
   useWaSendMessage,
   useWaMarcarLida,
+  useWaMarcarNaoLida,
   useWaConfig,
   useWaNovaConversa,
   useWaCriarGrupo,
@@ -169,6 +170,8 @@ import {
   ListTodo,
   StickyNote,
   MessageSquareText,
+  Eye,
+  EyeOff,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -472,6 +475,51 @@ function ConversaAvatar({
   );
 }
 
+// Conversas já atribuídas AO USUÁRIO LOGADO não devem exibir o estado "não lida"
+// automaticamente a partir de mensagens recebidas — só voltam a mostrá-lo se o
+// usuário selecionar "Marcar como não lida" no menu "..." do header
+// (`nao_lidas_forcada`). Conversas sem responsável, ou atribuídas a outra
+// pessoa (ex: admin/gestor abrindo uma conversa que não é dele), seguem o
+// contador normal — abrir/visualizar não marca como lida.
+function conversaNaoLida(conv: WaConversa, currentUserId?: string | null): boolean {
+  const atribuidaAoUsuarioAtual =
+    !!currentUserId && (conv.responsaveis ?? []).some((r) => r.id === currentUserId);
+  return conv.nao_lidas_forcada || (!atribuidaAoUsuarioAtual && conv.nao_lidas > 0);
+}
+
+// Badge de não lidas. Quando a conversa está aberta (`ativa`) o contador não
+// zera mais sozinho — só some quando o usuário envia uma resposta — então aqui
+// trocamos o badge sólido por um contorno com ícone de olho, sinalizando que a
+// conversa está sendo visualizada mas ainda conta como não lida.
+function NaoLidasBadge({
+  conv,
+  ativa,
+  currentUserId,
+}: {
+  conv: WaConversa;
+  ativa: boolean;
+  currentUserId?: string | null;
+}) {
+  if (!conversaNaoLida(conv, currentUserId)) return null;
+  const label = conv.nao_lidas > 0 ? (conv.nao_lidas > 99 ? "99+" : conv.nao_lidas) : "";
+  if (ativa) {
+    return (
+      <span
+        title="Visualizando — a conversa continua não lida até você responder"
+        className="flex h-5 items-center justify-center gap-1 rounded-full border border-destructive/50 bg-destructive/10 px-1.5 text-[10px] font-bold text-destructive"
+      >
+        <Eye className="h-3 w-3" />
+        {label}
+      </span>
+    );
+  }
+  return (
+    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
+      {label}
+    </span>
+  );
+}
+
 // Stack de avatares dos atendentes atribuídos (responsáveis pelo atendimento no
 // CRM), exibido à direita da linha da conversa — mesmo em grupos, mostra só os
 // responsáveis, não os participantes do WhatsApp. Mostra no máximo 3 avatares;
@@ -595,6 +643,7 @@ function MeusChatsList({
   hasFiltros,
   activeFiltrosCount,
   onLimparFiltros,
+  currentUserId,
 }: {
   conversas: WaConversa[];
   apelidoPorInstanciaId: Map<string, string>;
@@ -608,6 +657,7 @@ function MeusChatsList({
   countFechadas: number;
   filtrosDropdownContent: React.ReactNode;
   periodoFilterButton: React.ReactNode;
+  currentUserId?: string | null;
   hasFiltros: boolean;
   activeFiltrosCount: number;
   onLimparFiltros: () => void;
@@ -621,12 +671,14 @@ function MeusChatsList({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
-  const countNaoLidas = conversas.filter((c) => c.nao_lidas > 0).length;
+  const countNaoLidas = conversas.filter((c) =>
+    conversaNaoLida(c, currentUserId),
+  ).length;
   const countLidas = conversas.length - countNaoLidas;
 
   const conversasFiltradas = conversas.filter((c) => {
-    if (filtroLeitura === "nao_lidas") return c.nao_lidas > 0;
-    if (filtroLeitura === "lidas") return c.nao_lidas === 0;
+    if (filtroLeitura === "nao_lidas") return conversaNaoLida(c, currentUserId);
+    if (filtroLeitura === "lidas") return !conversaNaoLida(c, currentUserId);
     return true;
   });
 
@@ -809,7 +861,7 @@ function MeusChatsList({
                               <span
                                 className={cn(
                                   "truncate text-sm text-foreground",
-                                  conv.nao_lidas > 0
+                                  conversaNaoLida(conv, currentUserId)
                                     ? "font-bold"
                                     : "font-semibold",
                                 )}
@@ -836,7 +888,7 @@ function MeusChatsList({
                         <span
                           className={cn(
                             "block truncate text-sm text-muted-foreground",
-                            conv.nao_lidas > 0 && "text-foreground font-medium",
+                            conversaNaoLida(conv, currentUserId) && "text-foreground font-medium",
                           )}
                         >
                           {conv.ultima_mensagem ?? "Nenhuma mensagem"}
@@ -861,11 +913,7 @@ function MeusChatsList({
                       </TableCell>
                       <TableCell className="px-4 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {conv.nao_lidas > 0 && (
-                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
-                              {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
-                            </span>
-                          )}
+                          <NaoLidasBadge conv={conv} ativa={false} currentUserId={currentUserId} />
                           {conv.ultima_mensagem_at && (
                             <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                               {formatTime(conv.ultima_mensagem_at)}
@@ -3047,6 +3095,7 @@ export default function WhatsAppInbox() {
   }, [conversaAtiva?.responsaveis]);
   const sendMessage = useWaSendMessage();
   const marcarLida = useWaMarcarLida();
+  const marcarNaoLida = useWaMarcarNaoLida();
   const limparConversa = useWaLimparConversa();
   const arquivarConversa = useWaArquivarConversa();
   const deletarConversa = useWaDeletarConversa();
@@ -3617,9 +3666,9 @@ export default function WhatsAppInbox() {
     setShowScrollBottom(!isNearBottom);
   };
 
+  // Abrir a conversa não marca como lida — a conversa só sai do estado "não lida"
+  // quando o usuário efetivamente envia uma mensagem (ver handleSend/confirmSendAudio).
   useEffect(() => {
-    if (conversaAtiva && conversaAtiva.nao_lidas > 0)
-      marcarLida.mutate(conversaAtiva.id);
     inputRef.current?.focus();
     setRespondendoA(null);
   }, [conversaAtiva?.id]);
@@ -3909,8 +3958,7 @@ export default function WhatsAppInbox() {
     return map;
   }, [instancias]);
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
+  function addFiles(files: File[]) {
     if (files.length === 0) return;
     const toAdd: { file: File; previewUrl: string | null }[] = [];
     for (const file of files) {
@@ -3924,8 +3972,34 @@ export default function WhatsAppInbox() {
       toAdd.push({ file, previewUrl });
     }
     if (toAdd.length > 0) setAttachments((prev) => [...prev, ...toAdd]);
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    addFiles(Array.from(e.target.files ?? []));
     e.target.value = "";
     inputRef.current?.focus();
+  }
+
+  // Ctrl+V com uma imagem na área de transferência anexa direto, como qualquer
+  // outro anexo — sem isso o navegador só colaria o texto/nome do arquivo.
+  function handlePasteImage(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const imageFiles = Array.from(e.clipboardData?.items ?? [])
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => !!f);
+    if (imageFiles.length === 0) return;
+    e.preventDefault();
+    // Imagens copiadas da área de transferência costumam vir sem nome útil
+    // (ex: "image.png"); nomeia com timestamp pra não colidir/confundir no preview.
+    const named = imageFiles.map(
+      (file, i) =>
+        new File(
+          [file],
+          `imagem-colada-${Date.now()}-${i}.${file.type.split("/")[1] || "png"}`,
+          { type: file.type },
+        ),
+    );
+    addFiles(named);
   }
 
   function removeAttachment(index: number) {
@@ -4018,17 +4092,18 @@ export default function WhatsAppInbox() {
 
   async function confirmSendAudio() {
     if (!pendingAudio || !conversaAtiva) return;
+    const conversaId = conversaAtiva.id;
     const { file } = pendingAudio;
     cancelPendingAudio();
     const quoted = quotedParamsFor(respondendoA);
     setRespondendoA(null);
     setIsUploading(true);
     try {
-      const mediaUrl = await uploadWaMedia(file, conversaAtiva.id);
+      const mediaUrl = await uploadWaMedia(file, conversaId);
       await sendMessage.mutateAsync({
         telefone: conversaAtiva.telefone,
         mensagem: "[Áudio]",
-        conversa_id: conversaAtiva.id,
+        conversa_id: conversaId,
         tipo: "audio",
         media_url: mediaUrl,
         media_mime: file.type || null,
@@ -4036,6 +4111,7 @@ export default function WhatsAppInbox() {
         ptt: true,
         ...quoted,
       });
+      marcarLida.mutate(conversaId);
     } catch {
       toast.error("Erro ao enviar áudio");
     } finally {
@@ -4054,6 +4130,7 @@ export default function WhatsAppInbox() {
       return;
     }
 
+    const conversaId = conversaAtiva.id;
     const currentAttachments = attachments;
     const quoted = quotedParamsFor(respondendoA);
     setTexto("");
@@ -4066,10 +4143,11 @@ export default function WhatsAppInbox() {
         await sendMessage.mutateAsync({
           telefone: conversaAtiva.telefone,
           mensagem: msg,
-          conversa_id: conversaAtiva.id,
+          conversa_id: conversaId,
           tipo: "texto",
           ...quoted,
         });
+        marcarLida.mutate(conversaId);
         return;
       }
 
@@ -4079,7 +4157,7 @@ export default function WhatsAppInbox() {
       try {
         uploadedUrls = await Promise.all(
           currentAttachments.map((a) =>
-            uploadWaMedia(a.file, conversaAtiva.id),
+            uploadWaMedia(a.file, conversaId),
           ),
         );
       } catch {
@@ -4098,7 +4176,7 @@ export default function WhatsAppInbox() {
         await sendMessage.mutateAsync({
           telefone: conversaAtiva.telefone,
           mensagem: conteudo,
-          conversa_id: conversaAtiva.id,
+          conversa_id: conversaId,
           tipo,
           media_url: uploadedUrls[i],
           media_mime: file.type || null,
@@ -4106,6 +4184,7 @@ export default function WhatsAppInbox() {
           ...(i === 0 ? quoted : {}),
         });
       }
+      marcarLida.mutate(conversaId);
     } catch (err: any) {
       // onError do mutation já mostra toast e remove otimista; aqui só garantimos
       // que o estado não fique travado em caso de erro não capturado
@@ -4157,7 +4236,7 @@ export default function WhatsAppInbox() {
           <p
             className={cn(
               "text-sm font-medium text-foreground truncate",
-              conv.nao_lidas > 0 && !modoSelecao && "font-bold",
+              conversaNaoLida(conv, profile?.id) && !modoSelecao && "font-bold",
             )}
           >
             {conv.nome_contato ?? formatPhone(conv.telefone)}
@@ -4168,17 +4247,13 @@ export default function WhatsAppInbox() {
         </div>
         {!modoSelecao &&
           (conv.ultima_mensagem_at ||
-            conv.nao_lidas > 0 ||
+            conversaNaoLida(conv, profile?.id) ||
             naoAtribuida ||
             (conv.responsaveis ?? []).length > 0) && (
             <div className="flex flex-col items-end gap-1 shrink-0">
               <div className="flex items-center gap-1.5">
                 <ConversaParticipantesStack conv={conv} />
-                {conv.nao_lidas > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
-                    {conv.nao_lidas > 99 ? "99+" : conv.nao_lidas}
-                  </span>
-                )}
+                <NaoLidasBadge conv={conv} ativa={conversaAtiva?.id === conv.id} currentUserId={profile?.id} />
               </div>
               {conv.ultima_mensagem_at && (
                 <span className="text-xs text-muted-foreground font-medium">
@@ -4345,6 +4420,7 @@ export default function WhatsAppInbox() {
         <MeusChatsList
           conversas={conversasFiltradas}
           apelidoPorInstanciaId={apelidoPorInstanciaId}
+          currentUserId={profile?.id}
           onOpen={(id) => {
             setConversaAtivaId(id);
             setAbaInbox("conversas");
@@ -4429,9 +4505,21 @@ export default function WhatsAppInbox() {
                           </AvatarFallback>
                         </Avatar>
                       </button>
-                      {conv.nao_lidas > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
-                          {conv.nao_lidas > 9 ? "9+" : conv.nao_lidas}
+                      {conversaNaoLida(conv, profile?.id) && (
+                        <span
+                          title={
+                            conversaAtiva?.id === conv.id
+                              ? "Visualizando — continua não lida até você responder"
+                              : undefined
+                          }
+                          className={cn(
+                            "absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full text-[7px] font-bold ring-1 ring-background",
+                            conversaAtiva?.id === conv.id
+                              ? "border border-destructive bg-background text-destructive"
+                              : "bg-destructive text-destructive-foreground",
+                          )}
+                        >
+                          {conv.nao_lidas > 0 ? (conv.nao_lidas > 9 ? "9+" : conv.nao_lidas) : ""}
                         </span>
                       )}
                     </div>
@@ -5305,7 +5393,7 @@ export default function WhatsAppInbox() {
                 )}
 
                 {/* Header da conversa */}
-                <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
+                <div className="relative flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
                   <button
                     className="flex items-center gap-3 min-w-0 group"
                     onClick={() => setLeadSheetOpen(true)}
@@ -5346,6 +5434,15 @@ export default function WhatsAppInbox() {
                       </p>
                     </div>
                   </button>
+                  {conversaNaoLida(conversaAtiva, profile?.id) && (
+                    <span
+                      title="Continua não lida até você responder"
+                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex shrink-0 items-center gap-1 rounded-full border border-destructive/50 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold leading-4 text-destructive"
+                    >
+                      <Eye className="h-3 w-3" />
+                      Não lida
+                    </span>
+                  )}
                   <ConversaParticipantesStack
                     conv={conversaAtiva}
                     spacing="gap"
@@ -5419,6 +5516,16 @@ export default function WhatsAppInbox() {
                         >
                           <Phone className="h-4 w-4" />
                           Abrir no WhatsApp
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="gap-2"
+                          onClick={() =>
+                            marcarNaoLida.mutate(conversaAtiva.id)
+                          }
+                          disabled={conversaNaoLida(conversaAtiva, profile?.id)}
+                        >
+                          <EyeOff className="h-4 w-4" />
+                          Marcar como não lida
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive gap-2"
@@ -6000,6 +6107,7 @@ export default function WhatsAppInbox() {
                         value={texto}
                         onChange={(e) => setTexto(e.target.value)}
                         onKeyDown={handleKeyDown}
+                        onPaste={handlePasteImage}
                         disabled={isBusy || !!pendingAudio}
                         autoFocus
                       />
