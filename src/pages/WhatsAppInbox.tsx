@@ -4116,6 +4116,10 @@ export default function WhatsAppInbox() {
       toast.error("Erro ao enviar áudio");
     } finally {
       setIsUploading(false);
+      // Adia pro próximo tick: o textarea ainda está com `disabled` no DOM neste
+      // ponto (React só remove o atributo depois de commitar o novo estado), e
+      // .focus() em elemento disabled não faz nada.
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   }
 
@@ -4189,6 +4193,11 @@ export default function WhatsAppInbox() {
       // onError do mutation já mostra toast e remove otimista; aqui só garantimos
       // que o estado não fique travado em caso de erro não capturado
       if (err?.message) toast.error(err.message);
+    } finally {
+      // Adia pro próximo tick: o textarea ainda está com `disabled` no DOM neste
+      // ponto (React só remove o atributo depois de commitar o novo estado), e
+      // .focus() em elemento disabled não faz nada.
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   }
 

@@ -911,7 +911,14 @@ const Chat = () => {
     setSelectedFiles([]);
     const quoted = buildQuotedParams(respondendoA);
     setRespondendoA(null);
-    await send(trimmed, files, activeGrupoId, activeRecipientId, quoted);
+    try {
+      await send(trimmed, files, activeGrupoId, activeRecipientId, quoted);
+    } finally {
+      // Adia pro próximo tick: o textarea ainda está com `disabled` no DOM neste
+      // ponto (React só remove o atributo depois de commitar o novo estado de
+      // `sending`), e .focus() em elemento disabled não faz nada.
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
   };
 
   function buildQuotedParams(msg: ChatMessage | null): QuotedMessage | null {
