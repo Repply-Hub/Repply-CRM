@@ -1198,6 +1198,21 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
 
+            {/* Anexo */}
+            {selectedViewOrder.pdf_url && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Anexo</p>
+                <a
+                  href={selectedViewOrder.pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 p-3 rounded-lg border bg-muted/30 text-sm font-medium text-primary hover:underline w-fit"
+                >
+                  <FileText className="h-4 w-4" /> Ver PDF anexado
+                </a>
+              </div>
+            )}
+
             {/* Histórico de Tarefas */}
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2">
