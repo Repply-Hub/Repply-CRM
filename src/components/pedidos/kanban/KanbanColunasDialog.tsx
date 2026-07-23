@@ -151,10 +151,9 @@ export function KanbanColunasDialog({
         setEditCor(c.cor);
     };
 
-    // A proteção (não pode excluir/renomear slug) só vale no funil padrão da empresa —
-    // em funis criados pelo usuário, essas colunas podem ser removidas normalmente.
+    // "Fechamento"/"Perdido" são fixas em todo funil e não podem ser excluídas/renomeadas.
     const isProtegida = (c: DraftColuna) =>
-        (c.slug === 'perdido' || c.slug === 'fechamento') && c.is_sistema && (!selectedFunil || selectedFunil.is_padrao);
+        (c.slug === 'perdido' || c.slug === 'fechamento') && c.is_sistema;
 
     const startDelete = (c: DraftColuna) => {
         const outras = draft.filter(x => x.id !== c.id && !x.isNew);
