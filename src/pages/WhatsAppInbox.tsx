@@ -5697,7 +5697,9 @@ export default function WhatsAppInbox() {
                           );
 
                           // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca foi
-                          // enviada ao WhatsApp, renderiza como chip central em vez de bolha.
+                          // enviada ao WhatsApp. Renderiza como uma mensagem recebida (alinhada
+                          // à esquerda) mas com bg cinza próprio, pra diferenciar das bolhas
+                          // normais (que usam bg-muted).
                           if (msg.is_nota_interna) {
                             return (
                               <div
@@ -5706,18 +5708,39 @@ export default function WhatsAppInbox() {
                                 ref={isLast ? msgScrollRef : undefined}
                               >
                                 {dateChip}
-                                <div className="flex items-center justify-center my-2">
-                                  <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-zinc-300 dark:bg-zinc-700 px-3 py-1 rounded-full">
-                                    <StickyNote className="h-3 w-3" />
-                                    {msg.conteudo}
-                                    <span className="text-muted-foreground/70">
-                                      ·{" "}
-                                      {format(
-                                        new Date(msg.created_at),
-                                        "HH:mm",
+                                <div
+                                  className={cn(
+                                    "flex justify-start",
+                                    prevMsg?.direcao !== msg.direcao
+                                      ? "mt-3"
+                                      : "mt-0.5",
+                                  )}
+                                >
+                                  <div className="max-w-[75%] items-start">
+                                    <div
+                                      className={cn(
+                                        "px-3 py-2 break-words rounded-2xl rounded-tl-sm bg-zinc-300 dark:bg-zinc-700 text-foreground",
+                                        msg.id === destacadaMsgId &&
+                                          "ring-2 ring-primary ring-offset-2 ring-offset-background",
                                       )}
-                                    </span>
-                                  </span>
+                                    >
+                                      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                                        <StickyNote className="h-3 w-3" />
+                                        Nota interna
+                                      </div>
+                                      <p className="text-sm whitespace-pre-wrap">
+                                        {msg.conteudo}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-1 mt-0.5 justify-start ml-1">
+                                      <span className="text-[9px] text-muted-foreground">
+                                        {format(
+                                          new Date(msg.created_at),
+                                          "HH:mm",
+                                        )}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             );
