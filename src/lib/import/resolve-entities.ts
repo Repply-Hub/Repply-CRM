@@ -12,6 +12,17 @@ function normalizeKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/** Dedup por chave normalizada (trim + lowercase), preservando a primeira grafia encontrada. */
+function dedupeByNormalizedKey(names: string[]): string[] {
+  const seen = new Map<string, string>();
+  for (const n of names) {
+    if (!n) continue;
+    const key = normalizeKey(n);
+    if (!seen.has(key)) seen.set(key, n);
+  }
+  return [...seen.values()];
+}
+
 function obraKey(clienteId: string, nome: string): string {
   return `${clienteId}::${normalizeKey(nome)}`;
 }
@@ -73,9 +84,11 @@ export async function preloadResolveCache(
   const CHUNK = 50;
 
   // ── Clientes ──────────────────────────────────────────────────────────────
-  const clienteNames = [
-    ...new Set(rows.map(r => String(r.cliente ?? '').trim()).filter(Boolean)),
-  ];
+  // Dedup por chave normalizada (não só trim): planilhas costumam ter o mesmo
+  // cliente grafado com variação de maiúsculas/minúsculas entre linhas (ex:
+  // "2 C Engenharia Ltda" e "2 C ENGENHARIA LTDA"), e um Set sobre a string
+  // exata trataria isso como duas empresas diferentes, criando duplicatas.
+  const clienteNames = dedupeByNormalizedKey(rows.map(r => String(r.cliente ?? '').trim()));
 
   if (clienteNames.length > 0) {
     for (let i = 0; i < clienteNames.length; i += CHUNK) {
@@ -110,9 +123,7 @@ export async function preloadResolveCache(
   }
 
   // ── Fabricantes ───────────────────────────────────────────────────────────
-  const fabricanteNames = [
-    ...new Set(rows.map(r => String(r.fabricante ?? '').trim()).filter(Boolean)),
-  ];
+  const fabricanteNames = dedupeByNormalizedKey(rows.map(r => String(r.fabricante ?? '').trim()));
 
   if (fabricanteNames.length > 0) {
     for (let i = 0; i < fabricanteNames.length; i += CHUNK) {
