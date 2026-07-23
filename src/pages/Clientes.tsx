@@ -423,12 +423,16 @@ const Clientes = () => {
   ];
 
   const handleCnpjChange = (value: string) => {
-    setCnpj(maskCnpj(value));
+    const masked = maskCnpj(value);
+    setCnpj(masked);
     setCnpjStatus('idle');
+    if (unmaskCnpj(masked).length === 14) {
+      handleCnpjLookup(masked);
+    }
   };
 
-  const handleCnpjBlur = async () => {
-    const digits = unmaskCnpj(cnpj);
+  const handleCnpjLookup = async (cnpjValue: string) => {
+    const digits = unmaskCnpj(cnpjValue);
     if (digits.length !== 14) return;
     if (!isValidCnpjDigits(digits)) {
       setCnpjStatus('invalid');
@@ -960,7 +964,6 @@ const Clientes = () => {
                             <Input
                               value={cnpj}
                               onChange={(e) => handleCnpjChange(e.target.value)}
-                              onBlur={handleCnpjBlur}
                               placeholder="00.000.000/0000-00"
                               className={cnpjStatus === 'invalid' ? 'border-destructive' : cnpjStatus === 'valid' ? 'border-green-500' : ''}
                               required
