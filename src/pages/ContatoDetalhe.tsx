@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { ArrowLeft, User, Mail, Phone, Loader2, Pencil, Trash2, Building2, Calendar, Clock, MessageSquare, History, Factory, DollarSign, Plus } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Loader2, Pencil, Trash2, Building2, Calendar, Clock, MessageSquare, History, Factory, DollarSign, Plus, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
 import { slugify } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -20,6 +20,14 @@ import { ptBR } from 'date-fns/locale';
 import { usePedidos } from '@/hooks/use-pedidos';
 import { useHistoricoContatos } from '@/hooks/use-pedidos';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useAuth } from '@/hooks/use-auth';
+import { useTarefas } from '@/hooks/use-tarefas';
+import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
+import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
+import { ListPagination } from '@/components/shared/ListPagination';
+import { CargoSelect } from '@/components/shared/CargoSelect';
+
+const TAREFAS_PAGE_SIZE = 5;
 
 const ContatoDetalhe = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -56,6 +64,26 @@ const ContatoDetalhe = () => {
 
   const pedidosRelacionados = todosPedidos?.filter(p => p.cliente_id === clienteVinculado?.id) || [];
   const { data: historico } = useHistoricoContatos(null); // Just for structure, we might need a specific filter or mock if no direct link exists yet.
+
+  const { profile } = useAuth();
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
+  const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
+  const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
+  const tarefaKanbanStages = useMemo(
+    () => tarefasKanbanColunas.map(c => ({ key: c.slug, label: c.nome })),
+    [tarefasKanbanColunas]
+  );
+  const [addTarefaOpen, setAddTarefaOpen] = useState(false);
+  const [tarefasPage, setTarefasPage] = useState(1);
+  const tarefasRelacionadas = useMemo(
+    () => (tarefas ?? []).filter(t => t.cliente_id === clienteVinculado?.id),
+    [tarefas, clienteVinculado]
+  );
+  const totalTarefasPages = Math.max(1, Math.ceil(tarefasRelacionadas.length / TAREFAS_PAGE_SIZE));
+  const paginatedTarefas = useMemo(
+    () => tarefasRelacionadas.slice((tarefasPage - 1) * TAREFAS_PAGE_SIZE, tarefasPage * TAREFAS_PAGE_SIZE),
+    [tarefasRelacionadas, tarefasPage]
+  );
   
   const copyInfo = async (label: string, value?: string | null) => {
     if (!value?.trim()) return;
@@ -347,6 +375,91 @@ const ContatoDetalhe = () => {
           </Card>
         </div>
 
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* Card: Tarefas Vinculadas */}
+          <Card className="md:col-span-3">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <ListChecks className="h-4 w-4" /> Tarefas Vinculadas (Via Empresa)
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{tarefasRelacionadas.length} Registros</Badge>
+                {clienteVinculado && (
+                  <Button size="sm" onClick={() => setAddTarefaOpen(true)} className="gap-1.5">
+                    <Plus className="h-4 w-4" /> Nova Tarefa
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!clienteVinculado ? (
+                <div className="py-10 text-center border-2 border-dashed rounded-xl">
+                  <p className="text-sm text-muted-foreground">Vincule este contato a uma empresa para ver e criar tarefas.</p>
+                </div>
+              ) : loadingTarefas ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="rounded-xl border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="text-xs">Tarefa</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs">Prazo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tarefasRelacionadas.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                            Nenhuma tarefa vinculada a esta empresa.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        paginatedTarefas.map(t => (
+                          <TableRow key={t.id} className="cursor-pointer hover:bg-muted/30" onClick={() => navigate('/tarefas')}>
+                            <TableCell className="font-medium text-sm">{t.titulo}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize text-[10px]">{t.status.replace(/_/g, ' ')}</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {t.prazo_final ? format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR }) : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                  {tarefasRelacionadas.length > TAREFAS_PAGE_SIZE && (
+                    <ListPagination
+                      page={tarefasPage}
+                      totalPages={totalTarefasPages}
+                      totalItems={tarefasRelacionadas.length}
+                      pageSize={TAREFAS_PAGE_SIZE}
+                      onPageChange={setTarefasPage}
+                      onPageSizeChange={() => {}}
+                      itemLabel="tarefa"
+                      className="mt-4 border-t pt-4"
+                    />
+                  )}
+                </div>
+              )}
+            </CardContent>
+
+            {clienteVinculado && (
+              <TarefaFormDialog
+                open={addTarefaOpen}
+                onOpenChange={setAddTarefaOpen}
+                editingTarefa={null}
+                kanbanStages={tarefaKanbanStages}
+                extraFields={{ cliente_id: clienteVinculado.id }}
+              />
+            )}
+          </Card>
+        </div>
+
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent>
             <DialogHeader>
@@ -418,9 +531,9 @@ const ContatoDetalhe = () => {
               </div>
               <div>
                 <Label>Cargo</Label>
-                <Input 
-                  value={editData.cargo} 
-                  onChange={e => setEditData(d => ({ ...d, cargo: e.target.value }))} 
+                <CargoSelect
+                  value={editData.cargo}
+                  onValueChange={v => setEditData(d => ({ ...d, cargo: v }))}
                 />
               </div>
               <div>

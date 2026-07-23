@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useClientes } from '@/hooks/use-clientes';
 import { useCreateCliente } from '@/hooks/use-mutations';
 import { toast } from 'sonner';
+import { maskCnpj, unmaskCnpj, isValidCnpjDigits } from '@/lib/cnpj';
 
 interface EmpresaSelectorProps {
   value: string;
@@ -45,6 +46,8 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
     empresa: '',
     tipo: 'construtora',
     cnpj: '',
+    email: '',
+    telefone: '',
   });
 
   const { data: clientes, isLoading } = useClientes();
@@ -66,19 +69,38 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
   [clientes, value]);
 
   const handleCreate = async () => {
-    if (!newEmpresa.empresa) {
+    if (!newEmpresa.empresa.trim()) {
       toast.error('O nome da empresa é obrigatório');
+      return;
+    }
+    if (unmaskCnpj(newEmpresa.cnpj).length !== 14) {
+      toast.error('Informe um CNPJ válido');
+      return;
+    }
+    if (!isValidCnpjDigits(unmaskCnpj(newEmpresa.cnpj))) {
+      toast.error('CNPJ inválido');
+      return;
+    }
+    if (!newEmpresa.email.trim()) {
+      toast.error('O e-mail da empresa é obrigatório');
+      return;
+    }
+    if (!newEmpresa.telefone.trim()) {
+      toast.error('O telefone da empresa é obrigatório');
       return;
     }
 
     try {
-      const result = await createCliente.mutateAsync(newEmpresa);
+      const result = await createCliente.mutateAsync({
+        ...newEmpresa,
+        cnpj: unmaskCnpj(newEmpresa.cnpj),
+      });
       toast.success('Empresa cadastrada com sucesso!');
       setDialogOpen(false);
       if (result?.id) {
         onValueChange(result.id);
       }
-      setNewEmpresa({ empresa: '', tipo: 'construtora', cnpj: '' });
+      setNewEmpresa({ empresa: '', tipo: 'construtora', cnpj: '', email: '', telefone: '' });
     } catch (error: any) {
       toast.error('Erro ao cadastrar empresa: ' + error.message);
     }
@@ -208,12 +230,31 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="cnpj">CNPJ / CPF</Label>
+              <Label htmlFor="cnpj">CNPJ *</Label>
               <Input
                 id="cnpj"
                 value={newEmpresa.cnpj}
-                onChange={(e) => setNewEmpresa({ ...newEmpresa, cnpj: e.target.value })}
+                onChange={(e) => setNewEmpresa({ ...newEmpresa, cnpj: maskCnpj(e.target.value) })}
                 placeholder="00.000.000/0000-00"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="email">E-mail *</Label>
+              <Input
+                id="email"
+                type="email"
+                value={newEmpresa.email}
+                onChange={(e) => setNewEmpresa({ ...newEmpresa, email: e.target.value })}
+                placeholder="contato@empresa.com"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="telefone">Telefone *</Label>
+              <Input
+                id="telefone"
+                value={newEmpresa.telefone}
+                onChange={(e) => setNewEmpresa({ ...newEmpresa, telefone: e.target.value })}
+                placeholder="(00) 00000-0000"
               />
             </div>
           </div>

@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
 import { emptyEndereco, enderecoToString, stringToEndereco, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/shared/ListPagination';
+import { CargoSelect } from '@/components/shared/CargoSelect';
 import { slugify } from '@/lib/utils';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
@@ -129,6 +130,14 @@ const ClienteDetalhe = () => {
     if (!cliente) return;
     if (!novoContato.nome_contato.trim()) {
       toast.error('Informe o nome do contato.');
+      return;
+    }
+    if (!novoContato.email.trim()) {
+      toast.error('Informe o email do contato.');
+      return;
+    }
+    if (!novoContato.telefone.trim()) {
+      toast.error('Informe o telefone do contato.');
       return;
     }
     try {
@@ -702,31 +711,33 @@ const ClienteDetalhe = () => {
                         value={novoContato.nome_contato}
                         onChange={e => setNovoContato(c => ({ ...c, nome_contato: e.target.value }))}
                         placeholder="Ex: João Silva"
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Tipo / Cargo</Label>
-                      <Input
+                      <Label>Cargo</Label>
+                      <CargoSelect
                         value={novoContato.cargo}
-                        onChange={e => setNovoContato(c => ({ ...c, cargo: e.target.value }))}
-                        placeholder="Ex: Comprador, Engenheiro"
+                        onValueChange={v => setNovoContato(c => ({ ...c, cargo: v }))}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Email</Label>
+                      <Label>Email *</Label>
                       <Input
                         type="email"
                         value={novoContato.email}
                         onChange={e => setNovoContato(c => ({ ...c, email: e.target.value }))}
                         placeholder="email@exemplo.com"
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Telefone</Label>
+                      <Label>Telefone *</Label>
                       <Input
                         value={novoContato.telefone}
                         onChange={e => setNovoContato(c => ({ ...c, telefone: e.target.value }))}
                         placeholder="(00) 00000-0000"
+                        required
                       />
                     </div>
                     <div className="flex justify-end gap-3 pt-4">

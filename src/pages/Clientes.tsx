@@ -24,6 +24,7 @@ import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Us
 import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { CargoSelect } from '@/components/shared/CargoSelect';
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 
 import { toast } from 'sonner';
@@ -517,11 +518,24 @@ const Clientes = () => {
     const form = new FormData(e.currentTarget);
 
     if (activeTab === 'contatos') {
+      const contatoEmailValue = (form.get('email') as string) || '';
+      if (!nomeContato.trim()) {
+        toast.error('Informe o nome do contato.');
+        return;
+      }
+      if (!contatoEmailValue.trim()) {
+        toast.error('Informe o email do contato.');
+        return;
+      }
+      if (!telefone.trim()) {
+        toast.error('Informe o telefone do contato.');
+        return;
+      }
       try {
         await createContato.mutateAsync({
           empresa: clients?.find(c => c.id === empresa)?.empresa || undefined,
           nome_contato: nomeContato || undefined,
-          email: (form.get('email') as string) || undefined,
+          email: contatoEmailValue || undefined,
           telefone: telefone || undefined,
           cargo: cargo || undefined,
         });
@@ -547,9 +561,19 @@ const Clientes = () => {
       toast.error('Selecione um contato existente ou escolha cadastrar um novo.');
       return;
     }
-    if (contatoMode === 'novo' && !nomeContato.trim()) {
-      toast.error('Informe o nome do novo contato.');
-      return;
+    if (contatoMode === 'novo') {
+      if (!nomeContato.trim()) {
+        toast.error('Informe o nome do novo contato.');
+        return;
+      }
+      if (!contatoEmail.trim()) {
+        toast.error('Informe o email do novo contato.');
+        return;
+      }
+      if (!contatoTelefone.trim()) {
+        toast.error('Informe o telefone do novo contato.');
+        return;
+      }
     }
     const enderecoStr = enderecoToString(endereco);
     try {
@@ -1011,12 +1035,12 @@ const Clientes = () => {
                         )}
                         {contatoMode === 'novo' && (
                           <div className="space-y-3">
-                            <Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome do contato" />
+                            <Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome do contato *" required />
                             <div className="grid grid-cols-2 gap-3">
-                              <Input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Cargo ou função" />
-                              <Input value={contatoTelefone} onChange={e => setContatoTelefone(e.target.value)} placeholder="Telefone do contato" />
+                              <CargoSelect value={cargo} onValueChange={setCargo} />
+                              <Input value={contatoTelefone} onChange={e => setContatoTelefone(e.target.value)} placeholder="Telefone do contato *" required />
                             </div>
-                            <Input value={contatoEmail} onChange={e => setContatoEmail(e.target.value)} type="email" placeholder="Email do contato" />
+                            <Input value={contatoEmail} onChange={e => setContatoEmail(e.target.value)} type="email" placeholder="Email do contato *" required />
                           </div>
                         )}
                       </div>
@@ -1041,12 +1065,12 @@ const Clientes = () => {
                   </>
                 ) : (
                   <>
-                    <div><Label>Nome do contato</Label><Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome completo" /></div>
+                    <div><Label>Nome do contato *</Label><Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome completo" required /></div>
                     <div><Label>Empresa</Label><EmpresaSelector value={empresa} onValueChange={setEmpresa} placeholder="Vincular empresa..." /></div>
-                    <div><Label>Cargo</Label><Input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Cargo ou função" /></div>
+                    <div><Label>Cargo</Label><CargoSelect value={cargo} onValueChange={setCargo} /></div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
-                      <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" /></div>
+                      <div><Label>Email *</Label><Input name="email" type="email" placeholder="email@exemplo.com" required /></div>
+                      <div><Label>Telefone *</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required /></div>
                     </div>
                     <Button type="submit" className="w-full" disabled={createContato.isPending}>
                       {createContato.isPending ? 'Salvando...' : 'Salvar'}
