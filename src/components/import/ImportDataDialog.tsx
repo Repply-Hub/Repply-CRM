@@ -37,7 +37,7 @@ const NEGOCIOS_FIELDS: FieldDef[] = [
   { key: 'valor', label: 'Valor', required: true },
   { key: 'observacoes', label: 'Observações', required: false },
   { key: 'status', label: 'Status', required: false },
-  { key: 'data_pedido', label: 'Data do Pedido', required: false },
+  { key: 'data_pedido', label: 'Data do Negócio', required: false },
 ];
 
 type Step = 'upload' | 'mapping' | 'done';

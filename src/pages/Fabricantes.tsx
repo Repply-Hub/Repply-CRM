@@ -485,7 +485,7 @@ const Fabricantes = () => {
       const msg = err.message || "";
       if (msg.includes("violates foreign key") || msg.includes("referenced")) {
         toast.error(
-          "Este fabricante possui pedidos vinculados e não pode ser excluído.",
+          "Este fabricante possui negócios vinculados e não pode ser excluído.",
         );
       } else {
         toast.error(msg);

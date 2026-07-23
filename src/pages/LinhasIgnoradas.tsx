@@ -37,7 +37,7 @@ const FIELD_LABELS: Record<string, string> = {
   complemento: 'Complemento', bairro: 'Bairro', cidade: 'Cidade', uf: 'UF', cep: 'CEP',
   data_criacao: 'Data de Criação', cliente: 'Cliente', fabricante: 'Fabricante',
   obra: 'Obra', valor: 'Valor', observacoes: 'Observações', status: 'Status',
-  data_pedido: 'Data do Pedido',
+  data_pedido: 'Data do Negócio',
 };
 
 const REQUIRED_FIELDS: Record<string, Set<string>> = {

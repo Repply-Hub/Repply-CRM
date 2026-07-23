@@ -234,7 +234,7 @@ const ClienteDetalhe = () => {
                 </p>
               </div>
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Data do Pedido</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Data do Negócio</p>
                 <p className="text-sm font-medium">
                   {new Date(selectedViewOrder.data_pedido).toLocaleDateString('pt-BR')}
                 </p>
@@ -789,9 +789,9 @@ const ClienteDetalhe = () => {
         {/* Pedidos */}
         <Card className="border-border/40">
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-base">Pedidos</CardTitle>
+            <CardTitle className="text-base">Negócios</CardTitle>
             <Button size="sm" onClick={() => navigate('/pedidos')}>
-              <Plus className="h-4 w-4 mr-1" /> Novo Pedido
+              <Plus className="h-4 w-4 mr-1" /> Novo Negócio
             </Button>
           </CardHeader>
           <CardContent>
@@ -814,7 +814,7 @@ const ClienteDetalhe = () => {
                     {pedidosCliente.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                          Nenhum pedido encontrado para este cliente.
+                          Nenhum negócio encontrado para este cliente.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -841,7 +841,7 @@ const ClienteDetalhe = () => {
                 pageSize={PEDIDOS_PAGE_SIZE}
                 onPageChange={setPedidosPage}
                 onPageSizeChange={() => {}}
-                itemLabel="pedido"
+                itemLabel="negócio"
                 className="mt-4 border-t pt-4"
               />
             )}

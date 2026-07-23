@@ -134,7 +134,7 @@ export function useDeleteKanbanColuna() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kanban_colunas'] });
       qc.invalidateQueries({ queryKey: ['pedidos'] });
-      toast.success('Coluna excluída e pedidos remanejados');
+      toast.success('Coluna excluída e negócios remanejados');
     },
     onError: (err: any) => toast.error(err?.message || 'Erro ao excluir coluna'),
   });

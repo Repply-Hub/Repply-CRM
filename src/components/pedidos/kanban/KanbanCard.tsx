@@ -29,7 +29,7 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                 {...provided.draggableProps}
                 role="listitem"
                 aria-roledescription="item arrastável"
-                aria-label={`Pedido de ${order.clientName}, ${order.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
+                aria-label={`Negócio de ${order.clientName}, ${order.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
                 className={cn(
                   'bg-card rounded-xl p-3 shadow-card border border-border/60 mb-2 group relative',
                   'transition-all duration-200 ease-out',

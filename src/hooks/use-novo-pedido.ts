@@ -124,7 +124,7 @@ export function useCreatePedidoCompleto() {
           pedido_id: pedido.id,
           usuario_id: payload.usuario_id,
           tipo: 'automatico',
-          descricao: 'Contato agendado na criação do pedido',
+          descricao: 'Contato agendado na criação do negócio',
           proximo_contato_em: payload.proximo_contato,
         });
       }

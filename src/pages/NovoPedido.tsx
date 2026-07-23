@@ -198,7 +198,7 @@ const NovoPedido = () => {
     
     if (!fabricanteId) { toast.error('Selecione um fabricante'); return false; }
     if (!vendedorId) { toast.error('Selecione o responsável'); return false; }
-    if (!pdfFile) { toast.error('Anexe o PDF do pedido (obrigatório)'); return false; }
+    if (!pdfFile) { toast.error('Anexe o PDF do negócio (obrigatório)'); return false; }
     return true;
   };
 
@@ -212,7 +212,7 @@ const NovoPedido = () => {
 
   const handleSubmit = async () => {
     if (!validateStep2()) return;
-    if (!pdfFile) { toast.error('Anexe o PDF do pedido (obrigatório)'); return false; }
+    if (!pdfFile) { toast.error('Anexe o PDF do negócio (obrigatório)'); return false; }
     if (!funilId) { toast.error('Não foi possível identificar o funil de destino. Tente novamente em instantes.'); return false; }
 
     setIsUploading(true);
@@ -268,7 +268,7 @@ const NovoPedido = () => {
         proximo_contato: proximoContatoISO,
         valor_total: valorFinal,
       });
-      toast.success('Pedido criado com sucesso!');
+      toast.success('Negócio criado com sucesso!');
       navigate('/');
     } catch (err: any) {
       toast.error(err.message);
@@ -341,7 +341,7 @@ const NovoPedido = () => {
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/pedidos')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">Novo Pedido</h1>
+          <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">Novo Negócio</h1>
         </div>
       }
     >
@@ -351,12 +351,12 @@ const NovoPedido = () => {
         <div className="flex items-center gap-3 mb-6">
           <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors", step === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
             <span className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center text-xs font-bold">1</span>
-            Informações do Pedido
+            Informações do Negócio
           </div>
           <div className="h-px w-8 bg-border" />
           <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors", step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
             <span className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center text-xs font-bold">2</span>
-            Itens do Pedido
+            Itens do Negócio
           </div>
         </div>
 
@@ -376,7 +376,7 @@ const NovoPedido = () => {
 
                   {/* Fase do Pedido */}
                   <div className="space-y-2">
-                    <Label>Fase do Pedido</Label>
+                    <Label>Fase do Negócio</Label>
                     <Select value={status} onValueChange={setStatus}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecionar fase" />
@@ -594,8 +594,8 @@ const NovoPedido = () => {
 
                 {/* Descrição do Pedido */}
                 <div className="space-y-2">
-                  <Label>Descrição do Pedido</Label>
-                  <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações ou descrição geral do pedido" rows={3} />
+                  <Label>Descrição do Negócio</Label>
+                  <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações ou descrição geral do negócio" rows={3} />
                 </div>
 
                 <div className="flex justify-end pt-4">
@@ -609,7 +609,7 @@ const NovoPedido = () => {
                 {/* Items table */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <Label className="text-base font-semibold">Itens do Pedido</Label>
+                    <Label className="text-base font-semibold">Itens do Negócio</Label>
                     {itens.length > 0 && (
                       <Button size="sm" variant="outline" onClick={addItem}>
                         <Plus className="h-4 w-4 mr-1" /> Adicionar Item
@@ -620,7 +620,7 @@ const NovoPedido = () => {
                   {itens.length === 0 ? (
                     <div className="space-y-6">
                       <div className="border border-dashed border-border rounded-lg p-12 text-center bg-muted/5">
-                        <p className="text-sm text-muted-foreground mb-4">Ainda não há itens neste pedido.</p>
+                        <p className="text-sm text-muted-foreground mb-4">Ainda não há itens neste negócio.</p>
                         <Button size="sm" onClick={addItem}>
                           <Plus className="h-4 w-4 mr-1" /> Adicionar primeiro item
                         </Button>
@@ -815,7 +815,7 @@ const NovoPedido = () => {
                   </Button>
                   <Button onClick={handleSubmit} disabled={createPedido.isPending || isUploading}>
                     <Save className="h-4 w-4 mr-1" />
-                    {isUploading ? 'Enviando PDF...' : createPedido.isPending ? 'Criando...' : 'Criar Pedido'}
+                    {isUploading ? 'Enviando PDF...' : createPedido.isPending ? 'Criando...' : 'Criar Negócio'}
                   </Button>
                 </div>
               </div>

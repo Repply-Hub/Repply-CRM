@@ -222,7 +222,7 @@ const EditarPedido = () => {
           preco_unitario: i.preco_unitario,
         })),
       });
-      toast.success('Pedido atualizado com sucesso!');
+      toast.success('Negócio atualizado com sucesso!');
       navigate('/pedidos');
     } catch (err: any) {
       toast.error(err.message);
@@ -286,7 +286,7 @@ const EditarPedido = () => {
   if (!pedidoData) {
     return (
       <AppLayout>
-        <div className="p-6 text-center text-muted-foreground">Pedido não encontrado.</div>
+        <div className="p-6 text-center text-muted-foreground">Negócio não encontrado.</div>
       </AppLayout>
     );
   }
@@ -298,7 +298,7 @@ const EditarPedido = () => {
         <ArrowLeft className="h-4 w-4" />
       </Button>
 
-      <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">Editar Pedido</h1>
+      <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">Editar Negócio</h1>
       <Badge variant={isClosedStatus ? 'secondary' : 'default'} className="shrink-0">
         {STATUS_LABELS[pedidoStatus] || pedidoStatus}
       </Badge>
@@ -311,7 +311,7 @@ const EditarPedido = () => {
 
         {isClosedStatus && (
           <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3 mb-4">
-            ⚠️ Este pedido está em status "{STATUS_LABELS[pedidoStatus]}". Alterações podem impactar o fluxo.
+            ⚠️ Este negócio está em status "{STATUS_LABELS[pedidoStatus]}". Alterações podem impactar o fluxo.
           </div>
         )}
 
@@ -319,12 +319,12 @@ const EditarPedido = () => {
         <div className="flex items-center gap-3 mb-6">
           <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors", step === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
             <span className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center text-xs font-bold">1</span>
-            Informações do Pedido
+            Informações do Negócio
           </div>
           <div className="h-px w-8 bg-border" />
           <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors", step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
             <span className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center text-xs font-bold">2</span>
-            Itens do Pedido
+            Itens do Negócio
           </div>
         </div>
 
@@ -342,7 +342,7 @@ const EditarPedido = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Fase do Pedido</Label>
+                    <Label>Fase do Negócio</Label>
                     <Select value={status} onValueChange={setStatus}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecionar fase" />
@@ -504,8 +504,8 @@ const EditarPedido = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Descrição do Pedido</Label>
-                  <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações ou descrição geral do pedido" rows={3} />
+                  <Label>Descrição do Negócio</Label>
+                  <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações ou descrição geral do negócio" rows={3} />
                 </div>
 
                 {pdfUrl && (
@@ -513,7 +513,7 @@ const EditarPedido = () => {
                     <Label>Arquivo PDF</Label>
                     <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
                       <FileText className="h-5 w-5 text-primary" />
-                      <span className="text-sm font-medium flex-1 truncate">PDF do Pedido</span>
+                      <span className="text-sm font-medium flex-1 truncate">PDF do Negócio</span>
                       <Button variant="outline" size="sm" asChild>
                         <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
                           Ver PDF
@@ -533,7 +533,7 @@ const EditarPedido = () => {
               <div className="space-y-5">
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <Label className="text-base font-semibold">Itens do Pedido</Label>
+                    <Label className="text-base font-semibold">Itens do Negócio</Label>
                     <Button size="sm" variant="outline" onClick={addItem}>
                       <Plus className="h-4 w-4 mr-1" /> Adicionar Item
                     </Button>

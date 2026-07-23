@@ -298,7 +298,7 @@ const ContatoDetalhe = () => {
             <CardContent>
               {pedidosRelacionados.length === 0 ? (
                 <div className="py-10 text-center border-2 border-dashed rounded-xl">
-                  <p className="text-sm text-muted-foreground">Nenhum pedido vinculado a esta empresa.</p>
+                  <p className="text-sm text-muted-foreground">Nenhum negócio vinculado a esta empresa.</p>
                 </div>
               ) : (
                 <div className="rounded-xl border overflow-hidden">
@@ -337,7 +337,7 @@ const ContatoDetalhe = () => {
                   {pedidosRelacionados.length > 5 && (
                     <div className="p-3 bg-muted/10 text-center border-t">
                       <Button variant="link" className="text-xs h-auto p-0" onClick={() => clienteVinculado && navigate(`/clientes/${clienteVinculado.id}`)}>
-                        Ver todos os {pedidosRelacionados.length} pedidos na página da empresa
+                        Ver todos os {pedidosRelacionados.length} negócios na página da empresa
                       </Button>
                     </div>
                   )}

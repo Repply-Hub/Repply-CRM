@@ -596,7 +596,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     if (source.droppableId === destination.droppableId) return;
     const label = KANBAN_STAGES.find(s => s.key === destination.droppableId)?.label ?? destination.droppableId;
     await updateStatus.mutateAsync({ id: draggableId, status: destination.droppableId });
-    toast.success(`Pedido movido para "${label}"`);
+    toast.success(`Negócio movido para "${label}"`);
   }, [updateStatus, KANBAN_STAGES]);
 
   const currentPageIds = paginated.map(p => p.id);
@@ -1314,7 +1314,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           </div>
           <div className="flex items-center gap-2 sm:justify-end">
             <Button size="sm" className="w-full sm:w-auto h-10" onClick={() => navigate(funilId ? `/pedidos/novo?funilId=${encodeURIComponent(funilId)}` : '/pedidos/novo')}>
-              <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Pedido</span><span className="sm:hidden">Novo</span>
+              <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Negócio</span><span className="sm:hidden">Novo</span>
             </Button>
           </div>
         </div>

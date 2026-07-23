@@ -122,9 +122,9 @@ const Dashboard = () => {
 
   const kpis = [
     { label: 'Faturamento Total', value: formatCurrency(totalFaturamento), icon: DollarSign, change: lastMonth ? `${Number(faturamentoChange) >= 0 ? '+' : ''}${faturamentoChange}% últ. mês` : '', positive: Number(faturamentoChange) >= 0, accent: true },
-    { label: 'Taxa Conversão', value: `${taxaConversao}%`, icon: Target, change: `${totalPedidos} pedidos`, positive: true },
+    { label: 'Taxa Conversão', value: `${taxaConversao}%`, icon: Target, change: `${totalPedidos} negócios`, positive: true },
     { label: 'Ticket Médio', value: formatCurrency(ticketMedioGeral), icon: TrendingUp, change: '', positive: true },
-    { label: 'Pedidos Fechados', value: String(totalPedidosFechados), icon: Clock, change: '', positive: true },
+    { label: 'Negócios Fechados', value: String(totalPedidosFechados), icon: Clock, change: '', positive: true },
   ];
 
   const faturamentoData = filteredFaturamento.map(f => ({
@@ -295,7 +295,7 @@ const Dashboard = () => {
           <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
             <CardHeader className="pb-1">
               <CardTitle className="text-sm font-bold">Segmentação por Ticket</CardTitle>
-              <CardDescription className="text-xs">Distribuição dos pedidos por faixa de valor</CardDescription>
+              <CardDescription className="text-xs">Distribuição dos negócios por faixa de valor</CardDescription>
             </CardHeader>
             <CardContent className="pt-2">
               <ResponsiveContainer width="100%" height={260}>
@@ -318,7 +318,7 @@ const Dashboard = () => {
                     ))}
                   </Pie>
                   <Tooltip
-                    content={<ChartTooltip formatValue={(v) => `${v} pedido(s)`} />}
+                    content={<ChartTooltip formatValue={(v) => `${v} negócio(s)`} />}
                   />
                 </PieChart>
               </ResponsiveContainer>

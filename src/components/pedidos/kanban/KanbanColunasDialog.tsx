@@ -520,12 +520,12 @@ export function KanbanColunasDialog({
                         <AlertDialogDescription>
                             {excluindo?.isNew
                                 ? 'Esta coluna ainda não foi salva — ela será apenas removida do rascunho.'
-                                : 'Ao salvar as alterações, os pedidos atualmente nesta coluna serão movidos para a coluna escolhida abaixo. Esta ação não poderá ser desfeita.'}
+                                : 'Ao salvar as alterações, os negócios atualmente nesta coluna serão movidos para a coluna escolhida abaixo. Esta ação não poderá ser desfeita.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     {!excluindo?.isNew && (
                         <div className="space-y-1.5">
-                            <Label>Mover pedidos para:</Label>
+                            <Label>Mover negócios para:</Label>
                             <Select value={targetSlug} onValueChange={setTargetSlug}>
                                 <SelectTrigger><SelectValue placeholder="Selecione uma coluna" /></SelectTrigger>
                                 <SelectContent>

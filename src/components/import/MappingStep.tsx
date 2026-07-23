@@ -69,7 +69,7 @@ const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: st
   valor: { desc: 'Valor total convertido para número.', example: '15420.75', storage: 'pedidos.valor_total', synonyms: ['valor', 'total', 'preco', 'preço', 'orcamento'], type: 'number' },
   observacoes: { desc: 'Notas livres sobre o registro.', example: 'Entrega prevista para 15/12', storage: 'pedidos.observacoes', synonyms: ['observacoes', 'observações', 'obs', 'nota', 'descricao'] },
   status: { desc: 'Etapa do pipeline normalizada.', example: 'novo_lead', storage: 'pedidos.status', synonyms: ['status', 'etapa', 'fase', 'classificacao'], type: 'status' },
-  data_pedido: { desc: 'Data do pedido convertida para YYYY-MM-DD.', example: '2024-01-31', storage: 'pedidos.data_pedido', synonyms: ['data', 'data pedido', 'criado em', 'date'], type: 'date' },
+  data_pedido: { desc: 'Data do negócio convertida para YYYY-MM-DD.', example: '2024-01-31', storage: 'pedidos.data_pedido', synonyms: ['data', 'data pedido', 'criado em', 'date'], type: 'date' },
   nome_contato: { desc: 'Primeiro nome do contato principal do cliente.', example: 'João', storage: 'contatos.nome', synonyms: ['nome', 'nome contato', 'contato', 'first name'] },
   sobrenome_contato: { desc: 'Sobrenome do contato principal do cliente.', example: 'Silva', storage: 'contatos.sobrenome', synonyms: ['sobrenome', 'last name'] },
   cargo: { desc: 'Cargo ou função do contato na empresa.', example: 'Comprador', storage: 'contatos.cargo', synonyms: ['cargo', 'funcao', 'função', 'role', 'position'] },

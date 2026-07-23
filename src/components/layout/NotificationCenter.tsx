@@ -100,7 +100,7 @@ export function NotificationCenter() {
     const inativos = unread.filter(n => n.tipo === 'inatividade').length;
     const parts: string[] = [];
     if (followups > 0) parts.push(`${followups} contato${followups > 1 ? 's' : ''} agendado${followups > 1 ? 's' : ''}`);
-    if (inativos > 0) parts.push(`${inativos} pedido${inativos > 1 ? 's' : ''} parado${inativos > 1 ? 's' : ''}`);
+    if (inativos > 0) parts.push(`${inativos} negócio${inativos > 1 ? 's' : ''} parado${inativos > 1 ? 's' : ''}`);
     const summary = parts.join(' · ') || `${unread.length} pendência${unread.length > 1 ? 's' : ''}`;
 
     toast.info(`📋 ${summary}`, {
@@ -196,7 +196,7 @@ export function NotificationCenter() {
                           navigate(`/pedidos/${n.pedido_id}/editar`);
                         }}
                       >
-                        <MessageCircle className="h-3.5 w-3.5" /> Informações do pedido
+                        <MessageCircle className="h-3.5 w-3.5" /> Informações do negócio
                       </Button>
                     </div>
                   )}

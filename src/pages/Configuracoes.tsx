@@ -431,7 +431,7 @@ function ProfileTab() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Excluir sua conta?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Esta ação é <strong>permanente e irreversível</strong>. Todos os seus dados — clientes, pedidos e obras associados — serão perdidos.
+                        Esta ação é <strong>permanente e irreversível</strong>. Todos os seus dados — clientes, negócios e obras associados — serão perdidos.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -517,7 +517,7 @@ const Configuracoes = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Alertas de Inatividade</CardTitle>
-                    <CardDescription>Configure o tempo máximo que um pedido pode ficar parado</CardDescription>
+                    <CardDescription>Configure o tempo máximo que um negócio pode ficar parado</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center gap-4">
@@ -527,7 +527,7 @@ const Configuracoes = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-card-foreground">Notificação por email</p>
-                        <p className="text-xs text-muted-foreground">Enviar email quando o pedido ficar parado</p>
+                        <p className="text-xs text-muted-foreground">Enviar email quando o negócio ficar parado</p>
                       </div>
                       <Switch />
                     </div>

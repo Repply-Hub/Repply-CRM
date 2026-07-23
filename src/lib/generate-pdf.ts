@@ -59,7 +59,7 @@ export async function generatePedidosPdf(pedidos: PedidoRow[], titulo: string = 
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 50, 20);
 
   const totalValor = pedidos.reduce((acc, p) => acc + p.valor, 0);
-  doc.text(`${pedidos.length} pedidos · Total: ${totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, 50, 25);
+  doc.text(`${pedidos.length} negócios · Total: ${totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, 50, 25);
 
   doc.setTextColor(0);
 

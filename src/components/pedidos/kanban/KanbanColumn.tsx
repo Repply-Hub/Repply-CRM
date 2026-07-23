@@ -153,7 +153,7 @@ export const KanbanColumn = memo(function KanbanColumn({
         className="mt-2 shrink-0 w-full justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-background/60 border border-dashed border-border/60 hover:border-border"
       >
         <Plus className="h-3.5 w-3.5" />
-        Novo Pedido
+        Novo Negócio
       </Button>
     </div>
   );
