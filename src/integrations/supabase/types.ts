@@ -951,6 +951,8 @@ export type Database = {
           fim: string
           id: string
           inicio: string
+          lembrete_enviado: boolean
+          lembrete_minutos: number | null
           tipo_calendario: string
           titulo: string
           updated_at: string
@@ -964,6 +966,8 @@ export type Database = {
           fim: string
           id?: string
           inicio: string
+          lembrete_enviado?: boolean
+          lembrete_minutos?: number | null
           tipo_calendario?: string
           titulo: string
           updated_at?: string
@@ -977,6 +981,8 @@ export type Database = {
           fim?: string
           id?: string
           inicio?: string
+          lembrete_enviado?: boolean
+          lembrete_minutos?: number | null
           tipo_calendario?: string
           titulo?: string
           updated_at?: string

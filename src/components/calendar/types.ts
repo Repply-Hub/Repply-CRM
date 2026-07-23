@@ -11,6 +11,7 @@ export interface CalendarEvent {
   tipoCalendario: CalendarType;
   cor: string;
   editavel: boolean;
+  lembreteMinutos?: number | null;
 }
 
 export interface EventoForm {
@@ -22,6 +23,7 @@ export interface EventoForm {
   tipoCalendario: CalendarType;
   cor: string;
   participantes?: string[]; // user_ids (auth) — usado só na criação
+  lembreteMinutos: number | null; // antecedência em minutos p/ notificar os participantes
 }
 
 export const CALENDAR_COLORS: Record<CalendarType, string> = {

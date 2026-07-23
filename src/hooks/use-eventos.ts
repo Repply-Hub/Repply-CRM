@@ -15,6 +15,7 @@ interface EventoRow {
   dia_inteiro: boolean;
   tipo_calendario: string;
   cor: string;
+  lembrete_minutos: number | null;
   updated_at?: string;
 }
 
@@ -114,6 +115,7 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
           tipoCalendario: e.tipo_calendario as CalendarType,
           cor: e.cor,
           editavel: true,
+          lembreteMinutos: e.lembrete_minutos,
         });
       }
     });
@@ -188,6 +190,7 @@ export function useCreateEvento() {
         dia_inteiro: form.diaInteiro,
         tipo_calendario: form.tipoCalendario,
         cor: form.cor,
+        lembrete_minutos: form.lembreteMinutos,
       }));
 
       const { error } = await supabase.from('eventos').insert(rows);
@@ -216,6 +219,7 @@ export function useBulkCreateEventos() {
         dia_inteiro: form.diaInteiro,
         tipo_calendario: form.tipoCalendario,
         cor: form.cor,
+        lembrete_minutos: form.lembreteMinutos,
       }));
 
       // Insere em lotes de 500 para evitar limites do PostgREST
@@ -260,6 +264,7 @@ export function useUpdateEvento() {
           dia_inteiro: form.diaInteiro,
           tipo_calendario: form.tipoCalendario,
           cor: form.cor,
+          lembrete_minutos: form.lembreteMinutos,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);

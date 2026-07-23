@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.gmail-sync-inbox]
 verify_jwt = false
 
+[functions.eventos-lembrete]
+verify_jwt = false
+
 [functions.gmail-callback]
 verify_jwt = false
 

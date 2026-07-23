@@ -29,6 +29,7 @@ import { useAuth } from '@/hooks/use-auth';
 import type { CalendarEvent, EventoForm, CalendarType } from './types';
 import { EVENT_PRESET_COLORS, CALENDAR_COLORS } from './types';
 import { EventDateTimeField } from './EventDateTimeField';
+import { LembreteField } from './LembreteField';
 
 interface EventDialogProps {
   open: boolean;
@@ -59,6 +60,7 @@ const defaultForm = (): EventoForm => {
     tipoCalendario: 'empresa',
     cor: CALENDAR_COLORS.empresa,
     participantes: [],
+    lembreteMinutos: null,
   };
 };
 
@@ -99,6 +101,7 @@ export function EventDialog({
         tipoCalendario: editingEvent.tipoCalendario,
         cor: editingEvent.cor,
         participantes: [],
+        lembreteMinutos: editingEvent.lembreteMinutos ?? null,
       });
     } else {
       setForm({ ...defaultForm(), ...initialData });
@@ -263,6 +266,12 @@ export function EventDialog({
               </p>
             </div>
           )}
+
+          {/* Lembrete */}
+          <LembreteField
+            value={form.lembreteMinutos}
+            onChange={(v) => set('lembreteMinutos', v)}
+          />
 
           {/* Cor */}
           <div className="space-y-1.5">
