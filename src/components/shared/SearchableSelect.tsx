@@ -28,6 +28,9 @@ interface SearchableSelectProps {
   placeholder?: string;
   emptyMessage?: string;
   className?: string;
+  /** Sobrescreve a largura do dropdown (por padrão acompanha a largura do trigger) — útil
+   * quando o campo fica num grid estreito mas as opções têm rótulos longos. */
+  contentClassName?: string;
   onActionClick?: () => void;
   actionLabel?: string;
 }
@@ -39,6 +42,7 @@ export function SearchableSelect({
   placeholder = "Selecione uma opção...",
   emptyMessage = "Nenhuma opção encontrada.",
   className,
+  contentClassName,
   onActionClick,
   actionLabel,
 }: SearchableSelectProps) {
@@ -59,7 +63,10 @@ export function SearchableSelect({
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+      <PopoverContent
+        className={cn("w-[var(--radix-popover-trigger-width)] p-0", contentClassName)}
+        align="start"
+      >
         <div className="flex flex-col">
           <Command 
             className="flex flex-col"
