@@ -110,6 +110,9 @@ export function EventDateTimeField({
             onSelect={handleDateSelect}
             locale={ptBR}
             initialFocus
+            captionLayout="dropdown-buttons"
+            fromYear={2000}
+            toYear={new Date().getFullYear() + 10}
             className={cn('p-3 pointer-events-auto')}
           />
           {isDateTime && (
