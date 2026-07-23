@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
 import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
-import { ProjetoSelect } from '@/components/tarefas/ProjetoSelect';
+import { EventDateTimeField } from '@/components/calendar/EventDateTimeField';
 
 interface KanbanStage {
   key: string;
@@ -64,9 +64,13 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
         pedido_id: editingTarefa.pedido_id || '', cliente_id: editingTarefa.cliente_id || '',
       });
     } else {
-      setForm({ ...emptyForm, status: defaultStatus || kanbanStages[0]?.key || 'pendente' });
+      setForm({
+        ...emptyForm,
+        status: defaultStatus || kanbanStages[0]?.key || 'pendente',
+        responsavel: profile?.nome ?? '',
+      });
     }
-  }, [open, editingTarefa, kanbanStages, defaultStatus]);
+  }, [open, editingTarefa, kanbanStages, defaultStatus, profile]);
 
   async function handleSave() {
     if (!form.titulo.trim()) { toast.error('Título é obrigatório'); return; }
@@ -101,8 +105,8 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{editingTarefa ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle></DialogHeader>
         <div className="space-y-4 mt-2">
-          <div><Label>Título *</Label><Input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} /></div>
-          <div><Label>Descrição</Label><Textarea value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} rows={3} /></div>
+          <div><Label>Título *</Label><Input placeholder="Ex: Ligar para o cliente" value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} /></div>
+          <div><Label>Descrição</Label><Textarea placeholder="Detalhes da tarefa (opcional)" value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} rows={3} /></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Status</Label>
@@ -115,25 +119,21 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Prazo Final</Label>
-              <Input type="datetime-local" value={form.prazo_final} onChange={e => setForm(f => ({ ...f, prazo_final: e.target.value }))} />
-            </div>
+            <EventDateTimeField
+              label="Prazo Final"
+              type="datetime-local"
+              value={form.prazo_final}
+              onChange={v => setForm(f => ({ ...f, prazo_final: v }))}
+            />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Responsável</Label>
-              <SearchableSelect
-                options={vendedores.map(v => ({ value: v.nome, label: v.nome }))}
-                value={form.responsavel}
-                onValueChange={v => setForm(f => ({ ...f, responsavel: v }))}
-                placeholder="Selecione o responsável"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Projeto / Obra</Label>
-              <ProjetoSelect value={form.projeto} onChange={v => setForm(f => ({ ...f, projeto: v }))} />
-            </div>
+          <div className="space-y-1.5">
+            <Label>Responsável</Label>
+            <SearchableSelect
+              options={vendedores.map(v => ({ value: v.nome, label: v.nome }))}
+              value={form.responsavel}
+              onValueChange={v => setForm(f => ({ ...f, responsavel: v }))}
+              placeholder="Selecione o responsável"
+            />
           </div>
           {(!clienteTravado || !negocioTravado) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -145,6 +145,7 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
                     value={form.cliente_id}
                     onValueChange={v => setForm(f => ({ ...f, cliente_id: v }))}
                     placeholder="Vincular a uma empresa"
+                    contentClassName="w-[min(28rem,90vw)]"
                   />
                 </div>
               )}
@@ -159,6 +160,7 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
                     value={form.pedido_id}
                     onValueChange={v => setForm(f => ({ ...f, pedido_id: v }))}
                     placeholder="Vincular a um negócio"
+                    contentClassName="w-[min(28rem,90vw)]"
                   />
                 </div>
               )}
