@@ -204,6 +204,7 @@ export function useWaInstancias() {
 
 export function useWaMensagens(conversaId: string | null) {
   const qc = useQueryClient();
+  const { profile } = useAuth();
 
   const query = useQuery<WaMensagem[]>({
     queryKey: ['wa_mensagens', conversaId],
@@ -245,7 +246,10 @@ export function useWaMensagens(conversaId: string | null) {
             );
             if (idx !== -1) {
               const updated = [...prev];
-              updated[idx] = newMsg;
+              // O payload do realtime (postgres_changes) vem sem relacionamentos —
+              // sem isso o nome do remetente sumiria da bolha assim que o otimista
+              // fosse substituído pela mensagem real.
+              updated[idx] = { ...newMsg, usuario: newMsg.usuario ?? prev[idx].usuario };
               return updated;
             }
             // Otimista já foi removido pelo onSuccess — a mensagem real está como wamid ou não existe ainda
@@ -253,7 +257,22 @@ export function useWaMensagens(conversaId: string | null) {
             if (newMsg.wamid && prev.some((m) => m.wamid === newMsg.wamid)) return prev;
           }
 
-          return [...prev, newMsg];
+          // Mesmo sem otimista correspondente (ex: outra aba/sessão do mesmo usuário
+          // já removeu o otimista antes do evento chegar), tenta preencher o
+          // remetente pelo usuário logado nesta aba, se bater o usuario_id.
+          const usuarioInferido =
+            newMsg.direcao === 'saida' && !newMsg.usuario && newMsg.usuario_id && newMsg.usuario_id === profile?.id
+              ? {
+                  id: profile.id,
+                  nome: profile.nome,
+                  avatar_url: profile.avatar_url ?? null,
+                  email: profile.email ?? null,
+                  role: profile.role ?? null,
+                  telefone: profile.telefone ?? null,
+                }
+              : newMsg.usuario;
+
+          return [...prev, { ...newMsg, usuario: usuarioInferido }];
         });
       })
       .subscribe();
@@ -396,13 +415,27 @@ export function useWaSendMessage() {
         media_mime: vars.media_mime ?? null,
         wamid: null,
         status: 'enviando',
-        usuario_id: null,
+        usuario_id: profile?.id ?? null,
         lida: true,
         created_at: new Date().toISOString(),
         quoted_wamid: vars.quoted_wamid ?? null,
         quoted_conteudo: vars.quoted_conteudo ?? null,
         quoted_tipo: vars.quoted_tipo ?? null,
         quoted_remetente_nome: vars.quoted_remetente_nome ?? null,
+        // O evento realtime de INSERT chega sem os relacionamentos (postgres_changes
+        // não faz join), então guardamos o usuário aqui pra não perder o nome do
+        // remetente quando essa mensagem otimista for substituída pela real (ver
+        // useWaMensagens abaixo).
+        usuario: profile
+          ? {
+              id: profile.id,
+              nome: profile.nome,
+              avatar_url: profile.avatar_url ?? null,
+              email: profile.email ?? null,
+              role: profile.role ?? null,
+              telefone: profile.telefone ?? null,
+            }
+          : null,
       };
 
       qc.setQueryData<WaMensagem[]>(['wa_mensagens', vars.conversa_id], (old) => [
