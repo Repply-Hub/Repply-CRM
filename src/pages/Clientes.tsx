@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
-import { useCreateCliente, useCreateContato, useDeleteCliente, useDeleteContato } from '@/hooks/use-mutations';
+import { useCreateCliente, useCreateContato, useUpdateContato, useDeleteCliente, useDeleteContato } from '@/hooks/use-mutations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown, ChevronDown, FileWarning } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown, ChevronDown, FileWarning, Check } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
@@ -40,25 +40,38 @@ import { StandardPopoverMenu } from '@/components/ui/standard-popover-menu';
 
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
-  { id: 'empresa', label: 'Empresa', locked: false },
-  { id: 'tipo', label: 'Tipo' },
-  { id: 'cnpj', label: 'CPF/CNPJ' },
-  { id: 'classificacao', label: 'Classificação' },
-  { id: 'data_criacao', label: 'Criado' },
+  { id: 'tipo', label: 'Tipo / Segmento', locked: false },
+  { id: 'cnpj', label: 'CNPJ / CPF' },
+  { id: 'empresa', label: 'Empresa/Nome Fant' },
+  { id: 'razao_social', label: 'Razão social' },
+  { id: 'nome_contato', label: 'Contato da empresa' },
   { id: 'email', label: 'E-mail' },
   { id: 'telefone', label: 'Telefone' },
-  { id: 'endereco', label: 'Endereço' },
-  { id: 'obras_count', label: 'Qtd. Obras' },
+  { id: 'logradouro', label: 'Logradouro / Rua' },
+  { id: 'numero', label: 'Número' },
+  { id: 'complemento', label: 'Complemento' },
+  { id: 'bairro', label: 'Bairro' },
+  { id: 'cidade', label: 'Cidade' },
+  { id: 'uf', label: 'UF' },
+  { id: 'cep', label: 'CEP' },
+  { id: 'classificacao', label: 'Classificação' },
+  { id: 'data_criacao', label: 'Data de Criação' },
 ];
 
 const CONTATO_FIELDS: ColumnDefinition[] = [
-  { id: 'nome_contato', label: 'Nome', locked: false },
-  { id: 'empresa', label: 'Empresa' },
-  { id: 'classificacao', label: 'Classificação' },
-  { id: 'data_criacao', label: 'Criado em' },
-  { id: 'email', label: 'E-mail' },
-  { id: 'telefone', label: 'Telefone' },
+  { id: 'nome_contato', label: 'Nome Completo', locked: false },
+  { id: 'empresa', label: 'Empresa do contato' },
+  { id: 'email', label: 'E-mail do contato' },
+  { id: 'telefone', label: 'Telefone do contato' },
   { id: 'cargo', label: 'Cargo' },
+  { id: 'data_criacao', label: 'Data de Criação' },
+];
+
+const EMPRESA_STEPS = [
+  { id: 1, label: 'Dados' },
+  { id: 2, label: 'Contato' },
+  { id: 3, label: 'Endereço' },
+  { id: 4, label: 'Vincular Contato' },
 ];
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
@@ -205,6 +218,7 @@ const Clientes = () => {
   const { data: contatosList, isLoading: loadingContatos } = useContatos();
   const createCliente = useCreateCliente();
   const createContato = useCreateContato();
+  const updateContato = useUpdateContato();
   const deleteCliente = useDeleteCliente();
   const deleteContato = useDeleteContato();
   const [search, setSearch] = useState(() => localStorage.getItem('clientes_search') || '');
@@ -231,8 +245,14 @@ const Clientes = () => {
   const [razaoSocial, setRazaoSocial] = useState('');
   const [endereco, setEndereco] = useState<EnderecoFields>(emptyEndereco);
   const [telefone, setTelefone] = useState('');
+  const [email, setEmail] = useState('');
   const [nomeContato, setNomeContato] = useState('');
   const [cargo, setCargo] = useState('');
+  const [step, setStep] = useState(1);
+  const [contatoMode, setContatoMode] = useState<'nenhum' | 'existente' | 'novo'>('nenhum');
+  const [selectedContatoId, setSelectedContatoId] = useState('');
+  const [contatoEmail, setContatoEmail] = useState('');
+  const [contatoTelefone, setContatoTelefone] = useState('');
   const [customTipos, setCustomTipos] = useState<{ value: string; label: string }[]>(() => {
     const saved = localStorage.getItem('clientes_custom_tipos');
     return saved ? JSON.parse(saved) : [];
@@ -442,7 +462,50 @@ const Clientes = () => {
 
   const resetForm = () => {
     setCnpj(''); setEmpresa(''); setRazaoSocial(''); setEndereco(emptyEndereco);
-    setTelefone(''); setCnpjStatus('idle'); setNomeContato(''); setCargo('');
+    setTelefone(''); setEmail(''); setCnpjStatus('idle'); setNomeContato(''); setCargo('');
+    setContatoMode('nenhum'); setSelectedContatoId(''); setContatoEmail(''); setContatoTelefone('');
+    setStep(1);
+  };
+
+  // Valida os campos da etapa atual do wizard de "Nova Empresa"; retorna false
+  // e mostra o erro sem avançar quando algo obrigatório estiver faltando.
+  const validateEmpresaStep = (targetStep: number) => {
+    if (targetStep === 1) {
+      if (!empresa.trim()) {
+        toast.error('Informe o nome da empresa.');
+        return false;
+      }
+      if (unmaskCnpj(cnpj).length !== 14) {
+        toast.error('Informe um CNPJ válido.');
+        return false;
+      }
+      if (!isValidCnpjDigits(unmaskCnpj(cnpj))) {
+        toast.error('CNPJ inválido');
+        return false;
+      }
+    }
+    if (targetStep === 2) {
+      if (!email.trim()) {
+        toast.error('Informe o email da empresa.');
+        return false;
+      }
+      if (!telefone.trim()) {
+        toast.error('Informe o telefone da empresa.');
+        return false;
+      }
+    }
+    if (targetStep === 3) {
+      if (!endereco.numero.trim() || !endereco.logradouro.trim()) {
+        toast.error('Informe o logradouro e o número do endereço.');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleNextStep = () => {
+    if (!validateEmpresaStep(step)) return;
+    setStep(s => Math.min(s + 1, EMPRESA_STEPS.length));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -467,8 +530,21 @@ const Clientes = () => {
       return;
     }
 
-    if (unmaskCnpj(cnpj).length === 14 && !isValidCnpjDigits(unmaskCnpj(cnpj))) {
-      toast.error('CNPJ inválido');
+    // Formulário de empresa é um wizard: só permite submeter na última etapa,
+    // validando todas as etapas anteriores (caso o usuário edite algo e volte).
+    if (step < EMPRESA_STEPS.length) {
+      handleNextStep();
+      return;
+    }
+    if (!validateEmpresaStep(1) || !validateEmpresaStep(2) || !validateEmpresaStep(3)) {
+      return;
+    }
+    if (contatoMode === 'existente' && !selectedContatoId) {
+      toast.error('Selecione um contato existente ou escolha cadastrar um novo.');
+      return;
+    }
+    if (contatoMode === 'novo' && !nomeContato.trim()) {
+      toast.error('Informe o nome do novo contato.');
       return;
     }
     const enderecoStr = enderecoToString(endereco);
@@ -478,10 +554,21 @@ const Clientes = () => {
         razao_social: razaoSocial || undefined,
         tipo,
         cnpj: cnpj || undefined,
-        email: (form.get('email') as string) || undefined,
+        email: email || undefined,
         telefone: telefone || undefined,
         endereco: enderecoStr || undefined,
       });
+      if (contatoMode === 'existente') {
+        await updateContato.mutateAsync({ id: selectedContatoId, empresa: empresa.trim() });
+      } else if (contatoMode === 'novo') {
+        await createContato.mutateAsync({
+          empresa: empresa.trim(),
+          nome_contato: nomeContato.trim(),
+          cargo: cargo.trim() || undefined,
+          email: contatoEmail.trim() || undefined,
+          telefone: contatoTelefone.trim() || undefined,
+        });
+      }
       toast.success('Empresa cadastrada com sucesso!');
       resetForm();
       setDialogOpen(false);
@@ -812,56 +899,142 @@ const Clientes = () => {
             </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{activeTab === 'empresas' ? 'Cadastrar Empresa' : 'Cadastrar Contato'}</DialogTitle></DialogHeader>
+
+              {activeTab === 'empresas' && (
+                <div className="pt-1">
+                  <div className="flex items-center">
+                    {EMPRESA_STEPS.map((s, idx) => (
+                      <div key={s.id} className="flex items-center flex-1 last:flex-none">
+                        <div className={cn(
+                          "h-6 w-6 shrink-0 rounded-full flex items-center justify-center text-[11px] font-semibold border transition-colors",
+                          step === s.id ? "bg-primary text-primary-foreground border-primary" :
+                          step > s.id ? "bg-primary/15 text-primary border-primary/40" : "border-border text-muted-foreground"
+                        )}>
+                          {step > s.id ? <Check className="h-3.5 w-3.5" /> : s.id}
+                        </div>
+                        {idx < EMPRESA_STEPS.length - 1 && (
+                          <div className={cn("h-px flex-1 mx-1.5", step > s.id ? "bg-primary/40" : "bg-border")} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Etapa {step} de {EMPRESA_STEPS.length} · {EMPRESA_STEPS[step - 1].label}
+                  </p>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4 mt-2">
                 {activeTab === 'empresas' ? (
                   <>
-                    <div>
-                      <Label>Tipo</Label>
-                      <Select
-                        value={tipo}
-                        onValueChange={(v) => {
-                          if (v === '__new__') {
-                            setNewTipoTarget('form');
-                            setNewTipoOpen(true);
-                            return;
-                          }
-                          setTipo(v);
-                        }}
-                      >
-                        <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
-                        <SelectContent>
-                          {baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => (
-                            <SelectItem key={v} value={v}>{tipoLabels[v]}</SelectItem>
-                          ))}
-                          {customTipos.map(t => (
-                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                          ))}
-                          <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>CNPJ</Label>
-                      <div className="relative">
-                        <Input
-                          value={cnpj}
-                          onChange={(e) => handleCnpjChange(e.target.value)}
-                          onBlur={handleCnpjBlur}
-                          placeholder="00.000.000/0000-00"
-                          className={cnpjStatus === 'invalid' ? 'border-destructive' : cnpjStatus === 'valid' ? 'border-green-500' : ''}
-                        />
-                        {cnpjStatus === 'loading' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
-                        {cnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
+                    {step === 1 && (
+                      <>
+                        <div>
+                          <Label>Tipo</Label>
+                          <Select
+                            value={tipo}
+                            onValueChange={(v) => {
+                              if (v === '__new__') {
+                                setNewTipoTarget('form');
+                                setNewTipoOpen(true);
+                                return;
+                              }
+                              setTipo(v);
+                            }}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
+                            <SelectContent>
+                              {baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => (
+                                <SelectItem key={v} value={v}>{tipoLabels[v]}</SelectItem>
+                              ))}
+                              {customTipos.map(t => (
+                                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                              ))}
+                              <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>CNPJ *</Label>
+                          <div className="relative">
+                            <Input
+                              value={cnpj}
+                              onChange={(e) => handleCnpjChange(e.target.value)}
+                              onBlur={handleCnpjBlur}
+                              placeholder="00.000.000/0000-00"
+                              className={cnpjStatus === 'invalid' ? 'border-destructive' : cnpjStatus === 'valid' ? 'border-green-500' : ''}
+                              required
+                            />
+                            {cnpjStatus === 'loading' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
+                            {cnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">Ao sair do campo, o CNPJ será validado e os dados preenchidos automaticamente</p>
+                        </div>
+                        <div><Label>Nome *</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Nome fantasia ou nome" required /></div>
+                        <div><Label>Razão Social</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" /></div>
+                      </>
+                    )}
+
+                    {step === 2 && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div><Label>Email *</Label><Input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="email@exemplo.com" required /></div>
+                        <div><Label>Telefone *</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required /></div>
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">Ao sair do campo, o CNPJ será validado e os dados preenchidos automaticamente</p>
+                    )}
+
+                    {step === 3 && (
+                      <EnderecoForm value={endereco} onChange={setEndereco} required />
+                    )}
+
+                    {step === 4 && (
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold uppercase text-muted-foreground">Vincular Contato</Label>
+                        <div className="flex gap-2">
+                          <Button type="button" size="sm" variant={contatoMode === 'nenhum' ? 'default' : 'outline'} onClick={() => setContatoMode('nenhum')}>Nenhum</Button>
+                          <Button type="button" size="sm" variant={contatoMode === 'existente' ? 'default' : 'outline'} onClick={() => setContatoMode('existente')}>Selecionar existente</Button>
+                          <Button type="button" size="sm" variant={contatoMode === 'novo' ? 'default' : 'outline'} onClick={() => setContatoMode('novo')}>Novo contato</Button>
+                        </div>
+                        {contatoMode === 'existente' && (
+                          <Select value={selectedContatoId} onValueChange={setSelectedContatoId}>
+                            <SelectTrigger><SelectValue placeholder={loadingContatos ? 'Carregando contatos...' : 'Selecione um contato...'} /></SelectTrigger>
+                            <SelectContent>
+                              {contatosList?.map(c => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  {c.nome_contato}{c.empresa ? ` (${c.empresa})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {contatoMode === 'novo' && (
+                          <div className="space-y-3">
+                            <Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome do contato" />
+                            <div className="grid grid-cols-2 gap-3">
+                              <Input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="Cargo ou função" />
+                              <Input value={contatoTelefone} onChange={e => setContatoTelefone(e.target.value)} placeholder="Telefone do contato" />
+                            </div>
+                            <Input value={contatoEmail} onChange={e => setContatoEmail(e.target.value)} type="email" placeholder="Email do contato" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-2">
+                      {step > 1 && (
+                        <Button type="button" variant="outline" className="flex-1" onClick={() => setStep(s => s - 1)}>
+                          Voltar
+                        </Button>
+                      )}
+                      {step < EMPRESA_STEPS.length ? (
+                        <Button type="button" className="flex-1" onClick={handleNextStep}>
+                          Avançar
+                        </Button>
+                      ) : (
+                        <Button type="submit" className="flex-1" disabled={createCliente.isPending || createContato.isPending || updateContato.isPending}>
+                          {(createCliente.isPending || createContato.isPending || updateContato.isPending) ? 'Salvando...' : 'Salvar'}
+                        </Button>
+                      )}
                     </div>
-                    <div><Label>Nome</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Nome fantasia ou nome" /></div>
-                    <div><Label>Razão Social</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" /></div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
-                      <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" /></div>
-                    </div>
-                    <EnderecoForm value={endereco} onChange={setEndereco} />
                   </>
                 ) : (
                   <>
@@ -872,11 +1045,11 @@ const Clientes = () => {
                       <div><Label>Email</Label><Input name="email" type="email" placeholder="email@exemplo.com" /></div>
                       <div><Label>Telefone</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" /></div>
                     </div>
+                    <Button type="submit" className="w-full" disabled={createContato.isPending}>
+                      {createContato.isPending ? 'Salvando...' : 'Salvar'}
+                    </Button>
                   </>
                 )}
-                <Button type="submit" className="w-full" disabled={createCliente.isPending || createContato.isPending}>
-                  {(createCliente.isPending || createContato.isPending) ? 'Salvando...' : 'Salvar'}
-                </Button>
               </form>
             </DialogContent>
           </Dialog>

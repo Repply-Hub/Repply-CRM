@@ -8,6 +8,7 @@ import { maskCep, unmaskCep, fetchCepData, type EnderecoFields } from '@/lib/cep
 interface EnderecoFormProps {
   value: EnderecoFields;
   onChange: (v: EnderecoFields) => void;
+  required?: boolean;
 }
 
 interface AddressSuggestion {
@@ -39,7 +40,7 @@ const UF_MAP: Record<string, string> = {
   'Tocantins': 'TO',
 };
 
-export function EnderecoForm({ value, onChange }: EnderecoFormProps) {
+export function EnderecoForm({ value, onChange, required }: EnderecoFormProps) {
   const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -170,7 +171,7 @@ export function EnderecoForm({ value, onChange }: EnderecoFormProps) {
           <p className="text-[10px] text-muted-foreground mt-1">Auto-preenche ao sair</p>
         </div>
         <div className="col-span-2 relative" ref={containerRef}>
-          <Label>Logradouro</Label>
+          <Label>Logradouro{required && ' *'}</Label>
           <div className="relative">
             <Input
               value={value.logradouro}
@@ -178,6 +179,7 @@ export function EnderecoForm({ value, onChange }: EnderecoFormProps) {
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
               placeholder="Digite para buscar (ex: Rua Guaramiranga)"
               autoComplete="off"
+              required={required}
             />
             {searching && (
               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
@@ -208,8 +210,8 @@ export function EnderecoForm({ value, onChange }: EnderecoFormProps) {
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <Label>Número</Label>
-          <Input value={value.numero} onChange={e => set('numero', e.target.value)} placeholder="Nº" />
+          <Label>Número{required && ' *'}</Label>
+          <Input value={value.numero} onChange={e => set('numero', e.target.value)} placeholder="Nº" required={required} />
         </div>
         <div className="col-span-2">
           <Label>Complemento</Label>
