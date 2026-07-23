@@ -54,6 +54,13 @@ function compareConversas(a: WaConversa, b: WaConversa): number {
   return tb.localeCompare(ta);
 }
 
+export interface WaReacao {
+  emoji: string;
+  autor: string; // telefone do contato, ou "eu" para reações da própria instância
+  nome: string;
+  at: string;
+}
+
 export interface WaMensagem {
   id: string;
   conversa_id: string;
@@ -84,6 +91,9 @@ export interface WaMensagem {
   quoted_conteudo?: string | null;
   quoted_tipo?: string | null;
   quoted_remetente_nome?: string | null;
+  // Reações (emoji) à mensagem — um item por "autor" (telefone do contato, ou o
+  // literal "eu" para reações da própria instância).
+  reacoes?: WaReacao[];
   usuario?: {
     id: string;
     nome: string;
@@ -274,6 +284,20 @@ export function useWaMensagens(conversaId: string | null) {
 
           return [...prev, { ...newMsg, usuario: usuarioInferido }];
         });
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'whatsapp_mensagens',
+        filter: `conversa_id=eq.${conversaId}`,
+      }, (payload) => {
+        // Cobre tanto reações (coluna `reacoes`) quanto qualquer outro update de
+        // status/conteúdo — preserva os relacionamentos já carregados (o payload do
+        // realtime não traz joins).
+        const updated = payload.new as WaMensagem;
+        qc.setQueryData<WaMensagem[]>(['wa_mensagens', conversaId], (old) =>
+          (old ?? []).map((m) => (m.id === updated.id ? { ...m, ...updated, usuario: m.usuario } : m))
+        );
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -482,6 +506,55 @@ export function useWaSendMessage() {
         );
       }
       toast.error(err?.message ?? 'Erro ao enviar mensagem');
+    },
+  });
+}
+
+// --- Reagir a uma mensagem com emoji ---
+// `emoji` vazio remove a reação atual (toggle, igual ao WhatsApp: clicar de novo no
+// mesmo emoji tira a reação).
+
+export function useWaReagir() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      conversaId: string;
+      mensagemId: string;
+      wamid: string;
+      telefone: string;
+      emoji: string;
+    }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada');
+
+      const res = await supabase.functions.invoke('whatsapp-send-reaction', {
+        body: { wamid: params.wamid, telefone: params.telefone, emoji: params.emoji },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (res.error) throw res.error;
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data;
+    },
+
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ['wa_mensagens', vars.conversaId] });
+      qc.setQueryData<WaMensagem[]>(['wa_mensagens', vars.conversaId], (old) =>
+        (old ?? []).map((m) => {
+          if (m.id !== vars.mensagemId) return m;
+          const semAutor = (m.reacoes ?? []).filter((r) => r.autor !== 'eu');
+          const novasReacoes = vars.emoji
+            ? [...semAutor, { emoji: vars.emoji, autor: 'eu', nome: 'Você', at: new Date().toISOString() }]
+            : semAutor;
+          return { ...m, reacoes: novasReacoes };
+        })
+      );
+    },
+
+    onError: (err: any, vars) => {
+      qc.invalidateQueries({ queryKey: ['wa_mensagens', vars.conversaId] });
+      toast.error(err?.message ?? 'Erro ao reagir à mensagem');
     },
   });
 }

@@ -102,7 +102,8 @@ async function uploadBytesToStorage(
   const ext = mime.includes("ogg") ? "ogg" : mime.includes("webm") ? "webm"
     : mime.includes("mp4") ? "mp4" : mime.includes("mpeg") ? "mp3"
     : mime.includes("jpeg") || mime.includes("jpg") ? "jpg"
-    : mime.includes("png") ? "png" : mime.includes("pdf") ? "pdf" : "bin";
+    : mime.includes("png") ? "png" : mime.includes("webp") ? "webp"
+    : mime.includes("pdf") ? "pdf" : "bin";
 
   const path = `incoming/${empresaId}/${Date.now()}-${wamid.slice(-10)}.${ext}`;
   const { data: up, error } = await supabase.storage
@@ -261,12 +262,53 @@ async function handleIncomingMessage(
 
   const msgType = (msg.messageType ?? msg.type ?? "text").toLowerCase();
   const content = msg.content && typeof msg.content === "object" ? msg.content : null;
+
+  // --- Reação (❤️ 👍 etc.) a uma mensagem existente ---
+  // Formato confirmado empiricamente contra POST /message/react (docs.uazapi.com não é
+  // acessível programaticamente): messageType "ReactionMessage" e o alvo/emoji vêm direto
+  // em content.key.ID / content.text (chave capitalizada "ID", diferente do resto do
+  // payload que usa "id" minúsculo) — não aninhado em "reactionMessage". Mantém alguns
+  // fallbacks defensivos e loga o payload cru em webhook_debug para facilitar ajuste caso
+  // o webhook de mensagens recebidas difira do formato de confirmação de envio observado.
+  const looksLikeReaction = msgType.includes("reaction");
+  if (looksLikeReaction) {
+    const reactionEmoji: string = content?.text ?? msg.text ?? "";
+    const reactionTargetWamid: string | null =
+      content?.key?.ID ?? content?.key?.id ?? msg.quoted?.id ??
+      msg.quoted?.messageid ?? content?.contextInfo?.stanzaId ?? null;
+
+    await supabase.from("webhook_debug").insert({
+      payload: { _reaction_debug: true, msg, chat: payload.chat, reactionEmoji, reactionTargetWamid },
+    });
+
+    if (reactionTargetWamid) {
+      const autorKey = sentByOtherChannel ? "eu" : telefone;
+      const autorNome = sentByOtherChannel ? "Você" : (pushName || telefone);
+
+      const { data: alvos } = await supabase
+        .from("whatsapp_mensagens")
+        .select("id, reacoes")
+        .eq("empresa_id", empresaId)
+        .like("wamid", `%${reactionTargetWamid}`);
+
+      for (const alvo of alvos ?? []) {
+        const atuais: any[] = Array.isArray(alvo.reacoes) ? alvo.reacoes : [];
+        const semAutor = atuais.filter((r) => r?.autor !== autorKey);
+        const novasReacoes = reactionEmoji
+          ? [...semAutor, { emoji: reactionEmoji, autor: autorKey, nome: autorNome, at: new Date().toISOString() }]
+          : semAutor;
+        await supabase.from("whatsapp_mensagens").update({ reacoes: novasReacoes }).eq("id", alvo.id);
+      }
+    }
+    return;
+  }
+
   let conteudo: string = msg.text || content?.caption || msg.caption || "";
   let tipo = "texto";
 
   const anyMediaUrl = (): string | null =>
     content?.URL ?? content?.url ?? content?.link ?? content?.audio ??
-    msg.audioUrl ?? msg.imageUrl ?? msg.videoUrl ?? msg.documentUrl ?? null;
+    msg.audioUrl ?? msg.imageUrl ?? msg.videoUrl ?? msg.documentUrl ?? msg.stickerUrl ?? null;
 
   let mediaUrl: string | null = null;
   let mediaMime: string | null =
@@ -305,6 +347,11 @@ async function handleIncomingMessage(
       tipo = "audio";
       mediaUrl = anyMediaUrl();
       conteudo = "[Áudio]";
+    } else if (mime.includes("webp")) {
+      // Stickers do WhatsApp são sempre image/webp; imagens normais nunca usam esse mimetype.
+      tipo = "sticker";
+      mediaUrl = anyMediaUrl();
+      conteudo = "[Sticker]";
     } else if (mime.startsWith("image/")) {
       tipo = "imagem";
       mediaUrl = anyMediaUrl();

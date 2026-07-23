@@ -7,6 +7,7 @@ import {
   useWaConversas,
   useWaMensagens,
   useWaSendMessage,
+  useWaReagir,
   useWaMarcarLida,
   useWaMarcarNaoLida,
   useWaConfig,
@@ -31,6 +32,7 @@ import {
   uploadWaMedia,
   type WaConversa,
   type WaMensagem,
+  type WaReacao,
   type WaMensagemBusca,
   type WaMidiaTipo,
   type WaConfig,
@@ -167,6 +169,7 @@ import {
   UserX,
   List,
   Reply,
+  SmilePlus,
   ListTodo,
   StickyNote,
   MessageSquareText,
@@ -1224,15 +1227,99 @@ function QuotedPreview({
 // horizontalmente, como no WhatsApp) e um botão de responder que aparece no hover —
 // funciona igual em grupos e conversas individuais, já que ambos usam o mesmo bloco
 // de renderização de mensagens.
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+function ReactionPicker({ onPick }: { onPick: (emoji: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title="Reagir"
+          className={cn(
+            "h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground opacity-0 group-hover/bubble:opacity-100 transition-opacity",
+            open && "opacity-100",
+          )}
+        >
+          <SmilePlus className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="center" className="w-auto p-1 flex gap-0.5">
+        {QUICK_REACTIONS.map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            className="text-lg leading-none p-1.5 rounded-full hover:bg-accent hover:scale-125 transition-transform"
+            onClick={() => {
+              setOpen(false);
+              onPick(emoji);
+            }}
+          >
+            {emoji}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Agrupa as reações por emoji e exibe como um "balãozinho" sobreposto ao canto
+// inferior da bolha, igual ao WhatsApp — clicar de novo no próprio emoji remove a
+// reação (a mutation já trata isso como toggle).
+function ReactionBadge({
+  reacoes,
+  isSaida,
+  onToggle,
+}: {
+  reacoes: WaReacao[];
+  isSaida: boolean;
+  onToggle: (emoji: string) => void;
+}) {
+  if (reacoes.length === 0) return null;
+  const grupos = new Map<string, WaReacao[]>();
+  for (const r of reacoes) {
+    grupos.set(r.emoji, [...(grupos.get(r.emoji) ?? []), r]);
+  }
+  const minhaReacao = reacoes.find((r) => r.autor === "eu")?.emoji;
+
+  return (
+    <div
+      className={cn(
+        "absolute -bottom-2.5 flex items-center gap-0.5 bg-background border border-border rounded-full px-1 py-0.5 shadow-sm",
+        isSaida ? "left-1" : "right-1",
+      )}
+      title={reacoes.map((r) => `${r.nome}: ${r.emoji}`).join(", ")}
+    >
+      {[...grupos.entries()].map(([emoji, rs]) => (
+        <button
+          key={emoji}
+          type="button"
+          className={cn(
+            "text-xs leading-none flex items-center gap-0.5 px-0.5 rounded-full",
+            emoji === minhaReacao && "bg-primary/10",
+          )}
+          onClick={() => onToggle(emoji)}
+        >
+          <span>{emoji}</span>
+          {rs.length > 1 && <span className="text-[9px] text-muted-foreground">{rs.length}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function DraggableBubble({
   msg,
   isSaida,
   onReply,
+  onReact,
   children,
 }: {
   msg: WaMensagem;
   isSaida: boolean;
   onReply: (msg: WaMensagem) => void;
+  onReact: (msg: WaMensagem, emoji: string) => void;
   children: React.ReactNode;
 }) {
   const [dragX, setDragX] = useState(0);
@@ -1303,17 +1390,22 @@ function DraggableBubble({
       >
         {children}
       </div>
-      <button
-        type="button"
-        title="Responder"
-        onClick={() => onReply(msg)}
+      <div
         className={cn(
-          "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground opacity-0 group-hover/bubble:opacity-100 transition-opacity",
-          isSaida ? "-left-8" : "-right-8",
+          "absolute top-1/2 -translate-y-1/2 flex items-center gap-1",
+          isSaida ? "-left-[4.25rem] flex-row-reverse" : "-right-[4.25rem]",
         )}
       >
-        <Reply className="h-3.5 w-3.5" />
-      </button>
+        <button
+          type="button"
+          title="Responder"
+          onClick={() => onReply(msg)}
+          className="h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground opacity-0 group-hover/bubble:opacity-100 transition-opacity"
+        >
+          <Reply className="h-3.5 w-3.5" />
+        </button>
+        <ReactionPicker onPick={(emoji) => onReact(msg, emoji)} />
+      </div>
     </div>
   );
 }
@@ -1353,6 +1445,25 @@ function MessageContent({
             {msg.conteudo}
           </p>
         )}
+      </div>
+    );
+  }
+
+  if (msg.tipo === "sticker" && msg.media_url) {
+    return (
+      <div className="flex flex-col -mx-2 -mt-1 -mb-1">
+        <img
+          src={msg.media_url}
+          alt="figurinha"
+          className="w-[128px] h-[128px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => {
+            if (onImageClick) {
+              onImageClick(msg.media_url!, msg.id);
+            } else {
+              window.open(msg.media_url!, "_blank");
+            }
+          }}
+        />
       </div>
     );
   }
@@ -3094,6 +3205,7 @@ export default function WhatsAppInbox() {
     return nomes;
   }, [conversaAtiva?.responsaveis]);
   const sendMessage = useWaSendMessage();
+  const reagirMutation = useWaReagir();
   const marcarLida = useWaMarcarLida();
   const marcarNaoLida = useWaMarcarNaoLida();
   const limparConversa = useWaLimparConversa();
@@ -3677,6 +3789,19 @@ export default function WhatsAppInbox() {
   function handleReply(msg: WaMensagem) {
     setRespondendoA(msg);
     inputRef.current?.focus();
+  }
+
+  // Clicar no mesmo emoji que já reagiu remove a reação (toggle, como no WhatsApp).
+  function handleReact(msg: WaMensagem, emoji: string) {
+    if (!msg.wamid || !conversaAtiva) return;
+    const jaReagiu = msg.reacoes?.find((r) => r.autor === "eu")?.emoji === emoji;
+    reagirMutation.mutate({
+      conversaId: conversaAtiva.id,
+      mensagemId: msg.id,
+      wamid: msg.wamid,
+      telefone: conversaAtiva.telefone,
+      emoji: jaReagiu ? "" : emoji,
+    });
   }
 
   useEffect(() => {
@@ -5772,9 +5897,11 @@ export default function WhatsAppInbox() {
                                     msg={msg}
                                     isSaida={isSaida}
                                     onReply={handleReply}
+                                    onReact={handleReact}
                                   >
                                     <div
                                       className={cn(
+                                        "relative",
                                         msg.tipo === "audio"
                                           ? "p-0.5"
                                           : "px-3 py-2",
@@ -5867,6 +5994,11 @@ export default function WhatsAppInbox() {
                                         }
                                         onPreviewFile={setPreviewFile}
                                         conversaAtiva={conversaAtiva}
+                                      />
+                                      <ReactionBadge
+                                        reacoes={msg.reacoes ?? []}
+                                        isSaida={isSaida}
+                                        onToggle={(emoji) => handleReact(msg, emoji)}
                                       />
                                     </div>
                                     {msg.tipo !== "texto" && (
