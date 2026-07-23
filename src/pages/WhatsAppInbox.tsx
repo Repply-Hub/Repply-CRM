@@ -5698,7 +5698,7 @@ export default function WhatsAppInbox() {
                               >
                                 {dateChip}
                                 <div className="flex items-center justify-center my-2">
-                                  <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/60 px-3 py-1 rounded-full">
+                                  <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-zinc-300 dark:bg-zinc-700 px-3 py-1 rounded-full">
                                     <StickyNote className="h-3 w-3" />
                                     {msg.conteudo}
                                     <span className="text-muted-foreground/70">

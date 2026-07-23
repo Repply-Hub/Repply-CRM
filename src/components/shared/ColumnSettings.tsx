@@ -353,7 +353,17 @@ export const ColumnSettings = memo(function ColumnSettings({
                                                                                                 />
                                                                                             </div>
                                                                                         ) : (
-                                                                                            <span className="flex-1 truncate">{column.customLabel || column.label}</span>
+                                                                                            <span className="flex-1 truncate flex items-center gap-1.5">
+                                                                                                <span className="truncate">{column.customLabel || column.label}</span>
+                                                                                                {!column.isCustom && (
+                                                                                                    <span
+                                                                                                        className="text-[9px] font-bold text-muted-foreground bg-muted px-1 rounded leading-4 shrink-0"
+                                                                                                        title="Coluna padrão do sistema"
+                                                                                                    >
+                                                                                                        P
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </span>
                                                                                         )}
                                                                                         {!column.locked && onRename && !isEditing && (
                                                                                             <button
