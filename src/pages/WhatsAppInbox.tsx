@@ -4546,7 +4546,7 @@ export default function WhatsAppInbox() {
               </div>
             </div>
           ) : (
-            <div className="hidden md:flex w-72 lg:w-80 border-r border-border flex-col h-full shrink-0 transition-all duration-300">
+            <div className="hidden md:flex w-80 lg:w-[26rem] border-r border-border flex-col h-full shrink-0 transition-all duration-300">
               <div className="px-3 py-3 border-b border-border flex items-center gap-1 h-[4rem]">
                 <span className="text-sm font-semibold text-foreground flex-1 truncate">
                   Conversas
