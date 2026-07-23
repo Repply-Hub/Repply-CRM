@@ -10,6 +10,9 @@ import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { KanbanColunasDialog } from '@/components/pedidos/kanban/KanbanColunasDialog';
 import { useFunis } from '@/hooks/use-funis';
 import { usePedidos, usePedidosStats, useHistoricoContatos, useUpdatePedidoStatus, useBulkDeletePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
+import { useTarefasPorPedido } from '@/hooks/use-tarefas';
+import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
+import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import { Button } from '@/components/ui/button';
@@ -22,7 +25,7 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban
+  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, ListChecks
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -49,16 +52,16 @@ import { cn } from '@/lib/utils';
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
-  { id: 'negocio', label: 'Negócio', locked: false },
-  { id: 'cliente', label: 'Cliente', locked: false },
+  { id: 'cliente', label: 'Empresa/Cliente', locked: false },
   { id: 'contato', label: 'Contato', locked: false },
-  { id: 'obra', label: 'Obra', locked: false },
+  { id: 'etapa', label: 'Fase do negócio', locked: false },
   { id: 'fabricante', label: 'Fabricante', locked: false },
   { id: 'valor', label: 'Valor', locked: false },
-  { id: 'etapa', label: 'Etapa', locked: false },
   { id: 'vendedor', label: 'Responsável/Vendedor', locked: false },
-  { id: 'data_pedido', label: 'Criação', locked: false },
-  { id: 'prazo_resposta', label: 'Fechamento', locked: false },
+  { id: 'anexo', label: 'Anexo', locked: false },
+  { id: 'data_pedido', label: 'Data de Criação', locked: false },
+  { id: 'prazo_resposta', label: 'Data de Fechamento', locked: false },
+  { id: 'endereco_entrega', label: 'Endereço de entrega', locked: false },
   { id: 'observacoes', label: 'Observações', locked: false },
   { id: 'acoes', label: 'Ações', locked: false },
 ];
@@ -124,9 +127,9 @@ const PedidoRow = memo(({
         }
 
         switch (colId) {
-          case 'negocio':
+          case 'cliente':
             return (
-              <TableCell key={colId} className="min-w-[250px] px-4">
+              <TableCell key={colId} className="min-w-[200px] font-medium px-4">
                 <div className="space-y-1">
                   {isAlert && (
                     <div className="flex w-fit items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
@@ -134,22 +137,33 @@ const PedidoRow = memo(({
                       {daysInStage} dias nesta etapa
                     </div>
                   )}
-                  <p className="text-sm font-semibold leading-snug text-card-foreground">
-                    {camposExtras['Negócio'] || pedido.cliente?.empresa || 'Sem nome'}
-                  </p>
+                  <p className="whitespace-nowrap">{pedido.cliente?.empresa ?? '-'}</p>
                 </div>
               </TableCell>
             );
-          case 'cliente':
-            return <TableCell key={colId} className="font-medium whitespace-nowrap px-4">{pedido.cliente?.empresa ?? '-'}</TableCell>;
           case 'contato':
             return (
               <TableCell key={colId} className="whitespace-nowrap px-4">
                 {camposExtras['Contato'] || '—'}
               </TableCell>
             );
-          case 'obra':
-            return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.obra?.nome_obra ?? pedido.endereco_entrega ?? '-'}</TableCell>;
+          case 'anexo':
+            return (
+              <TableCell key={colId} className="whitespace-nowrap px-4" onClick={e => e.stopPropagation()}>
+                {pedido.pdf_url ? (
+                  <a
+                    href={pedido.pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    <FileText className="h-3.5 w-3.5" /> PDF
+                  </a>
+                ) : '—'}
+              </TableCell>
+            );
+          case 'endereco_entrega':
+            return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.endereco_entrega ?? pedido.obra?.nome_obra ?? '-'}</TableCell>;
           case 'fabricante':
             return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.fabricante?.nome ?? '-'}</TableCell>;
           case 'valor':
@@ -346,6 +360,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder || viewOrderId);
+  const { data: tarefasNegocio } = useTarefasPorPedido(viewOrderId);
+  const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
+  const tarefaKanbanStages = useMemo(
+    () => tarefasKanbanColunas.map(c => ({ key: c.slug, label: c.nome })),
+    [tarefasKanbanColunas]
+  );
+  const [addTarefaOpen, setAddTarefaOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportTargetId, setExportTargetId] = useState<string | undefined>(undefined);
 
@@ -1040,14 +1061,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <div className="py-6 space-y-8">
             {/* Grid de Dados */}
             <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <User className="h-3 w-3" /> Negócio
-                </p>
-                <p className="text-sm font-medium">
-                  {selectedViewOrder.campos_extras?.['Negócio'] || selectedViewOrder.cliente?.empresa || 'Sem nome'}
-                </p>
-              </div>
+              {selectedViewOrder.campos_extras?.['Negócio'] && selectedViewOrder.campos_extras['Negócio'] !== selectedViewOrder.cliente?.empresa && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="h-3 w-3" /> Negócio
+                  </p>
+                  <p className="text-sm font-medium">
+                    {selectedViewOrder.campos_extras['Negócio']}
+                  </p>
+                </div>
+              )}
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Building2 className="h-3 w-3" /> Cliente
@@ -1175,29 +1198,36 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
 
-            {/* Histórico Recente */}
+            {/* Histórico de Tarefas */}
             <div className="space-y-4">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Últimos Contatos</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Histórico de Tarefas</p>
+                <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => setAddTarefaOpen(true)}>
+                  <Plus className="h-3.5 w-3.5" /> Nova Tarefa
+                </Button>
+              </div>
               <div className="space-y-3">
-                {!contatos?.length ? (
-                  <p className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg">Nenhum registro de contato</p>
+                {!tarefasNegocio?.length ? (
+                  <p className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg">Nenhuma tarefa vinculada a este negócio</p>
                 ) : (
-                  contatos.slice(0, 3).map(contact => {
-                    const Icon = contactIcons[contact.tipo] ?? MessageSquare;
-                    return (
-                      <div key={contact.id} className="flex gap-3 p-3 rounded-lg border hover:bg-muted/10 transition-colors">
-                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <Icon className="h-3.5 w-3.5 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-foreground leading-snug">{contact.descricao}</p>
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            {format(new Date(contact.data_contato), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                          </p>
-                        </div>
+                  tarefasNegocio.map(tarefa => (
+                    <div key={tarefa.id} className="flex gap-3 p-3 rounded-lg border hover:bg-muted/10 transition-colors">
+                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <ListChecks className="h-3.5 w-3.5 text-primary" />
                       </div>
-                    );
-                  })
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium text-foreground leading-snug truncate">{tarefa.titulo}</p>
+                          <Badge variant="outline" className="capitalize shrink-0 text-[10px]">{tarefa.status.replace(/_/g, ' ')}</Badge>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {tarefa.prazo_final
+                            ? `Prazo: ${format(new Date(tarefa.prazo_final), 'dd/MM/yyyy', { locale: ptBR })}`
+                            : `Criada em ${format(new Date(tarefa.created_at), 'dd/MM/yyyy', { locale: ptBR })}`}
+                        </p>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
@@ -1227,6 +1257,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     </Sheet>
   );
 
+  const addTarefaDialog = (
+    <TarefaFormDialog
+      open={addTarefaOpen}
+      onOpenChange={setAddTarefaOpen}
+      editingTarefa={null}
+      kanbanStages={tarefaKanbanStages}
+      extraFields={{ pedido_id: viewOrderId!, cliente_id: selectedViewOrder?.cliente_id }}
+    />
+  );
 
   const isFiltered = hasPipelineFilters || deferredSearch.trim() !== '';
 
@@ -1576,6 +1615,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </Dialog>
 
       {viewOrderSheet}
+      {addTarefaDialog}
     </AppLayout>
   );
 };

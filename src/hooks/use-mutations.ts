@@ -125,7 +125,10 @@ export function useCreatePedido() {
       });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pedidos'] });
+      qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
+    },
   });
 }
 

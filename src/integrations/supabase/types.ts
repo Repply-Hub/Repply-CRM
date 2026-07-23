@@ -2050,6 +2050,7 @@ export type Database = {
           marcadores: string | null
           observadores: string | null
           participantes: string | null
+          pedido_id: string | null
           prazo_final: string | null
           projeto: string | null
           responsavel: string | null
@@ -2069,6 +2070,7 @@ export type Database = {
           marcadores?: string | null
           observadores?: string | null
           participantes?: string | null
+          pedido_id?: string | null
           prazo_final?: string | null
           projeto?: string | null
           responsavel?: string | null
@@ -2088,6 +2090,7 @@ export type Database = {
           marcadores?: string | null
           observadores?: string | null
           participantes?: string | null
+          pedido_id?: string | null
           prazo_final?: string | null
           projeto?: string | null
           responsavel?: string | null
@@ -2109,6 +2112,13 @@ export type Database = {
             columns: ["conversa_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
             referencedColumns: ["id"]
           },
         ]

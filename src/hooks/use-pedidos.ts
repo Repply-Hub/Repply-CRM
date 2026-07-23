@@ -14,6 +14,7 @@ export interface PedidoWithRelations {
   obra_id: string | null;
   endereco_entrega: string | null;
   prazo_resposta: string | null;
+  pdf_url: string | null;
   campos_extras: Record<string, any> | null;
   cliente: { id: string; empresa: string } | null;
   fabricante: { id: string; nome: string } | null;
@@ -71,7 +72,7 @@ export function usePedidos(
         .from('pedidos')
         .select(`
           id, status, valor_total, data_pedido, created_at, observacoes,
-          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta,
+          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
           vendedor:usuarios(id, nome, empresa_id),
@@ -125,6 +126,64 @@ export function usePedidos(
     // Mantém os dados da página/lote (ou do "Ver mais") anterior visíveis enquanto busca
     // o próximo, para o board do Kanban/Lista não sumir/piscar a cada requisição.
     placeholderData: keepPreviousData,
+  });
+}
+
+// Negócios de um cliente específico (página de detalhes do cliente/empresa). Filtra direto no
+// servidor por cliente_id em vez de reaproveitar usePedidos (que exige empresaId para rodar e,
+// mesmo sem esse filtro, só traz os N pedidos mais recentes da empresa toda — negócios antigos
+// de um cliente específico poderiam ficar de fora).
+export function usePedidosPorCliente(clienteId?: string | null) {
+  return useQuery({
+    queryKey: ['pedidos_por_cliente', clienteId],
+    enabled: !!clienteId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select(`
+          id, status, valor_total, data_pedido, created_at, observacoes,
+          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url,
+          cliente:clientes(id, empresa),
+          fabricante:fabricantes(id, nome),
+          vendedor:usuarios(id, nome, empresa_id),
+          obra:obras(id, nome_obra)
+        `)
+        .eq('cliente_id', clienteId!)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as PedidoWithRelations[];
+    },
+  });
+}
+
+export interface PedidoOption {
+  id: string;
+  status: string;
+  cliente: { id: string; empresa: string } | null;
+  fabricante: { id: string; nome: string } | null;
+}
+
+// Lista enxuta de negócios (só os campos usados pra rotular a opção) pra popular o seletor de
+// "vincular a um negócio" no formulário de tarefas — não reaproveita usePedidos porque esse traz
+// só os N pedidos mais recentes paginados, e aqui precisamos do universo pra busca.
+export function usePedidosOptions(empresaId?: string) {
+  return useQuery({
+    queryKey: ['pedidos_options', empresaId],
+    enabled: !!empresaId,
+    queryFn: async () => {
+      const usuarioIds = await resolveUsuarioIds(empresaId!);
+      if (usuarioIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('id, status, cliente:clientes(id, empresa), fabricante:fabricantes(id, nome)')
+        .in('usuario_id', usuarioIds)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data ?? []) as unknown as PedidoOption[];
+    },
+    staleTime: 1000 * 60 * 5,
   });
 }
 
@@ -195,6 +254,7 @@ export function useUpdatePedidoStatus() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['pedidos'] });
+      qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
       qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
@@ -257,6 +317,7 @@ export function useBulkDeletePedidos() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pedidos'] });
+      qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
       qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });

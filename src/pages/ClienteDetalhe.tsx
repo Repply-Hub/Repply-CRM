@@ -3,8 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
-import { usePedidos } from '@/hooks/use-pedidos';
-import { useTarefas, useCreateTarefa } from '@/hooks/use-tarefas';
+import { usePedidosPorCliente } from '@/hooks/use-pedidos';
+import { useTarefas } from '@/hooks/use-tarefas';
+import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
+import { useAuth } from '@/hooks/use-auth';
+import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -48,10 +51,15 @@ const ClienteDetalhe = () => {
 
   const navigate = useNavigate();
   const { data: clientes, isLoading: loadingClientes } = useClientes();
-  const { data: pedidosResult, isLoading: loadingPedidos } = usePedidos(undefined, 0, 500);
-  const pedidos = pedidosResult?.data ?? [];
+  const { data: pedidos = [], isLoading: loadingPedidos } = usePedidosPorCliente(id);
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
-  const createTarefa = useCreateTarefa();
+  const { profile } = useAuth();
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
+  const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
+  const tarefaKanbanStages = useMemo(
+    () => tarefasKanbanColunas.map(c => ({ key: c.slug, label: c.nome })),
+    [tarefasKanbanColunas]
+  );
 
   // Debug log
   console.log('ClienteDetalhe - slug:', slug, 'extracted id:', id);
@@ -77,7 +85,6 @@ const ClienteDetalhe = () => {
   const [pedidosPage, setPedidosPage] = useState(1);
   const PEDIDOS_PAGE_SIZE = 5;
   const [addTarefaOpen, setAddTarefaOpen] = useState(false);
-  const [novaTarefa, setNovaTarefa] = useState({ titulo: '', prazo_final: '' });
   const [tarefasPage, setTarefasPage] = useState(1);
   const TAREFAS_PAGE_SIZE = 5;
 
@@ -492,7 +499,7 @@ const ClienteDetalhe = () => {
                 <div 
                   key={obra.id} 
                   className="rounded-lg border border-border p-3 cursor-pointer hover:bg-muted/50 hover:border-primary/30 transition-all"
-                  onClick={() => navigate('/obras', { state: { selectedObraId: obra.id, activeTab: 'mapa' } })}
+                  onClick={() => navigate('/obras', { state: { selectedObraId: obra.id } })}
                 >
                   <p className="text-sm font-medium text-foreground">{obra.nome_obra}</p>
                   {obra.endereco_entrega && (
@@ -790,7 +797,7 @@ const ClienteDetalhe = () => {
         <Card className="border-border/40">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="text-base">Negócios</CardTitle>
-            <Button size="sm" onClick={() => navigate('/pedidos')}>
+            <Button size="sm" onClick={() => navigate(`/pedidos/novo?clienteId=${cliente.id}`)}>
               <Plus className="h-4 w-4 mr-1" /> Novo Negócio
             </Button>
           </CardHeader>
@@ -915,62 +922,13 @@ const ClienteDetalhe = () => {
             )}
           </CardContent>
 
-          <Dialog open={addTarefaOpen} onOpenChange={setAddTarefaOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Nova Tarefa</DialogTitle>
-              </DialogHeader>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!novaTarefa.titulo.trim()) {
-                    toast.error('O título da tarefa é obrigatório');
-                    return;
-                  }
-                  try {
-                    await createTarefa.mutateAsync({
-                      titulo: novaTarefa.titulo,
-                      status: 'pendente',
-                      prazo_final: novaTarefa.prazo_final ? new Date(novaTarefa.prazo_final).toISOString() : null,
-                      cliente_id: id!,
-                    });
-                    toast.success('Tarefa cadastrada com sucesso!');
-                    setNovaTarefa({ titulo: '', prazo_final: '' });
-                    setAddTarefaOpen(false);
-                  } catch (err: any) {
-                    toast.error('Erro ao cadastrar tarefa: ' + err.message);
-                  }
-                }}
-                className="space-y-4 pt-4"
-              >
-                <div className="space-y-2">
-                  <Label>Título *</Label>
-                  <Input
-                    value={novaTarefa.titulo}
-                    onChange={e => setNovaTarefa(t => ({ ...t, titulo: e.target.value }))}
-                    placeholder="Ex: Ligar para confirmar entrega"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Prazo</Label>
-                  <Input
-                    type="datetime-local"
-                    value={novaTarefa.prazo_final}
-                    onChange={e => setNovaTarefa(t => ({ ...t, prazo_final: e.target.value }))}
-                  />
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setAddTarefaOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={createTarefa.isPending}>
-                    {createTarefa.isPending ? 'Cadastrando...' : 'Adicionar Tarefa'}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <TarefaFormDialog
+            open={addTarefaOpen}
+            onOpenChange={setAddTarefaOpen}
+            editingTarefa={null}
+            kanbanStages={tarefaKanbanStages}
+            extraFields={{ cliente_id: id! }}
+          />
         </Card>
 
         {/* Excluir cliente */}

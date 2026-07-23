@@ -16,6 +16,7 @@ export interface Tarefa {
   usuario_id: string | null;
   conversa_id: string | null;
   cliente_id: string | null;
+  pedido_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +53,24 @@ export function useTarefasPorConversa(conversaId: string | null) {
   });
 }
 
+// Histórico de tarefas vinculadas a um negócio (pedido), exibido no painel
+// de detalhes do negócio em src/pages/Negocios.tsx.
+export function useTarefasPorPedido(pedidoId: string | null) {
+  return useQuery({
+    queryKey: ['tarefas_por_pedido', pedidoId],
+    enabled: !!pedidoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tarefas' as any)
+        .select('*')
+        .eq('pedido_id', pedidoId as string)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data as unknown as Tarefa[]) ?? [];
+    },
+  });
+}
+
 export function useCreateTarefa() {
   const qc = useQueryClient();
   return useMutation({
@@ -77,6 +96,9 @@ export function useCreateTarefa() {
       qc.invalidateQueries({ queryKey: ['tarefas'] });
       if (tarefa.conversa_id) {
         qc.invalidateQueries({ queryKey: ['tarefas_por_conversa', tarefa.conversa_id] });
+      }
+      if (tarefa.pedido_id) {
+        qc.invalidateQueries({ queryKey: ['tarefas_por_pedido', tarefa.pedido_id] });
       }
     },
   });

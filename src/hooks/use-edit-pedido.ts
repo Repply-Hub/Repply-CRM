@@ -119,6 +119,7 @@ export function useUpdatePedidoCompleto() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pedidos'] });
+      qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
       qc.invalidateQueries({ queryKey: ['pedido_completo'] });
     },
   });

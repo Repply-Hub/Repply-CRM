@@ -111,7 +111,7 @@ const NovoPedido = () => {
   const [step, setStep] = useState(1);
 
   // Step 1 fields
-  const [clienteId, setClienteId] = useState('');
+  const [clienteId, setClienteId] = useState(searchParams.get('clienteId') || '');
   const [obraId, setObraId] = useState('');
   const [fabricanteId, setFabricanteId] = useState('');
   const [vendedorId, setVendedorId] = useState('');

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { useTarefas, useCreateTarefa, useUpdateTarefa, useDeleteTarefa, Tarefa } from '@/hooks/use-tarefas';
+import { useTarefas, useUpdateTarefa, useDeleteTarefa, Tarefa } from '@/hooks/use-tarefas';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
@@ -11,7 +11,6 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
@@ -25,9 +24,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { supabase } from '@/integrations/supabase/client';
-import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
-import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
-import { ProjetoSelect } from '@/components/tarefas/ProjetoSelect';
+import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { TarefaKanbanColumn } from '@/components/tarefas/TarefaKanbanColumn';
 import { TarefaKanbanColunasDialog } from '@/components/tarefas/TarefaKanbanColunasDialog';
 import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
@@ -74,7 +71,6 @@ export default function Tarefas() {
   const { data: vendedores = [] } = useVendedores();
   const { data: obras = [] } = useObras();
   const queryClient = useQueryClient();
-  const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
   const deleteTarefa = useDeleteTarefa();
 
@@ -110,6 +106,7 @@ export default function Tarefas() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
+  const [newTarefaStatus, setNewTarefaStatus] = useState<string | undefined>();
   const [deleteTarefaTarget, setDeleteTarefaTarget] = useState<Tarefa | null>(null);
   const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null);
 
@@ -139,11 +136,6 @@ export default function Tarefas() {
   } = useTableSettings({
     key: 'tarefas',
     defaultColumns: TAREFA_COLUMNS,
-  });
-
-  const [form, setForm] = useState({
-    titulo: '', descricao: '', status: 'pendente', prazo_final: '',
-    responsavel: '', participantes: '', observadores: '', projeto: '', marcadores: '',
   });
 
   const filtered = useMemo(() => {
@@ -189,41 +181,17 @@ export default function Tarefas() {
 
   function openNew(initialStatus?: string) {
     setEditingTarefa(null);
-    setForm({ titulo: '', descricao: '', status: initialStatus || KANBAN_STAGES[0]?.key || 'pendente', prazo_final: '', responsavel: '', participantes: '', observadores: '', projeto: '', marcadores: '' });
+    setNewTarefaStatus(initialStatus);
     setDialogOpen(true);
   }
 
   function openEdit(t: Tarefa) {
     setEditingTarefa(t);
-    setForm({
-      titulo: t.titulo, descricao: t.descricao || '', status: t.status,
-      prazo_final: t.prazo_final ? t.prazo_final.slice(0, 16) : '',
-      responsavel: t.responsavel || '', participantes: t.participantes || '',
-      observadores: t.observadores || '', projeto: t.projeto || '', marcadores: t.marcadores || '',
-    });
     setDialogOpen(true);
   }
 
   function openDetails(t: Tarefa) {
     setSelectedTarefa(t);
-  }
-
-  async function handleSave() {
-    if (!form.titulo.trim()) { toast.error('Título é obrigatório'); return; }
-    try {
-      const payload = { ...form, prazo_final: form.prazo_final ? new Date(form.prazo_final).toISOString() : null };
-      if (editingTarefa) {
-        await updateTarefa.mutateAsync({ id: editingTarefa.id, ...payload });
-        toast.success('Tarefa atualizada');
-      } else {
-        await createTarefa.mutateAsync(payload);
-        toast.success('Tarefa criada');
-      }
-      setDialogOpen(false);
-    } catch (err: any) {
-      console.error('[tarefas] erro ao salvar:', err);
-      toast.error(err?.message || 'Erro ao salvar tarefa');
-    }
   }
 
   async function handleDelete(id: string) {
@@ -665,62 +633,13 @@ export default function Tarefas() {
       </div>
 
       {/* Dialog criar/editar */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editingTarefa ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div><Label>Título *</Label><Input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} /></div>
-            <div><Label>Descrição</Label><Textarea value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} rows={3} /></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label>Status</Label>
-                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {KANBAN_STAGES.map(stage => (
-                      <SelectItem key={stage.key} value={stage.key}>{stage.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Prazo Final</Label>
-                <Input type="datetime-local" value={form.prazo_final} onChange={e => setForm(f => ({ ...f, prazo_final: e.target.value }))} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Responsável</Label>
-                <SearchableSelect
-                  options={vendedores.map(v => ({ value: v.nome, label: v.nome }))}
-                  value={form.responsavel}
-                  onValueChange={v => setForm(f => ({ ...f, responsavel: v }))}
-                  placeholder="Selecione o responsável"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Projeto / Obra</Label>
-                <ProjetoSelect value={form.projeto} onChange={v => setForm(f => ({ ...f, projeto: v }))} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Participantes</Label>
-              <ParticipantesMultiSelect value={form.participantes} onChange={v => setForm(f => ({ ...f, participantes: v }))} usuarios={vendedores} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Marcadores</Label>
-              <MarcadoresMultiSelect value={form.marcadores} onChange={v => setForm(f => ({ ...f, marcadores: v }))} />
-            </div>
-          </div>
-          <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={createTarefa.isPending || updateTarefa.isPending}>
-              {(createTarefa.isPending || updateTarefa.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {editingTarefa ? 'Salvar Alterações' : 'Criar Tarefa'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TarefaFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        editingTarefa={editingTarefa}
+        kanbanStages={KANBAN_STAGES}
+        defaultStatus={newTarefaStatus}
+      />
 
       {/* Sheet de detalhes da tarefa (lateral) */}
       <Sheet open={!!selectedTarefa} onOpenChange={(open) => !open && setSelectedTarefa(null)}>
@@ -744,7 +663,32 @@ export default function Tarefas() {
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</Label>
                     <div className="pt-1">
-                      <Badge className={`border ${si.className}`}>{si.label}</Badge>
+                      <Select
+                        value={selectedTarefa.status}
+                        onValueChange={(value) => {
+                          updateTarefa.mutate(
+                            { id: selectedTarefa.id, status: value },
+                            {
+                              onSuccess: () => {
+                                setSelectedTarefa({ ...selectedTarefa, status: value });
+                                toast.success('Etapa atualizada.');
+                              },
+                              onError: () => toast.error('Erro ao atualizar etapa.'),
+                            }
+                          );
+                        }}
+                      >
+                        <SelectTrigger className="!flex !w-fit !justify-start !gap-1.5 h-8 border-0 bg-transparent p-0 hover:opacity-80 transition-opacity focus:ring-0 focus:ring-offset-0 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 [&>svg]:opacity-60">
+                          <Badge className={`border pointer-events-none ${si.className}`}>{si.label}</Badge>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {KANBAN_STAGES.map(stage => (
+                            <SelectItem key={stage.key} value={stage.key}>
+                              {stage.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   <div className="space-y-1">
