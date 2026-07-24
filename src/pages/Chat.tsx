@@ -612,6 +612,7 @@ const Chat = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesViewportRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     autoResizeTextarea(inputRef.current);
@@ -620,7 +621,7 @@ const Chat = () => {
   const activeGrupoId = target.type === 'grupo' ? target.grupoId : null;
   const activeRecipientId = target.type === 'dm' ? target.recipientId : null;
   const { data: messages, isLoading } = useChatMessages(activeGrupoId, activeRecipientId);
-  const { send, sending } = useSendMessage();
+  const { send } = useSendMessage();
   const clearChat = useClearChat();
   const { data: grupos = [] } = useChatGrupos();
   const updateGrupo = useUpdateChatGrupo();
@@ -854,7 +855,7 @@ const Chat = () => {
     // Only auto-scroll to bottom if we are already near the bottom or it's the initial load
     // For simplicity, we just scroll down when new messages arrive.
     // If the user scrolled up, showing the button is better.
-    const scrollContainer = document.querySelector('[data-radix-scroll-area-viewport]');
+    const scrollContainer = messagesViewportRef.current;
     if (scrollContainer) {
       setTimeout(() => {
         const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 150;
@@ -870,7 +871,7 @@ const Chat = () => {
   }, [activeGrupoId, activeRecipientId]);
 
   const scrollToBottom = () => {
-    const scrollContainer = document.querySelector('[data-radix-scroll-area-viewport]');
+    const scrollContainer = messagesViewportRef.current;
     if (scrollContainer) {
       scrollContainer.scrollTop = scrollContainer.scrollHeight;
     }
@@ -914,9 +915,6 @@ const Chat = () => {
     try {
       await send(trimmed, files, activeGrupoId, activeRecipientId, quoted);
     } finally {
-      // Adia pro próximo tick: o textarea ainda está com `disabled` no DOM neste
-      // ponto (React só remove o atributo depois de commitar o novo estado de
-      // `sending`), e .focus() em elemento disabled não faz nada.
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
@@ -1652,7 +1650,7 @@ const Chat = () => {
 
           {/* Messages */}
           <div className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
-            <ScrollArea className="flex-1 px-4" onScroll={handleScroll}>
+            <ScrollArea className="flex-1 px-4" onScroll={handleScroll} viewportRef={messagesViewportRef}>
               {isLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -1996,7 +1994,7 @@ const Chat = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={sending || isRecording || !!pendingAudio}
+                disabled={isRecording || !!pendingAudio}
                 className="shrink-0"
                 title="Anexar arquivo"
               >
@@ -2007,7 +2005,7 @@ const Chat = () => {
                 variant={isRecording ? 'destructive' : 'ghost'}
                 size="icon"
                 onClick={toggleRecording}
-                disabled={sending || !!pendingAudio}
+                disabled={!!pendingAudio}
                 className="shrink-0"
                 title={isRecording ? 'Parar gravação' : 'Gravar áudio'}
               >
@@ -2031,16 +2029,16 @@ const Chat = () => {
                   placeholder="Digite sua mensagem..."
                   className="flex-1 min-h-9 resize-none py-2 overflow-hidden"
                   rows={1}
-                  disabled={sending || !!pendingAudio}
+                  disabled={!!pendingAudio}
                   autoFocus
                 />
               )}
               <Button
                 onClick={handleSend}
-                disabled={sending || isRecording || !!pendingAudio || (!text.trim() && selectedFiles.length === 0)}
+                disabled={isRecording || !!pendingAudio || (!text.trim() && selectedFiles.length === 0)}
                 size="icon"
               >
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                <Send className="h-4 w-4" />
               </Button>
             </div>
           </div>

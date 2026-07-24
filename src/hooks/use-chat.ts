@@ -572,18 +572,27 @@ export function useSendMessage() {
         }
 
         qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId], (old) => [...(old || []), ...optimisticMsgs]);
+
+        return { previousMessages, grupoId, recipientId, optimisticIds: optimisticMsgs.map(m => m.id) };
       }
 
-      return { previousMessages, grupoId, recipientId };
+      return { previousMessages, grupoId, recipientId, optimisticIds: [] as string[] };
     },
     onError: (err: any, variables, context) => {
-      qc.setQueryData(['chat_mensagens', variables.grupoId, variables.recipientId], context?.previousMessages);
+      // Remove só as mensagens otimistas desta chamada, não todo o cache — com
+      // vários envios em paralelo, outra chamada pode ter mensagens otimistas
+      // próprias ainda em voo.
+      qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId, variables.recipientId], (old) =>
+        (old || []).filter(m => !context?.optimisticIds?.includes(m.id))
+      );
       console.error('Erro ao enviar mensagem:', err);
       toast.error(`Erro ao enviar mensagem: ${err.message || 'Erro desconhecido'}`);
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data, variables, context) => {
+      // Substitui apenas as mensagens otimistas desta chamada pelas reais —
+      // não mexe nas mensagens otimistas de outras chamadas ainda pendentes.
       qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId, variables.recipientId], (old) => {
-        const filtered = (old || []).filter(m => !m.id.toString().startsWith('temp-'));
+        const filtered = (old || []).filter(m => !context?.optimisticIds?.includes(m.id));
         return [...filtered, ...(data as any as ChatMessage[])];
       });
     }
