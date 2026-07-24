@@ -25,7 +25,7 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, ListChecks
+  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, ListChecks, Rows3
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -1291,8 +1291,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   return (
     <AppLayout title="Negócios" subtitle={subtitle} mainClassName={showKanban ? 'flex-1 overflow-hidden flex flex-col' : 'flex-1 overflow-auto'}>
       <div className={showKanban ? 'flex flex-col flex-1 min-h-0 px-4 sm:px-6 pt-4 sm:pt-6' : 'p-4 sm:p-6'}>
-        <div className={cn('mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between', showKanban ? 'shrink-0' : 'mb-4 md:mb-6')}>
-          <div className="flex-1 flex flex-wrap items-center gap-2 min-w-0">
+        <div className={cn('mb-3 flex items-center gap-3', showKanban ? 'shrink-0' : 'mb-4 md:mb-6')}>
+          <div className="flex-1 flex flex-wrap sm:flex-nowrap items-center gap-2 min-w-0 sm:overflow-x-auto custom-scrollbar sm:pb-1">
             {isPipelineMode && funis && funis.length > 1 && (
               <Select value={funilId} onValueChange={setFunilId}>
                 <SelectTrigger className="h-8 w-fit min-w-[140px] shrink-0 text-sm gap-1.5">
@@ -1308,7 +1308,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             )}
 
             {isPipelineMode && (
-              <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
+              <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5 shrink-0">
                 <Button
                   variant={pipelineView === 'kanban' ? 'default' : 'ghost'}
                   size="sm"
@@ -1331,22 +1331,21 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             )}
 
             {showKanban && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground whitespace-nowrap">Exibir</span>
-                <Select
-                  value={String(kanbanPageSize)}
-                  onValueChange={(value) => setKanbanPageSize(Number(value))}
-                >
-                  <SelectTrigger className="h-8 w-fit min-w-[70px] shrink-0 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {KANBAN_PAGE_SIZE_OPTIONS.map(option => (
-                      <SelectItem key={option} value={String(option)}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select
+                value={String(kanbanPageSize)}
+                onValueChange={(value) => setKanbanPageSize(Number(value))}
+              >
+                <SelectTrigger className="h-10 w-fit min-w-[70px] shrink-0 text-sm gap-1.5">
+                  <Rows3 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground whitespace-nowrap">Exibir</span>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {KANBAN_PAGE_SIZE_OPTIONS.map(option => (
+                    <SelectItem key={option} value={String(option)}>{option}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
 
             <SearchWithRecent
@@ -1354,20 +1353,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               value={search}
               onValueChange={handleSearchChange}
               storageKey="negocios_recent_searches"
-              className="min-w-[240px]"
+              className="order-last w-full sm:order-none sm:w-auto sm:min-w-[240px] sm:shrink-0"
             />
-            
-            {filtrosPopover}
-            {optionsPopover}
-            
+
+            <div className="shrink-0">{filtrosPopover}</div>
+            <div className="shrink-0">{optionsPopover}</div>
+
             {isPipelineMode && hasPipelineFilters && (
-              <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground" title="Limpar filtros">
+              <Button variant="ghost" size="icon" onClick={clearPipelineFilters} className="h-8 w-8 text-muted-foreground shrink-0" title="Limpar filtros">
                 <X className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:justify-end">
-            <Button size="sm" className="w-full sm:w-auto h-10" onClick={() => navigate(funilId ? `/pedidos/novo?funilId=${encodeURIComponent(funilId)}` : '/pedidos/novo')}>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" className="h-10" onClick={() => navigate(funilId ? `/pedidos/novo?funilId=${encodeURIComponent(funilId)}` : '/pedidos/novo')}>
               <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Novo Negócio</span><span className="sm:hidden">Novo</span>
             </Button>
           </div>
