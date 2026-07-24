@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -345,24 +344,27 @@ const NovoPedido = () => {
         </div>
       }
     >
-      <div className="p-6 max-w-4xl mx-auto">
+      <Dialog open onOpenChange={(open) => { if (!open) navigate('/pedidos'); }}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col gap-0 p-0">
+          <DialogHeader className="shrink-0 border-b px-6 py-4">
+            <DialogTitle>Novo Negócio</DialogTitle>
 
-        {/* Progress */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors", step === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-            <span className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center text-xs font-bold">1</span>
-            Informações do Negócio
-          </div>
-          <div className="h-px w-8 bg-border" />
-          <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors", step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-            <span className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center text-xs font-bold">2</span>
-            Itens do Negócio
-          </div>
-        </div>
+            {/* Progress */}
+            <div className="flex items-center gap-3 pt-2">
+              <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors", step === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                <span className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center text-xs font-bold">1</span>
+                Informações do Negócio
+              </div>
+              <div className="h-px w-8 bg-border" />
+              <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors", step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                <span className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center text-xs font-bold">2</span>
+                Itens do Negócio
+              </div>
+            </div>
+          </DialogHeader>
 
-        <Card>
-          <CardContent className="pt-6">
-            {step === 1 ? (
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+          {step === 1 ? (
               <div className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Cliente */}
@@ -598,11 +600,6 @@ const NovoPedido = () => {
                   <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações ou descrição geral do negócio" rows={3} />
                 </div>
 
-                <div className="flex justify-end pt-4">
-                  <Button onClick={handleNext}>
-                    Próximo <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
               </div>
             ) : (
               <div className="space-y-5">
@@ -809,20 +806,31 @@ const NovoPedido = () => {
                   </div>
                 )}
 
-                <div className="flex justify-between pt-4">
-                  <Button variant="outline" onClick={() => setStep(1)}>
-                    <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
-                  </Button>
-                  <Button onClick={handleSubmit} disabled={createPedido.isPending || isUploading}>
-                    <Save className="h-4 w-4 mr-1" />
-                    {isUploading ? 'Enviando PDF...' : createPedido.isPending ? 'Criando...' : 'Criar Negócio'}
-                  </Button>
-                </div>
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+
+          <DialogFooter className="shrink-0 border-t px-6 py-4 sm:justify-between">
+            {step === 2 ? (
+              <Button variant="outline" onClick={() => setStep(1)}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+              </Button>
+            ) : (
+              <div />
+            )}
+            {step === 1 ? (
+              <Button onClick={handleNext}>
+                Próximo <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <Button onClick={handleSubmit} disabled={createPedido.isPending || isUploading}>
+                <Save className="h-4 w-4 mr-1" />
+                {isUploading ? 'Enviando PDF...' : createPedido.isPending ? 'Criando...' : 'Criar Negócio'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={obraDialogOpen} onOpenChange={setObraDialogOpen}>
         <DialogContent>
