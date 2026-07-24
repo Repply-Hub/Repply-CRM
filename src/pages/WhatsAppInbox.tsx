@@ -2191,6 +2191,9 @@ function LeadSheet({
   >(null);
   const HISTORICO_PREVIEW_LIMIT = 5;
 
+  const [participantesExpandido, setParticipantesExpandido] = useState(false);
+  const PARTICIPANTES_PREVIEW_LIMIT = 5;
+
   const renderNotasList = (items: typeof notasConversa) => (
     <ul className="space-y-2">
       {items.map((n) => (
@@ -2831,23 +2834,47 @@ function LeadSheet({
                     ` (${participantesGrupo.length})`}
                 </p>
                 {participantesGrupo.length > 0 ? (
-                  <ul className="space-y-0.5">
-                    {participantesGrupo.map((p) => (
-                      <li
-                        key={p.telefone}
-                        className="w-full flex items-center gap-2.5 rounded-md px-2 py-2 text-sm"
+                  <>
+                    <ul className="space-y-0.5">
+                      {(participantesExpandido
+                        ? participantesGrupo
+                        : participantesGrupo.slice(
+                            0,
+                            PARTICIPANTES_PREVIEW_LIMIT,
+                          )
+                      ).map((p) => (
+                        <li
+                          key={p.telefone}
+                          className="w-full flex items-center gap-2.5 rounded-md px-2 py-2 text-sm"
+                        >
+                          <ParticipanteAvatar
+                            nome={p.nome}
+                            telefone={p.telefone}
+                            className="h-6 w-6 shrink-0"
+                          />
+                          <span className="flex-1 text-left truncate">
+                            {p.nome || formatPhone(p.telefone)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    {participantesGrupo.length > PARTICIPANTES_PREVIEW_LIMIT && (
+                      <button
+                        type="button"
+                        className="w-full text-center text-xs font-medium text-primary hover:underline"
+                        onClick={() =>
+                          setParticipantesExpandido((v) => !v)
+                        }
                       >
-                        <ParticipanteAvatar
-                          nome={p.nome}
-                          telefone={p.telefone}
-                          className="h-6 w-6 shrink-0"
-                        />
-                        <span className="flex-1 text-left truncate">
-                          {p.nome || formatPhone(p.telefone)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                        {participantesExpandido
+                          ? "Ver menos"
+                          : `Ver mais (+${
+                              participantesGrupo.length -
+                              PARTICIPANTES_PREVIEW_LIMIT
+                            })`}
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <p className="text-xs text-muted-foreground px-2">
                     Nenhum participante identificado ainda.
@@ -3049,6 +3076,39 @@ export default function WhatsAppInbox() {
       conversaId: conv.id,
       texto: `${profile?.nome ?? "Alguém"} direcionou esta conversa para ${nomeDestino}`,
     });
+  }
+
+  // Toggle de responsáveis direto no header da conversa — mesma semântica de
+  // "adicionar/remover" do popover de responsáveis do LeadSheet, mas operando
+  // sobre a conversa ativa sem precisar abrir o painel de detalhes.
+  const [editarResponsavelOpen, setEditarResponsavelOpen] = useState(false);
+  const [buscaEditarResponsavel, setBuscaEditarResponsavel] = useState("");
+  const vendedoresEditarResponsavel = useMemo(() => {
+    if (!buscaEditarResponsavel.trim()) return vendedores;
+    const termo = buscaEditarResponsavel.trim().toLowerCase();
+    return vendedores.filter((v) => v.nome.toLowerCase().includes(termo));
+  }, [vendedores, buscaEditarResponsavel]);
+
+  function toggleResponsavelHeader(conv: WaConversa, uid: string) {
+    const atuais = conv.responsaveis ?? [];
+    const isRemoving = atuais.some((r) => r.id === uid);
+    const novosIds = isRemoving
+      ? atuais.filter((r) => r.id !== uid).map((r) => r.id)
+      : [...atuais.map((r) => r.id), uid];
+    setResponsaveis.mutate({ conversaId: conv.id, usuarioIds: novosIds });
+    if (conv.arquivada)
+      arquivarConversa.mutate({ conversaId: conv.id, arquivada: false });
+    const autor = profile?.nome ?? "Alguém";
+    const alvoNome = vendedores.find((v) => v.id === uid)?.nome ?? "alguém";
+    const texto =
+      uid === profile?.id
+        ? isRemoving
+          ? `${autor} saiu dos responsáveis desta conversa`
+          : `${autor} assumiu esta conversa`
+        : isRemoving
+          ? `${autor} removeu ${alvoNome} dos responsáveis`
+          : `${autor} adicionou ${alvoNome} como responsável`;
+    addNota.mutate({ conversaId: conv.id, texto });
   }
   const [conversaAtivaId, setConversaAtivaId] = useState<string | null>(null);
   const conversaAtiva = conversas.find((c) => c.id === conversaAtivaId) ?? null;
@@ -4517,7 +4577,10 @@ export default function WhatsAppInbox() {
   }
 
   const isConnected = config?.status === "connected";
-  const isBusy = sendMessage.isPending || isUploading;
+  // Não trava o composer no envio da mensagem em si (sendMessage.isPending):
+  // o usuário deve poder digitar/enviar a próxima mensagem mesmo que a anterior
+  // ainda não tenha sido confirmada pelo servidor. Só trava durante upload de anexo.
+  const isBusy = isUploading;
 
   const headerContent = (
     <div className="flex items-center gap-3">
@@ -5527,9 +5590,9 @@ export default function WhatsAppInbox() {
                 )}
 
                 {/* Header da conversa */}
-                <div className="relative flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
+                <div className="relative flex items-center gap-2 px-2 py-3 border-b border-border bg-muted/30 h-[4rem] sm:gap-3 sm:px-4">
                   <button
-                    className="flex items-center gap-3 min-w-0 group"
+                    className="flex flex-1 items-center gap-2 min-w-0 group sm:gap-3"
                     onClick={() => setLeadSheetOpen(true)}
                     title="Ver detalhes do lead"
                   >
@@ -5571,21 +5634,119 @@ export default function WhatsAppInbox() {
                   {conversaNaoLida(conversaAtiva, profile?.id) && (
                     <span
                       title="Continua não lida até você responder"
-                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex shrink-0 items-center gap-1 rounded-full border border-destructive/50 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold leading-4 text-destructive"
+                      className="hidden shrink-0 items-center gap-1 rounded-full border border-destructive/50 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold leading-4 text-destructive md:absolute md:left-1/2 md:top-1/2 md:flex md:-translate-x-1/2 md:-translate-y-1/2"
                     >
                       <Eye className="h-3 w-3" />
                       Não lida
                     </span>
                   )}
-                  <ConversaParticipantesStack
-                    conv={conversaAtiva}
-                    spacing="gap"
-                  />
-                  <div className="ml-auto flex items-center gap-1">
+                  <Popover
+                    open={editarResponsavelOpen}
+                    onOpenChange={(v) => {
+                      setEditarResponsavelOpen(v);
+                      if (!v) setBuscaEditarResponsavel("");
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        title="Alterar responsável pelo atendimento"
+                        className="shrink-0 gap-1.5 px-1.5 text-xs text-muted-foreground hover:text-primary sm:px-2"
+                      >
+                        {(conversaAtiva.responsaveis ?? []).length > 0 ? (
+                          <>
+                            <ConversaParticipantesStack
+                              conv={conversaAtiva}
+                              spacing="gap"
+                            />
+                            <span className="hidden max-w-[120px] truncate sm:inline">
+                              {conversaAtiva.responsaveis!.length === 1
+                                ? conversaAtiva.responsaveis![0].nome.split(
+                                    " ",
+                                  )[0]
+                                : `${conversaAtiva.responsaveis!.length} responsáveis`}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">
+                              Adicionar responsável
+                            </span>
+                          </>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-64 p-0">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Buscar colega..."
+                          value={buscaEditarResponsavel}
+                          onValueChange={setBuscaEditarResponsavel}
+                        />
+                        <CommandList>
+                          <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                            Nenhum usuário encontrado.
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {vendedoresEditarResponsavel.map((v) => {
+                              const selecionado = (
+                                conversaAtiva.responsaveis ?? []
+                              ).some((r) => r.id === v.id);
+                              return (
+                                <CommandItem
+                                  key={v.id}
+                                  value={v.id}
+                                  onSelect={() =>
+                                    toggleResponsavelHeader(conversaAtiva, v.id)
+                                  }
+                                  className="gap-2.5"
+                                >
+                                  <Avatar className="h-6 w-6 shrink-0">
+                                    {v.avatar_url ? (
+                                      <img
+                                        src={v.avatar_url}
+                                        alt={v.nome}
+                                        className="h-full w-full object-cover rounded-full"
+                                      />
+                                    ) : (
+                                      <AvatarFallback className="text-[9px] bg-muted-foreground/20">
+                                        {v.nome
+                                          .trim()
+                                          .split(" ")
+                                          .map((p: string) => p[0])
+                                          .slice(0, 2)
+                                          .join("")
+                                          .toUpperCase()}
+                                      </AvatarFallback>
+                                    )}
+                                  </Avatar>
+                                  <span className="flex-1 truncate">
+                                    {v.nome}
+                                  </span>
+                                  {selecionado && (
+                                    <Check className="h-3.5 w-3.5 shrink-0" />
+                                  )}
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <div className="ml-auto flex shrink-0 items-center gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                      title={
+                        conversaAtiva.arquivada
+                          ? "Reabrir conversa"
+                          : "Marcar como fechada"
+                      }
+                      className="gap-1.5 px-1.5 text-xs text-muted-foreground hover:text-primary transition-colors sm:px-3"
                       onClick={() => {
                         const novaArquivada = !conversaAtiva.arquivada;
                         arquivarConversa.mutate({
@@ -5623,9 +5784,11 @@ export default function WhatsAppInbox() {
                       ) : (
                         <Archive className="h-3.5 w-3.5" />
                       )}
-                      {conversaAtiva.arquivada
-                        ? "Reabrir conversa"
-                        : "Marcar como fechada"}
+                      <span className="hidden sm:inline">
+                        {conversaAtiva.arquivada
+                          ? "Reabrir conversa"
+                          : "Marcar como fechada"}
+                      </span>
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -5844,7 +6007,7 @@ export default function WhatsAppInbox() {
                                   <div className="max-w-[75%] items-center">
                                     <div
                                       className={cn(
-                                        "px-3 py-2 break-words rounded-2xl bg-zinc-300 dark:bg-zinc-700 text-foreground",
+                                        "px-3 py-2 break-words rounded-2xl bg-zinc-300/50 dark:bg-zinc-700/50 text-foreground",
                                         msg.id === destacadaMsgId &&
                                           "ring-2 ring-primary ring-offset-2 ring-offset-background",
                                       )}
