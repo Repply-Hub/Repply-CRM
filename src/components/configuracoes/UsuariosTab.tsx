@@ -6,8 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,8 +13,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useVendedores, useVendedoresRemovidos } from '@/hooks/use-clientes';
 import { useCreateVendedor } from '@/hooks/use-mutations';
-import { usePermissoes, useUpsertPermissao, MODULOS, type Permissao, type Funcionalidade } from '@/hooks/use-permissoes';
-import { Plus, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, ChevronRight, History, CalendarIcon, Search, Building2, Crown, UserPlus, X, ChevronDown, ChevronUp, Mail, Phone, Info, Import, FileDown, Filter, ArrowRightLeft, MessageCircle, FileText, ToggleLeft, UserCheck, UsersRound, FileUp, Key, Globe, DollarSign, RotateCcw, UserX } from 'lucide-react';
+import { usePermissoes, useUpsertPermissao, MODULOS, type Permissao } from '@/hooks/use-permissoes';
+import { usePermissaoPresets, useApplyPermissaoPreset, useCreatePermissaoPreset, type PresetModuloPermissoes } from '@/hooks/use-permissao-presets';
+import { Plus, Loader2, Pencil, Trash2, Shield, Users, Eye, PenLine, Trash, ChevronRight, History, CalendarIcon, Search, Building2, Crown, UserPlus, X, ChevronDown, ChevronUp, Mail, Phone, RotateCcw, UserX, Save } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -26,6 +25,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { PerfilSelect } from './PerfilSelect';
 import { CodigoAcessoButton } from './CodigoAcessoButton';
+import { PermissaoMatrixEditor } from './PermissaoMatrixEditor';
+import { PermissaoPresetsDialog } from './PermissaoPresetsDialog';
 
 // ─── Role utils ───
 const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof Users; badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -86,42 +87,43 @@ function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nom
   );
 }
 
-// ─── Funcionalidade icon helper ───
-function getFuncIcon(icon: Funcionalidade['icon']) {
-  const map: Record<string, typeof Import> = {
-    import: Import, export: FileDown, filter: Filter, move: ArrowRightLeft,
-    whatsapp: MessageCircle, pdf: FileText, status: ToggleLeft,
-    assign: UserCheck, group: UsersRound, file: FileUp, users: Users,
-    shield: Shield, key: Key, ics: CalendarIcon, scraping: Globe, prices: DollarSign,
-  };
-  return map[icon] || Info;
-}
-
-// ─── Module icon helper ───
-function getModuloIcon(key: string) {
-  const map: Record<string, typeof Shield> = {
-    dashboard: FileText, pipeline: ArrowRightLeft, clientes: Building2,
-    contatos: Users, pedidos: FileText, obras: Shield, fabricantes: DollarSign,
-    portal: Globe, calendario: CalendarIcon, tarefas: UserCheck,
-    chat: MessageCircle, configuracoes: Shield,
-  };
-  return map[key] || Shield;
-}
-
 // ─── Inline Permissions Editor (card-based) ───
-function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: string; role: string } }) {
+function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: string; role: string; empresa_id?: string | null } }) {
   const { data: permissoes, isLoading } = usePermissoes(vendedor.id);
   const upsert = useUpsertPermissao();
-  const { user } = useAuth();
-  const qc = useQueryClient();
+  const { user, profile } = useAuth();
   const isGestor = vendedor.role === 'gestor' || vendedor.role === 'admin' || vendedor.role === 'empresa';
-  const [expandedModulo, setExpandedModulo] = useState<string | null>(null);
-  const [searchModulo, setSearchModulo] = useState('');
+  const empresaId = vendedor.empresa_id ?? profile?.empresa_id;
+  const { data: presets } = usePermissaoPresets(empresaId);
+  const applyPreset = useApplyPermissaoPreset();
+  const createPreset = useCreatePermissaoPreset();
+  const [savePresetOpen, setSavePresetOpen] = useState(false);
+  const [presetNome, setPresetNome] = useState('');
+  const [presetDescricao, setPresetDescricao] = useState('');
 
   const getPermissao = (modulo: string): Permissao | undefined =>
     permissoes?.find(p => p.modulo === modulo);
 
-  const updatePermissao = async (modulo: string, updates: Partial<Pick<Permissao, 'pode_ver' | 'pode_criar' | 'pode_editar' | 'pode_excluir' | 'funcionalidades'>>, acaoLog: string, detalhes: any) => {
+  const handleSalvarComoPreset = () => {
+    if (!presetNome.trim()) return;
+    const permissoesAtuais = MODULOS.reduce((acc, mod) => {
+      const perm = getPermissao(mod.key);
+      acc[mod.key] = {
+        pode_ver: perm?.pode_ver ?? true,
+        pode_criar: perm?.pode_criar ?? false,
+        pode_editar: perm?.pode_editar ?? false,
+        pode_excluir: perm?.pode_excluir ?? false,
+        funcionalidades: perm?.funcionalidades ?? {},
+      };
+      return acc;
+    }, {} as Record<string, PresetModuloPermissoes>);
+    createPreset.mutate(
+      { nome: presetNome.trim(), descricao: presetDescricao.trim() || undefined, permissoes: permissoesAtuais },
+      { onSuccess: () => { setSavePresetOpen(false); setPresetNome(''); setPresetDescricao(''); } }
+    );
+  };
+
+  const updatePermissao = async (modulo: string, updates: Partial<Pick<Permissao, 'pode_ver' | 'pode_criar' | 'pode_editar' | 'pode_excluir' | 'funcionalidades'>>) => {
     const existing = getPermissao(modulo);
     const newData = {
       usuario_id: vendedor.id,
@@ -133,11 +135,12 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
       funcionalidades: updates.funcionalidades ?? existing?.funcionalidades ?? {},
     };
     upsert.mutate(newData);
+    const campo = Object.keys(updates)[0];
     await supabase.from('audit_permissoes').insert({
       admin_id: user?.id ?? '',
       usuario_id: vendedor.id,
-      acao: acaoLog,
-      detalhes,
+      acao: campo === 'funcionalidades' ? `Alterou funcionalidade de ${modulo}` : `Alterou ${campo} de ${modulo}`,
+      detalhes: { campo, modulo } as any,
     });
   };
 
@@ -154,247 +157,72 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
     return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
-  // Apply preset to all modules
-  const applyPreset = async (preset: 'leitura' | 'operacional' | 'total' | 'nenhum') => {
-    const rows = MODULOS.map(mod => {
-      const existing = getPermissao(mod.key);
-      const baseFuncs = mod.funcionalidades.reduce((acc, f) => {
-        acc[f.key] = preset === 'total' || (preset === 'operacional' && !['gerenciar_usuarios', 'gerenciar_permissoes'].includes(f.key));
-        return acc;
-      }, {} as Record<string, boolean>);
-      const existingFuncs = (typeof existing?.funcionalidades === 'object' && existing?.funcionalidades !== null) ? existing.funcionalidades : {};
-      return {
-        usuario_id: vendedor.id,
-        modulo: mod.key,
-        pode_ver: preset !== 'nenhum',
-        pode_criar: preset === 'operacional' || preset === 'total',
-        pode_editar: preset === 'operacional' || preset === 'total',
-        pode_excluir: preset === 'total',
-        funcionalidades: preset === 'nenhum' ? {} : (preset === 'leitura' ? existingFuncs : baseFuncs),
-      };
-    });
-    const { error } = await supabase.from('permissoes_usuario').upsert(rows as any[], { onConflict: 'usuario_id,modulo' });
-    if (error) { toast.error('Erro ao aplicar preset'); return; }
-    await supabase.from('audit_permissoes').insert({
-      admin_id: user?.id ?? '',
-      usuario_id: vendedor.id,
-      acao: `Aplicou preset: ${preset}`,
-      detalhes: { preset } as any,
-    });
-    qc.invalidateQueries({ queryKey: ['permissoes_usuario', vendedor.id] });
-    toast.success(`Preset "${preset}" aplicado!`);
-  };
-
-  const getPermCount = (modKey: string) => {
-    const mod = MODULOS.find(m => m.key === modKey);
-    const perm = getPermissao(modKey);
-    const crudActive = [perm?.pode_ver ?? true, perm?.pode_criar ?? false, perm?.pode_editar ?? false, perm?.pode_excluir ?? false].filter(Boolean).length;
-    const funcActive = (mod?.funcionalidades ?? []).filter(f => perm?.funcionalidades?.[f.key] ?? false).length;
-    const total = 4 + (mod?.funcionalidades?.length ?? 0);
-    return { active: crudActive + funcActive, total };
-  };
-
-  const filteredModulos = MODULOS.filter(m =>
-    !searchModulo || m.label.toLowerCase().includes(searchModulo.toLowerCase())
-  );
-
   return (
     <div className="space-y-4">
-      {/* Presets + Search */}
+      {/* Presets */}
       <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Buscar módulo..."
-            value={searchModulo}
-            onChange={e => setSearchModulo(e.target.value)}
-            className="pl-8 h-9 text-sm"
-          />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground hidden sm:inline">Presets:</span>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => applyPreset('leitura')}>
-            <Eye className="h-3 w-3 mr-1" /> Leitura
-          </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => applyPreset('operacional')}>
-            <PenLine className="h-3 w-3 mr-1" /> Operacional
-          </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => applyPreset('total')}>
-            <Shield className="h-3 w-3 mr-1" /> Total
-          </Button>
-          <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground" onClick={() => applyPreset('nenhum')}>
-            <X className="h-3 w-3 mr-1" /> Limpar
-          </Button>
-        </div>
-      </div>
-
-      {/* Module cards */}
-      <div className="space-y-2">
-        {filteredModulos.map(mod => {
-          const perm = getPermissao(mod.key);
-          const ver = perm?.pode_ver ?? true;
-          const criar = perm?.pode_criar ?? false;
-          const editar = perm?.pode_editar ?? false;
-          const excluir = perm?.pode_excluir ?? false;
-          const isExpanded = expandedModulo === mod.key;
-          const counts = getPermCount(mod.key);
-          const ModIcon = getModuloIcon(mod.key);
-          const hasFuncs = mod.funcionalidades.length > 0;
-          const completionPct = (counts.active / counts.total) * 100;
-
-          return (
-            <div
-              key={mod.key}
-              className={cn(
-                "rounded-lg border transition-all overflow-hidden",
-                ver ? "border-border bg-card" : "border-border/50 bg-muted/20",
-                isExpanded && "border-primary/30 shadow-sm"
-              )}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-muted-foreground">Presets:</span>
+          {(presets ?? []).map(preset => (
+            <Button
+              key={preset.id}
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={applyPreset.isPending}
+              onClick={() => applyPreset.mutate({ usuarioId: vendedor.id, preset, adminId: user?.id ?? '' })}
             >
-              {/* Header: clickable to expand */}
-              <button
-                type="button"
-                onClick={() => setExpandedModulo(isExpanded ? null : mod.key)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left"
-              >
-                <div className={cn(
-                  "h-9 w-9 rounded-lg flex items-center justify-center shrink-0",
-                  ver ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                )}>
-                  <ModIcon className="h-4 w-4" />
+              {preset.nome}
+            </Button>
+          ))}
+        </div>
+        {empresaId && (
+          <Dialog open={savePresetOpen} onOpenChange={setSavePresetOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5 text-muted-foreground">
+                <Save className="h-3.5 w-3.5" /> Salvar como preset
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Salvar permissões de {vendedor.nome} como preset</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground -mt-2">
+                Cria um novo preset com exatamente as permissões configuradas agora para este usuário, pronto para aplicar em outros.
+              </p>
+              <div className="space-y-4 mt-2">
+                <div className="space-y-1.5">
+                  <Label>Nome</Label>
+                  <Input value={presetNome} onChange={e => setPresetNome(e.target.value)} placeholder="Ex: Vendedor sem calendário" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={cn("text-sm font-medium", !ver && "text-muted-foreground")}>{mod.label}</span>
-                    {!ver && <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Sem acesso</Badge>}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="h-1 flex-1 max-w-[100px] bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={cn(
-                          "h-full transition-all rounded-full",
-                          completionPct === 100 ? "bg-primary" : completionPct > 50 ? "bg-primary/70" : "bg-muted-foreground/40"
-                        )}
-                        style={{ width: `${completionPct}%` }}
-                      />
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">{counts.active}/{counts.total}</span>
-                  </div>
+                <div className="space-y-1.5">
+                  <Label>Descrição (opcional)</Label>
+                  <Input value={presetDescricao} onChange={e => setPresetDescricao(e.target.value)} placeholder="Ex: Igual ao vendedor padrão, sem acesso ao Calendário" />
                 </div>
-                <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform shrink-0", isExpanded && "rotate-180")} />
-              </button>
-
-              {/* Expanded content */}
-              {isExpanded && (
-                <div className="px-4 pb-4 space-y-4 border-t border-border/50 pt-4 bg-muted/10">
-                  {/* Master toggle: Ver */}
-                  <div className="flex items-center justify-between p-3 rounded-md bg-background border border-border">
-                    <div className="flex items-start gap-3 flex-1">
-                      <Eye className={cn("h-4 w-4 mt-0.5 shrink-0", ver ? "text-primary" : "text-muted-foreground/50")} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">Acesso ao módulo</p>
-                        <p className="text-xs text-muted-foreground">{mod.descricoes.ver}</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={ver}
-                      onCheckedChange={() => updatePermissao(mod.key, { pode_ver: !ver }, `Alterou pode_ver de ${mod.key}`, { campo: 'pode_ver', modulo: mod.key, de: ver, para: !ver })}
-                    />
-                  </div>
-
-                  {/* CRUD actions (only when ver is enabled) */}
-                  {ver && (
-                    <div>
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">Ações Permitidas</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {[
-                          { key: 'pode_criar', icon: Plus, label: 'Criar', desc: mod.descricoes.criar, value: criar, color: 'emerald' },
-                          { key: 'pode_editar', icon: PenLine, label: 'Editar', desc: mod.descricoes.editar, value: editar, color: 'amber' },
-                          { key: 'pode_excluir', icon: Trash, label: 'Excluir', desc: mod.descricoes.excluir, value: excluir, color: 'red' },
-                        ].map(action => {
-                          const ActionIcon = action.icon;
-                          const colorClasses = {
-                            emerald: action.value ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border',
-                            amber: action.value ? 'border-amber-500/30 bg-amber-500/5' : 'border-border',
-                            red: action.value ? 'border-red-500/30 bg-red-500/5' : 'border-border',
-                          }[action.color];
-                          const iconColor = {
-                            emerald: action.value ? 'text-emerald-500' : 'text-muted-foreground/40',
-                            amber: action.value ? 'text-amber-500' : 'text-muted-foreground/40',
-                            red: action.value ? 'text-red-500' : 'text-muted-foreground/40',
-                          }[action.color];
-                          return (
-                            <button
-                              key={action.key}
-                              type="button"
-                              onClick={() => updatePermissao(mod.key, { [action.key]: !action.value } as any, `Alterou ${action.key} de ${mod.key}`, { campo: action.key, modulo: mod.key, de: action.value, para: !action.value })}
-                              className={cn(
-                                "flex items-start gap-2 p-3 rounded-md border text-left transition-all hover:bg-muted/50",
-                                colorClasses
-                              )}
-                            >
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <ActionIcon className={cn("h-4 w-4 shrink-0", iconColor)} />
-                                <div className="flex-1 min-w-0">
-                                  <p className={cn("text-sm font-medium", !action.value && "text-muted-foreground")}>{action.label}</p>
-                                  <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 line-clamp-2">{action.desc}</p>
-                                </div>
-                              </div>
-                              <Checkbox checked={action.value} className="mt-0.5 shrink-0 pointer-events-none" />
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Funcionalidades específicas */}
-                  {ver && hasFuncs && (
-                    <div>
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">Funcionalidades Específicas</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {mod.funcionalidades.map(func => {
-                          const FuncIcon = getFuncIcon(func.icon);
-                          const isActive = perm?.funcionalidades?.[func.key] ?? false;
-                          return (
-                            <button
-                              key={func.key}
-                              type="button"
-                              onClick={() => updatePermissao(
-                                mod.key,
-                                { funcionalidades: { ...(perm?.funcionalidades ?? {}), [func.key]: !isActive } },
-                                `Alterou funcionalidade ${func.key} de ${mod.key}`,
-                                { tipo: 'funcionalidade', funcionalidade: func.key, modulo: mod.key, de: isActive, para: !isActive }
-                              )}
-                              className={cn(
-                                "flex items-start gap-2 p-3 rounded-md border text-left transition-all hover:bg-muted/50",
-                                isActive ? "border-primary/30 bg-primary/5" : "border-border"
-                              )}
-                            >
-                              <FuncIcon className={cn("h-4 w-4 shrink-0 mt-0.5", isActive ? "text-primary" : "text-muted-foreground/40")} />
-                              <div className="flex-1 min-w-0">
-                                <p className={cn("text-sm font-medium", !isActive && "text-muted-foreground")}>{func.label}</p>
-                                <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 line-clamp-2">{func.descricao}</p>
-                              </div>
-                              <Switch checked={isActive} className="shrink-0 pointer-events-none scale-75 origin-right" />
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                <DialogFooter>
+                  <Button onClick={handleSalvarComoPreset} disabled={!presetNome.trim() || createPreset.isPending}>
+                    {createPreset.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...</> : 'Salvar preset'}
+                  </Button>
+                </DialogFooter>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
-      {filteredModulos.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground text-sm">
-          Nenhum módulo encontrado.
-        </div>
-      )}
+      <PermissaoMatrixEditor
+        getValue={modulo => {
+          const perm = getPermissao(modulo);
+          return {
+            pode_ver: perm?.pode_ver ?? true,
+            pode_criar: perm?.pode_criar ?? false,
+            pode_editar: perm?.pode_editar ?? false,
+            pode_excluir: perm?.pode_excluir ?? false,
+            funcionalidades: perm?.funcionalidades ?? {},
+          };
+        }}
+        onChange={(modulo, updates) => updatePermissao(modulo, updates)}
+      />
     </div>
   );
 }
@@ -583,7 +411,7 @@ function AuditLog() {
 
 // ─── User Detail Panel ───
 function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId, empresaNome }: {
-  vendedor: { id: string; nome: string; email: string; telefone: string | null; role: string; user_id: string | null; avatar_url?: string | null };
+  vendedor: { id: string; nome: string; email: string; telefone: string | null; role: string; user_id: string | null; avatar_url?: string | null; empresa_id?: string | null };
   isGestor: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -609,56 +437,58 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId, 
                 <span className="text-foreground font-bold text-lg text-primary">{iniciais}</span>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-lg font-semibold text-foreground truncate">{vendedor.nome}</h3>
-                <Badge variant={roleConfig.badgeVariant} className="text-[10px] shrink-0">
-                  {roleConfig.label}
-                </Badge>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1.5">
-                <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Mail className="h-3.5 w-3.5" /> {vendedor.email}
-                </span>
-                {vendedor.telefone && (
+            <div className="flex-1 min-w-0 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-lg font-semibold text-foreground truncate">{vendedor.nome}</h3>
+                  <Badge variant={roleConfig.badgeVariant} className="text-[10px] shrink-0">
+                    {roleConfig.label}
+                  </Badge>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1.5">
                   <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Phone className="h-3.5 w-3.5" /> {vendedor.telefone}
+                    <Mail className="h-3.5 w-3.5" /> {vendedor.email}
+                  </span>
+                  {vendedor.telefone && (
+                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Phone className="h-3.5 w-3.5" /> {vendedor.telefone}
+                    </span>
+                  )}
+                </div>
+                {empresaNome && (
+                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
+                    <Building2 className="h-3.5 w-3.5" /> {empresaNome}
                   </span>
                 )}
               </div>
-              {empresaNome && (
-                <span className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
-                  <Building2 className="h-3.5 w-3.5" /> {empresaNome}
-                </span>
+              {!isSelf && (
+                <div className="flex gap-2 shrink-0">
+                  <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5">
+                    <Pencil className="h-3.5 w-3.5" /> Editar
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5">
+                        <Trash2 className="h-3.5 w-3.5" /> Excluir
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação não pode ser desfeita. Todos os dados de "{vendedor.nome}" serão removidos.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               )}
             </div>
           </div>
-          {!isSelf && (
-            <div className="flex gap-2 mt-4 pt-4 border-t border-border">
-              <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5">
-                <Pencil className="h-3.5 w-3.5" /> Editar
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5">
-                    <Trash2 className="h-3.5 w-3.5" /> Excluir
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Esta ação não pode ser desfeita. Todos os dados de "{vendedor.nome}" serão removidos.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -727,7 +557,7 @@ export function UsuariosTab() {
   const [roleFilter, setRoleFilter] = useState<string>('todos');
   const [empresaFilter, setEmpresaFilter] = useState<string>('todas');
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const { data: isGestor } = useQuery({
     queryKey: ['is_gestor'],
@@ -980,6 +810,9 @@ export function UsuariosTab() {
               </DialogContent>
             </Dialog>
           )}
+          {isGestor && profile?.empresa_id && (
+            <PermissaoPresetsDialog empresaId={profile.empresa_id} meuUsuarioId={profile?.id} />
+          )}
           <CodigoAcessoButton />
         </div>
       </div>
@@ -1119,7 +952,7 @@ export function UsuariosTab() {
       )}
 
       {/* Main content: list + detail */}
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 items-start">
         {/* Left: User list */}
         <Card className="overflow-hidden">
           <CardContent className="p-0">
