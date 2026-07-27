@@ -12,6 +12,7 @@ export function useCreateCliente() {
       email?: string;
       telefone?: string;
       endereco?: string;
+      campos_extras?: Record<string, string>;
     }) => {
       // Get current usuario_id
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
@@ -36,6 +37,7 @@ export function useCreateContato() {
       email?: string;
       telefone?: string;
       cargo?: string;
+      campos_extras?: Record<string, string>;
     }) => {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       const { error } = await supabase.from('contatos').insert({
@@ -62,6 +64,7 @@ export function useUpdateCliente() {
       telefone?: string;
       endereco?: string;
       nome_contato?: string;
+      campos_extras?: Record<string, string>;
     }) => {
       const { error } = await supabase.from('clientes').update(data).eq('id', id);
       if (error) throw error;
@@ -100,6 +103,7 @@ export function useUpdateContato() {
       telefone?: string;
       cargo?: string;
       empresa?: string;
+      campos_extras?: Record<string, string>;
     }) => {
       const { error } = await supabase.from('contatos').update(data).eq('id', id);
       if (error) throw error;

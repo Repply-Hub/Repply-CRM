@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { useCreateCliente, useCreateContato, useUpdateContato, useDeleteCliente, useDeleteContato } from '@/hooks/use-mutations';
+import { useConfiguracoesCampos, FIELD_LABELS } from '@/hooks/use-configuracoes-campos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -215,6 +216,11 @@ const Clientes = () => {
   // ação na UI — a RLS continua sendo a autoridade real, checada de novo no retorno
   // do delete em handleBulkDelete.
   const canDelete = ['gestor', 'admin', 'empresa'].includes(profile?.role);
+  const empresaIdAtual = profile?.empresa_id ?? profile?.empresas?.id;
+  const { data: camposConfigClientes } = useConfiguracoesCampos('clientes', empresaIdAtual);
+  const { data: camposConfigContatos } = useConfiguracoesCampos('contatos', empresaIdAtual);
+  const [camposExtrasEmpresa, setCamposExtrasEmpresa] = useState<Record<string, string>>({});
+  const [camposExtrasContato, setCamposExtrasContato] = useState<Record<string, string>>({});
   const { data: clients, isLoading: loadingClientes } = useClientes();
   const { data: contatosList, isLoading: loadingContatos } = useContatos();
   const createCliente = useCreateCliente();
@@ -469,6 +475,7 @@ const Clientes = () => {
     setCnpj(''); setEmpresa(''); setRazaoSocial(''); setEndereco(emptyEndereco);
     setTelefone(''); setEmail(''); setCnpjStatus('idle'); setNomeContato(''); setCargo('');
     setContatoMode('nenhum'); setSelectedContatoId(''); setContatoEmail(''); setContatoTelefone('');
+    setCamposExtrasEmpresa({}); setCamposExtrasContato({});
     setStep(1);
   };
 
@@ -488,19 +495,27 @@ const Clientes = () => {
         toast.error('CNPJ inválido');
         return false;
       }
+      const razaoSocialObrigatoria = camposConfigClientes?.find(c => c.campo_key === 'razao_social')?.obrigatorio ?? false;
+      if (razaoSocialObrigatoria && !razaoSocial.trim()) {
+        toast.error('Informe a razão social da empresa.');
+        return false;
+      }
     }
     if (targetStep === 2) {
-      if (!email.trim()) {
+      const emailObrigatorio = camposConfigClientes?.find(c => c.campo_key === 'email')?.obrigatorio ?? true;
+      const telefoneObrigatorio = camposConfigClientes?.find(c => c.campo_key === 'telefone')?.obrigatorio ?? true;
+      if (emailObrigatorio && !email.trim()) {
         toast.error('Informe o email da empresa.');
         return false;
       }
-      if (!telefone.trim()) {
+      if (telefoneObrigatorio && !telefone.trim()) {
         toast.error('Informe o telefone da empresa.');
         return false;
       }
     }
     if (targetStep === 3) {
-      if (!endereco.numero.trim() || !endereco.logradouro.trim()) {
+      const enderecoObrigatorio = camposConfigClientes?.find(c => c.campo_key === 'endereco')?.obrigatorio ?? false;
+      if (enderecoObrigatorio && (!endereco.numero.trim() || !endereco.logradouro.trim())) {
         toast.error('Informe o logradouro e o número do endereço.');
         return false;
       }
@@ -523,13 +538,21 @@ const Clientes = () => {
         toast.error('Informe o nome do contato.');
         return;
       }
-      if (!contatoEmailValue.trim()) {
+      const contatoEmailObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'email')?.obrigatorio ?? true;
+      const contatoTelefoneObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'telefone')?.obrigatorio ?? true;
+      if (contatoEmailObrigatorio && !contatoEmailValue.trim()) {
         toast.error('Informe o email do contato.');
         return;
       }
-      if (!telefone.trim()) {
+      if (contatoTelefoneObrigatorio && !telefone.trim()) {
         toast.error('Informe o telefone do contato.');
         return;
+      }
+      for (const c of (camposConfigContatos ?? []).filter(c => c.origem === 'customizado' && c.obrigatorio)) {
+        if (!camposExtrasContato[c.campo_key]?.trim()) {
+          toast.error(`Preencha o campo obrigatório: ${c.label}`);
+          return;
+        }
       }
       try {
         await createContato.mutateAsync({
@@ -538,6 +561,7 @@ const Clientes = () => {
           email: contatoEmailValue || undefined,
           telefone: telefone || undefined,
           cargo: cargo || undefined,
+          campos_extras: camposExtrasContato,
         });
         toast.success('Contato cadastrado com sucesso!');
         resetForm();
@@ -566,12 +590,26 @@ const Clientes = () => {
         toast.error('Informe o nome do novo contato.');
         return;
       }
-      if (!contatoEmail.trim()) {
+      const contatoEmailObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'email')?.obrigatorio ?? true;
+      const contatoTelefoneObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'telefone')?.obrigatorio ?? true;
+      if (contatoEmailObrigatorio && !contatoEmail.trim()) {
         toast.error('Informe o email do novo contato.');
         return;
       }
-      if (!contatoTelefone.trim()) {
+      if (contatoTelefoneObrigatorio && !contatoTelefone.trim()) {
         toast.error('Informe o telefone do novo contato.');
+        return;
+      }
+      for (const c of (camposConfigContatos ?? []).filter(c => c.origem === 'customizado' && c.obrigatorio)) {
+        if (!camposExtrasContato[c.campo_key]?.trim()) {
+          toast.error(`Preencha o campo obrigatório: ${c.label}`);
+          return;
+        }
+      }
+    }
+    for (const c of (camposConfigClientes ?? []).filter(c => c.origem === 'customizado' && c.obrigatorio)) {
+      if (!camposExtrasEmpresa[c.campo_key]?.trim()) {
+        toast.error(`Preencha o campo obrigatório: ${c.label}`);
         return;
       }
     }
@@ -585,6 +623,7 @@ const Clientes = () => {
         email: email || undefined,
         telefone: telefone || undefined,
         endereco: enderecoStr || undefined,
+        campos_extras: camposExtrasEmpresa,
       });
       if (contatoMode === 'existente') {
         await updateContato.mutateAsync({ id: selectedContatoId, empresa: empresa.trim() });
@@ -595,6 +634,7 @@ const Clientes = () => {
           cargo: cargo.trim() || undefined,
           email: contatoEmail.trim() || undefined,
           telefone: contatoTelefone.trim() || undefined,
+          campos_extras: camposExtrasContato,
         });
       }
       toast.success('Empresa cadastrada com sucesso!');
@@ -1010,7 +1050,19 @@ const Clientes = () => {
                     )}
 
                     {step === 3 && (
-                      <EnderecoForm value={endereco} onChange={setEndereco} required />
+                      <div className="space-y-3">
+                        <EnderecoForm value={endereco} onChange={setEndereco} required />
+                        {(camposConfigClientes ?? []).filter(c => c.origem === 'customizado').map(campo => (
+                          <div key={campo.id}>
+                            <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+                            <Input
+                              value={camposExtrasEmpresa[campo.campo_key] ?? ''}
+                              onChange={e => setCamposExtrasEmpresa(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}
+                              placeholder={campo.label ?? ''}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     )}
 
                     {step === 4 && (
@@ -1041,6 +1093,16 @@ const Clientes = () => {
                               <Input value={contatoTelefone} onChange={e => setContatoTelefone(e.target.value)} placeholder="Telefone do contato *" required />
                             </div>
                             <Input value={contatoEmail} onChange={e => setContatoEmail(e.target.value)} type="email" placeholder="Email do contato *" required />
+                            {(camposConfigContatos ?? []).filter(c => c.origem === 'customizado').map(campo => (
+                              <div key={campo.id}>
+                                <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+                                <Input
+                                  value={camposExtrasContato[campo.campo_key] ?? ''}
+                                  onChange={e => setCamposExtrasContato(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}
+                                  placeholder={campo.label ?? ''}
+                                />
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -1072,6 +1134,16 @@ const Clientes = () => {
                       <div><Label>Email *</Label><Input name="email" type="email" placeholder="email@exemplo.com" required /></div>
                       <div><Label>Telefone *</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required /></div>
                     </div>
+                    {(camposConfigContatos ?? []).filter(c => c.origem === 'customizado').map(campo => (
+                      <div key={campo.id}>
+                        <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+                        <Input
+                          value={camposExtrasContato[campo.campo_key] ?? ''}
+                          onChange={e => setCamposExtrasContato(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}
+                          placeholder={campo.label ?? ''}
+                        />
+                      </div>
+                    ))}
                     <Button type="submit" className="w-full" disabled={createContato.isPending}>
                       {createContato.isPending ? 'Salvando...' : 'Salvar'}
                     </Button>

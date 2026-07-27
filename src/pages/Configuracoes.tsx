@@ -12,8 +12,9 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Globe, Mail, Smartphone, History } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Globe, Mail, Smartphone, History, ListChecks } from 'lucide-react';
 import { SidebarHistoricoDialog } from '@/components/configuracoes/SidebarHistoricoDialog';
+import { CamposTab } from '@/components/configuracoes/CamposTab';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -491,6 +492,9 @@ const Configuracoes = () => {
             {isGestor && (
               <TabsTrigger value="automacao" className={TOGGLE_TRIGGER_CLASS}>Automação</TabsTrigger>
             )}
+            {isGestor && (
+              <TabsTrigger value="campos" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><ListChecks className="h-4 w-4" /> Campos</TabsTrigger>
+            )}
             {(isAdmin || isEmpresaRole) && (
               <TabsTrigger value="empresas" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
             )}
@@ -507,6 +511,12 @@ const Configuracoes = () => {
           {isGestor && (
             <TabsContent value="whatsapp" className="mt-4">
               <WhatsAppInstanciasTab />
+            </TabsContent>
+          )}
+
+          {isGestor && (
+            <TabsContent value="campos" className="mt-4">
+              <CamposTab />
             </TabsContent>
           )}
 

@@ -78,6 +78,7 @@ export interface NovoPedidoPayload {
     preco_unitario: number;
   }[];
   proximo_contato?: string;
+  campos_extras?: Record<string, string>;
 }
 
 export function useCreatePedidoCompleto() {
@@ -101,6 +102,7 @@ export function useCreatePedidoCompleto() {
           origem_lead: payload.origem_lead || null,
           endereco_entrega: payload.endereco_entrega || null,
           valor_total: payload.valor_total || 0,
+          campos_extras: payload.campos_extras || {},
         })
         .select('id')
         .single();
