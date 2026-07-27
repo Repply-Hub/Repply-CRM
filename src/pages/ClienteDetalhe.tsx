@@ -8,7 +8,9 @@ import { useTarefas } from '@/hooks/use-tarefas';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
+import { NovoNegocioDialog } from '@/components/pedidos/NovoNegocioDialog';
 import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
+import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -86,6 +88,7 @@ const ClienteDetalhe = () => {
   const [pedidosPage, setPedidosPage] = useState(1);
   const PEDIDOS_PAGE_SIZE = 5;
   const [addTarefaOpen, setAddTarefaOpen] = useState(false);
+  const [novoNegocioOpen, setNovoNegocioOpen] = useState(false);
   const [tarefasPage, setTarefasPage] = useState(1);
   const TAREFAS_PAGE_SIZE = 5;
 
@@ -122,9 +125,14 @@ const ClienteDetalhe = () => {
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '', telefone: '', nome_contato: '',
   });
   const [editEndereco, setEditEndereco] = useState<EnderecoFields>(emptyEndereco);
+  const [editCamposExtras, setEditCamposExtras] = useState<Record<string, string>>({});
+
+  const { data: camposConfigClientes } = useConfiguracoesCampos('clientes', empresaId);
+  const { data: camposConfigContatos } = useConfiguracoesCampos('contatos', empresaId);
 
   // Novo contato extra
   const [novoContato, setNovoContato] = useState({ nome_contato: '', cargo: '', email: '', telefone: '' });
+  const [novoContatoCamposExtras, setNovoContatoCamposExtras] = useState<Record<string, string>>({});
   const handleAddContato = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cliente) return;
@@ -132,13 +140,21 @@ const ClienteDetalhe = () => {
       toast.error('Informe o nome do contato.');
       return;
     }
-    if (!novoContato.email.trim()) {
+    const emailObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'email')?.obrigatorio ?? true;
+    const telefoneObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'telefone')?.obrigatorio ?? true;
+    if (emailObrigatorio && !novoContato.email.trim()) {
       toast.error('Informe o email do contato.');
       return;
     }
-    if (!novoContato.telefone.trim()) {
+    if (telefoneObrigatorio && !novoContato.telefone.trim()) {
       toast.error('Informe o telefone do contato.');
       return;
+    }
+    for (const c of (camposConfigContatos ?? []).filter(c => c.origem === 'customizado' && c.obrigatorio)) {
+      if (!novoContatoCamposExtras[c.campo_key]?.trim()) {
+        toast.error(`Preencha o campo obrigatório: ${c.label}`);
+        return;
+      }
     }
     try {
       await createContato.mutateAsync({
@@ -147,9 +163,11 @@ const ClienteDetalhe = () => {
         cargo: novoContato.cargo.trim() || undefined,
         email: novoContato.email.trim() || undefined,
         telefone: novoContato.telefone.trim() || undefined,
+        campos_extras: novoContatoCamposExtras,
       });
       toast.success('Contato adicionado!');
       setNovoContato({ nome_contato: '', cargo: '', email: '', telefone: '' });
+      setNovoContatoCamposExtras({});
       setAddContatoOpen(false);
     } catch (err: any) {
       toast.error(err.message);
@@ -168,12 +186,34 @@ const ClienteDetalhe = () => {
       nome_contato: cliente.nome_contato ?? '',
     });
     setEditEndereco(cliente.endereco ? stringToEndereco(cliente.endereco) : emptyEndereco);
+    setEditCamposExtras(((cliente as any).campos_extras as Record<string, string> | null) || {});
     setEditOpen(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
+    const emailObrigatorio = camposConfigClientes?.find(c => c.campo_key === 'email')?.obrigatorio ?? false;
+    const telefoneObrigatorio = camposConfigClientes?.find(c => c.campo_key === 'telefone')?.obrigatorio ?? false;
+    const razaoSocialObrigatoria = camposConfigClientes?.find(c => c.campo_key === 'razao_social')?.obrigatorio ?? false;
+    if (emailObrigatorio && !editData.email.trim()) {
+      toast.error('Informe o email da empresa.');
+      return;
+    }
+    if (telefoneObrigatorio && !editData.telefone.trim()) {
+      toast.error('Informe o telefone da empresa.');
+      return;
+    }
+    if (razaoSocialObrigatoria && !editData.razao_social.trim()) {
+      toast.error('Informe a razão social da empresa.');
+      return;
+    }
+    for (const c of (camposConfigClientes ?? []).filter(c => c.origem === 'customizado' && c.obrigatorio)) {
+      if (!editCamposExtras[c.campo_key]?.trim()) {
+        toast.error(`Preencha o campo obrigatório: ${c.label}`);
+        return;
+      }
+    }
     const enderecoStr = enderecoToString(editEndereco);
     try {
       await updateCliente.mutateAsync({
@@ -186,6 +226,7 @@ const ClienteDetalhe = () => {
         telefone: editData.telefone || undefined,
         endereco: enderecoStr || undefined,
         nome_contato: editData.nome_contato || undefined,
+        campos_extras: editCamposExtras,
       });
       toast.success('Cliente atualizado com sucesso!');
       setEditOpen(false);
@@ -357,6 +398,16 @@ const ClienteDetalhe = () => {
                 </div>
               </div>
               <EnderecoForm value={editEndereco} onChange={setEditEndereco} />
+              {(camposConfigClientes ?? []).filter(c => c.origem === 'customizado').map(campo => (
+                <div key={campo.id}>
+                  <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+                  <Input
+                    value={editCamposExtras[campo.campo_key] ?? ''}
+                    onChange={e => setEditCamposExtras(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}
+                    placeholder={campo.label ?? ''}
+                  />
+                </div>
+              ))}
               <Button type="submit" className="w-full" disabled={updateCliente.isPending}>
                 {updateCliente.isPending ? 'Salvando...' : 'Salvar Alterações'}
               </Button>
@@ -740,6 +791,16 @@ const ClienteDetalhe = () => {
                         required
                       />
                     </div>
+                    {(camposConfigContatos ?? []).filter(c => c.origem === 'customizado').map(campo => (
+                      <div key={campo.id} className="space-y-2">
+                        <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+                        <Input
+                          value={novoContatoCamposExtras[campo.campo_key] ?? ''}
+                          onChange={e => setNovoContatoCamposExtras(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}
+                          placeholder={campo.label ?? ''}
+                        />
+                      </div>
+                    ))}
                     <div className="flex justify-end gap-3 pt-4">
                       <Button type="button" variant="outline" onClick={() => setAddContatoOpen(false)}>
                         Cancelar
@@ -808,7 +869,7 @@ const ClienteDetalhe = () => {
         <Card className="border-border/40">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="text-base">Negócios</CardTitle>
-            <Button size="sm" onClick={() => navigate(`/pedidos/novo?clienteId=${cliente.id}`)}>
+            <Button size="sm" onClick={() => setNovoNegocioOpen(true)}>
               <Plus className="h-4 w-4 mr-1" /> Novo Negócio
             </Button>
           </CardHeader>
@@ -939,6 +1000,13 @@ const ClienteDetalhe = () => {
             editingTarefa={null}
             kanbanStages={tarefaKanbanStages}
             extraFields={{ cliente_id: id! }}
+          />
+
+          <NovoNegocioDialog
+            open={novoNegocioOpen}
+            onOpenChange={setNovoNegocioOpen}
+            clienteId={cliente.id}
+            onCreated={() => setNovoNegocioOpen(false)}
           />
         </Card>
 
