@@ -223,9 +223,13 @@ async function handleIncomingMessage(
 
   const sentByOtherChannel = msg.fromMe === true;
 
-  const isGroup = msg.isGroup === true || payload.chat?.wa_isGroup === true;
-
+  // `chatid` termina em "@g.us" para grupos no formato uazapi/baileys — sinal mais
+  // confiável que `msg.isGroup`/`payload.chat?.wa_isGroup`, que já vieram ausentes/false
+  // em payloads de grupo e faziam o telefone do grupo ser normalizado como se fosse um
+  // número BR individual, gerando uma conversa "fantasma" separada da conversa real.
   const chatid: string = msg.chatid ?? msg.sender_pn ?? "";
+  const isGroup = chatid.endsWith("@g.us") || msg.isGroup === true || payload.chat?.wa_isGroup === true;
+
   const rawTelefone = chatid
     .replace("@s.whatsapp.net", "")
     .replace("@c.us", "")
