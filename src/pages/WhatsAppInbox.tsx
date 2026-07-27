@@ -25,6 +25,7 @@ import {
   useWaDisconnect,
   useWaProvision,
   useWaFetchContactPhoto,
+  useWaRenomearContato,
   useWaFetchGroupParticipantes,
   useWaParticipantePhoto,
   useWaInstancias,
@@ -37,7 +38,8 @@ import {
   type WaMidiaTipo,
   type WaConfig,
 } from "@/hooks/use-whatsapp-inbox";
-import { useVendedores } from "@/hooks/use-clientes";
+import { useVendedores, useClientes } from "@/hooks/use-clientes";
+import { usePedidosOptions } from "@/hooks/use-pedidos";
 import { useCreateTarefa, useTarefasPorConversa } from "@/hooks/use-tarefas";
 import { useTarefasKanbanColunas } from "@/hooks/use-tarefas-kanban-colunas";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
@@ -175,6 +177,7 @@ import {
   MessageSquareText,
   Eye,
   EyeOff,
+  Pencil,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -189,6 +192,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn, autoResizeTextarea } from "@/lib/utils";
+import { downloadFile } from "@/lib/download-file";
 import { TOGGLE_LIST_CLASS, TOGGLE_BUTTON_CLASS, TOGGLE_BUTTON_ACTIVE, TOGGLE_BUTTON_INACTIVE } from "@/lib/toggle-group-styles";
 import { toast } from "sonner";
 
@@ -2125,6 +2129,18 @@ function LeadSheet({
   const { data: vendedores = [] } = useVendedores();
   const setResponsaveis = useWaSetResponsaveis();
   const addNota = useWaAddNota();
+  const renomearContato = useWaRenomearContato();
+  const [editarNomeOpen, setEditarNomeOpen] = useState(false);
+  const [nomeEditado, setNomeEditado] = useState("");
+  function handleSalvarNomeContato() {
+    const nome = nomeEditado.trim();
+    if (!nome || nome === conversa.nome_contato) {
+      setEditarNomeOpen(false);
+      return;
+    }
+    renomearContato.mutate({ conversaId: conversa.id, nome });
+    setEditarNomeOpen(false);
+  }
   const { data: mensagens = [] } = useWaMensagens(conversa.id);
   const { data: tarefasConversa = [] } = useTarefasPorConversa(conversa.id);
   // Notas internas (mensagens is_nota_interna) criadas a partir desta conversa,
@@ -2189,7 +2205,7 @@ function LeadSheet({
   const [expandedHistoricoTab, setExpandedHistoricoTab] = useState<
     "notas" | "tarefas" | null
   >(null);
-  const HISTORICO_PREVIEW_LIMIT = 5;
+  const HISTORICO_PREVIEW_LIMIT = 3;
 
   const [participantesExpandido, setParticipantesExpandido] = useState(false);
   const PARTICIPANTES_PREVIEW_LIMIT = 5;
@@ -2345,16 +2361,16 @@ function LeadSheet({
                   <MessageSquareText className="h-3.5 w-3.5" />
                 </button>
               )}
-              <a
-                href={m.media_url!}
-                download={label}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  downloadFile(m.media_url!, label);
+                }}
                 className="p-1.5 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0"
               >
                 <Download className="h-3.5 w-3.5" />
-              </a>
+              </button>
             </div>
           </li>
         );
@@ -2481,24 +2497,99 @@ function LeadSheet({
       <SheetContent className="sm:max-w-md overflow-y-auto flex flex-col gap-0 p-0">
         {/* Header */}
         <SheetHeader className="px-6 py-5 border-b">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10 border border-primary/10">
-              {conversa.foto_perfil_url && (
-                <AvatarImage src={conversa.foto_perfil_url} alt="" />
+          <div className="flex flex-col items-center gap-3 text-center">
+            <button
+              type="button"
+              onClick={() =>
+                conversa.foto_perfil_url &&
+                onImageClick(conversa.foto_perfil_url)
+              }
+              disabled={!conversa.foto_perfil_url}
+              title={conversa.foto_perfil_url ? "Ver foto de perfil" : undefined}
+              className={cn(
+                "rounded-full",
+                conversa.foto_perfil_url &&
+                  "cursor-pointer transition-opacity hover:opacity-80",
               )}
-              <AvatarFallback
-                className={cn(
-                  colorForPhone(conversa.telefone),
-                  "text-white text-sm font-semibold",
+            >
+              <Avatar className="h-20 w-20 border border-primary/10">
+                {conversa.foto_perfil_url && (
+                  <AvatarImage src={conversa.foto_perfil_url} alt="" />
                 )}
-              >
-                {initials(conversa.nome_contato, conversa.telefone)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <SheetTitle className="text-base font-bold leading-tight">
-                {displayName}
-              </SheetTitle>
+                <AvatarFallback
+                  className={cn(
+                    colorForPhone(conversa.telefone),
+                    "text-white text-2xl font-semibold",
+                  )}
+                >
+                  {initials(conversa.nome_contato, conversa.telefone)}
+                </AvatarFallback>
+              </Avatar>
+            </button>
+            <div className="min-w-0">
+              <div className="flex items-center justify-center gap-1.5">
+                <SheetTitle className="text-base font-bold leading-tight truncate">
+                  {displayName}
+                </SheetTitle>
+                {!conversa.is_group && (
+                  <Popover
+                    open={editarNomeOpen}
+                    onOpenChange={(v) => {
+                      setEditarNomeOpen(v);
+                      if (v) setNomeEditado(conversa.nome_contato ?? "");
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        title="Editar nome do contato"
+                        className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-64 space-y-2">
+                      <Label className="text-xs">Nome do contato</Label>
+                      <Input
+                        value={nomeEditado}
+                        onChange={(e) => setNomeEditado(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSalvarNomeContato();
+                        }}
+                        placeholder="Nome do contato"
+                        autoFocus
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Também atualiza o nome salvo no WhatsApp real deste contato.
+                      </p>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditarNomeOpen(false)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={renomearContato.isPending}
+                          onClick={handleSalvarNomeContato}
+                        >
+                          {renomearContato.isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            "Salvar"
+                          )}
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
               <SheetDescription className="text-xs mt-0.5">
                 {formatPhone(conversa.telefone)}
               </SheetDescription>
@@ -3114,12 +3205,12 @@ export default function WhatsAppInbox() {
   const conversaAtiva = conversas.find((c) => c.id === conversaAtivaId) ?? null;
   const [atribuicaoModalOpen, setAtribuicaoModalOpen] = useState(false);
 
-  // Tarefas não têm FK para cliente/contato/conversa (ver Tarefa em use-tarefas.ts) —
-  // o vínculo com o contato desta conversa é só por texto livre no título/descrição.
   // Mesmo padrão de formulário/campos do modal de criação em src/pages/Tarefas.tsx.
   const createTarefa = useCreateTarefa();
   const empresaIdTarefas =
     profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
+  const { data: clientesTarefas = [] } = useClientes();
+  const { data: pedidosOptionsTarefas = [] } = usePedidosOptions(empresaIdTarefas);
   const { data: kanbanColunasTarefas = [] } =
     useTarefasKanbanColunas(empresaIdTarefas);
   const KANBAN_STAGES_TAREFAS = useMemo(
@@ -3141,6 +3232,8 @@ export default function WhatsAppInbox() {
     participantes: "",
     projeto: "",
     marcadores: "",
+    cliente_id: "",
+    pedido_id: "",
   });
 
   function abrirNovaTarefa() {
@@ -3154,6 +3247,8 @@ export default function WhatsAppInbox() {
       participantes: "",
       projeto: "",
       marcadores: "",
+      cliente_id: "",
+      pedido_id: "",
     });
     setNovaTarefaOpen(true);
   }
@@ -3167,6 +3262,8 @@ export default function WhatsAppInbox() {
     try {
       await createTarefa.mutateAsync({
         ...tarefaForm,
+        cliente_id: tarefaForm.cliente_id || null,
+        pedido_id: tarefaForm.pedido_id || null,
         conversa_id: conversaAtiva.id,
         prazo_final: tarefaForm.prazo_final
           ? new Date(tarefaForm.prazo_final).toISOString()
@@ -3772,6 +3869,8 @@ export default function WhatsAppInbox() {
     { file: File; previewUrl: string | null }[]
   >([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const dragCounterRef = useRef(0);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -4202,6 +4301,36 @@ export default function WhatsAppInbox() {
       });
       return [];
     });
+  }
+
+  // Contador de enter/leave em vez de um booleano simples: arrastar sobre elementos
+  // filhos dispara dragLeave do pai antes do dragEnter do filho, e um booleano
+  // "piscaria" o overlay. O contador só zera quando o cursor realmente sai do painel.
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    if (!e.dataTransfer.types.includes("Files")) return;
+    dragCounterRef.current += 1;
+    setIsDraggingFile(true);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDraggingFile(false);
+    }
+  }
+
+  function handleDropFiles(e: React.DragEvent) {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDraggingFile(false);
+    addFiles(Array.from(e.dataTransfer.files ?? []));
   }
 
   async function startRecording() {
@@ -5481,7 +5610,21 @@ export default function WhatsAppInbox() {
           </Dialog>
 
           {/* Área de mensagens */}
-          <div className="flex-1 flex flex-col min-w-0 relative">
+          <div
+            className="flex-1 flex flex-col min-w-0 relative"
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDropFiles}
+          >
+            {isDraggingFile && conversaAtiva && (
+              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-primary bg-primary/5 backdrop-blur-[1px]">
+                <div className="flex flex-col items-center gap-2 rounded-lg bg-background/90 px-6 py-4 shadow-lg">
+                  <Paperclip className="h-6 w-6 text-primary" />
+                  <p className="text-sm font-medium">Solte os arquivos para anexar</p>
+                </div>
+              </div>
+            )}
             {conversaAtiva ? (
               <>
                 {/* Modal de atribuição: cobre só o painel da conversa (não a página
@@ -6012,11 +6155,11 @@ export default function WhatsAppInbox() {
                                           "ring-2 ring-primary ring-offset-2 ring-offset-background",
                                       )}
                                     >
-                                      <div className="flex items-center justify-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
-                                        <StickyNote className="h-3 w-3" />
-                                        Nota interna
-                                      </div>
-                                      <p className="text-sm text-center whitespace-pre-wrap">
+                                      <p className="text-xs text-center whitespace-pre-wrap text-muted-foreground">
+                                        <StickyNote className="inline-block h-3 w-3 mr-1 -mt-0.5" />
+                                        <span className="font-semibold">
+                                          Nota interna{msg.usuario?.nome ? ` (${msg.usuario.nome})` : ""}:
+                                        </span>{" "}
                                         {msg.conteudo}
                                       </p>
                                     </div>
@@ -6539,16 +6682,14 @@ export default function WhatsAppInbox() {
                 ) : (
                   <span />
                 )}
-                <a
-                  href={viewingImage.url}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => downloadFile(viewingImage.url, 'imagem.jpg')}
                 >
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    <Download className="h-4 w-4" /> Baixar
-                  </Button>
-                </a>
+                  <Download className="h-4 w-4" /> Baixar
+                </Button>
               </DialogFooter>
             </>
           )}
@@ -6698,6 +6839,41 @@ export default function WhatsAppInbox() {
                 <ProjetoSelect
                   value={tarefaForm.projeto}
                   onChange={(v) => setTarefaForm((f) => ({ ...f, projeto: v }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Empresa (cliente)</Label>
+                <SearchableSelect
+                  options={clientesTarefas.map((c) => ({
+                    value: c.id,
+                    label: c.empresa,
+                  }))}
+                  value={tarefaForm.cliente_id}
+                  onValueChange={(v) =>
+                    setTarefaForm((f) => ({ ...f, cliente_id: v }))
+                  }
+                  placeholder="Vincular a uma empresa"
+                  contentClassName="w-[min(28rem,90vw)]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Negócio</Label>
+                <SearchableSelect
+                  options={pedidosOptionsTarefas.map((p) => ({
+                    value: p.id,
+                    label:
+                      [p.cliente?.empresa, p.fabricante?.nome]
+                        .filter(Boolean)
+                        .join(" — ") || "Negócio sem cliente",
+                  }))}
+                  value={tarefaForm.pedido_id}
+                  onValueChange={(v) =>
+                    setTarefaForm((f) => ({ ...f, pedido_id: v }))
+                  }
+                  placeholder="Vincular a um negócio"
+                  contentClassName="w-[min(28rem,90vw)]"
                 />
               </div>
             </div>

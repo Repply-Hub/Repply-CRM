@@ -986,6 +986,33 @@ export function useWaFetchContactPhoto() {
   });
 }
 
+// --- Renomear contato (reflete tanto no CRM quanto na agenda real do WhatsApp,
+// via POST /contact/add da uazapi — grupos não têm agenda equivalente, então
+// nesse caso a edge function só atualiza o nome local) ---
+
+export function useWaRenomearContato() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversaId, nome }: { conversaId: string; nome: string }) => {
+      const { data, error } = await supabase.functions.invoke('whatsapp-contact-rename', {
+        body: { conversa_id: conversaId, nome },
+      });
+      if (error) throw error;
+      return { conversaId, nomeContato: data?.nome_contato as string };
+    },
+    onSuccess: ({ conversaId, nomeContato }) => {
+      qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
+        (old ?? []).map((c) => c.id === conversaId ? { ...c, nome_contato: nomeContato } : c)
+      );
+      toast.success('Nome do contato atualizado');
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? 'Erro ao renomear contato');
+    },
+  });
+}
+
 // --- Participantes de grupo (backfill para grupos criados antes do rastreio, ou
 // fora do CRM, cuja uazapi só devolve a lista completa via /group/list) ---
 
@@ -1141,19 +1168,18 @@ export function useWaNovaConversa() {
 
   return useMutation({
     mutationFn: async (params: { telefone: string; nome_contato?: string; cliente_id?: string }) => {
-      const empresaId = await getEmpresaId();
-      if (!empresaId) throw new Error('Empresa não encontrada');
-
       const telefone = normalizeWhatsappPhone(params.telefone);
 
-      const { data, error } = await supabase
-        .from('whatsapp_conversas')
-        .upsert(
-          { empresa_id: empresaId, telefone, nome_contato: params.nome_contato ?? null, cliente_id: params.cliente_id ?? null },
-          { onConflict: 'empresa_id,telefone' }
-        )
-        .select('*')
-        .single();
+      // RPC (SECURITY DEFINER) em vez de upsert client-side: se já existe conversa
+      // para esse telefone atribuída a outra pessoa, o upsert direto caía no caminho
+      // ON CONFLICT DO UPDATE e era barrado pela policy de RLS (USING
+      // can_access_wa_conversa) antes de chegar no WITH CHECK — a function trata
+      // esse caso com uma mensagem de erro clara em vez de "RLS violation".
+      const { data, error } = await supabase.rpc('wa_iniciar_conversa', {
+        p_telefone: telefone,
+        p_nome_contato: params.nome_contato ?? undefined,
+        p_cliente_id: params.cliente_id ?? undefined,
+      });
 
       if (error) throw error;
       return data as WaConversa;

@@ -21,14 +21,22 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'portal', path: '/portal', label: 'Portal', icon: 'Globe', visible: true },
   { id: 'calendario', path: '/calendario', label: 'Calendário', icon: 'CalendarDays', visible: true },
   { id: 'tarefas', path: '/tarefas', label: 'Tarefas', icon: 'ClipboardList', visible: true },
-  { id: 'chat', path: '/chat', label: 'Chat', icon: 'MessageCircle', visible: true },
-  { id: 'whatsapp', path: '/whatsapp', label: 'WhatsApp', icon: 'MessageSquare', visible: true },
+  { id: 'chat', path: '/chat', label: 'Chat', icon: 'MessageSquare', visible: true },
+  { id: 'whatsapp', path: '/whatsapp', label: 'WhatsApp', icon: 'MessageCircle', visible: true },
   { id: 'emails', path: '/emails', label: 'E-mails', icon: 'Mail', visible: true },
   { id: 'configuracoes', path: '/configuracoes', label: 'Configurações', icon: 'Settings', visible: true },
 
   { id: 'usuarios_admin', path: '/configuracoes?tab=usuarios', label: 'Usuários', icon: 'Users', visible: true },
   { id: 'admin_wa_instancias', path: '/admin/instancias-whatsapp', label: 'Instâncias WhatsApp', icon: 'Smartphone', visible: true },
 ];
+
+function fixChatWhatsappIcons(list: SidebarItem[]): SidebarItem[] {
+  return list.map(i => {
+    if (i.id === 'chat') return { ...i, icon: 'MessageSquare' };
+    if (i.id === 'whatsapp') return { ...i, icon: 'MessageCircle' };
+    return i;
+  });
+}
 
 export function useSidebarPreferences() {
   const { user, profile } = useAuth();
@@ -52,7 +60,7 @@ export function useSidebarPreferences() {
             .eq('empresa_id', empresaId)
             .maybeSingle();
           if (empresaPadrao && Array.isArray(empresaPadrao.items) && empresaPadrao.items.length > 0) {
-            return empresaPadrao.items as unknown as SidebarItem[];
+            return fixChatWhatsappIcons(empresaPadrao.items as unknown as SidebarItem[]);
           }
         }
         return DEFAULT_SIDEBAR_ITEMS;
@@ -64,9 +72,9 @@ export function useSidebarPreferences() {
       const REMOVED_IDS = new Set(['pedidos', 'portal_consultas', 'importacoes_ignoradas']);
       const rawSaved = data.items as unknown as SidebarItem[];
       const needsCleanup = rawSaved.some(i => REMOVED_IDS.has(i.id));
-      const saved = rawSaved
+      const saved = fixChatWhatsappIcons(rawSaved
         .filter(i => !REMOVED_IDS.has(i.id))
-        .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i);
+        .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i));
       const savedIds = new Set(saved.map(i => i.id));
       const newDefaults = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedIds.has(d.id));
       const merged = [...saved, ...newDefaults];

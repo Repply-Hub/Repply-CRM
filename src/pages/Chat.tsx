@@ -15,13 +15,14 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import {
-  Send, Loader2, MessageCircle, Users, Circle, PanelLeftClose, PanelLeftOpen,
+  Send, Loader2, MessageCircle, MessageSquare, Users, Circle, PanelLeftClose, PanelLeftOpen,
   Paperclip, FileText, Image, X, Download, Users2, Calendar, Eraser, ChevronDown,
   Video, Link2, ExternalLink, Play, Pause, Camera, Pencil, Check, Search, Trash2, UserPlus, Mic, Square, Reply
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, autoResizeTextarea } from '@/lib/utils';
+import { downloadFile } from '@/lib/download-file';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
 import { validateFile } from '@/lib/file-validation';
 import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
@@ -747,16 +748,16 @@ const Chat = () => {
                 {m.vendedor?.nome} • {format(new Date(m.created_at), 'dd MMM, HH:mm', { locale: ptBR })}
               </p>
             </div>
-            <a
-              href={m.arquivo_url!}
-              download={m.arquivo_nome!}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                downloadFile(m.arquivo_url!, m.arquivo_nome!);
+              }}
               className="p-1.5 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0"
             >
               <Download className="h-3.5 w-3.5" />
-            </a>
+            </button>
           </div>
         );
       })}
@@ -943,16 +944,51 @@ const Chat = () => {
     setTimeout(() => setDestacadaMsgId(null), 1600);
   }
 
+  const addFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    const validFiles = files.filter(file =>
+      validateFile(file, { allowedExtensions: CHAT_ALLOWED_EXT, allowedMimePrefixes: CHAT_ALLOWED_MIME })
+    );
+    setSelectedFiles(prev => [...prev, ...validFiles]);
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
-    if (files.length === 0) return;
-    
-    const validFiles = files.filter(file => 
-      validateFile(file, { allowedExtensions: CHAT_ALLOWED_EXT, allowedMimePrefixes: CHAT_ALLOWED_MIME })
-    );
-    
-    setSelectedFiles(prev => [...prev, ...validFiles]);
+    addFiles(files);
+  };
+
+  // Contador de enter/leave: arrastar sobre elementos filhos dispara dragLeave
+  // do pai antes do dragEnter do filho, então um booleano simples "piscaria"
+  // o overlay. Só zera quando o cursor realmente sai do painel do chat.
+  const dragCounterRef = useRef(0);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!e.dataTransfer.types.includes('Files')) return;
+    dragCounterRef.current += 1;
+    setIsDraggingFile(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDraggingFile(false);
+    }
+  };
+
+  const handleDropFiles = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDraggingFile(false);
+    addFiles(Array.from(e.dataTransfer.files ?? []));
   };
 
   // Ctrl+V com uma imagem na área de transferência anexa direto, como qualquer
@@ -1146,7 +1182,7 @@ const Chat = () => {
 
   const headerContent = (
     <div className="flex items-center gap-3">
-      <MessageCircle className="h-5 w-5 text-primary" />
+      <MessageSquare className="h-5 w-5 text-primary" />
       <div>
         <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight md:text-xl">Chat Interno</h1>
         <p className="text-[10px] sm:text-sm text-muted-foreground">Converse com sua equipe em tempo real</p>
@@ -1193,7 +1229,21 @@ const Chat = () => {
           onlineIds={onlineIds}
         />
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div
+          className="flex-1 flex flex-col min-w-0 relative"
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDropFiles}
+        >
+          {isDraggingFile && (
+            <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-primary bg-primary/5 backdrop-blur-[1px]">
+              <div className="flex flex-col items-center gap-2 rounded-lg bg-background/90 px-6 py-4 shadow-lg">
+                <Paperclip className="h-6 w-6 text-primary" />
+                <p className="text-sm font-medium">Solte os arquivos para anexar</p>
+              </div>
+            </div>
+          )}
           {/* Chat header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
             <Sheet open={sheetOpen} onOpenChange={(v) => {
@@ -1769,16 +1819,14 @@ const Chat = () => {
                                             className="max-w-[240px] max-h-[200px] rounded-lg object-cover"
                                           />
                                         </a>
-                                        <a
-                                          href={msg.arquivo_url}
-                                          download={msg.arquivo_nome || 'imagem'}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
+                                        <button
+                                          type="button"
+                                          onClick={() => downloadFile(msg.arquivo_url!, msg.arquivo_nome || 'imagem')}
                                           className="absolute top-2 right-2 p-1.5 bg-background/80 hover:bg-background rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity shadow-sm"
                                           title="Baixar imagem"
                                         >
                                           <Download className="h-3.5 w-3.5 text-foreground" />
-                                        </a>
+                                        </button>
                                       </div>
                                     ) : isPreviewable(msg.arquivo_nome || 'arquivo', msg.arquivo_tipo) ? (
                                       <button
@@ -1792,19 +1840,17 @@ const Chat = () => {
                                         <span className="text-xs truncate max-w-[180px]">{msg.arquivo_nome || 'Arquivo'}</span>
                                       </button>
                                     ) : (
-                                      <a
-                                        href={msg.arquivo_url}
-                                        download={msg.arquivo_nome || 'Arquivo'}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                                      <button
+                                        type="button"
+                                        onClick={() => downloadFile(msg.arquivo_url!, msg.arquivo_nome || 'Arquivo')}
+                                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors w-full text-left ${
                                           isMe ? 'bg-primary-foreground/10 hover:bg-primary-foreground/20' : 'bg-background/50 hover:bg-background/80'
                                         }`}
                                       >
                                         <FileText className="h-5 w-5 shrink-0" />
                                         <span className="text-xs truncate max-w-[180px]">{msg.arquivo_nome || 'Arquivo'}</span>
                                         <Download className="h-4 w-4 shrink-0 ml-auto" />
-                                      </a>
+                                      </button>
                                     )}
                                   </div>
                                 )}

@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, Loader2, FileText, MessageSquareText } from 'lucide-react';
+import { downloadFile } from '@/lib/download-file';
 
 export interface FilePreviewTarget {
   url: string;
@@ -149,11 +150,14 @@ export function FilePreviewDialog({
                 </Button>
               )}
               {file && (
-                <a href={file.url} download={file.nome} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" variant="outline" className="gap-1.5 shrink-0">
-                    <Download className="h-3.5 w-3.5" /> Baixar
-                  </Button>
-                </a>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 shrink-0"
+                  onClick={() => downloadFile(file.url, file.nome)}
+                >
+                  <Download className="h-3.5 w-3.5" /> Baixar
+                </Button>
               )}
             </div>
           </div>
