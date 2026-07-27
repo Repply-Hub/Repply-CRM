@@ -48,6 +48,7 @@ describe('importPedidosUtils', () => {
       status: 'Fase',
       data_pedido: '',
       prazo_resposta: '',
+      pdf_url: '',
     };
 
     expect(getImportedPedidosRows(rows, mapping)).toEqual([
@@ -63,6 +64,7 @@ describe('importPedidosUtils', () => {
         status: 'negociacao',
         data_pedido: undefined,
         prazo_resposta: undefined,
+        pdf_url: '',
         campos_extras: {},
       },
       {
@@ -77,6 +79,7 @@ describe('importPedidosUtils', () => {
         status: 'enviado',
         data_pedido: undefined,
         prazo_resposta: undefined,
+        pdf_url: '',
         campos_extras: {},
       },
     ]);

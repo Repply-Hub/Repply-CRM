@@ -4,7 +4,8 @@ import { useTarefas, useUpdateTarefa, useDeleteTarefa, Tarefa } from '@/hooks/us
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
-import { useVendedores } from '@/hooks/use-clientes';
+import { useVendedores, useClientes } from '@/hooks/use-clientes';
+import { usePedidosOptions } from '@/hooks/use-pedidos';
 import { useObras } from '@/hooks/use-obras';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -70,6 +71,8 @@ export default function Tarefas() {
   const { data: kanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
   const { data: vendedores = [] } = useVendedores();
   const { data: obras = [] } = useObras();
+  const { data: clientes = [] } = useClientes();
+  const { data: pedidosOptions = [] } = usePedidosOptions(empresaId);
   const queryClient = useQueryClient();
   const updateTarefa = useUpdateTarefa();
   const deleteTarefa = useDeleteTarefa();
@@ -712,6 +715,27 @@ export default function Tarefas() {
                       <FolderKanban className="h-3 w-3" /> Projeto / Obra
                     </Label>
                     <p className="text-sm font-medium">{selectedTarefa.projeto || '—'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Empresa</Label>
+                    <p className="text-sm font-medium">
+                      {selectedTarefa.cliente_id
+                        ? clientes.find(c => c.id === selectedTarefa.cliente_id)?.empresa || '—'
+                        : '—'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Negócio</Label>
+                    <p className="text-sm font-medium">
+                      {selectedTarefa.pedido_id
+                        ? (() => {
+                            const p = pedidosOptions.find(o => o.id === selectedTarefa.pedido_id);
+                            return p
+                              ? [p.cliente?.empresa, p.fabricante?.nome].filter(Boolean).join(' — ') || 'Negócio sem cliente'
+                              : '—';
+                          })()
+                        : '—'}
+                    </p>
                   </div>
                   {selectedTarefa.participantes && (
                     <div className="space-y-1 md:col-span-2">

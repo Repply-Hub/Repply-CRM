@@ -1,7 +1,7 @@
 import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
 import * as XLSX from 'xlsx';
 
-export type FieldKey = 'negocio' | 'cliente' | 'contato' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'data_pedido' | 'prazo_resposta';
+export type FieldKey = 'negocio' | 'cliente' | 'contato' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'data_pedido' | 'prazo_resposta' | 'pdf_url';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'negocio', label: 'Negócio', required: false },
@@ -15,6 +15,7 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'data_pedido', label: 'Criação', required: false },
   { key: 'prazo_resposta', label: 'Fechamento', required: false },
   { key: 'observacoes', label: 'Observações', required: false },
+  { key: 'pdf_url', label: 'Anexo', required: false },
 ];
 
 const EMPTY_MAPPING: Record<FieldKey, string> = {
@@ -29,6 +30,7 @@ const EMPTY_MAPPING: Record<FieldKey, string> = {
   status: '',
   data_pedido: '',
   prazo_resposta: '',
+  pdf_url: '',
 };
 
 const FIELD_KEYS = Object.keys(EMPTY_MAPPING) as FieldKey[];
@@ -133,6 +135,21 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /\bdescri/i, score: 78 },
     { pattern: /\bdetalhe/i, score: 76 },
   ],
+  pdf_url: [
+    { pattern: /^anexo$/, score: 100 },
+    { pattern: /^pdf$/, score: 100 },
+    { pattern: /^espelho$/, score: 100 },
+    { pattern: /^link pdf$/, score: 100 },
+    { pattern: /^cotacao$/, score: 95 },
+    { pattern: /espelho/, score: 90 },
+    { pattern: /link.*pdf/, score: 90 },
+    { pattern: /pdf.*link/, score: 90 },
+    { pattern: /\bpdf\b/, score: 85 },
+    { pattern: /anexo/, score: 85 },
+    { pattern: /cotacao/, score: 80 },
+    { pattern: /arquivo/, score: 74 },
+    { pattern: /documento/, score: 70 },
+  ],
 };
 
 const MIN_SCORE: Record<FieldKey, number> = {
@@ -147,6 +164,7 @@ const MIN_SCORE: Record<FieldKey, number> = {
   status: 70,
   data_pedido: 70,
   prazo_resposta: 70,
+  pdf_url: 70,
 };
 
 const STATUS_RULES: Array<{ status: string; patterns: RegExp[] }> = [
@@ -296,6 +314,7 @@ export function getImportedPedidosRows(
       const valor = mapping.valor ? parseNumber(row[mapping.valor]) : 0;
       const vendedor = mapping.vendedor ? row[mapping.vendedor]?.toString().trim() || '' : '';
       const observacoes = mapping.observacoes ? row[mapping.observacoes]?.toString().trim() || '' : '';
+      const pdf_url = mapping.pdf_url ? row[mapping.pdf_url]?.toString().trim() || '' : '';
       const status = mapping.status ? resolveImportedPedidoStatus(row[mapping.status]) : 'novo_lead';
       
       let data_pedido = undefined;
@@ -322,7 +341,7 @@ export function getImportedPedidosRows(
         if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
-      return { negocio, cliente, contato, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, prazo_resposta, campos_extras };
+      return { negocio, cliente, contato, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, prazo_resposta, pdf_url, campos_extras };
     });
 }
 

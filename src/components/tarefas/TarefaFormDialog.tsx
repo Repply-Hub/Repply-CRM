@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogPortal } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -100,8 +101,20 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
   return (
     // modal={false}: com o Dialog em modo modal (padrão), o lock de scroll do Radix bloqueia o
     // wheel/touch mesmo dentro dos dropdowns internos (Popover/Command de Responsável, Projeto,
-    // Empresa, Negócio etc.), que são renderizados num portal fora do DialogContent.
+    // Empresa, Negócio etc.), que são renderizados num portal fora do DialogContent. Como isso
+    // desliga o overlay nativo do Radix, o blur de fundo é recriado manualmente abaixo.
     <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+      {/* Portal sempre montado (não condicionado a `open`) para garantir que fique antes do
+          portal do DialogContent no DOM — senão pinta por cima do conteúdo do modal. */}
+      <DialogPortal>
+        <div
+          className={cn(
+            'fixed inset-0 z-[1050] bg-black/80 backdrop-blur-sm pointer-events-none',
+            !open && 'hidden',
+          )}
+        />
+      </DialogPortal>
+
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{editingTarefa ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle></DialogHeader>
         <div className="space-y-4 mt-2">

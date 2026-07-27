@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { resolveClienteId, resolveFabricanteId, resolveObraId, resetResolveCache, preloadResolveCache } from '@/lib/import/resolve-entities';
 import { computeRowHash } from '@/lib/import/row-hash';
+import { resolveEspelhoPdfUrls, type ResolvePdfResult } from '@/lib/import/resolve-pedido-pdf';
 
 export type ImportType = 'clientes' | 'negocios';
 
@@ -25,6 +26,25 @@ const STATUS_MAP: Record<string, string> = {
 function mapStatus(value: unknown): string {
   const normalized = String(value ?? '').trim().toLowerCase();
   return STATUS_MAP[normalized] ?? 'novo_lead';
+}
+
+/**
+ * Extrai uma mensagem de erro legível de um erro do Postgres/PostgREST (ou de uma
+ * exceção JS genérica), incluindo código/detalhes quando disponíveis, para que
+ * linhas_ignoradas_importacao nunca receba um motivo genérico tipo "Falha desconhecida".
+ */
+function errorToMotivo(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object') {
+    const e = err as { message?: string; code?: string; details?: string; hint?: string };
+    const parts = [
+      e.message,
+      e.code ? `código: ${e.code}` : null,
+      e.details ? `detalhes: ${e.details}` : null,
+      e.hint ? `dica: ${e.hint}` : null,
+    ].filter(Boolean);
+    if (parts.length > 0) return parts.join(' | ');
+  }
+  return fallback;
 }
 
 const PEDIDO_BATCH = 200;
@@ -107,7 +127,7 @@ export function useBulkImport() {
     }
   }
 
-  async function importNegocios(payload: Record<string, unknown>[], nomeArquivo?: string, funilIdParam?: string): Promise<ImportSummary> {
+  async function importNegocios(payload: Record<string, unknown>[], nomeArquivo?: string, funilIdParam?: string, empresaId?: string): Promise<ImportSummary> {
     const vendedorId = await getVendedorId();
     resetResolveCache();
 
@@ -126,14 +146,21 @@ export function useBulkImport() {
       funilId = funilPadrao.id;
     }
 
-    // Computa hashes e pré-carrega entidades em paralelo — são independentes entre si.
+    // Computa hashes, pré-carrega entidades e resolve PDFs de cotação do Bitrix em paralelo — são independentes entre si.
     let rowHashes: string[] = [];
+    let pdfResults: Array<ResolvePdfResult | undefined> = [];
     try {
-      [rowHashes] = await Promise.all([
+      [rowHashes, , pdfResults] = await Promise.all([
         Promise.all(payload.map(computeRowHash)),
         preloadResolveCache(payload, vendedorId).catch((err: Error) => {
           console.error('Preload de entidades falhou, resolução linha-a-linha será usada como fallback:', err.message);
         }),
+        empresaId
+          ? resolveEspelhoPdfUrls(payload.map(r => r.pdf_url as string | undefined), empresaId).catch((err: Error) => {
+              console.error('Resolução de PDFs de cotação falhou, links originais do Bitrix serão mantidos:', err.message);
+              return [] as Array<ResolvePdfResult | undefined>;
+            })
+          : Promise.resolve([] as Array<ResolvePdfResult | undefined>),
       ]);
     } catch (err) {
       console.error('Erro ao computar hashes ou pré-carregar entidades:', (err as Error).message);
@@ -159,12 +186,13 @@ export function useBulkImport() {
       motivosFalha[key] = (motivosFalha[key] || 0) + 1;
     };
 
-    // Divide o payload (e os hashes correspondentes) em lotes de PEDIDO_BATCH linhas
-    const batches: Array<{ rows: Record<string, unknown>[]; hashes: string[] }> = [];
+    // Divide o payload (e os hashes/PDFs correspondentes) em lotes de PEDIDO_BATCH linhas
+    const batches: Array<{ rows: Record<string, unknown>[]; hashes: string[]; pdfResults: Array<ResolvePdfResult | undefined> }> = [];
     for (let i = 0; i < payload.length; i += PEDIDO_BATCH) {
       batches.push({
         rows: payload.slice(i, i + PEDIDO_BATCH),
         hashes: rowHashes.slice(i, i + PEDIDO_BATCH),
+        pdfResults: pdfResults.slice(i, i + PEDIDO_BATCH),
       });
     }
 
@@ -173,7 +201,7 @@ export function useBulkImport() {
      * e em caso de erro faz retry linha-a-linha.
      * Retorna os resultados parciais sem modificar estado React (thread-safe para Promise.all).
      */
-    async function processBatch(batch: Record<string, unknown>[], batchHashes: string[]): Promise<{
+    async function processBatch(batch: Record<string, unknown>[], batchHashes: string[], batchPdfResults: Array<ResolvePdfResult | undefined>): Promise<{
       inserted: number;
       duplicados: number;
       failures: Array<{ row: Record<string, unknown>; motivo: string; logToIgnoradas: boolean }>;
@@ -212,6 +240,16 @@ export function useBulkImport() {
           // Reserva o hash antes do insert — evita duplicatas dentro do próprio arquivo
           if (hash) existingHashes.add(hash);
 
+          // Anexo do negócio: se veio do Bitrix, resolveEspelhoPdfUrls já tentou baixar e
+          // reidratar no Storage (resolveEspelhoPdfUrl). Falha no download não trava a
+          // linha — mantém o link original do Bitrix e sinaliza em campos_extras.
+          const rawPdfUrl = String(row.pdf_url ?? '').trim();
+          const pdfResult = batchPdfResults[ri];
+          const camposExtras: Record<string, string> = { ...(row.campos_extras as Record<string, string> ?? {}) };
+          if (pdfResult?.falhaDownload) {
+            camposExtras['Falha Anexo'] = 'Não foi possível baixar automaticamente o anexo do Bitrix; link original mantido.';
+          }
+
           batchPayloads.push({
             cliente_id: clienteId,
             fabricante_id: fabricanteId,
@@ -224,27 +262,41 @@ export function useBulkImport() {
             created_at: row.created_at ?? undefined,
             status: mapStatus(row.status),
             usuario_id: (row.usuario_id as string | undefined) ?? vendedorId,
-            campos_extras: row.campos_extras ?? {},
+            campos_extras: camposExtras,
             import_hash: hash || null,
+            pdf_url: pdfResult?.url ?? (rawPdfUrl || null),
           });
         } catch (err) {
           failures.push({ row, motivo: (err as Error).message, logToIgnoradas: true });
         }
       }
 
-      if (batchPayloads.length === 0) return { inserted: batchInserted, failures };
+      if (batchPayloads.length === 0) return { inserted: batchInserted, duplicados: batchDuplicados, failures };
 
-      // INSERT em lote
-      const { error } = await supabase.from('pedidos').insert(batchPayloads);
+      // INSERT em lote — se lançar (não só retornar {error}), cai no retry linha-a-linha
+      // abaixo em vez de propagar e abortar o import inteiro silenciosamente.
+      let batchError: { message?: string; code?: string; details?: string; hint?: string } | null = null;
+      try {
+        const { error } = await supabase.from('pedidos').insert(batchPayloads);
+        batchError = error;
+      } catch (err) {
+        console.error('[import-pedidos] INSERT em lote lançou exceção, caindo para retry linha-a-linha:', (err as Error).message);
+        batchError = err as Error;
+      }
 
-      if (error) {
-        // Lote falhou: retry linha-a-linha para não perder o lote inteiro
+      if (batchError) {
+        // Lote falhou: retry linha-a-linha, cada uma isolada em seu próprio try/catch,
+        // para que uma falha não impeça as demais linhas do lote de serem inseridas.
         for (const pedidoRow of batchPayloads) {
-          const { error: rowError } = await supabase.from('pedidos').insert(pedidoRow);
-          if (rowError) {
-            failures.push({ row: pedidoRow, motivo: rowError.message, logToIgnoradas: true });
-          } else {
-            batchInserted++;
+          try {
+            const { error: rowError } = await supabase.from('pedidos').insert(pedidoRow);
+            if (rowError) {
+              failures.push({ row: pedidoRow, motivo: errorToMotivo(rowError, 'Falha desconhecida ao inserir negócio'), logToIgnoradas: true });
+            } else {
+              batchInserted++;
+            }
+          } catch (err) {
+            failures.push({ row: pedidoRow, motivo: errorToMotivo(err, 'Falha desconhecida ao inserir negócio'), logToIgnoradas: true });
           }
         }
       } else {
@@ -262,7 +314,25 @@ export function useBulkImport() {
       for (let gi = 0; gi < batches.length; gi += PEDIDO_CONCURRENCY) {
         const group = batches.slice(gi, gi + PEDIDO_CONCURRENCY);
 
-        const groupResults = await Promise.all(group.map(b => processBatch(b.rows, b.hashes)));
+        const groupResults = await Promise.all(group.map(async (b) => {
+          try {
+            return await processBatch(b.rows, b.hashes, b.pdfResults);
+          } catch (err) {
+            // Defesa extra: mesmo um erro totalmente inesperado dentro de processBatch não
+            // deve abortar os outros lotes em voo nem o restante do import. Isola o lote e
+            // loga todas as suas linhas em linhas_ignoradas_importacao com o erro real.
+            console.error(`[import-pedidos] Lote falhou inesperadamente (${b.rows.length} linhas), isolando do restante do import:`, (err as Error).message);
+            return {
+              inserted: 0,
+              duplicados: 0,
+              failures: b.rows.map(row => ({
+                row,
+                motivo: errorToMotivo(err, 'Falha inesperada ao processar o lote'),
+                logToIgnoradas: true,
+              })),
+            };
+          }
+        }));
 
         completedBatches += group.length;
 

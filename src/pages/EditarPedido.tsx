@@ -18,6 +18,8 @@ import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useObrasByCliente, useTabelaPrecos, useIsGestor } from '@/hooks/use-novo-pedido';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
+import { useAuth } from '@/hooks/use-auth';
+import { useConfiguracoesCampos, FIELD_LABELS } from '@/hooks/use-configuracoes-campos';
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText } from 'lucide-react';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
@@ -25,6 +27,9 @@ import { FabricanteSelector } from '@/components/pedidos/FabricanteSelector';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
+import { filenameFromUrl } from '@/lib/download-file';
+import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
 import { Badge } from '@/components/ui/badge';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 
@@ -100,6 +105,10 @@ const EditarPedido = () => {
   const [itens, setItens] = useState<ItemPedido[]>([]);
   const [observacoes, setObservacoes] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
+  const [pdfPreview, setPdfPreview] = useState<FilePreviewTarget | null>(null);
+  const [camposExtras, setCamposExtras] = useState<Record<string, string>>({});
+  const { profile } = useAuth();
+  const { data: camposConfig } = useConfiguracoesCampos('pedidos', profile?.empresa_id);
 
   // Populate form when data loads
   useEffect(() => {
@@ -116,6 +125,7 @@ const EditarPedido = () => {
       setEnderecoEntrega(p.endereco_entrega || '');
       setObservacoes(p.observacoes || '');
       setPdfUrl(p.pdf_url || '');
+      setCamposExtras((p.campos_extras as Record<string, string> | null) || {});
       setItens(pedidoData.itens.map(i => ({
         id: i.id,
         descricao_material: i.descricao_material,
@@ -190,6 +200,22 @@ const EditarPedido = () => {
   };
 
   const validateStep2 = () => {
+    const valoresPadrao: Record<string, string | undefined> = {
+      obra_id: obraId,
+      origem_lead: origemLead,
+      endereco_entrega: enderecoEntrega,
+      prazo_resposta: prazoResposta ? 'ok' : undefined,
+      observacoes: observacoes,
+    };
+    for (const campo of camposConfig ?? []) {
+      if (!campo.obrigatorio) continue;
+      const valor = campo.origem === 'padrao' ? valoresPadrao[campo.campo_key] : camposExtras[campo.campo_key];
+      if (!valor || !valor.trim()) {
+        const label = campo.origem === 'padrao' ? (FIELD_LABELS[campo.campo_key] ?? campo.campo_key) : campo.label;
+        toast.error(`Preencha o campo obrigatório: ${label}`);
+        return false;
+      }
+    }
     return true;
   };
 
@@ -213,6 +239,7 @@ const EditarPedido = () => {
         origem_lead: origemLead || undefined,
         endereco_entrega: enderecoEntrega || undefined,
         observacoes: observacoes || undefined,
+        campos_extras: camposExtras,
         itens: itens.map(i => ({
           id: i.id,
           descricao_material: i.descricao_material,
@@ -514,14 +541,55 @@ const EditarPedido = () => {
                     <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
                       <FileText className="h-5 w-5 text-primary" />
                       <span className="text-sm font-medium flex-1 truncate">PDF do Negócio</span>
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
-                          Ver PDF
-                        </a>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const url = repairCorruptedBitrixUrl(pdfUrl);
+                          setPdfPreview({ url, nome: filenameFromUrl(url, 'anexo.pdf') });
+                        }}
+                      >
+                        Ver PDF
                       </Button>
                     </div>
                   </div>
                 )}
+
+                {(camposConfig ?? []).filter(c => c.origem === 'customizado').map(campo => (
+                  <div key={campo.id} className="space-y-2">
+                    <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+                    <Input
+                      value={camposExtras[campo.campo_key] ?? ''}
+                      onChange={e => setCamposExtras(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}
+                      placeholder={campo.label ?? ''}
+                    />
+                  </div>
+                ))}
+
+                {Object.entries((pedidoData.pedido.campos_extras as Record<string, string> | null) || {}).map(([key, value]) => {
+                  if (!value) return null;
+                  if ((camposConfig ?? []).some(c => c.origem === 'customizado' && c.campo_key === key)) return null;
+                  const strValue = String(value).trim();
+                  const isUrl = /^https?:\/\//i.test(strValue);
+                  return (
+                    <div key={key} className="space-y-2">
+                      <Label>{key}</Label>
+                      {isUrl ? (
+                        <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
+                          <FileText className="h-5 w-5 text-primary" />
+                          <span className="text-sm font-medium flex-1 truncate">{key}</span>
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={strValue} target="_blank" rel="noopener noreferrer">
+                              Abrir
+                            </a>
+                          </Button>
+                        </div>
+                      ) : (
+                        <Input value={strValue} disabled />
+                      )}
+                    </div>
+                  );
+                })}
 
                 <div className="flex justify-end pt-4">
                   <Button onClick={handleNext}>
@@ -684,6 +752,8 @@ const EditarPedido = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <FilePreviewDialog file={pdfPreview} onClose={() => setPdfPreview(null)} />
     </AppLayout>
   );
 };

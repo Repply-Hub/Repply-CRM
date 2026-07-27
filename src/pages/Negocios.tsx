@@ -10,7 +10,8 @@ import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { KanbanColunasDialog } from '@/components/pedidos/kanban/KanbanColunasDialog';
 import { useFunis } from '@/hooks/use-funis';
 import { usePedidos, usePedidosStats, useHistoricoContatos, useUpdatePedidoStatus, useBulkDeletePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
-import { useTarefasPorPedido } from '@/hooks/use-tarefas';
+import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
+import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
@@ -25,7 +26,7 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, ListChecks, Rows3
+  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, Rows3
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -49,6 +50,9 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
+import { filenameFromUrl } from '@/lib/download-file';
+import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
@@ -152,7 +156,7 @@ const PedidoRow = memo(({
               <TableCell key={colId} className="whitespace-nowrap px-4" onClick={e => e.stopPropagation()}>
                 {pedido.pdf_url ? (
                   <a
-                    href={pedido.pdf_url}
+                    href={repairCorruptedBitrixUrl(pedido.pdf_url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-primary hover:underline"
@@ -297,6 +301,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     defaultColumns: PEDIDOS_COLUMNS,
   });
 
+  // Corrige o rótulo legado da coluna de anexo ("Pdf da cotação" e variações), criada por
+  // importações antigas antes do campo virar genérico — o padrão atual passou a ser "Anexo".
+  useEffect(() => {
+    if (columns.some(c => c.id === 'pdf_url') && getLabel('pdf_url') !== 'Anexo') {
+      handleRename('pdf_url', 'Anexo');
+    }
+  }, [columns, getLabel, handleRename]);
+
   // Reage a mudanças no localStorage (ex.: importação adicionou novas colunas extras)
   useEffect(() => {
     const handler = () => {
@@ -367,6 +379,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     [tarefasKanbanColunas]
   );
   const [addTarefaOpen, setAddTarefaOpen] = useState(false);
+  const [editingTarefaNegocio, setEditingTarefaNegocio] = useState<Tarefa | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<FilePreviewTarget | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportTargetId, setExportTargetId] = useState<string | undefined>(undefined);
 
@@ -1166,12 +1180,29 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 const value = selectedViewOrder.campos_extras?.[colId] ?? selectedViewOrder.campos_extras?.[getLabel(colId)];
                 if (!value) return null;
 
+                // Evita duplicar a exibição quando o mesmo link já aparece na seção "Anexo"
+                // estruturada abaixo (importações antigas guardavam o PDF só como campo extra).
+                if (selectedViewOrder.pdf_url && typeof value === 'string' && value.trim() === selectedViewOrder.pdf_url.trim()) return null;
+
+                const isUrl = typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+
                 return (
                   <div key={colId} className="space-y-1">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <FileText className="h-3 w-3" /> {getLabel(colId)}
                     </p>
-                    <p className="text-sm font-medium">{value}</p>
+                    {isUrl ? (
+                      <a
+                        href={value.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 text-sm font-medium text-primary hover:underline w-fit"
+                      >
+                        <FileText className="h-4 w-4" /> Abrir {getLabel(colId)}
+                      </a>
+                    ) : (
+                      <p className="text-sm font-medium">{value}</p>
+                    )}
                   </div>
                 );
               })}
@@ -1188,62 +1219,68 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
 
-            {/* Observações */}
-            {selectedViewOrder.observacoes && (
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Observações</p>
-                <div className="p-4 rounded-lg border bg-muted/20">
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap italic">"{selectedViewOrder.observacoes}"</p>
-                </div>
-              </div>
-            )}
-
             {/* Anexo */}
             {selectedViewOrder.pdf_url && (
               <div className="space-y-2">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Anexo</p>
-                <a
-                  href={selectedViewOrder.pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = repairCorruptedBitrixUrl(selectedViewOrder.pdf_url);
+                    setPdfPreview({ url, nome: filenameFromUrl(url, 'anexo.pdf') });
+                  }}
                   className="inline-flex items-center gap-2 p-3 rounded-lg border bg-muted/30 text-sm font-medium text-primary hover:underline w-fit"
                 >
                   <FileText className="h-4 w-4" /> Ver PDF anexado
-                </a>
+                </button>
               </div>
             )}
 
-            {/* Histórico de Tarefas */}
+            {/* Tarefas / Observações do negócio */}
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Histórico de Tarefas</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tarefas</p>
                 <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => setAddTarefaOpen(true)}>
                   <Plus className="h-3.5 w-3.5" /> Nova Tarefa
                 </Button>
               </div>
-              <div className="space-y-3">
-                {!tarefasNegocio?.length ? (
-                  <p className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg">Nenhuma tarefa vinculada a este negócio</p>
-                ) : (
-                  tarefasNegocio.map(tarefa => (
-                    <div key={tarefa.id} className="flex gap-3 p-3 rounded-lg border hover:bg-muted/10 transition-colors">
-                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <ListChecks className="h-3.5 w-3.5 text-primary" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-medium text-foreground leading-snug truncate">{tarefa.titulo}</p>
-                          <Badge variant="outline" className="capitalize shrink-0 text-[10px]">{tarefa.status.replace(/_/g, ' ')}</Badge>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          {tarefa.prazo_final
-                            ? `Prazo: ${format(new Date(tarefa.prazo_final), 'dd/MM/yyyy', { locale: ptBR })}`
-                            : `Criada em ${format(new Date(tarefa.created_at), 'dd/MM/yyyy', { locale: ptBR })}`}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Tarefa</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Responsável</TableHead>
+                      <TableHead>Prazo Final</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {!tarefasNegocio?.length ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground text-sm">
+                          Nenhuma tarefa vinculada a este negócio
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      tarefasNegocio.map(tarefa => (
+                        <TableRow key={tarefa.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setEditingTarefaNegocio(tarefa)}>
+                          <TableCell className="font-medium text-sm">{tarefa.titulo}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize text-[10px]">{tarefa.status.replace(/_/g, ' ')}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm" onClick={(e) => tarefa.responsavel && e.stopPropagation()}>
+                            {tarefa.responsavel ? <UserProfilePopover name={tarefa.responsavel} /> : <span className="text-muted-foreground">-</span>}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {tarefa.prazo_final
+                              ? format(new Date(tarefa.prazo_final), 'dd/MM/yyyy', { locale: ptBR })
+                              : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </div>
           </div>
@@ -1277,6 +1314,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       open={addTarefaOpen}
       onOpenChange={setAddTarefaOpen}
       editingTarefa={null}
+      kanbanStages={tarefaKanbanStages}
+      extraFields={{ pedido_id: viewOrderId!, cliente_id: selectedViewOrder?.cliente_id }}
+    />
+  );
+
+  const editTarefaDialog = (
+    <TarefaFormDialog
+      open={!!editingTarefaNegocio}
+      onOpenChange={(open) => { if (!open) setEditingTarefaNegocio(null); }}
+      editingTarefa={editingTarefaNegocio}
       kanbanStages={tarefaKanbanStages}
       extraFields={{ pedido_id: viewOrderId!, cliente_id: selectedViewOrder?.cliente_id }}
     />
@@ -1630,6 +1677,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
       {viewOrderSheet}
       {addTarefaDialog}
+      {editTarefaDialog}
+      <FilePreviewDialog file={pdfPreview} onClose={() => setPdfPreview(null)} />
     </AppLayout>
   );
 };

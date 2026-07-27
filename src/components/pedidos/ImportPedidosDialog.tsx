@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X, ArrowRight, Plus, Pencil, EyeOff, FolderKanban } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X, ArrowRight, Plus, Pencil, EyeOff, FolderKanban, UserCheck, UserX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,6 +18,9 @@ import { ImportInstructionsStep } from '@/components/import/ImportInstructionsSt
 import { useBulkImport } from '@/hooks/use-bulk-import';
 import { useAuth } from '@/hooks/use-auth';
 import { useFunis } from '@/hooks/use-funis';
+import { useIsGestor } from '@/hooks/use-novo-pedido';
+import { useQuery } from '@tanstack/react-query';
+import { matchUsuarioByNome, type UsuarioLite } from '@/lib/import/match-usuario';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 import {
@@ -43,6 +46,7 @@ const FIELD_EXAMPLES: Partial<Record<FieldKey, string>> = {
   data_pedido: '2026-01-15',
   prazo_resposta: '2026-01-30',
   observacoes: 'Observação livre',
+  pdf_url: 'https://cdn.bitrix24.com.br/.../anexo.pdf',
 };
 const TEMPLATE_FIELDS = FIELDS.map(f => ({ label: f.label, example: FIELD_EXAMPLES[f.key] }));
 
@@ -71,6 +75,17 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: funis } = useFunis(empresaId);
   const [funilId, setFunilId] = useState<string | undefined>(undefined);
+  const { data: isGestor } = useIsGestor();
+  // Usuários da empresa para vincular a coluna Responsável/Vendedor por nome (só gestores atribuem para outros).
+  const { data: usuariosEmpresa } = useQuery({
+    queryKey: ['usuarios_empresa_nomes', empresaId],
+    enabled: Boolean(isGestor),
+    queryFn: async () => {
+      const { data, error } = await supabase.from('usuarios').select('id, nome');
+      if (error) throw error;
+      return (data ?? []) as UsuarioLite[];
+    },
+  });
   useEffect(() => {
     if (!funis || funis.length === 0 || funilId) return;
     setFunilId((funis.find(f => f.is_padrao) ?? funis[0]).id);
@@ -254,6 +269,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         data_pedido: rest.data_pedido || undefined,
         prazo_resposta: rest.prazo_resposta || undefined,
         observacoes: rest.observacoes || '',
+        pdf_url: rest.pdf_url || '',
         campos_extras: campos_extras || {}
       };
     });
@@ -315,6 +331,18 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     [extras, customColumns]
   );
 
+  // Vincula o nome da coluna Responsável/Vendedor a um usuário real da empresa (por nome,
+  // tolerando acentos/variação de digitação) para mostrar o resultado já no preview.
+  const vendedorMatches = useMemo(() => {
+    if (!isGestor || !usuariosEmpresa || usuariosEmpresa.length === 0) return new Map<string, ReturnType<typeof matchUsuarioByNome>>();
+    const map = new Map<string, ReturnType<typeof matchUsuarioByNome>>();
+    previewRows.forEach(r => {
+      if (!r.vendedor || map.has(r.vendedor)) return;
+      map.set(r.vendedor, matchUsuarioByNome(r.vendedor, usuariosEmpresa));
+    });
+    return map;
+  }, [previewRows, usuariosEmpresa, isGestor]);
+
   const handleImport = async () => {
     if (importing) return;
     const allRows = getMappedRows();
@@ -341,7 +369,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       if (!vid) throw new Error('Vendedor não encontrado');
 
-      const { data: isGestor } = await supabase.rpc('is_gestor');
+      const { data: isGestorNow } = await supabase.rpc('is_gestor');
 
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id;
@@ -435,21 +463,24 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         window.dispatchEvent(new Event('storage'));
       }
 
-      // Busca vendedores para atribuição por nome (somente se gestor)
-      let vendedorMap = new Map<string, string>();
-      if (isGestor) {
+      // Busca vendedores para vincular a coluna Responsável/Vendedor por nome (somente se
+      // gestor) — reaproveita a lista já carregada para o preview quando disponível.
+      let usuariosParaMatch: UsuarioLite[] = usuariosEmpresa ?? [];
+      if (isGestorNow && usuariosParaMatch.length === 0) {
         const { data: vends } = await supabase.from('usuarios').select('id, nome');
-        if (vends) vendedorMap = new Map(vends.map(v => [v.nome?.toLowerCase().trim() || '', v.id]));
+        usuariosParaMatch = vends ?? [];
       }
 
       // Pré-processa linhas: enriquece campos_extras e resolve usuario_id para gestor.
       // Resolução de clientes/fabricantes/obras, hashing e batch paralelo ficam no hook.
       const enrichedRows: Record<string, unknown>[] = rows.map(r => {
         const campos_extras = { ...(r.campos_extras || {}) };
-        const matchedVendedorId = r.vendedor ? vendedorMap.get(r.vendedor.toLowerCase().trim()) : null;
-        const resolvedUserId = isGestor && matchedVendedorId ? matchedVendedorId : null;
+        const match = isGestorNow && r.vendedor ? matchUsuarioByNome(r.vendedor, usuariosParaMatch) : null;
+        const resolvedUserId = match?.usuarioId ?? null;
 
-        if (r.vendedor && !resolvedUserId) campos_extras['Vendedor Original'] = r.vendedor;
+        // Guarda o nome original sempre que não houve match exato — tanto para auditoria
+        // de matches aproximados quanto para revisão manual quando ninguém bateu.
+        if (r.vendedor && (!match || !match.exact)) campos_extras['Vendedor Original'] = r.vendedor;
         if (r.contato) campos_extras['Contato'] = r.contato;
         if (r.negocio) campos_extras['Negócio'] = r.negocio;
         else if (r.obra) campos_extras['Negócio'] = r.obra;
@@ -465,7 +496,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         };
       });
 
-      const summary = await importNegocios(enrichedRows, undefined, funilId);
+      const summary = await importNegocios(enrichedRows, undefined, funilId, empresaId);
 
       // Log linhas com data inválida (filtradas antes do hook — não chegam ao importNegocios)
       if (userId) {
@@ -750,6 +781,21 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                   </div>
                 </div>
               )}
+
+              {isGestor && vendedorMatches.size > 0 && (
+                <div className="bg-muted/50 border border-border/50 rounded-xl p-4 flex items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center shrink-0 border border-border/50">
+                    <UserCheck className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Responsável vinculado por nome</span>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed flex items-center gap-3 flex-wrap">
+                      <span className="inline-flex items-center gap-1"><UserCheck className="h-3 w-3 text-green-600" /> encontrado na empresa</span>
+                      <span className="inline-flex items-center gap-1"><UserX className="h-3 w-3 text-muted-foreground/70" /> sem match, fica com você</span>
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border rounded-lg overflow-x-auto">
@@ -781,7 +827,31 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                       <TableCell className="text-xs whitespace-nowrap">{r.fabricante}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap max-w-[120px] truncate">{r.negocio || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap max-w-[120px] truncate">{r.obra || '-'}</TableCell>
-                      <TableCell className="text-xs whitespace-nowrap max-w-[100px] truncate">{r.vendedor || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap max-w-[140px]">
+                        {r.vendedor ? (
+                          isGestor ? (
+                            (() => {
+                              const match = vendedorMatches.get(r.vendedor);
+                              return match ? (
+                                <span
+                                  className={cn('inline-flex items-center gap-1 truncate', match.exact ? 'text-foreground' : 'text-amber-700')}
+                                  title={match.exact ? undefined : `Vinculado por aproximação de nome a "${match.usuarioNome}"`}
+                                >
+                                  <UserCheck className={cn('h-3.5 w-3.5 shrink-0', match.exact ? 'text-green-600' : 'text-amber-600')} />
+                                  <span className="truncate">{match.usuarioNome}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 truncate text-muted-foreground" title="Nenhum usuário da empresa bate com esse nome — o negócio ficará com você como responsável">
+                                  <UserX className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+                                  <span className="truncate">{r.vendedor}</span>
+                                </span>
+                              );
+                            })()
+                          ) : (
+                            <span className="truncate block">{r.vendedor}</span>
+                          )
+                        ) : '-'}
+                      </TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
                         {r.valor ? r.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                       </TableCell>
