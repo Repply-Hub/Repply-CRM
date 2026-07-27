@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Download, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Download, ArrowRight, CheckCircle2, Lightbulb } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export interface TemplateField {
@@ -41,7 +41,12 @@ export function ImportInstructionsStep({ templateFileName, templateFields, onCon
   return (
     <div className="flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-200">
       <div className="rounded-2xl border border-border/50 bg-muted/30 p-6">
-        <h3 className="text-base font-bold text-foreground mb-4">Antes de importar, siga essas boas práticas</h3>
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Lightbulb className="h-4 w-4 text-primary" />
+          </div>
+          <h3 className="text-base font-bold text-foreground">Antes de importar, siga essas boas práticas</h3>
+        </div>
         <ul className="space-y-2.5">
           {tips.map((tip, i) => (
             <li key={i} className="flex gap-2.5 text-sm text-muted-foreground">
@@ -52,12 +57,17 @@ export function ImportInstructionsStep({ templateFileName, templateFields, onCon
         </ul>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-dashed border-primary/30 bg-primary/[0.03] p-6">
-        <div>
-          <p className="text-sm font-bold text-foreground">Planilha modelo</p>
-          <p className="text-xs text-muted-foreground max-w-md">
-            Baixe o modelo com as colunas esperadas pelo sistema e use como base para organizar seus dados antes de importar.
-          </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-dashed border-primary/30 bg-primary/[0.03] p-6 transition-colors hover:bg-primary/[0.05]">
+        <div className="flex items-start gap-3">
+          <div className="h-9 w-9 rounded-lg bg-background flex items-center justify-center shrink-0 shadow-sm border border-primary/10">
+            <Download className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Planilha modelo</p>
+            <p className="text-xs text-muted-foreground max-w-md">
+              Baixe o modelo com as colunas esperadas pelo sistema e use como base para organizar seus dados antes de importar.
+            </p>
+          </div>
         </div>
         <Button variant="outline" className="shrink-0" onClick={() => downloadImportTemplate(templateFileName, templateFields)}>
           <Download className="h-4 w-4 mr-2" /> Baixar planilha modelo
