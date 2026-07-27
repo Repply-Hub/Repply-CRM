@@ -537,6 +537,66 @@ export type Database = {
           },
         ]
       }
+      configuracoes_campos: {
+        Row: {
+          campo_key: string
+          created_at: string
+          created_by: string | null
+          empresa_id: string
+          entidade: string
+          id: string
+          label: string | null
+          obrigatorio: boolean
+          ordem: number
+          origem: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          campo_key: string
+          created_at?: string
+          created_by?: string | null
+          empresa_id: string
+          entidade: string
+          id?: string
+          label?: string | null
+          obrigatorio?: boolean
+          ordem?: number
+          origem: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          campo_key?: string
+          created_at?: string
+          created_by?: string | null
+          empresa_id?: string
+          entidade?: string
+          id?: string
+          label?: string | null
+          obrigatorio?: boolean
+          ordem?: number
+          origem?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configuracoes_campos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "configuracoes_campos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       configuracoes_automacao: {
         Row: {
           chave: string
@@ -1794,6 +1854,60 @@ export type Database = {
           },
         ]
       }
+      permissao_presets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          empresa_id: string
+          id: string
+          nome: string
+          origem: string
+          permissoes: Json
+          preset_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          empresa_id: string
+          id?: string
+          nome: string
+          origem: string
+          permissoes?: Json
+          preset_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          empresa_id?: string
+          id?: string
+          nome?: string
+          origem?: string
+          permissoes?: Json
+          preset_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permissao_presets_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permissao_presets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       perfis_customizados: {
         Row: {
           created_at: string
@@ -2767,6 +2881,32 @@ export type Database = {
       vendedor_in_my_empresa: {
         Args: { _usuario_id: string }
         Returns: boolean
+      }
+      wa_iniciar_conversa: {
+        Args: {
+          p_cliente_id?: string
+          p_nome_contato?: string
+          p_telefone: string
+        }
+        Returns: {
+          arquivada: boolean
+          cliente_id: string | null
+          contato_id: string | null
+          created_at: string
+          empresa_id: string
+          foto_perfil_expires_at: string | null
+          foto_perfil_url: string | null
+          id: string
+          instancia_id: string | null
+          is_group: boolean
+          nao_lidas: number
+          nome_contato: string | null
+          participantes: Json
+          telefone: string
+          ultima_mensagem: string | null
+          ultima_mensagem_at: string | null
+          updated_at: string
+        }
       }
     }
     Enums: {
