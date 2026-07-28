@@ -31,6 +31,7 @@ import {
   useWaInstancias,
   useWaBuscarMensagens,
   uploadWaMedia,
+  mimeForFile,
   type WaConversa,
   type WaMensagem,
   type WaReacao,
@@ -1016,6 +1017,8 @@ function MessageStatus({ status }: { status: string }) {
   return null;
 }
 
+const AUDIO_SPEEDS = [1, 1.5, 2] as const;
+
 function WaAudioPlayer({
   src,
   isSaida,
@@ -1030,7 +1033,19 @@ function WaAudioPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState<(typeof AUDIO_SPEEDS)[number]>(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = playbackRate;
+  }, [playbackRate, src]);
+
+  const cycleSpeed = () => {
+    setPlaybackRate((prev) => {
+      const idx = AUDIO_SPEEDS.indexOf(prev);
+      return AUDIO_SPEEDS[(idx + 1) % AUDIO_SPEEDS.length];
+    });
+  };
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -1160,10 +1175,22 @@ function WaAudioPlayer({
           />
         </div>
 
-        <div className="flex justify-between items-center text-[9px] opacity-75 px-0.5">
-          <span className={isSaida ? "text-white/90" : "text-muted-foreground"}>
+        <div className="flex justify-between items-center text-[9px] px-0.5">
+          <span className={cn("opacity-75", isSaida ? "text-white/90" : "text-muted-foreground")}>
             {formatAudioTime(currentTime || duration)}
           </span>
+          <button
+            type="button"
+            onClick={cycleSpeed}
+            className={cn(
+              "rounded-full px-1.5 py-0.5 font-semibold leading-none transition-colors",
+              isSaida
+                ? "bg-white/20 hover:bg-white/30 text-white"
+                : "bg-black/5 hover:bg-black/10 text-foreground",
+            )}
+          >
+            {playbackRate}x
+          </button>
         </div>
       </div>
     </div>
@@ -4485,7 +4512,7 @@ export default function WhatsAppInbox() {
         conversa_id: conversaId,
         tipo: "audio",
         media_url: mediaUrl,
-        media_mime: file.type || null,
+        media_mime: mimeForFile(file),
         nome_arquivo: file.name,
         ptt: true,
         ...quoted,
@@ -4560,7 +4587,7 @@ export default function WhatsAppInbox() {
           conversa_id: conversaId,
           tipo,
           media_url: uploadedUrls[i],
-          media_mime: file.type || null,
+          media_mime: mimeForFile(file),
           nome_arquivo: file.name,
           ...(i === 0 ? quoted : {}),
         });
@@ -6243,7 +6270,13 @@ export default function WhatsAppInbox() {
                                         <StickyNote className="inline-block h-3 w-3 mr-1 -mt-0.5" />
                                         <span className="font-semibold">
                                           Nota interna
-                                          {msg.usuario?.nome
+                                          {/* Notas de sistema (assumir/direcionar/fechar conversa,
+                                              adicionar/remover responsável) já embutem o nome do
+                                              autor no início do texto — repetir aqui seria
+                                              redundante. Só mostra o nome quando ele não aparece
+                                              no início do conteúdo (nota digitada manualmente). */}
+                                          {msg.usuario?.nome &&
+                                          !msg.conteudo?.startsWith(msg.usuario.nome)
                                             ? ` (${msg.usuario.nome})`
                                             : ""}
                                           :

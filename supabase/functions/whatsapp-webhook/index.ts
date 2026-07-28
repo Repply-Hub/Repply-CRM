@@ -108,18 +108,53 @@ async function logWebhookDrop(supabase: any, motivo: string, payload: unknown) {
   }
 }
 
+// Mimetypes de documento que a uazapi/baileys mandam para arquivos "document" — sem
+// essas entradas, o fallback genérico gravava tudo como .bin, tornando o arquivo
+// original (docx, xlsx, etc.) ilegível para quem baixasse pela URL do Storage.
+const MIME_TO_EXT: Record<string, string> = {
+  "vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "msword": "doc",
+  "vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "vnd.ms-excel": "xls",
+  "vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "vnd.ms-powerpoint": "ppt",
+  "zip": "zip",
+  "x-rar-compressed": "rar",
+  "vnd.rar": "rar",
+  "csv": "csv",
+  "plain": "txt",
+};
+
+function extFromFileName(fileName: string | null): string | null {
+  if (!fileName) return null;
+  const match = /\.([a-zA-Z0-9]{1,8})$/.exec(fileName.trim());
+  return match ? match[1].toLowerCase() : null;
+}
+
+function extFromMime(mime: string): string {
+  if (mime.includes("ogg")) return "ogg";
+  if (mime.includes("webm")) return "webm";
+  if (mime.includes("mp4")) return "mp4";
+  if (mime.includes("mpeg")) return "mp3";
+  if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
+  if (mime.includes("png")) return "png";
+  if (mime.includes("webp")) return "webp";
+  if (mime.includes("pdf")) return "pdf";
+  for (const [needle, ext] of Object.entries(MIME_TO_EXT)) {
+    if (mime.includes(needle)) return ext;
+  }
+  return "bin";
+}
+
 async function uploadBytesToStorage(
   supabase: any,
   bytes: Uint8Array,
   mime: string,
   empresaId: string,
   wamid: string,
+  fileName: string | null = null,
 ): Promise<string | null> {
-  const ext = mime.includes("ogg") ? "ogg" : mime.includes("webm") ? "webm"
-    : mime.includes("mp4") ? "mp4" : mime.includes("mpeg") ? "mp3"
-    : mime.includes("jpeg") || mime.includes("jpg") ? "jpg"
-    : mime.includes("png") ? "png" : mime.includes("webp") ? "webp"
-    : mime.includes("pdf") ? "pdf" : "bin";
+  const ext = extFromFileName(fileName) ?? extFromMime(mime);
 
   const path = `incoming/${empresaId}/${Date.now()}-${wamid.slice(-10)}.${ext}`;
   const { data: up, error } = await supabase.storage
@@ -172,9 +207,61 @@ async function decryptWhatsAppMedia(
   return new Uint8Array(plaintext);
 }
 
+// Fallback quando a uazapi não manda `mimetype` no payload (comum em figurinhas).
+// Usar um default único (ex.: "audio/ogg") para todos os tipos gravava o Content-Type
+// errado no Storage para mídias não-áudio — um sticker salvo como "audio/ogg" não
+// renderiza em nenhuma tag <img>, mesmo com os bytes corretos.
+const DEFAULT_MIME_BY_TIPO: Record<string, string> = {
+  audio: "audio/ogg",
+  imagem: "image/jpeg",
+  video: "video/mp4",
+  documento: "application/octet-stream",
+  sticker: "image/webp",
+};
+
+// Fallback via API da uazapi (POST /message/download) para quando o payload do
+// webhook não traz um `content.url`/mediaKey utilizáveis (visto em produção: algumas
+// figurinhas chegam com `content.url` truncado, ex. "https://a.whatsapp.net", que não
+// é um link de mídia válido — nossa descriptografia manual não tem como funcionar com
+// isso). A uazapi já faz esse download/descriptografia internamente; ver
+// docs.uazapi.com — endpoint retorna `base64Data` quando `return_base64: true`.
+type UazapiDownloadResult =
+  | { ok: true; bytes: Uint8Array; mime: string | null }
+  | { ok: false; reason: string; detail: unknown };
+
+async function downloadViaUazapiApi(
+  config: { instance_url: string; api_key: string },
+  wamid: string,
+): Promise<UazapiDownloadResult> {
+  try {
+    const baseUrl = config.instance_url.replace(/\/$/, "");
+    const res = await fetch(`${baseUrl}/message/download`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token: config.api_key },
+      body: JSON.stringify({ id: wamid, return_base64: true, return_link: false }),
+    });
+    const bodyText = await res.text();
+    if (!res.ok) {
+      return { ok: false, reason: `http_${res.status}`, detail: bodyText.slice(0, 2000) };
+    }
+    let data: any;
+    try {
+      data = JSON.parse(bodyText);
+    } catch {
+      return { ok: false, reason: "invalid_json", detail: bodyText.slice(0, 2000) };
+    }
+    if (!data?.base64Data) {
+      return { ok: false, reason: "no_base64Data", detail: data };
+    }
+    return { ok: true, bytes: b64ToBytes(data.base64Data), mime: data.mimetype ?? null };
+  } catch (e) {
+    return { ok: false, reason: "exception", detail: String(e) };
+  }
+}
+
 async function downloadAndStoreMedia(
   supabase: any,
-  _config: any,
+  config: any,
   empresaId: string,
   _instanceName: string,
   wamid: string,
@@ -183,23 +270,46 @@ async function downloadAndStoreMedia(
   inlineB64: string | null,
   mediaKey: string | null,
   tipo: string,
+  fileName: string | null = null,
 ): Promise<string | null> {
-  const mime = (mediaMime ?? "audio/ogg").split(";")[0].trim();
+  const mime = (mediaMime ?? DEFAULT_MIME_BY_TIPO[tipo] ?? "audio/ogg").split(";")[0].trim();
 
   try {
     if (inlineB64) {
       console.log("[webhook] base64 inline");
       const bytes = b64ToBytes(inlineB64);
-      return await uploadBytesToStorage(supabase, bytes, mime, empresaId, wamid);
+      return await uploadBytesToStorage(supabase, bytes, mime, empresaId, wamid, fileName);
     }
 
     if (cdnUrl && mediaKey) {
       console.log("[webhook] descriptografando WhatsApp E2E...");
-      const bytes = await decryptWhatsAppMedia(cdnUrl, mediaKey, tipo);
+      // `crypto.subtle.decrypt` lança (não retorna null) quando a chave/padding não
+      // batem — sem este try/catch local, essa exceção seria pega pelo catch externo
+      // da função inteira, abortando antes de tentar o fallback via API da uazapi.
+      let bytes: Uint8Array | null = null;
+      try {
+        bytes = await decryptWhatsAppMedia(cdnUrl, mediaKey, tipo);
+      } catch (e) {
+        console.error("[webhook] descriptografia E2E falhou:", e);
+      }
       if (bytes) {
         console.log(`[webhook] descriptografia OK — ${bytes.length} bytes`);
-        return await uploadBytesToStorage(supabase, bytes, mime, empresaId, wamid);
+        return await uploadBytesToStorage(supabase, bytes, mime, empresaId, wamid, fileName);
       }
+    }
+
+    if (config?.instance_url && config?.api_key && wamid) {
+      console.log("[webhook] fallback: baixando mídia via API uazapi...");
+      const apiResult = await downloadViaUazapiApi(config, wamid);
+      if (apiResult.ok) {
+        const apiMime = (apiResult.mime ?? mime).split(";")[0].trim();
+        console.log(`[webhook] download via API OK — ${apiResult.bytes.length} bytes, mime=${apiMime}`);
+        return await uploadBytesToStorage(supabase, apiResult.bytes, apiMime, empresaId, wamid, fileName);
+      }
+      console.log(`[webhook] download via API uazapi falhou: ${apiResult.reason}`);
+      await logWebhookDrop(supabase, `media_download_uazapi_falhou:${apiResult.reason}`, {
+        wamid, tipo, detail: apiResult.detail,
+      });
     }
 
     return null;
@@ -339,6 +449,8 @@ async function handleIncomingMessage(
   let mediaUrl: string | null = null;
   let mediaMime: string | null =
     content?.mimetype ?? content?.mimeType ?? msg.mimetype ?? null;
+  const mediaFileName: string | null =
+    content?.fileName ?? content?.filename ?? msg.fileName ?? null;
 
   if (msgType.includes("image")) {
     tipo = "imagem";
@@ -359,7 +471,7 @@ async function handleIncomingMessage(
   } else if (msgType.includes("document")) {
     tipo = "documento";
     mediaUrl = anyMediaUrl();
-    if (!conteudo) conteudo = content?.fileName ?? content?.filename ?? "[Documento]";
+    if (!conteudo) conteudo = mediaFileName ?? "[Documento]";
   } else if (msgType.includes("sticker")) {
     tipo = "sticker";
     mediaUrl = anyMediaUrl();
@@ -395,18 +507,39 @@ async function handleIncomingMessage(
 
   if (!conteudo) conteudo = `[${tipo}]`;
 
-  // Mensagem citada (reply) — a uazapi expõe isso tanto em `msg.quoted` (formato mais
-  // recente) quanto em `content.contextInfo.quotedMessage`/`stanzaId` (baileys "cru").
-  // Guarda um snapshot (não uma FK) porque a mensagem original pode já ter sido apagada.
-  const quotedRaw = msg.quoted ?? content?.contextInfo?.quotedMessage ?? null;
-  const quotedWamid: string | null =
-    msg.quoted?.id ?? msg.quoted?.messageid ?? content?.contextInfo?.stanzaId ?? null;
-  const quotedConteudo: string | null = quotedRaw
-    ? (quotedRaw.text ?? quotedRaw.conversation ?? quotedRaw.caption ?? null)
-    : null;
-  const quotedTipo: string | null = msg.quoted?.messageType ?? msg.quoted?.type ?? null;
-  const quotedRemetenteNome: string | null =
-    msg.quoted?.senderName ?? content?.contextInfo?.participant ?? null;
+  // Mensagem citada (reply) — `msg.quoted` é uma STRING PURA com o id da mensagem
+  // citada (confirmado contra payloads reais em webhook_debug/_reaction_debug), não um
+  // objeto com .id/.messageType/.senderName como o código antigo assumia — por isso
+  // replies de clientes nunca apareciam como citação no chat (a condição nunca batia).
+  // uazapi não manda conteúdo/tipo/autor da mensagem citada, só o id; buscamos isso na
+  // nossa própria tabela (mesmo padrão de match "sufixo" usado para reações, já que
+  // `wamid` pode estar salvo como "<telefone>:<messageid>"). Guarda um snapshot (não
+  // uma FK) porque a mensagem original pode já ter sido apagada.
+  const quotedRawId: string | null =
+    (typeof msg.quoted === "string" && msg.quoted) ||
+    content?.contextInfo?.stanzaId || null;
+
+  let quotedWamid: string | null = null;
+  let quotedConteudo: string | null = null;
+  let quotedTipo: string | null = null;
+  let quotedRemetenteNome: string | null = null;
+
+  if (quotedRawId) {
+    const { data: quotedMatches } = await supabase
+      .from("whatsapp_mensagens")
+      .select("wamid, conteudo, tipo, direcao, remetente_nome")
+      .eq("empresa_id", empresaId)
+      .like("wamid", `%${quotedRawId}`)
+      .limit(1);
+    const quotedMsg = quotedMatches?.[0] ?? null;
+    if (quotedMsg) {
+      quotedWamid = quotedMsg.wamid;
+      quotedConteudo = quotedMsg.conteudo;
+      quotedTipo = quotedMsg.tipo;
+      quotedRemetenteNome =
+        quotedMsg.direcao === "saida" ? "Você" : (quotedMsg.remetente_nome ?? null);
+    }
+  }
 
   const inlineB64: string | null =
     msg.base64 ?? content?.base64 ?? msg.data ?? content?.data ?? null;
@@ -416,9 +549,14 @@ async function handleIncomingMessage(
   if (tipo !== "texto" && wamid) {
     const storedUrl = await downloadAndStoreMedia(
       supabase, config, empresaId, instanceName, wamid, mediaMime,
-      anyMediaUrl(), inlineB64, mediaKey, tipo,
+      anyMediaUrl(), inlineB64, mediaKey, tipo, mediaFileName,
     );
-    if (storedUrl) mediaUrl = storedUrl;
+    // Se o download/upload falhar, não usa a URL crua da CDN do WhatsApp como
+    // media_url: ela é um link E2E criptografado (.enc) sem os headers/auth que só
+    // nosso decrypt (ou a API da uazapi) sabe resolver — salvar isso trava a mensagem
+    // com uma imagem/anexo quebrado para sempre. Melhor deixar null e mostrar o
+    // placeholder de "mídia indisponível" no frontend.
+    mediaUrl = storedUrl;
     console.log(`[webhook] mídia (${tipo}) stored="${storedUrl ?? "falhou"}"`);
   }
 

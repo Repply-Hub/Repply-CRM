@@ -234,6 +234,43 @@ const WA_MENSAGENS_OLDER_PAGE_SIZE = 50;
 
 const MENSAGEM_SELECT = '*, usuario:usuarios(id, nome, avatar_url, email, role, telefone)';
 
+// Payloads do Realtime (`postgres_changes`) trazem a linha crua da tabela, sem o join
+// `usuario:usuarios(...)` do MENSAGEM_SELECT — por isso mensagens de saída recém-chegadas
+// via Realtime ficavam sem nome/avatar do remetente até a conversa ser recarregada.
+// Preenche a partir do usuário logado nesta aba (caso comum: eu mesmo, em outra sessão) ou
+// do cache de `['usuarios']` (lista de usuários da empresa, já carregada pela página do
+// inbox via `useVendedores`) — cobre o caso de a mensagem ter sido enviada por um colega.
+function buscarUsuarioNoCache(
+  qc: ReturnType<typeof useQueryClient>,
+  usuarioId: string,
+  profile: { id: string; nome: string; avatar_url?: string | null; email?: string | null; role?: string | null; telefone?: string | null } | null | undefined,
+): WaMensagem['usuario'] {
+  if (profile && usuarioId === profile.id) {
+    return {
+      id: profile.id,
+      nome: profile.nome,
+      avatar_url: profile.avatar_url ?? null,
+      email: profile.email ?? null,
+      role: profile.role ?? null,
+      telefone: profile.telefone ?? null,
+    };
+  }
+  const usuarios = qc.getQueryData<Array<{
+    id: string; nome: string; avatar_url: string | null; email: string | null; role: string | null; telefone: string | null;
+  }>>(['usuarios']);
+  const encontrado = usuarios?.find((u) => u.id === usuarioId);
+  return encontrado
+    ? {
+        id: encontrado.id,
+        nome: encontrado.nome,
+        avatar_url: encontrado.avatar_url ?? null,
+        email: encontrado.email ?? null,
+        role: encontrado.role ?? null,
+        telefone: encontrado.telefone ?? null,
+      }
+    : null;
+}
+
 export function useWaMensagens(conversaId: string | null) {
   const qc = useQueryClient();
   const { profile } = useAuth();
@@ -370,18 +407,14 @@ export function useWaMensagens(conversaId: string | null) {
           }
 
           // Mesmo sem otimista correspondente (ex: outra aba/sessão do mesmo usuário
-          // já removeu o otimista antes do evento chegar), tenta preencher o
-          // remetente pelo usuário logado nesta aba, se bater o usuario_id.
+          // já removeu o otimista antes do evento chegar, ou a mensagem foi enviada
+          // por OUTRO usuário da empresa), tenta preencher o remetente: primeiro pelo
+          // usuário logado nesta aba, senão pelo cache de `['usuarios']` (já carregado
+          // pela página do inbox via useVendedores) — sem isso, mensagens enviadas por
+          // colegas em outra sessão ficavam sem nome/avatar até a conversa ser recarregada.
           const usuarioInferido =
-            newMsg.direcao === 'saida' && !newMsg.usuario && newMsg.usuario_id && newMsg.usuario_id === profile?.id
-              ? {
-                  id: profile.id,
-                  nome: profile.nome,
-                  avatar_url: profile.avatar_url ?? null,
-                  email: profile.email ?? null,
-                  role: profile.role ?? null,
-                  telefone: profile.telefone ?? null,
-                }
+            newMsg.direcao === 'saida' && !newMsg.usuario && newMsg.usuario_id
+              ? buscarUsuarioNoCache(qc, newMsg.usuario_id, profile)
               : newMsg.usuario;
 
           return [...prev, { ...newMsg, usuario: usuarioInferido }];
@@ -469,12 +502,35 @@ export function useWaBuscarMensagens() {
 
 // --- Upload de mídia para Storage ---
 
+// Alguns navegadores/SOs não reconhecem `File.type` para formatos de documento
+// (ex.: .docx retorna ""), o que fazia o objeto ser salvo no Storage com um
+// Content-Type genérico mesmo com a extensão correta no nome do arquivo.
+const EXT_TO_MIME: Record<string, string> = {
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  doc: 'application/msword',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ppt: 'application/vnd.ms-powerpoint',
+  pdf: 'application/pdf',
+  csv: 'text/csv',
+  txt: 'text/plain',
+  zip: 'application/zip',
+  rar: 'application/vnd.rar',
+};
+
+export function mimeForFile(file: File): string | null {
+  if (file.type) return file.type;
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  return ext ? EXT_TO_MIME[ext] ?? null : null;
+}
+
 export async function uploadWaMedia(file: File, conversaId: string): Promise<string> {
   const ext = file.name.split('.').pop() ?? 'bin';
   const path = `${conversaId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { data, error } = await supabase.storage
     .from('whatsapp-media')
-    .upload(path, file, { upsert: false });
+    .upload(path, file, { upsert: false, contentType: mimeForFile(file) ?? undefined });
   if (error) throw error;
   const { data: { publicUrl } } = supabase.storage
     .from('whatsapp-media')
