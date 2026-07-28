@@ -25,6 +25,7 @@ import Emails from "./pages/Emails";
 import WhatsAppInbox from "./pages/WhatsAppInbox";
 import LinhasIgnoradas from "./pages/LinhasIgnoradas";
 import AdminWhatsAppInstancias from "./pages/AdminWhatsAppInstancias";
+import HistoricoAlteracoes from "./pages/HistoricoAlteracoes";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 
 import Login from "./pages/Login";
@@ -236,6 +237,13 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function GestorRoute({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth();
+  const isGestor = profile?.role === "admin" || profile?.role === "gestor" || profile?.role === "empresa";
+  if (profile && !isGestor) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 const AppRoutes = () => (
   <Routes>
     <Route
@@ -389,6 +397,16 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <LinhasIgnoradas />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/historico"
+      element={
+        <ProtectedRoute>
+          <GestorRoute>
+            <HistoricoAlteracoes />
+          </GestorRoute>
         </ProtectedRoute>
       }
     />

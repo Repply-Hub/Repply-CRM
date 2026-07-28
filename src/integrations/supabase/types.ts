@@ -140,6 +140,41 @@ export type Database = {
           },
         ]
       }
+      chat_geral_config: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          foto_url: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          foto_url?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          foto_url?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_geral_config_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_grupo_membros: {
         Row: {
           created_at: string
@@ -249,41 +284,6 @@ export type Database = {
           },
         ]
       }
-      chat_geral_config: {
-        Row: {
-          created_at: string
-          empresa_id: string
-          foto_url: string | null
-          id: string
-          nome: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          empresa_id: string
-          foto_url?: string | null
-          id?: string
-          nome?: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          empresa_id?: string
-          foto_url?: string | null
-          id?: string
-          nome?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chat_geral_config_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: true
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       chat_mensagens: {
         Row: {
           arquivo_nome: string | null
@@ -296,6 +296,11 @@ export type Database = {
           id: string
           lida: boolean
           lida_em: string | null
+          quoted_arquivo_nome: string | null
+          quoted_arquivo_tipo: string | null
+          quoted_conteudo: string | null
+          quoted_mensagem_id: string | null
+          quoted_remetente_nome: string | null
           recipient_id: string | null
           usuario_id: string
         }
@@ -310,6 +315,11 @@ export type Database = {
           id?: string
           lida?: boolean
           lida_em?: string | null
+          quoted_arquivo_nome?: string | null
+          quoted_arquivo_tipo?: string | null
+          quoted_conteudo?: string | null
+          quoted_mensagem_id?: string | null
+          quoted_remetente_nome?: string | null
           recipient_id?: string | null
           usuario_id: string
         }
@@ -324,6 +334,11 @@ export type Database = {
           id?: string
           lida?: boolean
           lida_em?: string | null
+          quoted_arquivo_nome?: string | null
+          quoted_arquivo_tipo?: string | null
+          quoted_conteudo?: string | null
+          quoted_mensagem_id?: string | null
+          quoted_remetente_nome?: string | null
           recipient_id?: string | null
           usuario_id?: string
         }
@@ -340,6 +355,13 @@ export type Database = {
             columns: ["grupo_id"]
             isOneToOne: false
             referencedRelation: "chat_grupos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_quoted_mensagem_id_fkey"
+            columns: ["quoted_mensagem_id"]
+            isOneToOne: false
+            referencedRelation: "chat_mensagens"
             referencedColumns: ["id"]
           },
           {
@@ -537,6 +559,41 @@ export type Database = {
           },
         ]
       }
+      configuracoes_automacao: {
+        Row: {
+          chave: string
+          empresa_id: string
+          id: string
+          updated_at: string
+          updated_by: string | null
+          valor: Json
+        }
+        Insert: {
+          chave: string
+          empresa_id: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+          valor?: Json
+        }
+        Update: {
+          chave?: string
+          empresa_id?: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+          valor?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configuracoes_automacao_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       configuracoes_campos: {
         Row: {
           campo_key: string
@@ -582,49 +639,28 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "configuracoes_campos_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "configuracoes_campos_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      configuracoes_automacao: {
-        Row: {
-          chave: string
-          empresa_id: string
-          id: string
-          updated_at: string
-          updated_by: string | null
-          valor: Json
-        }
-        Insert: {
-          chave: string
-          empresa_id: string
-          id?: string
-          updated_at?: string
-          updated_by?: string | null
-          valor?: Json
-        }
-        Update: {
-          chave?: string
-          empresa_id?: string
-          id?: string
-          updated_at?: string
-          updated_by?: string | null
-          valor?: Json
-        }
-        Relationships: [
           {
-            foreignKeyName: "configuracoes_automacao_empresa_id_fkey"
+            foreignKeyName: "configuracoes_campos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_usuario"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "configuracoes_campos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "configuracoes_campos_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
@@ -1083,6 +1119,36 @@ export type Database = {
         }
         Relationships: []
       }
+      funis: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          is_padrao: boolean
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_padrao?: boolean
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_padrao?: boolean
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       gmail_tokens: {
         Row: {
           access_token: string
@@ -1112,6 +1178,77 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      historico_alteracoes: {
+        Row: {
+          acao: string
+          created_at: string
+          dados_antes: Json | null
+          dados_depois: Json | null
+          descricao: string | null
+          empresa_id: string | null
+          id: string
+          origem: string
+          registro_id: string | null
+          tabela: string
+          usuario_id: string | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          dados_antes?: Json | null
+          dados_depois?: Json | null
+          descricao?: string | null
+          empresa_id?: string | null
+          id?: string
+          origem?: string
+          registro_id?: string | null
+          tabela: string
+          usuario_id?: string | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          dados_antes?: Json | null
+          dados_depois?: Json | null
+          descricao?: string | null
+          empresa_id?: string | null
+          id?: string
+          origem?: string
+          registro_id?: string | null
+          tabela?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_alteracoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_alteracoes_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_alteracoes_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_usuario"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "historico_alteracoes_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["usuario_id"]
+          },
+        ]
       }
       historico_contatos: {
         Row: {
@@ -1226,36 +1363,6 @@ export type Database = {
             referencedColumns: ["pedido_id"]
           },
         ]
-      }
-      funis: {
-        Row: {
-          created_at: string
-          empresa_id: string
-          id: string
-          is_padrao: boolean
-          nome: string
-          ordem: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          empresa_id: string
-          id?: string
-          is_padrao?: boolean
-          nome: string
-          ordem?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          empresa_id?: string
-          id?: string
-          is_padrao?: boolean
-          nome?: string
-          ordem?: number
-          updated_at?: string
-        }
-        Relationships: []
       }
       kanban_colunas: {
         Row: {
@@ -1797,13 +1904,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "pedidos_funil_id_fkey"
-            columns: ["funil_id"]
-            isOneToOne: false
-            referencedRelation: "funis"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "pedidos_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -1823,6 +1923,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_velocidade_por_fabricante"
             referencedColumns: ["fabricante_id"]
+          },
+          {
+            foreignKeyName: "pedidos_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "pedidos_obra_id_fkey"
@@ -1853,6 +1960,27 @@ export type Database = {
             referencedColumns: ["usuario_id"]
           },
         ]
+      }
+      perfis_customizados: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string | null
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome?: string | null
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string | null
+          slug?: string
+        }
+        Relationships: []
       }
       permissao_presets: {
         Row: {
@@ -1893,41 +2021,34 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "permissao_presets_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "permissao_presets_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "permissao_presets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_usuario"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "permissao_presets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "permissao_presets_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
         ]
-      }
-      perfis_customizados: {
-        Row: {
-          created_at: string
-          id: string
-          nome: string | null
-          slug: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          nome?: string | null
-          slug: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          nome?: string | null
-          slug?: string
-        }
-        Relationships: []
       }
       permissoes_usuario: {
         Row: {
@@ -2241,6 +2362,13 @@ export type Database = {
             referencedRelation: "pedidos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "tarefas_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pedidos_inativos"
+            referencedColumns: ["pedido_id"]
+          },
         ]
       }
       tarefas_kanban_colunas: {
@@ -2525,6 +2653,7 @@ export type Database = {
           instancia_id: string | null
           is_group: boolean
           nao_lidas: number
+          nao_lidas_forcada: boolean
           nome_contato: string | null
           participantes: Json
           telefone: string
@@ -2544,6 +2673,7 @@ export type Database = {
           instancia_id?: string | null
           is_group?: boolean
           nao_lidas?: number
+          nao_lidas_forcada?: boolean
           nome_contato?: string | null
           participantes?: Json
           telefone: string
@@ -2563,6 +2693,7 @@ export type Database = {
           instancia_id?: string | null
           is_group?: boolean
           nao_lidas?: number
+          nao_lidas_forcada?: boolean
           nome_contato?: string | null
           participantes?: Json
           telefone?: string
@@ -2618,6 +2749,7 @@ export type Database = {
           quoted_remetente_nome: string | null
           quoted_tipo: string | null
           quoted_wamid: string | null
+          reacoes: Json
           remetente_nome: string | null
           remetente_telefone: string | null
           status: string
@@ -2641,6 +2773,7 @@ export type Database = {
           quoted_remetente_nome?: string | null
           quoted_tipo?: string | null
           quoted_wamid?: string | null
+          reacoes?: Json
           remetente_nome?: string | null
           remetente_telefone?: string | null
           status?: string
@@ -2664,6 +2797,7 @@ export type Database = {
           quoted_remetente_nome?: string | null
           quoted_tipo?: string | null
           quoted_wamid?: string | null
+          reacoes?: Json
           remetente_nome?: string | null
           remetente_telefone?: string | null
           status?: string
@@ -2808,6 +2942,11 @@ export type Database = {
       }
     }
     Functions: {
+      can_access_wa_conversa: {
+        Args: { _conversa_id: string }
+        Returns: boolean
+      }
+      criar_funil: { Args: { p_nome: string }; Returns: string }
       dashboard_stats: {
         Args: {
           p_date_from?: string
@@ -2826,7 +2965,6 @@ export type Database = {
           total_pedidos: number
         }[]
       }
-      criar_funil: { Args: { p_nome: string }; Returns: string }
       delete_current_user: { Args: never; Returns: undefined }
       delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
       get_my_empresa_id: { Args: never; Returns: string }
@@ -2842,23 +2980,56 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_gestor: { Args: never; Returns: boolean }
+      is_member_of_grupo: { Args: { _grupo_id: string }; Returns: boolean }
+      montar_permissoes_preset_padrao: {
+        Args: { p_preset_key: string }
+        Returns: Json
+      }
       normalize_whatsapp_phone: { Args: { raw: string }; Returns: string }
-      pedidos_stats: {
-        Args: {
-          p_date_from?: string
-          p_date_to?: string
-          p_fabricante_ids?: string[]
-          p_funil_id?: string
-          p_only_attention?: boolean
-          p_search?: string
-          p_stages?: string[]
-          p_usuario_ids?: string[]
-        }
+      parse_endereco_livre: {
+        Args: { p_endereco: string }
         Returns: {
-          total_count: number
-          total_valor: number
+          bairro: string
+          cep: string
+          cidade: string
+          complemento: string
+          logradouro: string
+          numero: string
+          uf: string
         }[]
       }
+      pedidos_stats:
+        | {
+            Args: {
+              p_date_from?: string
+              p_date_to?: string
+              p_fabricante_ids?: string[]
+              p_only_attention?: boolean
+              p_search?: string
+              p_stages?: string[]
+              p_usuario_ids?: string[]
+            }
+            Returns: {
+              total_count: number
+              total_valor: number
+            }[]
+          }
+        | {
+            Args: {
+              p_date_from?: string
+              p_date_to?: string
+              p_fabricante_ids?: string[]
+              p_funil_id?: string
+              p_only_attention?: boolean
+              p_search?: string
+              p_stages?: string[]
+              p_usuario_ids?: string[]
+            }
+            Returns: {
+              total_count: number
+              total_valor: number
+            }[]
+          }
       restaurar_usuario_por_email: {
         Args: {
           p_email: string
@@ -2900,12 +3071,19 @@ export type Database = {
           instancia_id: string | null
           is_group: boolean
           nao_lidas: number
+          nao_lidas_forcada: boolean
           nome_contato: string | null
           participantes: Json
           telefone: string
           ultima_mensagem: string | null
           ultima_mensagem_at: string | null
           updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "whatsapp_conversas"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
     }

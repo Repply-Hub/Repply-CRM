@@ -85,6 +85,9 @@ export function AppSidebar() {
     // Itens exclusivos do admin master nunca aparecem para outros perfis
     if (i.id === 'admin_wa_instancias' || i.id === 'usuarios_admin') return false;
 
+    // Histórico de alterações é exclusivo de gestores/empresa (não aparece pra vendedor comum)
+    if (i.id === 'historico' && !isGestor) return false;
+
     if (isGestor) return true; // gestores/empresa see all visible items
     // For vendedores e cargos customizados: check if they have pode_ver permission for this module
     if (!permissoes || permissoes.length === 0) return true; // no permissions set = show all (default)

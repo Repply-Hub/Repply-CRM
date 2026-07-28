@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './use-auth';
+import { useRegistrarAtividade } from './use-historico-alteracoes';
 
 export function useCreateCliente() {
   const qc = useQueryClient();
@@ -75,12 +77,27 @@ export function useUpdateCliente() {
 
 export function useDeleteCliente() {
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const registrarAtividade = useRegistrarAtividade();
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('clientes').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['clientes'] }),
+    onSuccess: (_data, id) => {
+      const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
+      if (empresaId && profile?.id) {
+        registrarAtividade.mutate({
+          empresaId,
+          usuarioId: profile.id,
+          tabela: 'clientes',
+          registroId: id,
+          acao: 'DELETE',
+          descricao: 'Excluiu um cliente',
+        });
+      }
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+    },
   });
 }
 export function useDeleteContato() {
@@ -193,6 +210,8 @@ export function useUpdateObra() {
 
 export function useDeleteObra() {
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const registrarAtividade = useRegistrarAtividade();
   return useMutation({
     mutationFn: async (id: string) => {
       console.log('Excluindo obra única:', id);
@@ -204,7 +223,18 @@ export function useDeleteObra() {
       console.log('Resultado exclusão única:', data);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
+      if (empresaId && profile?.id) {
+        registrarAtividade.mutate({
+          empresaId,
+          usuarioId: profile.id,
+          tabela: 'obras',
+          registroId: id,
+          acao: 'DELETE',
+          descricao: 'Excluiu uma obra',
+        });
+      }
       qc.invalidateQueries({ queryKey: ['obras'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
     },
@@ -213,6 +243,8 @@ export function useDeleteObra() {
 
 export function useDeleteObrasBulk() {
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const registrarAtividade = useRegistrarAtividade();
   return useMutation({
     mutationFn: async (ids: string[]) => {
       console.log('Iniciando exclusão em massa via RPC para IDs:', ids);
@@ -220,10 +252,10 @@ export function useDeleteObrasBulk() {
         console.warn('Nenhum ID fornecido para exclusão');
         return;
       }
-      
+
       // Usamos a função RPC para contornar problemas de performance/RLS em grandes volumes
-      const { data, error } = await supabase.rpc('delete_obras_bulk', { 
-        obra_ids: ids 
+      const { data, error } = await supabase.rpc('delete_obras_bulk', {
+        obra_ids: ids
       });
 
       if (error) {
@@ -232,7 +264,17 @@ export function useDeleteObrasBulk() {
       }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, ids) => {
+      const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
+      if (empresaId && profile?.id) {
+        registrarAtividade.mutate({
+          empresaId,
+          usuarioId: profile.id,
+          tabela: 'obras',
+          acao: 'DELETE',
+          descricao: `Excluiu ${ids.length} obra(s) em massa`,
+        });
+      }
       qc.invalidateQueries({ queryKey: ['obras'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
     },

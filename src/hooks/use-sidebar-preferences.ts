@@ -24,6 +24,7 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'chat', path: '/chat', label: 'Chat', icon: 'MessageSquare', visible: true },
   { id: 'whatsapp', path: '/whatsapp', label: 'WhatsApp', icon: 'MessageCircle', visible: true },
   { id: 'emails', path: '/emails', label: 'E-mails', icon: 'Mail', visible: true },
+  { id: 'historico', path: '/historico', label: 'Histórico', icon: 'History', visible: true },
   { id: 'configuracoes', path: '/configuracoes', label: 'Configurações', icon: 'Settings', visible: true },
 
   { id: 'usuarios_admin', path: '/configuracoes?tab=usuarios', label: 'Usuários', icon: 'Users', visible: true },

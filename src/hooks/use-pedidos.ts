@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './use-auth';
+import { useRegistrarAtividade } from './use-historico-alteracoes';
 
 export interface PedidoWithRelations {
   id: string;
@@ -225,6 +227,8 @@ export function usePedidosStats(empresaId?: string, stages?: string[], filters?:
 
 export function useUpdatePedidoStatus() {
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const registrarAtividade = useRegistrarAtividade();
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const updateData: Record<string, unknown> = { status };
@@ -236,6 +240,19 @@ export function useUpdatePedidoStatus() {
       }
       const { error } = await supabase.from('pedidos').update(updateData).eq('id', id);
       if (error) throw error;
+    },
+    onSuccess: (_data, { id, status }) => {
+      const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
+      if (empresaId && profile?.id) {
+        registrarAtividade.mutate({
+          empresaId,
+          usuarioId: profile.id,
+          tabela: 'pedidos',
+          registroId: id,
+          acao: 'UPDATE',
+          descricao: `Moveu o negócio para a etapa "${status}"`,
+        });
+      }
     },
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: ['pedidos'] });
@@ -268,6 +285,8 @@ const DELETE_BATCH_DELAY_MS = 200;
 
 export function useBulkDeletePedidos() {
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const registrarAtividade = useRegistrarAtividade();
   return useMutation({
     mutationFn: async (params: { ids: string[] } | { empresaId: string; stages?: string[]; filters?: PedidosFilters }) => {
       if ('ids' in params) {
@@ -315,7 +334,20 @@ export function useBulkDeletePedidos() {
       if (error) throw error;
       return count ?? 0;
     },
-    onSuccess: () => {
+    onSuccess: (count, variables) => {
+      const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
+      if (empresaId && profile?.id) {
+        const descricao = 'ids' in variables
+          ? `Excluiu ${count} negócio(s) selecionado(s) manualmente`
+          : `Excluiu ${count} negócio(s) em massa (exclusão por filtro)`;
+        registrarAtividade.mutate({
+          empresaId,
+          usuarioId: profile.id,
+          tabela: 'pedidos',
+          acao: 'DELETE',
+          descricao,
+        });
+      }
       qc.invalidateQueries({ queryKey: ['pedidos'] });
       qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });

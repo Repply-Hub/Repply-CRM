@@ -3,7 +3,7 @@ import {
   Globe, CalendarDays, ClipboardList, Link, BarChart3, Mail, Phone,
   Star, Heart, BookOpen, Briefcase, Home, Map, Package, ShoppingCart,
   Truck, Wallet, Wrench, Zap, MessageCircle, MessageSquare, List, FileWarning,
-  Smartphone, Building2, type LucideIcon
+  Smartphone, Building2, History, type LucideIcon
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -39,6 +39,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   FileWarning,
   Smartphone,
   Building2,
+  History,
 };
 
 export const AVAILABLE_ICONS = Object.keys(ICON_MAP);
