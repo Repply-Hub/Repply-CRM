@@ -77,6 +77,11 @@ serve(async (req) => {
       await handleIncomingMessage(supabase, empresaId, instanceName, config, payload);
     } else if (eventType.includes("connection")) {
       await handleConnectionUpdate(supabase, empresaId, instanceName, payload);
+    } else if (!eventType.includes("presence") && !eventType.includes("group")) {
+      // eventType desconhecido e não é um dos tipos já ignorados de propósito
+      // (presence/group) — grava pra investigar depois se isso não devia ter
+      // sido tratado como mensagem.
+      await logWebhookDrop(supabase, "evento_nao_reconhecido", { eventType, payload });
     }
 
     return new Response(JSON.stringify({ ok: true }), {
@@ -91,6 +96,17 @@ serve(async (req) => {
     });
   }
 });
+
+// Registra em webhook_debug qualquer ponto em que uma mensagem/evento é descartado
+// sem gravar nada — sem isso, perdas silenciosas só são descobertas quando alguém
+// nota "faltou uma mensagem" dias depois, sem nenhuma pista de qual campo faltou.
+async function logWebhookDrop(supabase: any, motivo: string, payload: unknown) {
+  try {
+    await supabase.from("webhook_debug").insert({ payload: { _drop_reason: motivo, payload } });
+  } catch (e) {
+    console.error("[webhook] falha ao gravar webhook_debug:", e);
+  }
+}
 
 async function uploadBytesToStorage(
   supabase: any,
@@ -211,7 +227,10 @@ async function handleIncomingMessage(
   payload: any,
 ) {
   const msg = payload.message;
-  if (!msg) return;
+  if (!msg) {
+    await logWebhookDrop(supabase, "sem_message", payload);
+    return;
+  }
 
   // `wasSentByApi` = true significa que essa mensagem já foi inserida de forma
   // síncrona pelo whatsapp-send (CRM chamou a API da uazapi) — ignora pra não duplicar.
@@ -234,7 +253,10 @@ async function handleIncomingMessage(
     .replace("@s.whatsapp.net", "")
     .replace("@c.us", "")
     .replace("@g.us", "");
-  if (!rawTelefone) return;
+  if (!rawTelefone) {
+    await logWebhookDrop(supabase, "sem_telefone", { msg, chat: payload.chat });
+    return;
+  }
   const telefone = isGroup ? rawTelefone : normalizeWhatsappPhone(rawTelefone);
 
   const wamid: string = msg.messageid ?? msg.id ?? "";

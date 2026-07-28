@@ -156,9 +156,17 @@ export function useWaConversas() {
         }) as WaConversa)
         .sort(compareConversas);
     },
+    // Rede de segurança caso o Realtime caia sem disparar reconexão perceptível —
+    // ver mesmo comentário em useWaMensagens. React Query pausa isso sozinho com
+    // a aba em segundo plano.
+    refetchInterval: 20_000,
   });
 
   useEffect(() => {
+    // Depois da primeira conexão, qualquer novo "SUBSCRIBED" é uma reconexão —
+    // força um refetch pra recuperar conversas/mensagens que podem ter mudado
+    // durante a janela sem conexão, já que o Realtime não faz replay.
+    let jaConectouUmaVez = false;
     const channel = supabase
       .channel(`wa-conversas-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'whatsapp_conversas' }, (payload) => {
@@ -183,6 +191,12 @@ export function useWaConversas() {
       })
       .subscribe((status, err) => {
         if (err) console.error('[wa_conversas] falha na subscription realtime:', status, err);
+        if (status === 'SUBSCRIBED') {
+          if (jaConectouUmaVez) {
+            qc.invalidateQueries({ queryKey: ['wa_conversas'] });
+          }
+          jaConectouUmaVez = true;
+        }
       });
     return () => { supabase.removeChannel(channel); };
   }, [qc]);
@@ -220,20 +234,33 @@ export function useWaMensagens(conversaId: string | null) {
     queryKey: ['wa_mensagens', conversaId],
     queryFn: async () => {
       if (!conversaId) return [];
+      // Busca as 200 mais RECENTES (desc + limit) e inverte pra exibir em ordem
+      // cronológica — buscar em ordem ascendente com limit trazia as 200 mais
+      // ANTIGAS da conversa, então qualquer chat com mais de 200 mensagens nunca
+      // carregava as mensagens novas (só apareciam se chegassem via Realtime com a
+      // tela já aberta).
       const { data, error } = await supabase
         .from('whatsapp_mensagens')
         .select('*, usuario:usuarios(id, nome, avatar_url, email, role, telefone)')
         .eq('conversa_id', conversaId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(200);
       if (error) throw error;
-      return (data as any) ?? [];
+      return ((data as any) ?? []).reverse();
     },
     enabled: !!conversaId,
+    // Rede de segurança caso o Realtime caia sem disparar reconexão perceptível
+    // (rede instável, aba em segundo plano no celular) — React Query já pausa
+    // isso sozinho quando a aba está oculta (refetchIntervalInBackground: false).
+    refetchInterval: conversaId ? 20_000 : false,
   });
 
   useEffect(() => {
     if (!conversaId) return;
+    // Depois da primeira conexão, qualquer novo "SUBSCRIBED" é uma reconexão
+    // (rede caiu e voltou) — força um refetch pra recuperar mensagens que podem
+    // ter chegado durante a janela sem conexão, já que o Realtime não faz replay.
+    let jaConectouUmaVez = false;
     const channel = supabase
       .channel(`wa-msgs-rt-${conversaId}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', {
@@ -299,7 +326,14 @@ export function useWaMensagens(conversaId: string | null) {
           (old ?? []).map((m) => (m.id === updated.id ? { ...m, ...updated, usuario: m.usuario } : m))
         );
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          if (jaConectouUmaVez) {
+            qc.invalidateQueries({ queryKey: ['wa_mensagens', conversaId] });
+          }
+          jaConectouUmaVez = true;
+        }
+      });
     return () => { supabase.removeChannel(channel); };
   }, [conversaId, qc]);
 
