@@ -1,4 +1,4 @@
-import { useEffect, useRef, createElement } from 'react';
+import { useEffect, useRef, useState, useCallback, createElement } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -226,34 +226,109 @@ export function useWaInstancias() {
 
 // --- Mensagens de uma conversa ---
 
+const WA_MENSAGENS_PAGE_SIZE = 200;
+// Página menor pro "carregar mais" ao rolar pro topo — a primeira carga usa uma
+// janela maior (200) porque é o que a maioria das conversas precisa pra caber a
+// tela toda; as páginas seguintes podem ser mais leves.
+const WA_MENSAGENS_OLDER_PAGE_SIZE = 50;
+
+const MENSAGEM_SELECT = '*, usuario:usuarios(id, nome, avatar_url, email, role, telefone)';
+
 export function useWaMensagens(conversaId: string | null) {
   const qc = useQueryClient();
   const { profile } = useAuth();
+  // Se a última página buscada (inicial ou "carregar mais") veio com menos do
+  // que o tamanho pedido, não existe mensagem mais antiga que essa no banco —
+  // não faz sentido continuar tentando carregar mais ao rolar pro topo.
+  const [hasOlderMensagens, setHasOlderMensagens] = useState(true);
+  const [loadingOlderMensagens, setLoadingOlderMensagens] = useState(false);
+
+  useEffect(() => {
+    setHasOlderMensagens(true);
+    setLoadingOlderMensagens(false);
+  }, [conversaId]);
 
   const query = useQuery<WaMensagem[]>({
     queryKey: ['wa_mensagens', conversaId],
     queryFn: async () => {
       if (!conversaId) return [];
-      // Busca as 200 mais RECENTES (desc + limit) e inverte pra exibir em ordem
-      // cronológica — buscar em ordem ascendente com limit trazia as 200 mais
-      // ANTIGAS da conversa, então qualquer chat com mais de 200 mensagens nunca
-      // carregava as mensagens novas (só apareciam se chegassem via Realtime com a
-      // tela já aberta).
+
+      // Se já existe histórico em cache (reconexão do Realtime, refetch
+      // periódico, ou reabrir uma conversa já visitada), busca só o que é mais
+      // NOVO que a última mensagem carregada e anexa — nunca substitui o array
+      // inteiro, senão qualquer página antiga carregada via "carregar mais"
+      // seria descartada a cada refetch automático.
+      const cache = qc.getQueryData<WaMensagem[]>(['wa_mensagens', conversaId]);
+      if (cache && cache.length > 0) {
+        const maisRecente = cache[cache.length - 1];
+        const { data, error } = await supabase
+          .from('whatsapp_mensagens')
+          .select(MENSAGEM_SELECT)
+          .eq('conversa_id', conversaId)
+          .gt('created_at', maisRecente.created_at)
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        const novas = ((data as any) ?? []) as WaMensagem[];
+        if (novas.length === 0) return cache;
+        const idsExistentes = new Set(cache.map((m) => m.id));
+        return [...cache, ...novas.filter((m) => !idsExistentes.has(m.id))];
+      }
+
+      // Primeira carga da conversa: as mais RECENTES (desc + limit) e inverte
+      // pra exibir em ordem cronológica — buscar em ordem ascendente com limit
+      // trazia as mais ANTIGAS da conversa, então qualquer chat com mais
+      // mensagens do que o limite nunca carregava as mensagens novas (só
+      // apareciam se chegassem via Realtime com a tela já aberta).
       const { data, error } = await supabase
         .from('whatsapp_mensagens')
-        .select('*, usuario:usuarios(id, nome, avatar_url, email, role, telefone)')
+        .select(MENSAGEM_SELECT)
         .eq('conversa_id', conversaId)
         .order('created_at', { ascending: false })
-        .limit(200);
+        .limit(WA_MENSAGENS_PAGE_SIZE);
       if (error) throw error;
-      return ((data as any) ?? []).reverse();
+      const pagina = (((data as any) ?? []) as WaMensagem[]).reverse();
+      setHasOlderMensagens(pagina.length === WA_MENSAGENS_PAGE_SIZE);
+      return pagina;
     },
     enabled: !!conversaId,
     // Rede de segurança caso o Realtime caia sem disparar reconexão perceptível
     // (rede instável, aba em segundo plano no celular) — React Query já pausa
     // isso sozinho quando a aba está oculta (refetchIntervalInBackground: false).
+    // Seguro rodar em intervalo porque o queryFn acima só anexa mensagens novas
+    // quando já existe cache, nunca trunca o que já foi carregado.
     refetchInterval: conversaId ? 20_000 : false,
   });
+
+  // Busca uma leva mais antiga (rolar pro topo do chat) e insere no início do
+  // array em cache, sem tocar no que já está carregado.
+  const fetchOlderMensagens = useCallback(async () => {
+    if (!conversaId || loadingOlderMensagens || !hasOlderMensagens) return;
+    const cache = qc.getQueryData<WaMensagem[]>(['wa_mensagens', conversaId]) ?? [];
+    const maisAntiga = cache[0];
+    if (!maisAntiga) return;
+
+    setLoadingOlderMensagens(true);
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_mensagens')
+        .select(MENSAGEM_SELECT)
+        .eq('conversa_id', conversaId)
+        .lt('created_at', maisAntiga.created_at)
+        .order('created_at', { ascending: false })
+        .limit(WA_MENSAGENS_OLDER_PAGE_SIZE);
+      if (error) throw error;
+      const pagina = (((data as any) ?? []) as WaMensagem[]).reverse();
+      setHasOlderMensagens(pagina.length === WA_MENSAGENS_OLDER_PAGE_SIZE);
+      if (pagina.length > 0) {
+        qc.setQueryData<WaMensagem[]>(['wa_mensagens', conversaId], (old) => [...pagina, ...(old ?? [])]);
+      }
+    } catch (err) {
+      console.error('[wa] erro ao carregar mensagens antigas:', err);
+      toast.error('Erro ao carregar mensagens antigas');
+    } finally {
+      setLoadingOlderMensagens(false);
+    }
+  }, [conversaId, hasOlderMensagens, loadingOlderMensagens, qc]);
 
   useEffect(() => {
     if (!conversaId) return;
@@ -337,7 +412,7 @@ export function useWaMensagens(conversaId: string | null) {
     return () => { supabase.removeChannel(channel); };
   }, [conversaId, qc]);
 
-  return query;
+  return { ...query, fetchOlderMensagens, hasOlderMensagens, loadingOlderMensagens };
 }
 
 // --- Busca de mensagens por texto + período, em todas as conversas ---

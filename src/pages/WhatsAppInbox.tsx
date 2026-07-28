@@ -193,7 +193,12 @@ import {
 import { ptBR } from "date-fns/locale";
 import { cn, autoResizeTextarea } from "@/lib/utils";
 import { downloadFile } from "@/lib/download-file";
-import { TOGGLE_LIST_CLASS, TOGGLE_BUTTON_CLASS, TOGGLE_BUTTON_ACTIVE, TOGGLE_BUTTON_INACTIVE } from "@/lib/toggle-group-styles";
+import {
+  TOGGLE_LIST_CLASS,
+  TOGGLE_BUTTON_CLASS,
+  TOGGLE_BUTTON_ACTIVE,
+  TOGGLE_BUTTON_INACTIVE,
+} from "@/lib/toggle-group-styles";
 import { toast } from "sonner";
 
 function formatPhone(phone: string) {
@@ -488,10 +493,16 @@ function ConversaAvatar({
 // (`nao_lidas_forcada`). Conversas sem responsável, ou atribuídas a outra
 // pessoa (ex: admin/gestor abrindo uma conversa que não é dele), seguem o
 // contador normal — abrir/visualizar não marca como lida.
-function conversaNaoLida(conv: WaConversa, currentUserId?: string | null): boolean {
+function conversaNaoLida(
+  conv: WaConversa,
+  currentUserId?: string | null,
+): boolean {
   const atribuidaAoUsuarioAtual =
-    !!currentUserId && (conv.responsaveis ?? []).some((r) => r.id === currentUserId);
-  return conv.nao_lidas_forcada || (!atribuidaAoUsuarioAtual && conv.nao_lidas > 0);
+    !!currentUserId &&
+    (conv.responsaveis ?? []).some((r) => r.id === currentUserId);
+  return (
+    conv.nao_lidas_forcada || (!atribuidaAoUsuarioAtual && conv.nao_lidas > 0)
+  );
 }
 
 // Badge de não lidas. Quando a conversa está aberta (`ativa`) o contador não
@@ -508,7 +519,8 @@ function NaoLidasBadge({
   currentUserId?: string | null;
 }) {
   if (!conversaNaoLida(conv, currentUserId)) return null;
-  const label = conv.nao_lidas > 0 ? (conv.nao_lidas > 99 ? "99+" : conv.nao_lidas) : "";
+  const label =
+    conv.nao_lidas > 0 ? (conv.nao_lidas > 99 ? "99+" : conv.nao_lidas) : "";
   if (ativa) {
     return (
       <span
@@ -706,7 +718,7 @@ function MeusChatsList({
             Filtros + Limpar), pra essa lista deixar de ser restrita só a
             "atribuído a mim" e refletir os mesmos filtros globais. */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <div className={cn(TOGGLE_LIST_CLASS, 'w-fit shrink-0')}>
+          <div className={cn(TOGGLE_LIST_CLASS, "w-fit shrink-0")}>
             {(
               [
                 ["aberto", "Em aberto", countAbertas],
@@ -719,7 +731,9 @@ function MeusChatsList({
                 onClick={() => setFiltroStatus(val)}
                 className={cn(
                   TOGGLE_BUTTON_CLASS,
-                  filtroStatus === val ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
+                  filtroStatus === val
+                    ? TOGGLE_BUTTON_ACTIVE
+                    : TOGGLE_BUTTON_INACTIVE,
                 )}
               >
                 {label}
@@ -768,7 +782,7 @@ function MeusChatsList({
           </Button>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className={cn(TOGGLE_LIST_CLASS, 'w-fit shrink-0')}>
+          <div className={cn(TOGGLE_LIST_CLASS, "w-fit shrink-0")}>
             {(
               [
                 { key: "todas", label: "Todas", count: conversas.length },
@@ -785,7 +799,9 @@ function MeusChatsList({
                 }}
                 className={cn(
                   TOGGLE_BUTTON_CLASS,
-                  filtroLeitura === opt.key ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
+                  filtroLeitura === opt.key
+                    ? TOGGLE_BUTTON_ACTIVE
+                    : TOGGLE_BUTTON_INACTIVE,
                 )}
               >
                 {opt.label}
@@ -895,7 +911,8 @@ function MeusChatsList({
                         <span
                           className={cn(
                             "block truncate text-sm text-muted-foreground",
-                            conversaNaoLida(conv, currentUserId) && "text-foreground font-medium",
+                            conversaNaoLida(conv, currentUserId) &&
+                              "text-foreground font-medium",
                           )}
                         >
                           {conv.ultima_mensagem ?? "Nenhuma mensagem"}
@@ -920,7 +937,11 @@ function MeusChatsList({
                       </TableCell>
                       <TableCell className="px-4 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <NaoLidasBadge conv={conv} ativa={false} currentUserId={currentUserId} />
+                          <NaoLidasBadge
+                            conv={conv}
+                            ativa={false}
+                            currentUserId={currentUserId}
+                          />
                           {conv.ultima_mensagem_at && (
                             <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                               {formatTime(conv.ultima_mensagem_at)}
@@ -1249,7 +1270,11 @@ function ReactionPicker({ onPick }: { onPick: (emoji: string) => void }) {
           <SmilePlus className="h-3.5 w-3.5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="center" className="w-auto p-1 flex gap-0.5">
+      <PopoverContent
+        side="top"
+        align="center"
+        className="w-auto p-1 flex gap-0.5"
+      >
         {QUICK_REACTIONS.map((emoji) => (
           <button
             key={emoji}
@@ -1306,7 +1331,11 @@ function ReactionBadge({
           onClick={() => onToggle(emoji)}
         >
           <span>{emoji}</span>
-          {rs.length > 1 && <span className="text-[9px] text-muted-foreground">{rs.length}</span>}
+          {rs.length > 1 && (
+            <span className="text-[9px] text-muted-foreground">
+              {rs.length}
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -2505,7 +2534,9 @@ function LeadSheet({
                 onImageClick(conversa.foto_perfil_url)
               }
               disabled={!conversa.foto_perfil_url}
-              title={conversa.foto_perfil_url ? "Ver foto de perfil" : undefined}
+              title={
+                conversa.foto_perfil_url ? "Ver foto de perfil" : undefined
+              }
               className={cn(
                 "rounded-full",
                 conversa.foto_perfil_url &&
@@ -2562,7 +2593,8 @@ function LeadSheet({
                         autoFocus
                       />
                       <p className="text-[11px] text-muted-foreground">
-                        Também atualiza o nome salvo no WhatsApp real deste contato.
+                        Também atualiza o nome salvo no WhatsApp real deste
+                        contato.
                       </p>
                       <div className="flex justify-end gap-2">
                         <Button
@@ -2949,13 +2981,12 @@ function LeadSheet({
                         </li>
                       ))}
                     </ul>
-                    {participantesGrupo.length > PARTICIPANTES_PREVIEW_LIMIT && (
+                    {participantesGrupo.length >
+                      PARTICIPANTES_PREVIEW_LIMIT && (
                       <button
                         type="button"
                         className="w-full text-center text-xs font-medium text-primary hover:underline"
-                        onClick={() =>
-                          setParticipantesExpandido((v) => !v)
-                        }
+                        onClick={() => setParticipantesExpandido((v) => !v)}
                       >
                         {participantesExpandido
                           ? "Ver menos"
@@ -3210,7 +3241,8 @@ export default function WhatsAppInbox() {
   const empresaIdTarefas =
     profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: clientesTarefas = [] } = useClientes();
-  const { data: pedidosOptionsTarefas = [] } = usePedidosOptions(empresaIdTarefas);
+  const { data: pedidosOptionsTarefas = [] } =
+    usePedidosOptions(empresaIdTarefas);
   const { data: kanbanColunasTarefas = [] } =
     useTarefasKanbanColunas(empresaIdTarefas);
   const KANBAN_STAGES_TAREFAS = useMemo(
@@ -3312,9 +3344,13 @@ export default function WhatsAppInbox() {
     const semResponsavel = (conversaAtiva.responsaveis?.length ?? 0) === 0;
     setAtribuicaoModalOpen(semResponsavel);
   }, [conversaAtiva]);
-  const { data: mensagens = [], isLoading: loadingMensagens } = useWaMensagens(
-    conversaAtiva?.id ?? null,
-  );
+  const {
+    data: mensagens = [],
+    isLoading: loadingMensagens,
+    fetchOlderMensagens,
+    hasOlderMensagens,
+    loadingOlderMensagens,
+  } = useWaMensagens(conversaAtiva?.id ?? null);
   // Lookup de wamid -> id da mensagem, usado para rolar até a mensagem original ao
   // clicar em uma citação (reply).
   const idPorWamid = useMemo(() => {
@@ -3649,10 +3685,7 @@ export default function WhatsAppInbox() {
                 pelo flex do próprio Button). Onde há mais espaço (lista em
                 tabela) o rótulo fica sempre visível. */}
             <span
-              className={cn(
-                "truncate",
-                !alwaysShowLabel && "hidden lg:inline",
-              )}
+              className={cn("truncate", !alwaysShowLabel && "hidden lg:inline")}
             >
               {periodoLabel}
             </span>
@@ -3889,6 +3922,10 @@ export default function WhatsAppInbox() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const msgScrollRef = useRef<HTMLDivElement>(null);
+  // Guarda a altura/posição de rolagem no instante em que uma página de
+  // mensagens mais antigas foi pedida, pra manter o conteúdo visualmente
+  // ancorado quando ela chegar (em vez de saltar pro fundo do chat).
+  const prependAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
 
   useLayoutEffect(() => {
     autoResizeTextarea(inputRef.current);
@@ -3906,18 +3943,28 @@ export default function WhatsAppInbox() {
     configRef.current = config;
   }, [config]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const viewport =
       (msgScrollRef.current?.closest(
         "[data-radix-scroll-area-viewport]",
       ) as HTMLElement | null) ?? msgScrollRef.current;
-    if (viewport) {
-      const isNearBottom =
-        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
-        150;
-      if (isNearBottom || mensagens.length > 0) {
-        viewport.scrollTop = viewport.scrollHeight;
-      }
+    if (!viewport) return;
+
+    // Mensagens antigas acabaram de ser inseridas no INÍCIO do array (o usuário
+    // rolou até o topo) — mantém o mesmo conteúdo ancorado na tela em vez de
+    // forçar a rolagem pro fundo, senão a tela "salta" a cada página carregada.
+    if (prependAnchorRef.current) {
+      const { scrollHeight: alturaAnterior, scrollTop: topoAnterior } = prependAnchorRef.current;
+      viewport.scrollTop = viewport.scrollHeight - alturaAnterior + topoAnterior;
+      prependAnchorRef.current = null;
+      return;
+    }
+
+    const isNearBottom =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
+      150;
+    if (isNearBottom || mensagens.length > 0) {
+      viewport.scrollTop = viewport.scrollHeight;
     }
   }, [mensagens.length, atribuicaoModalOpen, conversaAtiva?.id]);
 
@@ -3935,6 +3982,22 @@ export default function WhatsAppInbox() {
     const isNearBottom =
       target.scrollHeight - target.scrollTop - target.clientHeight < 150;
     setShowScrollBottom(!isNearBottom);
+
+    // Perto do topo do histórico carregado — busca a próxima leva de mensagens
+    // mais antigas. prependAnchorRef guarda a régua atual pra restaurar a
+    // posição de rolagem assim que a página chegar (ver useLayoutEffect acima).
+    if (
+      target.scrollTop < 200 &&
+      hasOlderMensagens &&
+      !loadingOlderMensagens &&
+      !prependAnchorRef.current
+    ) {
+      prependAnchorRef.current = {
+        scrollHeight: target.scrollHeight,
+        scrollTop: target.scrollTop,
+      };
+      fetchOlderMensagens();
+    }
   };
 
   // Abrir a conversa não marca como lida — a conversa só sai do estado "não lida"
@@ -3942,6 +4005,7 @@ export default function WhatsAppInbox() {
   useEffect(() => {
     inputRef.current?.focus();
     setRespondendoA(null);
+    prependAnchorRef.current = null;
   }, [conversaAtiva?.id]);
 
   // Ao marcar uma mensagem para responder, já deixa o campo de texto pronto pra digitar.
@@ -3953,7 +4017,8 @@ export default function WhatsAppInbox() {
   // Clicar no mesmo emoji que já reagiu remove a reação (toggle, como no WhatsApp).
   function handleReact(msg: WaMensagem, emoji: string) {
     if (!msg.wamid || !conversaAtiva) return;
-    const jaReagiu = msg.reacoes?.find((r) => r.autor === "eu")?.emoji === emoji;
+    const jaReagiu =
+      msg.reacoes?.find((r) => r.autor === "eu")?.emoji === emoji;
     reagirMutation.mutate({
       conversaId: conversaAtiva.id,
       mensagemId: msg.id,
@@ -4474,9 +4539,7 @@ export default function WhatsAppInbox() {
       let uploadedUrls: string[];
       try {
         uploadedUrls = await Promise.all(
-          currentAttachments.map((a) =>
-            uploadWaMedia(a.file, conversaId),
-          ),
+          currentAttachments.map((a) => uploadWaMedia(a.file, conversaId)),
         );
       } catch {
         toast.error("Erro ao fazer upload dos arquivos");
@@ -4576,7 +4639,11 @@ export default function WhatsAppInbox() {
             <div className="flex flex-col items-end gap-1 shrink-0">
               <div className="flex items-center gap-1.5">
                 <ConversaParticipantesStack conv={conv} />
-                <NaoLidasBadge conv={conv} ativa={conversaAtiva?.id === conv.id} currentUserId={profile?.id} />
+                <NaoLidasBadge
+                  conv={conv}
+                  ativa={conversaAtiva?.id === conv.id}
+                  currentUserId={profile?.id}
+                />
               </div>
               {conv.ultima_mensagem_at && (
                 <span className="text-xs text-muted-foreground font-medium">
@@ -4845,7 +4912,11 @@ export default function WhatsAppInbox() {
                               : "bg-destructive text-destructive-foreground",
                           )}
                         >
-                          {conv.nao_lidas > 0 ? (conv.nao_lidas > 9 ? "9+" : conv.nao_lidas) : ""}
+                          {conv.nao_lidas > 0
+                            ? conv.nao_lidas > 9
+                              ? "9+"
+                              : conv.nao_lidas
+                            : ""}
                         </span>
                       )}
                     </div>
@@ -4953,7 +5024,9 @@ export default function WhatsAppInbox() {
                       onClick={() => setFiltroStatus("aberto")}
                       className={cn(
                         "flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded-md py-1.5 transition-colors",
-                        filtroStatus === "aberto" ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
+                        filtroStatus === "aberto"
+                          ? TOGGLE_BUTTON_ACTIVE
+                          : TOGGLE_BUTTON_INACTIVE,
                       )}
                     >
                       Em aberto
@@ -4973,7 +5046,9 @@ export default function WhatsAppInbox() {
                       onClick={() => setFiltroStatus("fechado")}
                       className={cn(
                         "flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded-md py-1.5 transition-colors",
-                        filtroStatus === "fechado" ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
+                        filtroStatus === "fechado"
+                          ? TOGGLE_BUTTON_ACTIVE
+                          : TOGGLE_BUTTON_INACTIVE,
                       )}
                     >
                       Fechado
@@ -5184,13 +5259,15 @@ export default function WhatsAppInbox() {
                 <div className="px-2 pt-2 border-b border-border bg-background space-y-2">
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-1.5">
-                      <div className={cn(TOGGLE_LIST_CLASS, 'flex-1')}>
+                      <div className={cn(TOGGLE_LIST_CLASS, "flex-1")}>
                         <button
                           type="button"
                           onClick={() => setFiltroStatus("aberto")}
                           className={cn(
                             "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
-                            filtroStatus === "aberto" ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
+                            filtroStatus === "aberto"
+                              ? TOGGLE_BUTTON_ACTIVE
+                              : TOGGLE_BUTTON_INACTIVE,
                           )}
                         >
                           Em aberto
@@ -5210,7 +5287,9 @@ export default function WhatsAppInbox() {
                           onClick={() => setFiltroStatus("fechado")}
                           className={cn(
                             "flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium rounded-md py-1 transition-colors",
-                            filtroStatus === "fechado" ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
+                            filtroStatus === "fechado"
+                              ? TOGGLE_BUTTON_ACTIVE
+                              : TOGGLE_BUTTON_INACTIVE,
                           )}
                         >
                           Fechado
@@ -5621,7 +5700,9 @@ export default function WhatsAppInbox() {
               <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-primary bg-primary/5 backdrop-blur-[1px]">
                 <div className="flex flex-col items-center gap-2 rounded-lg bg-background/90 px-6 py-4 shadow-lg">
                   <Paperclip className="h-6 w-6 text-primary" />
-                  <p className="text-sm font-medium">Solte os arquivos para anexar</p>
+                  <p className="text-sm font-medium">
+                    Solte os arquivos para anexar
+                  </p>
                 </div>
               </div>
             )}
@@ -5887,7 +5968,7 @@ export default function WhatsAppInbox() {
                       title={
                         conversaAtiva.arquivada
                           ? "Reabrir conversa"
-                          : "Marcar como fechada"
+                          : "Fechar conversa"
                       }
                       className="gap-1.5 px-1.5 text-xs text-muted-foreground hover:text-primary transition-colors sm:px-3"
                       onClick={() => {
@@ -5959,9 +6040,7 @@ export default function WhatsAppInbox() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="gap-2"
-                          onClick={() =>
-                            marcarNaoLida.mutate(conversaAtiva.id)
-                          }
+                          onClick={() => marcarNaoLida.mutate(conversaAtiva.id)}
                           disabled={conversaNaoLida(conversaAtiva, profile?.id)}
                         >
                           <EyeOff className="h-4 w-4" />
@@ -6074,6 +6153,11 @@ export default function WhatsAppInbox() {
                           atribuicaoModalOpen && "pb-40",
                         )}
                       >
+                        {loadingOlderMensagens && (
+                          <div className="flex items-center justify-center py-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
                         {mensagens.map((msg, i) => {
                           const isSaida = msg.direcao === "saida";
                           const prevMsg = mensagens[i - 1];
@@ -6158,7 +6242,11 @@ export default function WhatsAppInbox() {
                                       <p className="text-xs text-center whitespace-pre-wrap text-muted-foreground">
                                         <StickyNote className="inline-block h-3 w-3 mr-1 -mt-0.5" />
                                         <span className="font-semibold">
-                                          Nota interna{msg.usuario?.nome ? ` (${msg.usuario.nome})` : ""}:
+                                          Nota interna
+                                          {msg.usuario?.nome
+                                            ? ` (${msg.usuario.nome})`
+                                            : ""}
+                                          :
                                         </span>{" "}
                                         {msg.conteudo}
                                       </p>
@@ -6304,7 +6392,9 @@ export default function WhatsAppInbox() {
                                       <ReactionBadge
                                         reacoes={msg.reacoes ?? []}
                                         isSaida={isSaida}
-                                        onToggle={(emoji) => handleReact(msg, emoji)}
+                                        onToggle={(emoji) =>
+                                          handleReact(msg, emoji)
+                                        }
                                       />
                                     </div>
                                     {msg.tipo !== "texto" && (
@@ -6686,7 +6776,7 @@ export default function WhatsAppInbox() {
                   variant="outline"
                   size="sm"
                   className="gap-1.5"
-                  onClick={() => downloadFile(viewingImage.url, 'imagem.jpg')}
+                  onClick={() => downloadFile(viewingImage.url, "imagem.jpg")}
                 >
                   <Download className="h-4 w-4" /> Baixar
                 </Button>
