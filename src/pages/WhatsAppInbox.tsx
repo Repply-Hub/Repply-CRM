@@ -1455,8 +1455,8 @@ function DraggableBubble({
       </div>
       <div
         className={cn(
-          "absolute top-1/2 -translate-y-1/2 flex items-center gap-1",
-          isSaida ? "-left-[4.25rem] flex-row-reverse" : "-right-[4.25rem]",
+          "absolute top-1/2 -translate-y-1/2 flex items-center gap-1 whitespace-nowrap",
+          isSaida ? "right-full mr-1.5 flex-row-reverse" : "left-full ml-1.5",
         )}
       >
         <button

@@ -2734,6 +2734,7 @@ export type Database = {
       }
       whatsapp_mensagens: {
         Row: {
+          apagada_para_todos: boolean
           conteudo: string
           conversa_id: string
           created_at: string
@@ -2758,6 +2759,7 @@ export type Database = {
           wamid: string | null
         }
         Insert: {
+          apagada_para_todos?: boolean
           conteudo: string
           conversa_id: string
           created_at?: string
@@ -2782,6 +2784,7 @@ export type Database = {
           wamid?: string | null
         }
         Update: {
+          apagada_para_todos?: boolean
           conteudo?: string
           conversa_id?: string
           created_at?: string
