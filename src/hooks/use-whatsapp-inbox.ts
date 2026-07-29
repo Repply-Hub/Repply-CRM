@@ -297,18 +297,32 @@ export function useWaMensagens(conversaId: string | null) {
       // seria descartada a cada refetch automático.
       const cache = qc.getQueryData<WaMensagem[]>(['wa_mensagens', conversaId]);
       if (cache && cache.length > 0) {
-        const maisRecente = cache[cache.length - 1];
+        // Ignora otimistas (id local, created_at do relógio do cliente) ao achar o
+        // corte: usar o timestamp de uma otimista aqui é instável (relógio do
+        // cliente pode estar adiantado em relação ao servidor) e, se a otimista
+        // correspondente nunca chegar via Realtime, ela ficava presa pra sempre —
+        // esse refetch nunca a substituía porque o corte também vinha dela.
+        const maisRecente = [...cache].reverse().find((m) => !m.id.startsWith('otimista-'));
         const { data, error } = await supabase
           .from('whatsapp_mensagens')
           .select(MENSAGEM_SELECT)
           .eq('conversa_id', conversaId)
-          .gt('created_at', maisRecente.created_at)
+          .gt('created_at', maisRecente?.created_at ?? '1970-01-01')
           .order('created_at', { ascending: true });
         if (error) throw error;
         const novas = ((data as any) ?? []) as WaMensagem[];
         if (novas.length === 0) return cache;
         const idsExistentes = new Set(cache.map((m) => m.id));
-        return [...cache, ...novas.filter((m) => !idsExistentes.has(m.id))];
+        // As "novas" já vindas do banco confirmam o envio — remove qualquer
+        // otimista com o mesmo conteúdo em vez de deixá-la duplicada ao lado da
+        // mensagem real (mesma lógica do handler de Realtime INSERT abaixo).
+        const conteudosConfirmados = new Set(
+          novas.filter((m) => m.direcao === 'saida').map((m) => m.conteudo)
+        );
+        const semOtimistasConfirmadas = cache.filter(
+          (m) => !(m.id.startsWith('otimista-') && conteudosConfirmados.has(m.conteudo))
+        );
+        return [...semOtimistasConfirmadas, ...novas.filter((m) => !idsExistentes.has(m.id))];
       }
 
       // Primeira carga da conversa: as mais RECENTES (desc + limit) e inverte
@@ -564,23 +578,41 @@ export function useWaSendMessage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão expirada');
 
-      const res = await supabase.functions.invoke('whatsapp-send', {
-        body: {
-          telefone: params.telefone,
-          mensagem: params.mensagem,
-          conversa_id: params.conversa_id,
-          tipo: params.tipo ?? 'texto',
-          media_url: params.media_url ?? null,
-          media_mime: params.media_mime ?? null,
-          nome_arquivo: params.nome_arquivo ?? null,
-          ptt: params.ptt ?? false,
-          quoted_wamid: params.quoted_wamid ?? null,
-          quoted_conteudo: params.quoted_conteudo ?? null,
-          quoted_tipo: params.quoted_tipo ?? null,
-          quoted_remetente_nome: params.quoted_remetente_nome ?? null,
-        },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      // Sem isso, uma requisição travada (rede instável, function fria) nunca
+      // resolve nem rejeita: a bolha otimista fica em "enviando" pra sempre até
+      // um refetch qualquer sobrescrever a lista e ela sumir sem nenhum toast de
+      // erro (o onError abaixo nunca chega a rodar porque a Promise não resolveu).
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+      let res: Awaited<ReturnType<typeof supabase.functions.invoke>>;
+      try {
+        res = await supabase.functions.invoke('whatsapp-send', {
+          body: {
+            telefone: params.telefone,
+            mensagem: params.mensagem,
+            conversa_id: params.conversa_id,
+            tipo: params.tipo ?? 'texto',
+            media_url: params.media_url ?? null,
+            media_mime: params.media_mime ?? null,
+            nome_arquivo: params.nome_arquivo ?? null,
+            ptt: params.ptt ?? false,
+            quoted_wamid: params.quoted_wamid ?? null,
+            quoted_conteudo: params.quoted_conteudo ?? null,
+            quoted_tipo: params.quoted_tipo ?? null,
+            quoted_remetente_nome: params.quoted_remetente_nome ?? null,
+          },
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          signal: controller.signal,
+        });
+      } catch (e) {
+        if (controller.signal.aborted) {
+          throw new Error('Tempo esgotado ao enviar mensagem. Verifique sua conexão e tente novamente.');
+        }
+        throw e;
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (res.error) throw res.error;
       if (res.data?.error) throw new Error(res.data.error);

@@ -3389,6 +3389,35 @@ export default function WhatsAppInbox() {
     () => mensagens.filter((m) => m.is_nota_interna && m.fixada),
     [mensagens],
   );
+  // Agrupa mensagens consecutivas do mesmo dia para o marcador de data: cada grupo
+  // vira um wrapper com o chip de data em `sticky top-0` — como o wrapper cobre toda
+  // a altura das mensagens daquele dia, o chip fica fixo logo abaixo do header
+  // enquanto o grupo estiver na tela e só é substituído quando o próximo grupo (dia
+  // seguinte) alcança o topo da rolagem. Não precisa de JS rastreando scroll: é o
+  // mesmo truque de "sticky section header" já usado em ConversaGroupHeader.
+  const gruposPorDia = useMemo(() => {
+    const grupos: {
+      dateKey: string;
+      label: string;
+      itens: { msg: WaMensagem; index: number }[];
+    }[] = [];
+    mensagens.forEach((msg, index) => {
+      const data = new Date(msg.created_at);
+      const dateKey = data.toDateString();
+      const ultimo = grupos[grupos.length - 1];
+      if (ultimo?.dateKey === dateKey) {
+        ultimo.itens.push({ msg, index });
+        return;
+      }
+      const label = isToday(data)
+        ? "Hoje"
+        : isYesterday(data)
+          ? "Ontem"
+          : format(data, "d 'de' MMMM", { locale: ptBR });
+      grupos.push({ dateKey, label, itens: [{ msg, index }] });
+    });
+    return grupos;
+  }, [mensagens]);
   // Participantes do grupo: os salvos na criação (via CRM) somados aos remetentes
   // distintos vistos nas mensagens (cobre membros que entraram depois ou grupos
   // criados fora do CRM, onde a uazapi não devolveu a lista completa).
@@ -6185,277 +6214,268 @@ export default function WhatsAppInbox() {
                             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                           </div>
                         )}
-                        {mensagens.map((msg, i) => {
-                          const isSaida = msg.direcao === "saida";
-                          const prevMsg = mensagens[i - 1];
-                          const showDate =
-                            !prevMsg ||
-                            new Date(msg.created_at).toDateString() !==
-                              new Date(prevMsg.created_at).toDateString();
-                          const isLast = i === mensagens.length - 1;
-                          // Mensagem de saída sem usuario_id = veio de fora do CRM (WhatsApp
-                          // Web/celular físico, ver comentário no whatsapp-webhook) — quem
-                          // mandou costuma se identificar com um prefixo manual "*Nome:*".
-                          const prefixoExterno =
-                            isSaida && !msg.usuario
-                              ? extrairPrefixoRemetenteExterno(msg.conteudo)
-                              : null;
-                          const usuarioExterno = prefixoExterno
-                            ? (vendedores.find(
-                                (v) =>
-                                  normalizeNomeBusca(v.nome) ===
-                                  normalizeNomeBusca(prefixoExterno.nome),
-                              ) ?? null)
-                            : null;
-                          const msgParaExibir = prefixoExterno
-                            ? { ...msg, conteudo: prefixoExterno.resto }
-                            : msg;
-                          // Empilha mensagens consecutivas do mesmo remetente sem repetir o
-                          // nome/número acima de cada bolha — só mostra na primeira da leva.
-                          const isFirstDoRemetente =
-                            !prevMsg ||
-                            showDate ||
-                            prevMsg.direcao !== msg.direcao ||
-                            (isSaida
-                              ? (prevMsg.usuario?.id ?? null) !==
-                                (msg.usuario?.id ?? null)
-                              : (prevMsg.remetente_telefone ?? null) !==
-                                (msg.remetente_telefone ?? null));
-
-                          const dateChip = showDate && (
-                            <div className="flex items-center justify-center my-4">
-                              <span className="text-[10px] bg-muted text-muted-foreground px-3 py-1 rounded-full">
-                                {isToday(new Date(msg.created_at))
-                                  ? "Hoje"
-                                  : isYesterday(new Date(msg.created_at))
-                                    ? "Ontem"
-                                    : format(
-                                        new Date(msg.created_at),
-                                        "d 'de' MMMM",
-                                        { locale: ptBR },
-                                      )}
+                        {gruposPorDia.map((grupo) => (
+                          <div key={grupo.dateKey} className="relative">
+                            <div className="sticky top-0 z-10 flex items-center justify-center py-2">
+                              <span className="text-[10px] bg-muted/90 backdrop-blur-sm text-muted-foreground px-3 py-1 rounded-full shadow-sm">
+                                {grupo.label}
                               </span>
                             </div>
-                          );
-
-                          // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca foi
-                          // enviada ao WhatsApp. Renderiza centralizada (como um chip de
-                          // sistema), mas com bg cinza próprio, pra diferenciar das bolhas
-                          // normais (que usam bg-muted).
-                          if (msg.is_nota_interna) {
-                            return (
-                              <div
-                                key={msg.id}
-                                id={`wa-msg-${msg.id}`}
-                                ref={isLast ? msgScrollRef : undefined}
-                              >
-                                {dateChip}
+                            {grupo.itens.map(({ msg, index: i }) => {
+                            const isSaida = msg.direcao === "saida";
+                            const prevMsg = mensagens[i - 1];
+                            const showDate =
+                              !prevMsg ||
+                              new Date(msg.created_at).toDateString() !==
+                                new Date(prevMsg.created_at).toDateString();
+                            const isLast = i === mensagens.length - 1;
+                            // Mensagem de saída sem usuario_id = veio de fora do CRM (WhatsApp
+                            // Web/celular físico, ver comentário no whatsapp-webhook) — quem
+                            // mandou costuma se identificar com um prefixo manual "*Nome:*".
+                            const prefixoExterno =
+                              isSaida && !msg.usuario
+                                ? extrairPrefixoRemetenteExterno(msg.conteudo)
+                                : null;
+                            const usuarioExterno = prefixoExterno
+                              ? (vendedores.find(
+                                  (v) =>
+                                    normalizeNomeBusca(v.nome) ===
+                                    normalizeNomeBusca(prefixoExterno.nome),
+                                ) ?? null)
+                              : null;
+                            const msgParaExibir = prefixoExterno
+                              ? { ...msg, conteudo: prefixoExterno.resto }
+                              : msg;
+                            // Empilha mensagens consecutivas do mesmo remetente sem repetir o
+                            // nome/número acima de cada bolha — só mostra na primeira da leva.
+                            const isFirstDoRemetente =
+                              !prevMsg ||
+                              showDate ||
+                              prevMsg.direcao !== msg.direcao ||
+                              (isSaida
+                                ? (prevMsg.usuario?.id ?? null) !==
+                                  (msg.usuario?.id ?? null)
+                                : (prevMsg.remetente_telefone ?? null) !==
+                                  (msg.remetente_telefone ?? null));
+  
+                            // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca foi
+                            // enviada ao WhatsApp. Renderiza centralizada (como um chip de
+                            // sistema), mas com bg cinza próprio, pra diferenciar das bolhas
+                            // normais (que usam bg-muted).
+                            if (msg.is_nota_interna) {
+                              return (
                                 <div
-                                  className={cn(
-                                    "flex justify-center",
-                                    prevMsg?.direcao !== msg.direcao
-                                      ? "mt-3"
-                                      : "mt-0.5",
-                                  )}
+                                  key={msg.id}
+                                  id={`wa-msg-${msg.id}`}
+                                  ref={isLast ? msgScrollRef : undefined}
                                 >
-                                  <div className="max-w-[75%] items-center">
-                                    <div
-                                      className={cn(
-                                        "px-3 py-2 break-words rounded-2xl bg-zinc-300/50 dark:bg-zinc-700/50 text-foreground",
-                                        msg.id === destacadaMsgId &&
-                                          "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                                      )}
-                                    >
-                                      <p className="text-xs text-center whitespace-pre-wrap text-muted-foreground">
-                                        <StickyNote className="inline-block h-3 w-3 mr-1 -mt-0.5" />
-                                        <span className="font-semibold">
-                                          Nota interna
-                                          {/* Notas de sistema (assumir/direcionar/fechar conversa,
-                                              adicionar/remover responsável) já embutem o nome do
-                                              autor no início do texto — repetir aqui seria
-                                              redundante. Só mostra o nome quando ele não aparece
-                                              no início do conteúdo (nota digitada manualmente). */}
-                                          {msg.usuario?.nome &&
-                                          !msg.conteudo?.startsWith(msg.usuario.nome)
-                                            ? ` (${msg.usuario.nome})`
-                                            : ""}
-                                          :
-                                        </span>{" "}
-                                        {msg.conteudo}
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center gap-1 mt-0.5 justify-center">
-                                      <span className="text-[9px] text-muted-foreground">
-                                        {format(
-                                          new Date(msg.created_at),
-                                          "HH:mm",
-                                        )}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div
-                              key={msg.id}
-                              id={`wa-msg-${msg.id}`}
-                              ref={isLast ? msgScrollRef : undefined}
-                            >
-                              {dateChip}
-                              <div
-                                className={cn(
-                                  "flex",
-                                  isSaida ? "justify-end" : "justify-start",
-                                  prevMsg?.direcao !== msg.direcao
-                                    ? "mt-3"
-                                    : "mt-0.5",
-                                )}
-                              >
-                                <div
-                                  className={cn(
-                                    "max-w-[75%]",
-                                    isSaida ? "items-end" : "items-start",
-                                  )}
-                                >
-                                  <DraggableBubble
-                                    msg={msg}
-                                    isSaida={isSaida}
-                                    onReply={handleReply}
-                                    onReact={handleReact}
+                                  <div
+                                    className={cn(
+                                      "flex justify-center",
+                                      prevMsg?.direcao !== msg.direcao
+                                        ? "mt-3"
+                                        : "mt-0.5",
+                                    )}
                                   >
-                                    <div
-                                      className={cn(
-                                        "relative",
-                                        msg.tipo === "audio"
-                                          ? "p-0.5"
-                                          : "px-3 py-2",
-                                        "break-words transition-shadow duration-500",
-                                        isSaida
-                                          ? "bg-orange-500 text-white rounded-2xl rounded-tr-sm"
-                                          : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
-                                        msg.id === destacadaMsgId &&
-                                          "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                                      )}
-                                    >
-                                      {isSaida &&
-                                        msg.usuario &&
-                                        isFirstDoRemetente && (
-                                          <UserPreviewPopover
-                                            usuario={msg.usuario}
-                                            nameClassName={cn(
-                                              "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2 text-white",
-                                              msg.tipo === "audio" &&
-                                                "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
-                                            )}
-                                          />
-                                        )}
-                                      {isSaida &&
-                                        !msg.usuario &&
-                                        prefixoExterno &&
-                                        isFirstDoRemetente && (
-                                          <div
-                                            className={cn(
-                                              "flex items-center gap-1 mb-2",
-                                              msg.tipo === "audio" &&
-                                                "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
-                                            )}
-                                          >
-                                            {usuarioExterno ? (
-                                              <UserPreviewPopover
-                                                usuario={usuarioExterno}
-                                                nameClassName="w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight text-white"
-                                              />
-                                            ) : (
-                                              <span className="w-fit max-w-full truncate text-sm font-semibold leading-tight text-white">
-                                                {prefixoExterno.nome}
-                                              </span>
-                                            )}
-                                            <span
-                                              title="Enviado fora do CRM (WhatsApp Web/celular)"
-                                              className="inline-flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded text-[9px] font-medium bg-white/20 text-white"
-                                            >
-                                              <Smartphone className="h-2.5 w-2.5" />
-                                            </span>
-                                          </div>
-                                        )}
-                                      {!isSaida && isFirstDoRemetente && (
-                                        <ContactPreviewPopover
-                                          conversa={conversaAtiva}
-                                          remetenteNome={msg.remetente_nome}
-                                          remetenteTelefone={
-                                            msg.remetente_telefone
-                                          }
-                                          nameClassName={cn(
-                                            "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2",
-                                            senderNameColor(conversaAtiva.id),
-                                            msg.tipo === "audio" &&
-                                              "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
-                                          )}
-                                        />
-                                      )}
-                                      {msg.quoted_wamid && (
-                                        <QuotedPreview
-                                          remetenteNome={
-                                            msg.quoted_remetente_nome
-                                          }
-                                          conteudo={msg.quoted_conteudo}
-                                          tipo={msg.quoted_tipo}
-                                          isSaida={isSaida}
-                                          onClick={() => {
-                                            const originalId = idPorWamid.get(
-                                              msg.quoted_wamid!,
-                                            );
-                                            if (!originalId) return;
-                                            irParaMensagem(originalId);
-                                          }}
-                                        />
-                                      )}
-                                      <MessageContent
-                                        msg={msgParaExibir}
-                                        isSaida={isSaida}
-                                        onImageClick={(url) =>
-                                          setViewingImage({ url })
-                                        }
-                                        onPreviewFile={setPreviewFile}
-                                        conversaAtiva={conversaAtiva}
-                                      />
-                                      <ReactionBadge
-                                        reacoes={msg.reacoes ?? []}
-                                        isSaida={isSaida}
-                                        onToggle={(emoji) =>
-                                          handleReact(msg, emoji)
-                                        }
-                                      />
-                                    </div>
-                                    {msg.tipo !== "texto" && (
+                                    <div className="max-w-[75%] items-center">
                                       <div
                                         className={cn(
-                                          "flex items-center gap-1 mt-0.5",
-                                          isSaida
-                                            ? "justify-end mr-1"
-                                            : "justify-start ml-1",
+                                          "px-3 py-2 break-words rounded-2xl bg-zinc-300/50 dark:bg-zinc-700/50 text-foreground",
+                                          msg.id === destacadaMsgId &&
+                                            "ring-2 ring-primary ring-offset-2 ring-offset-background",
                                         )}
                                       >
+                                        <p className="text-xs text-center whitespace-pre-wrap text-muted-foreground">
+                                          <StickyNote className="inline-block h-3 w-3 mr-1 -mt-0.5" />
+                                          <span className="font-semibold">
+                                            Nota interna
+                                            {/* Notas de sistema (assumir/direcionar/fechar conversa,
+                                                adicionar/remover responsável) já embutem o nome do
+                                                autor no início do texto — repetir aqui seria
+                                                redundante. Só mostra o nome quando ele não aparece
+                                                no início do conteúdo (nota digitada manualmente). */}
+                                            {msg.usuario?.nome &&
+                                            !msg.conteudo?.startsWith(msg.usuario.nome)
+                                              ? ` (${msg.usuario.nome})`
+                                              : ""}
+                                            :
+                                          </span>{" "}
+                                          {msg.conteudo}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-1 mt-0.5 justify-center">
                                         <span className="text-[9px] text-muted-foreground">
                                           {format(
                                             new Date(msg.created_at),
                                             "HH:mm",
                                           )}
                                         </span>
-                                        {isSaida && (
-                                          <MessageStatus status={msg.status} />
-                                        )}
                                       </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+  
+                            return (
+                              <div
+                                key={msg.id}
+                                id={`wa-msg-${msg.id}`}
+                                ref={isLast ? msgScrollRef : undefined}
+                              >
+                                <div
+                                  className={cn(
+                                    "flex",
+                                    isSaida ? "justify-end" : "justify-start",
+                                    prevMsg?.direcao !== msg.direcao
+                                      ? "mt-3"
+                                      : "mt-0.5",
+                                  )}
+                                >
+                                  <div
+                                    className={cn(
+                                      "max-w-[75%]",
+                                      isSaida ? "items-end" : "items-start",
                                     )}
-                                  </DraggableBubble>
+                                  >
+                                    <DraggableBubble
+                                      msg={msg}
+                                      isSaida={isSaida}
+                                      onReply={handleReply}
+                                      onReact={handleReact}
+                                    >
+                                      <div
+                                        className={cn(
+                                          "relative",
+                                          msg.tipo === "audio"
+                                            ? "p-0.5"
+                                            : "px-3 py-2",
+                                          "break-words transition-shadow duration-500",
+                                          isSaida
+                                            ? "bg-orange-500 text-white rounded-2xl rounded-tr-sm"
+                                            : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
+                                          msg.id === destacadaMsgId &&
+                                            "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                                        )}
+                                      >
+                                        {isSaida &&
+                                          msg.usuario &&
+                                          isFirstDoRemetente && (
+                                            <UserPreviewPopover
+                                              usuario={msg.usuario}
+                                              nameClassName={cn(
+                                                "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2 text-white",
+                                                msg.tipo === "audio" &&
+                                                  "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                              )}
+                                            />
+                                          )}
+                                        {isSaida &&
+                                          !msg.usuario &&
+                                          prefixoExterno &&
+                                          isFirstDoRemetente && (
+                                            <div
+                                              className={cn(
+                                                "flex items-center gap-1 mb-2",
+                                                msg.tipo === "audio" &&
+                                                  "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                              )}
+                                            >
+                                              {usuarioExterno ? (
+                                                <UserPreviewPopover
+                                                  usuario={usuarioExterno}
+                                                  nameClassName="w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight text-white"
+                                                />
+                                              ) : (
+                                                <span className="w-fit max-w-full truncate text-sm font-semibold leading-tight text-white">
+                                                  {prefixoExterno.nome}
+                                                </span>
+                                              )}
+                                              <span
+                                                title="Enviado fora do CRM (WhatsApp Web/celular)"
+                                                className="inline-flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded text-[9px] font-medium bg-white/20 text-white"
+                                              >
+                                                <Smartphone className="h-2.5 w-2.5" />
+                                              </span>
+                                            </div>
+                                          )}
+                                        {!isSaida && isFirstDoRemetente && (
+                                          <ContactPreviewPopover
+                                            conversa={conversaAtiva}
+                                            remetenteNome={msg.remetente_nome}
+                                            remetenteTelefone={
+                                              msg.remetente_telefone
+                                            }
+                                            nameClassName={cn(
+                                              "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2",
+                                              senderNameColor(conversaAtiva.id),
+                                              msg.tipo === "audio" &&
+                                                "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                            )}
+                                          />
+                                        )}
+                                        {msg.quoted_wamid && (
+                                          <QuotedPreview
+                                            remetenteNome={
+                                              msg.quoted_remetente_nome
+                                            }
+                                            conteudo={msg.quoted_conteudo}
+                                            tipo={msg.quoted_tipo}
+                                            isSaida={isSaida}
+                                            onClick={() => {
+                                              const originalId = idPorWamid.get(
+                                                msg.quoted_wamid!,
+                                              );
+                                              if (!originalId) return;
+                                              irParaMensagem(originalId);
+                                            }}
+                                          />
+                                        )}
+                                        <MessageContent
+                                          msg={msgParaExibir}
+                                          isSaida={isSaida}
+                                          onImageClick={(url) =>
+                                            setViewingImage({ url })
+                                          }
+                                          onPreviewFile={setPreviewFile}
+                                          conversaAtiva={conversaAtiva}
+                                        />
+                                        <ReactionBadge
+                                          reacoes={msg.reacoes ?? []}
+                                          isSaida={isSaida}
+                                          onToggle={(emoji) =>
+                                            handleReact(msg, emoji)
+                                          }
+                                        />
+                                      </div>
+                                      {msg.tipo !== "texto" && (
+                                        <div
+                                          className={cn(
+                                            "flex items-center gap-1 mt-0.5",
+                                            isSaida
+                                              ? "justify-end mr-1"
+                                              : "justify-start ml-1",
+                                          )}
+                                        >
+                                          <span className="text-[9px] text-muted-foreground">
+                                            {format(
+                                              new Date(msg.created_at),
+                                              "HH:mm",
+                                            )}
+                                          </span>
+                                          {isSaida && (
+                                            <MessageStatus status={msg.status} />
+                                          )}
+                                        </div>
+                                      )}
+                                    </DraggableBubble>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                            })}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </ScrollArea>
