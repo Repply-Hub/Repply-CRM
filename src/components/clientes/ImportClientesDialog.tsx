@@ -16,15 +16,15 @@ import { ImportInstructionsStep } from '@/components/import/ImportInstructionsSt
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
-type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'uf' | 'cep' | 'nome_contato' | 'sobrenome_contato' | 'cargo' | 'classificacao' | 'data_criacao';
+type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'uf' | 'cep' | 'nome_contato' | 'cargo' | 'classificacao' | 'data_criacao';
 
 const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: boolean }[] = [
-  { key: 'empresa', label: 'Empresa', required: false },
-  { key: 'nome_contato', label: 'Nome', required: false },
-  { key: 'sobrenome_contato', label: 'Sobrenome', required: false },
-  { key: 'razao_social', label: 'Razão social', required: false },
   { key: 'tipo', label: 'Tipo / Segmento', required: false },
   { key: 'cnpj', label: 'CNPJ / CPF', required: false },
+  { key: 'empresa', label: 'Empresa/Nome Fantasia', required: false },
+  { key: 'razao_social', label: 'Razão social', required: false },
+  { key: 'nome_contato', label: 'Contato da empresa', required: false },
+  { key: 'cargo', label: 'Cargo', required: false, forContatos: true },
   { key: 'email', label: 'E-mail', required: false },
   { key: 'telefone', label: 'Telefone', required: false },
   { key: 'logradouro', label: 'Logradouro / Rua', required: false },
@@ -34,7 +34,6 @@ const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: b
   { key: 'cidade', label: 'Cidade', required: false },
   { key: 'uf', label: 'UF', required: false },
   { key: 'cep', label: 'CEP', required: false },
-  { key: 'cargo', label: 'Cargo', required: false, forContatos: true },
   { key: 'classificacao', label: 'Classificação', required: false },
   { key: 'data_criacao', label: 'Data de Criação', required: false },
 ];
@@ -57,8 +56,7 @@ const TIPO_MAP: Record<string, string> = {
 
 const FIELD_EXAMPLES: Partial<Record<FieldKey, string>> = {
   empresa: 'Construtora Exemplo Ltda',
-  nome_contato: 'João',
-  sobrenome_contato: 'Silva',
+  nome_contato: 'João Silva',
   razao_social: 'Construtora Exemplo Ltda',
   tipo: 'construtora',
   cnpj: '00.000.000/0001-00',
@@ -96,13 +94,9 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   cep: [/^cep$/, /cep/, /zip/, /postcode/],
   nome_contato: [
     /^nome$/, /^nome\s*completo$/, /^primeiro\s*nome$/, /^first\s*name$/, /^full\s*name$/, /^nome\s*proprio$/,
-    /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^responsavel$/, /^pessoa$/,
+    /^nome\s*contato$/, /^nome\s*do\s*contato$/, /^contato\s*da\s*empresa$/, /^responsavel$/, /^pessoa$/,
     /^contato\s*principal$/, /^contato$/,
     /responsavel/, /^nome\b/, /first.*name/, /full.*name/
-  ],
-  sobrenome_contato: [
-    /^sobrenome$/, /^ultimo\s*nome$/, /^last\s*name$/, /^surname$/, /^apelido$/,
-    /sobrenome/, /last.*name/, /surname/,
   ],
   cargo: [/^cargo$/, /cargo/, /funcao/, /posicao/],
   classificacao: [/^classificacao$/, /^classificacao.*cliente$/, /^rank$/, /^ranking$/, /^score$/, /classificacao/],
@@ -114,7 +108,7 @@ function autoDetectMapping(headers: string[], fields: { key: FieldKey; label: st
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
     telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
     cidade: '', uf: '', cep: '',
-    nome_contato: '', sobrenome_contato: '', cargo: '',
+    nome_contato: '', cargo: '',
     classificacao: '', data_criacao: '',
   };
 
@@ -179,7 +173,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
     telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
     cidade: '', uf: '', cep: '',
-    nome_contato: '', sobrenome_contato: '', cargo: '',
+    nome_contato: '', cargo: '',
     classificacao: '', data_criacao: '',
   });
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
@@ -215,7 +209,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
       telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
       cidade: '', uf: '', cep: '',
-      nome_contato: '', sobrenome_contato: '', cargo: '',
+      nome_contato: '', cargo: '',
       classificacao: '', data_criacao: '',
     });
     setFieldDefaultValues({});
@@ -362,9 +356,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         const empresa = get('empresa');
         const razao_social = get('razao_social');
         const cnpj = get('cnpj');
-        const primeiro = get('nome_contato');
-        const sobrenome = get('sobrenome_contato');
-        const nome_contato = [primeiro, sobrenome].filter(Boolean).join(' ').trim();
+        const nome_contato = get('nome_contato');
         const tipoRaw = get('tipo');
 
         // Resolve o nome da empresa usando fallbacks se necessário
@@ -408,7 +400,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     return target === 'empresas' ? mergeRowsByCnpj(mappedRows) : mappedRows;
   };
 
-  const canProceed = Boolean(mapping.empresa) || Boolean(mapping.razao_social) || Boolean(mapping.cnpj) || Boolean(mapping.nome_contato) || Boolean(mapping.sobrenome_contato) || Boolean(mapping.email);
+  const canProceed = Boolean(mapping.empresa) || Boolean(mapping.razao_social) || Boolean(mapping.cnpj) || Boolean(mapping.nome_contato) || Boolean(mapping.email);
 
   const previewRows = useMemo(() => (step === 'preview' ? previewRowsSnapshot : []), [step, previewRowsSnapshot]);
 
@@ -768,7 +760,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                   empresa: '', razao_social: '', tipo: '', cnpj: '', email: '',
                   telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
                   cidade: '', uf: '', cep: '',
-                  nome_contato: '', sobrenome_contato: '', cargo: '',
+                  nome_contato: '', cargo: '',
                   classificacao: '', data_criacao: '',
                 });
                 setExtras({});
