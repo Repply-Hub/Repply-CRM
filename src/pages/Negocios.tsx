@@ -119,7 +119,26 @@ const PedidoRow = memo(({
         const colId = col.id;
         // Colunas padrão do sistema
         const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);
-        
+
+        // Coluna legada "pdf_url" (renomeada só no label para "Anexo", nunca no id)
+        // — trata como alias de "anexo" para nunca ler o valor bruto de campos_extras.
+        if (colId === 'pdf_url') {
+          return (
+            <TableCell key={colId} className="whitespace-nowrap px-4" onClick={e => e.stopPropagation()}>
+              {pedido.pdf_url ? (
+                <a
+                  href={repairCorruptedBitrixUrl(pedido.pdf_url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  <FileText className="h-3.5 w-3.5" /> PDF
+                </a>
+              ) : '—'}
+            </TableCell>
+          );
+        }
+
         if (!isDefault) {
           // Busca o valor em camposExtras usando o ID da coluna ou o label (fallback)
           const value = camposExtras[colId] ?? camposExtras[getLabel(colId)];
@@ -1177,12 +1196,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);
                 if (isDefault || colId === 'acoes') return null;
                 
+                if (colId === 'pdf_url') return null; // já exibido acima em "Anexo", com correção de link corrompido
                 const value = selectedViewOrder.campos_extras?.[colId] ?? selectedViewOrder.campos_extras?.[getLabel(colId)];
                 if (!value) return null;
 
                 // Evita duplicar a exibição quando o mesmo link já aparece na seção "Anexo"
                 // estruturada abaixo (importações antigas guardavam o PDF só como campo extra).
-                if (selectedViewOrder.pdf_url && typeof value === 'string' && value.trim() === selectedViewOrder.pdf_url.trim()) return null;
+                // Compara após reparo, pois o valor bruto em campos_extras pode ter a corrupção
+                // de locale (pontos trocados por vírgulas) que o pdf_url estruturado já corrige.
+                if (
+                  selectedViewOrder.pdf_url &&
+                  typeof value === 'string' &&
+                  repairCorruptedBitrixUrl(value.trim()) === repairCorruptedBitrixUrl(selectedViewOrder.pdf_url.trim())
+                ) return null;
 
                 const isUrl = typeof value === 'string' && /^https?:\/\//i.test(value.trim());
 

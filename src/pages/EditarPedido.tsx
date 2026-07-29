@@ -568,6 +568,7 @@ const EditarPedido = () => {
 
                 {Object.entries((pedidoData.pedido.campos_extras as Record<string, string> | null) || {}).map(([key, value]) => {
                   if (!value) return null;
+                  if (key === 'pdf_url') return null; // já exibido acima em "Arquivo PDF", com correção de link corrompido
                   if ((camposConfig ?? []).some(c => c.origem === 'customizado' && c.campo_key === key)) return null;
                   const strValue = String(value).trim();
                   const isUrl = /^https?:\/\//i.test(strValue);

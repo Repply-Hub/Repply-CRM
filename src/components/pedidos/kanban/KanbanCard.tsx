@@ -91,7 +91,7 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
 
                   {columns?.filter(col =>
                     visibleColumns?.includes(col.id) &&
-                    !['negocio', 'cliente', 'obra', 'fabricante', 'valor', 'vendedor', 'data_pedido', 'etapa', 'observacoes', 'acoes'].includes(col.id)
+                    !['negocio', 'cliente', 'obra', 'fabricante', 'valor', 'vendedor', 'data_pedido', 'etapa', 'observacoes', 'acoes', 'anexo', 'pdf_url'].includes(col.id)
                   ).map(col => {
                     const value = order.campos_extras?.[col.id] || order.campos_extras?.[col.label];
                     if (!value) return null;
