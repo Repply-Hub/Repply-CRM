@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X, ArrowRight, Plus, Pencil, EyeOff, FolderKanban, UserCheck, UserX } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X, ArrowRight, Plus, Pencil, EyeOff, FolderKanban, UserCheck, UserX, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -812,6 +812,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Etapa</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Data</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Obs</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Anexo</TableHead>
                     {extraFieldInfos.map(info => (
                       <TableHead key={info.id} className="text-xs sticky top-0 bg-accent/40 text-accent-foreground whitespace-nowrap">
                         {info.label} <span className="text-[10px] opacity-70">(extra)</span>
@@ -860,6 +861,19 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                         {r.data_pedido ? r.data_pedido.split('-').reverse().join('/') : '-'}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap max-w-[150px] truncate">{r.observacoes || '-'}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {r.pdf_url ? (
+                          <a
+                            href={r.pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                            title={r.pdf_url}
+                          >
+                            <Paperclip className="h-3.5 w-3.5" />
+                          </a>
+                        ) : '-'}
+                      </TableCell>
                       {extraFieldInfos.map(info => (
                         <TableCell key={info.id} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
                           {r.campos_extras?.[info.id] || r.campos_extras?.[info.label] || '-'}
