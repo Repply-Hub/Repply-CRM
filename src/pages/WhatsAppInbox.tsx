@@ -499,6 +499,7 @@ function conversaNaoLida(
   conv: WaConversa,
   currentUserId?: string | null,
 ): boolean {
+  if (conv.arquivada) return false;
   const atribuidaAoUsuarioAtual =
     !!currentUserId &&
     (conv.responsaveis ?? []).some((r) => r.id === currentUserId);
@@ -1479,7 +1480,15 @@ function DraggableBubble({
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align={isSaida ? "end" : "start"}>
+            {/* data-no-drag: os itens do Radix DropdownMenuItem renderizam <div
+                role="menuitem">, não <button> — sem essa marcação, o onPointerDown
+                de swipe-to-reply da bolha (que só ignora button/a/img/video/audio)
+                capturava o ponteiro antes do clique chegar ao Radix, fechando o menu
+                sem disparar a ação. */}
+            <DropdownMenuContent
+              align={isSaida ? "end" : "start"}
+              data-no-drag
+            >
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => onExcluir(msg)}
@@ -3217,12 +3226,11 @@ export default function WhatsAppInbox() {
     profile?.role === "empresa" ||
     profile?.role === "gestor" ||
     profile?.role === "admin";
-  // Para vendedor, "Meus chats" = atribuídos a ele mesmo (é tudo que a RLS
-  // deixa enxergar). Admin/gestor enxergam a empresa toda, então "Atribuídos"
-  // pra eles mostra qualquer conversa com responsável (de qualquer um) — pra
-  // filtrar só as próprias, usam o filtro "Responsável" e selecionam a si
-  // mesmos (useVendedores traz todos os usuários da empresa, sem filtro de role).
-  const meuChatsLabel = isGestor ? "Atribuídos" : "Meus chats";
+  // Nomenclatura padronizada entre vendedor e admin/gestor: "Meus chats" é
+  // sempre "atribuídos a mim", em qualquer perfil. Admin/gestor enxergam a
+  // empresa toda, mas diferenciam o que é deles do resto da equipe pelo
+  // filtro "Outros atendentes" (abaixo), em vez de um rótulo próprio.
+  const meuChatsLabel = "Meus chats";
   const { data: vendedores = [] } = useVendedores();
   const setResponsaveis = useWaSetResponsaveis();
   const addNota = useWaAddNota();
@@ -3602,7 +3610,7 @@ export default function WhatsAppInbox() {
     "aberto",
   );
   const [filtroConversa, setFiltroConversa] = useState<
-    "todos" | "geral" | "meu"
+    "todos" | "geral" | "meu" | "outros"
   >("todos");
   const [filtroPeriodo, setFiltroPeriodo] = useState<
     "todos" | "semana" | "mes" | "ano" | "personalizado"
@@ -3823,6 +3831,10 @@ export default function WhatsAppInbox() {
           ["todos", "Todos"],
           ["geral", "Não atribuído"],
           ["meu", meuChatsLabel],
+          // "Outros atendentes" só faz sentido pra admin/gestor — vendedor
+          // comum, por causa da RLS, nunca enxerga conversa atribuída a
+          // outra pessoa.
+          ...(isGestor ? ([["outros", "Outros atendentes"]] as const) : []),
         ] as const
       ).map(([val, label]) => (
         <button
@@ -4223,19 +4235,24 @@ export default function WhatsAppInbox() {
   const conversasPorTipoEBusca = conversas.filter((c) => {
     if (filtroConversa === "geral" && (c.responsaveis?.length ?? 0) > 0)
       return false;
-    if (filtroConversa === "meu") {
-      // Admin/gestor: "Atribuídos" = qualquer conversa com responsável
-      // (de qualquer pessoa da empresa) — usam o filtro "Responsável" pra
-      // restringir a si mesmos. Vendedor: só o que é atribuído a ele mesmo.
-      if (isGestor) {
-        if ((c.responsaveis?.length ?? 0) === 0) return false;
-      } else if (
-        !profile?.id ||
-        !c.responsaveis?.some((r) => r.id === profile.id)
-      ) {
-        return false;
-      }
-    }
+    // "Meus chats" tem o mesmo significado pra vendedor e admin/gestor:
+    // só o que está atribuído ao usuário logado.
+    if (
+      filtroConversa === "meu" &&
+      (!profile?.id || !c.responsaveis?.some((r) => r.id === profile.id))
+    )
+      return false;
+    // "Outros atendentes": só existe pra admin/gestor (vendedor comum, por
+    // causa da RLS, nunca enxerga conversa atribuída a outra pessoa) — mostra
+    // o que está atribuído a alguém que não é o usuário logado.
+    if (
+      filtroConversa === "outros" &&
+      !(
+        (c.responsaveis?.length ?? 0) > 0 &&
+        !c.responsaveis?.some((r) => r.id === profile?.id)
+      )
+    )
+      return false;
 
     if (filtroInstancia !== "todos" && c.instancia_id !== filtroInstancia)
       return false;
@@ -4265,14 +4282,14 @@ export default function WhatsAppInbox() {
     }
 
     if (!busca) return true;
-    const term = busca.toLowerCase();
+    const term = normalizeNomeBusca(busca);
     return (
-      (c.nome_contato ?? "").toLowerCase().includes(term) ||
+      normalizeNomeBusca(c.nome_contato ?? "").includes(term) ||
       c.telefone.includes(term) ||
-      (c.ultima_mensagem ?? "").toLowerCase().includes(term) ||
+      normalizeNomeBusca(c.ultima_mensagem ?? "").includes(term) ||
       (c.participantes ?? []).some(
         (p) =>
-          (p.nome ?? "").toLowerCase().includes(term) ||
+          normalizeNomeBusca(p.nome ?? "").includes(term) ||
           p.telefone.includes(term),
       )
     );
@@ -4378,8 +4395,18 @@ export default function WhatsAppInbox() {
       if (conversasFiltradas.length)
         grupos.push({
           key: "meus",
-          label: isGestor ? "Atribuídos à equipe" : "Atribuídos a mim",
+          label: "Atribuídos a mim",
           icon: UserCheck,
+          conversas: conversasFiltradas,
+        });
+      return grupos.length ? grupos : null;
+    }
+    if (filtroConversa === "outros") {
+      if (conversasFiltradas.length)
+        grupos.push({
+          key: "outros",
+          label: "Outros atendentes",
+          icon: Users,
           conversas: conversasFiltradas,
         });
       return grupos.length ? grupos : null;
@@ -4406,7 +4433,7 @@ export default function WhatsAppInbox() {
     if (meus.length)
       grupos.push({
         key: "meus",
-        label: isGestor ? "Atribuídos à equipe" : "Atribuídos a mim",
+        label: "Atribuídos a mim",
         icon: UserCheck,
         conversas: meus,
       });
@@ -4420,7 +4447,7 @@ export default function WhatsAppInbox() {
 
     if (grupos.length === 0) return null;
     return grupos;
-  }, [conversasFiltradas, filtroConversa, profile?.id, isGestor]);
+  }, [conversasFiltradas, filtroConversa, profile?.id]);
 
   // Mapa id → apelido da instância, para exibir o badge na linha da conversa
   // independente do agrupamento ativo (por responsável ou por instância).
@@ -5480,6 +5507,11 @@ export default function WhatsAppInbox() {
                                 ["todos", "Todos"],
                                 ["geral", "Não atribuído"],
                                 ["meu", meuChatsLabel],
+                                ...(isGestor
+                                  ? ([
+                                      ["outros", "Outros atendentes"],
+                                    ] as const)
+                                  : []),
                               ] as const
                             ).map(([val, label]) => (
                               <button
@@ -6361,6 +6393,52 @@ export default function WhatsAppInbox() {
                                 : (prevMsg.remetente_telefone ?? null) !==
                                   (msg.remetente_telefone ?? null));
   
+                            // Notificação de chamada de voz/vídeo feita pelo cliente via WhatsApp
+                            // (webhook de evento "call" da uazapi) — assim como o WhatsApp Web/app
+                            // oficial, renderiza como um chip centralizado em vez de bolha normal,
+                            // já que não é uma mensagem de texto trocada entre as partes.
+                            if (msg.tipo === "chamada") {
+                              return (
+                                <div
+                                  key={msg.id}
+                                  id={`wa-msg-${msg.id}`}
+                                  ref={isLast ? msgScrollRef : undefined}
+                                >
+                                  <div
+                                    className={cn(
+                                      "flex justify-center",
+                                      prevMsg?.direcao !== msg.direcao
+                                        ? "mt-3"
+                                        : "mt-0.5",
+                                    )}
+                                  >
+                                    <div className="max-w-[75%] items-center">
+                                      <div
+                                        className={cn(
+                                          "px-3 py-2 break-words rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 text-foreground flex items-center gap-1.5",
+                                          msg.id === destacadaMsgId &&
+                                            "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                                        )}
+                                      >
+                                        <Phone className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                        <p className="text-xs text-center whitespace-pre-wrap">
+                                          {msg.conteudo}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-1 mt-0.5 justify-center">
+                                        <span className="text-[9px] text-muted-foreground">
+                                          {format(
+                                            new Date(msg.created_at),
+                                            "HH:mm",
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+
                             // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca foi
                             // enviada ao WhatsApp. Renderiza centralizada (como um chip de
                             // sistema), mas com bg cinza próprio, pra diferenciar das bolhas

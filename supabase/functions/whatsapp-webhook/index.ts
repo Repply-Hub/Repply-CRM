@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-webhook-secret",
 };
 
 // WhatsApp/uazapi às vezes envia o JID de celulares BR sem o 9º dígito (número antigo).
@@ -27,17 +28,21 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
     const url = new URL(req.url);
-    const instanceName = url.searchParams.get("instance") ?? req.headers.get("x-instance-name");
+    const instanceName =
+      url.searchParams.get("instance") ?? req.headers.get("x-instance-name");
 
     if (!instanceName) {
-      return new Response(JSON.stringify({ error: "instance param required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "instance param required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const rawBody = await req.text();
@@ -53,7 +58,9 @@ serve(async (req) => {
 
     const { data: config } = await supabase
       .from("configuracoes_wapi")
-      .select("id, empresa_id, webhook_secret, instance_url, api_key, api_instance_name")
+      .select(
+        "id, empresa_id, webhook_secret, instance_url, api_key, api_instance_name",
+      )
       .eq("instance_name", instanceName)
       .single();
 
@@ -68,20 +75,40 @@ serve(async (req) => {
 
     // payload.event pode ser string (nome do evento, em payloads antigos) ou objeto
     // (dados do evento, ex: messages_update) — só usa como fallback se for string.
-    const eventTypeFallback = typeof payload.event === "string" ? payload.event : "";
-    const eventType = (payload.EventType ?? eventTypeFallback ?? payload.type ?? "").toLowerCase();
+    const eventTypeFallback =
+      typeof payload.event === "string" ? payload.event : "";
+    const eventType = (
+      payload.EventType ??
+      eventTypeFallback ??
+      payload.type ??
+      ""
+    ).toLowerCase();
 
     if (eventType === "messages_update") {
       await handleStatusUpdate(supabase, empresaId, payload);
     } else if (eventType === "messages" || eventType.includes("message")) {
-      await handleIncomingMessage(supabase, empresaId, instanceName, config, payload);
+      await handleIncomingMessage(
+        supabase,
+        empresaId,
+        instanceName,
+        config,
+        payload,
+      );
     } else if (eventType.includes("connection")) {
       await handleConnectionUpdate(supabase, empresaId, instanceName, payload);
-    } else if (!eventType.includes("presence") && !eventType.includes("group")) {
+    } else if (eventType.includes("call")) {
+      await handleCallEvent(supabase, empresaId, payload);
+    } else if (
+      !eventType.includes("presence") &&
+      !eventType.includes("group")
+    ) {
       // eventType desconhecido e não é um dos tipos já ignorados de propósito
       // (presence/group) — grava pra investigar depois se isso não devia ter
       // sido tratado como mensagem.
-      await logWebhookDrop(supabase, "evento_nao_reconhecido", { eventType, payload });
+      await logWebhookDrop(supabase, "evento_nao_reconhecido", {
+        eventType,
+        payload,
+      });
     }
 
     return new Response(JSON.stringify({ ok: true }), {
@@ -102,7 +129,9 @@ serve(async (req) => {
 // nota "faltou uma mensagem" dias depois, sem nenhuma pista de qual campo faltou.
 async function logWebhookDrop(supabase: any, motivo: string, payload: unknown) {
   try {
-    await supabase.from("webhook_debug").insert({ payload: { _drop_reason: motivo, payload } });
+    await supabase
+      .from("webhook_debug")
+      .insert({ payload: { _drop_reason: motivo, payload } });
   } catch (e) {
     console.error("[webhook] falha ao gravar webhook_debug:", e);
   }
@@ -113,16 +142,16 @@ async function logWebhookDrop(supabase: any, motivo: string, payload: unknown) {
 // original (docx, xlsx, etc.) ilegível para quem baixasse pela URL do Storage.
 const MIME_TO_EXT: Record<string, string> = {
   "vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-  "msword": "doc",
+  msword: "doc",
   "vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
   "vnd.ms-excel": "xls",
   "vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
   "vnd.ms-powerpoint": "ppt",
-  "zip": "zip",
+  zip: "zip",
   "x-rar-compressed": "rar",
   "vnd.rar": "rar",
-  "csv": "csv",
-  "plain": "txt",
+  csv: "csv",
+  plain: "txt",
 };
 
 function extFromFileName(fileName: string | null): string | null {
@@ -160,8 +189,12 @@ async function uploadBytesToStorage(
   const { data: up, error } = await supabase.storage
     .from("whatsapp-media")
     .upload(path, bytes, { contentType: mime, upsert: false });
-  if (error) { console.error("[webhook] upload falhou:", error); return null; }
-  return supabase.storage.from("whatsapp-media").getPublicUrl(up.path).data.publicUrl;
+  if (error) {
+    console.error("[webhook] upload falhou:", error);
+    return null;
+  }
+  return supabase.storage.from("whatsapp-media").getPublicUrl(up.path).data
+    .publicUrl;
 }
 
 function b64ToBytes(raw: string): Uint8Array {
@@ -187,7 +220,9 @@ async function decryptWhatsAppMedia(
   const info = new TextEncoder().encode(infoMap[tipo] ?? "WhatsApp Audio Keys");
 
   const mediaKey = b64ToBytes(mediaKeyB64);
-  const ikm = await crypto.subtle.importKey("raw", mediaKey, "HKDF", false, ["deriveBits"]);
+  const ikm = await crypto.subtle.importKey("raw", mediaKey, "HKDF", false, [
+    "deriveBits",
+  ]);
   const expandedBits = await crypto.subtle.deriveBits(
     { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info },
     ikm,
@@ -197,13 +232,28 @@ async function decryptWhatsAppMedia(
   const iv = expanded.slice(0, 16);
   const cipherKey = expanded.slice(16, 48);
 
-  const res = await fetch(encUrl, { headers: { "User-Agent": "WhatsApp/2.23.0 A" } });
-  if (!res.ok) { console.log(`[webhook] CDN fetch ${res.status}`); return null; }
+  const res = await fetch(encUrl, {
+    headers: { "User-Agent": "WhatsApp/2.23.0 A" },
+  });
+  if (!res.ok) {
+    console.log(`[webhook] CDN fetch ${res.status}`);
+    return null;
+  }
   const encData = new Uint8Array(await res.arrayBuffer());
   const encMedia = encData.slice(0, -10);
 
-  const key = await crypto.subtle.importKey("raw", cipherKey, { name: "AES-CBC" }, false, ["decrypt"]);
-  const plaintext = await crypto.subtle.decrypt({ name: "AES-CBC", iv }, key, encMedia);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    cipherKey,
+    { name: "AES-CBC" },
+    false,
+    ["decrypt"],
+  );
+  const plaintext = await crypto.subtle.decrypt(
+    { name: "AES-CBC", iv },
+    key,
+    encMedia,
+  );
   return new Uint8Array(plaintext);
 }
 
@@ -238,22 +288,38 @@ async function downloadViaUazapiApi(
     const res = await fetch(`${baseUrl}/message/download`, {
       method: "POST",
       headers: { "Content-Type": "application/json", token: config.api_key },
-      body: JSON.stringify({ id: wamid, return_base64: true, return_link: false }),
+      body: JSON.stringify({
+        id: wamid,
+        return_base64: true,
+        return_link: false,
+      }),
     });
     const bodyText = await res.text();
     if (!res.ok) {
-      return { ok: false, reason: `http_${res.status}`, detail: bodyText.slice(0, 2000) };
+      return {
+        ok: false,
+        reason: `http_${res.status}`,
+        detail: bodyText.slice(0, 2000),
+      };
     }
     let data: any;
     try {
       data = JSON.parse(bodyText);
     } catch {
-      return { ok: false, reason: "invalid_json", detail: bodyText.slice(0, 2000) };
+      return {
+        ok: false,
+        reason: "invalid_json",
+        detail: bodyText.slice(0, 2000),
+      };
     }
     if (!data?.base64Data) {
       return { ok: false, reason: "no_base64Data", detail: data };
     }
-    return { ok: true, bytes: b64ToBytes(data.base64Data), mime: data.mimetype ?? null };
+    return {
+      ok: true,
+      bytes: b64ToBytes(data.base64Data),
+      mime: data.mimetype ?? null,
+    };
   } catch (e) {
     return { ok: false, reason: "exception", detail: String(e) };
   }
@@ -272,13 +338,22 @@ async function downloadAndStoreMedia(
   tipo: string,
   fileName: string | null = null,
 ): Promise<string | null> {
-  const mime = (mediaMime ?? DEFAULT_MIME_BY_TIPO[tipo] ?? "audio/ogg").split(";")[0].trim();
+  const mime = (mediaMime ?? DEFAULT_MIME_BY_TIPO[tipo] ?? "audio/ogg")
+    .split(";")[0]
+    .trim();
 
   try {
     if (inlineB64) {
       console.log("[webhook] base64 inline");
       const bytes = b64ToBytes(inlineB64);
-      return await uploadBytesToStorage(supabase, bytes, mime, empresaId, wamid, fileName);
+      return await uploadBytesToStorage(
+        supabase,
+        bytes,
+        mime,
+        empresaId,
+        wamid,
+        fileName,
+      );
     }
 
     if (cdnUrl && mediaKey) {
@@ -294,7 +369,14 @@ async function downloadAndStoreMedia(
       }
       if (bytes) {
         console.log(`[webhook] descriptografia OK — ${bytes.length} bytes`);
-        return await uploadBytesToStorage(supabase, bytes, mime, empresaId, wamid, fileName);
+        return await uploadBytesToStorage(
+          supabase,
+          bytes,
+          mime,
+          empresaId,
+          wamid,
+          fileName,
+        );
       }
     }
 
@@ -303,13 +385,30 @@ async function downloadAndStoreMedia(
       const apiResult = await downloadViaUazapiApi(config, wamid);
       if (apiResult.ok) {
         const apiMime = (apiResult.mime ?? mime).split(";")[0].trim();
-        console.log(`[webhook] download via API OK — ${apiResult.bytes.length} bytes, mime=${apiMime}`);
-        return await uploadBytesToStorage(supabase, apiResult.bytes, apiMime, empresaId, wamid, fileName);
+        console.log(
+          `[webhook] download via API OK — ${apiResult.bytes.length} bytes, mime=${apiMime}`,
+        );
+        return await uploadBytesToStorage(
+          supabase,
+          apiResult.bytes,
+          apiMime,
+          empresaId,
+          wamid,
+          fileName,
+        );
       }
-      console.log(`[webhook] download via API uazapi falhou: ${apiResult.reason}`);
-      await logWebhookDrop(supabase, `media_download_uazapi_falhou:${apiResult.reason}`, {
-        wamid, tipo, detail: apiResult.detail,
-      });
+      console.log(
+        `[webhook] download via API uazapi falhou: ${apiResult.reason}`,
+      );
+      await logWebhookDrop(
+        supabase,
+        `media_download_uazapi_falhou:${apiResult.reason}`,
+        {
+          wamid,
+          tipo,
+          detail: apiResult.detail,
+        },
+      );
     }
 
     return null;
@@ -357,7 +456,10 @@ async function handleIncomingMessage(
   // em payloads de grupo e faziam o telefone do grupo ser normalizado como se fosse um
   // número BR individual, gerando uma conversa "fantasma" separada da conversa real.
   const chatid: string = msg.chatid ?? msg.sender_pn ?? "";
-  const isGroup = chatid.endsWith("@g.us") || msg.isGroup === true || payload.chat?.wa_isGroup === true;
+  const isGroup =
+    chatid.endsWith("@g.us") ||
+    msg.isGroup === true ||
+    payload.chat?.wa_isGroup === true;
 
   const rawTelefone = chatid
     .replace("@s.whatsapp.net", "")
@@ -379,10 +481,10 @@ async function handleIncomingMessage(
   // empresa a cada resposta enviada fora do CRM. payload.chat sempre descreve o contato
   // da conversa, então é a fonte certa quando quem enviou não é o contato.
   const pushName: string = isGroup
-    ? (groupName || msg.senderName || "")
-    : (sentByOtherChannel
-        ? (payload.chat?.wa_name ?? payload.chat?.name ?? "")
-        : (msg.senderName ?? payload.chat?.wa_name ?? payload.chat?.name ?? ""));
+    ? groupName || msg.senderName || ""
+    : sentByOtherChannel
+      ? (payload.chat?.wa_name ?? payload.chat?.name ?? "")
+      : (msg.senderName ?? payload.chat?.wa_name ?? payload.chat?.name ?? "");
 
   // Em grupos, quem enviou a mensagem é o participante (msg.sender_pn / msg.senderName),
   // não o grupo em si — guarda separado para exibir "quem mandou o quê" na UI.
@@ -393,11 +495,14 @@ async function handleIncomingMessage(
     const rawSenderPn = (msg.sender_pn ?? "")
       .replace("@s.whatsapp.net", "")
       .replace("@c.us", "");
-    remetenteTelefone = rawSenderPn ? normalizeWhatsappPhone(rawSenderPn) : null;
+    remetenteTelefone = rawSenderPn
+      ? normalizeWhatsappPhone(rawSenderPn)
+      : null;
   }
 
   const msgType = (msg.messageType ?? msg.type ?? "text").toLowerCase();
-  const content = msg.content && typeof msg.content === "object" ? msg.content : null;
+  const content =
+    msg.content && typeof msg.content === "object" ? msg.content : null;
 
   // --- Reação (❤️ 👍 etc.) a uma mensagem existente ---
   // Formato confirmado empiricamente contra POST /message/react (docs.uazapi.com não é
@@ -410,16 +515,26 @@ async function handleIncomingMessage(
   if (looksLikeReaction) {
     const reactionEmoji: string = content?.text ?? msg.text ?? "";
     const reactionTargetWamid: string | null =
-      content?.key?.ID ?? content?.key?.id ?? msg.quoted?.id ??
-      msg.quoted?.messageid ?? content?.contextInfo?.stanzaId ?? null;
+      content?.key?.ID ??
+      content?.key?.id ??
+      msg.quoted?.id ??
+      msg.quoted?.messageid ??
+      content?.contextInfo?.stanzaId ??
+      null;
 
     await supabase.from("webhook_debug").insert({
-      payload: { _reaction_debug: true, msg, chat: payload.chat, reactionEmoji, reactionTargetWamid },
+      payload: {
+        _reaction_debug: true,
+        msg,
+        chat: payload.chat,
+        reactionEmoji,
+        reactionTargetWamid,
+      },
     });
 
     if (reactionTargetWamid) {
       const autorKey = sentByOtherChannel ? "eu" : telefone;
-      const autorNome = sentByOtherChannel ? "Você" : (pushName || telefone);
+      const autorNome = sentByOtherChannel ? "Você" : pushName || telefone;
 
       const { data: alvos } = await supabase
         .from("whatsapp_mensagens")
@@ -431,9 +546,20 @@ async function handleIncomingMessage(
         const atuais: any[] = Array.isArray(alvo.reacoes) ? alvo.reacoes : [];
         const semAutor = atuais.filter((r) => r?.autor !== autorKey);
         const novasReacoes = reactionEmoji
-          ? [...semAutor, { emoji: reactionEmoji, autor: autorKey, nome: autorNome, at: new Date().toISOString() }]
+          ? [
+              ...semAutor,
+              {
+                emoji: reactionEmoji,
+                autor: autorKey,
+                nome: autorNome,
+                at: new Date().toISOString(),
+              },
+            ]
           : semAutor;
-        await supabase.from("whatsapp_mensagens").update({ reacoes: novasReacoes }).eq("id", alvo.id);
+        await supabase
+          .from("whatsapp_mensagens")
+          .update({ reacoes: novasReacoes })
+          .eq("id", alvo.id);
       }
     }
     return;
@@ -443,8 +569,16 @@ async function handleIncomingMessage(
   let tipo = "texto";
 
   const anyMediaUrl = (): string | null =>
-    content?.URL ?? content?.url ?? content?.link ?? content?.audio ??
-    msg.audioUrl ?? msg.imageUrl ?? msg.videoUrl ?? msg.documentUrl ?? msg.stickerUrl ?? null;
+    content?.URL ??
+    content?.url ??
+    content?.link ??
+    content?.audio ??
+    msg.audioUrl ??
+    msg.imageUrl ??
+    msg.videoUrl ??
+    msg.documentUrl ??
+    msg.stickerUrl ??
+    null;
 
   let mediaUrl: string | null = null;
   let mediaMime: string | null =
@@ -457,9 +591,11 @@ async function handleIncomingMessage(
     mediaUrl = anyMediaUrl();
     if (!conteudo) conteudo = "[Imagem]";
   } else if (
-    msgType.includes("audio") || msgType.includes("ptt") ||
+    msgType.includes("audio") ||
+    msgType.includes("ptt") ||
     msgType.includes("voice") ||
-    msg.ptt === true || content?.ptt === true
+    msg.ptt === true ||
+    content?.ptt === true
   ) {
     tipo = "audio";
     mediaUrl = anyMediaUrl();
@@ -481,7 +617,11 @@ async function handleIncomingMessage(
   // Fallback: detecta pelo mimetype
   if (tipo === "texto" && mediaMime) {
     const mime = mediaMime.toLowerCase();
-    if (mime.startsWith("audio/") || mime.includes("ogg") || mime.includes("opus")) {
+    if (
+      mime.startsWith("audio/") ||
+      mime.includes("ogg") ||
+      mime.includes("opus")
+    ) {
       tipo = "audio";
       mediaUrl = anyMediaUrl();
       conteudo = "[Áudio]";
@@ -498,7 +638,11 @@ async function handleIncomingMessage(
       tipo = "video";
       mediaUrl = anyMediaUrl();
       if (!conteudo) conteudo = "[Vídeo]";
-    } else if (mime.startsWith("application/") || mime.includes("pdf") || mime.includes("zip")) {
+    } else if (
+      mime.startsWith("application/") ||
+      mime.includes("pdf") ||
+      mime.includes("zip")
+    ) {
       tipo = "documento";
       mediaUrl = anyMediaUrl();
       if (!conteudo) conteudo = "[Documento]";
@@ -517,7 +661,8 @@ async function handleIncomingMessage(
   // uma FK) porque a mensagem original pode já ter sido apagada.
   const quotedRawId: string | null =
     (typeof msg.quoted === "string" && msg.quoted) ||
-    content?.contextInfo?.stanzaId || null;
+    content?.contextInfo?.stanzaId ||
+    null;
 
   let quotedWamid: string | null = null;
   let quotedConteudo: string | null = null;
@@ -537,7 +682,9 @@ async function handleIncomingMessage(
       quotedConteudo = quotedMsg.conteudo;
       quotedTipo = quotedMsg.tipo;
       quotedRemetenteNome =
-        quotedMsg.direcao === "saida" ? "Você" : (quotedMsg.remetente_nome ?? null);
+        quotedMsg.direcao === "saida"
+          ? "Você"
+          : (quotedMsg.remetente_nome ?? null);
     }
   }
 
@@ -548,8 +695,17 @@ async function handleIncomingMessage(
 
   if (tipo !== "texto" && wamid) {
     const storedUrl = await downloadAndStoreMedia(
-      supabase, config, empresaId, instanceName, wamid, mediaMime,
-      anyMediaUrl(), inlineB64, mediaKey, tipo, mediaFileName,
+      supabase,
+      config,
+      empresaId,
+      instanceName,
+      wamid,
+      mediaMime,
+      anyMediaUrl(),
+      inlineB64,
+      mediaKey,
+      tipo,
+      mediaFileName,
     );
     // Se o download/upload falhar, não usa a URL crua da CDN do WhatsApp como
     // media_url: ela é um link E2E criptografado (.enc) sem os headers/auth que só
@@ -560,7 +716,9 @@ async function handleIncomingMessage(
     console.log(`[webhook] mídia (${tipo}) stored="${storedUrl ?? "falhou"}"`);
   }
 
-  console.log(`[webhook] mensagem de ${telefone} (${pushName}) grupo=${isGroup}: "${conteudo}" tipo=${tipo}`);
+  console.log(
+    `[webhook] mensagem de ${telefone} (${pushName}) grupo=${isGroup}: "${conteudo}" tipo=${tipo}`,
+  );
 
   // A uazapi reentrega o mesmo webhook (retry por timeout/cold start) e a linha da
   // mensagem já é deduplicada mais abaixo via upsert(onConflict: wamid,
@@ -594,7 +752,10 @@ async function handleIncomingMessage(
         nome_contato: pushName || existente.nome_contato,
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
-        nao_lidas: sentByOtherChannel || jaProcessada ? (existente.nao_lidas ?? 0) : (existente.nao_lidas ?? 0) + 1,
+        nao_lidas:
+          sentByOtherChannel || jaProcessada
+            ? (existente.nao_lidas ?? 0)
+            : (existente.nao_lidas ?? 0) + 1,
         arquivada: false,
         is_group: isGroup,
         instancia_id: config.id,
@@ -647,15 +808,138 @@ async function handleIncomingMessage(
   if (quotedWamid) insertData.quoted_wamid = quotedWamid;
   if (quotedConteudo) insertData.quoted_conteudo = quotedConteudo;
   if (quotedTipo) insertData.quoted_tipo = quotedTipo;
-  if (quotedRemetenteNome) insertData.quoted_remetente_nome = quotedRemetenteNome;
+  if (quotedRemetenteNome)
+    insertData.quoted_remetente_nome = quotedRemetenteNome;
 
   const { error: msgError } = await supabase
     .from("whatsapp_mensagens")
-    .upsert(insertData, wamid ? { onConflict: "wamid", ignoreDuplicates: true } : {});
+    .upsert(
+      insertData,
+      wamid ? { onConflict: "wamid", ignoreDuplicates: true } : {},
+    );
 
   if (msgError) {
     console.error("[webhook] insert mensagem:", msgError);
   }
+}
+
+// Notifica no chat quando o cliente faz uma ligação (voz ou vídeo) pelo WhatsApp
+// (evento "call" do webhook uazapi). Schema confirmado a partir de payloads reais
+// gravados em webhook_debug (_call_debug): cada ligação dispara um sub-evento por
+// estado — event.Data.Tag em ("offer", "accept", "reject", "terminate") — todos
+// com o mesmo event.CallID. Só "offer" representa o cliente iniciando a ligação;
+// os demais vêm de quem atende/recusa/encerra (inclusive do nosso lado) e não
+// devem virar notificação nova. O JID em event.From/event.CallCreator é um "@lid"
+// (identificador anônimo do WhatsApp para chamadas, não o telefone real) — usar
+// isso direto cria uma conversa fantasma; o telefone de fato vem em
+// `payload.sender_pn` / `event.Data.Attrs.caller_pn`, no formato
+// "<numero>@s.whatsapp.net".
+async function handleCallEvent(supabase: any, empresaId: string, payload: any) {
+  const ev = payload.event ?? {};
+
+  await supabase.from("webhook_debug").insert({
+    payload: { _call_debug: true, payload },
+  });
+
+  const tag = String(ev.Data?.Tag ?? "").toLowerCase();
+  if (tag !== "offer") return;
+
+  const rawFrom: string = payload.sender_pn ?? ev.Data?.Attrs?.caller_pn ?? "";
+  if (!rawFrom) {
+    await logWebhookDrop(supabase, "call_sem_sender_pn", { ev, payload });
+    return;
+  }
+
+  const isGroupCall = rawFrom.endsWith("@g.us");
+  const rawTelefone = rawFrom
+    .replace("@s.whatsapp.net", "")
+    .replace("@c.us", "")
+    .replace("@g.us", "")
+    .split(":")[0]; // remove eventual sufixo de device (ex: "<numero>:59@lid")
+  if (!rawTelefone) return;
+  const telefone = isGroupCall
+    ? rawTelefone
+    : normalizeWhatsappPhone(rawTelefone);
+
+  // Chamada de vídeo inclui uma tag "video" entre os codecs oferecidos em
+  // event.Data.Content — só áudio nunca tem essa tag.
+  const content: any[] = Array.isArray(ev.Data?.Content) ? ev.Data.Content : [];
+  const isVideo = content.some(
+    (c) => String(c?.Tag ?? "").toLowerCase() === "video",
+  );
+  const conteudo = isVideo
+    ? "Chamada de vídeo recebida"
+    : "Chamada de voz recebida";
+
+  const callId = String(ev.CallID ?? ev.Data?.Attrs?.["call-id"] ?? "");
+  const wamid = callId ? `call:${callId}` : `call:${telefone}:${Date.now()}`;
+
+  // A uazapi reentrega o mesmo webhook em retry — sem essa checagem, a mesma
+  // ligação incrementaria nao_lidas mais de uma vez (mesmo padrão usado em
+  // handleIncomingMessage para mensagens).
+  const { data: msgExistente } = await supabase
+    .from("whatsapp_mensagens")
+    .select("id")
+    .eq("empresa_id", empresaId)
+    .eq("wamid", wamid)
+    .maybeSingle();
+  if (msgExistente) return;
+
+  const { data: existente } = await supabase
+    .from("whatsapp_conversas")
+    .select("id, nao_lidas")
+    .eq("empresa_id", empresaId)
+    .eq("telefone", telefone)
+    .maybeSingle();
+
+  let conversaId: string | null = null;
+  if (existente) {
+    await supabase
+      .from("whatsapp_conversas")
+      .update({
+        ultima_mensagem: conteudo,
+        ultima_mensagem_at: new Date().toISOString(),
+        nao_lidas: (existente.nao_lidas ?? 0) + 1,
+        arquivada: false,
+      })
+      .eq("id", existente.id);
+    conversaId = existente.id;
+  } else {
+    const { data, error } = await supabase
+      .from("whatsapp_conversas")
+      .insert({
+        empresa_id: empresaId,
+        telefone,
+        ultima_mensagem: conteudo,
+        ultima_mensagem_at: new Date().toISOString(),
+        nao_lidas: 1,
+        arquivada: false,
+        is_group: isGroupCall,
+      })
+      .select("id")
+      .single();
+    if (error) {
+      console.error("[webhook] insert conversa (call):", error);
+      return;
+    }
+    conversaId = data?.id ?? null;
+  }
+  if (!conversaId) return;
+
+  const { error: msgError } = await supabase.from("whatsapp_mensagens").upsert(
+    {
+      conversa_id: conversaId,
+      empresa_id: empresaId,
+      direcao: "entrada",
+      conteudo,
+      tipo: "chamada",
+      status: "entregue",
+      lida: false,
+      wamid,
+    },
+    { onConflict: "wamid", ignoreDuplicates: true },
+  );
+  if (msgError) console.error("[webhook] insert chamada:", msgError);
 }
 
 // Recibo de entrega/leitura (evento "messages_update" da uazapi). Formato real
@@ -663,7 +947,12 @@ async function handleIncomingMessage(
 // "Delivered", MessageIDs: ["<messageid sem prefixo de telefone>"], ... } } — o
 // wamid salvo em whatsapp_mensagens vem como "<telefone>:<messageid>" (resposta do
 // /send/text), por isso o match é por sufixo (LIKE '%<messageid>').
-const STATUS_RANK: Record<string, number> = { enviando: 0, enviado: 1, entregue: 2, lido: 3 };
+const STATUS_RANK: Record<string, number> = {
+  enviando: 0,
+  enviado: 1,
+  entregue: 2,
+  lido: 3,
+};
 const RECEIPT_STATUS_MAP: Record<string, string> = {
   delivered: "entregue",
   read: "lido",
@@ -671,9 +960,15 @@ const RECEIPT_STATUS_MAP: Record<string, string> = {
   played: "lido",
 };
 
-async function handleStatusUpdate(supabase: any, empresaId: string, payload: any) {
+async function handleStatusUpdate(
+  supabase: any,
+  empresaId: string,
+  payload: any,
+) {
   const ev = payload.event ?? {};
-  const messageIds: string[] = Array.isArray(ev.MessageIDs) ? ev.MessageIDs : [];
+  const messageIds: string[] = Array.isArray(ev.MessageIDs)
+    ? ev.MessageIDs
+    : [];
   if (messageIds.length === 0) return;
 
   const receiptType = String(ev.Type ?? payload.state ?? "").toLowerCase();
@@ -694,7 +989,10 @@ async function handleStatusUpdate(supabase: any, empresaId: string, payload: any
     }
     for (const m of msgs ?? []) {
       if ((STATUS_RANK[m.status] ?? 0) >= STATUS_RANK[novoStatus]) continue;
-      await supabase.from("whatsapp_mensagens").update({ status: novoStatus }).eq("id", m.id);
+      await supabase
+        .from("whatsapp_mensagens")
+        .update({ status: novoStatus })
+        .eq("id", m.id);
     }
   }
 }
@@ -703,12 +1001,14 @@ async function handleConnectionUpdate(
   supabase: any,
   empresaId: string,
   instanceName: string,
-  payload: any
+  payload: any,
 ) {
   const state = payload.data?.state ?? payload.state ?? payload.status;
   const statusMap: Record<string, string> = {
-    open: "connected", connected: "connected",
-    close: "disconnected", disconnected: "disconnected",
+    open: "connected",
+    connected: "connected",
+    close: "disconnected",
+    disconnected: "disconnected",
     connecting: "connecting",
   };
   const status = statusMap[state] ?? "disconnected";
