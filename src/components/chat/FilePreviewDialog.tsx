@@ -65,7 +65,7 @@ function SpreadsheetPreview({ url }: { url: string }) {
 
   return (
     <div
-      className="overflow-auto max-h-[70vh] border rounded-md [&_table]:text-xs [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1"
+      className="overflow-auto max-h-[80vh] border rounded-md [&_table]:text-xs [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -98,7 +98,7 @@ function DocxPreview({ url }: { url: string }) {
 
   return (
     <div
-      className="overflow-auto max-h-[70vh] border rounded-md p-4 prose prose-sm dark:prose-invert max-w-none"
+      className="overflow-auto max-h-[80vh] border rounded-md p-4 prose prose-sm dark:prose-invert max-w-none"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -134,7 +134,7 @@ export function FilePreviewDialog({
 
   return (
     <Dialog open={!!file} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl w-full">
+      <DialogContent className="max-w-6xl w-full max-h-[92vh] flex flex-col">
         <DialogHeader>
           <div className="flex items-center justify-between gap-3 pr-6">
             <DialogTitle className="truncate">{file?.nome}</DialogTitle>
@@ -162,16 +162,18 @@ export function FilePreviewDialog({
             </div>
           </div>
         </DialogHeader>
-        {file && kind === 'pdf' && (
-          <iframe
-            src={file.url}
-            title={file.nome}
-            className="w-full h-[75vh] rounded-md border"
-          />
-        )}
-        {file && kind === 'spreadsheet' && <SpreadsheetPreview url={file.url} />}
-        {file && kind === 'docx' && <DocxPreview url={file.url} />}
-        {file && kind === 'unsupported' && <PreviewError />}
+        <div className="flex-1 min-h-0">
+          {file && kind === 'pdf' && (
+            <iframe
+              src={file.url}
+              title={file.nome}
+              className="w-full h-full min-h-[75vh] rounded-md border"
+            />
+          )}
+          {file && kind === 'spreadsheet' && <SpreadsheetPreview url={file.url} />}
+          {file && kind === 'docx' && <DocxPreview url={file.url} />}
+          {file && kind === 'unsupported' && <PreviewError />}
+        </div>
       </DialogContent>
     </Dialog>
   );

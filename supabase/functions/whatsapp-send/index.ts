@@ -237,7 +237,10 @@ serve(async (req) => {
     try { wapiResult = JSON.parse(responseText); } catch { /* ok */ }
     const wamid = wapiResult?.key?.id ?? wapiResult?.id ?? null;
 
-    const conteudo = mensagem || nome_arquivo || PLACEHOLDER[tipo] || '[mensagem]';
+    // nome_arquivo só deve virar legenda visível para documentos; pra imagem/áudio/
+    // vídeo isso vazaria o nome do arquivo (ex: "imagem-colada-...png") como se fosse
+    // texto digitado pelo usuário.
+    const conteudo = mensagem || (tipo === 'documento' ? nome_arquivo : null) || PLACEHOLDER[tipo] || '[mensagem]';
     const now = new Date().toISOString();
 
     // Garante conversa e grava mensagem — operações em paralelo quando possível

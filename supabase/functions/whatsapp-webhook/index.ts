@@ -562,6 +562,22 @@ async function handleIncomingMessage(
 
   console.log(`[webhook] mensagem de ${telefone} (${pushName}) grupo=${isGroup}: "${conteudo}" tipo=${tipo}`);
 
+  // A uazapi reentrega o mesmo webhook (retry por timeout/cold start) e a linha da
+  // mensagem já é deduplicada mais abaixo via upsert(onConflict: wamid,
+  // ignoreDuplicates). O contador de não lidas não tinha essa mesma proteção e era
+  // incrementado a cada reentrega, mesmo quando só 1 mensagem de fato chegava —
+  // daí o badge mostrar um número bem maior que a quantidade real de mensagens.
+  let jaProcessada = false;
+  if (wamid) {
+    const { data: msgExistente } = await supabase
+      .from("whatsapp_mensagens")
+      .select("id")
+      .eq("empresa_id", empresaId)
+      .eq("wamid", wamid)
+      .maybeSingle();
+    jaProcessada = !!msgExistente;
+  }
+
   const { data: existente } = await supabase
     .from("whatsapp_conversas")
     .select("id, nao_lidas, nome_contato")
@@ -578,7 +594,7 @@ async function handleIncomingMessage(
         nome_contato: pushName || existente.nome_contato,
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
-        nao_lidas: sentByOtherChannel ? (existente.nao_lidas ?? 0) : (existente.nao_lidas ?? 0) + 1,
+        nao_lidas: sentByOtherChannel || jaProcessada ? (existente.nao_lidas ?? 0) : (existente.nao_lidas ?? 0) + 1,
         arquivada: false,
         is_group: isGroup,
         instancia_id: config.id,
@@ -600,7 +616,7 @@ async function handleIncomingMessage(
         nome_contato: pushName || null,
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
-        nao_lidas: sentByOtherChannel ? 0 : 1,
+        nao_lidas: sentByOtherChannel || jaProcessada ? 0 : 1,
         arquivada: false,
         is_group: isGroup,
         instancia_id: config.id,

@@ -94,6 +94,11 @@ export interface WaMensagem {
   // Reações (emoji) à mensagem — um item por "autor" (telefone do contato, ou o
   // literal "eu" para reações da própria instância).
   reacoes?: WaReacao[];
+  // Mensagem excluída via edge function whatsapp-delete-message: reflete no
+  // WhatsApp real (POST /message/delete da uazapi, que só tem esse modo — sempre
+  // "para todos", não existe apagar só localmente sem afetar o outro lado) e some
+  // para todo mundo no CRM.
+  apagada_para_todos?: boolean;
   usuario?: {
     id: string;
     nome: string;
@@ -314,14 +319,18 @@ export function useWaMensagens(conversaId: string | null) {
         if (novas.length === 0) return cache;
         const idsExistentes = new Set(cache.map((m) => m.id));
         // As "novas" já vindas do banco confirmam o envio — remove qualquer
-        // otimista com o mesmo conteúdo em vez de deixá-la duplicada ao lado da
-        // mensagem real (mesma lógica do handler de Realtime INSERT abaixo).
-        const conteudosConfirmados = new Set(
-          novas.filter((m) => m.direcao === 'saida').map((m) => m.conteudo)
-        );
-        const semOtimistasConfirmadas = cache.filter(
-          (m) => !(m.id.startsWith('otimista-') && conteudosConfirmados.has(m.conteudo))
-        );
+        // otimista correspondente em vez de deixá-la duplicada ao lado da mensagem
+        // real (mesma lógica de match do handler de Realtime INSERT abaixo: mídia
+        // compara por media_url, que é sempre idêntico, pois conteudo pode divergir
+        // entre a legenda vazia da otimista e o placeholder da mensagem real).
+        const enviadasConfirmadas = novas.filter((m) => m.direcao === 'saida');
+        const semOtimistasConfirmadas = cache.filter((m) => {
+          if (!m.id.startsWith('otimista-')) return true;
+          const confirmada = enviadasConfirmadas.some((n) =>
+            m.media_url && n.media_url ? m.media_url === n.media_url : m.conteudo === n.conteudo
+          );
+          return !confirmada;
+        });
         return [...semOtimistasConfirmadas, ...novas.filter((m) => !idsExistentes.has(m.id))];
       }
 
@@ -402,11 +411,17 @@ export function useWaMensagens(conversaId: string | null) {
           // Já existe pelo id real do banco
           if (prev.some((m) => m.id === newMsg.id)) return prev;
 
-          // Mensagem de saída: substitui o otimista com mesmo conteúdo (se ainda existir)
+          // Mensagem de saída: substitui o otimista correspondente (se ainda existir).
+          // Mídia compara por media_url (sempre idêntico, já que a otimista usa a
+          // mesma URL já enviada pro upload) em vez de conteudo — a legenda pode ficar
+          // vazia na otimista e virar um placeholder tipo "[Imagem]" na mensagem real,
+          // o que faria esse match falhar e duplicar a bolha.
           if (newMsg.direcao === 'saida') {
-            const idx = prev.findIndex(
-              (m) => m.id.startsWith('otimista-') && m.conteudo === newMsg.conteudo
-            );
+            const idx = prev.findIndex((m) => {
+              if (!m.id.startsWith('otimista-')) return false;
+              if (m.media_url && newMsg.media_url) return m.media_url === newMsg.media_url;
+              return m.conteudo === newMsg.conteudo;
+            });
             if (idx !== -1) {
               const updated = [...prev];
               // O payload do realtime (postgres_changes) vem sem relacionamentos —
@@ -752,6 +767,44 @@ export function useWaReagir() {
     onError: (err: any, vars) => {
       qc.invalidateQueries({ queryKey: ['wa_mensagens', vars.conversaId] });
       toast.error(err?.message ?? 'Erro ao reagir à mensagem');
+    },
+  });
+}
+
+// --- Excluir mensagem: chama a edge function que apaga na uazapi (POST
+// /message/delete) e só depois marca `apagada_para_todos` no banco. A uazapi só
+// tem esse único modo de exclusão — sempre reflete no WhatsApp real para todos os
+// participantes, não existe "apagar só para mim" na API deles (ver validação em
+// whatsapp-delete-message). ---
+
+export function useWaExcluirMensagem() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { conversaId: string; mensagemId: string }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada');
+
+      const res = await supabase.functions.invoke('whatsapp-delete-message', {
+        body: { mensagemId: params.mensagemId },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (res.error) throw res.error;
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data;
+    },
+
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ['wa_mensagens', vars.conversaId] });
+      qc.setQueryData<WaMensagem[]>(['wa_mensagens', vars.conversaId], (old) =>
+        (old ?? []).map((m) => (m.id === vars.mensagemId ? { ...m, apagada_para_todos: true } : m))
+      );
+    },
+
+    onError: (err: any, vars) => {
+      qc.invalidateQueries({ queryKey: ['wa_mensagens', vars.conversaId] });
+      toast.error(err?.message ?? 'Erro ao excluir mensagem');
     },
   });
 }

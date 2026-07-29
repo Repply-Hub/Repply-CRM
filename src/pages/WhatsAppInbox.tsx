@@ -20,6 +20,7 @@ import {
   useWaSetResponsaveis,
   useWaAddNota,
   useWaSetNotaFixada,
+  useWaExcluirMensagem,
   useWaConnect,
   useWaSyncStatus,
   useWaDisconnect,
@@ -1374,12 +1375,14 @@ function DraggableBubble({
   isSaida,
   onReply,
   onReact,
+  onExcluir,
   children,
 }: {
   msg: WaMensagem;
   isSaida: boolean;
   onReply: (msg: WaMensagem) => void;
   onReact: (msg: WaMensagem, emoji: string) => void;
+  onExcluir: (msg: WaMensagem) => void;
   children: React.ReactNode;
 }) {
   const [dragX, setDragX] = useState(0);
@@ -1465,6 +1468,28 @@ function DraggableBubble({
           <Reply className="h-3.5 w-3.5" />
         </button>
         <ReactionPicker onPick={(emoji) => onReact(msg, emoji)} />
+        {!msg.apagada_para_todos && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                title="Mais opções"
+                className="h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground opacity-0 group-hover/bubble:opacity-100 transition-opacity"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align={isSaida ? "end" : "start"}>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => onExcluir(msg)}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                Excluir mensagem
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );
@@ -1484,6 +1509,15 @@ function MessageContent({
   conversaAtiva: WaConversa;
 }) {
   const textCls = isSaida ? "text-white" : "text-foreground";
+
+  if (msg.apagada_para_todos) {
+    return (
+      <p className={cn("text-sm italic flex items-center gap-1.5", isSaida ? "text-white/70" : "text-muted-foreground")}>
+        <EyeOff className="h-3.5 w-3.5 shrink-0" />
+        Esta mensagem foi apagada
+      </p>
+    );
+  }
 
   if (msg.tipo === "imagem" && msg.media_url) {
     return (
@@ -3455,7 +3489,29 @@ export default function WhatsAppInbox() {
   }, [conversaAtiva?.responsaveis]);
   const sendMessage = useWaSendMessage();
   const reagirMutation = useWaReagir();
+  const excluirMensagem = useWaExcluirMensagem();
+  const [msgParaApagar, setMsgParaApagar] = useState<WaMensagem | null>(null);
   const marcarLida = useWaMarcarLida();
+  // Abrir a conversa só marca como lida quando quem abre é o responsável por ela —
+  // gestor/admin entrando numa conversa que não é sua não deve alterar o estado de
+  // lida/não lida (só o próprio responsável respondendo, ou marcando manualmente,
+  // faz isso). Depende só do id da conversa/usuário pra rodar uma vez por abertura,
+  // não a cada atualização de `conversas` (senão dispararia em toda mensagem nova).
+  useEffect(() => {
+    if (!conversaAtivaId || !profile?.id) return;
+    const conv = conversas.find((c) => c.id === conversaAtivaId);
+    if (!conv) return;
+    // Usa nao_lidas/nao_lidas_forcada crus, não `conversaNaoLida` — essa função já
+    // suprime o estado "não lida" pra quem é responsável (é só uma regra de exibição
+    // do badge), então usá-la aqui nunca deixaria a mutation disparar pro próprio
+    // responsável, e o contador ficaria acumulando pra sempre do ponto de vista de
+    // quem vê a conversa sem ser o responsável (gestor/admin).
+    const souResponsavel = (conv.responsaveis ?? []).some((r) => r.id === profile.id);
+    if (souResponsavel && (conv.nao_lidas > 0 || conv.nao_lidas_forcada)) {
+      marcarLida.mutate(conversaAtivaId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversaAtivaId, profile?.id]);
   const marcarNaoLida = useWaMarcarNaoLida();
   const limparConversa = useWaLimparConversa();
   const arquivarConversa = useWaArquivarConversa();
@@ -3975,6 +4031,13 @@ export default function WhatsAppInbox() {
     null,
   );
 
+  // Trava de envio duplicado: `isBusy`/`isUploading` só fica true durante o
+  // upload de anexos, nunca durante o envio de uma mensagem só de texto — sem
+  // essa ref, um Enter duplo (ou clique duplo no botão) antes do primeiro
+  // envio terminar disparava handleSend duas vezes com o mesmo texto, já que
+  // o guard por state (`texto`/`attachments`) só é limpo de fato no próximo
+  // render, não na hora.
+  const isSendingRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const msgScrollRef = useRef<HTMLDivElement>(null);
@@ -4082,6 +4145,12 @@ export default function WhatsAppInbox() {
       telefone: conversaAtiva.telefone,
       emoji: jaReagiu ? "" : emoji,
     });
+  }
+
+  function confirmarApagarMensagem() {
+    if (!msgParaApagar || !conversaAtiva) return;
+    excluirMensagem.mutate({ conversaId: conversaAtiva.id, mensagemId: msgParaApagar.id });
+    setMsgParaApagar(null);
   }
 
   useEffect(() => {
@@ -4560,6 +4629,7 @@ export default function WhatsAppInbox() {
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
+    if (isSendingRef.current) return;
     const msg = texto.trim();
     if (!msg && attachments.length === 0) return;
     if (!conversaAtiva) return;
@@ -4569,6 +4639,7 @@ export default function WhatsAppInbox() {
       return;
     }
 
+    isSendingRef.current = true;
     const conversaId = conversaAtiva.id;
     const currentAttachments = attachments;
     const quoted = quotedParamsFor(respondendoA);
@@ -4609,7 +4680,10 @@ export default function WhatsAppInbox() {
         const { file } = currentAttachments[i];
         const tipo = tipoFromFile(file);
         const caption = i === 0 ? msg : "";
-        const conteudo = caption || file.name || `[${tipo}]`;
+        // Nome do arquivo só vira legenda para documentos (onde faz sentido ver o
+        // nome); imagem/áudio/vídeo sem legenda digitada vão sem texto algum, senão
+        // o nome do arquivo (ex: "imagem-colada-...png") aparece na conversa real.
+        const conteudo = caption || (tipo === "documento" ? file.name : "");
         await sendMessage.mutateAsync({
           telefone: conversaAtiva.telefone,
           mensagem: conteudo,
@@ -4627,6 +4701,7 @@ export default function WhatsAppInbox() {
       // que o estado não fique travado em caso de erro não capturado
       if (err?.message) toast.error(err.message);
     } finally {
+      isSendingRef.current = false;
       // Adia pro próximo tick: o textarea ainda está com `disabled` no DOM neste
       // ponto (React só remove o atributo depois de commitar o novo estado), e
       // .focus() em elemento disabled não faz nada.
@@ -6185,6 +6260,34 @@ export default function WhatsAppInbox() {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+
+                  {/* Confirmação de excluir mensagem */}
+                  <AlertDialog
+                    open={!!msgParaApagar}
+                    onOpenChange={(open) => !open && setMsgParaApagar(null)}
+                  >
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta mensagem será removida do WhatsApp para todos os participantes da conversa. Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive hover:bg-destructive/90"
+                          onClick={confirmarApagarMensagem}
+                        >
+                          {excluirMensagem.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Excluir"
+                          )}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
 
                 {/* Notas fixadas — ficam sempre visíveis no topo, fora da rolagem normal */}
@@ -6343,6 +6446,7 @@ export default function WhatsAppInbox() {
                                       isSaida={isSaida}
                                       onReply={handleReply}
                                       onReact={handleReact}
+                                      onExcluir={setMsgParaApagar}
                                     >
                                       <div
                                         className={cn(
@@ -6794,7 +6898,7 @@ export default function WhatsAppInbox() {
         open={!!viewingImage}
         onOpenChange={(open) => !open && setViewingImage(null)}
       >
-        <DialogContent className="max-w-4xl w-full p-0 gap-0 flex flex-col max-h-[90vh]">
+        <DialogContent className="max-w-6xl w-full p-0 gap-0 flex flex-col max-h-[95vh]">
           <DialogHeader className="px-4 py-3 border-b border-border">
             <DialogTitle>Visualizar imagem</DialogTitle>
           </DialogHeader>
@@ -6804,7 +6908,7 @@ export default function WhatsAppInbox() {
                 <img
                   src={viewingImage.url}
                   alt="Visualização"
-                  className="max-h-[65vh] w-auto max-w-full object-contain rounded-lg shadow-md"
+                  className="w-full h-full object-contain rounded-lg shadow-md"
                 />
               </div>
               <DialogFooter className="px-4 py-3 border-t border-border sm:justify-between">
