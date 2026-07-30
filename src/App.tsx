@@ -1,37 +1,40 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
-import Negocios from "./pages/Negocios";
-import Clientes from "./pages/Clientes";
-import ClienteDetalhe from "./pages/ClienteDetalhe";
-import ContatoDetalhe from "./pages/ContatoDetalhe";
-import NovoPedido from "./pages/NovoPedido";
-import Dashboard from "./pages/Dashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import Configuracoes from "./pages/Configuracoes";
-import Obras from "./pages/Obras";
-import Fabricantes from "./pages/Fabricantes";
-import Portal from "./pages/Portal";
-import EditarPedido from "./pages/EditarPedido";
-import Calendario from "./pages/Calendario";
-import Tarefas from "./pages/Tarefas";
-import Chat from "./pages/Chat";
-import Emails from "./pages/Emails";
-import WhatsAppInbox from "./pages/WhatsAppInbox";
-import LinhasIgnoradas from "./pages/LinhasIgnoradas";
-import AdminWhatsAppInstancias from "./pages/AdminWhatsAppInstancias";
-import HistoricoAlteracoes from "./pages/HistoricoAlteracoes";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 
-import Login from "./pages/Login";
-import EsqueciSenha from "./pages/EsqueciSenha";
-import RedefinirSenha from "./pages/RedefinirSenha";
-import NotFound from "./pages/NotFound";
+const Negocios = lazy(() => import("./pages/Negocios"));
+const Clientes = lazy(() => import("./pages/Clientes"));
+const ClienteDetalhe = lazy(() => import("./pages/ClienteDetalhe"));
+const ContatoDetalhe = lazy(() => import("./pages/ContatoDetalhe"));
+const NovoPedido = lazy(() => import("./pages/NovoPedido"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+const Obras = lazy(() => import("./pages/Obras"));
+const Fabricantes = lazy(() => import("./pages/Fabricantes"));
+const Portal = lazy(() => import("./pages/Portal"));
+const EditarPedido = lazy(() => import("./pages/EditarPedido"));
+const Calendario = lazy(() => import("./pages/Calendario"));
+const Tarefas = lazy(() => import("./pages/Tarefas"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Emails = lazy(() => import("./pages/Emails"));
+const WhatsAppInbox = lazy(() => import("./pages/WhatsAppInbox"));
+const LinhasIgnoradas = lazy(() => import("./pages/LinhasIgnoradas"));
+const AdminWhatsAppInstancias = lazy(
+  () => import("./pages/AdminWhatsAppInstancias"),
+);
+const HistoricoAlteracoes = lazy(() => import("./pages/HistoricoAlteracoes"));
+
+const Login = lazy(() => import("./pages/Login"));
+const EsqueciSenha = lazy(() => import("./pages/EsqueciSenha"));
+const RedefinirSenha = lazy(() => import("./pages/RedefinirSenha"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
@@ -449,6 +452,12 @@ function UrlCleaner() {
   return null;
 }
 
+const PageFallback = () => (
+  <div className="min-h-screen flex items-center justify-center text-muted-foreground">
+    Carregando...
+  </div>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -458,7 +467,9 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <UrlCleaner />
-            <AppRoutes />
+            <Suspense fallback={<PageFallback />}>
+              <AppRoutes />
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
