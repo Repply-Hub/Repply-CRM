@@ -1,14 +1,16 @@
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { useBulkCreatePrecos } from '@/hooks/use-fabricantes';
-import { Upload, Loader2, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { Upload, Loader2, FileSpreadsheet, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateFile } from '@/lib/file-validation';
+import { ImportInstructionsStep, type TemplateField } from '@/components/import/ImportInstructionsStep';
+import { MappingStep, sanitizeImportedRows, type ExtraMappingValue, type FieldDef, detectFuzzyMapping } from '@/components/import/MappingStep';
+import { cn } from '@/lib/utils';
 
 interface Props {
   open: boolean;
@@ -17,243 +19,317 @@ interface Props {
   fabricanteNome?: string;
 }
 
-const TARGET_FIELDS = [
-  { key: 'descricao_material', label: 'Produto', required: true },
-  { key: 'imagem_url', label: 'Fotos' },
-  { key: 'estoque_disponivel', label: 'Estoque disponível' },
-  { key: 'unidade', label: 'Unidade de medida' },
-  { key: 'preco_unitario', label: 'Preço de varejo', required: true },
-  { key: 'referencia', label: 'Referência' },
-  { key: 'categoria', label: 'Categoria' },
-] as const;
+const VISIBLE_FIELDS: FieldDef[] = [
+  { key: 'descricao_material', label: 'Produto', required: true, type: 'text' },
+  { key: 'imagem_url', label: 'Fotos', required: false, type: 'text' },
+  { key: 'estoque_disponivel', label: 'Estoque Disponível', required: false, type: 'number' },
+  { key: 'unidade', label: 'Unidade de Medida', required: false, type: 'text' },
+  { key: 'preco_unitario', label: 'Preço de Varejo', required: true, type: 'number' },
+  { key: 'referencia', label: 'Referência', required: false, type: 'text' },
+  { key: 'categoria', label: 'Categoria', required: false, type: 'text' },
+];
 
-type TargetKey = typeof TARGET_FIELDS[number]['key'];
-
-const SKIP = '__skip__';
-
-function autoMap(header: string): TargetKey | null {
-  const h = header.toLowerCase().trim();
-  
-  if (h === 'produto' || /(produto|desc|material|item)/.test(h)) return 'descricao_material';
-  if (h === 'fotos' || h === 'mais fotos' || /(foto|img|imagem|url)/.test(h)) return 'imagem_url';
-  if (h === 'estoque disponível' || h === 'estoque disponivel' || /(estoque|disponível|disponivel|qtd|quant)/.test(h)) return 'estoque_disponivel';
-  if (h === 'unidade de medida' || /(unidade|medida|un)/.test(h)) return 'unidade';
-  if (h === 'preço de varejo' || h === 'preco de varejo' || /(preço|preco|valor|varejo)/.test(h)) return 'preco_unitario';
-  if (/(ref|cód|cod|sku)/.test(h)) return 'referencia';
-  if (/(categ|linha|grupo|famíl|famil)/.test(h)) return 'categoria';
-  
-  return null;
-}
+const FIELD_EXAMPLES: Record<string, string> = {
+  descricao_material: 'Tubo PVC 100mm',
+  imagem_url: 'https://exemplo.com/foto.jpg',
+  estoque_disponivel: '50',
+  unidade: 'UN',
+  preco_unitario: '45.90',
+  referencia: 'REF-1234',
+  categoria: 'Tubos e Conexões',
+};
+const TEMPLATE_FIELDS: TemplateField[] = VISIBLE_FIELDS.map(f => ({ label: f.label, example: FIELD_EXAMPLES[f.key] }));
 
 export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabricanteNome }: Props) {
-  const [file, setFile] = useState<File | null>(null);
+  const [step, setStep] = useState<'instructions' | 'upload' | 'mapping' | 'preview'>('instructions');
+  const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<Record<string, any>[]>([]);
-  const [mapping, setMapping] = useState<Record<string, TargetKey | typeof SKIP>>({});
-  const [parsing, setParsing] = useState(false);
+  const [mapping, setMapping] = useState<Record<string, string | string[]>>({});
+  const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
+  const [extras, setExtras] = useState<Record<string, ExtraMappingValue>>({});
+  const [customColumns, setCustomColumns] = useState<Record<string, string>>({});
+  const [fileName, setFileName] = useState('');
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const bulk = useBulkCreatePrecos();
 
   const reset = () => {
-    setFile(null); setHeaders([]); setRows([]); setMapping({});
+    setStep('instructions');
+    setRawData([]);
+    setHeaders([]);
+    setMapping({});
+    setFieldDefaultValues({});
+    setExtras({});
+    setCustomColumns({});
+    setFileName('');
+    if (fileRef.current) fileRef.current.value = '';
   };
 
-  const handleFile = async (f: File) => {
-    if (!validateFile(f, { allowedExtensions: ['.xlsx', '.xls', '.csv'] })) return;
-    setParsing(true);
+  const handleFile = async (file: File) => {
+    if (!validateFile(file, { allowedExtensions: ['.xlsx', '.xls', '.csv'] })) return;
+    setFileName(file.name);
     try {
-      const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+
       if (json.length === 0) {
-        toast.error('Planilha vazia');
+        toast.error('Arquivo vazio ou sem dados válidos');
         return;
       }
-      const hdrs = Object.keys(json[0]);
-      setHeaders(hdrs);
-      setRows(json);
-      const map: Record<string, TargetKey | typeof SKIP> = {};
-      hdrs.forEach(h => {
-        const t = autoMap(h);
-        map[h] = t ?? SKIP;
-      });
-      setMapping(map);
-      setFile(f);
+
+      const cols = Array.from(new Set(json.flatMap((row) => Object.keys(row))));
+      setRawData(json);
+      setHeaders(cols);
+      setMapping(detectFuzzyMapping(cols, VISIBLE_FIELDS));
+      setFieldDefaultValues({});
+      setExtras({});
+      setCustomColumns({});
+      setStep('mapping');
+      toast.success(`${json.length} linhas lidas. Confira o mapeamento.`);
     } catch (err: any) {
-      toast.error(err.message || 'Falha ao ler planilha');
-    } finally {
-      setParsing(false);
+      toast.error('Erro ao ler o arquivo: ' + (err.message || 'formato inválido'));
     }
   };
 
-  const handleImport = async () => {
-    const descCol = Object.entries(mapping).find(([, v]) => v === 'descricao_material')?.[0];
-    const precoCol = Object.entries(mapping).find(([, v]) => v === 'preco_unitario')?.[0];
-    if (!descCol || !precoCol) {
-      toast.error('Mapeie pelo menos Produto e Preço de Varejo');
-      return;
-    }
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
 
-    const records = rows.map((row, index) => {
-      const get = (target: TargetKey) => {
-        const col = Object.entries(mapping).find(([, v]) => v === target)?.[0];
-        if (!col) return undefined;
-        const v = row[col];
-        return v === '' || v === undefined || v === null ? undefined : v;
-      };
+  const canProceedToPreview = Boolean(mapping.descricao_material && mapping.preco_unitario);
 
-      const precoRaw = get('preco_unitario');
-      let preco = 0;
-      if (typeof precoRaw === 'number') {
-        preco = precoRaw;
-      } else if (precoRaw) {
-        // Handle various currency formats: R$ 1.234,56 or 1234.56
-        const sanitized = String(precoRaw)
-          .replace(/[^\d,.]/g, '') // remove currency symbols and letters
-          .trim();
-        
-        if (sanitized.includes(',') && sanitized.includes('.')) {
-          // Format like 1.234,56
-          preco = parseFloat(sanitized.replace(/\./g, '').replace(',', '.'));
-        } else if (sanitized.includes(',')) {
-          // Format like 1234,56
-          preco = parseFloat(sanitized.replace(',', '.'));
-        } else {
-          // Format like 1234.56
-          preco = parseFloat(sanitized);
-        }
-      }
+  const previewData = useMemo(() => {
+    if (step !== 'preview') return { records: [], ignoredCount: 0 };
+    const sanitized = sanitizeImportedRows({
+      rawData,
+      fields: VISIBLE_FIELDS,
+      mapping,
+      extras,
+      customColumns,
+      fieldDefaultValues,
+    });
 
-      const estoqueRaw = get('estoque_disponivel');
-      let estoque = null;
-      if (estoqueRaw !== undefined && estoqueRaw !== null && estoqueRaw !== '') {
-        if (typeof estoqueRaw === 'number') {
-          estoque = estoqueRaw;
-        } else {
-          const sanitized = String(estoqueRaw).replace(/[^\d,.]/g, '').replace(',', '.');
-          estoque = parseFloat(sanitized);
-        }
-      }
-
-      const descricao = String(get('descricao_material') ?? '').trim();
-
-      return {
+    let ignoredCount = 0;
+    const records = sanitized.reduce<any[]>((acc, row) => {
+      const isValid = row.descricao_material && Number(row.preco_unitario) > 0;
+      if (!isValid) { ignoredCount++; return acc; }
+      acc.push({
         fabricante_id: fabricanteId,
-        descricao_material: descricao,
-        referencia: get('referencia') ? String(get('referencia')).trim() : null,
-        categoria: get('categoria') ? String(get('categoria')).trim() : null,
-        unidade: get('unidade') ? String(get('unidade')).trim() : null,
-        imagem_url: get('imagem_url') ? String(get('imagem_url')).trim() : null,
-        estoque_disponivel: (estoque !== null && !isNaN(estoque)) ? estoque : null,
-        preco_unitario: preco,
+        descricao_material: row.descricao_material,
+        referencia: row.referencia || null,
+        categoria: row.categoria || null,
+        unidade: row.unidade || null,
+        imagem_url: row.imagem_url || null,
+        estoque_disponivel: row.estoque_disponivel !== undefined && row.estoque_disponivel !== '' ? Number(row.estoque_disponivel) : null,
+        preco_unitario: Number(row.preco_unitario),
         vigente: true,
-      };
-    }).filter(r => r.descricao_material && !isNaN(r.preco_unitario));
-
-    if (records.length === 0) {
-      const descColExists = !!descCol;
-      const precoColExists = !!precoCol;
-      console.log('Dados processados para depuração:', {
-        rowsSample: rows.slice(0, 3),
-        mapping,
-        descColExists,
-        precoColExists
+        campos_extras: row.campos_extras || {},
       });
-      toast.error('Nenhuma linha válida encontrada. Verifique se as colunas de "Produto" e "Preço de varejo" estão corretamente preenchidas.');
+      return acc;
+    }, []);
+
+    return { records, ignoredCount };
+  }, [step, rawData, mapping, extras, customColumns, fieldDefaultValues, fabricanteId]);
+
+  const handleImport = async () => {
+    if (previewData.records.length === 0) {
+      toast.error('Nenhum registro válido encontrado');
       return;
     }
 
+    setImporting(true);
     try {
-      const { inserted } = await bulk.mutateAsync(records);
+      const { inserted } = await bulk.mutateAsync(previewData.records);
       toast.success(`${inserted} produto(s) importado(s)!`);
       reset();
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || 'Falha na importação');
+    } finally {
+      setImporting(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle>Importar Catálogo</DialogTitle>
-          <DialogDescription>
-            {fabricanteNome ? `Fabricante: ${fabricanteNome}` : 'Importação em massa de produtos via planilha.'}
-          </DialogDescription>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+        <DialogHeader className="px-6 py-4 bg-muted/30 shrink-0 border-b flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2.5 text-foreground font-bold text-lg">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <FileSpreadsheet className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex flex-col items-start gap-0.5">
+                <span>Importar Catálogo</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {fabricanteNome ? `Fabricante: ${fabricanteNome}` : 'Importação em massa de produtos via planilha'}
+                </span>
+              </div>
+            </DialogTitle>
+          </div>
+
+          {(step === 'mapping' || step === 'preview') && (
+            <div className="flex items-center gap-4 bg-background/50 px-4 py-2 rounded-xl border border-border/50 shadow-sm w-fit">
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
+                  step === 'mapping' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
+                )}>
+                  1
+                </div>
+                <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'mapping' ? "text-primary" : "text-muted-foreground")}>
+                  Mapeamento
+                </span>
+              </div>
+
+              <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
+
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
+                  step === 'preview' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
+                )}>
+                  2
+                </div>
+                <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'preview' ? "text-primary" : "text-muted-foreground")}>
+                  Revisão
+                </span>
+              </div>
+            </div>
+          )}
         </DialogHeader>
 
-        {!file ? (
-          <div className="border-2 border-dashed border-border rounded-xl p-6 sm:p-8 text-center">
-            <FileSpreadsheet className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="text-sm font-medium mb-1">Selecione uma planilha (.xlsx, .xls ou .csv)</p>
-            <p className="text-xs text-muted-foreground mb-4">
-              Colunas reconhecidas: produto, fotos, estoque disponível, unidade de medida, preço de varejo, referência, categoria
-            </p>
-            <input
-              id="catalogo-import-file"
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleFile(f);
-              }}
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          {step === 'instructions' && (
+            <ImportInstructionsStep
+              templateFileName="modelo-importacao-catalogo.xlsx"
+              templateFields={TEMPLATE_FIELDS}
+              extraTips={['Produto e Preço de Varejo precisam estar preenchidos em cada linha.']}
+              onContinue={() => setStep('upload')}
             />
-            <Button asChild variant="outline" disabled={parsing}>
-              <label htmlFor="catalogo-import-file" className="cursor-pointer gap-2">
-                {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Escolher arquivo
-              </label>
+          )}
+
+          {step === 'upload' && (
+            <div
+              className="border-2 border-dashed border-border rounded-xl p-8 sm:p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+              <p className="text-sm font-medium text-foreground mb-1">Arraste a planilha aqui ou clique para selecionar</p>
+              <p className="text-xs text-muted-foreground">Formatos aceitos: .xlsx, .xls, .csv</p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFile(file);
+                }}
+              />
+            </div>
+          )}
+
+          {step === 'mapping' && (
+            <div className="bg-muted/30 rounded-xl border border-border/50 shadow-sm overflow-hidden">
+              <MappingStep
+                fileName={fileName}
+                rawData={rawData}
+                headers={headers}
+                mapping={mapping}
+                setMapping={setMapping as any}
+                fieldDefaultValues={fieldDefaultValues}
+                setFieldDefaultValues={setFieldDefaultValues}
+                extras={extras}
+                setExtras={setExtras}
+                customColumns={customColumns}
+                setCustomColumns={setCustomColumns}
+                visibleFields={VISIBLE_FIELDS}
+                onReset={reset}
+                onAutoDetect={() => { setMapping(detectFuzzyMapping(headers, VISIBLE_FIELDS)); setExtras({}); }}
+                onClearAll={() => { setMapping({}); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
+                canProceed={canProceedToPreview}
+                onNext={() => setStep('preview')}
+              />
+            </div>
+          )}
+
+          {step === 'preview' && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="secondary" className="gap-1">
+                  <FileSpreadsheet className="h-3 w-3" />
+                  {fileName}
+                </Badge>
+                <Badge variant="outline">{previewData.records.length} produtos válidos</Badge>
+                {previewData.ignoredCount > 0 && (
+                  <Badge variant="outline">{previewData.ignoredCount} linhas ignoradas</Badge>
+                )}
+              </div>
+
+              <div className="border rounded-lg overflow-x-auto">
+                <Table className="min-w-[600px]">
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-xs">#</TableHead>
+                      <TableHead className="text-xs">Descrição</TableHead>
+                      <TableHead className="text-xs">Preço</TableHead>
+                      <TableHead className="text-xs">Categoria</TableHead>
+                      <TableHead className="text-xs">Referência</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewData.records.slice(0, 50).map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell className="text-xs font-medium">{r.descricao_material}</TableCell>
+                        <TableCell className="text-xs">
+                          {r.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </TableCell>
+                        <TableCell className="text-xs">{r.categoria || '-'}</TableCell>
+                        <TableCell className="text-xs">{r.referencia || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {previewData.records.length > 50 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    Mostrando 50 de {previewData.records.length} produtos
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {step === 'mapping' && (
+          <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
+            <Button variant="ghost" onClick={reset}>Cancelar</Button>
+            <Button
+              onClick={() => setStep('preview')}
+              className="h-10 px-6 font-bold shadow-lg shadow-primary/20"
+              disabled={!canProceedToPreview}
+            >
+              Revisar Importação <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm bg-muted/40 rounded-lg p-3">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-                <span className="font-medium truncate">{file.name}</span>
-              </div>
-              <span className="text-muted-foreground sm:ml-auto">{rows.length} linhas</span>
-            </div>
+        )}
 
-            <div>
-              <Label className="text-sm">Mapeamento de colunas</Label>
-              <p className="text-xs text-muted-foreground mb-3">
-                Associe as colunas da planilha aos campos do catálogo.
-              </p>
-              <div className="space-y-3 sm:space-y-2 max-h-72 overflow-y-auto pr-1">
-                {headers.map(h => (
-                  <div key={h} className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 items-start sm:items-center border-b sm:border-0 pb-3 sm:pb-0 last:border-0">
-                    <div className="text-sm font-medium break-words" title={h}>{h}</div>
-                    <Select
-                      value={mapping[h] ?? SKIP}
-                      onValueChange={(v) => setMapping(prev => ({ ...prev, [h]: v as any }))}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={SKIP}>Ignorar</SelectItem>
-                        {TARGET_FIELDS.map(t => (
-                          <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={reset} disabled={bulk.isPending} className="w-full sm:w-auto">
-                Trocar arquivo
-              </Button>
-              <Button onClick={handleImport} disabled={bulk.isPending} className="w-full sm:w-auto gap-1.5">
-                {bulk.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Importar
-              </Button>
-            </div>
+        {step === 'preview' && (
+          <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
+            <Button variant="ghost" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
+            <Button onClick={handleImport} disabled={importing} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
+              {importing ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
+              ) : (
+                <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {previewData.records.length} produtos</>
+              )}
+            </Button>
           </div>
         )}
       </DialogContent>

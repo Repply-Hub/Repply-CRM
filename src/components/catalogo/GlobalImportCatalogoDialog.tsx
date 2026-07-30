@@ -1,10 +1,10 @@
 import { useState, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBulkCreatePrecos } from '@/hooks/use-fabricantes';
 import { useFabricantes } from '@/hooks/use-clientes';
@@ -12,8 +12,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
 import { MappingStep, sanitizeImportedRows, type ExtraMappingValue, type FieldDef, detectFuzzyMapping } from '@/components/import/MappingStep';
+import { ImportInstructionsStep, type TemplateField } from '@/components/import/ImportInstructionsStep';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 const VISIBLE_FIELDS: FieldDef[] = [
   { key: 'descricao_material', label: 'Produto', required: true, type: 'text' },
@@ -25,6 +27,18 @@ const VISIBLE_FIELDS: FieldDef[] = [
   { key: 'categoria', label: 'Categoria', required: false, type: 'text' },
   { key: 'fabricante_nome', label: 'Fabricante', required: false, type: 'text' },
 ];
+
+const FIELD_EXAMPLES: Record<string, string> = {
+  descricao_material: 'Tubo PVC 100mm',
+  imagem_url: 'https://exemplo.com/foto.jpg',
+  estoque_disponivel: '50',
+  unidade: 'UN',
+  preco_unitario: '45.90',
+  referencia: 'REF-1234',
+  categoria: 'Tubos e Conexões',
+  fabricante_nome: 'Tigre',
+};
+const TEMPLATE_FIELDS: TemplateField[] = VISIBLE_FIELDS.map(f => ({ label: f.label, example: FIELD_EXAMPLES[f.key] }));
 
 interface Props {
   open: boolean;
@@ -44,7 +58,7 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
   });
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
-  const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
+  const [step, setStep] = useState<'instructions' | 'upload' | 'mapping' | 'preview'>('instructions');
   const [selectedFabricanteId, setSelectedFabricanteId] = useState<string>('');
   
   const fileRef = useRef<HTMLInputElement>(null);
@@ -61,7 +75,7 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
     setCustomColumns({});
     setFileName('');
     setSelectedFabricanteId('');
-    setStep('upload');
+    setStep('instructions');
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -236,145 +250,204 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-3xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto flex flex-col p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-primary" />
-            Importar Catálogo (Geral)
-          </DialogTitle>
-          <DialogDescription>
-            Importe produtos e direcione para os fabricantes corretos usando mapeamento inteligente.
-          </DialogDescription>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+        <DialogHeader className="px-6 py-4 bg-muted/30 shrink-0 border-b flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2.5 text-foreground font-bold text-lg">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <FileSpreadsheet className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex flex-col items-start gap-0.5">
+                <span>Importar Catálogo (Geral)</span>
+                <span className="text-xs font-normal text-muted-foreground">Importe produtos e direcione para os fabricantes corretos</span>
+              </div>
+            </DialogTitle>
+          </div>
+
+          {(step === 'mapping' || step === 'preview') && (
+            <div className="flex items-center gap-4 bg-background/50 px-4 py-2 rounded-xl border border-border/50 shadow-sm w-fit">
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
+                  step === 'mapping' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
+                )}>
+                  1
+                </div>
+                <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'mapping' ? "text-primary" : "text-muted-foreground")}>
+                  Mapeamento
+                </span>
+              </div>
+
+              <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
+
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all",
+                  step === 'preview' ? "bg-primary border-primary text-primary-foreground shadow-sm" : "bg-muted border-border text-muted-foreground"
+                )}>
+                  2
+                </div>
+                <span className={cn("text-[11px] font-bold uppercase tracking-wider", step === 'preview' ? "text-primary" : "text-muted-foreground")}>
+                  Revisão
+                </span>
+              </div>
+            </div>
+          )}
         </DialogHeader>
 
-        {step === 'upload' && (
-          <div
-            className="border-2 border-dashed border-border rounded-xl p-8 sm:p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-            onClick={() => fileRef.current?.click()}
-          >
-            <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-            <p className="text-sm font-medium text-foreground mb-1">Arraste a planilha aqui ou clique para selecionar</p>
-            <p className="text-xs text-muted-foreground">Formatos aceitos: .xlsx, .xls, .csv</p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFile(file);
-              }}
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          {step === 'instructions' && (
+            <ImportInstructionsStep
+              templateFileName="modelo-importacao-fabricantes.xlsx"
+              templateFields={TEMPLATE_FIELDS}
+              extraTips={['Produto e Preço de Varejo precisam estar preenchidos em cada linha.']}
+              onContinue={() => setStep('upload')}
             />
-          </div>
-        )}
+          )}
+
+          {step === 'upload' && (
+            <div
+              className="border-2 border-dashed border-border rounded-xl p-8 sm:p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+              <p className="text-sm font-medium text-foreground mb-1">Arraste a planilha aqui ou clique para selecionar</p>
+              <p className="text-xs text-muted-foreground">Formatos aceitos: .xlsx, .xls, .csv</p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFile(file);
+                }}
+              />
+            </div>
+          )}
+
+          {step === 'mapping' && (
+            <div className="flex flex-col gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Fabricante Padrão (Opcional)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Usado para linhas onde o fabricante não for identificado na planilha.
+                </p>
+                <Select value={selectedFabricanteId} onValueChange={setSelectedFabricanteId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um fabricante..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fabricantes?.map(f => (
+                      <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="bg-muted/30 rounded-xl border border-border/50 shadow-sm overflow-hidden">
+                <MappingStep
+                  fileName={fileName}
+                  rawData={rawData}
+                  headers={headers}
+                  mapping={mapping}
+                  setMapping={setMapping as any}
+                  fieldDefaultValues={fieldDefaultValues}
+                  setFieldDefaultValues={setFieldDefaultValues}
+                  extras={extras}
+                  setExtras={setExtras}
+                  customColumns={customColumns}
+                  setCustomColumns={setCustomColumns}
+                  visibleFields={VISIBLE_FIELDS}
+                  onReset={reset}
+                  onAutoDetect={() => { setMapping(detectFuzzyMapping(headers, VISIBLE_FIELDS)); setExtras({}); }}
+                  onClearAll={() => { setMapping({}); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
+                  onSaveAsDefault={saveAsDefault}
+                  isAutoSaveEnabled={isAutoSaveEnabled}
+                  canProceed={canProceedToPreview}
+                  onNext={() => setStep('preview')}
+                />
+              </div>
+            </div>
+          )}
+
+          {step === 'preview' && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="secondary" className="gap-1">
+                    <FileSpreadsheet className="h-3 w-3" />
+                    {fileName}
+                  </Badge>
+                  <Badge variant="outline">{previewData.allRecords.length} produtos válidos</Badge>
+                  <Badge variant="outline">{previewData.uniqueFabIds.length} fabricantes identificados</Badge>
+                </div>
+              </div>
+
+              <div className="border rounded-lg overflow-x-auto">
+                <Table className="min-w-[600px]">
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-xs">#</TableHead>
+                      <TableHead className="text-xs">Descrição</TableHead>
+                      <TableHead className="text-xs">Fabricante</TableHead>
+                      <TableHead className="text-xs">Preço</TableHead>
+                      <TableHead className="text-xs">Categoria</TableHead>
+                      <TableHead className="text-xs">Referência</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewData.allRecords.slice(0, 50).map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell className="text-xs font-medium">{r.descricao_material}</TableCell>
+                        <TableCell className="text-xs">
+                          {fabricantes?.find(f => f.id === r.fabricante_id)?.nome || '-'}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {r.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </TableCell>
+                        <TableCell className="text-xs">{r.categoria || '-'}</TableCell>
+                        <TableCell className="text-xs">{r.referencia || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {previewData.allRecords.length > 50 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    Mostrando 50 de {previewData.allRecords.length} produtos
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {step === 'mapping' && (
-          <div className="flex flex-col gap-4">
-            <div className="space-y-2">
-              <Label className="text-sm">Fabricante Padrão (Opcional)</Label>
-              <p className="text-xs text-muted-foreground">
-                Usado para linhas onde o fabricante não for identificado na planilha.
-              </p>
-              <Select value={selectedFabricanteId} onValueChange={setSelectedFabricanteId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um fabricante..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {fabricantes?.map(f => (
-                    <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <MappingStep
-              fileName={fileName}
-              rawData={rawData}
-              headers={headers}
-              mapping={mapping}
-              setMapping={setMapping as any}
-              fieldDefaultValues={fieldDefaultValues}
-              setFieldDefaultValues={setFieldDefaultValues}
-              extras={extras}
-              setExtras={setExtras}
-              customColumns={customColumns}
-              setCustomColumns={setCustomColumns}
-              visibleFields={VISIBLE_FIELDS}
-              onReset={reset}
-              onAutoDetect={() => { setMapping(detectFuzzyMapping(headers, VISIBLE_FIELDS)); setExtras({}); }}
-              onClearAll={() => { setMapping({}); setExtras({}); setCustomColumns({}); setFieldDefaultValues({}); }}
-              onSaveAsDefault={saveAsDefault}
-              isAutoSaveEnabled={isAutoSaveEnabled}
-              canProceed={canProceedToPreview}
-              onNext={() => setStep('preview')}
-            />
+          <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
+            <Button variant="ghost" onClick={reset}>Cancelar</Button>
+            <Button
+              onClick={() => setStep('preview')}
+              className="h-10 px-6 font-bold shadow-lg shadow-primary/20"
+              disabled={!canProceedToPreview}
+            >
+              Revisar Importação <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
           </div>
         )}
 
         {step === 'preview' && (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className="gap-1">
-                  <FileSpreadsheet className="h-3 w-3" />
-                  {fileName}
-                </Badge>
-                <Badge variant="outline">{previewData.allRecords.length} produtos válidos</Badge>
-                <Badge variant="outline">{previewData.uniqueFabIds.length} fabricantes identificados</Badge>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setStep('mapping')}>
-                <X className="h-4 w-4 mr-1" /> Voltar
-              </Button>
-            </div>
-
-            <div className="border rounded-lg overflow-x-auto">
-              <Table className="min-w-[600px]">
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs">#</TableHead>
-                    <TableHead className="text-xs">Descrição</TableHead>
-                    <TableHead className="text-xs">Fabricante</TableHead>
-                    <TableHead className="text-xs">Preço</TableHead>
-                    <TableHead className="text-xs">Categoria</TableHead>
-                    <TableHead className="text-xs">Referência</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {previewData.allRecords.slice(0, 50).map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="text-xs font-medium">{r.descricao_material}</TableCell>
-                      <TableCell className="text-xs">
-                        {fabricantes?.find(f => f.id === r.fabricante_id)?.nome || '-'}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {r.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </TableCell>
-                      <TableCell className="text-xs">{r.categoria || '-'}</TableCell>
-                      <TableCell className="text-xs">{r.referencia || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {previewData.allRecords.length > 50 && (
-                <p className="text-xs text-muted-foreground text-center py-2">
-                  Mostrando 50 de {previewData.allRecords.length} produtos
-                </p>
+          <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
+            <Button variant="ghost" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
+            <Button onClick={handleImport} disabled={importing} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
+              {importing ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
+              ) : (
+                <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {previewData.allRecords.length} produtos</>
               )}
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStep('mapping')} className="w-full sm:w-auto">Voltar</Button>
-              <Button onClick={handleImport} disabled={importing} className="w-full sm:w-auto">
-                {importing ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importando...</>
-                ) : (
-                  <><CheckCircle2 className="h-4 w-4 mr-1" /> Importar {previewData.allRecords.length} produtos</>
-                )}
-              </Button>
-            </div>
+            </Button>
           </div>
         )}
       </DialogContent>
