@@ -23,7 +23,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useAuth } from '@/hooks/use-auth';
 import type { CalendarEvent, EventoForm, CalendarType } from './types';
@@ -75,7 +82,7 @@ export function EventDialog({
   const [form, setForm] = useState<EventoForm>(defaultForm());
   const [participantesOpen, setParticipantesOpen] = useState(false);
   const { user } = useAuth();
-  const { data: usuarios } = useVendedores();
+  const { data: usuarios, refetch: refetchUsuarios } = useVendedores();
 
   // Funcionários da empresa, exceto o próprio usuário logado
   const funcionariosDisponiveis = useMemo(() => {
@@ -84,6 +91,11 @@ export function EventDialog({
 
   useEffect(() => {
     if (!open) return;
+
+    // Garante a lista de funcionários atualizada toda vez que o modal é aberto,
+    // já que a página de calendário fica montada e o cache pode estar desatualizado
+    // (ex.: usuário novo criado em outra sessão/aba).
+    refetchUsuarios();
 
     if (editingEvent) {
       const ini = editingEvent.diaInteiro
@@ -215,29 +227,40 @@ export function EventDialog({
                     <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
-                  <ScrollArea className="max-h-[240px]">
-                    <div className="p-1">
-                      {funcionariosDisponiveis.map((u: { id: string; user_id: string; nome: string; email: string }) => {
-                        const checked = participantesSelecionados.includes(u.user_id);
-                        return (
-                          <button
-                            key={u.id}
-                            type="button"
-                            onClick={() => toggleParticipante(u.user_id)}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent text-sm text-left"
-                          >
-                            <Checkbox checked={checked} className="pointer-events-none" />
-                            <div className="flex-1 min-w-0">
-                              <div className="truncate">{u.nome}</div>
-                              <div className="text-xs text-muted-foreground truncate">{u.email}</div>
-                            </div>
-                            {checked && <Check className="h-4 w-4 text-primary shrink-0" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
+                <PopoverContent className="w-[400px] p-0" align="start" onWheel={(e) => e.stopPropagation()}>
+                  <Command
+                    filter={(value, search) => {
+                      if (value.toLowerCase().includes(search.toLowerCase())) return 1;
+                      return 0;
+                    }}
+                  >
+                    <CommandInput placeholder="Buscar funcionário..." />
+                    <CommandList className="max-h-[240px] overflow-y-auto overflow-x-hidden">
+                      <CommandEmpty className="py-6 text-center text-sm">
+                        Nenhum funcionário encontrado.
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {funcionariosDisponiveis.map((u: { id: string; user_id: string; nome: string; email: string }) => {
+                          const checked = participantesSelecionados.includes(u.user_id);
+                          return (
+                            <CommandItem
+                              key={u.id}
+                              value={`${u.nome} ${u.email}`}
+                              onSelect={() => toggleParticipante(u.user_id)}
+                              className="gap-2"
+                            >
+                              <Checkbox checked={checked} className="pointer-events-none" />
+                              <div className="flex-1 min-w-0">
+                                <div className="truncate">{u.nome}</div>
+                                <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                              </div>
+                              {checked && <Check className="h-4 w-4 text-primary shrink-0" />}
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
                 </PopoverContent>
               </Popover>
 
