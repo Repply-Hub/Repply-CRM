@@ -20,8 +20,10 @@ import { useCreateObra } from '@/hooks/use-mutations';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesCampos, FIELD_LABELS } from '@/hooks/use-configuracoes-campos';
+import { supabase } from '@/integrations/supabase/client';
+import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText, Upload } from 'lucide-react';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { FabricanteSelector } from '@/components/pedidos/FabricanteSelector';
 import { format, parseISO } from 'date-fns';
@@ -105,6 +107,8 @@ const EditarPedido = () => {
   const [itens, setItens] = useState<ItemPedido[]>([]);
   const [observacoes, setObservacoes] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [pdfPreview, setPdfPreview] = useState<FilePreviewTarget | null>(null);
   const [camposExtras, setCamposExtras] = useState<Record<string, string>>({});
   const { profile } = useAuth();
@@ -226,7 +230,23 @@ const EditarPedido = () => {
   const handleSubmit = async () => {
     if (!validateStep2() || !id) return;
 
+    setIsUploadingPdf(true);
     try {
+      let newPdfUrl = pdfUrl;
+
+      if (pdfFile) {
+        const filePath = `${crypto.randomUUID()}/${sanitizeFileName(pdfFile.name)}`;
+        const { error: uploadError } = await supabase.storage
+          .from('pedido-anexos')
+          .upload(filePath, pdfFile);
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('pedido-anexos')
+          .getPublicUrl(filePath);
+        newPdfUrl = publicUrl;
+      }
+
       await updatePedido.mutateAsync({
         pedido_id: id,
         cliente_id: clienteId,
@@ -239,6 +259,7 @@ const EditarPedido = () => {
         origem_lead: origemLead || undefined,
         endereco_entrega: enderecoEntrega || undefined,
         observacoes: observacoes || undefined,
+        pdf_url: newPdfUrl,
         campos_extras: camposExtras,
         itens: itens.map(i => ({
           id: i.id,
@@ -249,10 +270,14 @@ const EditarPedido = () => {
           preco_unitario: i.preco_unitario,
         })),
       });
+      setPdfUrl(newPdfUrl);
+      setPdfFile(null);
       toast.success('Negócio atualizado com sucesso!');
       navigate('/pedidos');
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setIsUploadingPdf(false);
     }
   };
 
@@ -535,25 +560,67 @@ const EditarPedido = () => {
                   <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações ou descrição geral do negócio" rows={3} />
                 </div>
 
-                {pdfUrl && (
-                  <div className="space-y-2">
-                    <Label>Arquivo PDF</Label>
-                    <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
-                      <FileText className="h-5 w-5 text-primary" />
-                      <span className="text-sm font-medium flex-1 truncate">PDF do Negócio</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const url = repairCorruptedBitrixUrl(pdfUrl);
-                          setPdfPreview({ url, nome: filenameFromUrl(url, 'anexo.pdf') });
-                        }}
-                      >
-                        Ver PDF
-                      </Button>
+                <div className="space-y-2">
+                  <Label>Arquivo PDF</Label>
+                  <div className={cn(
+                    "relative border-2 border-dashed rounded-lg p-4 transition-colors",
+                    pdfFile ? "border-primary/50 bg-primary/5" : "border-muted hover:border-primary/30"
+                  )}>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="flex items-center justify-center gap-3">
+                      {pdfFile ? (
+                        <>
+                          <FileText className="h-6 w-6 text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{pdfFile.name}</p>
+                            <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024 / 1024).toFixed(2)} MB · substituirá o PDF atual</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="relative z-10 h-8 w-8 text-destructive"
+                            onClick={(e) => { e.stopPropagation(); setPdfFile(null); }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : pdfUrl ? (
+                        <>
+                          <FileText className="h-6 w-6 text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">PDF do Negócio</p>
+                            <p className="text-xs text-muted-foreground">Clique ou arraste um novo arquivo para substituir</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="relative z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const url = repairCorruptedBitrixUrl(pdfUrl);
+                              setPdfPreview({ url, nome: filenameFromUrl(url, 'anexo.pdf') });
+                            }}
+                          >
+                            Ver PDF
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-6 w-6 text-muted-foreground" />
+                          <div className="text-center">
+                            <p className="text-sm font-medium">Clique ou arraste o PDF aqui</p>
+                            <p className="text-xs text-muted-foreground">Apenas arquivos PDF são aceitos</p>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
 
                 {(camposConfig ?? []).filter(c => c.origem === 'customizado').map(campo => (
                   <div key={campo.id} className="space-y-2">
@@ -691,9 +758,9 @@ const EditarPedido = () => {
                   <Button variant="outline" onClick={() => setStep(1)}>
                     <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
                   </Button>
-                  <Button onClick={handleSubmit} disabled={updatePedido.isPending}>
+                  <Button onClick={handleSubmit} disabled={updatePedido.isPending || isUploadingPdf}>
                     <Save className="h-4 w-4 mr-1" />
-                    {updatePedido.isPending ? 'Salvando...' : 'Salvar Alterações'}
+                    {updatePedido.isPending || isUploadingPdf ? 'Salvando...' : 'Salvar Alterações'}
                   </Button>
                 </div>
               </div>

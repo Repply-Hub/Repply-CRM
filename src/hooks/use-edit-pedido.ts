@@ -37,6 +37,7 @@ export interface UpdatePedidoPayload {
   origem_lead?: string;
   endereco_entrega?: string;
   observacoes?: string;
+  pdf_url?: string;
   campos_extras?: Record<string, string>;
   itens: {
     id?: string;
@@ -66,6 +67,7 @@ export function useUpdatePedidoCompleto() {
           origem_lead: payload.origem_lead || null,
           endereco_entrega: payload.endereco_entrega || null,
           observacoes: payload.observacoes || null,
+          ...(payload.pdf_url !== undefined ? { pdf_url: payload.pdf_url || null } : {}),
           ...(payload.campos_extras ? { campos_extras: payload.campos_extras } : {}),
         })
         .eq('id', payload.pedido_id);
