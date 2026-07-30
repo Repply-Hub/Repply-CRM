@@ -12,8 +12,9 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Globe, Mail, Smartphone, History, ListChecks } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks } from 'lucide-react';
 import { SidebarHistoricoDialog } from '@/components/configuracoes/SidebarHistoricoDialog';
+import { AvatarCropDialog } from '@/components/configuracoes/AvatarCropDialog';
 import { CamposTab } from '@/components/configuracoes/CamposTab';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
@@ -119,6 +120,8 @@ function ProfileTab() {
   const { user, signOut } = useAuth();
   const qc = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['meu_perfil', user?.id],
@@ -146,18 +149,32 @@ function ProfileTab() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const selectAvatarFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) return;
+    const file = event.target.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropImageSrc(reader.result as string);
+      setCropDialogOpen(true);
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  };
+
+  const editCurrentAvatar = () => {
+    if (!perfil?.avatar_url) return;
+    setCropImageSrc(perfil.avatar_url);
+    setCropDialogOpen(true);
+  };
+
+  const uploadAvatar = async (blob: Blob) => {
     try {
       setIsUploading(true);
-      if (!event.target.files || event.target.files.length === 0) return;
-      
-      const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${user!.id}/${Math.random()}.${fileExt}`;
+      const filePath = `${user!.id}/${Math.random()}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file);
+        .upload(filePath, blob, { contentType: 'image/jpeg' });
 
       if (uploadError) throw uploadError;
 
@@ -265,6 +282,7 @@ function ProfileTab() {
   const iniciais = (perfil.nome || 'Usuário').split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
 
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="space-y-6">
         <Card>
@@ -284,13 +302,42 @@ function ProfileTab() {
                 </div>
                 <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
                   {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-                  <input type="file" accept="image/*" onChange={uploadAvatar} disabled={isUploading} className="hidden" />
+                  <input type="file" accept="image/*" onChange={selectAvatarFile} disabled={isUploading} className="hidden" />
                 </label>
               </div>
               <div>
                 <p className="font-semibold">{perfil.nome}</p>
                 <p className="text-sm text-muted-foreground">{perfil.email}</p>
-                <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    className="h-7 gap-1.5 text-xs"
+                    disabled={isUploading}
+                  >
+                    <label className="cursor-pointer">
+                      {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+                      {perfil.avatar_url ? 'Alterar foto' : 'Adicionar foto'}
+                      <input type="file" accept="image/*" onChange={selectAvatarFile} disabled={isUploading} className="hidden" />
+                    </label>
+                  </Button>
+                  {perfil.avatar_url && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs"
+                      disabled={isUploading}
+                      onClick={editCurrentAvatar}
+                    >
+                      <Crop className="h-3.5 w-3.5" />
+                      Editar
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 mt-1.5">
                   <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="text-[10px]">
                     {{ admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' }[perfil.role] || perfil.role}
                   </Badge>
@@ -449,6 +496,13 @@ function ProfileTab() {
         </Card>
       </div>
     </div>
+    <AvatarCropDialog
+      imageSrc={cropImageSrc}
+      open={cropDialogOpen}
+      onOpenChange={setCropDialogOpen}
+      onConfirm={uploadAvatar}
+    />
+    </>
   );
 }
 
