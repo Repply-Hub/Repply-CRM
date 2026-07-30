@@ -2655,6 +2655,7 @@ export type Database = {
           nao_lidas: number
           nao_lidas_forcada: boolean
           nome_contato: string | null
+          nome_contato_editado_manualmente: boolean
           participantes: Json
           telefone: string
           ultima_mensagem: string | null
@@ -2675,6 +2676,7 @@ export type Database = {
           nao_lidas?: number
           nao_lidas_forcada?: boolean
           nome_contato?: string | null
+          nome_contato_editado_manualmente?: boolean
           participantes?: Json
           telefone: string
           ultima_mensagem?: string | null
@@ -2695,6 +2697,7 @@ export type Database = {
           nao_lidas?: number
           nao_lidas_forcada?: boolean
           nome_contato?: string | null
+          nome_contato_editado_manualmente?: boolean
           participantes?: Json
           telefone?: string
           ultima_mensagem?: string | null

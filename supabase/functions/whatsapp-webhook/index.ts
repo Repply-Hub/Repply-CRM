@@ -738,7 +738,7 @@ async function handleIncomingMessage(
 
   const { data: existente } = await supabase
     .from("whatsapp_conversas")
-    .select("id, nao_lidas, nome_contato")
+    .select("id, nao_lidas, nome_contato, nome_contato_editado_manualmente")
     .eq("empresa_id", empresaId)
     .eq("telefone", telefone)
     .maybeSingle();
@@ -749,7 +749,13 @@ async function handleIncomingMessage(
     const { data, error } = await supabase
       .from("whatsapp_conversas")
       .update({
-        nome_contato: pushName || existente.nome_contato,
+        // Um nome editado manualmente no CRM (via whatsapp-contact-rename) não pode ser
+        // sobrescrito pelo nome de perfil que chega em toda mensagem recebida — sem essa
+        // checagem, a edição manual "resetava" para o nome padrão do WhatsApp na próxima
+        // mensagem do contato.
+        nome_contato: existente.nome_contato_editado_manualmente
+          ? existente.nome_contato
+          : (pushName || existente.nome_contato),
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
         nao_lidas:

@@ -63,7 +63,7 @@ serve(async (req) => {
     if (conversa.is_group) {
       const { error: updErr } = await supabase
         .from("whatsapp_conversas")
-        .update({ nome_contato: nomeTrim })
+        .update({ nome_contato: nomeTrim, nome_contato_editado_manualmente: true })
         .eq("id", conversa_id);
       if (updErr) throw updErr;
       return new Response(JSON.stringify({ nome_contato: nomeTrim, synced_to_whatsapp: false }), {
@@ -116,7 +116,7 @@ serve(async (req) => {
 
     const { error: updErr } = await supabase
       .from("whatsapp_conversas")
-      .update({ nome_contato: nomeTrim })
+      .update({ nome_contato: nomeTrim, nome_contato_editado_manualmente: true })
       .eq("id", conversa_id);
     if (updErr) throw updErr;
 
