@@ -180,6 +180,9 @@ import {
   Eye,
   EyeOff,
   Pencil,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -4043,6 +4046,93 @@ export default function WhatsAppInbox() {
     null,
   );
 
+  // Zoom/pan do "Visualizar imagem" — sempre reinicia ao trocar de imagem ou fechar,
+  // senão o dialog abriria a próxima foto já ampliada/deslocada da anterior.
+  const IMG_ZOOM_MIN = 1;
+  const IMG_ZOOM_MAX = 4;
+  const IMG_ZOOM_STEP = 0.5;
+  const [imgZoom, setImgZoom] = useState(IMG_ZOOM_MIN);
+  const [imgOffset, setImgOffset] = useState({ x: 0, y: 0 });
+  const [isDraggingImg, setIsDraggingImg] = useState(false);
+  const imgDragRef = useRef<{
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
+
+  useEffect(() => {
+    setImgZoom(IMG_ZOOM_MIN);
+    setImgOffset({ x: 0, y: 0 });
+  }, [viewingImage?.url]);
+
+  function clampImgZoom(z: number) {
+    return Math.min(IMG_ZOOM_MAX, Math.max(IMG_ZOOM_MIN, +z.toFixed(2)));
+  }
+
+  function zoomImgIn() {
+    setImgZoom((z) => clampImgZoom(z + IMG_ZOOM_STEP));
+  }
+
+  function zoomImgOut() {
+    setImgZoom((z) => {
+      const next = clampImgZoom(z - IMG_ZOOM_STEP);
+      if (next === IMG_ZOOM_MIN) setImgOffset({ x: 0, y: 0 });
+      return next;
+    });
+  }
+
+  function resetImgZoom() {
+    setImgZoom(IMG_ZOOM_MIN);
+    setImgOffset({ x: 0, y: 0 });
+  }
+
+  function handleImgWheel(e: React.WheelEvent<HTMLImageElement>) {
+    const delta = e.deltaY < 0 ? IMG_ZOOM_STEP : -IMG_ZOOM_STEP;
+    setImgZoom((z) => {
+      const next = clampImgZoom(z + delta);
+      if (next === IMG_ZOOM_MIN) setImgOffset({ x: 0, y: 0 });
+      return next;
+    });
+  }
+
+  function handleImgDoubleClick() {
+    if (imgZoom > IMG_ZOOM_MIN) {
+      resetImgZoom();
+    } else {
+      setImgZoom(2);
+    }
+  }
+
+  function handleImgMouseDown(e: React.MouseEvent<HTMLImageElement>) {
+    if (imgZoom <= IMG_ZOOM_MIN) return;
+    e.preventDefault();
+    setIsDraggingImg(true);
+    imgDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: imgOffset.x,
+      originY: imgOffset.y,
+    };
+    const zoomAtDragStart = imgZoom;
+    const handleMove = (ev: MouseEvent) => {
+      const drag = imgDragRef.current;
+      if (!drag) return;
+      setImgOffset({
+        x: drag.originX + (ev.clientX - drag.startX) / zoomAtDragStart,
+        y: drag.originY + (ev.clientY - drag.startY) / zoomAtDragStart,
+      });
+    };
+    const handleUp = () => {
+      imgDragRef.current = null;
+      setIsDraggingImg(false);
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+  }
+
   // Trava de envio duplicado: `isBusy`/`isUploading` só fica true durante o
   // upload de anexos, nunca durante o envio de uma mensagem só de texto — sem
   // essa ref, um Enter duplo (ou clique duplo no botão) antes do primeiro
@@ -6982,12 +7072,63 @@ export default function WhatsAppInbox() {
           </DialogHeader>
           {viewingImage && (
             <>
-              <div className="flex-1 min-h-0 flex items-center justify-center bg-muted/30 p-4 overflow-auto">
+              <div className="relative flex-1 min-h-0 flex items-center justify-center bg-muted/30 p-4 overflow-hidden">
                 <img
                   src={viewingImage.url}
                   alt="Visualização"
-                  className="w-full h-full object-contain rounded-lg shadow-md"
+                  draggable={false}
+                  onWheel={handleImgWheel}
+                  onDoubleClick={handleImgDoubleClick}
+                  onMouseDown={handleImgMouseDown}
+                  className={cn(
+                    "max-w-full max-h-full object-contain rounded-lg shadow-md select-none",
+                    imgZoom > IMG_ZOOM_MIN
+                      ? isDraggingImg
+                        ? "cursor-grabbing"
+                        : "cursor-grab"
+                      : "cursor-zoom-in",
+                  )}
+                  style={{
+                    transform: `scale(${imgZoom}) translate(${imgOffset.x}px, ${imgOffset.y}px)`,
+                    transition: isDraggingImg ? "none" : "transform 0.15s ease-out",
+                  }}
                 />
+                <div className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-full border border-border bg-background/90 px-1 py-1 shadow-sm backdrop-blur">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    onClick={zoomImgOut}
+                    disabled={imgZoom <= IMG_ZOOM_MIN}
+                    title="Diminuir zoom"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="w-10 text-center text-xs tabular-nums text-muted-foreground">
+                    {Math.round(imgZoom * 100)}%
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    onClick={zoomImgIn}
+                    disabled={imgZoom >= IMG_ZOOM_MAX}
+                    title="Aumentar zoom"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                  {imgZoom > IMG_ZOOM_MIN && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      onClick={resetImgZoom}
+                      title="Restaurar zoom"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
               <DialogFooter className="px-4 py-3 border-t border-border sm:justify-between">
                 {viewingImage.msgId ? (
