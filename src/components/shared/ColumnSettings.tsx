@@ -197,19 +197,32 @@ export const ColumnSettings = memo(function ColumnSettings({
                             <div className="flex flex-col h-full max-h-[500px]">
                                 <div className="flex items-center gap-1 justify-end px-1 pb-2">
                                     {onReset && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (window.confirm('Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Deseja continuar?')) {
-                                                    onReset();
-                                                }
-                                            }}
-                                            className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-all active:scale-95 group"
-                                            title="Resetar para o padrão"
-                                        >
-                                            <RotateCcw className="h-3 w-3" />
-                                            <span className="text-[10px] font-bold text-destructive/80">Resetar</span>
-                                        </button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <button
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-full hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-all active:scale-95 group"
+                                                    title="Resetar para o padrão"
+                                                >
+                                                    <RotateCcw className="h-3 w-3" />
+                                                    <span className="text-[10px] font-bold text-destructive/80">Resetar</span>
+                                                </button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Restaurar padrão?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Isso irá remover todas as colunas personalizadas e restaurar a visualização padrão. Essa ação não pode ser desfeita.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => onReset()}>
+                                                        Restaurar
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     )}
                                     {onAdd && (
                                         <button
