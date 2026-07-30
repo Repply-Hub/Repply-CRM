@@ -88,31 +88,24 @@ export function useUnreadChatMessages() {
   const qc = useQueryClient();
   const { user, profile } = useAuth();
   const meId = profile?.id;
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
 
   const query = useQuery({
-    queryKey: ['unread_chat_count', user?.id],
+    queryKey: ['unread_chat_count', user?.id, meId],
     queryFn: async () => {
-      if (!user) return 0;
-
-      const { data: me } = await supabase
-        .from('usuarios')
-        .select('id, empresa_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!me) return 0;
+      if (!user || !meId) return 0;
 
       const { count, error } = await supabase
         .from('chat_mensagens')
         .select('*', { count: 'exact', head: true })
         .eq('lida', false)
-        .neq('usuario_id', me.id)
-        .or(`recipient_id.eq.${me.id},and(recipient_id.is.null,grupo_id.is.null,empresa_id.eq.${me.empresa_id}),and(grupo_id.not.is.null,empresa_id.eq.${me.empresa_id})`);
+        .neq('usuario_id', meId)
+        .or(`recipient_id.eq.${meId},and(recipient_id.is.null,grupo_id.is.null,empresa_id.eq.${empresaId}),and(grupo_id.not.is.null,empresa_id.eq.${empresaId})`);
 
       if (error) throw error;
       return count || 0;
     },
-    enabled: !!user,
+    enabled: !!user && !!meId,
   });
 
   // Assinatura global (sempre montada via AppSidebar) para garantir que o toast

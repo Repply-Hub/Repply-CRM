@@ -256,18 +256,42 @@ export function useUpdatePedidoStatus() {
     },
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: ['pedidos'] });
-      const previous = qc.getQueryData<PedidoWithRelations[]>(['pedidos']);
-      if (previous) {
-        qc.setQueryData<PedidoWithRelations[]>(['pedidos'], old =>
-          old?.map(p => p.id === id ? { ...p, status } : p)
-        );
+
+      const previousEntries = qc.getQueriesData<{ data: PedidoWithRelations[]; count: number }>({ queryKey: ['pedidos'] });
+
+      let movedItem: PedidoWithRelations | undefined;
+      for (const [, data] of previousEntries) {
+        movedItem = data?.data.find(p => p.id === id);
+        if (movedItem) break;
       }
-      return { previous };
+
+      qc.setQueriesData<{ data: PedidoWithRelations[]; count: number }>({ queryKey: ['pedidos'] }, (old, query) => {
+        if (!old) return old;
+        const stages = query.queryKey[4] as string[] | undefined;
+        const hasItem = old.data.some(p => p.id === id);
+
+        if (stages && stages.length > 0) {
+          const belongsToTarget = stages.includes(status);
+          if (!belongsToTarget && hasItem) {
+            return { data: old.data.filter(p => p.id !== id), count: Math.max(0, old.count - 1) };
+          }
+          if (belongsToTarget && !hasItem && movedItem) {
+            return { data: [{ ...movedItem, status }, ...old.data], count: old.count + 1 };
+          }
+          return old;
+        }
+
+        return hasItem
+          ? { data: old.data.map(p => p.id === id ? { ...p, status } : p), count: old.count }
+          : old;
+      });
+
+      return { previousEntries };
     },
     onError: (err, variables, context) => {
-      if (context?.previous) {
-        qc.setQueryData(['pedidos'], context.previous);
-      }
+      context?.previousEntries?.forEach(([key, data]) => {
+        qc.setQueryData(key, data);
+      });
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['pedidos'] });

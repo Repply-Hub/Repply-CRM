@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useDeferredValue, memo } from 'react';
+import { useEffect, useMemo, useState, useCallback, useDeferredValue, memo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parse, isValid, startOfDay, endOfDay, parseISO } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
@@ -33,15 +33,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { generatePedidosPdf, type PedidoRow } from '@/lib/generate-pdf';
-import { generatePedidosExcel } from '@/lib/generate-excel';
+import type { PedidoRow } from '@/lib/generate-pdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsHeader, ColumnSettingsPopover } from '@/components/shared/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ImportPedidosDialog } from '@/components/pedidos/ImportPedidosDialog';
 import { ImportDialog } from '@/components/ImportDialog';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { KanbanColumn } from '@/components/pedidos/kanban/KanbanColumn';
@@ -54,6 +52,10 @@ import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
 import { filenameFromUrl } from '@/lib/download-file';
 import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
+
+const ImportPedidosDialog = lazy(() =>
+  import('@/components/pedidos/ImportPedidosDialog').then(m => ({ default: m.ImportPedidosDialog }))
+);
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'negocio', label: 'Negócio', locked: false },
@@ -393,6 +395,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
+  const [importDialogMounted, setImportDialogMounted] = useState(false);
   const [importAiOpen, setImportAiOpen] = useState(false);
   const [selectedStages, setSelectedStages] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
@@ -782,12 +785,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const handleExportPdf = async (specificPedidoId?: string) => {
     const { rows, titulo } = buildExportRows(specificPedidoId);
     if (rows.length === 0) return;
+    const { generatePedidosPdf } = await import('@/lib/generate-pdf');
     await generatePedidosPdf(rows, titulo);
   };
 
   const handleExportExcel = async (specificPedidoId?: string) => {
     const { rows, titulo } = buildExportRows(specificPedidoId);
     if (rows.length === 0) return;
+    const { generatePedidosExcel } = await import('@/lib/generate-excel');
     generatePedidosExcel(rows, titulo);
   };
 
@@ -835,7 +840,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <ColumnSettingsItem
             label="Importar"
             icon={Upload}
-            onClick={() => setImportOpen(true)}
+            onClick={() => {
+              setImportDialogMounted(true);
+              setImportOpen(true);
+            }}
           />
 
           <ColumnSettingsItem
@@ -884,6 +892,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     totalCount,
     someSelected,
     setImportOpen,
+    setImportDialogMounted,
     setColunasDialogOpen,
     isPipelineMode,
     setConfirmDeleteOpen
@@ -1659,7 +1668,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
+      {importDialogMounted && (
+        <Suspense fallback={null}>
+          <ImportPedidosDialog open={importOpen} onOpenChange={setImportOpen} />
+        </Suspense>
+      )}
       <ImportDialog
         open={importAiOpen}
         importType="negocios"
