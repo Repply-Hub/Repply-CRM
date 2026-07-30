@@ -492,23 +492,17 @@ function ConversaAvatar({
   );
 }
 
-// Conversas já atribuídas AO USUÁRIO LOGADO não devem exibir o estado "não lida"
-// automaticamente a partir de mensagens recebidas — só voltam a mostrá-lo se o
-// usuário selecionar "Marcar como não lida" no menu "..." do header
-// (`nao_lidas_forcada`). Conversas sem responsável, ou atribuídas a outra
-// pessoa (ex: admin/gestor abrindo uma conversa que não é dele), seguem o
-// contador normal — abrir/visualizar não marca como lida.
+// Segue o contador normal (nao_lidas) para qualquer conversa, atribuída ao
+// usuário logado ou não — abrir a conversa é o que marca como lida (ver
+// useEffect que chama `marcarLida` ao trocar `conversaAtivaId`), não a mera
+// atribuição. `nao_lidas_forcada` é a marcação manual via "Marcar como não
+// lida" no menu "..." do header.
 function conversaNaoLida(
   conv: WaConversa,
   currentUserId?: string | null,
 ): boolean {
   if (conv.arquivada) return false;
-  const atribuidaAoUsuarioAtual =
-    !!currentUserId &&
-    (conv.responsaveis ?? []).some((r) => r.id === currentUserId);
-  return (
-    conv.nao_lidas_forcada || (!atribuidaAoUsuarioAtual && conv.nao_lidas > 0)
-  );
+  return conv.nao_lidas_forcada || conv.nao_lidas > 0;
 }
 
 // Badge de não lidas. Quando a conversa está aberta (`ativa`) o contador não
@@ -1602,11 +1596,8 @@ function MessageContent({
     );
   }
 
-  if (msg.tipo === "documento" && msg.media_url) {
-    const label = !PLACEHOLDERS.includes(msg.conteudo)
-      ? msg.conteudo
-      : "Documento anexado";
-    const previewable = onPreviewFile && isPreviewable(label, msg.media_mime);
+  const renderFileChip = (label: string, url: string, mime?: string) => {
+    const previewable = onPreviewFile && isPreviewable(label, mime);
     const sharedClassName = cn(
       "flex items-center gap-3 p-2.5 rounded-lg border hover:opacity-80 transition-colors w-[220px] sm:w-[260px]",
       isSaida ? "bg-white/10 border-white/20" : "bg-muted/50 border-border",
@@ -1646,13 +1637,7 @@ function MessageContent({
         <button
           type="button"
           className={sharedClassName}
-          onClick={() =>
-            onPreviewFile!({
-              url: msg.media_url!,
-              nome: label,
-              mime: msg.media_mime,
-            })
-          }
+          onClick={() => onPreviewFile!({ url, nome: label, mime })}
         >
           {content}
         </button>
@@ -1660,14 +1645,44 @@ function MessageContent({
     }
 
     return (
-      <a
-        href={msg.media_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={sharedClassName}
-      >
+      <a href={url} target="_blank" rel="noopener noreferrer" className={sharedClassName}>
         {content}
       </a>
+    );
+  };
+
+  if (msg.tipo === "documento" && msg.media_url) {
+    const label = !PLACEHOLDERS.includes(msg.conteudo)
+      ? msg.conteudo
+      : "Documento anexado";
+    return renderFileChip(label, msg.media_url, msg.media_mime);
+  }
+
+  // Anexo com URL cujo tipo não bateu em nenhum caso específico acima (ex.: tipo
+  // desalinhado com o mimetype real) — mostra um chip de download genérico em vez
+  // de deixar o anexo invisível.
+  if (msg.media_url) {
+    const label = !PLACEHOLDERS.includes(msg.conteudo)
+      ? msg.conteudo
+      : "Arquivo anexado";
+    return renderFileChip(label, msg.media_url, msg.media_mime);
+  }
+
+  // Tipo indica anexo de mídia, mas o download/descriptografia falhou no webhook
+  // (media_url ficou null) — mostra aviso em vez de texto puro sem contexto.
+  if (["imagem", "sticker", "audio", "video", "documento"].includes(msg.tipo)) {
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-2 p-2.5 rounded-lg border w-[220px] sm:w-[260px]",
+          isSaida ? "bg-white/10 border-white/20" : "bg-muted/50 border-border",
+        )}
+      >
+        <FileText className={cn("h-5 w-5 shrink-0 opacity-70", textCls)} />
+        <span className={cn("text-sm", textCls)}>
+          Não foi possível carregar este arquivo
+        </span>
+      </div>
     );
   }
 
