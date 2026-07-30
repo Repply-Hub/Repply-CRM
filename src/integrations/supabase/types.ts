@@ -468,6 +468,7 @@ export type Database = {
           cnpj: string | null
           complemento: string | null
           created_at: string
+          criado_por_usuario_id: string | null
           data_criacao: string | null
           email: string | null
           empresa: string | null
@@ -493,6 +494,7 @@ export type Database = {
           cnpj?: string | null
           complemento?: string | null
           created_at?: string
+          criado_por_usuario_id?: string | null
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
@@ -518,6 +520,7 @@ export type Database = {
           cnpj?: string | null
           complemento?: string | null
           created_at?: string
+          criado_por_usuario_id?: string | null
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
@@ -540,6 +543,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_criado_por_usuario_id_fkey"
+            columns: ["criado_por_usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
           {
@@ -826,8 +836,10 @@ export type Database = {
           cep: string | null
           cidade: string | null
           classificacao: string | null
+          cliente_id: string | null
           complemento: string | null
           created_at: string
+          criado_por_usuario_id: string | null
           data_criacao: string | null
           email: string | null
           empresa: string | null
@@ -847,8 +859,10 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           classificacao?: string | null
+          cliente_id?: string | null
           complemento?: string | null
           created_at?: string
+          criado_por_usuario_id?: string | null
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
@@ -868,8 +882,10 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           classificacao?: string | null
+          cliente_id?: string | null
           complemento?: string | null
           created_at?: string
+          criado_por_usuario_id?: string | null
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
@@ -882,7 +898,22 @@ export type Database = {
           updated_at?: string
           usuario_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contatos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contatos_criado_por_usuario_id_fkey"
+            columns: ["criado_por_usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       debug_logs: {
         Row: {

@@ -44,7 +44,7 @@ import { StandardPopoverMenu } from '@/components/ui/standard-popover-menu';
 const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'tipo', label: 'Tipo / Segmento', locked: false },
   { id: 'cnpj', label: 'CNPJ / CPF' },
-  { id: 'empresa', label: 'Empresa/Nome Fant' },
+  { id: 'empresa', label: 'Empresa/Nome Fantasia' },
   { id: 'razao_social', label: 'Razão social' },
   { id: 'nome_contato', label: 'Contato da empresa' },
   { id: 'email', label: 'E-mail' },
@@ -58,6 +58,7 @@ const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'cep', label: 'CEP' },
   { id: 'classificacao', label: 'Classificação' },
   { id: 'data_criacao', label: 'Data de Criação' },
+  { id: 'criado_por', label: 'Criado por' },
 ];
 
 const CONTATO_FIELDS: ColumnDefinition[] = [
@@ -67,6 +68,7 @@ const CONTATO_FIELDS: ColumnDefinition[] = [
   { id: 'telefone', label: 'Telefone do contato' },
   { id: 'cargo', label: 'Cargo' },
   { id: 'data_criacao', label: 'Data de Criação' },
+  { id: 'criado_por', label: 'Criado por' },
 ];
 
 const EMPRESA_STEPS = [
@@ -149,6 +151,20 @@ const getSchemaKeyByColumn = (column?: ColumnDefinition) => {
 const getColumnValue = (row: Record<string, any>, column?: ColumnDefinition) => {
   if (!column) return undefined;
 
+  // "Criado por" é uma FK (criado_por_usuario_id -> usuarios.nome) — prioriza o nome
+  // vinculado; cai para o texto livre em campos_extras só em registros antigos
+  // importados antes da coluna estruturada existir e que não bateram com nenhum usuário.
+  if (column.id === 'criado_por' && hasDisplayValue(row.criado_por_usuario?.nome)) {
+    return row.criado_por_usuario.nome;
+  }
+
+  // "Empresa do contato" (linhas de contatos) é uma FK (cliente_id -> clientes.empresa) —
+  // prioriza o nome atual da empresa vinculada; cai para o texto solto legado
+  // (contatos.empresa) em registros antigos sem o vínculo.
+  if (column.id === 'empresa' && hasDisplayValue(row.cliente?.empresa)) {
+    return row.cliente.empresa;
+  }
+
   const camposExtras = row.campos_extras || {};
   const schemaKey = getSchemaKeyByColumn(column);
   if (schemaKey && hasDisplayValue(row[schemaKey])) return row[schemaKey];
@@ -194,6 +210,7 @@ const buildRowSearchText = (row: Record<string, any>, tipoLabel?: string) => {
     row.cidade,
     row.uf,
     row.cep,
+    row.criado_por_usuario?.nome,
   ];
   const extraValues =
     row.campos_extras && typeof row.campos_extras === 'object'
@@ -557,6 +574,7 @@ const Clientes = () => {
       try {
         await createContato.mutateAsync({
           empresa: clients?.find(c => c.id === empresa)?.empresa || undefined,
+          cliente_id: empresa || undefined,
           nome_contato: nomeContato || undefined,
           email: contatoEmailValue || undefined,
           telefone: telefone || undefined,
@@ -615,7 +633,7 @@ const Clientes = () => {
     }
     const enderecoStr = enderecoToString(endereco);
     try {
-      await createCliente.mutateAsync({
+      const createdCliente = await createCliente.mutateAsync({
         empresa: empresa || (form.get('empresa') as string),
         razao_social: razaoSocial || undefined,
         tipo,
@@ -626,10 +644,11 @@ const Clientes = () => {
         campos_extras: camposExtrasEmpresa,
       });
       if (contatoMode === 'existente') {
-        await updateContato.mutateAsync({ id: selectedContatoId, empresa: empresa.trim() });
+        await updateContato.mutateAsync({ id: selectedContatoId, empresa: empresa.trim(), cliente_id: createdCliente.id });
       } else if (contatoMode === 'novo') {
         await createContato.mutateAsync({
           empresa: empresa.trim(),
+          cliente_id: createdCliente.id,
           nome_contato: nomeContato.trim(),
           cargo: cargo.trim() || undefined,
           email: contatoEmail.trim() || undefined,

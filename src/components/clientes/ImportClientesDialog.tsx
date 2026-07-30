@@ -4,19 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, ArrowRight, Pencil, Plus } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2, ArrowRight, Pencil, Plus, UserCheck, UserX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
 import { MappingStep, sanitizeImportedRows, type ExtraMappingValue } from '@/components/import/MappingStep';
 import { ImportInstructionsStep } from '@/components/import/ImportInstructionsStep';
+import { stringToEndereco, fetchCepData, maskCep, unmaskCep } from '@/lib/cep';
+import { matchUsuarioByNome, type UsuarioLite } from '@/lib/import/match-usuario';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
-type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'uf' | 'cep' | 'nome_contato' | 'cargo' | 'classificacao' | 'data_criacao';
+type FieldKey = 'empresa' | 'razao_social' | 'tipo' | 'cnpj' | 'email' | 'telefone' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'uf' | 'cep' | 'nome_contato' | 'cargo' | 'classificacao' | 'data_criacao' | 'criado_por';
 
 const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: boolean }[] = [
   { key: 'tipo', label: 'Tipo / Segmento', required: false },
@@ -36,6 +38,7 @@ const FIELDS: { key: FieldKey; label: string; required: boolean; forContatos?: b
   { key: 'cep', label: 'CEP', required: false },
   { key: 'classificacao', label: 'Classificação', required: false },
   { key: 'data_criacao', label: 'Data de Criação', required: false },
+  { key: 'criado_por', label: 'Criado por', required: false },
 ];
 
 const TIPO_MAP: Record<string, string> = {
@@ -72,6 +75,7 @@ const FIELD_EXAMPLES: Partial<Record<FieldKey, string>> = {
   cargo: 'Comprador',
   classificacao: 'A',
   data_criacao: '2026-01-15',
+  criado_por: 'João Silva',
 };
 
 function normalizeText(v: string): string {
@@ -101,6 +105,7 @@ const AUTO_RULES: Record<FieldKey, RegExp[]> = {
   cargo: [/^cargo$/, /cargo/, /funcao/, /posicao/],
   classificacao: [/^classificacao$/, /^classificacao.*cliente$/, /^rank$/, /^ranking$/, /^score$/, /classificacao/],
   data_criacao: [/^data\s*criacao$/, /^criado$/, /^criado\s*em$/, /^data\s*cadastro$/],
+  criado_por: [/^criado\s*por$/, /^created\s*by$/, /criado\s*por/, /created\s*by/],
 };
 
 function autoDetectMapping(headers: string[], fields: { key: FieldKey; label: string }[]): Record<FieldKey, string> {
@@ -109,7 +114,7 @@ function autoDetectMapping(headers: string[], fields: { key: FieldKey; label: st
     telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
     cidade: '', uf: '', cep: '',
     nome_contato: '', cargo: '',
-    classificacao: '', data_criacao: '',
+    classificacao: '', data_criacao: '', criado_por: '',
   };
 
   const used = new Set<string>();
@@ -133,7 +138,7 @@ function autoDetectMapping(headers: string[], fields: { key: FieldKey; label: st
 
 function autoDetectExtras(headers: string[], mappedHeaders: Iterable<string>) {
   const used = new Set(mappedHeaders);
-  const extraRules = [/^criado\s*por$/, /^created\s*by$/, /vendedor/, /responsavel\s*cadastro/, /origem/, /setor/, /departamento/];
+  const extraRules = [/vendedor/, /responsavel\s*cadastro/, /origem/, /setor/, /departamento/];
   const observationsRules = [/observacoes/, /obs/, /nota/, /observacao/];
   
   return headers.reduce<Record<string, string>>((acc, header) => {
@@ -155,6 +160,57 @@ function autoDetectExtras(headers: string[], mappedHeaders: Iterable<string>) {
   }, {});
 }
 
+interface EnderecoRow {
+  cep?: string;
+  logradouro?: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
+}
+
+// Quando a linha só trouxe o CEP (sem logradouro/bairro/cidade mapeados ou preenchidos),
+// busca o endereço via BrasilAPI e completa os demais campos. Deduplica por CEP e limita
+// a concorrência para não disparar centenas de requisições de uma vez em importações grandes.
+async function enrichRowsWithCep<T extends EnderecoRow>(rows: T[]): Promise<T[]> {
+  const pendentes = rows.filter(r => r.cep && !(r.logradouro && r.bairro && r.cidade));
+  const cepsUnicos = Array.from(new Set(
+    pendentes.map(r => unmaskCep(r.cep!)).filter(d => d.length === 8)
+  ));
+  if (cepsUnicos.length === 0) return rows;
+
+  const cache = new Map<string, Awaited<ReturnType<typeof fetchCepData>> | null>();
+  const CONCURRENCY = 6;
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < cepsUnicos.length) {
+      const digits = cepsUnicos[cursor++];
+      try {
+        cache.set(digits, await fetchCepData(digits));
+      } catch {
+        cache.set(digits, null);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, cepsUnicos.length) }, worker));
+
+  return rows.map(row => {
+    if (!row.cep) return row;
+    const digits = unmaskCep(row.cep);
+    if (digits.length !== 8) return row;
+    if (row.logradouro && row.bairro && row.cidade) return row;
+    const data = cache.get(digits);
+    if (!data) return row;
+    return {
+      ...row,
+      cep: maskCep(digits),
+      logradouro: row.logradouro || data.street || row.logradouro,
+      bairro: row.bairro || data.neighborhood || row.bairro,
+      cidade: row.cidade || data.city || row.cidade,
+      uf: row.uf || data.state || row.uf,
+    };
+  });
+}
+
 interface ImportClientesDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -174,7 +230,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
     cidade: '', uf: '', cep: '',
     nome_contato: '', cargo: '',
-    classificacao: '', data_criacao: '',
+    classificacao: '', data_criacao: '', criado_por: '',
   });
   const [fieldDefaultValues, setFieldDefaultValues] = useState<Record<string, string>>({});
   // extras: column name (planilha) -> nome no sistema (campos_extras)
@@ -187,10 +243,23 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
+  const [enrichingCep, setEnrichingCep] = useState(false);
   const [step, setStep] = useState<'instructions' | 'upload' | 'mapping' | 'preview'>('instructions');
   const [previewRowsSnapshot, setPreviewRowsSnapshot] = useState<any[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+
+  // Usuários da empresa para vincular "Criado por" a um nome já cadastrado no sistema
+  // (RLS já escopa por empresa — não precisa filtrar por empresa_id aqui).
+  const { data: usuariosEmpresa } = useQuery({
+    queryKey: ['usuarios_empresa_nomes'],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('usuarios').select('id, nome');
+      if (error) throw error;
+      return (data ?? []) as UsuarioLite[];
+    },
+  });
 
   const visibleFields = useMemo(
     () => FIELDS.filter(f => target === 'contatos' || !f.forContatos),
@@ -210,7 +279,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
       cidade: '', uf: '', cep: '',
       nome_contato: '', cargo: '',
-      classificacao: '', data_criacao: '',
+      classificacao: '', data_criacao: '', criado_por: '',
     });
     setFieldDefaultValues({});
     setExtras({});
@@ -369,6 +438,38 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           }
         }
 
+        // Se a coluna de logradouro veio com o endereço inteiro em um único campo
+        // (ex: "Rua X, 320, Bairro Y, Cidade UF – CEP", comum em exports do Bitrix24)
+        // e os campos estruturados não foram mapeados/preenchidos separadamente,
+        // distribui automaticamente para número/bairro/cidade/UF/CEP.
+        let logradouro = get('logradouro') || undefined;
+        let numero = get('numero') || undefined;
+        let complemento = get('complemento') || undefined;
+        let bairro = get('bairro') || undefined;
+        let cidade = get('cidade') || undefined;
+        let uf = get('uf') || undefined;
+        let cep = get('cep') || undefined;
+
+        if (logradouro && logradouro.includes(',') && !(numero && bairro && cidade)) {
+          const parsed = stringToEndereco(logradouro);
+          logradouro = parsed.logradouro || logradouro;
+          numero = numero || parsed.numero || undefined;
+          complemento = complemento || parsed.complemento || undefined;
+          bairro = bairro || parsed.bairro || undefined;
+          cidade = cidade || parsed.cidade || undefined;
+          uf = uf || parsed.uf || undefined;
+          cep = cep || parsed.cep || undefined;
+        }
+
+        // "Criado por" vira a FK clientes.criado_por_usuario_id quando o nome da planilha
+        // bate com um usuário da empresa (tolera acento/maiúscula/pequena variação de
+        // digitação). Sem match, guarda o texto original em campos_extras para revisão
+        // manual depois — igual ao que já é feito para "Vendedor" na importação de negócios.
+        const criadoPorRaw = get('criado_por');
+        const criadoPorMatch = criadoPorRaw ? matchUsuarioByNome(criadoPorRaw, usuariosEmpresa ?? []) : null;
+        const camposExtras = { ...(row.campos_extras as Record<string, string> || {}) };
+        if (criadoPorRaw && !criadoPorMatch?.exact) camposExtras['Criado por Original'] = criadoPorRaw;
+
         return {
           empresa: resolvedEmpresa,
           razao_social: razao_social || undefined,
@@ -376,18 +477,22 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           cnpj: cnpj || undefined,
           email: get('email') || undefined,
           telefone: get('telefone') || undefined,
-          logradouro: get('logradouro') || undefined,
-          numero: get('numero') || undefined,
-          complemento: get('complemento') || undefined,
-          bairro: get('bairro') || undefined,
-          cidade: get('cidade') || undefined,
-          uf: get('uf') || undefined,
-          cep: get('cep') || undefined,
+          logradouro,
+          numero,
+          complemento,
+          bairro,
+          cidade,
+          uf,
+          cep,
           nome_contato: nome_contato || undefined,
           cargo: get('cargo') || undefined,
           classificacao: get('classificacao') || undefined,
           data_criacao: get('data_criacao') || undefined,
-          campos_extras: (row.campos_extras as Record<string, string>) || {},
+          criado_por_usuario_id: criadoPorMatch?.usuarioId,
+          // Só para exibição na prévia — preparedBatch monta o payload de insert campo a
+          // campo, então essa chave extra nunca chega a ser gravada no banco.
+          criado_por_nome: criadoPorMatch ? criadoPorMatch.usuarioNome : criadoPorRaw || undefined,
+          campos_extras: camposExtras,
         };
       });
     
@@ -400,13 +505,37 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     return target === 'empresas' ? mergeRowsByCnpj(mappedRows) : mappedRows;
   };
 
+  // Mostra a prévia imediatamente com o que já foi mapeado e, em segundo plano,
+  // completa por CEP as linhas de empresa que só trouxeram o CEP.
+  const advanceToPreview = (sanitizedRows?: ReturnType<typeof sanitizeImportedRows>) => {
+    const mapped = getMappedRows(sanitizedRows);
+    if (mapped.length === 0) {
+      toast.error('Nenhum registro válido com o mapeamento atual');
+      return false;
+    }
+    setPreviewRowsSnapshot(mapped);
+    setStep('preview');
+
+    if (target === 'empresas') {
+      setEnrichingCep(true);
+      enrichRowsWithCep(mapped)
+        .then(setPreviewRowsSnapshot)
+        .finally(() => setEnrichingCep(false));
+    }
+    return true;
+  };
+
   const canProceed = Boolean(mapping.empresa) || Boolean(mapping.razao_social) || Boolean(mapping.cnpj) || Boolean(mapping.nome_contato) || Boolean(mapping.email);
 
   const previewRows = useMemo(() => (step === 'preview' ? previewRowsSnapshot : []), [step, previewRowsSnapshot]);
 
-  // Lista de campos extras únicos para mostrar no preview (com nome final)
+  // Lista de campos extras únicos para mostrar no preview (com nome final) — "Criado por"
+  // tem coluna própria na prévia (não é genérico), então não entra nessa lista. "Criado por
+  // Original" também fica de fora: já aparece dentro da própria coluna "Criado por" quando
+  // não há match, não precisa duplicar como campo extra genérico.
   const extraFieldNames = useMemo(
-    () => Array.from(new Set(previewRowsSnapshot.flatMap(row => Object.keys(row.campos_extras || {})))),
+    () => Array.from(new Set(previewRowsSnapshot.flatMap(row => Object.keys(row.campos_extras || {}))))
+      .filter(name => name !== 'Criado por' && name !== 'Criado por Original'),
     [previewRowsSnapshot]
   );
 
@@ -454,6 +583,28 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         }
       }
 
+      // Resolve "Empresa do contato" (texto) para um cliente_id real quando o nome bate
+      // com exatamente uma empresa já cadastrada — ambíguo (nenhuma ou mais de uma) fica
+      // sem vínculo, mantém só o texto (nunca adivinha errado).
+      let clienteIdPorNomeEmpresa: Map<string, string> | null = null;
+      if (target === 'contatos') {
+        const { data: clientesExistentes, error: clientesError } = await supabase
+          .from('clientes')
+          .select('id, empresa');
+        if (clientesError) throw clientesError;
+        const contagemPorNome = new Map<string, number>();
+        const idPorNome = new Map<string, string>();
+        (clientesExistentes ?? []).forEach(c => {
+          if (!c.empresa) return;
+          const chave = c.empresa.trim().toLowerCase();
+          contagemPorNome.set(chave, (contagemPorNome.get(chave) ?? 0) + 1);
+          idPorNome.set(chave, c.id);
+        });
+        clienteIdPorNomeEmpresa = new Map(
+          Array.from(idPorNome.entries()).filter(([chave]) => contagemPorNome.get(chave) === 1)
+        );
+      }
+
       const BATCH = 500;
       let imported = 0;
       console.debug('[ImportClientes] preview snapshot usado na confirmação', rows.slice(0, 5));
@@ -462,6 +613,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         if (target === 'contatos') {
           const batch = rows.slice(i, i + BATCH).map(r => ({
             empresa: r.empresa || (r.nome_contato ? 'Sem empresa' : 'Sem empresa'),
+            cliente_id: r.empresa ? clienteIdPorNomeEmpresa?.get(r.empresa.trim().toLowerCase()) || null : null,
             nome_contato: r.nome_contato || r.empresa || null,
             email: r.email || null,
             telefone: r.telefone || null,
@@ -477,12 +629,13 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             data_criacao: r.data_criacao || null,
             campos_extras: r.campos_extras || {},
             usuario_id: vid,
+            criado_por_usuario_id: r.criado_por_usuario_id || null,
           }));
           console.debug('[ImportClientes] batch final contatos', batch.slice(0, 5));
           const { data: saved, error } = await supabase
             .from('contatos')
             .insert(batch)
-            .select('id,empresa,nome_contato,email,telefone,cargo,logradouro,numero,complemento,bairro,cidade,uf,cep,classificacao,data_criacao,campos_extras');
+            .select('id,empresa,cliente_id,nome_contato,email,telefone,cargo,logradouro,numero,complemento,bairro,cidade,uf,cep,classificacao,data_criacao,campos_extras,criado_por_usuario_id');
           if (error) throw error;
           console.debug('[ImportClientes] contatos salvos', saved?.slice(0, 5));
         } else {
@@ -505,6 +658,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             data_criacao: r.data_criacao || null,
             campos_extras: r.campos_extras || {},
             usuario_id: vid,
+            criado_por_usuario_id: r.criado_por_usuario_id || null,
           }));
 
           const cnpjs = Array.from(new Set(preparedBatch.map(r => r.cnpj).filter(Boolean))) as string[];
@@ -512,7 +666,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           if (cnpjs.length > 0) {
             const { data: existingRows, error: existingError } = await supabase
               .from('clientes')
-              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras,usuario_id')
+              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras,usuario_id,criado_por_usuario_id')
               .in('cnpj', cnpjs)
               .eq('usuario_id', vid);
             if (existingError) throw existingError;
@@ -546,6 +700,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               data_criacao: hasValue(incoming.data_criacao) ? incoming.data_criacao : existing.data_criacao,
               campos_extras: mergeExtraFields(existing.campos_extras || {}, incoming.campos_extras || {}),
               usuario_id: existing.usuario_id,
+              criado_por_usuario_id: hasValue(incoming.criado_por_usuario_id) ? incoming.criado_por_usuario_id : existing.criado_por_usuario_id,
             };
           }) as any[];
           console.debug('[ImportClientes] batch final clientes', batch.slice(0, 5));
@@ -557,7 +712,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             const { data: saved, error: insertError } = await supabase
               .from('clientes')
               .insert(inserts)
-              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras');
+              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras,criado_por_usuario_id');
             if (insertError) throw insertError;
             totalSaved = totalSaved.concat(saved || []);
             console.debug('[ImportClientes] clientes novos inseridos', saved?.slice(0, 3));
@@ -569,7 +724,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                 .from('clientes')
                 .update(updateData)
                 .eq('id', id)
-                .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras');
+                .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras,criado_por_usuario_id');
               if (updateError) throw updateError;
               totalSaved = totalSaved.concat(saved || []);
             }
@@ -761,7 +916,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                   telefone: '', logradouro: '', numero: '', complemento: '', bairro: '',
                   cidade: '', uf: '', cep: '',
                   nome_contato: '', cargo: '',
-                  classificacao: '', data_criacao: '',
+                  classificacao: '', data_criacao: '', criado_por: '',
                 });
                 setExtras({});
                 setCustomColumns({});
@@ -771,13 +926,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
               isAutoSaveEnabled={isAutoSaveEnabled}
               canProceed={canProceed}
               onNext={(payload) => {
-                const mapped = getMappedRows(payload);
-                if (mapped.length === 0) {
-                  toast.error('Nenhum registro válido com o mapeamento atual');
-                  return;
-                }
-                setPreviewRowsSnapshot(mapped);
-                setStep('preview');
+                advanceToPreview(payload);
               }}
             />
           </div>
@@ -798,6 +947,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                     {extraFieldNames.length > 0 && (
                       <Badge className="bg-accent/10 text-accent-foreground border-accent/20 text-[10px] font-bold py-0 h-5">
                         +{extraFieldNames.length} campo{extraFieldNames.length === 1 ? '' : 's'} extra{extraFieldNames.length === 1 ? '' : 's'}
+                      </Badge>
+                    )}
+                    {enrichingCep && (
+                      <Badge variant="outline" className="text-[10px] font-bold py-0 h-5 bg-background gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Completando endereços pelo CEP...
                       </Badge>
                     )}
                   </div>
@@ -854,6 +1008,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                     {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Cidade</TableHead>}
                     {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">UF</TableHead>}
                     {target === 'contatos' && <TableHead className="text-xs sticky top-0 bg-muted/50">Cargo</TableHead>}
+                    {target === 'empresas' && <TableHead className="text-xs sticky top-0 bg-muted/50">Criado por</TableHead>}
                     {extraFieldNames.map(name => (
                       <TableHead key={name} className="text-xs sticky top-0 bg-muted/50">{name}</TableHead>
                     ))}
@@ -876,6 +1031,23 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                       {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap">{r.cidade || '-'}</TableCell>}
                       {target === 'empresas' && <TableCell className="text-xs whitespace-nowrap">{r.uf || '-'}</TableCell>}
                       {target === 'contatos' && <TableCell className="text-xs whitespace-nowrap">{r.cargo || '-'}</TableCell>}
+                      {target === 'empresas' && (
+                        <TableCell className="text-xs whitespace-nowrap max-w-[160px]">
+                          {r.criado_por_nome ? (
+                            r.criado_por_usuario_id ? (
+                              <span className="inline-flex items-center gap-1 truncate" title="Vinculado a um usuário da empresa">
+                                <UserCheck className="h-3.5 w-3.5 shrink-0 text-green-600" />
+                                <span className="truncate">{r.criado_por_nome}</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 truncate text-muted-foreground" title="Nenhum usuário da empresa bate com esse nome — fica só como texto">
+                                <UserX className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+                                <span className="truncate">{r.criado_por_nome}</span>
+                              </span>
+                            )
+                          ) : '-'}
+                        </TableCell>
+                      )}
                       {extraFieldNames.map(name => (
                         <TableCell key={name} className="text-xs whitespace-nowrap max-w-[200px] truncate bg-accent/10">
                           {r.campos_extras?.[name] || '-'}
@@ -899,16 +1071,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         {step === 'mapping' && (
           <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
             <Button variant="ghost" onClick={reset}>Cancelar</Button>
-            <Button 
-              onClick={() => {
-                const mapped = getMappedRows();
-                if (mapped.length === 0) {
-                  toast.error('Nenhum registro válido com o mapeamento atual');
-                  return;
-                }
-                setPreviewRowsSnapshot(mapped);
-                setStep('preview');
-              }} 
+            <Button
+              onClick={() => advanceToPreview()}
               className="h-10 px-6 font-bold shadow-lg shadow-primary/20"
               disabled={!canProceed}
             >
@@ -920,9 +1084,11 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         {step === 'preview' && (
           <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
             <Button variant="ghost" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
-            <Button onClick={handleImport} disabled={importing} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
+            <Button onClick={handleImport} disabled={importing || enrichingCep} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
               {importing ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
+              ) : enrichingCep ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Completando endereços...</>
               ) : (
                 <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {previewRows.length} {target === 'contatos' ? 'contatos' : 'empresas'}</>
               )}

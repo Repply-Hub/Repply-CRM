@@ -56,17 +56,18 @@ import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/Fil
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 
 const PEDIDOS_COLUMNS: ColumnDefinition[] = [
-  { id: 'cliente', label: 'Empresa/Cliente', locked: false },
+  { id: 'negocio', label: 'Negócio', locked: false },
+  { id: 'cliente', label: 'Cliente', locked: false },
   { id: 'contato', label: 'Contato', locked: false },
-  { id: 'etapa', label: 'Fase do negócio', locked: false },
+  { id: 'endereco_entrega', label: 'Obra/Endereço', locked: false },
   { id: 'fabricante', label: 'Fabricante', locked: false },
   { id: 'valor', label: 'Valor', locked: false },
   { id: 'vendedor', label: 'Responsável/Vendedor', locked: false },
-  { id: 'anexo', label: 'Anexo', locked: false },
-  { id: 'data_pedido', label: 'Data de Criação', locked: false },
-  { id: 'prazo_resposta', label: 'Data de Fechamento', locked: false },
-  { id: 'endereco_entrega', label: 'Endereço de entrega', locked: false },
+  { id: 'etapa', label: 'Etapa', locked: false },
+  { id: 'data_pedido', label: 'Criação', locked: false },
+  { id: 'prazo_resposta', label: 'Fechamento', locked: false },
   { id: 'observacoes', label: 'Observações', locked: false },
+  { id: 'anexo', label: 'Anexo', locked: false },
   { id: 'acoes', label: 'Ações', locked: false },
 ];
 
@@ -150,6 +151,12 @@ const PedidoRow = memo(({
         }
 
         switch (colId) {
+          case 'negocio':
+            return (
+              <TableCell key={colId} className="min-w-[200px] font-medium px-4 whitespace-nowrap">
+                {[pedido.cliente?.empresa, pedido.fabricante?.nome].filter(Boolean).join(' | ') || '—'}
+              </TableCell>
+            );
           case 'cliente':
             return (
               <TableCell key={colId} className="min-w-[200px] font-medium px-4">

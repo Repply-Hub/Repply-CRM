@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown, Users, X, HardHat, ListChecks } from 'lucide-react';
+import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown, Users, X, HardHat, ListChecks, FileText, Contact, Tag, CalendarDays, UserCheck } from 'lucide-react';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { toast } from 'sonner';
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
@@ -31,6 +31,16 @@ import { slugify } from '@/lib/utils';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física', condominio: 'Condomínio', hospital: 'Hospital', distribuidor: 'Distribuidor', hotel: 'Hotel', escola: 'Escola', instalador: 'Instalador' };
+
+// Formata datas ISO ("aaaa-mm-dd" ou timestamp completo) para dd/mm/aaaa sem passar
+// por conversão de timezone do navegador (o valor já representa a data salva pelo backend).
+const formatDateBR = (value?: string | null) => {
+  if (!value) return '';
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return value;
+  const [, ano, mes, dia] = match;
+  return `${dia}/${mes}/${ano}`;
+};
 
 const stageColors: Record<string, string> = {
   novo_lead: 'bg-kanban-new text-white',
@@ -439,6 +449,50 @@ const ClienteDetalhe = () => {
               </CardContent>
             </Card>
           )}
+          {(cliente as any).razao_social && (cliente as any).razao_social !== cliente.empresa && (
+            <Card
+              role="button"
+              tabIndex={0}
+              className="border-border/40 cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => copyInfo('Razão social', (cliente as any).razao_social)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  copyInfo('Razão social', (cliente as any).razao_social);
+                }
+              }}
+            >
+               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+                 <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                 <div className="min-w-0">
+                   <p className="text-xs text-muted-foreground">Razão social</p>
+                   <p className="text-sm font-medium text-foreground truncate">{(cliente as any).razao_social}</p>
+                 </div>
+              </CardContent>
+            </Card>
+          )}
+          {cliente.nome_contato && (
+            <Card
+              role="button"
+              tabIndex={0}
+              className="border-border/40 cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => copyInfo('Contato da empresa', cliente.nome_contato)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  copyInfo('Contato da empresa', cliente.nome_contato);
+                }
+              }}
+            >
+               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+                 <Contact className="h-4 w-4 text-muted-foreground shrink-0" />
+                 <div className="min-w-0">
+                   <p className="text-xs text-muted-foreground">Contato da empresa</p>
+                   <p className="text-sm font-medium text-foreground truncate">{cliente.nome_contato}</p>
+                 </div>
+              </CardContent>
+            </Card>
+          )}
           <Card
             role={cliente.email ? 'button' : undefined}
             tabIndex={cliente.email ? 0 : undefined}
@@ -487,26 +541,93 @@ const ClienteDetalhe = () => {
               </CardContent>
             </Card>
           )}
-          {cliente.endereco && (() => {
-            // Parse "logradouro, numero, complemento, bairro, cidade - UF, CEP" format
-            const parts = cliente.endereco.split(',').map(s => s.trim());
-            const logradouro = parts[0] || '';
-            const numero = parts[1] || '';
-            const bairro = parts.length > 3 ? parts[2] : '';
-            const cidadeUfRaw = parts.length > 3 ? parts[3] : parts[2] || '';
-            const cep = parts.length > 4 ? parts[4] : '';
-            const cidadeUfMatch = cidadeUfRaw.match(/^(.+?)\s*-\s*(.+)$/);
-            const cidade = cidadeUfMatch ? cidadeUfMatch[1].trim() : cidadeUfRaw;
-            const uf = cidadeUfMatch ? cidadeUfMatch[2].trim() : '';
-            
+          {(cliente as any).classificacao && (
+            <Card
+              role="button"
+              tabIndex={0}
+              className="border-border/40 cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => copyInfo('Classificação', (cliente as any).classificacao)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  copyInfo('Classificação', (cliente as any).classificacao);
+                }
+              }}
+            >
+               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+                 <Tag className="h-4 w-4 text-muted-foreground shrink-0" />
+                 <div className="min-w-0">
+                   <p className="text-xs text-muted-foreground">Classificação</p>
+                   <p className="text-sm font-medium text-foreground truncate">{(cliente as any).classificacao}</p>
+                 </div>
+              </CardContent>
+            </Card>
+          )}
+          {((cliente as any).data_criacao || cliente.created_at) && (
+            <Card className="border-border/40">
+               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+                 <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                 <div className="min-w-0">
+                   <p className="text-xs text-muted-foreground">Data de criação</p>
+                   <p className="text-sm font-medium text-foreground truncate">
+                     {formatDateBR((cliente as any).data_criacao || cliente.created_at)}
+                   </p>
+                 </div>
+              </CardContent>
+            </Card>
+          )}
+          {(cliente as any).criado_por_usuario?.nome && (
+            <Card className="border-border/40">
+               <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+                 <UserCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                 <div className="min-w-0">
+                   <p className="text-xs text-muted-foreground">Criado por</p>
+                   <p className="text-sm font-medium text-foreground truncate">{(cliente as any).criado_por_usuario.nome}</p>
+                 </div>
+              </CardContent>
+            </Card>
+          )}
+          {(camposConfigClientes ?? []).filter(c => c.origem === 'customizado').map(campo => {
+            const valor = ((cliente as any).campos_extras as Record<string, string> | null)?.[campo.campo_key];
+            if (!valor) return null;
+            return (
+              <Card
+                key={campo.id}
+                role="button"
+                tabIndex={0}
+                className="border-border/40 cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => copyInfo(campo.label, valor)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    copyInfo(campo.label, valor);
+                  }
+                }}
+              >
+                 <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
+                   <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                   <div className="min-w-0">
+                     <p className="text-xs text-muted-foreground">{campo.label}</p>
+                     <p className="text-sm font-medium text-foreground truncate">{valor}</p>
+                   </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+          {(() => {
+            const parsed = cliente.endereco ? stringToEndereco(cliente.endereco) : emptyEndereco;
+            const c = cliente as any;
             const fields = [
-              { label: 'Logradouro', value: logradouro },
-              { label: 'Número', value: numero },
-              { label: 'Bairro', value: bairro },
-              { label: 'Cidade', value: cidade },
-              { label: 'UF', value: uf },
-              { label: 'CEP', value: cep },
+              { label: 'Logradouro', value: c.logradouro || parsed.logradouro },
+              { label: 'Número', value: c.numero || parsed.numero },
+              { label: 'Complemento', value: c.complemento || parsed.complemento },
+              { label: 'Bairro', value: c.bairro || parsed.bairro },
+              { label: 'Cidade', value: c.cidade || parsed.cidade },
+              { label: 'UF', value: c.uf || parsed.uf },
+              { label: 'CEP', value: c.cep || parsed.cep },
             ].filter(f => f.value);
+
+            if (fields.length === 0) return null;
 
             return (
               <Card className="md:col-span-3 border-border/40">

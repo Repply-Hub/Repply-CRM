@@ -22,6 +22,7 @@ export function useCreateCliente() {
         ...insertData,
         data_criacao: new Date().toISOString().slice(0, 10),
         usuario_id: vid,
+        criado_por_usuario_id: vid,
       }).select('id').single();
       if (error) throw error;
       return created;
@@ -35,6 +36,7 @@ export function useCreateContato() {
   return useMutation({
     mutationFn: async (data: {
       empresa?: string;
+      cliente_id?: string;
       nome_contato?: string;
       email?: string;
       telefone?: string;
@@ -46,6 +48,7 @@ export function useCreateContato() {
         ...data,
         data_criacao: new Date().toISOString().slice(0, 10),
         usuario_id: vid,
+        criado_por_usuario_id: vid,
       });
       if (error) throw error;
     },
@@ -120,6 +123,7 @@ export function useUpdateContato() {
       telefone?: string;
       cargo?: string;
       empresa?: string;
+      cliente_id?: string | null;
       campos_extras?: Record<string, string>;
     }) => {
       const { error } = await supabase.from('contatos').update(data).eq('id', id);
