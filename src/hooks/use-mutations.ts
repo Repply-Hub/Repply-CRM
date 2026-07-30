@@ -292,6 +292,8 @@ export function useCreateFabricante() {
       const { error } = await supabase.from('fabricantes').insert(data);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['fabricantes'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fabricantes'] });
+    },
   });
 }

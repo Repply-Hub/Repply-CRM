@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
@@ -132,14 +132,27 @@ function FabricanteForm({
   const [nome, setNome] = useState(editData?.nome ?? "");
   const [contato, setContato] = useState(editData?.nome_contato ?? "");
   const [telefone, setTelefone] = useState(editData?.telefone ?? "");
+  const sessionRef = useRef(0);
 
   const reset = () => {
+    sessionRef.current += 1;
     setCnpj("");
     setCnpjStatus("idle");
     setNome("");
     setContato("");
     setTelefone("");
   };
+
+  useEffect(() => {
+    if (open) {
+      sessionRef.current += 1;
+      setCnpj(editData?.cnpj ?? "");
+      setCnpjStatus("idle");
+      setNome(editData?.nome ?? "");
+      setContato(editData?.nome_contato ?? "");
+      setTelefone(editData?.telefone ?? "");
+    }
+  }, [open, editData]);
 
   const handleCnpjBlur = async () => {
     const digits = unmaskCnpj(cnpj);
@@ -149,14 +162,17 @@ function FabricanteForm({
       toast.error("CNPJ inválido");
       return;
     }
+    const session = sessionRef.current;
     setCnpjStatus("loading");
     try {
       const data = await fetchCnpjData(digits);
+      if (sessionRef.current !== session) return; // formulário foi fechado/reaberto enquanto a consulta rodava
       setCnpjStatus("valid");
       if (data.razao_social && !nome) setNome(data.razao_social);
       if (data.ddd_telefone_1 && !telefone) setTelefone(data.ddd_telefone_1);
       toast.success("CNPJ validado!");
     } catch {
+      if (sessionRef.current !== session) return;
       setCnpjStatus("invalid");
       toast.error("CNPJ não encontrado");
     }

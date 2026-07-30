@@ -167,7 +167,9 @@ export function useUpdateFabricante() {
       const { error } = await supabase.from('fabricantes').update(data).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['fabricantes'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fabricantes'] });
+    },
   });
 }
 
@@ -178,6 +180,8 @@ export function useDeleteFabricante() {
       const { error } = await supabase.from('fabricantes').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['fabricantes'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fabricantes'] });
+    },
   });
 }
