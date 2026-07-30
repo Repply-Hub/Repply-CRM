@@ -81,6 +81,9 @@ export function useSaveSidebarEmpresaPadrao() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sidebar-empresa-padrao'] });
       queryClient.invalidateQueries({ queryKey: ['sidebar-empresa-padrao-historico'] });
+      // Usuários com preferência pessoal salva também precisam receber os
+      // itens novos do padrão da empresa (ver merge em use-sidebar-preferences.ts).
+      queryClient.invalidateQueries({ queryKey: ['sidebar-preferences'] });
     },
   });
 }

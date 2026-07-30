@@ -77,13 +77,8 @@ export function AppSidebar() {
   const visibleItems = items.filter(i => {
     if (!i.visible) return false;
 
-    // Admin vê Dashboard para métricas e Configurações para permissões
-    if (isAdmin) {
-      return i.id === 'dashboard' || i.id === 'usuarios_admin' || i.id === 'configuracoes' || i.id === 'admin_wa_instancias';
-    }
-
     // Itens exclusivos do admin master nunca aparecem para outros perfis
-    if (i.id === 'admin_wa_instancias' || i.id === 'usuarios_admin') return false;
+    if (!isAdmin && (i.id === 'admin_wa_instancias' || i.id === 'usuarios_admin')) return false;
 
     // Histórico de alterações é exclusivo de gestores/empresa (não aparece pra vendedor comum)
     if (i.id === 'historico' && !isGestor) return false;

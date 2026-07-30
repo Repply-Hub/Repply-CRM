@@ -77,7 +77,25 @@ export function useSidebarPreferences() {
         .filter(i => !REMOVED_IDS.has(i.id))
         .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i));
       const savedIds = new Set(saved.map(i => i.id));
-      const newDefaults = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedIds.has(d.id));
+
+      // Itens novos adicionados ao padrão da empresa depois que este usuário salvou
+      // sua própria personalização também precisam aparecer para ele (não só os
+      // itens novos do app em si) — senão o padrão da empresa nunca mais o alcança.
+      let empresaPadraoItems: SidebarItem[] = [];
+      if (empresaId) {
+        const { data: empresaPadrao } = await supabase
+          .from('sidebar_empresa_padrao')
+          .select('items')
+          .eq('empresa_id', empresaId)
+          .maybeSingle();
+        if (empresaPadrao && Array.isArray(empresaPadrao.items) && empresaPadrao.items.length > 0) {
+          empresaPadraoItems = empresaPadrao.items as unknown as SidebarItem[];
+        }
+      }
+
+      const newDefaults = [...empresaPadraoItems, ...DEFAULT_SIDEBAR_ITEMS].filter(
+        (d, idx, arr) => !savedIds.has(d.id) && arr.findIndex(x => x.id === d.id) === idx
+      );
       const merged = [...saved, ...newDefaults];
 
       if (needsCleanup) {
