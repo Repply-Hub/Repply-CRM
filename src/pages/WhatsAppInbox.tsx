@@ -3683,6 +3683,16 @@ export default function WhatsAppInbox() {
     setFiltroInstancia("todos");
     setFiltroResponsavel([]);
   }
+  // Conversas fechadas não têm responsável atribuído (ver comentário acima
+  // sobre reabertura) nem faz sentido filtrar por "Conversa" nelas — no menu
+  // de fechadas só os filtros de Instância e Período continuam fazendo
+  // sentido.
+  useEffect(() => {
+    if (filtroStatus === "fechado") {
+      setFiltroResponsavel((prev) => (prev.length > 0 ? [] : prev));
+      setFiltroConversa((prev) => (prev !== "todos" ? "todos" : prev));
+    }
+  }, [filtroStatus]);
   // Busca por conteúdo de mensagem em todo o histórico (não só nas últimas
   // carregadas): reaproveita a própria barra de busca da sidebar e o filtro de
   // Período (dropdown "Filtros") em vez de um diálogo à parte com campos
@@ -3841,37 +3851,51 @@ export default function WhatsAppInbox() {
   // a mim".
   const filtrosDropdownContent = (
     <div className="flex flex-col gap-0.5 w-44">
-      <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-        Conversa
-      </p>
-      {(
-        [
-          ["todos", "Todos"],
-          ["geral", "Não atribuído"],
-          ["meu", meuChatsLabel],
-          // "Outros atendentes" só faz sentido pra admin/gestor — vendedor
-          // comum, por causa da RLS, nunca enxerga conversa atribuída a
-          // outra pessoa.
-          ...(isGestor ? ([["outros", "Outros atendentes"]] as const) : []),
-        ] as const
-      ).map(([val, label]) => (
-        <button
-          key={val}
-          type="button"
-          onClick={() => setFiltroConversa(val)}
-          className={cn(
-            "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-            filtroConversa === val && "bg-primary/10 text-primary",
-          )}
-        >
-          {label}
-          {filtroConversa === val && <Check className="h-3.5 w-3.5" />}
-        </button>
-      ))}
+      {/* Conversas fechadas não têm responsável/atribuição, então "Conversa"
+          (Todos/Não atribuído/Meus/Outros atendentes) não se aplica — só o
+          filtro de Instância faz sentido. */}
+      {filtroStatus !== "fechado" && (
+        <>
+          <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            Conversa
+          </p>
+          {(
+            [
+              ["todos", "Todos"],
+              ["geral", "Não atribuído"],
+              ["meu", meuChatsLabel],
+              // "Outros atendentes" só faz sentido pra admin/gestor — vendedor
+              // comum, por causa da RLS, nunca enxerga conversa atribuída a
+              // outra pessoa.
+              ...(isGestor ? ([["outros", "Outros atendentes"]] as const) : []),
+            ] as const
+          ).map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setFiltroConversa(val)}
+              className={cn(
+                "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                filtroConversa === val && "bg-primary/10 text-primary",
+              )}
+            >
+              {label}
+              {filtroConversa === val && <Check className="h-3.5 w-3.5" />}
+            </button>
+          ))}
+        </>
+      )}
       {temInstanciaConhecida && (
         <>
-          <div className="mx-3 my-1 border-t border-border/50" />
-          <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+          {filtroStatus !== "fechado" && (
+            <div className="mx-3 my-1 border-t border-border/50" />
+          )}
+          <p
+            className={cn(
+              "px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70",
+              filtroStatus === "fechado" && "pt-1",
+            )}
+          >
             Instância
           </p>
           <button
@@ -3905,7 +3929,7 @@ export default function WhatsAppInbox() {
           ))}
         </>
       )}
-      {vendedores.length > 0 && (
+      {vendedores.length > 0 && filtroStatus !== "fechado" && (
         <>
           <div className="mx-3 my-1 border-t border-border/50" />
           <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
@@ -5604,41 +5628,52 @@ export default function WhatsAppInbox() {
                               )}
                             </button>
                             <div className="mx-3 my-1 border-t border-border/50" />
-                            <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                              Conversa
-                            </p>
-                            {(
-                              [
-                                ["todos", "Todos"],
-                                ["geral", "Não atribuído"],
-                                ["meu", meuChatsLabel],
-                                ...(isGestor
-                                  ? ([
-                                      ["outros", "Outros atendentes"],
-                                    ] as const)
-                                  : []),
-                              ] as const
-                            ).map(([val, label]) => (
-                              <button
-                                key={val}
-                                type="button"
-                                onClick={() => setFiltroConversa(val)}
-                                className={cn(
-                                  "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                                  filtroConversa === val &&
-                                    "bg-primary/10 text-primary",
-                                )}
-                              >
-                                {label}
-                                {filtroConversa === val && (
-                                  <Check className="h-3.5 w-3.5" />
-                                )}
-                              </button>
-                            ))}
+                            {filtroStatus !== "fechado" && (
+                              <>
+                                <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                  Conversa
+                                </p>
+                                {(
+                                  [
+                                    ["todos", "Todos"],
+                                    ["geral", "Não atribuído"],
+                                    ["meu", meuChatsLabel],
+                                    ...(isGestor
+                                      ? ([
+                                          ["outros", "Outros atendentes"],
+                                        ] as const)
+                                      : []),
+                                  ] as const
+                                ).map(([val, label]) => (
+                                  <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() => setFiltroConversa(val)}
+                                    className={cn(
+                                      "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                      filtroConversa === val &&
+                                        "bg-primary/10 text-primary",
+                                    )}
+                                  >
+                                    {label}
+                                    {filtroConversa === val && (
+                                      <Check className="h-3.5 w-3.5" />
+                                    )}
+                                  </button>
+                                ))}
+                              </>
+                            )}
                             {temInstanciaConhecida && (
                               <>
-                                <div className="mx-3 my-1 border-t border-border/50" />
-                                <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                {filtroStatus !== "fechado" && (
+                                  <div className="mx-3 my-1 border-t border-border/50" />
+                                )}
+                                <p
+                                  className={cn(
+                                    "px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70",
+                                    filtroStatus === "fechado" && "pt-1",
+                                  )}
+                                >
                                   Instância
                                 </p>
                                 <button
@@ -5676,7 +5711,7 @@ export default function WhatsAppInbox() {
                                 ))}
                               </>
                             )}
-                            {vendedores.length > 0 && (
+                            {vendedores.length > 0 && filtroStatus !== "fechado" && (
                               <>
                                 <div className="mx-3 my-1 border-t border-border/50" />
                                 <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
