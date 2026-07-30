@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
 
+const MENSAGEM_TOAST_MAX_CHARS = 100;
+
 export interface Notificacao {
   id: string;
   usuario_id: string;
@@ -119,15 +121,31 @@ export function useUnreadChatMessages() {
     if (!user?.id) return;
     const channel = supabase
       .channel(`chat-unread-rt-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, async (payload) => {
         qc.invalidateQueries({ queryKey: ['unread_chat_count'] });
 
         if (payload.eventType === 'INSERT' && meId && payload.new.usuario_id !== meId) {
           const members = qc.getQueryData<any[]>(['chat-members']) || [];
-          const sender = members.find((m) => m.id === payload.new.usuario_id);
+          let sender = members.find((m) => m.id === payload.new.usuario_id);
+
+          if (!sender) {
+            const { data } = await supabase
+              .from('usuarios')
+              .select('id, nome')
+              .eq('id', payload.new.usuario_id)
+              .single();
+            sender = data;
+          }
+
           const nomeConversa = sender?.nome || 'Alguém';
-          toast(createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
-            description: payload.new.conteudo?.slice(0, 120) || 'Enviou um arquivo',
+          const conteudo = payload.new.conteudo?.trim();
+          const descricao = conteudo
+            ? conteudo.length > MENSAGEM_TOAST_MAX_CHARS
+              ? `${conteudo.slice(0, MENSAGEM_TOAST_MAX_CHARS)}...`
+              : conteudo
+            : 'Enviou um arquivo';
+          toast(() => createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
+            description: descricao,
             style: { background: '#f97316', color: '#fff', border: 'none' },
             descriptionClassName: '!text-white/90',
           });

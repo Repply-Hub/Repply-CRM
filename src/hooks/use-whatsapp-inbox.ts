@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 
+const MENSAGEM_TOAST_MAX_CHARS = 100;
+
 // WhatsApp/uazapi às vezes usa o JID de celulares BR sem o 9º dígito (número antigo).
 // Normaliza para o formato canônico (55 + DDD + 9 + número), igual ao whatsapp-webhook,
 // para casar com conversas já existentes do mesmo contato e evitar duplicidade.
@@ -945,8 +947,14 @@ export function useUnreadWaMessages() {
 
           if (currentCount > prevCount) {
             const nomeConversa = row.nome_contato || row.telefone;
-            toast(createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
-              description: row.ultima_mensagem?.slice(0, 120) || 'Nova mensagem',
+            const ultimaMensagem = row.ultima_mensagem?.trim();
+            const descricao = ultimaMensagem
+              ? ultimaMensagem.length > MENSAGEM_TOAST_MAX_CHARS
+                ? `${ultimaMensagem.slice(0, MENSAGEM_TOAST_MAX_CHARS)}...`
+                : ultimaMensagem
+              : 'Nova mensagem';
+            toast(() => createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
+              description: descricao,
               style: { background: '#f97316', color: '#fff', border: 'none' },
               descriptionClassName: '!text-white/90',
             });
