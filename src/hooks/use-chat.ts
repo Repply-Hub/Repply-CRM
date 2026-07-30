@@ -137,6 +137,18 @@ export function useChatMessages(grupoId: string | null = null, recipientId: stri
           (old || []).filter(m => m.id !== oldMsg.id)
         );
       })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'chat_mensagens'
+      }, (payload) => {
+        // Reflete em tempo real quando o destinatário marca a conversa como lida,
+        // pra quem enviou ver o "visualizado" sem precisar reabrir a tela.
+        const updated = payload.new as any;
+        qc.setQueryData<ChatMessage[]>(['chat_mensagens', grupoId, recipientId], (old) =>
+          (old || []).map(m => (m.id === updated.id ? { ...m, lida: updated.lida, lida_em: updated.lida_em } : m))
+        );
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -356,6 +368,13 @@ function activityKeyFor(me: string, msg: { usuario_id: string; recipient_id?: st
   return null;
 }
 
+export interface ChatLastActivity {
+  created_at: string;
+  conteudo: string | null;
+  arquivo_nome: string | null;
+  usuario_id: string;
+}
+
 export function useChatLastActivity() {
   const qc = useQueryClient();
   // chat_mensagens.usuario_id/recipient_id referenciam usuarios.id, não o id legado
@@ -363,7 +382,7 @@ export function useChatLastActivity() {
   // o handler de realtime comparar contra a mesma coisa que activityKeyFor espera.
   const meIdRef = useRef<string | null>(null);
 
-  const query = useQuery<Record<string, string>>({
+  const query = useQuery<Record<string, ChatLastActivity>>({
     queryKey: ['chat-last-activity'],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
@@ -375,17 +394,24 @@ export function useChatLastActivity() {
 
       const { data, error } = await supabase
         .from('chat_mensagens')
-        .select('usuario_id, recipient_id, grupo_id, created_at')
+        .select('usuario_id, recipient_id, grupo_id, conteudo, arquivo_nome, created_at')
         .eq('empresa_id', me.empresa_id)
         .order('created_at', { ascending: false })
         .limit(500);
       if (error) throw error;
 
-      const map: Record<string, string> = {};
+      const map: Record<string, ChatLastActivity> = {};
       (data ?? []).forEach((msg) => {
         const key = activityKeyFor(me.id, msg);
         // Ordem descendente: a primeira ocorrência de cada chave já é a mais recente.
-        if (key && !map[key]) map[key] = msg.created_at;
+        if (key && !map[key]) {
+          map[key] = {
+            created_at: msg.created_at,
+            conteudo: msg.conteudo,
+            arquivo_nome: msg.arquivo_nome,
+            usuario_id: msg.usuario_id,
+          };
+        }
       });
       return map;
     },
@@ -404,9 +430,14 @@ export function useChatLastActivity() {
         }
         const key = activityKeyFor(meId, newMsg);
         if (!key) return;
-        qc.setQueryData<Record<string, string>>(['chat-last-activity'], (old) => ({
+        qc.setQueryData<Record<string, ChatLastActivity>>(['chat-last-activity'], (old) => ({
           ...(old ?? {}),
-          [key]: newMsg.created_at,
+          [key]: {
+            created_at: newMsg.created_at,
+            conteudo: newMsg.conteudo,
+            arquivo_nome: newMsg.arquivo_nome,
+            usuario_id: newMsg.usuario_id,
+          },
         }));
       })
       .subscribe();
@@ -643,6 +674,77 @@ export function useMarkChatAsRead() {
       qc.invalidateQueries({ queryKey: ['unread_chat_count'] });
     }
   });
+}
+
+// Confirmação de leitura por usuário (grupo/geral): chat_mensagens.lida é um único
+// booleano por mensagem, então em conversas com mais de 2 participantes ele vira
+// true assim que QUALQUER UM lê. Pra saber quando TODOS os participantes leram,
+// cada leitor registra sua própria linha em chat_mensagens_leituras.
+export function useMarkGroupMessagesRead() {
+  return useMutation({
+    mutationFn: async ({ messageIds }: { messageIds: string[] }) => {
+      if (messageIds.length === 0) return;
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
+      const { data: me } = await supabase.from('usuarios').select('id').eq('user_id', userData.user.id).single();
+      if (!me) return;
+
+      const rows = messageIds.map((mensagem_id) => ({ mensagem_id, usuario_id: me.id }));
+      const { error } = await supabase
+        .from('chat_mensagens_leituras')
+        .upsert(rows, { onConflict: 'mensagem_id,usuario_id', ignoreDuplicates: true });
+      if (error) throw error;
+    },
+  });
+}
+
+// Mapa mensagem_id -> lista de usuario_id que já a leram, para as mensagens
+// informadas (tipicamente as que EU enviei numa conversa em grupo/geral).
+export function useMessageReadReceipts(messageIds: string[]) {
+  const qc = useQueryClient();
+  const idsKey = [...messageIds].sort().join(',');
+
+  const query = useQuery<Record<string, string[]>>({
+    queryKey: ['chat-read-receipts', idsKey],
+    queryFn: async () => {
+      if (messageIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from('chat_mensagens_leituras')
+        .select('mensagem_id, usuario_id')
+        .in('mensagem_id', messageIds);
+      if (error) throw error;
+
+      const map: Record<string, string[]> = {};
+      (data ?? []).forEach((r) => {
+        (map[r.mensagem_id] ??= []).push(r.usuario_id);
+      });
+      return map;
+    },
+    enabled: messageIds.length > 0,
+  });
+
+  useEffect(() => {
+    if (messageIds.length === 0) return;
+    const idsSet = new Set(messageIds);
+    const channel = supabase
+      .channel(`chat-read-receipts-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensagens_leituras' }, (payload) => {
+        const row = payload.new as { mensagem_id: string; usuario_id: string };
+        if (!idsSet.has(row.mensagem_id)) return;
+        qc.setQueryData<Record<string, string[]>>(['chat-read-receipts', idsKey], (old) => {
+          const next = { ...(old ?? {}) };
+          const list = next[row.mensagem_id] ?? [];
+          if (!list.includes(row.usuario_id)) next[row.mensagem_id] = [...list, row.usuario_id];
+          return next;
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc, idsKey]);
+
+  return query;
 }
 
 export function useClearChat() {

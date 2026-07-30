@@ -408,6 +408,56 @@ export type Database = {
           },
         ]
       }
+      chat_mensagens_leituras: {
+        Row: {
+          id: string
+          lida_em: string
+          mensagem_id: string
+          usuario_id: string
+        }
+        Insert: {
+          id?: string
+          lida_em?: string
+          mensagem_id: string
+          usuario_id: string
+        }
+        Update: {
+          id?: string
+          lida_em?: string
+          mensagem_id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_mensagens_leituras_mensagem_id_fkey"
+            columns: ["mensagem_id"]
+            isOneToOne: false
+            referencedRelation: "chat_mensagens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_leituras_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_leituras_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_usuario"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "chat_mensagens_leituras_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["usuario_id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           bairro: string | null

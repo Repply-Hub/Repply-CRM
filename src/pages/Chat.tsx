@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
-import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, useDeleteChatMessage, useAddChatGrupoMembros, ChatGrupo, ChatMessage, QuotedMessage, useMarkChatAsRead, useChatGeralConfig, useUpdateChatGeralConfig, useChatLastActivity } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, useDeleteChatMessage, useAddChatGrupoMembros, ChatGrupo, ChatMessage, QuotedMessage, useMarkChatAsRead, useMarkGroupMessagesRead, useMessageReadReceipts, useChatGeralConfig, useUpdateChatGeralConfig, useChatLastActivity, ChatLastActivity } from '@/hooks/use-chat';
 import { useOnlineUsers } from '@/hooks/use-presence';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import {
   Send, Loader2, MessageCircle, MessageSquare, Users, Circle, PanelLeftClose, PanelLeftOpen,
   Paperclip, FileText, Image, X, Download, Users2, Calendar, Eraser, ChevronDown,
-  Video, Link2, ExternalLink, Play, Pause, Camera, Pencil, Check, Search, Trash2, UserPlus, Mic, Square, Reply
+  Video, Link2, ExternalLink, Play, Pause, Camera, Pencil, Check, CheckCheck, Search, Trash2, UserPlus, Mic, Square, Reply
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -98,6 +98,7 @@ function MembersList({
   geralNome,
   geralFotoUrl,
   onlineIds,
+  lastActivity,
 }: {
   members: Vendedor[];
   myId: string | null;
@@ -110,6 +111,7 @@ function MembersList({
   geralNome: string;
   geralFotoUrl?: string | null;
   onlineIds: Set<string>;
+  lastActivity: Record<string, ChatLastActivity>;
 }) {
   const [memberSearch, setMemberSearch] = useState('');
   const searching = memberSearch.trim().length > 0;
@@ -185,6 +187,9 @@ function MembersList({
                   </AvatarFallback>
                 </Avatar>
               </button>
+              {onlineIds.has(m.id) && (
+                <Circle className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 fill-emerald-500 text-background stroke-[3]" />
+              )}
               {count > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
                   {count}
@@ -313,6 +318,10 @@ function MembersList({
           {(searching ? filteredMembers : members.filter(m => m.id !== myId)).map((m) => {
             const isMe = m.id === myId;
             const isSelected = target.type === 'dm' && target.memberId === m.id;
+            const lastMsg = lastActivity[`dm_${m.id}`];
+            const lastMsgPreview = lastMsg
+              ? `${lastMsg.usuario_id === myId ? 'Você: ' : ''}${lastMsg.conteudo?.trim() || (lastMsg.arquivo_nome ? 'Enviou um arquivo' : '')}`
+              : '';
             return (
               <button
                 key={m.id}
@@ -339,7 +348,9 @@ function MembersList({
                   <p className="text-xs font-medium text-foreground truncate">
                     {m.nome} {isMe && <span className="text-muted-foreground font-normal">(você)</span>}
                   </p>
-                  <p className="text-[10px] text-muted-foreground capitalize truncate">{m.role}</p>
+                  {lastMsgPreview && (
+                    <p className="text-[10px] text-muted-foreground truncate">{lastMsgPreview}</p>
+                  )}
                 </div>
                 {unreadCounts[`dm_${m.id}`] > 0 && (
                   <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
@@ -847,11 +858,33 @@ const Chat = () => {
     },
   });
 
+  const markGroupRead = useMarkGroupMessagesRead();
+
+  // Confirmação de leitura por todos: só se aplica a grupo/geral, onde chat_mensagens.lida
+  // (booleano único) não distingue "um leu" de "todos leram". Só precisamos das leituras
+  // das mensagens que EU enviei nessa conversa — só elas mostram o duplo-check pra mim.
+  const isGroupTarget = target.type === 'grupo' || target.type === 'geral';
+  const myMessageIds = useMemo(
+    () => (isGroupTarget ? (messages ?? []).filter(m => m.usuario_id === myVendedor).map(m => m.id) : []),
+    [isGroupTarget, messages, myVendedor]
+  );
+  const { data: readReceipts = {} } = useMessageReadReceipts(myMessageIds);
+  const expectedReaders = useMemo(() => {
+    if (target.type === 'grupo') return grupoMembros.filter(m => m.id !== myVendedor).map(m => m.id);
+    if (target.type === 'geral') return members.filter(m => m.id !== myVendedor).map(m => m.id);
+    return [];
+  }, [target.type, grupoMembros, members, myVendedor]);
+
   useEffect(() => {
     if (!messages || messages.length === 0) return;
-    
+
     // Mark messages as read when they are loaded in the view
     markAsRead.mutate({ grupoId: activeGrupoId, recipientId: activeRecipientId });
+
+    if (isGroupTarget) {
+      const idsToMark = messages.filter(m => m.usuario_id !== myVendedor).map(m => m.id);
+      if (idsToMark.length > 0) markGroupRead.mutate({ messageIds: idsToMark });
+    }
 
     // Only auto-scroll to bottom if we are already near the bottom or it's the initial load
     // For simplicity, we just scroll down when new messages arrive.
@@ -1192,8 +1225,8 @@ const Chat = () => {
 
   const sortedMembers = useMemo(() => {
     return [...members].sort((a, b) => {
-      const ta = lastActivity[`dm_${a.id}`];
-      const tb = lastActivity[`dm_${b.id}`];
+      const ta = lastActivity[`dm_${a.id}`]?.created_at;
+      const tb = lastActivity[`dm_${b.id}`]?.created_at;
       if (ta && tb) return tb.localeCompare(ta);
       if (ta) return -1;
       if (tb) return 1;
@@ -1203,8 +1236,8 @@ const Chat = () => {
 
   const sortedGrupos = useMemo(() => {
     return [...grupos].sort((a, b) => {
-      const ta = lastActivity[`grupo_${a.id}`];
-      const tb = lastActivity[`grupo_${b.id}`];
+      const ta = lastActivity[`grupo_${a.id}`]?.created_at;
+      const tb = lastActivity[`grupo_${b.id}`]?.created_at;
       if (ta && tb) return tb.localeCompare(ta);
       if (ta) return -1;
       if (tb) return 1;
@@ -1227,6 +1260,7 @@ const Chat = () => {
           geralNome={geralNome}
           geralFotoUrl={geralConfig?.foto_url}
           onlineIds={onlineIds}
+          lastActivity={lastActivity}
         />
 
         <div
@@ -1275,14 +1309,19 @@ const Chat = () => {
                     </>
                   ) : target.type === 'dm' ? (
                     <>
-                      <Avatar className="h-8 w-8 border border-border">
-                        {selectedMemberData.avatar_url && (
-                          <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                      <div className="relative shrink-0">
+                        <Avatar className="h-8 w-8 border border-border">
+                          {selectedMemberData.avatar_url && (
+                            <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                          )}
+                          <AvatarFallback className={`${colorForId(target.memberId)} text-white text-xs`}>
+                            {getInitials(chatHeaderName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {onlineIds.has(target.memberId) && (
+                          <Circle className="absolute -bottom-0.5 -right-0.5 h-3 w-3 fill-emerald-500 text-background stroke-[3]" />
                         )}
-                        <AvatarFallback className={`${colorForId(target.memberId)} text-white text-xs`}>
-                          {getInitials(chatHeaderName)}
-                        </AvatarFallback>
-                      </Avatar>
+                      </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{chatHeaderName}</p>
                         <p className="text-[10px] text-muted-foreground capitalize">{chatHeaderSub}</p>
@@ -1723,6 +1762,12 @@ const Chat = () => {
                         const isMe = msg.usuario_id === myVendedor;
                         const name = msg.vendedor?.nome ?? 'Desconhecido';
                         const showAvatar = i === 0 || group.msgs[i - 1].usuario_id !== msg.usuario_id;
+                        // DM: chat_mensagens.lida já é 1:1 (só existe um destinatário).
+                        // Grupo/geral: só considera "visualizado" quando TODOS os participantes
+                        // esperados já registraram sua leitura em chat_mensagens_leituras.
+                        const isSeen = isGroupTarget
+                          ? expectedReaders.length > 0 && expectedReaders.every(uid => readReceipts[msg.id]?.includes(uid))
+                          : msg.lida;
                         return (
                           <div
                             key={msg.id}
@@ -1856,8 +1901,18 @@ const Chat = () => {
                                 )}
                                 {msg.conteudo && !(msg.arquivo_url && msg.conteudo === msg.arquivo_nome) && msg.conteudo}
                               </div>
-                              <p className={`text-[9px] text-muted-foreground mt-0.5 ${isMe ? 'text-right mr-1' : 'ml-1'}`}>
+                              <p className={`flex items-center gap-0.5 text-[9px] text-muted-foreground mt-0.5 ${isMe ? 'justify-end mr-1' : 'ml-1'}`}>
                                 {format(new Date(msg.created_at), 'HH:mm', { locale: ptBR })}
+                                {isMe && !msg.id.startsWith('temp-') && (
+                                  isSeen ? (
+                                    <CheckCheck
+                                      className="h-3 w-3 text-sky-500"
+                                      title={!isGroupTarget && msg.lida_em ? `Visualizado às ${format(new Date(msg.lida_em), 'HH:mm', { locale: ptBR })}` : 'Visualizado por todos'}
+                                    />
+                                  ) : (
+                                    <Check className="h-3 w-3" title="Enviado" />
+                                  )
+                                )}
                               </p>
                             </div>
                           </div>
