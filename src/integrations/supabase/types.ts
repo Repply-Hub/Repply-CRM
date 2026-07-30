@@ -2042,6 +2042,48 @@ export type Database = {
           },
         ]
       }
+      pedidos_historico_status: {
+        Row: {
+          created_at: string
+          id: string
+          pedido_id: string
+          status_anterior: string | null
+          status_novo: string
+          usuario_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pedido_id: string
+          status_anterior?: string | null
+          status_novo: string
+          usuario_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pedido_id?: string
+          status_anterior?: string | null
+          status_novo?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_historico_status_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_historico_status_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       perfis_customizados: {
         Row: {
           created_at: string

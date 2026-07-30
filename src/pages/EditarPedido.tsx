@@ -18,12 +18,13 @@ import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useObrasByCliente, useTabelaPrecos, useIsGestor } from '@/hooks/use-novo-pedido';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
+import { usePedidoHistoricoStatus } from '@/hooks/use-pedidos';
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesCampos, FIELD_LABELS } from '@/hooks/use-configuracoes-campos';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText, Upload } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText, Upload, History } from 'lucide-react';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { FabricanteSelector } from '@/components/pedidos/FabricanteSelector';
 import { format, parseISO } from 'date-fns';
@@ -69,6 +70,7 @@ const EditarPedido = () => {
   const { data: vendedores } = useVendedores();
   const { data: isGestor } = useIsGestor();
   const { data: kanbanColunas } = useKanbanColunas(undefined, pedidoData?.pedido?.funil_id);
+  const { data: historicoStatus } = usePedidoHistoricoStatus(id ?? null);
   const updatePedido = useUpdatePedidoCompleto();
   const createObraMutation = useCreateObra();
 
@@ -152,6 +154,9 @@ const EditarPedido = () => {
 
   const pedidoStatus = pedidoData?.pedido?.status || '';
   const isClosedStatus = ['fechamento', 'perdido'].includes(pedidoStatus);
+
+  const getStatusLabel = (slug: string) =>
+    kanbanColunas?.find(c => c.slug === slug)?.nome || STATUS_LABELS[slug] || slug;
 
   const handleObraChange = (oid: string) => {
     setObraId(oid);
@@ -764,6 +769,44 @@ const EditarPedido = () => {
                   </Button>
                 </div>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <History className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold">Histórico de Movimentação</h2>
+            </div>
+
+            {!historicoStatus || historicoStatus.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma movimentação registrada ainda.</p>
+            ) : (
+              <ol className="space-y-4">
+                {historicoStatus.map((entry, idx) => (
+                  <li key={entry.id} className="relative pl-6">
+                    {idx < historicoStatus.length - 1 && (
+                      <span className="absolute left-[5px] top-4 bottom-[-16px] w-px bg-border" />
+                    )}
+                    <span className="absolute left-0 top-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                    <p className="text-sm">
+                      {entry.status_anterior ? (
+                        <>
+                          Movido de <span className="font-medium">{getStatusLabel(entry.status_anterior)}</span>{' '}
+                          para <span className="font-medium">{getStatusLabel(entry.status_novo)}</span>
+                        </>
+                      ) : (
+                        <>Negócio criado na etapa <span className="font-medium">{getStatusLabel(entry.status_novo)}</span></>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {format(new Date(entry.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      {entry.usuario?.nome && ` · ${entry.usuario.nome}`}
+                    </p>
+                  </li>
+                ))}
+              </ol>
             )}
           </CardContent>
         </Card>

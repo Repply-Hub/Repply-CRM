@@ -22,6 +22,14 @@ export function autoResizeTextarea(el: HTMLTextAreaElement | null, maxRows = 6) 
   el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
 }
 
+// Usado para não navegar/abrir detalhe ao clicar em linhas de tabela quando o
+// clique foi na verdade o fim de uma seleção de texto (o usuário estava
+// copiando um valor da célula, não tentando abrir o registro).
+export function hasTextSelection() {
+  const selection = window.getSelection();
+  return !!selection && selection.toString().length > 0;
+}
+
 export function slugify(text: string) {
   return text
     .toString()

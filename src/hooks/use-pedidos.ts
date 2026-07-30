@@ -382,6 +382,36 @@ export function useBulkDeletePedidos() {
   });
 }
 
+export interface PedidoHistoricoStatus {
+  id: string;
+  pedido_id: string;
+  status_anterior: string | null;
+  status_novo: string;
+  usuario_id: string | null;
+  usuario: { id: string; nome: string } | null;
+  created_at: string;
+}
+
+// Histórico de movimentação do negócio no Kanban (uma linha por avanço/troca de
+// etapa, incluindo a etapa inicial na criação). Alimentado só por trigger no
+// banco (trg_pedidos_historico_status) — cobre drag-and-drop, edição manual e
+// qualquer outra via de escrita, sem depender do front lembrar de instrumentar.
+export function usePedidoHistoricoStatus(pedidoId: string | null) {
+  return useQuery({
+    queryKey: ['pedido_historico_status', pedidoId],
+    enabled: !!pedidoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pedidos_historico_status')
+        .select('*, usuario:usuarios(id, nome)')
+        .eq('pedido_id', pedidoId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as PedidoHistoricoStatus[];
+    },
+  });
+}
+
 export function useHistoricoContatos(pedidoId: string | null) {
   return useQuery({
     queryKey: ['historico_contatos', pedidoId],

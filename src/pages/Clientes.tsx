@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ArrowUpDown, ChevronDown, FileWarning, Check } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, FileWarning, Check } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
@@ -35,10 +35,11 @@ import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cn
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/shared/ListPagination';
-import { cn, slugify } from '@/lib/utils';
+import { cn, slugify, hasTextSelection } from '@/lib/utils';
 import { ExportClientesButton } from '@/components/clientes/ExportClientesButton';
 import { FilterButton } from '@/components/shared/FilterButton';
 import { StandardPopoverMenu } from '@/components/ui/standard-popover-menu';
+import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
 
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
@@ -247,7 +248,8 @@ const Clientes = () => {
   const deleteContato = useDeleteContato();
   const [search, setSearch] = useState(() => localStorage.getItem('clientes_search') || '');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortColumn, setSortColumn] = useState<string>('empresa');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     const saved = localStorage.getItem('clientes_active_tab');
     return (saved === 'empresas' || saved === 'contatos') ? saved : 'empresas';
@@ -388,31 +390,55 @@ const Clientes = () => {
   const isLoading = activeTab === 'empresas' ? loadingClientes : loadingContatos;
   const totalCount = (clients?.length ?? 0) + (contatosList?.length ?? 0);
 
-  const sortByName = <T extends { empresa?: string | null; nome_contato?: string | null }>(arr: T[], key: 'empresa' | 'nome_contato') => {
-    const dir = sortOrder === 'asc' ? 1 : -1;
-    return [...arr].sort((a, b) => {
-      const av = ((a[key] as string | null | undefined) ?? '').toLowerCase();
-      const bv = ((b[key] as string | null | undefined) ?? '').toLowerCase();
-      return av.localeCompare(bv, 'pt-BR') * dir;
+  // Ordena por qualquer coluna visível (acionado pelo dropdown no cabeçalho da
+  // tabela — ver SortableTh), reaproveitando getColumnValue pra ler o mesmo
+  // valor que é exibido na célula (campos_extras, FKs resolvidas, etc).
+  const sortRows = <T extends Record<string, any>>(rows: T[], colId: string, direction: SortDirection, columnDefs: ColumnDefinition[]) => {
+    const dir = direction === 'asc' ? 1 : -1;
+    const column = columnDefs.find(col => col.id === colId);
+    return [...rows].sort((a, b) => {
+      let av: any = getColumnValue(a, column);
+      let bv: any = getColumnValue(b, column);
+      if (colId === 'tipo') {
+        av = getTipoLabel(a.tipo, customTipos);
+        bv = getTipoLabel(b.tipo, customTipos);
+      }
+      if (colId === 'data_criacao') {
+        const at = av ? new Date(av as string).getTime() : 0;
+        const bt = bv ? new Date(bv as string).getTime() : 0;
+        return (at - bt) * dir;
+      }
+      const as = (av ?? '').toString().toLowerCase();
+      const bs = (bv ?? '').toString().toLowerCase();
+      return as.localeCompare(bs, 'pt-BR') * dir;
     });
   };
 
-  const filteredEmpresas = sortByName(
+  const handleSort = (colId: string, direction: SortDirection) => {
+    setSortColumn(colId);
+    setSortDirection(direction);
+  };
+
+  const filteredEmpresas = sortRows(
     empresas.filter(c => {
       const s = search.toLowerCase();
       const matchSearch = !s || buildRowSearchText(c, getTipoLabel(c.tipo, customTipos)).includes(s);
       const matchTipo = tipoFilter === 'todos' || c.tipo === tipoFilter;
       return matchSearch && matchTipo;
     }),
-    'empresa',
+    sortColumn,
+    sortDirection,
+    empresasSettings.columns,
   );
 
-  const filteredContatos = sortByName(
+  const filteredContatos = sortRows(
     contatos.filter(c => {
       const s = search.toLowerCase();
       return !s || buildRowSearchText(c).includes(s);
     }),
-    'nome_contato',
+    sortColumn,
+    sortDirection,
+    contatosSettings.columns,
   );
 
   const filtered = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
@@ -668,6 +694,8 @@ const Clientes = () => {
     setActiveTab(tab as ViewTab);
     setTipoFilter('todos');
     setSearch('');
+    setSortColumn(tab === 'empresas' ? 'empresa' : 'nome_contato');
+    setSortDirection('asc');
     setPage(1);
     setSelected(new Set());
   };
@@ -780,12 +808,11 @@ const Clientes = () => {
             storageKey="clientes_recent_searches"
           />
 
-          <FilterButton 
+          <FilterButton
             hasFilters={hasFilters}
             activeFilterCount={activeFilterCount}
             onClear={() => {
               setTipoFilter('todos');
-              setSortOrder('asc');
             }}
             popoverClassName="w-64"
           >
@@ -804,7 +831,7 @@ const Clientes = () => {
                   <div className="p-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Selecionar Tipo</p>
-                      <button 
+                      <button
                         className="text-[10px] font-bold text-primary hover:underline"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -826,29 +853,6 @@ const Clientes = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-              </StandardPopoverMenu>
-
-              {/* Submenu Ordenação */}
-              <StandardPopoverMenu
-                label="Ordenação"
-                icon={ArrowUpDown}
-                side="left"
-                align="start"
-                sideOffset={10}
-                popoverClassName="w-60"
-              >
-                <div className="p-3 space-y-3">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Critério</p>
-                  <Select value={sortOrder} onValueChange={(v: 'asc' | 'desc') => setSortOrder(v)}>
-                    <SelectTrigger className="w-full h-9">
-                      <SelectValue placeholder="Ordenar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="asc">Nome (A-Z)</SelectItem>
-                      <SelectItem value="desc">Nome (Z-A)</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </StandardPopoverMenu>
             </div>
@@ -1251,9 +1255,16 @@ const Clientes = () => {
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
                     {visibleColumns.map(colId => (
-                      <th key={colId} className="text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap">
-                        {getLabel(colId)}
-                      </th>
+                      <SortableTh
+                        key={colId}
+                        label={getLabel(colId)}
+                        sortKey={colId}
+                        currentSortKey={sortColumn}
+                        currentDirection={sortDirection}
+                        onSort={handleSort}
+                        ascLabel={colId === 'data_criacao' ? 'Mais antigos primeiro' : 'Ordenar A-Z'}
+                        descLabel={colId === 'data_criacao' ? 'Mais recentes primeiro' : 'Ordenar Z-A'}
+                      />
                     ))}
                   </tr>
                 </thead>
@@ -1272,8 +1283,17 @@ const Clientes = () => {
                     const Icon = getTipoIcon(client.tipo);
                     const camposExtras = (client as any).campos_extras || {};
 
+                    // Se o clique foi o fim de uma seleção de texto (usuário copiando um
+                    // valor da célula), não navega — o resto da linha continua clicável
+                    // normalmente pra abrir o detalhe.
+                    const navigateToDetail = () => {
+                      if (hasTextSelection()) return;
+                      const slug = slugify(client.empresa || 'cliente');
+                      navigate(`/clientes/${slug}-${client.id}`);
+                    };
+
                     return (
-                      <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`}>
+                      <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`} onClick={navigateToDetail}>
                         <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
                           <Checkbox checked={selected.has(client.id)} onCheckedChange={() => toggleOne(client.id)} aria-label={`Selecionar ${client.empresa}`} />
                         </td>
@@ -1281,15 +1301,10 @@ const Clientes = () => {
                           const isCustom = colId.startsWith('custom_');
                           const column = columns.find(col => col.id === colId);
                           let value: any = getColumnValue(client as any, column);
-                          
-                          const navigateToDetail = () => {
-                            const slug = slugify(client.empresa || 'cliente');
-                            navigate(`/clientes/${slug}-${client.id}`);
-                          };
 
                           if (colId === 'empresa') {
                             return (
-                              <td key={colId} className="py-2.5 px-4" onClick={navigateToDetail}>
+                              <td key={colId} className="py-2.5 px-4">
                                 <div className="flex items-center gap-2.5">
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <Icon className="h-4 w-4 text-primary" />
@@ -1302,15 +1317,15 @@ const Clientes = () => {
 
                           if (colId === 'tipo') {
                             return (
-                              <td key={colId} className="py-2.5 px-4" onClick={navigateToDetail}>
+                              <td key={colId} className="py-2.5 px-4">
                                 <Badge variant="secondary" className="text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
                               </td>
                             );
                           }
-                          
+
                           if (colId === 'obras_count') {
                             return (
-                              <td key={colId} className="py-2.5 px-4 text-xs" onClick={navigateToDetail}>
+                              <td key={colId} className="py-2.5 px-4 text-xs">
                                 {client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}
                               </td>
                             );
@@ -1321,7 +1336,7 @@ const Clientes = () => {
                           }
 
                           return (
-                            <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")} onClick={navigateToDetail}>
+                            <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
                               {value || '—'}
                             </td>
                           );
@@ -1356,9 +1371,16 @@ const Clientes = () => {
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
                     {visibleColumns.map(colId => (
-                      <th key={colId} className="text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap">
-                        {getLabel(colId)}
-                      </th>
+                      <SortableTh
+                        key={colId}
+                        label={getLabel(colId)}
+                        sortKey={colId}
+                        currentSortKey={sortColumn}
+                        currentDirection={sortDirection}
+                        onSort={handleSort}
+                        ascLabel={colId === 'data_criacao' ? 'Mais antigos primeiro' : 'Ordenar A-Z'}
+                        descLabel={colId === 'data_criacao' ? 'Mais recentes primeiro' : 'Ordenar Z-A'}
+                      />
                     ))}
                   </tr>
                 </thead>
@@ -1376,9 +1398,15 @@ const Clientes = () => {
                   ) : paginatedContatos.map(contato => {
                     const camposExtras = (contato as any).campos_extras || {};
 
+                    const navigateToContatoDetail = () => {
+                      if (hasTextSelection()) return;
+                      const slug = slugify(contato.nome_contato || 'contato');
+                      navigate(`/contatos/${slug}-${contato.id}`);
+                    };
+
                     return (
-                      <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`}>
-                        <td className="py-2.5 px-4 w-10">
+                      <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`} onClick={navigateToContatoDetail}>
+                        <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
                           <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
                         </td>
                         {visibleColumns.map(colId => {
@@ -1390,12 +1418,8 @@ const Clientes = () => {
                           }
 
                           if (colId === 'nome_contato') {
-                            const navigateToContatoDetail = () => {
-                              const slug = slugify(contato.nome_contato || 'contato');
-                              navigate(`/contatos/${slug}-${contato.id}`);
-                            };
                             return (
-                              <td key={colId} className="py-2.5 px-4" onClick={navigateToContatoDetail}>
+                              <td key={colId} className="py-2.5 px-4">
                                 <div className="flex items-center gap-2.5">
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <User className="h-4 w-4 text-primary" />
@@ -1408,20 +1432,14 @@ const Clientes = () => {
 
                           if (colId === 'empresa') {
                             return (
-                              <td key={colId} className="py-2.5 px-4 text-sm font-medium text-foreground whitespace-nowrap" onClick={() => {
-                                const slug = slugify(contato.nome_contato || 'contato');
-                                navigate(`/contatos/${slug}-${contato.id}`);
-                              }}>
+                              <td key={colId} className="py-2.5 px-4 text-sm font-medium text-foreground whitespace-nowrap">
                                 {value || '—'}
                               </td>
                             );
                           }
 
                           return (
-                            <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")} onClick={() => {
-                              const slug = slugify(contato.nome_contato || 'contato');
-                              navigate(`/contatos/${slug}-${contato.id}`);
-                            }}>
+                            <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
                               {value || '—'}
                             </td>
                           );

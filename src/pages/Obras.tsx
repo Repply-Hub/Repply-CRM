@@ -17,10 +17,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
-import { 
-  Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon, 
+import {
+  Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon,
   LayoutGrid, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2,
-  FileText, ArrowUpDown
+  FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -33,8 +33,9 @@ import { ListPagination } from '@/components/shared/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { MapaObras } from '@/components/obras/MapaObras';
 import { StatusObrasDialog } from '@/components/obras/StatusObrasDialog';
-import { cn } from '@/lib/utils';
+import { cn, hasTextSelection } from '@/lib/utils';
 import { FilterButton } from '@/components/shared/FilterButton';
+import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
 import { supabase } from '@/integrations/supabase/client';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { EnderecoAutocomplete } from '@/components/obras/EnderecoAutocomplete';
@@ -60,8 +61,6 @@ const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'actions', label: 'Ações', locked: false },
 ];
 
-type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc';
-
 export default function Obras() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -73,7 +72,8 @@ export default function Obras() {
   const deleteObrasBulk = useDeleteObrasBulk();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
-  const [sort, setSort] = useState<SortOption>('recent');
+  const [sortColumn, setSortColumn] = useState<string>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [page, setPage] = useState(1);
   const [selectedObra, setSelectedObra] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('lista');
@@ -199,22 +199,34 @@ export default function Obras() {
       list = list.filter((o) => o.status === statusFilter);
     }
 
-    switch (sort) {
-      case 'oldest':
-        list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        break;
-      case 'name_asc':
-        list.sort((a, b) => a.nome_obra.localeCompare(b.nome_obra));
-        break;
-      case 'name_desc':
-        list.sort((a, b) => b.nome_obra.localeCompare(a.nome_obra));
-        break;
-      default:
-        list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
+    const getSortValue = (o: any) => {
+      switch (sortColumn) {
+        case 'status': return getStatusInfo(o.status).label;
+        case 'cliente': return (o.clientes as any)?.empresa;
+        case 'endereco': return o.endereco_entrega || o.nome_obra;
+        case 'spe_cnpj': return o.spe_cnpj;
+        case 'created_at': return o.created_at;
+        case 'nome_obra': return o.nome_obra;
+        default: return o.nome_obra;
+      }
+    };
+
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    list.sort((a, b) => {
+      const av = getSortValue(a);
+      const bv = getSortValue(b);
+      if (sortColumn === 'created_at') {
+        const at = av ? new Date(av).getTime() : 0;
+        const bt = bv ? new Date(bv).getTime() : 0;
+        return (at - bt) * dir;
+      }
+      const as = (av ?? '').toString().toLowerCase();
+      const bs = (bv ?? '').toString().toLowerCase();
+      return as.localeCompare(bs, 'pt-BR') * dir;
+    });
 
     return list;
-  }, [obras, search, statusFilter, sort]);
+  }, [obras, search, statusFilter, sortColumn, sortDirection, statusObras]);
 
   const obrasParaMapa = useMemo(
     () =>
@@ -233,8 +245,9 @@ export default function Obras() {
     [filtered]
   );
 
-  const hasFilters = statusFilter !== 'todos' || sort !== 'recent';
-  const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0) + (sort !== 'recent' ? 1 : 0);
+  const isDefaultSort = sortColumn === 'created_at' && sortDirection === 'desc';
+  const hasFilters = statusFilter !== 'todos' || !isDefaultSort;
+  const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0) + (!isDefaultSort ? 1 : 0);
 
   const paginatedObras = useMemo(() => {
     const startIndex = (page - 1) * pageSize;
@@ -313,12 +326,13 @@ export default function Obras() {
                 className="h-10"
               />
 
-              <FilterButton 
+              <FilterButton
                 hasFilters={hasFilters}
                 activeFilterCount={activeFilterCount}
                 onClear={() => {
                   setStatusFilter('todos');
-                  setSort('recent');
+                  setSortColumn('created_at');
+                  setSortDirection('desc');
                 }}
                 popoverClassName="w-64"
                 align="end"
@@ -336,7 +350,7 @@ export default function Obras() {
                   >
                     <div className="flex flex-col h-full">
                       <div className="p-1 space-y-1">
-                        <div 
+                        <div
                           className={cn(
                             "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
                             statusFilter === 'todos' && "bg-accent text-accent-foreground"
@@ -347,8 +361,8 @@ export default function Obras() {
                           Todos os status
                         </div>
                         {statusObras?.map(status => (
-                          <div 
-                            key={status.slug} 
+                          <div
+                            key={status.slug}
                             className={cn(
                               "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
                               statusFilter === status.slug && "bg-accent text-accent-foreground"
@@ -367,31 +381,6 @@ export default function Obras() {
                           onClick={() => setStatusDialogOpen(true)}
                         />
                       </div>
-                    </div>
-                  </StandardPopoverMenu>
-
-                  {/* Submenu Ordenação */}
-                  <StandardPopoverMenu
-                    label="Ordenação"
-                    icon={ArrowUpDown}
-                    side="left"
-                    align="start"
-                    sideOffset={10}
-                    popoverClassName="w-60"
-                  >
-                    <div className="p-3 space-y-3">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Critério</p>
-                      <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-                        <SelectTrigger className="w-full h-9">
-                          <SelectValue placeholder="Ordenar" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="recent">Mais recentes</SelectItem>
-                          <SelectItem value="oldest">Mais antigas</SelectItem>
-                          <SelectItem value="name_asc">Nome A-Z</SelectItem>
-                          <SelectItem value="name_desc">Nome Z-A</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                   </StandardPopoverMenu>
                 </div>
@@ -445,9 +434,22 @@ export default function Obras() {
                           />
                         </th>
                         {visibleColumns.map(colId => (
-                          <th key={colId} className="text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap">
-                            {getLabel(colId)}
-                          </th>
+                          colId === 'actions' ? (
+                            <th key={colId} className="text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap">
+                              {getLabel(colId)}
+                            </th>
+                          ) : (
+                            <SortableTh
+                              key={colId}
+                              label={getLabel(colId)}
+                              sortKey={colId}
+                              currentSortKey={sortColumn}
+                              currentDirection={sortDirection}
+                              onSort={(key, direction) => { setSortColumn(key); setSortDirection(direction); }}
+                              ascLabel={colId === 'created_at' ? 'Mais antigas primeiro' : 'Ordenar A-Z'}
+                              descLabel={colId === 'created_at' ? 'Mais recentes primeiro' : 'Ordenar Z-A'}
+                            />
+                          )
                         ))}
                       </tr>
                     </thead>
@@ -456,15 +458,22 @@ export default function Obras() {
                         const status = getStatusInfo(obra.status);
                         const cliente = obra.clientes as any;
                         const camposExtras = (obra as any).campos_extras || {};
+                        // Se o clique foi o fim de uma seleção de texto (usuário copiando
+                        // um valor da célula), não abre o painel — o resto da linha
+                        // continua clicável normalmente.
+                        const openDetail = () => {
+                          if (hasTextSelection()) return;
+                          setSelectedObra(obra);
+                        };
 
                         return (
-                          <tr 
-                            key={obra.id} 
+                          <tr
+                            key={obra.id}
                             className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                            onClick={() => setSelectedObra(obra)}
+                            onClick={openDetail}
                           >
                             <td className="py-3 px-4 w-10" onClick={(e) => e.stopPropagation()}>
-                              <Checkbox 
+                              <Checkbox
                                 checked={selectedIds.includes(obra.id)}
                                 onCheckedChange={() => toggleSelect(obra.id)}
                               />
