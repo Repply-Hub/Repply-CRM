@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { resolveClienteId, resolveFabricanteId, resolveObraId, resetResolveCache, preloadResolveCache } from '@/lib/import/resolve-entities';
+import { resolveClienteId, resolveFabricanteId, resolveObraId, resolveMarcadorId, resetResolveCache, preloadResolveCache } from '@/lib/import/resolve-entities';
 import { computeRowHash } from '@/lib/import/row-hash';
 import { resolveEspelhoPdfUrls, type ResolvePdfResult } from '@/lib/import/resolve-pedido-pdf';
 
@@ -236,6 +236,8 @@ export function useBulkImport() {
           const clienteId = await resolveClienteId(clienteNome, vendedorId);
           const fabricanteId = await resolveFabricanteId(fabricanteNome);
           const obraId = obraNome ? await resolveObraId(obraNome, clienteId) : undefined;
+          const marcadorNome = String(row.marcador ?? '').trim();
+          const marcadorId = marcadorNome && empresaId ? await resolveMarcadorId(marcadorNome, empresaId) : undefined;
 
           // Reserva o hash antes do insert — evita duplicatas dentro do próprio arquivo
           if (hash) existingHashes.add(hash);
@@ -261,6 +263,7 @@ export function useBulkImport() {
             prazo_resposta: row.prazo_resposta ?? null,
             created_at: row.created_at ?? undefined,
             status: mapStatus(row.status),
+            marcador_id: marcadorId ?? null,
             usuario_id: (row.usuario_id as string | undefined) ?? vendedorId,
             campos_extras: camposExtras,
             import_hash: hash || null,

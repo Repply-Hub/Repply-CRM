@@ -1,7 +1,7 @@
 import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
 import * as XLSX from 'xlsx';
 
-export type FieldKey = 'negocio' | 'cliente' | 'contato' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'data_pedido' | 'prazo_resposta' | 'pdf_url';
+export type FieldKey = 'negocio' | 'cliente' | 'contato' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'marcador' | 'data_pedido' | 'prazo_resposta' | 'pdf_url';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'negocio', label: 'Negócio', required: false },
@@ -12,6 +12,7 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'valor', label: 'Valor', required: false },
   { key: 'vendedor', label: 'Responsável/Vendedor', required: false },
   { key: 'status', label: 'Etapa', required: false },
+  { key: 'marcador', label: 'Marcador', required: false },
   { key: 'data_pedido', label: 'Criação', required: false },
   { key: 'prazo_resposta', label: 'Fechamento', required: false },
   { key: 'observacoes', label: 'Observações', required: false },
@@ -28,6 +29,7 @@ const EMPTY_MAPPING: Record<FieldKey, string> = {
   vendedor: '',
   observacoes: '',
   status: '',
+  marcador: '',
   data_pedido: '',
   prazo_resposta: '',
   pdf_url: '',
@@ -127,6 +129,14 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /owner/, score: 80 },
     { pattern: /assigned/, score: 75 },
   ],
+  marcador: [
+    { pattern: /^marcador$/, score: 100 },
+    { pattern: /^tag$/, score: 95 },
+    { pattern: /^etiqueta$/, score: 95 },
+    { pattern: /marcador/, score: 85 },
+    { pattern: /etiqueta/, score: 80 },
+    { pattern: /\btag\b/, score: 78 },
+  ],
   observacoes: [
     { pattern: /^observacoes$/, score: 100 },
     { pattern: /observa/, score: 95 },
@@ -162,6 +172,7 @@ const MIN_SCORE: Record<FieldKey, number> = {
   vendedor: 70,
   observacoes: 68,
   status: 70,
+  marcador: 70,
   data_pedido: 70,
   prazo_resposta: 70,
   pdf_url: 70,
@@ -316,6 +327,7 @@ export function getImportedPedidosRows(
       const observacoes = mapping.observacoes ? row[mapping.observacoes]?.toString().trim() || '' : '';
       const pdf_url = mapping.pdf_url ? row[mapping.pdf_url]?.toString().trim() || '' : '';
       const status = mapping.status ? resolveImportedPedidoStatus(row[mapping.status]) : 'novo_lead';
+      const marcador = mapping.marcador ? row[mapping.marcador]?.toString().trim() || '' : '';
       
       let data_pedido = undefined;
       if (mapping.data_pedido && row[mapping.data_pedido]) {
@@ -341,7 +353,7 @@ export function getImportedPedidosRows(
         if (v !== '' && name.trim()) campos_extras[name.trim()] = v;
       });
 
-      return { negocio, cliente, contato, obra, fabricante, valor, vendedor, observacoes, status, data_pedido, prazo_resposta, pdf_url, campos_extras };
+      return { negocio, cliente, contato, obra, fabricante, valor, vendedor, observacoes, status, marcador, data_pedido, prazo_resposta, pdf_url, campos_extras };
     });
 }
 

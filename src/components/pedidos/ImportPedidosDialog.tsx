@@ -43,6 +43,7 @@ const FIELD_EXAMPLES: Partial<Record<FieldKey, string>> = {
   valor: '1500.00',
   vendedor: 'Nome do Vendedor',
   status: 'novo lead',
+  marcador: 'Quente',
   data_pedido: '2026-01-15',
   prazo_resposta: '2026-01-30',
   observacoes: 'Observação livre',
@@ -266,6 +267,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         valor: typeof rest.valor === 'number' ? rest.valor : 0,
         vendedor: rest.vendedor || '',
         status: rest.status || 'novo lead',
+        marcador: rest.marcador || '',
         data_pedido: rest.data_pedido || undefined,
         prazo_resposta: rest.prazo_resposta || undefined,
         observacoes: rest.observacoes || '',
@@ -810,6 +812,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Vendedor</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Valor</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Etapa</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Marcador</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Data</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Obs</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Anexo</TableHead>
@@ -857,6 +860,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                         {r.valor ? r.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{stageLabel(r.status)}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{r.marcador || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
                         {r.data_pedido ? r.data_pedido.split('-').reverse().join('/') : '-'}
                       </TableCell>

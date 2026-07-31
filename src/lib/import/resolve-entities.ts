@@ -6,6 +6,7 @@ const cache = {
   clientes: new Map<string, string>(),
   fabricantes: new Map<string, string>(),
   obras: new Map<string, string>(),
+  marcadores: new Map<string, string>(),
 };
 
 function normalizeKey(name: string): string {
@@ -25,6 +26,21 @@ function dedupeByNormalizedKey(names: string[]): string[] {
 
 function obraKey(clienteId: string, nome: string): string {
   return `${clienteId}::${normalizeKey(nome)}`;
+}
+
+function marcadorKey(empresaId: string, nome: string): string {
+  return `${empresaId}::${normalizeKey(nome)}`;
+}
+
+function slugifyMarcador(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40) || `marcador ${Date.now()}`;
 }
 
 /**
@@ -61,6 +77,7 @@ export function resetResolveCache() {
   cache.clientes.clear();
   cache.fabricantes.clear();
   cache.obras.clear();
+  cache.marcadores.clear();
 }
 
 /**
@@ -273,5 +290,35 @@ export async function resolveObraId(nome: string, clienteId: string): Promise<st
 
   if (error || !created) throw new Error(`Não foi possível criar obra "${nome}": ${error?.message}`);
   cache.obras.set(key, created.id);
+  return created.id;
+}
+
+/**
+ * Busca marcador por nome dentro da empresa; cria se não achar (permitindo que a planilha
+ * introduza marcadores novos, além dos padrão "Quente"/"Frio"/"Futura"). Marcadores são
+ * escopados por empresa, diferente de fabricantes (catálogo compartilhado).
+ */
+export async function resolveMarcadorId(nome: string, empresaId: string): Promise<string> {
+  const key = marcadorKey(empresaId, nome);
+  if (cache.marcadores.has(key)) return cache.marcadores.get(key)!;
+
+  const { data: existing } = await supabase
+    .from('marcadores').select('id').eq('empresa_id', empresaId).ilike('nome', escapeIlikeWildcards(nome)).limit(1).maybeSingle();
+  if (existing) { cache.marcadores.set(key, existing.id); return existing.id; }
+
+  const { data: created, error } = await supabase
+    .from('marcadores')
+    .insert({ empresa_id: empresaId, nome, slug: slugifyMarcador(nome), cor: 'muted-foreground' })
+    .select('id').single();
+
+  if (error || !created) {
+    // Corrida rara: outra linha do mesmo import já criou um marcador com o mesmo slug
+    // entre a checagem acima e este insert — reaproveita o registro em vez de falhar a linha.
+    const { data: raced } = await supabase
+      .from('marcadores').select('id').eq('empresa_id', empresaId).ilike('nome', escapeIlikeWildcards(nome)).limit(1).maybeSingle();
+    if (raced) { cache.marcadores.set(key, raced.id); return raced.id; }
+    throw new Error(`Não foi possível criar marcador "${nome}": ${error?.message}`);
+  }
+  cache.marcadores.set(key, created.id);
   return created.id;
 }
