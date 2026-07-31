@@ -700,25 +700,30 @@ export function useMarkGroupMessagesRead() {
   });
 }
 
-// Mapa mensagem_id -> lista de usuario_id que já a leram, para as mensagens
-// informadas (tipicamente as que EU enviei numa conversa em grupo/geral).
+export interface ChatReadReceipt {
+  usuario_id: string;
+  lida_em: string;
+}
+
+// Mapa mensagem_id -> lista de { usuario_id, lida_em } de quem já a leu, para as
+// mensagens informadas (tipicamente as que EU enviei numa conversa em grupo/geral).
 export function useMessageReadReceipts(messageIds: string[]) {
   const qc = useQueryClient();
   const idsKey = [...messageIds].sort().join(',');
 
-  const query = useQuery<Record<string, string[]>>({
+  const query = useQuery<Record<string, ChatReadReceipt[]>>({
     queryKey: ['chat-read-receipts', idsKey],
     queryFn: async () => {
       if (messageIds.length === 0) return {};
       const { data, error } = await supabase
         .from('chat_mensagens_leituras')
-        .select('mensagem_id, usuario_id')
+        .select('mensagem_id, usuario_id, lida_em')
         .in('mensagem_id', messageIds);
       if (error) throw error;
 
-      const map: Record<string, string[]> = {};
+      const map: Record<string, ChatReadReceipt[]> = {};
       (data ?? []).forEach((r) => {
-        (map[r.mensagem_id] ??= []).push(r.usuario_id);
+        (map[r.mensagem_id] ??= []).push({ usuario_id: r.usuario_id, lida_em: r.lida_em });
       });
       return map;
     },
@@ -731,12 +736,14 @@ export function useMessageReadReceipts(messageIds: string[]) {
     const channel = supabase
       .channel(`chat-read-receipts-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_mensagens_leituras' }, (payload) => {
-        const row = payload.new as { mensagem_id: string; usuario_id: string };
+        const row = payload.new as { mensagem_id: string; usuario_id: string; lida_em: string };
         if (!idsSet.has(row.mensagem_id)) return;
-        qc.setQueryData<Record<string, string[]>>(['chat-read-receipts', idsKey], (old) => {
+        qc.setQueryData<Record<string, ChatReadReceipt[]>>(['chat-read-receipts', idsKey], (old) => {
           const next = { ...(old ?? {}) };
           const list = next[row.mensagem_id] ?? [];
-          if (!list.includes(row.usuario_id)) next[row.mensagem_id] = [...list, row.usuario_id];
+          if (!list.some(r => r.usuario_id === row.usuario_id)) {
+            next[row.mensagem_id] = [...list, { usuario_id: row.usuario_id, lida_em: row.lida_em }];
+          }
           return next;
         });
       })

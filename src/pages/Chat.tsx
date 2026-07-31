@@ -130,7 +130,7 @@ function MembersList({
           >
             <Avatar className="h-7 w-7 border border-border">
               {geralFotoUrl && (
-                <img src={geralFotoUrl} alt={geralNome} className="h-full w-full object-cover" onError={hideOnError} />
+                <img src={geralFotoUrl} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
               )}
               <AvatarFallback className="bg-primary text-primary-foreground text-[8px]">
                 <Users className="h-3.5 w-3.5" />
@@ -154,7 +154,7 @@ function MembersList({
               >
                 <Avatar className="h-7 w-7 border border-border">
                   {g.foto_url && (
-                    <img src={g.foto_url} alt={g.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                    <img src={g.foto_url} alt={g.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                   )}
                   <AvatarFallback className="bg-primary text-primary-foreground text-[8px] font-semibold">
                     <Users2 className="h-3.5 w-3.5" />
@@ -180,7 +180,7 @@ function MembersList({
               >
                 <Avatar className="h-7 w-7 border border-border">
                   {m.avatar_url && (
-                    <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                    <img src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                   )}
                   <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                     {getInitials(m.nome)}
@@ -241,7 +241,7 @@ function MembersList({
               >
                 <Avatar className="h-8 w-8 border border-border">
                   {geralFotoUrl && (
-                    <img src={geralFotoUrl} alt={geralNome} className="h-full w-full object-cover" onError={hideOnError} />
+                    <img src={geralFotoUrl} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                   )}
                   <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
                     <Users className="h-4 w-4" />
@@ -278,7 +278,7 @@ function MembersList({
             >
               <Avatar className="h-8 w-8 border border-border">
                 {g.foto_url && (
-                  <img src={g.foto_url} alt={g.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                  <img src={g.foto_url} alt={g.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                 )}
                 <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
                   <Users2 className="h-4 w-4" />
@@ -334,7 +334,7 @@ function MembersList({
                 <div className="relative">
                   <Avatar className="h-8 w-8 border border-border">
                     {m.avatar_url && (
-                      <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                      <img src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                     )}
                     <AvatarFallback className={`${colorForId(m.id)} text-white text-[10px] font-semibold`}>
                       {getInitials(m.nome)}
@@ -640,6 +640,7 @@ const Chat = () => {
   const deleteGrupo = useDeleteChatGrupo();
   const deleteMessage = useDeleteChatMessage();
   const [msgToDelete, setMsgToDelete] = useState<ChatMessage | null>(null);
+  const [readReceiptsMsg, setReadReceiptsMsg] = useState<ChatMessage | null>(null);
   const addGrupoMembros = useAddChatGrupoMembros();
   const [addMembersOpen, setAddMembersOpen] = useState(false);
   const [addMembersSearch, setAddMembersSearch] = useState('');
@@ -902,6 +903,7 @@ const Chat = () => {
 
   useEffect(() => {
     setRespondendoA(null);
+    setReadReceiptsMsg(null);
   }, [activeGrupoId, activeRecipientId]);
 
   const scrollToBottom = () => {
@@ -1296,7 +1298,7 @@ const Chat = () => {
                     <>
                       <Avatar className="h-8 w-8 border border-border">
                         {activeGrupo?.foto_url && (
-                          <img src={activeGrupo.foto_url} alt={chatHeaderName} className="h-full w-full object-cover" onError={hideOnError} />
+                          <img src={activeGrupo.foto_url} alt={chatHeaderName} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                         )}
                         <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                           <Users2 className="h-4 w-4" />
@@ -1312,7 +1314,7 @@ const Chat = () => {
                       <div className="relative shrink-0">
                         <Avatar className="h-8 w-8 border border-border">
                           {selectedMemberData.avatar_url && (
-                            <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                            <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                           )}
                           <AvatarFallback className={`${colorForId(target.memberId)} text-white text-xs`}>
                             {getInitials(chatHeaderName)}
@@ -1331,7 +1333,7 @@ const Chat = () => {
                     <>
                       <Avatar className="h-8 w-8 border border-border">
                         {geralConfig?.foto_url && (
-                          <img src={geralConfig.foto_url} alt={geralNome} className="h-full w-full object-cover" onError={hideOnError} />
+                          <img src={geralConfig.foto_url} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                         )}
                         <AvatarFallback className="bg-primary text-primary-foreground">
                           <Users className="h-4 w-4" />
@@ -1409,7 +1411,7 @@ const Chat = () => {
                           >
                             <Avatar className="h-14 w-14 border border-border">
                               {activeGrupo?.foto_url && (
-                                <img src={activeGrupo.foto_url} alt={chatHeaderName} className="h-full w-full object-cover" onError={hideOnError} />
+                                <img src={activeGrupo.foto_url} alt={chatHeaderName} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                               )}
                               <AvatarFallback className="bg-primary text-primary-foreground">
                                 <Users2 className="h-6 w-6" />
@@ -1472,7 +1474,7 @@ const Chat = () => {
                                   >
                                     <Avatar className="h-6 w-6 shrink-0 border border-border">
                                       {m.avatar_url && (
-                                        <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                                        <img src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                                       )}
                                       <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                                         {getInitials(m.nome)}
@@ -1510,7 +1512,7 @@ const Chat = () => {
                             >
                               <Avatar className="h-14 w-14 border border-border">
                                 {geralConfig?.foto_url && (
-                                  <img src={geralConfig.foto_url} alt={geralNome} className="h-full w-full object-cover" onError={hideOnError} />
+                                  <img src={geralConfig.foto_url} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                                 )}
                                 <AvatarFallback className="bg-primary text-primary-foreground">
                                   <Users className="h-6 w-6" />
@@ -1561,7 +1563,7 @@ const Chat = () => {
                                   >
                                     <Avatar className="h-6 w-6 shrink-0 border border-border">
                                       {m.avatar_url && (
-                                        <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                                        <img src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                                       )}
                                       <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                                         {getInitials(m.nome)}
@@ -1766,7 +1768,7 @@ const Chat = () => {
                         // Grupo/geral: só considera "visualizado" quando TODOS os participantes
                         // esperados já registraram sua leitura em chat_mensagens_leituras.
                         const isSeen = isGroupTarget
-                          ? expectedReaders.length > 0 && expectedReaders.every(uid => readReceipts[msg.id]?.includes(uid))
+                          ? expectedReaders.length > 0 && expectedReaders.every(uid => readReceipts[msg.id]?.some(r => r.usuario_id === uid))
                           : msg.lida;
                         return (
                           <div
@@ -1777,7 +1779,7 @@ const Chat = () => {
                             {showAvatar ? (
                               <Avatar className="h-8 w-8 shrink-0 border border-border">
                                 {msg.vendedor?.avatar_url && (
-                                  <img src={msg.vendedor.avatar_url} alt={name} className="h-full w-full object-cover" onError={hideOnError} />
+                                  <img src={msg.vendedor.avatar_url} alt={name} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                                 )}
                                 <AvatarFallback className={`${colorForId(msg.usuario_id)} text-white text-xs`}>
                                   {getInitials(name)}
@@ -1829,8 +1831,14 @@ const Chat = () => {
                                       </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
+                                      {isGroupTarget && (
+                                        <DropdownMenuItem onClick={() => setReadReceiptsMsg(msg)}>
+                                          <CheckCheck className="h-3.5 w-3.5 mr-2" />
+                                          Dados da mensagem
+                                        </DropdownMenuItem>
+                                      )}
                                       <DropdownMenuItem
-                                        className="text-destructive focus:text-destructive"
+                                        className="bg-destructive text-white focus:bg-destructive/90 focus:text-white"
                                         onClick={() => setMsgToDelete(msg)}
                                       >
                                         <Trash2 className="h-3.5 w-3.5 mr-2" />
@@ -1956,6 +1964,80 @@ const Chat = () => {
             </AlertDialogContent>
           </AlertDialog>
 
+          <Sheet open={!!readReceiptsMsg} onOpenChange={(open) => !open && setReadReceiptsMsg(null)}>
+            <SheetContent className="w-full sm:max-w-sm flex flex-col p-0">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle>Visualizado por</SheetTitle>
+                {readReceiptsMsg && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    {readReceiptsMsg.conteudo || readReceiptsMsg.arquivo_nome || 'Mensagem'}
+                  </p>
+                )}
+              </SheetHeader>
+              <ScrollArea className="flex-1">
+                {(() => {
+                  if (!readReceiptsMsg) return null;
+                  const directory = target.type === 'grupo' ? grupoMembros : members;
+                  const receipts = readReceipts[readReceiptsMsg.id] ?? [];
+                  const receiptByUser = new Map(receipts.map(r => [r.usuario_id, r.lida_em]));
+                  const readList = expectedReaders
+                    .filter(uid => receiptByUser.has(uid))
+                    .map(uid => ({ vendedor: directory.find(v => v.id === uid), lida_em: receiptByUser.get(uid)! }))
+                    .filter((r): r is { vendedor: Vendedor; lida_em: string } => !!r.vendedor)
+                    .sort((a, b) => new Date(b.lida_em).getTime() - new Date(a.lida_em).getTime());
+                  const unreadList = expectedReaders
+                    .filter(uid => !receiptByUser.has(uid))
+                    .map(uid => directory.find(v => v.id === uid))
+                    .filter((v): v is Vendedor => !!v)
+                    .sort((a, b) => a.nome.localeCompare(b.nome));
+
+                  const renderRow = (vendedor: Vendedor, subtitle: string) => (
+                    <div key={vendedor.id} className="flex items-center gap-3 px-4 py-2">
+                      <Avatar className="h-9 w-9 shrink-0 border border-border">
+                        {vendedor.avatar_url && (
+                          <img src={vendedor.avatar_url} alt={vendedor.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                        )}
+                        <AvatarFallback className={`${colorForId(vendedor.id)} text-white text-xs`}>
+                          {getInitials(vendedor.nome)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm truncate">{vendedor.nome}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
+                      </div>
+                    </div>
+                  );
+
+                  return (
+                    <div className="py-2">
+                      {readList.length > 0 && (
+                        <div className="mb-2">
+                          <p className="px-4 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                            Lido por {readList.length}
+                          </p>
+                          {readList.map(({ vendedor, lida_em }) =>
+                            renderRow(vendedor, format(new Date(lida_em), "d 'de' MMM 'às' HH:mm", { locale: ptBR }))
+                          )}
+                        </div>
+                      )}
+                      {unreadList.length > 0 && (
+                        <div>
+                          <p className="px-4 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                            Ainda não visualizado {unreadList.length}
+                          </p>
+                          {unreadList.map((vendedor) => renderRow(vendedor, 'Não visualizado'))}
+                        </div>
+                      )}
+                      {readList.length === 0 && unreadList.length === 0 && (
+                        <p className="px-4 py-6 text-sm text-muted-foreground text-center">Nenhum participante encontrado.</p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </ScrollArea>
+            </SheetContent>
+          </Sheet>
+
           <Dialog open={addMembersOpen} onOpenChange={(v) => { setAddMembersOpen(v); if (!v) { setSelectedNewMembers([]); setAddMembersSearch(''); } }}>
             <DialogContent>
               <DialogHeader>
@@ -2011,7 +2093,7 @@ const Chat = () => {
                           />
                           <Avatar className="h-7 w-7 border border-border">
                             {m.avatar_url && (
-                              <img src={m.avatar_url} alt={m.nome} className="h-full w-full object-cover" onError={hideOnError} />
+                              <img src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                             )}
                             <AvatarFallback className={`${colorForId(m.id)} text-white text-[9px] font-semibold`}>
                               {getInitials(m.nome)}

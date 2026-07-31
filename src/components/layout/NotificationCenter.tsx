@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Bell, CheckCheck, MessageCircle } from 'lucide-react';
+import { Bell, CheckCheck, MessageCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -175,9 +175,24 @@ export function NotificationCenter() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className={cn("text-sm leading-tight", !n.lida && "font-medium")}>{n.titulo}</p>
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap mt-0.5">
-                        {formatTime(n.created_at)}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap mt-0.5">
+                          {formatTime(n.created_at)}
+                        </span>
+                        {!n.lida && (
+                          <span
+                            role="button"
+                            aria-label="Fechar notificação"
+                            className="p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markRead.mutate(n.id);
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {n.mensagem && (
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.mensagem}</p>
