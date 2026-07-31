@@ -40,10 +40,12 @@ import {
   useCreatePreco,
   useUpdatePreco,
   useDeletePreco,
+  useBulkDeletePrecos,
   useUpdateFabricante,
   useDeleteFabricante,
   useCategorias,
 } from "@/hooks/use-fabricantes";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus,
   Loader2,
@@ -61,6 +63,7 @@ import {
   Upload,
   ImageIcon,
   Eye,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -429,6 +432,8 @@ const Fabricantes = () => {
   const [newCategoryName, setNewCategoryName] = useState("");
 
   const [globalImportOpen, setGlobalImportOpen] = useState(false);
+  const [selectedPrecoIds, setSelectedPrecoIds] = useState<string[]>([]);
+  const [confirmBulkDeletePrecos, setConfirmBulkDeletePrecos] = useState(false);
   const [deleteAlert, setDeleteAlert] = useState<{
     type: "fab" | "preco";
     id: string;
@@ -457,6 +462,7 @@ const Fabricantes = () => {
 
   const deleteFabricante = useDeleteFabricante();
   const deletePreco = useDeletePreco();
+  const bulkDeletePrecos = useBulkDeletePrecos();
   const { data: precos, isLoading: loadingPrecos } =
     useTabelaPrecos(selectedFabId);
 
@@ -479,6 +485,35 @@ const Fabricantes = () => {
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
+  };
+
+  useEffect(() => {
+    setSelectedPrecoIds([]);
+  }, [selectedFabId]);
+
+  const togglePrecoSelection = (id: string) => {
+    setSelectedPrecoIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAllPrecos = () => {
+    setSelectedPrecoIds((prev) =>
+      prev.length === precosFiltrados.length
+        ? []
+        : precosFiltrados.map((p: any) => p.id),
+    );
+  };
+
+  const handleBulkDeletePrecos = async () => {
+    try {
+      await bulkDeletePrecos.mutateAsync(selectedPrecoIds);
+      toast.success(`${selectedPrecoIds.length} produto(s) excluído(s) com sucesso!`);
+      setSelectedPrecoIds([]);
+      setConfirmBulkDeletePrecos(false);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao excluir produtos em massa");
+    }
   };
 
   const handleDelete = async () => {
@@ -708,6 +743,33 @@ const Fabricantes = () => {
                           <span>Importar</span>
                         </Button>
 
+                        {selectedPrecoIds.length > 0 && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setSelectedPrecoIds([])}
+                              className="gap-1.5 h-9"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              <span>Cancelar</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={bulkDeletePrecos.isPending}
+                              onClick={() => setConfirmBulkDeletePrecos(true)}
+                              className="gap-1.5 h-9"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>
+                                Excluir Selecionados (
+                                {selectedPrecoIds.length})
+                              </span>
+                            </Button>
+                          </>
+                        )}
+
                         <Button
                           size="sm"
                           onClick={() => {
@@ -732,6 +794,17 @@ const Fabricantes = () => {
                         <Table>
                           <TableHeader className="sticky top-0 bg-background/95 backdrop-blur z-10 shadow-sm">
                             <TableRow className="bg-muted/30 hover:bg-muted/30">
+                              <TableHead className="w-10 px-4 py-3">
+                                <Checkbox
+                                  checked={
+                                    precosFiltrados.length > 0 &&
+                                    selectedPrecoIds.length ===
+                                      precosFiltrados.length
+                                  }
+                                  onCheckedChange={toggleSelectAllPrecos}
+                                  aria-label="Selecionar todos"
+                                />
+                              </TableHead>
                               {visiblePrecoColumns.map((colId) => (
                                 <TableHead
                                   key={colId}
@@ -750,7 +823,23 @@ const Fabricantes = () => {
                             {precosFiltrados.map((p: any) => {
                               const camposExtras = p.campos_extras || {};
                               return (
-                                <TableRow key={p.id} className="group">
+                                <TableRow
+                                  key={p.id}
+                                  className={cn(
+                                    "group",
+                                    selectedPrecoIds.includes(p.id) &&
+                                      "bg-primary/5",
+                                  )}
+                                >
+                                  <TableCell className="w-10 px-4">
+                                    <Checkbox
+                                      checked={selectedPrecoIds.includes(p.id)}
+                                      onCheckedChange={() =>
+                                        togglePrecoSelection(p.id)
+                                      }
+                                      aria-label="Selecionar produto"
+                                    />
+                                  </TableCell>
                                   {visiblePrecoColumns.map((colId) => {
                                     const isCustom =
                                       colId.startsWith("custom_");
@@ -882,7 +971,8 @@ const Fabricantes = () => {
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
                                                   setEditPreco(p);
                                                   setPrecoDialog(true);
                                                 }}
@@ -1055,6 +1145,38 @@ const Fabricantes = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmBulkDeletePrecos}
+        onOpenChange={setConfirmBulkDeletePrecos}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Excluir {selectedPrecoIds.length} produtos?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todos os{" "}
+              {selectedPrecoIds.length} produtos selecionados serão removidos
+              permanentemente do catálogo deste fabricante.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDeletePrecos}
+              disabled={bulkDeletePrecos.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeletePrecos.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Excluir Todos"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
