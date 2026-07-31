@@ -12,13 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -84,9 +77,14 @@ export function EventDialog({
   const { user } = useAuth();
   const { data: usuarios, refetch: refetchUsuarios } = useVendedores();
 
-  // Funcionários da empresa, exceto o próprio usuário logado
+  // Funcionários da empresa, incluindo o próprio usuário logado (aparece como "Você", no topo)
   const funcionariosDisponiveis = useMemo(() => {
-    return (usuarios ?? []).filter((u: { user_id: string | null }) => u.user_id && u.user_id !== user?.id);
+    const lista = (usuarios ?? []).filter((u: { user_id: string | null }) => u.user_id);
+    return [...lista].sort((a: { user_id: string }, b: { user_id: string }) => {
+      if (a.user_id === user?.id) return -1;
+      if (b.user_id === user?.id) return 1;
+      return 0;
+    });
   }, [usuarios, user?.id]);
 
   useEffect(() => {
@@ -116,9 +114,13 @@ export function EventDialog({
         lembreteMinutos: editingEvent.lembreteMinutos ?? null,
       });
     } else {
-      setForm({ ...defaultForm(), ...initialData });
+      setForm({
+        ...defaultForm(),
+        participantes: user?.id ? [user.id] : [],
+        ...initialData,
+      });
     }
-  }, [open, editingEvent, initialData]);
+  }, [open, editingEvent, initialData, user?.id]);
 
   const set = <K extends keyof EventoForm>(key: K, value: EventoForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -191,20 +193,15 @@ export function EventDialog({
           </div>
 
           {/* Tipo de calendário */}
-          <div className="space-y-1.5">
-            <Label>Calendário</Label>
-            <Select
-              value={form.tipoCalendario}
-              onValueChange={(v) => handleCalendarTypeChange(v as CalendarType)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pessoal">Meu calendário</SelectItem>
-                <SelectItem value="empresa">Calendário da empresa</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="disponivel-empresa" className="cursor-pointer">
+              Disponibilizar este evento para toda a empresa
+            </Label>
+            <Switch
+              id="disponivel-empresa"
+              checked={form.tipoCalendario === 'empresa'}
+              onCheckedChange={(v) => handleCalendarTypeChange(v ? 'empresa' : 'pessoal')}
+            />
           </div>
 
           {/* Participantes (só ao criar) */}
@@ -241,17 +238,18 @@ export function EventDialog({
                       </CommandEmpty>
                       <CommandGroup>
                         {funcionariosDisponiveis.map((u: { id: string; user_id: string; nome: string; email: string }) => {
+                          const isSelf = u.user_id === user?.id;
                           const checked = participantesSelecionados.includes(u.user_id);
                           return (
                             <CommandItem
                               key={u.id}
-                              value={`${u.nome} ${u.email}`}
+                              value={isSelf ? `Você ${u.nome} ${u.email}` : `${u.nome} ${u.email}`}
                               onSelect={() => toggleParticipante(u.user_id)}
                               className="gap-2"
                             >
                               <Checkbox checked={checked} className="pointer-events-none" />
                               <div className="flex-1 min-w-0">
-                                <div className="truncate">{u.nome}</div>
+                                <div className="truncate">{isSelf ? 'Você' : u.nome}</div>
                                 <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                               </div>
                               {checked && <Check className="h-4 w-4 text-primary shrink-0" />}
@@ -269,9 +267,10 @@ export function EventDialog({
                   {participantesSelecionados.map((uid) => {
                     const u = funcionariosDisponiveis.find((x: { user_id: string }) => x.user_id === uid) as { nome: string } | undefined;
                     if (!u) return null;
+                    const isSelf = uid === user?.id;
                     return (
                       <Badge key={uid} variant="secondary" className="gap-1">
-                        {u.nome}
+                        {isSelf ? 'Você' : u.nome}
                         <button
                           type="button"
                           className="ml-1 hover:text-destructive"

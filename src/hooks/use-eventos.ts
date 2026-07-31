@@ -178,8 +178,12 @@ export function useCreateEvento() {
         ? new Date(form.fim + 'T23:59:59').toISOString()
         : new Date(form.fim).toISOString();
 
-      // Sempre cria para o próprio usuário + cada participante selecionado.
-      const targets = new Set<string>([user!.id, ...(form.participantes ?? [])]);
+      // Cria uma linha por participante selecionado no formulário (o próprio
+      // usuário pode se incluir ou se remover explicitamente). Se ninguém
+      // ficar selecionado, cai de volta para o criador, evitando um evento
+      // órfão que não aparece em calendário nenhum.
+      const selecionados = form.participantes ?? [];
+      const targets = new Set<string>(selecionados.length > 0 ? selecionados : [user!.id]);
 
       const rows = Array.from(targets).map((uid) => ({
         user_id: uid,
