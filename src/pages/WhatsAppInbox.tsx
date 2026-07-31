@@ -3271,6 +3271,13 @@ export default function WhatsAppInbox() {
       conversaId: conv.id,
       texto: `${profile.nome ?? "Alguém"} assumiu esta conversa`,
     });
+    // Conversa sem responsável nunca zera nao_lidas sozinha ao ser aberta (só o
+    // próprio responsável dispara esse reset, ver efeito de `marcarLida` abaixo)
+    // — então assumir precisa zerar na hora, senão o contador fica preso mesmo
+    // já tendo sido lida por quem assumiu.
+    if (conv.nao_lidas > 0 || conv.nao_lidas_forcada) {
+      marcarLida.mutate(conv.id);
+    }
   }
 
   function direcionarConversa(conv: WaConversa, usuarioId: string) {
