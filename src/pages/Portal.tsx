@@ -694,10 +694,10 @@ export default function Portal() {
   };
 
   return (
-    <AppLayout title="Portal de Consultas" subtitle="Consulte licenças e publicações oficiais de órgãos públicos.">
-      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <AppLayout title="Portal de Consultas" subtitle="Consulte licenças e publicações oficiais de órgãos públicos." mainClassName="flex-1 overflow-hidden flex flex-col">
+      <div className="p-3 sm:p-4 md:p-6 flex flex-col flex-1 min-h-0 gap-4 sm:gap-6">
         {/* Search bar */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -744,7 +744,7 @@ export default function Portal() {
         </div>
 
         {/* Site cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 flex-1 min-h-0 overflow-y-auto content-start">
           {SITES.map((site) => {
             const res = results[site.id];
             const isBusy = loading[site.id] || scraping[site.id];

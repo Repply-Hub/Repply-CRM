@@ -826,8 +826,8 @@ const Clientes = () => {
 
 
   return (
-    <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`}>
-      <div className="p-6 w-full">
+    <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`} mainClassName="flex-1 overflow-hidden flex flex-col">
+      <div className="p-6 w-full flex-1 flex flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <TabsList className={cn(TOGGLE_LIST_CLASS, 'shrink-0')}>
@@ -1288,11 +1288,11 @@ const Clientes = () => {
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : activeTab === 'empresas' ? (
           <>
-            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-x-auto">
+            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-auto flex-1 min-h-0">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-muted">
                   <tr className="border-b bg-muted/50">
-                    <th className="py-2.5 px-4 w-10">
+                    <th className="h-14 px-2.5 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
                     {visibleColumns.map(colId => (
@@ -1345,7 +1345,7 @@ const Clientes = () => {
 
                     return (
                       <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`} onClick={openEmpresaPainel}>
-                        <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
+                        <td className="py-1.5 px-2.5 w-10" onClick={e => e.stopPropagation()}>
                           <Checkbox checked={selected.has(client.id)} onCheckedChange={() => toggleOne(client.id)} aria-label={`Selecionar ${client.empresa}`} />
                         </td>
                         {visibleColumns.map(colId => {
@@ -1355,7 +1355,7 @@ const Clientes = () => {
 
                           if (colId === 'empresa') {
                             return (
-                              <td key={colId} className="py-2.5 px-4">
+                              <td key={colId} className="py-1.5 px-2.5">
                                 <div className="flex items-center gap-2.5">
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <Icon className="h-4 w-4 text-primary" />
@@ -1368,7 +1368,7 @@ const Clientes = () => {
 
                           if (colId === 'tipo') {
                             return (
-                              <td key={colId} className="py-2.5 px-4">
+                              <td key={colId} className="py-1.5 px-2.5">
                                 <Badge variant="secondary" className="text-[10px] font-medium" onClick={onTextClick}>{getTipoLabel(client.tipo, customTipos)}</Badge>
                               </td>
                             );
@@ -1376,7 +1376,7 @@ const Clientes = () => {
 
                           if (colId === 'obras_count') {
                             return (
-                              <td key={colId} className="py-2.5 px-4 text-xs">
+                              <td key={colId} className="py-1.5 px-2.5 text-xs">
                                 <span onClick={onTextClick}>
                                   {client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}
                                 </span>
@@ -1389,7 +1389,7 @@ const Clientes = () => {
                           }
 
                           return (
-                            <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
+                            <td key={colId} className={cn("py-1.5 px-2.5 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
                               <span onClick={onTextClick}>{value || '—'}</span>
                             </td>
                           );
@@ -1416,11 +1416,11 @@ const Clientes = () => {
           </>
         ) : (
           <>
-            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-x-auto">
+            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-auto flex-1 min-h-0">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-muted">
                   <tr className="border-b bg-muted/50">
-                    <th className="py-2.5 px-4 w-10">
+                    <th className="h-14 px-2.5 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
                     {visibleColumns.map(colId => (
@@ -1469,7 +1469,7 @@ const Clientes = () => {
 
                     return (
                       <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`} onClick={openContatoPainel}>
-                        <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
+                        <td className="py-1.5 px-2.5 w-10" onClick={e => e.stopPropagation()}>
                           <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
                         </td>
                         {visibleColumns.map(colId => {
@@ -1482,7 +1482,7 @@ const Clientes = () => {
 
                           if (colId === 'nome_contato') {
                             return (
-                              <td key={colId} className="py-2.5 px-4">
+                              <td key={colId} className="py-1.5 px-2.5">
                                 <div className="flex items-center gap-2.5">
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <User className="h-4 w-4 text-primary" />
@@ -1495,14 +1495,14 @@ const Clientes = () => {
 
                           if (colId === 'empresa') {
                             return (
-                              <td key={colId} className="py-2.5 px-4 text-sm font-medium text-foreground whitespace-nowrap">
+                              <td key={colId} className="py-1.5 px-2.5 text-sm font-medium text-foreground whitespace-nowrap">
                                 <span onClick={onTextClick}>{value || '—'}</span>
                               </td>
                             );
                           }
 
                           return (
-                            <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
+                            <td key={colId} className={cn("py-1.5 px-2.5 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
                               <span onClick={onTextClick}>{value || '—'}</span>
                             </td>
                           );

@@ -294,11 +294,11 @@ export default function Tarefas() {
     <AppLayout
       title="Tarefas"
       subtitle={`${filtered.length} tarefa(s)`}
-      mainClassName={view === 'kanban' ? 'flex-1 overflow-hidden flex flex-col' : 'flex-1 overflow-auto'}
+      mainClassName="flex-1 overflow-hidden flex flex-col"
     >
-      <div className={view === 'kanban' ? 'flex flex-col flex-1 min-h-0 p-3 sm:p-4 md:p-6' : 'p-3 sm:p-4 md:p-6 w-full space-y-4 md:space-y-6'}>
+      <div className="flex flex-col flex-1 min-h-0 p-3 sm:p-4 md:p-6">
         {/* Filters & Actions */}
-        <div className={cn('flex flex-wrap items-center gap-2 sm:gap-3', view === 'kanban' && 'mb-3 shrink-0')}>
+        <div className={cn('flex flex-wrap items-center gap-2 sm:gap-3 shrink-0', view === 'kanban' ? 'mb-3' : 'mb-4 md:mb-6')}>
           <div className="inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5">
             <Button
               variant={view === 'kanban' ? 'default' : 'ghost'}
@@ -492,9 +492,9 @@ export default function Tarefas() {
             </div>
           </DragDropContext>
         ) : (
-          <div className="space-y-3 md:space-y-0">
+          <div className="flex-1 flex flex-col min-h-0">
             {/* Mobile: card layout */}
-            <div className="block md:hidden space-y-3">
+            <div className="block md:hidden space-y-3 flex-1 min-h-0 overflow-y-auto">
               {paginated.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground text-sm">Nenhuma tarefa encontrada</div>
               ) : paginated.map(t => {
@@ -536,19 +536,19 @@ export default function Tarefas() {
             </div>
 
             {/* Desktop: table layout */}
-            <div className="hidden md:block rounded-xl border border-border/60 border-b-0 rounded-b-none overflow-x-auto shadow-[var(--shadow-card)]">
-              <Table>
-                <TableHeader>
+            <div className="hidden md:flex flex-col rounded-xl border border-border/60 border-b-0 rounded-b-none overflow-hidden shadow-[var(--shadow-card)] flex-1 min-h-0">
+              <Table wrapperClassName="flex-1 min-h-0">
+                <TableHeader className="sticky top-0 z-10 bg-muted">
                   <TableRow className="bg-muted/50 border-b border-border/60">
-                    <TableHead className="w-10">
+                    <TableHead className="w-10 h-14 px-2.5">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </TableHead>
                     {visibleColumns.map(colId => (
-                      <TableHead key={colId} className={cn("text-xs font-semibold whitespace-nowrap px-4 py-3", (colId === 'responsavel' || colId === 'prazo_final') && "hidden lg:table-cell", colId === 'projeto' && "hidden xl:table-cell")}>
+                      <TableHead key={colId} className={cn("text-xs font-semibold whitespace-nowrap h-14 px-2.5", (colId === 'responsavel' || colId === 'prazo_final') && "hidden lg:table-cell", colId === 'projeto' && "hidden xl:table-cell")}>
                         {getLabel(colId)}
                       </TableHead>
                     ))}
-                    <TableHead className="w-[80px] text-xs font-semibold whitespace-nowrap px-4 py-3">Ações</TableHead>
+                    <TableHead className="w-[80px] text-xs font-semibold whitespace-nowrap h-14 px-2.5">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -559,13 +559,13 @@ export default function Tarefas() {
                     const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
                     return (
                       <TableRow key={t.id} onClick={() => openDetails(t)} className={`hover:bg-muted/30 transition-colors cursor-pointer ${selected.has(t.id) ? 'bg-primary/5' : ''}`}>
-                        <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                        <TableCell className="w-10 py-2 px-2.5" onClick={(e) => e.stopPropagation()}>
                           <Checkbox checked={selected.has(t.id)} onCheckedChange={() => toggleOne(t.id)} aria-label={`Selecionar ${t.titulo}`} />
                         </TableCell>
                         {visibleColumns.map(colId => {
                           if (colId === 'titulo') {
                             return (
-                              <TableCell key={colId} className="max-w-[300px]">
+                              <TableCell key={colId} className="max-w-[300px] py-2 px-2.5">
                                 <p className="font-semibold text-sm text-card-foreground">{t.titulo}</p>
                                 {visibleColumns.includes('projeto') && t.projeto && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.projeto}</p>}
                                 {visibleColumns.includes('responsavel') && t.responsavel && <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{t.responsavel}</p>}
@@ -575,13 +575,13 @@ export default function Tarefas() {
 
                           if (colId === 'responsavel') {
                             return (
-                              <TableCell key={colId} className="hidden lg:table-cell text-sm whitespace-nowrap" onClick={(e) => t.responsavel && e.stopPropagation()}>{t.responsavel ? <UserProfilePopover name={t.responsavel} /> : '—'}</TableCell>
+                              <TableCell key={colId} className="hidden lg:table-cell text-sm whitespace-nowrap py-2 px-2.5" onClick={(e) => t.responsavel && e.stopPropagation()}>{t.responsavel ? <UserProfilePopover name={t.responsavel} /> : '—'}</TableCell>
                             );
                           }
 
                           if (colId === 'prazo_final') {
                             return (
-                              <TableCell key={colId} className={`hidden lg:table-cell text-sm whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : ''}`}>
+                              <TableCell key={colId} className={`hidden lg:table-cell text-sm whitespace-nowrap py-2 px-2.5 ${isOverdue ? 'text-destructive font-medium' : ''}`}>
                                 {t.prazo_final ? format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR }) : '—'}
                               </TableCell>
                             );
@@ -589,7 +589,7 @@ export default function Tarefas() {
 
                           if (colId === 'status') {
                             return (
-                              <TableCell key={colId}>
+                              <TableCell key={colId} className="py-2 px-2.5">
                                 <Badge className={`whitespace-nowrap text-[11px] border ${si.className}`}>{si.label}</Badge>
                               </TableCell>
                             );
@@ -597,13 +597,13 @@ export default function Tarefas() {
 
                           if (colId === 'projeto') {
                             return (
-                              <TableCell key={colId} className="hidden xl:table-cell text-sm text-muted-foreground truncate max-w-[180px]">{t.projeto || '—'}</TableCell>
+                              <TableCell key={colId} className="hidden xl:table-cell text-sm text-muted-foreground truncate max-w-[180px] py-2 px-2.5">{t.projeto || '—'}</TableCell>
                             );
                           }
 
                           return null;
                         })}
-                        <TableCell onClick={(e) => e.stopPropagation()}>
+                        <TableCell className="py-2 px-2.5" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-0.5">
                             <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/5" onClick={() => openEdit(t)}>
                               <Pencil className="h-4 w-4 text-muted-foreground" />
@@ -629,7 +629,7 @@ export default function Tarefas() {
               }}
               itemLabel="tarefa"
               itemLabelPlural="tarefas"
-              className="rounded-xl border border-border/60 bg-card px-3 py-3 shadow-[var(--shadow-card)] md:rounded-t-none md:border-t-0 md:shadow-none"
+              className="shrink-0 mt-3 md:mt-0 rounded-xl border border-border/60 bg-card px-3 py-3 shadow-[var(--shadow-card)] md:rounded-t-none md:border-t-0 md:shadow-none"
             />
           </div>
         )}

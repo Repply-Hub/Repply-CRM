@@ -32,7 +32,7 @@ export const SortableTh = memo(function SortableTh({
   const isActive = currentSortKey === sortKey;
 
   return (
-    <th className={cn('text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap', className)}>
+    <th className={cn('text-left h-14 px-2.5 font-semibold text-muted-foreground text-xs whitespace-nowrap', className)}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button

@@ -191,18 +191,19 @@ export default function LinhasIgnoradas() {
     <AppLayout
       title="Linhas Ignoradas na Importação"
       subtitle="Revise e ajuste dados que não puderam ser importados automaticamente"
+      mainClassName="flex-1 overflow-hidden flex flex-col"
     >
-      <div className="p-6 space-y-6">
+      <div className="p-6 flex flex-col flex-1 min-h-0 gap-6">
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-2"
+          className="-ml-2 shrink-0 self-start"
           onClick={() => navigate('/')}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar para Negócios
         </Button>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2 text-muted-foreground">
             <AlertTriangle className="h-5 w-5 text-warning" />
             <span>{linhas?.count ?? 0} linhas pendentes de revisão</span>
@@ -227,7 +228,7 @@ export default function LinhasIgnoradas() {
             Nenhuma linha ignorada encontrada.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 flex-1 min-h-0 overflow-y-auto">
             {Array.from(fileGroups.entries()).map(([fileKey, fileLinhas]) => {
               const isFileOpen = openFiles.has(fileKey);
               const tipos = Array.from(new Set(fileLinhas.map(l => l.tipo_importacao)));

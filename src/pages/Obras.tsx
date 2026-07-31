@@ -297,9 +297,10 @@ export default function Obras() {
           <p className="text-[10px] sm:text-sm text-muted-foreground truncate">Gerencie e acompanhe todas as obras cadastradas.</p>
         </div>
       }
+      mainClassName="flex-1 overflow-hidden flex flex-col"
     >
-      <div className="p-4 md:p-6 space-y-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <div className="p-4 md:p-6 space-y-6 flex-1 flex flex-col min-h-0">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 flex-1 flex flex-col min-h-0">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex flex-1 items-center gap-3">
               <TabsList className={cn(TOGGLE_LIST_CLASS, 'shrink-0')}>
@@ -404,7 +405,7 @@ export default function Obras() {
             </div>
           </div>
 
-          <TabsContent value="lista" className="space-y-6 mt-0">
+          <TabsContent value="lista" className="space-y-6 mt-0 flex-1 flex flex-col min-h-0">
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -434,11 +435,11 @@ export default function Obras() {
                   </div>
                 </div>
                 
-                <div className="rounded-lg border border-border/60 overflow-x-auto bg-card">
+                <div className="rounded-lg border border-border/60 overflow-auto bg-card flex-1 min-h-0">
                   <table className="w-full text-sm">
-                    <thead>
+                    <thead className="sticky top-0 z-10 bg-muted">
                       <tr className="border-b bg-muted/50">
-                        <th className="py-3 px-4 w-10 text-center">
+                        <th className="h-14 px-2.5 w-10 text-center">
                           <Checkbox 
                             checked={selectedIds.length > 0 && selectedIds.length === paginatedObras.length && paginatedObras.every(o => selectedIds.includes(o.id))}
                             onCheckedChange={toggleSelectAllPage}
@@ -446,7 +447,7 @@ export default function Obras() {
                         </th>
                         {visibleColumns.map(colId => (
                           colId === 'actions' ? (
-                            <th key={colId} className="text-left py-3 px-4 font-semibold text-muted-foreground text-xs whitespace-nowrap">
+                            <th key={colId} className="text-left h-14 px-2.5 font-semibold text-muted-foreground text-xs whitespace-nowrap">
                               {getLabel(colId)}
                             </th>
                           ) : (
@@ -483,14 +484,14 @@ export default function Obras() {
                             className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
                             onClick={openDetail}
                           >
-                            <td className="py-3 px-4 w-10" onClick={(e) => e.stopPropagation()}>
+                            <td className="py-1.5 px-2.5 w-10" onClick={(e) => e.stopPropagation()}>
                               <Checkbox
                                 checked={selectedIds.includes(obra.id)}
                                 onCheckedChange={() => toggleSelect(obra.id)}
                               />
                             </td>
                             {visibleColumns.map(colId => (
-                              <td key={colId} className="py-3 px-4 truncate max-w-[200px]">
+                              <td key={colId} className="py-1.5 px-2.5 truncate max-w-[200px]">
                                 {colId === 'nome_obra' && (
                                   <span className="font-semibold text-sm text-foreground">
                                     {obra.nome_obra}

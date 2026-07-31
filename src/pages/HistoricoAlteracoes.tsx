@@ -56,18 +56,18 @@ function LinhaHistorico({ item }: { item: HistoricoAlteracao }) {
     <Collapsible asChild open={aberto} onOpenChange={setAberto}>
       <>
         <TableRow className={temDetalhe ? 'cursor-pointer' : undefined} onClick={() => temDetalhe && setAberto((v) => !v)}>
-          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+          <TableCell className="whitespace-nowrap text-sm text-muted-foreground py-2 px-2.5">
             {new Date(item.created_at).toLocaleString('pt-BR')}
           </TableCell>
-          <TableCell className="text-sm">{item.usuario?.nome ?? 'Sistema'}</TableCell>
-          <TableCell className="text-sm">{TABELA_LABELS[item.tabela] ?? item.tabela}</TableCell>
-          <TableCell>
+          <TableCell className="text-sm py-2 px-2.5">{item.usuario?.nome ?? 'Sistema'}</TableCell>
+          <TableCell className="text-sm py-2 px-2.5">{TABELA_LABELS[item.tabela] ?? item.tabela}</TableCell>
+          <TableCell className="py-2 px-2.5">
             <Badge variant={acao.variant}>{acao.label}</Badge>
           </TableCell>
-          <TableCell className="text-sm text-muted-foreground">
+          <TableCell className="text-sm text-muted-foreground py-2 px-2.5">
             {item.descricao ?? resumo ?? '—'}
           </TableCell>
-          <TableCell className="w-8">
+          <TableCell className="w-8 py-2 px-2.5">
             {temDetalhe && (
               <CollapsibleTrigger asChild>
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${aberto ? 'rotate-180' : ''}`} />
@@ -127,9 +127,9 @@ export default function HistoricoAlteracoes() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return (
-    <AppLayout title="Histórico de Alterações" subtitle="Registro de toda ação realizada no sistema">
-      <div className="p-6 space-y-4">
-        <div className="flex flex-wrap gap-3">
+    <AppLayout title="Histórico de Alterações" subtitle="Registro de toda ação realizada no sistema" mainClassName="flex-1 overflow-hidden flex flex-col">
+      <div className="p-6 flex flex-col flex-1 min-h-0 gap-4">
+        <div className="flex flex-wrap gap-3 shrink-0">
           <Select
             value={tabelaFiltro ?? 'todas'}
             onValueChange={(value) => {
@@ -167,17 +167,17 @@ export default function HistoricoAlteracoes() {
           </Select>
         </div>
 
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
+        <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <CardContent className="p-0 flex-1 min-h-0 flex flex-col overflow-hidden">
+            <Table wrapperClassName="flex-1 min-h-0">
+              <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
-                  <TableHead>Data/Hora</TableHead>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Entidade</TableHead>
-                  <TableHead>Ação</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead className="w-8" />
+                  <TableHead className="h-14 px-2.5">Data/Hora</TableHead>
+                  <TableHead className="h-14 px-2.5">Usuário</TableHead>
+                  <TableHead className="h-14 px-2.5">Entidade</TableHead>
+                  <TableHead className="h-14 px-2.5">Ação</TableHead>
+                  <TableHead className="h-14 px-2.5">Descrição</TableHead>
+                  <TableHead className="w-8 h-14 px-2.5" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -213,6 +213,7 @@ export default function HistoricoAlteracoes() {
           pageSizeOptions={PAGE_SIZE_OPTIONS}
           itemLabel="alteração"
           itemLabelPlural="alterações"
+          className="shrink-0"
         />
       </div>
     </AppLayout>

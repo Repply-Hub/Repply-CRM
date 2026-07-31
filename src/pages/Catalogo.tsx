@@ -101,12 +101,13 @@ const Catalogo = () => {
   const showFolders = categoria === 'todas' && busca.trim() === '';
 
   return (
-    <AppLayout 
-      title="Catálogo de Produtos" 
+    <AppLayout
+      title="Catálogo de Produtos"
       subtitle={showFolders ? `${categorias.length} categoria(s)` : `${filtered.length} produto(s)`}
+      mainClassName="flex-1 overflow-hidden flex flex-col"
     >
-      <div className="p-4 md:p-6 w-full space-y-6">
-        <Card className="rounded-xl border-border/60">
+      <div className="p-4 md:p-6 w-full flex flex-col flex-1 min-h-0 gap-6">
+        <Card className="rounded-xl border-border/60 shrink-0">
           <CardContent className="p-4 flex flex-wrap gap-3 items-center">
             <SearchWithRecent
               placeholder="Buscar por descrição, referência ou fabricante..."
@@ -159,7 +160,7 @@ const Catalogo = () => {
           </CardContent>
         </Card>
 
-        <div className="flex justify-between items-center gap-4">
+        <div className="flex justify-between items-center gap-4 shrink-0">
           {!showFolders ? (
             <Button 
               variant="ghost" 
@@ -229,7 +230,7 @@ const Catalogo = () => {
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : showFolders ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 flex-1 min-h-0 overflow-y-auto content-start">
             {categorias.map(c => (
               <Card 
                 key={c} 
@@ -304,7 +305,7 @@ const Catalogo = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 flex-1 min-h-0 overflow-y-auto content-start">
             {filtered.map((p: any) => (
               <Card 
                 key={p.id} 
