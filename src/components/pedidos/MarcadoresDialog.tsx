@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Loader2, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, GripVertical, Lock } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -185,20 +185,29 @@ export function MarcadoresDialog({ open, onOpenChange, empresaId }: Props) {
                                 </div>
                                 <span className={cn('h-3 w-3 rounded-full shrink-0', corClass)} />
                                 <span className="flex-1 text-sm font-medium">{m.nome}</span>
-                                {m.is_sistema && (
-                                  <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">PADRÃO</span>
-                                )}
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(m)}>
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-destructive hover:text-destructive"
-                                  onClick={() => startDelete(m)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
+                                {m.is_sistema ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground"
+                                    disabled
+                                    title={`O marcador "${m.nome}" é padrão do sistema e não pode ser excluído`}
+                                  >
+                                    <Lock className="h-3.5 w-3.5" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                    onClick={() => startDelete(m)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
                               </div>
                             )}
                           </Draggable>
