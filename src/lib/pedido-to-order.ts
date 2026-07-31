@@ -16,5 +16,9 @@ export function mapPedidoToOrder(p: PedidoWithRelations): Order {
     createdAt: p.data_pedido,
     campos_extras: p.campos_extras || {},
     marcador: p.marcador ? { nome: p.marcador.nome, cor: p.marcador.cor } : null,
+    contato: p.campos_extras?.['Contato'] ?? null,
+    observacoes: p.observacoes,
+    prazoResposta: p.prazo_resposta,
+    pdfUrl: p.pdf_url,
   };
 }

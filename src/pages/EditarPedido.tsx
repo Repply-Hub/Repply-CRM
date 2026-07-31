@@ -21,7 +21,7 @@ import { useCreateObra } from '@/hooks/use-mutations';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
 import { usePedidoHistoricoStatus } from '@/hooks/use-pedidos';
 import { useAuth } from '@/hooks/use-auth';
-import { useConfiguracoesCampos, FIELD_LABELS } from '@/hooks/use-configuracoes-campos';
+import { useConfiguracoesCampos, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
@@ -214,17 +214,24 @@ const EditarPedido = () => {
 
   const validateStep2 = () => {
     const valoresPadrao: Record<string, string | undefined> = {
+      cliente_id: clienteId,
+      fabricante_id: fabricanteId,
+      vendedor_id: vendedorId,
+      status: status,
+      anexo_pdf: (pdfFile || pdfUrl) ? 'ok' : undefined,
+      data_pedido: dataPedido ? 'ok' : undefined,
       obra_id: obraId,
       origem_lead: origemLead,
       endereco_entrega: enderecoEntrega,
       prazo_resposta: prazoResposta ? 'ok' : undefined,
       observacoes: observacoes,
+      itens: itens.length > 0 ? 'ok' : undefined,
     };
     for (const campo of camposConfig ?? []) {
       if (!campo.obrigatorio) continue;
       const valor = campo.origem === 'padrao' ? valoresPadrao[campo.campo_key] : camposExtras[campo.campo_key];
       if (!valor || !valor.trim()) {
-        const label = campo.origem === 'padrao' ? (FIELD_LABELS[campo.campo_key] ?? campo.campo_key) : campo.label;
+        const label = campo.origem === 'padrao' ? resolveFieldLabel(campo) : campo.label;
         toast.error(`Preencha o campo obrigatório: ${label}`);
         return false;
       }

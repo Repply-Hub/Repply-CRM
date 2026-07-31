@@ -13,6 +13,10 @@ export interface Order {
   createdAt: string;
   campos_extras?: Record<string, any>;
   marcador?: { nome: string; cor: string } | null;
+  contato?: string | null;
+  observacoes?: string | null;
+  prazoResposta?: string | null;
+  pdfUrl?: string | null;
 }
 
 export interface Client {

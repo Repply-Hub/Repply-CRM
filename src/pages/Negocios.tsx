@@ -843,7 +843,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       onLoadPreset={loadPreset}
       onDeletePreset={deletePreset}
       onReset={resetToDefaults}
-      label="Colunas"
+      label={showKanban ? 'Itens do card' : 'Colunas'}
     >
       <div className="flex flex-col border-t border-border/50">
         {showKanban && (
@@ -1204,6 +1204,18 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   <Factory className="h-3 w-3" /> Fabricante
                 </p>
                 <p className="text-sm font-medium">{selectedViewOrder.fabricante?.nome ?? '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Tag className="h-3 w-3" /> Marcador
+                </p>
+                {selectedViewOrder.marcador ? (
+                  <Badge className={getStageBadgeClass(selectedViewOrder.marcador.cor)}>
+                    {selectedViewOrder.marcador.nome}
+                  </Badge>
+                ) : (
+                  <p className="text-sm font-medium">-</p>
+                )}
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">

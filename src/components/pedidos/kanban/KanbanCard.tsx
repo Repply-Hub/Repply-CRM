@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Building2, Factory, DollarSign, GripVertical } from 'lucide-react';
+import { AlertTriangle, Building2, Factory, DollarSign, GripVertical, User, CalendarIcon, FileText, StickyNote } from 'lucide-react';
 import { Order } from '@/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -11,9 +11,16 @@ interface KanbanCardProps {
   index: number;
   visibleColumns?: string[];
   columns?: any[];
+  stageLabel?: string;
+  stageColorClass?: string;
 }
 
-export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visibleColumns, columns }: KanbanCardProps & { onClick?: (id: string) => void }) {
+const formatDate = (value: string) => {
+  const parts = value.split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : value;
+};
+
+export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visibleColumns, columns, stageLabel, stageColorClass }: KanbanCardProps & { onClick?: (id: string) => void }) {
   const navigate = useNavigate();
   const isAlert = order.daysInStage >= order.alertDays;
 
@@ -69,14 +76,23 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                   <h4 className="font-semibold text-xs sm:text-sm text-card-foreground leading-snug pr-5">{order.clientName}</h4>
                 )}
 
-                {order.marcador && (!visibleColumns || visibleColumns.includes('marcador')) && (
-                  <span className={cn('inline-flex items-center mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white', `bg-${order.marcador.cor}`)}>
-                    {order.marcador.nome}
-                  </span>
+                {(!visibleColumns || visibleColumns.includes('marcador') || visibleColumns.includes('etapa')) && (
+                  <div className="flex flex-wrap items-center gap-1 mt-1">
+                    {order.marcador && (!visibleColumns || visibleColumns.includes('marcador')) && (
+                      <span className={cn('inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white', `bg-${order.marcador.cor}`)}>
+                        {order.marcador.nome}
+                      </span>
+                    )}
+                    {stageLabel && (!visibleColumns || visibleColumns.includes('etapa')) && (
+                      <span className={cn('inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white', `bg-${stageColorClass || 'muted-foreground'}`)}>
+                        {stageLabel}
+                      </span>
+                    )}
+                  </div>
                 )}
 
                 <div className="mt-2 space-y-1">
-                  {(!visibleColumns || visibleColumns.includes('obra')) && (
+                  {(!visibleColumns || visibleColumns.includes('endereco_entrega')) && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <Building2 className="h-3 w-3 shrink-0 text-muted-foreground/70" />
                       <span className="truncate">{order.obra}</span>
@@ -88,16 +104,46 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                       <span className="truncate">{order.fabricante}</span>
                     </div>
                   )}
+                  {order.contato && (!visibleColumns || visibleColumns.includes('contato')) && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <User className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+                      <span className="truncate">{order.contato}</span>
+                    </div>
+                  )}
                   {(!visibleColumns || visibleColumns.includes('valor')) && (
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-card-foreground">
                       <DollarSign className="h-3 w-3 shrink-0 text-primary/70" />
                       {order.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </div>
                   )}
+                  {(!visibleColumns || visibleColumns.includes('data_pedido')) && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <CalendarIcon className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+                      <span className="truncate">Criado em {formatDate(order.createdAt)}</span>
+                    </div>
+                  )}
+                  {order.prazoResposta && (!visibleColumns || visibleColumns.includes('prazo_resposta')) && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <CalendarIcon className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+                      <span className="truncate">Fechamento {formatDate(order.prazoResposta)}</span>
+                    </div>
+                  )}
+                  {order.observacoes && (!visibleColumns || visibleColumns.includes('observacoes')) && (
+                    <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                      <StickyNote className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground/70" />
+                      <span className="line-clamp-2">{order.observacoes}</span>
+                    </div>
+                  )}
+                  {order.pdfUrl && (!visibleColumns || visibleColumns.includes('anexo')) && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <FileText className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+                      <span className="truncate">Anexo disponível</span>
+                    </div>
+                  )}
 
                   {columns?.filter(col =>
                     visibleColumns?.includes(col.id) &&
-                    !['negocio', 'cliente', 'obra', 'fabricante', 'valor', 'vendedor', 'data_pedido', 'etapa', 'observacoes', 'acoes', 'anexo', 'pdf_url'].includes(col.id)
+                    !['negocio', 'cliente', 'obra', 'endereco_entrega', 'contato', 'fabricante', 'valor', 'vendedor', 'data_pedido', 'etapa', 'marcador', 'observacoes', 'acoes', 'anexo', 'pdf_url'].includes(col.id)
                   ).map(col => {
                     const value = order.campos_extras?.[col.id] || order.campos_extras?.[col.label];
                     if (!value) return null;

@@ -122,7 +122,16 @@ export const KanbanColumn = memo(function KanbanColumn({
               </div>
             )}
             {orders.map((order, idx) => (
-              <KanbanCard key={order.id} order={order} index={idx} onClick={onCardClick} visibleColumns={visibleColumns} columns={columns} />
+              <KanbanCard
+                key={order.id}
+                order={order}
+                index={idx}
+                onClick={onCardClick}
+                visibleColumns={visibleColumns}
+                columns={columns}
+                stageLabel={safeLabel}
+                stageColorClass={safeColor}
+              />
             ))}
             {provided.placeholder}
           </div>
