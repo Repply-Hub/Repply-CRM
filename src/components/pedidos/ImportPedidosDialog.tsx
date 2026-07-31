@@ -389,81 +389,30 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         if (ignoreError) console.error('Erro ao salvar linhas ignoradas:', ignoreError);
       }
 
-      // Atualizar nomes das colunas (padrão e extras) para salvar como colunas na página de Negócios
+      // Atualizar labels dos campos padrão que foram renomeados (não cria nem duplica itens do
+      // card: apenas ajusta o rótulo de colunas padrão já existentes na configuração da página).
       const savedAllColumns = localStorage.getItem('pedidos_all_columns');
-      let currentColumns: any[] = savedAllColumns ? JSON.parse(savedAllColumns) : [...VISIBLE_FIELDS.map(f => ({ id: f.key, label: f.label, type: 'text' }))];
-      const savedVisible = localStorage.getItem('pedidos_visible_columns');
-      let currentVisible: string[] = savedVisible ? JSON.parse(savedVisible) : currentColumns.map((c: any) => c.id);
-      let hasChanges = false;
-      let visibleChanged = false;
-
-      // Garantir que as colunas padrão existem no currentColumns (sem duplicar)
-      VISIBLE_FIELDS.forEach(f => {
-        if (!currentColumns.some(c => c.id === f.key)) {
-          currentColumns.push({ id: f.key, label: f.label, type: 'text' });
-          hasChanges = true;
-        }
-      });
-
-      // Atualizar labels dos campos padrão que foram renomeados
-      Object.entries(fieldLabels).forEach(([key, label]) => {
-        const col = currentColumns.find((c: any) => c.id === key);
-        if (col && col.label !== label) {
-          col.label = label;
-          hasChanges = true;
-        }
-      });
-
-      // Adicionar colunas extras (de mapeamento extra e colunas customizadas)
-      extraFieldInfos.forEach((info) => {
-        const { id, label } = info;
-        const lowerLabel = label.toLowerCase().trim();
-        const mainName = label.includes(', ') ? label.split(', ')[0] : label;
-        const lowerMainName = mainName.toLowerCase().trim();
-
-        // Procurar se já existe uma coluna com o mesmo nome principal OU o mesmo ID
-        const existingCol = currentColumns.find(c => 
-          c.id === id ||
-          c.label.toLowerCase().trim() === lowerMainName || 
-          c.id.toLowerCase().trim() === lowerMainName ||
-          c.id === mainName
-        );
-
-        let finalId = existingCol?.id;
-        
-        if (!existingCol) {
-          finalId = id;
-          currentColumns.push({ id: finalId, label: mainName, type: 'text', isCustom: true });
-          hasChanges = true;
-        }
-
-        if (finalId && !currentVisible.includes(finalId)) {
-          // Inserir após a coluna de etapa (status) se for nova
-          const statusIdx = currentVisible.indexOf('etapa');
-          if (statusIdx !== -1) {
-            currentVisible.splice(statusIdx + 1, 0, finalId);
-          } else {
-            currentVisible.push(finalId);
+      if (savedAllColumns && Object.keys(fieldLabels).length > 0) {
+        try {
+          const currentColumns: any[] = JSON.parse(savedAllColumns);
+          let labelsChanged = false;
+          Object.entries(fieldLabels).forEach(([key, label]) => {
+            const col = currentColumns.find((c: any) => c.id === key);
+            if (col && col.label !== label) {
+              col.label = label;
+              labelsChanged = true;
+            }
+          });
+          if (labelsChanged) {
+            localStorage.setItem('pedidos_all_columns', JSON.stringify(currentColumns));
+            window.dispatchEvent(new Event('storage'));
           }
-          visibleChanged = true;
-        }
-      });
+        } catch (e) {}
+      }
 
-      if (hasChanges) {
-        // Remove duplicatas físicas se existirem por erro anterior antes de salvar
-        const uniqueColumns = Array.from(new Map(currentColumns.map(c => [c.id, c])).values());
-        // Filtrar possíveis colunas repetidas indesejadas (ex: Contato repetido muitas vezes)
-        // Se houver muitas colunas com o mesmo nome base ou IDs muito similares, podemos limpar.
-        // Mas por enquanto vamos focar em garantir que o ID seja único.
-        localStorage.setItem('pedidos_all_columns', JSON.stringify(uniqueColumns));
-      }
-      if (visibleChanged) {
-        const uniqueVisible = Array.from(new Set(currentVisible));
-        localStorage.setItem('pedidos_visible_columns', JSON.stringify(uniqueVisible));
-      }
-      if (hasChanges || visibleChanged) {
-        window.dispatchEvent(new Event('storage'));
-      }
+      // Os campos extras/customizados mapeados na importação são salvos em campos_extras de
+      // cada pedido (ver enrichedRows abaixo) sem criar novos "Itens do card" — eles só passam a
+      // aparecer no card se já existir (ou o usuário criar depois) um item com o mesmo id/label.
 
       // Busca vendedores para vincular a coluna Responsável/Vendedor por nome (somente se
       // gestor) — reaproveita a lista já carregada para o preview quando disponível.
