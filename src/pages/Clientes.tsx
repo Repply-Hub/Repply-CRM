@@ -645,12 +645,15 @@ const Clientes = () => {
       return;
     }
 
-    // Formulário de empresa é um wizard: só permite submeter na última etapa,
-    // validando todas as etapas anteriores (caso o usuário edite algo e volte).
+    // No wizard de empresa, Enter nos campos apenas avança a etapa — nunca cria diretamente.
+    // A criação só acontece via clique explícito no botão "Salvar" (handleSaveEmpresa).
     if (step < EMPRESA_STEPS.length) {
       handleNextStep();
-      return;
     }
+  };
+
+  const handleSaveEmpresa = async () => {
+    if (step !== EMPRESA_STEPS.length) return;
     if (!validateEmpresaStep(1) || !validateEmpresaStep(2) || !validateEmpresaStep(3)) {
       return;
     }
@@ -695,7 +698,7 @@ const Clientes = () => {
     const enderecoStr = enderecoToString(endereco);
     try {
       const createdCliente = await createCliente.mutateAsync({
-        empresa: empresa || (form.get('empresa') as string),
+        empresa,
         razao_social: razaoSocial || undefined,
         tipo,
         cnpj: cnpj || undefined,
@@ -1177,7 +1180,7 @@ const Clientes = () => {
                           Avançar
                         </Button>
                       ) : (
-                        <Button type="submit" className="flex-1" disabled={createCliente.isPending || createContato.isPending || updateContato.isPending}>
+                        <Button type="button" className="flex-1" onClick={handleSaveEmpresa} disabled={createCliente.isPending || createContato.isPending || updateContato.isPending}>
                           {(createCliente.isPending || createContato.isPending || updateContato.isPending) ? 'Salvando...' : 'Salvar'}
                         </Button>
                       )}
