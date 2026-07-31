@@ -353,6 +353,7 @@ export function useBulkDeletePedidos() {
       if (stages && stages.length > 0) query = query.in('status', stages);
       if (filters?.funilId) query = query.eq('funil_id', filters.funilId);
       if (filters?.fabricanteIds && filters.fabricanteIds.length > 0) query = query.in('fabricante_id', filters.fabricanteIds);
+      if (filters?.marcadorIds && filters.marcadorIds.length > 0) query = query.in('marcador_id', filters.marcadorIds);
       if (filters?.dateFrom) query = query.gte('data_pedido', filters.dateFrom);
       if (filters?.dateTo) query = query.lte('data_pedido', filters.dateTo);
       if (filters?.onlyAttention) {

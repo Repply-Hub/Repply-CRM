@@ -119,7 +119,7 @@ const PedidoRow = memo(({
 
   return (
     <TableRow className={`cursor-pointer hover:bg-muted/30 ${selected ? 'bg-primary/5' : ''}`} onClick={onClick}>
-      <TableCell className="w-10" onClick={e => e.stopPropagation()}>
+      <TableCell className="w-10 py-2 px-2.5" onClick={e => e.stopPropagation()}>
         <Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Selecionar ${pedido.cliente?.empresa}`} />
       </TableCell>
       {columns.filter(col => visibleColumns.includes(col.id)).map(col => {
@@ -131,7 +131,7 @@ const PedidoRow = memo(({
         // — trata como alias de "anexo" para nunca ler o valor bruto de campos_extras.
         if (colId === 'pdf_url') {
           return (
-            <TableCell key={colId} className="whitespace-nowrap px-4" onClick={e => e.stopPropagation()}>
+            <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5" onClick={e => e.stopPropagation()}>
               {pedido.pdf_url ? (
                 <a
                   href={repairCorruptedBitrixUrl(pedido.pdf_url)}
@@ -150,7 +150,7 @@ const PedidoRow = memo(({
           // Busca o valor em camposExtras usando o ID da coluna ou o label (fallback)
           const value = camposExtras[colId] ?? camposExtras[getLabel(colId)];
           return (
-            <TableCell key={colId} className="text-xs text-muted-foreground whitespace-nowrap px-4">
+            <TableCell key={colId} className="text-xs text-muted-foreground whitespace-nowrap py-2 px-2.5">
               {value || '—'}
             </TableCell>
           );
@@ -159,13 +159,13 @@ const PedidoRow = memo(({
         switch (colId) {
           case 'negocio':
             return (
-              <TableCell key={colId} className="min-w-[200px] font-medium px-4 whitespace-nowrap">
+              <TableCell key={colId} className="min-w-[200px] font-medium py-2 px-2.5 whitespace-nowrap">
                 {[pedido.cliente?.empresa, pedido.fabricante?.nome].filter(Boolean).join(' | ') || '—'}
               </TableCell>
             );
           case 'cliente':
             return (
-              <TableCell key={colId} className="min-w-[200px] font-medium px-4">
+              <TableCell key={colId} className="min-w-[200px] font-medium py-2 px-2.5">
                 <div className="space-y-1">
                   {isAlert && (
                     <div className="flex w-fit items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
@@ -179,13 +179,13 @@ const PedidoRow = memo(({
             );
           case 'contato':
             return (
-              <TableCell key={colId} className="whitespace-nowrap px-4">
+              <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">
                 {camposExtras['Contato'] || '—'}
               </TableCell>
             );
           case 'anexo':
             return (
-              <TableCell key={colId} className="whitespace-nowrap px-4" onClick={e => e.stopPropagation()}>
+              <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5" onClick={e => e.stopPropagation()}>
                 {pedido.pdf_url ? (
                   <a
                     href={repairCorruptedBitrixUrl(pedido.pdf_url)}
@@ -199,15 +199,15 @@ const PedidoRow = memo(({
               </TableCell>
             );
           case 'endereco_entrega':
-            return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.endereco_entrega ?? pedido.obra?.nome_obra ?? '-'}</TableCell>;
+            return <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">{pedido.endereco_entrega ?? pedido.obra?.nome_obra ?? '-'}</TableCell>;
           case 'fabricante':
-            return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.fabricante?.nome ?? '-'}</TableCell>;
+            return <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">{pedido.fabricante?.nome ?? '-'}</TableCell>;
           case 'valor':
-            return <TableCell key={colId} className="whitespace-nowrap px-4">{(pedido.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>;
+            return <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">{(pedido.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>;
           case 'etapa':
             const stage = KANBAN_STAGES.find(s => s.key === pedido.status);
             return (
-              <TableCell key={colId} className="whitespace-nowrap px-4">
+              <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">
                 <Badge className={`bg-${stage?.color || 'muted-foreground'} text-white`}>
                   {stageLabel(pedido.status)}
                 </Badge>
@@ -215,18 +215,18 @@ const PedidoRow = memo(({
             );
           case 'marcador':
             return (
-              <TableCell key={colId} className="whitespace-nowrap px-4">
+              <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">
                 {pedido.marcador ? (
                   <Badge className={`bg-${pedido.marcador.cor} text-white`}>{pedido.marcador.nome}</Badge>
                 ) : '—'}
               </TableCell>
             );
           case 'vendedor':
-            return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.vendedor?.nome ?? '-'}</TableCell>;
+            return <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">{pedido.vendedor?.nome ?? '-'}</TableCell>;
           case 'data_pedido':
             return (
-              <TableCell key={colId} className="whitespace-nowrap px-4">
-                {pedido.data_pedido 
+              <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">
+                {pedido.data_pedido
                   ? (() => {
                     const dateParts = pedido.data_pedido.split('-');
                     return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
@@ -236,8 +236,8 @@ const PedidoRow = memo(({
             );
           case 'prazo_resposta':
             return (
-              <TableCell key={colId} className="whitespace-nowrap px-4">
-                {pedido.prazo_resposta 
+              <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">
+                {pedido.prazo_resposta
                   ? (() => {
                     const dateParts = pedido.prazo_resposta.split('-');
                     return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
@@ -246,10 +246,10 @@ const PedidoRow = memo(({
               </TableCell>
             );
           case 'observacoes':
-            return <TableCell key={colId} className="max-w-[300px] truncate px-4" title={pedido.observacoes}>{pedido.observacoes || '—'}</TableCell>;
+            return <TableCell key={colId} className="max-w-[300px] truncate py-2 px-2.5" title={pedido.observacoes}>{pedido.observacoes || '—'}</TableCell>;
           case 'acoes':
             return (
-              <TableCell key={colId} className="px-4 text-center">
+              <TableCell key={colId} className="py-2 px-2.5 text-center">
                 <div className="flex justify-center gap-1" onClick={e => e.stopPropagation()}>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClick} title="Visualizar e Editar">
                     <Eye className="h-4 w-4 text-primary" />
@@ -691,7 +691,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const someSelected = selected.size > 0 || deleteAllFilteredMode;
 
   const toggleOne = (id: string) => {
-    setDeleteAllFilteredMode(false);
+    if (deleteAllFilteredMode) {
+      // Estava no modo "todos os filtrados" (sem ids carregados) — ao desmarcar um item
+      // específico, cai para seleção manual desta página, exceto o item clicado.
+      setDeleteAllFilteredMode(false);
+      setSelected(new Set(currentPageIds.filter(pid => pid !== id)));
+      return;
+    }
     setSelected(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -1450,8 +1456,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const subtitle = `${totalCount} negócios${isFiltered ? ' (filtrados)' : ''} · Total: ${totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
 
   return (
-    <AppLayout title="Negócios" subtitle={subtitle} mainClassName={showKanban ? 'flex-1 overflow-hidden flex flex-col' : 'flex-1 overflow-auto'}>
-      <div className={showKanban ? 'flex flex-col flex-1 min-h-0 px-4 sm:px-6 pt-4 sm:pt-6' : 'p-4 sm:p-6'}>
+    <AppLayout title="Negócios" subtitle={subtitle} mainClassName="flex-1 overflow-hidden flex flex-col">
+      <div className={cn('flex flex-col flex-1 min-h-0 px-4 sm:px-6 pt-4 sm:pt-6', !showKanban && 'pb-4 sm:pb-6')}>
         <div className={cn('mb-3 flex items-center gap-3', showKanban ? 'shrink-0' : 'mb-4 md:mb-6')}>
           <div className="flex-1 flex flex-wrap sm:flex-nowrap items-center gap-2 min-w-0 sm:overflow-x-auto custom-scrollbar sm:pb-1">
             {isPipelineMode && funis && funis.length > 1 && (
@@ -1572,9 +1578,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           </DragDropContext>
         ) : null}
         {!isLoading && !showKanban && (
-          <div className="flex min-w-0 flex-col gap-6 xl:flex-row">
-            <div className="min-w-0 flex-1">
-              <div className="mb-4">
+          <div className="flex min-w-0 flex-1 min-h-0 flex-col gap-6 xl:flex-row">
+            <div className="min-w-0 flex-1 flex flex-col min-h-0">
+              <div className="mb-4 shrink-0">
                 {someSelected && (
                   <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
                     <Trash2 className="h-4 w-4" />
@@ -1583,17 +1589,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 )}
               </div>
 
-              <div className="w-full rounded-xl border border-border overflow-hidden">
-                <div className="overflow-x-auto">
-                  <Table>
-                  <TableHeader>
+              <div className="w-full rounded-xl border border-border overflow-hidden flex-1 min-h-0 flex flex-col">
+                <Table wrapperClassName="flex-1 min-h-0">
+                  <TableHeader className="sticky top-0 z-10 bg-muted">
                     <TableRow className="bg-muted/50">
-                      <TableHead className="w-10">
-                        <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                      <TableHead className="w-10 h-14 px-2.5">
+                        <Checkbox checked={allPageSelected || deleteAllFilteredMode} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
                       {columns.filter(col => tableVisibleColumns.includes(col.id)).map(col => (
                         <TableHead key={col.id} className={cn(
-                          "whitespace-nowrap px-4 py-3 text-xs font-semibold",
+                          "whitespace-nowrap h-14 px-2.5 text-xs font-semibold",
                           col.id === 'acoes' ? "w-[80px] text-center" : "min-w-[150px]"
                         )}>
                           {getLabel(col.id)}
@@ -1613,7 +1618,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                         <PedidoRow
                           key={p.id}
                           pedido={p}
-                          selected={selected.has(p.id)}
+                          selected={selected.has(p.id) || deleteAllFilteredMode}
                           onToggle={() => toggleOne(p.id)}
                           onClick={() => setViewOrderId(p.id)}
                           visibleColumns={tableVisibleColumns}
@@ -1626,8 +1631,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
                     )}
                   </TableBody>
-                  </Table>
-                </div>
+                </Table>
                 <ListPagination
                   page={page}
                   totalPages={totalPages}
