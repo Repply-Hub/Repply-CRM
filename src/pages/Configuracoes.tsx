@@ -509,6 +509,9 @@ function ProfileTab() {
 const Configuracoes = () => {
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get('tab') === 'usuarios' ? 'vendedores' : (searchParams.get('tab') || 'perfil');
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  // A aba de Usuários usa layout de altura fixa (scroll interno nos cards); as demais rolam a página normalmente.
+  const noPageScroll = activeTab === 'vendedores';
   const [alertDays, setAlertDays] = useState('5');
   const { profile } = useAuth();
   const isEmpresaRole = profile?.role === 'empresa';
@@ -532,10 +535,14 @@ const Configuracoes = () => {
   });
 
   return (
-    <AppLayout title="Configurações" subtitle={isGestor ? "Gerencie usuários, permissões e automações" : "Gerencie vendedores, permissões e automações"}>
-      <div className="p-6">
-        <Tabs defaultValue={defaultTab}>
-          <TabsList className={TOGGLE_LIST_CLASS}>
+    <AppLayout
+      title="Configurações"
+      subtitle={isGestor ? "Gerencie usuários, permissões e automações" : "Gerencie vendedores, permissões e automações"}
+      mainClassName={noPageScroll ? "flex-1 overflow-hidden flex flex-col" : "flex-1 overflow-auto"}
+    >
+      <div className={cn("p-6", noPageScroll && "flex-1 flex flex-col min-h-0")}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className={cn(noPageScroll && "flex-1 flex flex-col min-h-0")}>
+          <TabsList className={cn(TOGGLE_LIST_CLASS, noPageScroll && "flex-none self-start")}>
             <TabsTrigger value="perfil" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><UserCircle className="h-4 w-4" /> Perfil</TabsTrigger>
             {isGestor && (
               <TabsTrigger value="vendedores" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Users className="h-4 w-4" /> Usuários</TabsTrigger>
@@ -557,7 +564,7 @@ const Configuracoes = () => {
           <TabsContent value="perfil" className="mt-4"><ProfileTab /></TabsContent>
 
           {isGestor && (
-            <TabsContent value="vendedores" className="mt-4">
+            <TabsContent value="vendedores" className="mt-4 flex-1 min-h-0 flex flex-col overflow-hidden data-[state=inactive]:hidden">
               <UsuariosTab />
             </TabsContent>
           )}

@@ -296,8 +296,8 @@ function AuditLog() {
   ];
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row gap-2">
+    <div className="h-full flex flex-col gap-3 min-h-0">
+      <div className="flex flex-col sm:flex-row gap-2 flex-none">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
           <Input placeholder="Buscar alterações..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
@@ -328,7 +328,7 @@ function AuditLog() {
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center gap-1.5 flex-wrap flex-none">
         {[{ label: 'Todos', active: !activeFilter }, ...filterItems.map(f => ({ ...f, active: activeFilter === f.label }))].map((f, i) => (
           <button
             key={f.label}
@@ -349,7 +349,7 @@ function AuditLog() {
       {filtered.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-4">Nenhum resultado encontrado.</p>
       ) : (
-        <ScrollArea className="h-[350px]">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-0.5">
             {dateKeys.map(dateKey => {
               const items = grouped[dateKey];
@@ -401,7 +401,7 @@ function AuditLog() {
           </div>
         </ScrollArea>
       )}
-      <div className="flex items-center justify-between pt-1 border-t border-border">
+      <div className="flex items-center justify-between pt-1 border-t border-border flex-none">
         <span className="text-[10px] text-muted-foreground">{filtered.length} alteração(ões)</span>
         <span className="text-[10px] text-muted-foreground">{dateKeys.length} dia(s)</span>
       </div>
@@ -424,9 +424,9 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId, 
   const isSelf = vendedor.user_id === currentUserId;
 
   return (
-    <div className="space-y-4">
+    <div className="h-full flex flex-col gap-4 min-h-0">
       {/* User header card */}
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden flex-none">
         <div className="h-1.5 bg-gradient-to-r from-primary to-primary/50" />
         <CardContent className="pt-5">
           <div className="flex items-start gap-4">
@@ -494,7 +494,7 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId, 
 
       {/* Section tabs */}
       {isGestor && (
-        <div className="flex gap-1 p-1 bg-muted/50 rounded-lg border border-border">
+        <div className="flex gap-1 p-1 bg-muted/50 rounded-lg border border-border flex-none">
           <button
             onClick={() => setActiveSection('permissoes')}
             className={cn(
@@ -518,23 +518,23 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId, 
 
       {/* Section content */}
       {isGestor && activeSection === 'permissoes' && (
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <CardHeader className="pb-2 flex-none">
             <CardTitle className="text-sm font-medium">Permissões por Módulo</CardTitle>
             <CardDescription className="text-xs">Controle granular de acesso para {vendedor.nome}</CardDescription>
           </CardHeader>
-          <CardContent className="p-0 sm:p-6 sm:pt-0">
+          <CardContent className="p-0 sm:p-6 sm:pt-0 flex-1 min-h-0 overflow-y-auto">
             <InlinePermissaoEditor vendedor={vendedor} />
           </CardContent>
         </Card>
       )}
 
       {isGestor && activeSection === 'historico' && (
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <CardHeader className="pb-2 flex-none">
             <CardTitle className="text-sm font-medium">Histórico de Alterações</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <AuditLog />
           </CardContent>
         </Card>
@@ -707,119 +707,20 @@ export function UsuariosTab() {
   }, [customPerfis]);
 
   return (
-    <div className="space-y-4">
-      {/* Top bar: stats + actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Users className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-foreground">{vendedoresData?.length ?? 0}</p>
-              <p className="text-xs text-muted-foreground -mt-0.5">usuários</p>
-            </div>
+    <div className="h-full flex flex-col gap-4 min-h-0">
+      {/* Top bar: stats, busca, filtros e ações — tudo inline */}
+      <div className="flex items-center gap-2 flex-wrap flex-none">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Users className="h-5 w-5 text-primary" />
           </div>
-          {/* Role chips */}
-          <div className="flex gap-1.5 flex-wrap">
-            {Object.entries(roleCounts).sort(([a], [b]) => {
-              const order = ['admin', 'empresa', 'gestor', 'vendedor'];
-              return order.indexOf(a) - order.indexOf(b);
-            }).map(([role, count]) => {
-              const cfg = getRoleConfig(role);
-              return (
-                <button
-                  key={role}
-                  onClick={() => setRoleFilter(roleFilter === role ? 'todos' : role)}
-                  className={cn(
-                    'flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-all',
-                    roleFilter === role
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-border text-muted-foreground hover:bg-accent hover:border-accent'
-                  )}
-                >
-                  {cfg.label} <span className="font-bold">{count}</span>
-                </button>
-              );
-            })}
+          <div>
+            <p className="text-lg font-bold text-foreground">{vendedoresData?.length ?? 0}</p>
+            <p className="text-xs text-muted-foreground -mt-0.5">usuários</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <Dialog open={reativarDialog} onOpenChange={setReativarDialog}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1.5 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10">
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Reativar conta
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Reativar usuário por email</DialogTitle>
-                </DialogHeader>
-                <p className="text-sm text-muted-foreground -mt-2">
-                  Use quando o usuário foi removido mas ainda tem conta de acesso. O sistema vai localizar a conta pelo email e reativar o perfil.
-                </p>
-                <form
-                  className="space-y-4 mt-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const form = new FormData(e.currentTarget);
-                    reativarMutation.mutate({
-                      email: form.get('email') as string,
-                      nome: form.get('nome') as string,
-                      role: form.get('role') as string,
-                      empresa_id: form.get('empresa_id') as string,
-                    });
-                  }}
-                >
-                  <div className="space-y-1.5">
-                    <Label>Email <span className="text-destructive">*</span></Label>
-                    <Input name="email" type="email" required placeholder="email@usuario.com" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Nome</Label>
-                    <Input name="nome" placeholder="Nome completo" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Perfil</Label>
-                    <PerfilSelect name="role" defaultValue="vendedor" />
-                  </div>
-                  {empresasData && empresasData.length > 0 && (
-                    <div className="space-y-1.5">
-                      <Label>Empresa</Label>
-                      <Select name="empresa_id">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecionar empresa" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {empresasData.map(emp => (
-                            <SelectItem key={emp.id} value={emp.id}>{emp.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <DialogFooter>
-                    <Button type="submit" disabled={reativarMutation.isPending} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                      {reativarMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Reativando...</> : 'Reativar usuário'}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
-          {isGestor && profile?.empresa_id && (
-            <PermissaoPresetsDialog empresaId={profile.empresa_id} meuUsuarioId={profile?.id} />
-          )}
-          <CodigoAcessoButton />
-        </div>
-      </div>
-
-      {/* Filters bar */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nome ou email..."
@@ -828,6 +729,28 @@ export function UsuariosTab() {
             className="pl-9"
           />
         </div>
+
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-[190px] shrink-0 gap-1.5">
+            <Shield className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <SelectValue placeholder="Filtrar por perfil" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os perfis ({vendedoresData?.length ?? 0})</SelectItem>
+            {Object.entries(roleCounts).sort(([a], [b]) => {
+              const order = ['admin', 'empresa', 'gestor', 'vendedor'];
+              return order.indexOf(a) - order.indexOf(b);
+            }).map(([role, count]) => {
+              const cfg = getRoleConfig(role);
+              return (
+                <SelectItem key={role} value={role}>
+                  {cfg.label} ({count})
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+
         {isAdmin && empresasData && empresasData.length > 0 && (
           <Select value={empresaFilter} onValueChange={(val) => { setEmpresaFilter(val); setSelectedVendedor(null); }}>
             <SelectTrigger className="w-fit max-w-full shrink-0 whitespace-nowrap">
@@ -859,11 +782,80 @@ export function UsuariosTab() {
             </SelectContent>
           </Select>
         )}
+
+        {isAdmin && (
+          <Dialog open={reativarDialog} onOpenChange={setReativarDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 shrink-0 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10">
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reativar conta
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Reativar usuário por email</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground -mt-2">
+                Use quando o usuário foi removido mas ainda tem conta de acesso. O sistema vai localizar a conta pelo email e reativar o perfil.
+              </p>
+              <form
+                className="space-y-4 mt-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = new FormData(e.currentTarget);
+                  reativarMutation.mutate({
+                    email: form.get('email') as string,
+                    nome: form.get('nome') as string,
+                    role: form.get('role') as string,
+                    empresa_id: form.get('empresa_id') as string,
+                  });
+                }}
+              >
+                <div className="space-y-1.5">
+                  <Label>Email <span className="text-destructive">*</span></Label>
+                  <Input name="email" type="email" required placeholder="email@usuario.com" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nome</Label>
+                  <Input name="nome" placeholder="Nome completo" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Perfil</Label>
+                  <PerfilSelect name="role" defaultValue="vendedor" />
+                </div>
+                {empresasData && empresasData.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label>Empresa</Label>
+                    <Select name="empresa_id">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar empresa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {empresasData.map(emp => (
+                          <SelectItem key={emp.id} value={emp.id}>{emp.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button type="submit" disabled={reativarMutation.isPending} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    {reativarMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Reativando...</> : 'Reativar usuário'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
+        {isGestor && profile?.empresa_id && (
+          <PermissaoPresetsDialog empresaId={profile.empresa_id} meuUsuarioId={profile?.id} />
+        )}
+        <CodigoAcessoButton />
       </div>
 
       {/* Usuários removidos (somente admin) */}
       {isAdmin && (vendedoresRemovidos?.length ?? 0) > 0 && (
-        <Card className="border-destructive/20">
+        <Card className="border-destructive/20 flex-none">
           <CardHeader className="pb-2 cursor-pointer" onClick={() => setShowRemovidos(v => !v)}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -883,7 +875,7 @@ export function UsuariosTab() {
           </CardHeader>
           {showRemovidos && (
             <CardContent className="pt-0">
-              <div className="divide-y divide-border rounded-md border border-border overflow-hidden">
+              <div className="divide-y divide-border rounded-md border border-border overflow-y-auto max-h-64">
                 {vendedoresRemovidos?.map(v => {
                   const iniciais = (v.nome ?? v.email).split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
                   const roleConfig = getRoleConfig(v.role);
@@ -952,10 +944,10 @@ export function UsuariosTab() {
       )}
 
       {/* Main content: list + detail */}
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 flex-1 min-h-0 lg:grid-rows-1">
         {/* Left: User list */}
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
+        <Card className="overflow-hidden flex flex-col min-h-0 h-full">
+          <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
             {loadV ? (
               <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
             ) : filteredVendedores.length === 0 ? (
@@ -965,7 +957,7 @@ export function UsuariosTab() {
                 {searchQuery && <p className="text-xs text-muted-foreground/60 mt-1">Tente outro termo de busca</p>}
               </div>
             ) : (
-              <ScrollArea className="h-[calc(100vh-380px)] min-h-[300px]">
+              <ScrollArea className="flex-1 min-h-0">
                 {(() => {
                   const roleOrder = ['admin', 'empresa', 'gestor', 'vendedor'];
                   const groupedByRole = roleOrder.reduce<Record<string, typeof filteredVendedores>>((acc, role) => {
@@ -1040,7 +1032,7 @@ export function UsuariosTab() {
         </Card>
 
         {/* Right: Detail */}
-        <div>
+        <div className="h-full min-h-0 overflow-hidden">
           {activeVendedor ? (
             <>
               <Dialog open={editingVendedor?.id === activeVendedor.id} onOpenChange={(open) => !open && setEditingVendedor(null)}>
