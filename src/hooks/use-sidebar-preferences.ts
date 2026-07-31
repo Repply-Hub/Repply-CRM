@@ -24,12 +24,15 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'chat', path: '/chat', label: 'Chat', icon: 'MessageSquare', visible: true },
   { id: 'whatsapp', path: '/whatsapp', label: 'WhatsApp', icon: 'MessageCircle', visible: true },
   { id: 'emails', path: '/emails', label: 'E-mails', icon: 'Mail', visible: true },
-  { id: 'historico', path: '/historico', label: 'Histórico', icon: 'History', visible: true },
   { id: 'configuracoes', path: '/configuracoes', label: 'Configurações', icon: 'Settings', visible: true },
 
   { id: 'usuarios_admin', path: '/configuracoes?tab=usuarios', label: 'Usuários', icon: 'Users', visible: true },
   { id: 'admin_wa_instancias', path: '/admin/instancias-whatsapp', label: 'Instâncias WhatsApp', icon: 'Smartphone', visible: true },
 ];
+
+// Itens descontinuados que ainda podem existir em preferências salvas (usuário ou empresa)
+// de antes da remoção — filtrados ao carregar para que sumam do menu de todo mundo.
+const REMOVED_IDS = new Set(['pedidos', 'portal_consultas', 'importacoes_ignoradas', 'historico']);
 
 function fixChatWhatsappIcons(list: SidebarItem[]): SidebarItem[] {
   return list.map(i => {
@@ -61,7 +64,9 @@ export function useSidebarPreferences() {
             .eq('empresa_id', empresaId)
             .maybeSingle();
           if (empresaPadrao && Array.isArray(empresaPadrao.items) && empresaPadrao.items.length > 0) {
-            return fixChatWhatsappIcons(empresaPadrao.items as unknown as SidebarItem[]);
+            return fixChatWhatsappIcons(
+              (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id))
+            );
           }
         }
         return DEFAULT_SIDEBAR_ITEMS;
@@ -70,7 +75,6 @@ export function useSidebarPreferences() {
       // Merge saved preferences with defaults to handle new items added after save.
       // Remove o antigo item 'pedidos' (Lista de Negócios) — funcionalidade unificada em 'pipeline' (/).
       // Garante que 'pipeline' aponte para / com label 'Negócios'.
-      const REMOVED_IDS = new Set(['pedidos', 'portal_consultas', 'importacoes_ignoradas']);
       const rawSaved = data.items as unknown as SidebarItem[];
       const needsCleanup = rawSaved.some(i => REMOVED_IDS.has(i.id));
       const saved = fixChatWhatsappIcons(rawSaved
@@ -89,7 +93,7 @@ export function useSidebarPreferences() {
           .eq('empresa_id', empresaId)
           .maybeSingle();
         if (empresaPadrao && Array.isArray(empresaPadrao.items) && empresaPadrao.items.length > 0) {
-          empresaPadraoItems = empresaPadrao.items as unknown as SidebarItem[];
+          empresaPadraoItems = (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id));
         }
       }
 
