@@ -395,8 +395,12 @@ export function useBulkDeletePedidos() {
 export interface PedidoHistoricoStatus {
   id: string;
   pedido_id: string;
+  tipo: 'status' | 'campo';
   status_anterior: string | null;
-  status_novo: string;
+  status_novo: string | null;
+  campo: string | null;
+  valor_anterior_txt: string | null;
+  valor_novo_txt: string | null;
   usuario_id: string | null;
   usuario: { id: string; nome: string } | null;
   created_at: string;

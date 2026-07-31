@@ -2101,28 +2101,40 @@ export type Database = {
       }
       pedidos_historico_status: {
         Row: {
+          campo: string | null
           created_at: string
           id: string
           pedido_id: string
           status_anterior: string | null
-          status_novo: string
+          status_novo: string | null
+          tipo: string
           usuario_id: string | null
+          valor_anterior_txt: string | null
+          valor_novo_txt: string | null
         }
         Insert: {
+          campo?: string | null
           created_at?: string
           id?: string
           pedido_id: string
           status_anterior?: string | null
-          status_novo: string
+          status_novo?: string | null
+          tipo?: string
           usuario_id?: string | null
+          valor_anterior_txt?: string | null
+          valor_novo_txt?: string | null
         }
         Update: {
+          campo?: string | null
           created_at?: string
           id?: string
           pedido_id?: string
           status_anterior?: string | null
-          status_novo?: string
+          status_novo?: string | null
+          tipo?: string
           usuario_id?: string | null
+          valor_anterior_txt?: string | null
+          valor_novo_txt?: string | null
         }
         Relationships: [
           {

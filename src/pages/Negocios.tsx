@@ -10,6 +10,7 @@ import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { KanbanColunasDialog } from '@/components/pedidos/kanban/KanbanColunasDialog';
 import { useMarcadores } from '@/hooks/use-marcadores';
 import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
+import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { useFunis } from '@/hooks/use-funis';
 import { usePedidos, usePedidosStats, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
@@ -1390,34 +1391,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <History className="h-3 w-3" /> Histórico de Movimentação
               </p>
-              {!historicoStatusNegocio || historicoStatusNegocio.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma movimentação registrada ainda.</p>
-              ) : (
-                <ol className="space-y-4">
-                  {historicoStatusNegocio.map((entry, idx) => (
-                    <li key={entry.id} className="relative pl-6">
-                      {idx < historicoStatusNegocio.length - 1 && (
-                        <span className="absolute left-[5px] top-4 bottom-[-16px] w-px bg-border" />
-                      )}
-                      <span className="absolute left-0 top-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                      <p className="text-sm">
-                        {entry.status_anterior ? (
-                          <>
-                            Movido de <span className="font-medium">{stageLabel(entry.status_anterior)}</span>{' '}
-                            para <span className="font-medium">{stageLabel(entry.status_novo)}</span>
-                          </>
-                        ) : (
-                          <>Negócio criado na etapa <span className="font-medium">{stageLabel(entry.status_novo)}</span></>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {format(new Date(entry.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                        {entry.usuario?.nome && ` · ${entry.usuario.nome}`}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              )}
+              <HistoricoMovimentacaoNegocio historico={historicoStatusNegocio} stageLabel={stageLabel} />
             </div>
           </div>
         ) : (

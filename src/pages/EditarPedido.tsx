@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText, Upload, History } from 'lucide-react';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { FabricanteSelector } from '@/components/pedidos/FabricanteSelector';
+import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -811,34 +812,7 @@ const EditarPedido = () => {
               <h2 className="text-sm font-semibold">Histórico de Movimentação</h2>
             </div>
 
-            {!historicoStatus || historicoStatus.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma movimentação registrada ainda.</p>
-            ) : (
-              <ol className="space-y-4">
-                {historicoStatus.map((entry, idx) => (
-                  <li key={entry.id} className="relative pl-6">
-                    {idx < historicoStatus.length - 1 && (
-                      <span className="absolute left-[5px] top-4 bottom-[-16px] w-px bg-border" />
-                    )}
-                    <span className="absolute left-0 top-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                    <p className="text-sm">
-                      {entry.status_anterior ? (
-                        <>
-                          Movido de <span className="font-medium">{getStatusLabel(entry.status_anterior)}</span>{' '}
-                          para <span className="font-medium">{getStatusLabel(entry.status_novo)}</span>
-                        </>
-                      ) : (
-                        <>Negócio criado na etapa <span className="font-medium">{getStatusLabel(entry.status_novo)}</span></>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {format(new Date(entry.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                      {entry.usuario?.nome && ` · ${entry.usuario.nome}`}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            )}
+            <HistoricoMovimentacaoNegocio historico={historicoStatus} stageLabel={getStatusLabel} />
           </CardContent>
         </Card>
       </div>
