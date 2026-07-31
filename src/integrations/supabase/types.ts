@@ -2416,6 +2416,7 @@ export type Database = {
       }
       tabela_precos: {
         Row: {
+          campos_extras: Json
           categoria: string | null
           created_at: string
           descricao_material: string
@@ -2429,6 +2430,7 @@ export type Database = {
           vigente: boolean
         }
         Insert: {
+          campos_extras?: Json
           categoria?: string | null
           created_at?: string
           descricao_material: string
@@ -2442,6 +2444,7 @@ export type Database = {
           vigente?: boolean
         }
         Update: {
+          campos_extras?: Json
           categoria?: string | null
           created_at?: string
           descricao_material?: string
