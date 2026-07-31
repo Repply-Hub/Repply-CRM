@@ -584,8 +584,10 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       }
 
       // Resolve "Empresa do contato" (texto) para um cliente_id real quando o nome bate
-      // com exatamente uma empresa já cadastrada — ambíguo (nenhuma ou mais de uma) fica
-      // sem vínculo, mantém só o texto (nunca adivinha errado).
+      // com exatamente uma empresa já cadastrada — ambíguo (mais de uma) fica sem vínculo,
+      // mantém só o texto (nunca adivinha errado). Sem nenhuma correspondência, cria a
+      // empresa na hora (mesmo comportamento do import de Negócios via resolveClienteId),
+      // para que os dois fluxos fiquem sincronizados.
       let clienteIdPorNomeEmpresa: Map<string, string> | null = null;
       if (target === 'contatos') {
         const { data: clientesExistentes, error: clientesError } = await supabase
@@ -603,6 +605,43 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
         clienteIdPorNomeEmpresa = new Map(
           Array.from(idPorNome.entries()).filter(([chave]) => contagemPorNome.get(chave) === 1)
         );
+
+        // Nomes de empresa citados nos contatos que não bateram com nenhum cliente
+        // existente (chave ambígua não entra aqui) — precisam ser criados antes do
+        // insert dos contatos, senão cliente_id ficaria null para toda empresa nova.
+        // "Sem empresa" é o placeholder usado quando o contato não trouxe empresa
+        // nenhuma (ver getMappedRowsBase) — nunca deve virar um cliente de verdade.
+        const nomesParaCriar = new Map<string, string>();
+        allRows.forEach(r => {
+          const nome = r.empresa?.trim();
+          if (!nome) return;
+          const chave = nome.toLowerCase();
+          if (chave === 'sem empresa') return;
+          if (contagemPorNome.has(chave)) return; // já existe (única ou ambígua)
+          if (!nomesParaCriar.has(chave)) nomesParaCriar.set(chave, nome);
+        });
+
+        if (nomesParaCriar.size > 0) {
+          const novos = Array.from(nomesParaCriar.values());
+          const { data: criados, error: criarError } = await supabase
+            .from('clientes')
+            .insert(novos.map(nome => ({ empresa: nome, tipo: 'cliente', usuario_id: vid })))
+            .select('id, empresa');
+
+          if (criarError) {
+            // Lote falhou: cria um por um para maximizar aproveitamento
+            for (const nome of novos) {
+              const { data: single } = await supabase
+                .from('clientes')
+                .insert({ empresa: nome, tipo: 'cliente', usuario_id: vid })
+                .select('id, empresa')
+                .single();
+              if (single) clienteIdPorNomeEmpresa.set(single.empresa!.trim().toLowerCase(), single.id);
+            }
+          } else {
+            criados?.forEach(c => clienteIdPorNomeEmpresa!.set(c.empresa!.trim().toLowerCase(), c.id));
+          }
+        }
       }
 
       const BATCH = 500;
