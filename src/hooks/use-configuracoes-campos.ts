@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type EntidadeCampos = 'pedidos' | 'clientes' | 'contatos';
+export type EntidadeCampos = 'pedidos' | 'clientes' | 'contatos' | 'obras';
 
 export interface ConfiguracaoCampo {
   id: string;
@@ -14,9 +14,14 @@ export interface ConfiguracaoCampo {
   tipo: string;
   obrigatorio: boolean;
   ordem: number;
+  etapa: string | null;
   created_by: string | null;
 }
 
+// Fallback de rótulo só para as linhas padrão "originais" (label NULL no banco).
+// Linhas padrão adicionadas depois já trazem o label preenchido diretamente na
+// migration, para evitar colisão de campo_key entre entidades (ex.: "status"
+// significa coisas diferentes em pedidos e em obras).
 export const FIELD_LABELS: Record<string, string> = {
   obra_id: 'Obra vinculada',
   origem_lead: 'Origem do lead',
@@ -29,6 +34,10 @@ export const FIELD_LABELS: Record<string, string> = {
   endereco: 'Endereço',
   cargo: 'Cargo',
 };
+
+export function resolveFieldLabel(campo: Pick<ConfiguracaoCampo, 'campo_key' | 'label'>): string {
+  return campo.label ?? FIELD_LABELS[campo.campo_key] ?? campo.campo_key;
+}
 
 function slugify(str: string): string {
   return str

@@ -6,7 +6,7 @@ import {
   useToggleObrigatorioCampo,
   useCreateCampoCustomizado,
   useDeleteCampoCustomizado,
-  FIELD_LABELS,
+  resolveFieldLabel,
 } from '@/hooks/use-configuracoes-campos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,13 +21,24 @@ import {
 } from '@/components/ui/alert-dialog';
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { cn } from '@/lib/utils';
-import { Loader2, Trash2, Briefcase, Building2, Contact, Plus } from 'lucide-react';
+import { Loader2, Trash2, Briefcase, Building2, Contact, HardHat, Plus } from 'lucide-react';
 
 const ENTIDADE_OPCOES: { value: EntidadeCampos; label: string; icon: typeof Briefcase }[] = [
   { value: 'pedidos', label: 'Negócios', icon: Briefcase },
   { value: 'clientes', label: 'Empresas', icon: Building2 },
   { value: 'contatos', label: 'Contatos', icon: Contact },
+  { value: 'obras', label: 'Obras', icon: HardHat },
 ];
+
+// Campos que já eram obrigatórios de forma fixa no código antes de virarem
+// configuráveis por aqui — desmarcar o switch muda um comportamento que já
+// existia no sistema, então vale avisar.
+const CAMPOS_JA_OBRIGATORIOS_ANTES: Record<EntidadeCampos, string[]> = {
+  pedidos: ['cliente_id', 'fabricante_id', 'vendedor_id', 'anexo_pdf', 'data_pedido'],
+  clientes: ['cnpj', 'nome'],
+  contatos: ['nome_contato'],
+  obras: ['nome_obra', 'cliente_id'],
+};
 
 function EntidadeCamposPanel({ entidade, empresaId, meuUsuarioId }: { entidade: EntidadeCampos; empresaId: string; meuUsuarioId?: string }) {
   const { data: campos, isLoading } = useConfiguracoesCampos(entidade, empresaId);
@@ -45,6 +56,16 @@ function EntidadeCamposPanel({ entidade, empresaId, meuUsuarioId }: { entidade: 
   const padrao = (campos ?? []).filter(c => c.origem === 'padrao');
   const customizados = (campos ?? []).filter(c => c.origem === 'customizado');
 
+  // Agrupa os campos padrão por etapa do wizard (Negócios e Empresas têm múltiplos
+  // passos); entidades sem etapa (Contatos, Obras) caem todas no grupo "sem etapa"
+  // e são renderizadas como lista única, sem subtítulo.
+  const etapasOrdenadas = Array.from(new Set(padrao.map(c => c.etapa ?? '')));
+  const gruposPorEtapa = etapasOrdenadas.map(etapa => ({
+    etapa: etapa || null,
+    campos: padrao.filter(c => (c.etapa ?? '') === etapa),
+  }));
+  const temEtapas = gruposPorEtapa.some(g => g.etapa);
+
   const handleAdicionar = () => {
     if (!novoLabel.trim()) return;
     createCampo.mutate(
@@ -55,28 +76,42 @@ function EntidadeCamposPanel({ entidade, empresaId, meuUsuarioId }: { entidade: 
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
+      <div className="space-y-4">
         <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Campos padrão
         </Label>
-        <div className="rounded-md border border-border divide-y divide-border">
-          {padrao.length === 0 ? (
+        {padrao.length === 0 ? (
+          <div className="rounded-md border border-border">
             <p className="text-sm text-muted-foreground px-4 py-3">Nenhum campo configurável para esta entidade.</p>
-          ) : (
-            padrao.map(campo => (
-              <div key={campo.id} className="flex items-center justify-between px-4 py-2.5">
-                <span className="text-sm">{FIELD_LABELS[campo.campo_key] ?? campo.campo_key}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{campo.obrigatorio ? 'Obrigatório' : 'Opcional'}</span>
-                  <Switch
-                    checked={campo.obrigatorio}
-                    onCheckedChange={checked => toggleObrigatorio.mutate({ id: campo.id, obrigatorio: checked })}
-                  />
-                </div>
+          </div>
+        ) : (
+          gruposPorEtapa.map(grupo => (
+            <div key={grupo.etapa ?? '_sem_etapa'} className="space-y-1.5">
+              {temEtapas && grupo.etapa && (
+                <p className="text-xs font-medium text-muted-foreground pl-1">Etapa: {grupo.etapa}</p>
+              )}
+              <div className="rounded-md border border-border divide-y divide-border">
+                {grupo.campos.map(campo => (
+                  <div key={campo.id} className="flex items-center justify-between px-4 py-2.5">
+                    <div className="flex flex-col">
+                      <span className="text-sm">{resolveFieldLabel(campo)}</span>
+                      {campo.obrigatorio && CAMPOS_JA_OBRIGATORIOS_ANTES[entidade].includes(campo.campo_key) && (
+                        <p className="text-xs text-muted-foreground">Recomendamos manter este campo como obrigatório.</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{campo.obrigatorio ? 'Obrigatório' : 'Opcional'}</span>
+                      <Switch
+                        checked={campo.obrigatorio}
+                        onCheckedChange={checked => toggleObrigatorio.mutate({ id: campo.id, obrigatorio: checked })}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))
-          )}
-        </div>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="space-y-2">

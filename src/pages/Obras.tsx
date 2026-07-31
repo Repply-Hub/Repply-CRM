@@ -25,6 +25,8 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useCreateObra, useUpdateObra, useDeleteObra, useDeleteObrasBulk } from '@/hooks/use-mutations';
+import { useAuth } from '@/hooks/use-auth';
+import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { formatCnpj, isValidCnpj } from '@/utils/cnpj';
@@ -64,8 +66,10 @@ const OBRA_FIELDS: ColumnDefinition[] = [
 export default function Obras() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { profile } = useAuth();
   const { data: obras, isLoading } = useObras();
   const { data: clientes } = useClientes();
+  const { data: camposConfigObras } = useConfiguracoesCampos('obras', profile?.empresa_id);
   const createObra = useCreateObra();
   const updateObra = useUpdateObra();
   const deleteObra = useDeleteObra();
@@ -93,6 +97,13 @@ export default function Obras() {
     status: '',
     spe_cnpj: '',
   });
+  const [camposExtrasObra, setCamposExtrasObra] = useState<Record<string, string>>({});
+
+  // Helper de leitura da config: campos que ainda não têm linha na config
+  // (empresas antigas antes desta migration) caem no `fallback`, que reflete o
+  // comportamento hardcoded que esses campos tinham antes de virarem configuráveis.
+  const obraObrigatorio = (key: string, fallback: boolean) =>
+    camposConfigObras?.find(c => c.campo_key === key)?.obrigatorio ?? fallback;
   const [editObra, setEditObra] = useState({
     id: '',
     nome_obra: '',
@@ -764,31 +775,44 @@ export default function Obras() {
             </DialogHeader>
             <form onSubmit={(e) => {
               e.preventDefault();
-              if (!newObra.nome_obra || !newObra.cliente_id) {
+              const nomeObraObrigatorio = obraObrigatorio('nome_obra', true);
+              const clienteObrigatorio = obraObrigatorio('cliente_id', true);
+              if ((nomeObraObrigatorio && !newObra.nome_obra) || (clienteObrigatorio && !newObra.cliente_id)) {
                 toast.error("Preencha ao menos o nome e o cliente.");
                 return;
               }
-              const result = cnpjSchema.safeParse(newObra.spe_cnpj);
-              if (!result.success) {
-                setNewObraCnpjError(result.error.errors[0].message);
-                return;
+              const speCnpjObrigatorio = obraObrigatorio('spe_cnpj', false);
+              if (speCnpjObrigatorio || newObra.spe_cnpj.trim()) {
+                const result = cnpjSchema.safeParse(newObra.spe_cnpj);
+                if (!result.success) {
+                  setNewObraCnpjError(result.error.errors[0].message);
+                  return;
+                }
+              }
+              for (const c of (camposConfigObras ?? []).filter(c => c.origem === 'customizado' && c.obrigatorio)) {
+                if (!camposExtrasObra[c.campo_key]?.trim()) {
+                  toast.error(`Preencha o campo obrigatório: ${c.label}`);
+                  return;
+                }
               }
               const payload = {
                 ...newObra,
-                spe_cnpj: newObra.spe_cnpj.replace(/\D/g, "")
+                spe_cnpj: newObra.spe_cnpj.replace(/\D/g, ""),
+                campos_extras: camposExtrasObra,
               };
               createObra.mutate(payload, {
                 onSuccess: () => {
                   setDialogOpen(false);
                   setNewObra({ nome_obra: '', cliente_id: '', endereco_entrega: '', status: statusObras?.[0]?.slug || '', spe_cnpj: '' });
+                  setCamposExtrasObra({});
                   setNewObraCnpjError('');
                 }
               });
             }} className="space-y-4">
               <div className="space-y-2">
-                <Label>Nome da Obra</Label>
-                <Input 
-                  required
+                <Label>Nome da Obra{obraObrigatorio('nome_obra', true) && ' *'}</Label>
+                <Input
+                  required={obraObrigatorio('nome_obra', true)}
                   placeholder="Ex: Edifício Central"
                   value={newObra.nome_obra}
                   onChange={(e) => setNewObra(prev => ({ ...prev, nome_obra: e.target.value }))}
@@ -796,7 +820,7 @@ export default function Obras() {
               </div>
 
               <div className="space-y-2">
-                <Label>Cliente Responsável</Label>
+                <Label>Cliente Responsável{obraObrigatorio('cliente_id', true) && ' *'}</Label>
                 <EmpresaSelector
                   value={newObra.cliente_id}
                   onValueChange={(v) => setNewObra(prev => ({ ...prev, cliente_id: v }))}
@@ -805,9 +829,9 @@ export default function Obras() {
               </div>
 
               <div className="space-y-2">
-                <Label>Status Inicial</Label>
-                <Select 
-                  value={newObra.status} 
+                <Label>Status Inicial{obraObrigatorio('status', false) && ' *'}</Label>
+                <Select
+                  value={newObra.status}
                   onValueChange={(v) => setNewObra(prev => ({ ...prev, status: v }))}
                 >
                   <SelectTrigger>
@@ -822,7 +846,7 @@ export default function Obras() {
               </div>
 
               <div className="space-y-2">
-                <Label>Endereço de Entrega</Label>
+                <Label>Endereço de Entrega{obraObrigatorio('endereco_entrega', false) && ' *'}</Label>
                 <EnderecoAutocomplete
                   value={newObra.endereco_entrega}
                   onChange={(v) => setNewObra(prev => ({ ...prev, endereco_entrega: v }))}
@@ -830,8 +854,8 @@ export default function Obras() {
               </div>
 
               <div className="space-y-2">
-                <Label>SPE / CNPJ</Label>
-                <Input 
+                <Label>SPE / CNPJ{obraObrigatorio('spe_cnpj', false) && ' *'}</Label>
+                <Input
                   placeholder="00.000.000/0000-00"
                   maxLength={18}
                   value={newObra.spe_cnpj}
@@ -842,6 +866,17 @@ export default function Obras() {
                 />
                 {newObraCnpjError && <p className="text-[0.8rem] font-medium text-destructive">{newObraCnpjError}</p>}
               </div>
+
+              {(camposConfigObras ?? []).filter(c => c.origem === 'customizado').map(campo => (
+                <div key={campo.id} className="space-y-2">
+                  <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+                  <Input
+                    value={camposExtrasObra[campo.campo_key] ?? ''}
+                    onChange={(e) => setCamposExtrasObra(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}
+                    placeholder={campo.label ?? ''}
+                  />
+                </div>
+              ))}
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>

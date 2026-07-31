@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { useCreateCliente, useCreateContato, useUpdateContato, useDeleteCliente, useDeleteContato } from '@/hooks/use-mutations';
-import { useConfiguracoesCampos, FIELD_LABELS } from '@/hooks/use-configuracoes-campos';
+import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -237,6 +237,13 @@ const Clientes = () => {
   const empresaIdAtual = profile?.empresa_id ?? profile?.empresas?.id;
   const { data: camposConfigClientes } = useConfiguracoesCampos('clientes', empresaIdAtual);
   const { data: camposConfigContatos } = useConfiguracoesCampos('contatos', empresaIdAtual);
+  // Helpers de leitura da config: campos que ainda não têm linha na config
+  // (empresas antigas antes desta migration) caem no `fallback`, que reflete o
+  // comportamento hardcoded que esses campos tinham antes de virarem configuráveis.
+  const empresaObrigatorio = (key: string, fallback: boolean) =>
+    camposConfigClientes?.find(c => c.campo_key === key)?.obrigatorio ?? fallback;
+  const contatoObrigatorio = (key: string, fallback: boolean) =>
+    camposConfigContatos?.find(c => c.campo_key === key)?.obrigatorio ?? fallback;
   const [camposExtrasEmpresa, setCamposExtrasEmpresa] = useState<Record<string, string>>({});
   const [camposExtrasContato, setCamposExtrasContato] = useState<Record<string, string>>({});
   const { data: clients, isLoading: loadingClientes } = useClientes();
@@ -526,21 +533,32 @@ const Clientes = () => {
   // e mostra o erro sem avançar quando algo obrigatório estiver faltando.
   const validateEmpresaStep = (targetStep: number) => {
     if (targetStep === 1) {
-      if (!empresa.trim()) {
+      const nomeObrigatorio = camposConfigClientes?.find(c => c.campo_key === 'nome')?.obrigatorio ?? true;
+      if (nomeObrigatorio && !empresa.trim()) {
         toast.error('Informe o nome da empresa.');
         return false;
       }
-      if (unmaskCnpj(cnpj).length !== 14) {
-        toast.error('Informe um CNPJ válido.');
-        return false;
-      }
-      if (!isValidCnpjDigits(unmaskCnpj(cnpj))) {
-        toast.error('CNPJ inválido');
-        return false;
+      const cnpjObrigatorio = camposConfigClientes?.find(c => c.campo_key === 'cnpj')?.obrigatorio ?? true;
+      // Se o CNPJ não for obrigatório e o campo estiver vazio, pula a validação de
+      // formato; se foi preenchido (mesmo sem ser obrigatório), o formato ainda é validado.
+      if (cnpjObrigatorio || cnpj.trim()) {
+        if (unmaskCnpj(cnpj).length !== 14) {
+          toast.error('Informe um CNPJ válido.');
+          return false;
+        }
+        if (!isValidCnpjDigits(unmaskCnpj(cnpj))) {
+          toast.error('CNPJ inválido');
+          return false;
+        }
       }
       const razaoSocialObrigatoria = camposConfigClientes?.find(c => c.campo_key === 'razao_social')?.obrigatorio ?? false;
       if (razaoSocialObrigatoria && !razaoSocial.trim()) {
         toast.error('Informe a razão social da empresa.');
+        return false;
+      }
+      const tipoObrigatorio = camposConfigClientes?.find(c => c.campo_key === 'tipo')?.obrigatorio ?? false;
+      if (tipoObrigatorio && !tipo.trim()) {
+        toast.error('Informe o tipo da empresa.');
         return false;
       }
     }
@@ -577,18 +595,29 @@ const Clientes = () => {
 
     if (activeTab === 'contatos') {
       const contatoEmailValue = (form.get('email') as string) || '';
-      if (!nomeContato.trim()) {
+      const nomeContatoObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'nome_contato')?.obrigatorio ?? true;
+      if (nomeContatoObrigatorio && !nomeContato.trim()) {
         toast.error('Informe o nome do contato.');
         return;
       }
       const contatoEmailObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'email')?.obrigatorio ?? true;
       const contatoTelefoneObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'telefone')?.obrigatorio ?? true;
+      const cargoObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'cargo')?.obrigatorio ?? false;
+      const empresaVinculoObrigatoria = camposConfigContatos?.find(c => c.campo_key === 'empresa_vinculo')?.obrigatorio ?? false;
       if (contatoEmailObrigatorio && !contatoEmailValue.trim()) {
         toast.error('Informe o email do contato.');
         return;
       }
       if (contatoTelefoneObrigatorio && !telefone.trim()) {
         toast.error('Informe o telefone do contato.');
+        return;
+      }
+      if (cargoObrigatorio && !cargo.trim()) {
+        toast.error('Informe o cargo do contato.');
+        return;
+      }
+      if (empresaVinculoObrigatoria && !empresa.trim()) {
+        toast.error('Vincule uma empresa ao contato.');
         return;
       }
       for (const c of (camposConfigContatos ?? []).filter(c => c.origem === 'customizado' && c.obrigatorio)) {
@@ -630,18 +659,24 @@ const Clientes = () => {
       return;
     }
     if (contatoMode === 'novo') {
-      if (!nomeContato.trim()) {
+      const nomeContatoObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'nome_contato')?.obrigatorio ?? true;
+      if (nomeContatoObrigatorio && !nomeContato.trim()) {
         toast.error('Informe o nome do novo contato.');
         return;
       }
       const contatoEmailObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'email')?.obrigatorio ?? true;
       const contatoTelefoneObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'telefone')?.obrigatorio ?? true;
+      const cargoObrigatorio = camposConfigContatos?.find(c => c.campo_key === 'cargo')?.obrigatorio ?? false;
       if (contatoEmailObrigatorio && !contatoEmail.trim()) {
         toast.error('Informe o email do novo contato.');
         return;
       }
       if (contatoTelefoneObrigatorio && !contatoTelefone.trim()) {
         toast.error('Informe o telefone do novo contato.');
+        return;
+      }
+      if (cargoObrigatorio && !cargo.trim()) {
+        toast.error('Informe o cargo do novo contato.');
         return;
       }
       for (const c of (camposConfigContatos ?? []).filter(c => c.origem === 'customizado' && c.obrigatorio)) {
@@ -1021,7 +1056,7 @@ const Clientes = () => {
                     {step === 1 && (
                       <>
                         <div>
-                          <Label>Tipo</Label>
+                          <Label>Tipo{empresaObrigatorio('tipo', false) && ' *'}</Label>
                           <Select
                             value={tipo}
                             onValueChange={(v) => {
@@ -1046,35 +1081,35 @@ const Clientes = () => {
                           </Select>
                         </div>
                         <div>
-                          <Label>CNPJ *</Label>
+                          <Label>CNPJ{empresaObrigatorio('cnpj', true) && ' *'}</Label>
                           <div className="relative">
                             <Input
                               value={cnpj}
                               onChange={(e) => handleCnpjChange(e.target.value)}
                               placeholder="00.000.000/0000-00"
                               className={cnpjStatus === 'invalid' ? 'border-destructive' : cnpjStatus === 'valid' ? 'border-green-500' : ''}
-                              required
+                              required={empresaObrigatorio('cnpj', true)}
                             />
                             {cnpjStatus === 'loading' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
                             {cnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
                           </div>
                           <p className="text-[10px] text-muted-foreground mt-1">Ao sair do campo, o CNPJ será validado e os dados preenchidos automaticamente</p>
                         </div>
-                        <div><Label>Nome *</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Nome fantasia ou nome" required /></div>
-                        <div><Label>Razão Social</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" /></div>
+                        <div><Label>Nome{empresaObrigatorio('nome', true) && ' *'}</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Nome fantasia ou nome" required={empresaObrigatorio('nome', true)} /></div>
+                        <div><Label>Razão Social{empresaObrigatorio('razao_social', false) && ' *'}</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" required={empresaObrigatorio('razao_social', false)} /></div>
                       </>
                     )}
 
                     {step === 2 && (
                       <div className="grid grid-cols-2 gap-3">
-                        <div><Label>Email *</Label><Input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="email@exemplo.com" required /></div>
-                        <div><Label>Telefone *</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required /></div>
+                        <div><Label>Email{empresaObrigatorio('email', true) && ' *'}</Label><Input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="email@exemplo.com" required={empresaObrigatorio('email', true)} /></div>
+                        <div><Label>Telefone{empresaObrigatorio('telefone', true) && ' *'}</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required={empresaObrigatorio('telefone', true)} /></div>
                       </div>
                     )}
 
                     {step === 3 && (
                       <div className="space-y-3">
-                        <EnderecoForm value={endereco} onChange={setEndereco} required />
+                        <EnderecoForm value={endereco} onChange={setEndereco} required={empresaObrigatorio('endereco', false)} />
                         {(camposConfigClientes ?? []).filter(c => c.origem === 'customizado').map(campo => (
                           <div key={campo.id}>
                             <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
@@ -1110,12 +1145,12 @@ const Clientes = () => {
                         )}
                         {contatoMode === 'novo' && (
                           <div className="space-y-3">
-                            <Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome do contato *" required />
+                            <Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder={`Nome do contato${contatoObrigatorio('nome_contato', true) ? ' *' : ''}`} required={contatoObrigatorio('nome_contato', true)} />
                             <div className="grid grid-cols-2 gap-3">
                               <CargoSelect value={cargo} onValueChange={setCargo} />
-                              <Input value={contatoTelefone} onChange={e => setContatoTelefone(e.target.value)} placeholder="Telefone do contato *" required />
+                              <Input value={contatoTelefone} onChange={e => setContatoTelefone(e.target.value)} placeholder={`Telefone do contato${contatoObrigatorio('telefone', true) ? ' *' : ''}`} required={contatoObrigatorio('telefone', true)} />
                             </div>
-                            <Input value={contatoEmail} onChange={e => setContatoEmail(e.target.value)} type="email" placeholder="Email do contato *" required />
+                            <Input value={contatoEmail} onChange={e => setContatoEmail(e.target.value)} type="email" placeholder={`Email do contato${contatoObrigatorio('email', true) ? ' *' : ''}`} required={contatoObrigatorio('email', true)} />
                             {(camposConfigContatos ?? []).filter(c => c.origem === 'customizado').map(campo => (
                               <div key={campo.id}>
                                 <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
@@ -1150,12 +1185,12 @@ const Clientes = () => {
                   </>
                 ) : (
                   <>
-                    <div><Label>Nome do contato *</Label><Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome completo" required /></div>
-                    <div><Label>Empresa</Label><EmpresaSelector value={empresa} onValueChange={setEmpresa} placeholder="Vincular empresa..." /></div>
-                    <div><Label>Cargo</Label><CargoSelect value={cargo} onValueChange={setCargo} /></div>
+                    <div><Label>Nome do contato{contatoObrigatorio('nome_contato', true) && ' *'}</Label><Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome completo" required={contatoObrigatorio('nome_contato', true)} /></div>
+                    <div><Label>Empresa{contatoObrigatorio('empresa_vinculo', false) && ' *'}</Label><EmpresaSelector value={empresa} onValueChange={setEmpresa} placeholder="Vincular empresa..." /></div>
+                    <div><Label>Cargo{contatoObrigatorio('cargo', false) && ' *'}</Label><CargoSelect value={cargo} onValueChange={setCargo} /></div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div><Label>Email *</Label><Input name="email" type="email" placeholder="email@exemplo.com" required /></div>
-                      <div><Label>Telefone *</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required /></div>
+                      <div><Label>Email{contatoObrigatorio('email', true) && ' *'}</Label><Input name="email" type="email" placeholder="email@exemplo.com" required={contatoObrigatorio('email', true)} /></div>
+                      <div><Label>Telefone{contatoObrigatorio('telefone', true) && ' *'}</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required={contatoObrigatorio('telefone', true)} /></div>
                     </div>
                     {(camposConfigContatos ?? []).filter(c => c.origem === 'customizado').map(campo => (
                       <div key={campo.id}>

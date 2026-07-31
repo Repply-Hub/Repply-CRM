@@ -15,7 +15,7 @@ import { useFunis } from '@/hooks/use-funis';
 import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCreatePedidoCompleto } from '@/hooks/use-novo-pedido';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { useAuth } from '@/hooks/use-auth';
-import { useConfiguracoesCampos, FIELD_LABELS } from '@/hooks/use-configuracoes-campos';
+import { useConfiguracoesCampos, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
@@ -230,42 +230,63 @@ function NovoNegocioFormContent({
   };
 
   // Validation
-  const isStep1Complete = !!clienteId && !!fabricanteId && !!vendedorId && !!pdfFile;
+  // Helper de leitura da config: campos que ainda não têm linha na config
+  // (empresas antigas antes desta migration) caem no `fallback`, que reflete o
+  // comportamento hardcoded que esses campos tinham antes de virarem configuráveis.
+  const obrigatorio = (key: string, fallback: boolean) =>
+    camposConfig?.find(c => c.campo_key === key)?.obrigatorio ?? fallback;
 
-  const validateStep1 = () => {
-    if (!clienteId) { toast.error('Selecione um cliente'); return false; }
-
-    if (!fabricanteId) { toast.error('Selecione um fabricante'); return false; }
-    if (!vendedorId) { toast.error('Selecione o responsável'); return false; }
-    if (!pdfFile) { toast.error('Anexe o PDF do negócio (obrigatório)'); return false; }
-    return true;
-  };
-
-  const getMissingStep2Field = () => {
+  // Um único mapa de valores cobre os campos das duas etapas do wizard; qual
+  // etapa cada campo pertence vem da própria config (`etapa`), então não
+  // precisa duplicar essa lista aqui.
+  const getMissingField = (etapaAlvo: 'step1' | 'step2') => {
     const valoresPadrao: Record<string, string | undefined> = {
+      cliente_id: clienteId,
+      fabricante_id: fabricanteId,
+      vendedor_id: vendedorId,
+      status: status,
+      anexo_pdf: pdfFile ? 'ok' : undefined,
+      data_pedido: dataPedido ? 'ok' : undefined,
       obra_id: obraId,
       origem_lead: origemLead,
       endereco_entrega: enderecoEntrega,
       prazo_resposta: prazoResposta ? 'ok' : undefined,
       observacoes: observacoes,
+      itens: itens.length > 0 ? 'ok' : undefined,
+      // Valor manual só é exigível quando o modo manual está ativo — fora dele,
+      // o valor vem do somatório dos itens.
+      valor_manual: (!isManualMode || valorManual != null) ? 'ok' : undefined,
+      proximo_contato: proximoContato ? 'ok' : undefined,
     };
-    for (const campo of camposConfig ?? []) {
+    const camposDaEtapa = (camposConfig ?? []).filter(c =>
+      etapaAlvo === 'step2' ? c.etapa === 'Itens do Negócio' : c.etapa !== 'Itens do Negócio'
+    );
+    for (const campo of camposDaEtapa) {
       if (!campo.obrigatorio) continue;
       const valor = campo.origem === 'padrao' ? valoresPadrao[campo.campo_key] : camposExtras[campo.campo_key];
       if (!valor || !valor.trim()) {
-        const label = campo.origem === 'padrao' ? (FIELD_LABELS[campo.campo_key] ?? campo.campo_key) : campo.label;
-        return label;
+        return resolveFieldLabel(campo);
       }
     }
     return null;
   };
 
-  const isStep2Complete = getMissingStep2Field() === null;
+  const missingStep1Field = getMissingField('step1');
+  const missingStep2Field = getMissingField('step2');
+  const isStep1Complete = missingStep1Field === null;
+  const isStep2Complete = missingStep2Field === null;
+
+  const validateStep1 = () => {
+    if (missingStep1Field) {
+      toast.error(`Preencha o campo obrigatório: ${missingStep1Field}`);
+      return false;
+    }
+    return true;
+  };
 
   const validateStep2 = () => {
-    const missing = getMissingStep2Field();
-    if (missing) {
-      toast.error(`Preencha o campo obrigatório: ${missing}`);
+    if (missingStep2Field) {
+      toast.error(`Preencha o campo obrigatório: ${missingStep2Field}`);
       return false;
     }
     return true;
@@ -276,29 +297,30 @@ function NovoNegocioFormContent({
   };
 
   const handleSubmit = async () => {
-    if (!validateStep2()) return;
-    if (!pdfFile) { toast.error('Anexe o PDF do negócio (obrigatório)'); return false; }
+    if (!validateStep1() || !validateStep2()) return;
     if (!resolvedFunilId) { toast.error('Não foi possível identificar o funil de destino. Tente novamente em instantes.'); return false; }
 
     setIsUploading(true);
     let pdfUrl = '';
 
     try {
-      // 1. Upload PDF (nome sanitizado — o Storage rejeita chaves com acentos/
-      // espaços — isolado numa pasta aleatória para evitar colisão entre uploads)
-      const filePath = `${crypto.randomUUID()}/${sanitizeFileName(pdfFile.name)}`;
+      if (pdfFile) {
+        // 1. Upload PDF (nome sanitizado — o Storage rejeita chaves com acentos/
+        // espaços — isolado numa pasta aleatória para evitar colisão entre uploads)
+        const filePath = `${crypto.randomUUID()}/${sanitizeFileName(pdfFile.name)}`;
 
-      const { error: uploadError, data } = await supabase.storage
-        .from('pedido-anexos')
-        .upload(filePath, pdfFile);
+        const { error: uploadError } = await supabase.storage
+          .from('pedido-anexos')
+          .upload(filePath, pdfFile);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('pedido-anexos')
-        .getPublicUrl(filePath);
+        const { data: { publicUrl } } = supabase.storage
+          .from('pedido-anexos')
+          .getPublicUrl(filePath);
 
-      pdfUrl = publicUrl;
+        pdfUrl = publicUrl;
+      }
 
       // 2. Create Pedido
       let proximoContatoISO: string | undefined;
@@ -425,7 +447,7 @@ function NovoNegocioFormContent({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Cliente */}
                 <div className="space-y-2">
-                  <Label>Cliente *</Label>
+                  <Label>Cliente{obrigatorio('cliente_id', true) && ' *'}</Label>
                   <EmpresaSelector
                     value={clienteId}
                     onValueChange={handleClienteChange}
@@ -434,7 +456,7 @@ function NovoNegocioFormContent({
 
                 {/* Fase do Pedido */}
                 <div className="space-y-2">
-                  <Label>Fase do Negócio</Label>
+                  <Label>Fase do Negócio{obrigatorio('status', false) && ' *'}</Label>
                   <Select value={status} onValueChange={setStatus}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecionar fase" />
@@ -461,7 +483,7 @@ function NovoNegocioFormContent({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Fabricante */}
                 <div className="space-y-2">
-                  <Label>Fabricante *</Label>
+                  <Label>Fabricante{obrigatorio('fabricante_id', true) && ' *'}</Label>
                   <FabricanteSelector
                     value={fabricanteId}
                     onValueChange={setFabricanteId}
@@ -470,7 +492,7 @@ function NovoNegocioFormContent({
 
                 {/* Obra */}
                 <div className="space-y-2">
-                  <Label>Obra</Label>
+                  <Label>Obra{obrigatorio('obra_id', false) && ' *'}</Label>
                   <SearchableSelect
                     options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
                     value={obraId}
@@ -488,7 +510,7 @@ function NovoNegocioFormContent({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Vendedor */}
                 <div className="space-y-2">
-                  <Label>Responsável *</Label>
+                  <Label>Responsável{obrigatorio('vendedor_id', true) && ' *'}</Label>
                   <SearchableSelect
                     options={(vendedores ?? []).map(v => ({ value: v.id, label: v.nome }))}
                     value={vendedorId}
@@ -500,7 +522,7 @@ function NovoNegocioFormContent({
 
                 {/* Origem */}
                 <div className="space-y-2">
-                  <Label>Origem</Label>
+                  <Label>Origem{obrigatorio('origem_lead', false) && ' *'}</Label>
                   <Select value={origemLead} onValueChange={setOrigemLead}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Selecionar origem" />
@@ -532,8 +554,10 @@ function NovoNegocioFormContent({
               {/* Anexo PDF */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
-                  Anexar PDF *
-                  <span className="text-xs font-normal text-muted-foreground">(Obrigatório)</span>
+                  Anexar PDF{obrigatorio('anexo_pdf', true) && ' *'}
+                  {obrigatorio('anexo_pdf', true) && (
+                    <span className="text-xs font-normal text-muted-foreground">(Obrigatório)</span>
+                  )}
                 </Label>
                 <div className={cn(
                   "relative border-2 border-dashed rounded-lg p-4 transition-colors",
@@ -578,7 +602,7 @@ function NovoNegocioFormContent({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Data de Criação */}
                 <div className="space-y-2">
-                  <Label>Data de Criação *</Label>
+                  <Label>Data de Criação{obrigatorio('data_pedido', true) && ' *'}</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start text-left font-normal">
@@ -607,7 +631,7 @@ function NovoNegocioFormContent({
 
                 {/* Data de Fechamento */}
                 <div className="space-y-2">
-                  <Label>Data de Fechamento</Label>
+                  <Label>Data de Fechamento{obrigatorio('prazo_resposta', false) && ' *'}</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start text-left font-normal">
@@ -646,13 +670,13 @@ function NovoNegocioFormContent({
 
               {/* Endereço de entrega */}
               <div className="space-y-2">
-                <Label>Endereço de Entrega</Label>
+                <Label>Endereço de Entrega{obrigatorio('endereco_entrega', false) && ' *'}</Label>
                 <Input value={enderecoEntrega} onChange={e => setEnderecoEntrega(e.target.value)} placeholder="Endereço de entrega" />
               </div>
 
               {/* Descrição do Pedido */}
               <div className="space-y-2">
-                <Label>Descrição do Negócio</Label>
+                <Label>Descrição do Negócio{obrigatorio('observacoes', false) && ' *'}</Label>
                 <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações ou descrição geral do negócio" rows={3} />
               </div>
 
@@ -674,7 +698,7 @@ function NovoNegocioFormContent({
               {/* Items table */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <Label className="text-base font-semibold">Itens do Negócio</Label>
+                  <Label className="text-base font-semibold">Itens do Negócio{obrigatorio('itens', false) && ' *'}</Label>
                   {itens.length > 0 && (
                     <Button size="sm" variant="outline" onClick={addItem}>
                       <Plus className="h-4 w-4 mr-1" /> Adicionar Item

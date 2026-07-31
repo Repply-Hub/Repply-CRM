@@ -180,6 +180,7 @@ export function useCreateObra() {
       endereco_entrega?: string;
       status?: string;
       spe_cnpj?: string;
+      campos_extras?: Record<string, string>;
     }) => {
       const { error } = await supabase.from('obras').insert(data);
       if (error) throw error;

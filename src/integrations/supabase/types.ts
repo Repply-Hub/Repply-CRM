@@ -661,6 +661,7 @@ export type Database = {
           created_by: string | null
           empresa_id: string
           entidade: string
+          etapa: string | null
           id: string
           label: string | null
           obrigatorio: boolean
@@ -675,6 +676,7 @@ export type Database = {
           created_by?: string | null
           empresa_id: string
           entidade: string
+          etapa?: string | null
           id?: string
           label?: string | null
           obrigatorio?: boolean
@@ -689,6 +691,7 @@ export type Database = {
           created_by?: string | null
           empresa_id?: string
           entidade?: string
+          etapa?: string | null
           id?: string
           label?: string | null
           obrigatorio?: boolean
