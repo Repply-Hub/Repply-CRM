@@ -180,11 +180,69 @@ const MIN_SCORE: Record<FieldKey, number> = {
 
 const STATUS_RULES: Array<{ status: string; patterns: RegExp[] }> = [
   { status: 'fechamento', patterns: [/fech/, /ganho/, /concluid/, /won/] },
+  { status: 'perdido', patterns: [/perdid/, /perda/, /cancelad/, /\blost\b/, /reprovad/, /recusad/, /declinad/] },
   { status: 'negociacao', patterns: [/negocia/, /tratativa/] },
   { status: 'enviado', patterns: [/enviad/, /apresentad/, /proposta/] },
   { status: 'elaboracao', patterns: [/elabora/, /orcamento/, /cotacao/, /em andamento/] },
   { status: 'novo lead', patterns: [/novo lead/, /\blead\b/, /\bnovo\b/] },
 ];
+
+// Slugs padrão de sistema (ver supabase/migrations/20260418175245_*.sql e
+// 20260722120000_kanban_coluna_perdido_padrao.sql) usados como ponte entre os rótulos
+// genéricos acima e as colunas reais da empresa em matchPedidoStatusToColuna.
+const DEFAULT_SLUG_BY_STATUS: Record<string, string> = {
+  fechamento: 'fechamento',
+  perdido: 'perdido',
+  negociacao: 'negociacao',
+  enviado: 'enviado',
+  elaboracao: 'elaboracao',
+  'novo lead': 'novo_lead',
+};
+
+export interface ImportKanbanColuna {
+  slug: string;
+  nome: string;
+}
+
+/**
+ * Resolve o status importado para o slug de uma coluna real do Kanban da empresa/funil
+ * (kanban_colunas), já que as etapas são configuráveis por empresa e não um enum fixo.
+ * Sem isso, qualquer etapa que não bata com as 5-6 palavras-chave padrão acaba caindo
+ * sempre na primeira coluna (normalmente "Novo Lead").
+ */
+export function matchPedidoStatusToColuna(rawStatus: unknown, colunas: ImportKanbanColuna[]): string {
+  const fallbackSlug = colunas[0]?.slug ?? 'novo_lead';
+  if (colunas.length === 0) return fallbackSlug;
+
+  const normalized = normalizeText(rawStatus);
+  if (!normalized) return fallbackSlug;
+
+  // 1. Match exato contra nome ou slug reais da coluna (cobre colunas renomeadas/customizadas)
+  const exact = colunas.find((c) => normalizeText(c.nome) === normalized || normalizeText(c.slug) === normalized);
+  if (exact) return exact.slug;
+
+  // 2. Contém / é contido
+  const partial = colunas.find((c) => {
+    const nome = normalizeText(c.nome);
+    const slug = normalizeText(c.slug);
+    return (nome && (nome.includes(normalized) || normalized.includes(nome))) ||
+      (slug && (slug.includes(normalized) || normalized.includes(slug)));
+  });
+  if (partial) return partial.slug;
+
+  // 3. Sinônimos conhecidos (ex.: "Ganho"/"Won" → fechamento), apontando para a coluna
+  //    real da empresa somente se ela ainda existir com o slug padrão do sistema
+  for (const rule of STATUS_RULES) {
+    if (rule.patterns.some((pattern) => pattern.test(normalized))) {
+      const defaultSlug = DEFAULT_SLUG_BY_STATUS[rule.status];
+      const bySlug = colunas.find((c) => c.slug === defaultSlug);
+      if (bySlug) return bySlug.slug;
+    }
+  }
+
+  // 4. Nada bateu: cai na primeira coluna do funil, respeitando a ordem configurada
+  return fallbackSlug;
+}
 
 function normalizeText(value: unknown): string {
   return (value ?? '')

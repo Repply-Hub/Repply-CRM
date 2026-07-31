@@ -3,6 +3,7 @@ import {
   detectImportPedidosMapping,
   getImportedPedidosRows,
   getSheetHeaders,
+  matchPedidoStatusToColuna,
 } from './importPedidosUtils';
 
 describe('importPedidosUtils', () => {
@@ -86,5 +87,42 @@ describe('importPedidosUtils', () => {
         campos_extras: {},
       },
     ]);
+  });
+});
+
+describe('matchPedidoStatusToColuna', () => {
+  const colunasPadrao = [
+    { slug: 'novo_lead', nome: 'Novo Lead' },
+    { slug: 'elaboracao', nome: 'Elaboração de Orçamento' },
+    { slug: 'enviado', nome: 'Orçamento Enviado' },
+    { slug: 'negociacao', nome: 'Negociação' },
+    { slug: 'fechamento', nome: 'Fechamento' },
+    { slug: 'perdido', nome: 'Perdido' },
+  ];
+
+  it('reconhece "Perdido" e não deixa cair em Novo Lead', () => {
+    expect(matchPedidoStatusToColuna('Perdido', colunasPadrao)).toBe('perdido');
+    expect(matchPedidoStatusToColuna('Cancelado', colunasPadrao)).toBe('perdido');
+  });
+
+  it('casa por nome/slug reais mesmo com colunas customizadas pela empresa', () => {
+    const colunasCustom = [
+      { slug: 'contato inicial', nome: 'Contato Inicial' },
+      { slug: 'visita tecnica', nome: 'Visita Técnica' },
+      { slug: 'proposta', nome: 'Proposta Enviada' },
+      { slug: 'ganho', nome: 'Ganhamos' },
+    ];
+
+    expect(matchPedidoStatusToColuna('Visita Técnica', colunasCustom)).toBe('visita tecnica');
+    expect(matchPedidoStatusToColuna('proposta enviada', colunasCustom)).toBe('proposta');
+    expect(matchPedidoStatusToColuna('Ganho', colunasCustom)).toBe('ganho');
+  });
+
+  it('cai na primeira coluna do funil (respeitando a ordem) quando nada bate', () => {
+    expect(matchPedidoStatusToColuna('valor totalmente desconhecido', colunasPadrao)).toBe('novo_lead');
+  });
+
+  it('sem colunas carregadas, usa novo_lead como último fallback', () => {
+    expect(matchPedidoStatusToColuna('qualquer coisa', [])).toBe('novo_lead');
   });
 });

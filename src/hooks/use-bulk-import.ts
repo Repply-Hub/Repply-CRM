@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { resolveClienteId, resolveFabricanteId, resolveObraId, resolveMarcadorId, resetResolveCache, preloadResolveCache } from '@/lib/import/resolve-entities';
 import { computeRowHash } from '@/lib/import/row-hash';
 import { resolveEspelhoPdfUrls, type ResolvePdfResult } from '@/lib/import/resolve-pedido-pdf';
+import { matchPedidoStatusToColuna, type ImportKanbanColuna } from '@/components/import-pedidos/importPedidosUtils';
 
 export type ImportType = 'clientes' | 'negocios';
 
@@ -13,19 +14,6 @@ export interface ImportSummary {
   ignored: number;
   duplicados: number;
   motivosFalha: Record<string, number>;
-}
-
-const STATUS_MAP: Record<string, string> = {
-  'novo lead': 'novo_lead',
-  'elaboracao': 'elaboracao',
-  'enviado': 'enviado',
-  'negociacao': 'negociacao',
-  'fechamento': 'fechamento',
-};
-
-function mapStatus(value: unknown): string {
-  const normalized = String(value ?? '').trim().toLowerCase();
-  return STATUS_MAP[normalized] ?? 'novo_lead';
 }
 
 /**
@@ -146,11 +134,18 @@ export function useBulkImport() {
       funilId = funilPadrao.id;
     }
 
-    // Computa hashes, pré-carrega entidades e resolve PDFs de cotação do Bitrix em paralelo — são independentes entre si.
+    // Colunas reais do funil escolhido — as etapas são configuráveis por empresa (não um
+    // enum fixo), então o status importado precisa ser casado contra elas em vez de um
+    // dicionário fixo de 5 palavras-chave (isso fazia qualquer etapa customizada ou não
+    // reconhecida cair sempre em "Novo Lead").
+    let kanbanColunas: ImportKanbanColuna[] = [];
+
+    // Computa hashes, pré-carrega entidades, resolve PDFs de cotação do Bitrix e busca as
+    // colunas do funil em paralelo — são independentes entre si.
     let rowHashes: string[] = [];
     let pdfResults: Array<ResolvePdfResult | undefined> = [];
     try {
-      [rowHashes, , pdfResults] = await Promise.all([
+      [rowHashes, , pdfResults, kanbanColunas] = await Promise.all([
         Promise.all(payload.map(computeRowHash)),
         preloadResolveCache(payload, vendedorId).catch((err: Error) => {
           console.error('Preload de entidades falhou, resolução linha-a-linha será usada como fallback:', err.message);
@@ -161,6 +156,14 @@ export function useBulkImport() {
               return [] as Array<ResolvePdfResult | undefined>;
             })
           : Promise.resolve([] as Array<ResolvePdfResult | undefined>),
+        supabase.from('kanban_colunas').select('slug, nome').eq('funil_id', funilId).order('ordem', { ascending: true })
+          .then(({ data, error }) => {
+            if (error) {
+              console.error('Falha ao carregar colunas do funil para casar o status importado:', error.message);
+              return [] as ImportKanbanColuna[];
+            }
+            return (data ?? []) as ImportKanbanColuna[];
+          }),
       ]);
     } catch (err) {
       console.error('Erro ao computar hashes ou pré-carregar entidades:', (err as Error).message);
@@ -262,7 +265,7 @@ export function useBulkImport() {
             data_pedido: row.data_pedido,
             prazo_resposta: row.prazo_resposta ?? null,
             created_at: row.created_at ?? undefined,
-            status: mapStatus(row.status),
+            status: matchPedidoStatusToColuna(row.status, kanbanColunas),
             marcador_id: marcadorId ?? null,
             usuario_id: (row.usuario_id as string | undefined) ?? vendedorId,
             campos_extras: camposExtras,
