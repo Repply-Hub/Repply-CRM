@@ -678,8 +678,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     const { draggableId, source, destination } = result;
     if (source.droppableId === destination.droppableId) return;
     const label = KANBAN_STAGES.find(s => s.key === destination.droppableId)?.label ?? destination.droppableId;
-    await updateStatus.mutateAsync({ id: draggableId, status: destination.droppableId });
-    toast.success(`Negócio movido para "${label}"`);
+    try {
+      await updateStatus.mutateAsync({ id: draggableId, status: destination.droppableId });
+      toast.success(`Negócio movido para "${label}"`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao mover o negócio');
+    }
   }, [updateStatus, KANBAN_STAGES]);
 
   const currentPageIds = paginated.map(p => p.id);

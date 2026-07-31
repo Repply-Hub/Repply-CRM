@@ -275,26 +275,25 @@ export function useUpdatePedidoStatus() {
         if (movedItem) break;
       }
 
-      qc.setQueriesData<{ data: PedidoWithRelations[]; count: number }>({ queryKey: ['pedidos'] }, (old, query) => {
-        if (!old) return old;
-        const stages = query.queryKey[4] as string[] | undefined;
+      for (const [key, old] of previousEntries) {
+        if (!old) continue;
+        const stages = key[4] as string[] | undefined;
         const hasItem = old.data.some(p => p.id === id);
 
         if (stages && stages.length > 0) {
           const belongsToTarget = stages.includes(status);
           if (!belongsToTarget && hasItem) {
-            return { data: old.data.filter(p => p.id !== id), count: Math.max(0, old.count - 1) };
+            qc.setQueryData(key, { data: old.data.filter(p => p.id !== id), count: Math.max(0, old.count - 1) });
+          } else if (belongsToTarget && !hasItem && movedItem) {
+            qc.setQueryData(key, { data: [{ ...movedItem, status }, ...old.data], count: old.count + 1 });
           }
-          if (belongsToTarget && !hasItem && movedItem) {
-            return { data: [{ ...movedItem, status }, ...old.data], count: old.count + 1 };
-          }
-          return old;
+          continue;
         }
 
-        return hasItem
-          ? { data: old.data.map(p => p.id === id ? { ...p, status } : p), count: old.count }
-          : old;
-      });
+        if (hasItem) {
+          qc.setQueryData(key, { data: old.data.map(p => p.id === id ? { ...p, status } : p), count: old.count });
+        }
+      }
 
       return { previousEntries };
     },

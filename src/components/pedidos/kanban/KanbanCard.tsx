@@ -34,13 +34,14 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                 id={`kanban-card-${order.id}`}
                 ref={provided.innerRef}
                 {...provided.draggableProps}
+                {...provided.dragHandleProps}
                 role="listitem"
                 aria-roledescription="item arrastável"
                 aria-label={`Negócio de ${order.clientName}, ${order.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
                 className={cn(
                   'bg-card rounded-xl p-3 shadow-card border border-border/60 mb-2 group relative',
                   'transition-all duration-200 ease-out',
-                  'cursor-pointer',
+                  'cursor-grab active:cursor-grabbing',
                   snapshot.isDragging && 'shadow-brand ring-2 ring-primary/30 rotate-[1.5deg] scale-[1.03] z-50 opacity-95 cursor-grabbing',
                   isAlert && 'border-destructive/40 bg-destructive/[0.02]',
                   !snapshot.isDragging && 'hover:shadow-card-hover hover:border-border hover:-translate-y-0.5'
@@ -54,10 +55,8 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                 onClick={() => onClick ? onClick(order.id) : navigate(`/pedidos/${order.id}/editar`)}
               >
                 <div
-                  {...provided.dragHandleProps}
-                  onClick={(e) => e.stopPropagation()}
                   className={cn(
-                    'absolute top-2.5 right-1.5 text-muted-foreground/30 transition-opacity duration-150 cursor-grab active:cursor-grabbing p-1 rounded-md hover:bg-muted/60',
+                    'absolute top-2.5 right-1.5 text-muted-foreground/30 transition-opacity duration-150 pointer-events-none',
                     'group-hover:text-muted-foreground/60',
                     snapshot.isDragging && 'text-primary/50'
                   )}
