@@ -63,6 +63,7 @@ export interface NovoPedidoPayload {
   funil_id: string;
   obra_id?: string;
   status?: string;
+  marcador_id?: string | null;
   data_pedido: string;
   prazo_resposta?: string;
   origem_lead?: string;
@@ -96,6 +97,7 @@ export function useCreatePedidoCompleto() {
           obra_id: payload.obra_id || null,
           data_pedido: payload.data_pedido,
           status: payload.status || 'novo_lead',
+          marcador_id: payload.marcador_id || null,
           observacoes: payload.observacoes || null,
           pdf_url: payload.pdf_url || null,
           prazo_resposta: payload.prazo_resposta || null,

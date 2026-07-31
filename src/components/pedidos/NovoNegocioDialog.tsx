@@ -11,6 +11,7 @@ import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
+import { useMarcadores } from '@/hooks/use-marcadores';
 import { useFunis } from '@/hooks/use-funis';
 import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCreatePedidoCompleto } from '@/hooks/use-novo-pedido';
 import { useCreateObra } from '@/hooks/use-mutations';
@@ -155,6 +156,7 @@ function NovoNegocioFormContent({
   const [enderecoEntrega, setEnderecoEntrega] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [status, setStatus] = useState(statusProp ?? 'novo_lead');
+  const [marcadorId, setMarcadorId] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
   // Step 2 fields
@@ -162,6 +164,7 @@ function NovoNegocioFormContent({
   const [observacoes, setObservacoes] = useState('');
   const { profile } = useAuth();
   const { data: camposConfig } = useConfiguracoesCampos('pedidos', profile?.empresa_id);
+  const { data: marcadores } = useMarcadores(profile?.empresa_id);
   const [camposExtras, setCamposExtras] = useState<Record<string, string>>({});
   const [proximoContato, setProximoContato] = useState<Date | undefined>();
   const [proximoContatoHora, setProximoContatoHora] = useState('09:00');
@@ -338,6 +341,7 @@ function NovoNegocioFormContent({
         funil_id: resolvedFunilId,
         obra_id: obraId || undefined,
         status: status,
+        marcador_id: marcadorId || undefined,
         data_pedido: format(dataPedido, 'yyyy-MM-dd'),
         prazo_resposta: prazoResposta ? format(prazoResposta, 'yyyy-MM-dd') : undefined,
         origem_lead: origemLead || undefined,
@@ -475,6 +479,26 @@ function NovoNegocioFormContent({
                           <SelectItem value="fechamento">Fechamento</SelectItem>
                         </>
                       )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Marcador */}
+                <div className="space-y-2">
+                  <Label>Marcador</Label>
+                  <Select value={marcadorId || 'nenhum'} onValueChange={(v) => setMarcadorId(v === 'nenhum' ? '' : v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar marcador" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nenhum">Nenhum</SelectItem>
+                      {(marcadores ?? []).map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.nome}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

@@ -15,6 +15,7 @@ import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
+import { useMarcadores } from '@/hooks/use-marcadores';
 import { useObrasByCliente, useTabelaPrecos, useIsGestor } from '@/hooks/use-novo-pedido';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
@@ -100,6 +101,7 @@ const EditarPedido = () => {
   const [fabricanteId, setFabricanteId] = useState('');
   const [vendedorId, setVendedorId] = useState('');
   const [status, setStatus] = useState('novo_lead');
+  const [marcadorId, setMarcadorId] = useState('');
   const [dataPedido, setDataPedido] = useState<Date>(new Date());
   const [prazoResposta, setPrazoResposta] = useState<Date | undefined>();
   const [origemLead, setOrigemLead] = useState('');
@@ -115,6 +117,7 @@ const EditarPedido = () => {
   const [camposExtras, setCamposExtras] = useState<Record<string, string>>({});
   const { profile } = useAuth();
   const { data: camposConfig } = useConfiguracoesCampos('pedidos', profile?.empresa_id);
+  const { data: marcadores } = useMarcadores(profile?.empresa_id);
 
   // Populate form when data loads
   useEffect(() => {
@@ -125,6 +128,7 @@ const EditarPedido = () => {
       setFabricanteId(p.fabricante_id);
       setVendedorId(p.usuario_id);
       setStatus(p.status || 'novo_lead');
+      setMarcadorId(p.marcador_id || '');
       setDataPedido(new Date(p.data_pedido + 'T12:00:00'));
       setPrazoResposta(p.prazo_resposta ? new Date(p.prazo_resposta + 'T12:00:00') : undefined);
       setOrigemLead(p.origem_lead || '');
@@ -259,6 +263,7 @@ const EditarPedido = () => {
         usuario_id: vendedorId,
         obra_id: obraId || undefined,
         status: status,
+        marcador_id: marcadorId || null,
         data_pedido: format(dataPedido, 'yyyy-MM-dd'),
         prazo_resposta: prazoResposta ? format(prazoResposta, 'yyyy-MM-dd') : undefined,
         origem_lead: origemLead || undefined,
@@ -418,6 +423,25 @@ const EditarPedido = () => {
                             <SelectItem value="fechamento">Fechamento</SelectItem>
                           </>
                         )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Marcador</Label>
+                    <Select value={marcadorId || 'nenhum'} onValueChange={(v) => setMarcadorId(v === 'nenhum' ? '' : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar marcador" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[1200]">
+                        <SelectItem value="nenhum">Nenhum</SelectItem>
+                        {(marcadores ?? []).map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.nome}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

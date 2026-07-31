@@ -69,6 +69,12 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                   <h4 className="font-semibold text-xs sm:text-sm text-card-foreground leading-snug pr-5">{order.clientName}</h4>
                 )}
 
+                {order.marcador && (!visibleColumns || visibleColumns.includes('marcador')) && (
+                  <span className={cn('inline-flex items-center mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white', `bg-${order.marcador.cor}`)}>
+                    {order.marcador.nome}
+                  </span>
+                )}
+
                 <div className="mt-2 space-y-1">
                   {(!visibleColumns || visibleColumns.includes('obra')) && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">

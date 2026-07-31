@@ -8,6 +8,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { KanbanColunasDialog } from '@/components/pedidos/kanban/KanbanColunasDialog';
+import { useMarcadores } from '@/hooks/use-marcadores';
+import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
 import { useFunis } from '@/hooks/use-funis';
 import { usePedidos, usePedidosStats, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
@@ -26,7 +28,7 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, Rows3, History
+  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, Rows3, History, Tag
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -66,6 +68,7 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'valor', label: 'Valor', locked: false },
   { id: 'vendedor', label: 'Responsável/Vendedor', locked: false },
   { id: 'etapa', label: 'Etapa', locked: false },
+  { id: 'marcador', label: 'Marcador', locked: false },
   { id: 'data_pedido', label: 'Criação', locked: false },
   { id: 'prazo_resposta', label: 'Fechamento', locked: false },
   { id: 'observacoes', label: 'Observações', locked: false },
@@ -209,6 +212,14 @@ const PedidoRow = memo(({
                 </Badge>
               </TableCell>
             );
+          case 'marcador':
+            return (
+              <TableCell key={colId} className="whitespace-nowrap px-4">
+                {pedido.marcador ? (
+                  <Badge className={`bg-${pedido.marcador.cor} text-white`}>{pedido.marcador.nome}</Badge>
+                ) : '—'}
+              </TableCell>
+            );
           case 'vendedor':
             return <TableCell key={colId} className="whitespace-nowrap px-4">{pedido.vendedor?.nome ?? '-'}</TableCell>;
           case 'data_pedido':
@@ -289,6 +300,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   );
 
   const [colunasDialogOpen, setColunasDialogOpen] = useState(false);
+  const [marcadoresDialogOpen, setMarcadoresDialogOpen] = useState(false);
+  const { data: marcadores } = useMarcadores(empresaId);
 
   // O efeito de limpeza total foi removido para permitir que novas colunas importadas apareçam nas opções.
   // No entanto, vamos garantir que colunas duplicadas sejam limpas se detectadas.
@@ -416,6 +429,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
   const [selectedFabricantes, setSelectedFabricantes] = useState<string[]>([]);
+  const [selectedMarcadores, setSelectedMarcadores] = useState<string[]>([]);
   const [showOnlyAttention, setShowOnlyAttention] = useState(false);
   const [hideImportados, setHideImportados] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
@@ -459,6 +473,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const pedidosFilters: PedidosFilters = useMemo(() => ({
     vendedorIds: selectedVendedores.length > 0 ? selectedVendedores : undefined,
     fabricanteIds: selectedFabricantes.length > 0 ? selectedFabricantes : undefined,
+    marcadorIds: selectedMarcadores.length > 0 ? selectedMarcadores : undefined,
     dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
     dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
     onlyAttention: showOnlyAttention || undefined,
@@ -469,7 +484,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     // totais do cabeçalho continuam somando negócios importados mesmo com o filtro ligado.
     hideImportados: hideImportados || undefined,
     funilId,
-  }), [selectedVendedores, selectedFabricantes, dateFrom, dateTo, showOnlyAttention, deferredSearch, hideImportados, funilId]);
+  }), [selectedVendedores, selectedFabricantes, selectedMarcadores, dateFrom, dateTo, showOnlyAttention, deferredSearch, hideImportados, funilId]);
 
   // Essa query só serve a view Lista agora — desabilitada no Kanban, já que cada coluna
   // busca seus próprios dados de forma independente.
@@ -571,6 +586,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     return all.filter(p => {
       if (selectedVendedores.length > 0 && !selectedVendedores.includes(p.usuario_id)) return false;
       if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(p.fabricante_id)) return false;
+      if (selectedMarcadores.length > 0 && !selectedMarcadores.includes(p.marcador_id ?? '')) return false;
       if (showOnlyAttention) {
         const days = Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000);
         if (days < 7) return false;
@@ -585,7 +601,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       }
       return true;
     });
-  }, [pedidos, isPipelineMode, selectedVendedores, selectedFabricantes, showOnlyAttention, dateFrom, dateTo]);
+  }, [pedidos, isPipelineMode, selectedVendedores, selectedFabricantes, selectedMarcadores, showOnlyAttention, dateFrom, dateTo]);
 
   const filtered = useMemo(() => {
     const q = deferredSearch.trim().toLowerCase();
@@ -615,7 +631,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // lote de cada coluna sozinho, dentro do KanbanColumn, ao ver os filtros mudarem).
   useEffect(() => {
     setPage(1);
-  }, [empresaId, deferredSearch, selectedStages, selectedVendedores, selectedFabricantes, showOnlyAttention, hideImportados, dateFrom, dateTo]);
+  }, [empresaId, deferredSearch, selectedStages, selectedVendedores, selectedFabricantes, selectedMarcadores, showOnlyAttention, hideImportados, dateFrom, dateTo]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -638,8 +654,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     [kanbanPedidosFlat]
   );
 
-  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || showOnlyAttention || hideImportados || !!dateFrom || !!dateTo || selectedStages.length > 0;
-  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (hideImportados ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (selectedStages.length > 0 ? 1 : 0);
+  const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || selectedMarcadores.length > 0 || showOnlyAttention || hideImportados || !!dateFrom || !!dateTo || selectedStages.length > 0;
+  const activeFilterCount = (selectedVendedores.length > 0 ? 1 : 0) + (selectedFabricantes.length > 0 ? 1 : 0) + (selectedMarcadores.length > 0 ? 1 : 0) + (showOnlyAttention ? 1 : 0) + (hideImportados ? 1 : 0) + (dateFrom || dateTo ? 1 : 0) + (selectedStages.length > 0 ? 1 : 0);
 
   const toggleFilter = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, id: string) => {
     setList(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -648,6 +664,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const clearPipelineFilters = () => {
     setSelectedVendedores([]);
     setSelectedFabricantes([]);
+    setSelectedMarcadores([]);
     setShowOnlyAttention(false);
     setHideImportados(false);
     setDateFrom(undefined);
@@ -837,6 +854,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           />
         )}
 
+        <ColumnSettingsItem
+          label="Gerenciar marcadores"
+          icon={Tag}
+          onClick={() => setMarcadoresDialogOpen(true)}
+        />
+
         <ColumnSettingsPopover label="Ações" icon={Plus}>
           <ColumnSettingsItem
             label="Importar"
@@ -895,6 +918,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setImportOpen,
     setImportDialogMounted,
     setColunasDialogOpen,
+    setMarcadoresDialogOpen,
     isPipelineMode,
     setConfirmDeleteOpen
   ]);
@@ -975,6 +999,28 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
                   <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
                   {f.nome}
+                </label>
+              ))}
+            </div>
+          </ScrollArea>
+        </StandardPopoverMenu>
+
+        {/* Submenu Marcador */}
+        <StandardPopoverMenu
+          label="Marcador"
+          icon={Tag}
+          badge={selectedMarcadores.length > 0 ? selectedMarcadores.length : undefined}
+          side="left"
+          align="start"
+          sideOffset={10}
+          popoverClassName="w-60"
+        >
+          <ScrollArea className="h-60">
+            <div className="space-y-1 pr-3">
+              {(marcadores ?? []).map(m => (
+                <label key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                  <Checkbox checked={selectedMarcadores.includes(m.id)} onCheckedChange={() => toggleFilter(selectedMarcadores, setSelectedMarcadores, m.id)} />
+                  {m.nome}
                 </label>
               ))}
             </div>
@@ -1080,7 +1126,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </div>
       </div>
     </FilterButton>
-  ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention, hideImportados, setHideImportados]);
+  ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, marcadores, selectedMarcadores, dateFrom, setDateFrom, dateTo, setDateTo, showOnlyAttention, setShowOnlyAttention, hideImportados, setHideImportados]);
   const selectedViewOrder = useMemo(
     () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === viewOrderId),
     [showKanban, kanbanPedidosFlat, pedidos, viewOrderId]
@@ -1728,6 +1774,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         visibleSlugs={visibleKanbanStages}
         onToggleVisibility={toggleKanbanStage}
         onResetVisibility={toggleAllKanbanStages}
+      />
+
+      <MarcadoresDialog
+        open={marcadoresDialogOpen}
+        onOpenChange={setMarcadoresDialogOpen}
+        empresaId={empresaId}
       />
 
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>

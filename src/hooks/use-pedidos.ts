@@ -18,16 +18,19 @@ export interface PedidoWithRelations {
   prazo_resposta: string | null;
   pdf_url: string | null;
   campos_extras: Record<string, any> | null;
+  marcador_id: string | null;
   cliente: { id: string; empresa: string } | null;
   fabricante: { id: string; nome: string } | null;
   vendedor: { id: string; nome: string } | null;
   obra: { id: string; nome_obra: string } | null;
+  marcador: { id: string; nome: string; cor: string } | null;
 }
 
 export interface PedidosFilters {
   stages?: string[];
   vendedorIds?: string[];
   fabricanteIds?: string[];
+  marcadorIds?: string[];
   /** Escopa a busca a um único funil (pipeline). Sem isso, negócios de todos os funis da empresa aparecem juntos. */
   funilId?: string;
   dateFrom?: string;
@@ -58,10 +61,10 @@ export function usePedidos(
   filters?: PedidosFilters,
   enabled = true,
 ) {
-  const { vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId } = filters ?? {};
+  const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId } = filters ?? {};
 
   return useQuery({
-    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId],
+    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
@@ -74,11 +77,12 @@ export function usePedidos(
         .from('pedidos')
         .select(`
           id, status, valor_total, data_pedido, created_at, observacoes,
-          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url,
+          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
           vendedor:usuarios(id, nome, empresa_id),
-          obra:obras(id, nome_obra)
+          obra:obras(id, nome_obra),
+          marcador:marcadores(id, nome, cor)
         `, { count: 'exact' })
         // `created_at` tem MUITOS valores duplicados (imports em massa gravam o mesmo
         // timestamp em centenas de linhas) — sem um desempate único e estável, o Postgres
@@ -103,6 +107,10 @@ export function usePedidos(
 
       if (fabricanteIds && fabricanteIds.length > 0) {
         query = query.in('fabricante_id', fabricanteIds);
+      }
+
+      if (marcadorIds && marcadorIds.length > 0) {
+        query = query.in('marcador_id', marcadorIds);
       }
 
       if (dateFrom) query = query.gte('data_pedido', dateFrom);
@@ -144,11 +152,12 @@ export function usePedidosPorCliente(clienteId?: string | null) {
         .from('pedidos')
         .select(`
           id, status, valor_total, data_pedido, created_at, observacoes,
-          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url,
+          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
           vendedor:usuarios(id, nome, empresa_id),
-          obra:obras(id, nome_obra)
+          obra:obras(id, nome_obra),
+          marcador:marcadores(id, nome, cor)
         `)
         .eq('cliente_id', clienteId!)
         .order('created_at', { ascending: false })
@@ -190,12 +199,12 @@ export function usePedidosOptions(empresaId?: string) {
 }
 
 export function usePedidosStats(empresaId?: string, stages?: string[], filters?: PedidosFilters) {
-  const { vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, search, funilId } = filters ?? {};
+  const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, search, funilId } = filters ?? {};
 
   return useQuery({
     // Reage a filtros e busca — NUNCA a page/pageSize/"Exibir"/"Ver mais", que não fazem
     // parte da queryKey aqui de propósito (o header precisa do total real, não do carregado).
-    queryKey: ['pedidos_stats', empresaId, stages, vendedorIds, fabricanteIds, dateFrom, dateTo, onlyAttention, search, funilId],
+    queryKey: ['pedidos_stats', empresaId, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, search, funilId],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
@@ -213,6 +222,7 @@ export function usePedidosStats(empresaId?: string, stages?: string[], filters?:
         p_search: search?.trim() ? search.trim() : null,
         p_only_attention: !!onlyAttention,
         p_funil_id: funilId ?? null,
+        p_marcador_ids: marcadorIds && marcadorIds.length > 0 ? marcadorIds : null,
       });
       if (error) throw error;
       const row = data?.[0];

@@ -1717,6 +1717,50 @@ export type Database = {
         }
         Relationships: []
       }
+      marcadores: {
+        Row: {
+          cor: string
+          created_at: string
+          empresa_id: string
+          id: string
+          is_sistema: boolean
+          nome: string
+          ordem: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          cor?: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_sistema?: boolean
+          nome: string
+          ordem?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          cor?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_sistema?: boolean
+          nome?: string
+          ordem?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marcadores_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mensagens_whatsapp: {
         Row: {
           cliente_id: string | null
@@ -1936,6 +1980,7 @@ export type Database = {
           funil_id: string
           id: string
           import_hash: string | null
+          marcador_id: string | null
           obra_id: string | null
           observacoes: string | null
           origem_lead: string | null
@@ -1956,6 +2001,7 @@ export type Database = {
           funil_id: string
           id?: string
           import_hash?: string | null
+          marcador_id?: string | null
           obra_id?: string | null
           observacoes?: string | null
           origem_lead?: string | null
@@ -1976,6 +2022,7 @@ export type Database = {
           funil_id?: string
           id?: string
           import_hash?: string | null
+          marcador_id?: string | null
           obra_id?: string | null
           observacoes?: string | null
           origem_lead?: string | null
@@ -1992,6 +2039,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_marcador_id_fkey"
+            columns: ["marcador_id"]
+            isOneToOne: false
+            referencedRelation: "marcadores"
             referencedColumns: ["id"]
           },
           {
@@ -3152,6 +3206,23 @@ export type Database = {
               p_date_to?: string
               p_fabricante_ids?: string[]
               p_funil_id?: string
+              p_only_attention?: boolean
+              p_search?: string
+              p_stages?: string[]
+              p_usuario_ids?: string[]
+            }
+            Returns: {
+              total_count: number
+              total_valor: number
+            }[]
+          }
+        | {
+            Args: {
+              p_date_from?: string
+              p_date_to?: string
+              p_fabricante_ids?: string[]
+              p_funil_id?: string
+              p_marcador_ids?: string[]
               p_only_attention?: boolean
               p_search?: string
               p_stages?: string[]

@@ -12,6 +12,7 @@ export interface Order {
   vendedor: string;
   createdAt: string;
   campos_extras?: Record<string, any>;
+  marcador?: { nome: string; cor: string } | null;
 }
 
 export interface Client {
