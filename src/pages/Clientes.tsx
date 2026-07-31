@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -21,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, FileWarning, Check } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, FileWarning, Check, Calendar, Briefcase, ExternalLink, IdCard } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
@@ -270,6 +271,8 @@ const Clientes = () => {
   const [typedConfirmText, setTypedConfirmText] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [panelEmpresa, setPanelEmpresa] = useState<any | null>(null);
+  const [panelContato, setPanelContato] = useState<any | null>(null);
 
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
@@ -1321,17 +1324,27 @@ const Clientes = () => {
                     const Icon = getTipoIcon(client.tipo);
                     const camposExtras = (client as any).campos_extras || {};
 
-                    // Se o clique foi o fim de uma seleção de texto (usuário copiando um
-                    // valor da célula), não navega — o resto da linha continua clicável
-                    // normalmente pra abrir o detalhe.
-                    const navigateToDetail = () => {
+                    // Clique em cima do texto de qualquer coluna abre a página de detalhe
+                    // (stopPropagation evita que o clique também dispare o painel lateral);
+                    // clique na linha fora do texto (padding, espaços vazios da célula) abre
+                    // o painel. Ambos ignoram o clique se ele foi o fim de uma seleção de
+                    // texto (usuário copiando um valor da célula).
+                    const openEmpresaDetail = () => {
                       if (hasTextSelection()) return;
                       const slug = slugify(client.empresa || 'cliente');
                       navigate(`/clientes/${slug}-${client.id}`);
                     };
+                    const onTextClick = (e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      openEmpresaDetail();
+                    };
+                    const openEmpresaPainel = () => {
+                      if (hasTextSelection()) return;
+                      setPanelEmpresa(client);
+                    };
 
                     return (
-                      <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`} onClick={navigateToDetail}>
+                      <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`} onClick={openEmpresaPainel}>
                         <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
                           <Checkbox checked={selected.has(client.id)} onCheckedChange={() => toggleOne(client.id)} aria-label={`Selecionar ${client.empresa}`} />
                         </td>
@@ -1347,7 +1360,7 @@ const Clientes = () => {
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <Icon className="h-4 w-4 text-primary" />
                                   </div>
-                                  <span className="font-semibold text-sm whitespace-nowrap text-foreground">{client.empresa}</span>
+                                  <span className="font-semibold text-sm whitespace-nowrap text-foreground" onClick={onTextClick}>{client.empresa}</span>
                                 </div>
                               </td>
                             );
@@ -1356,7 +1369,7 @@ const Clientes = () => {
                           if (colId === 'tipo') {
                             return (
                               <td key={colId} className="py-2.5 px-4">
-                                <Badge variant="secondary" className="text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
+                                <Badge variant="secondary" className="text-[10px] font-medium" onClick={onTextClick}>{getTipoLabel(client.tipo, customTipos)}</Badge>
                               </td>
                             );
                           }
@@ -1364,7 +1377,9 @@ const Clientes = () => {
                           if (colId === 'obras_count') {
                             return (
                               <td key={colId} className="py-2.5 px-4 text-xs">
-                                {client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}
+                                <span onClick={onTextClick}>
+                                  {client.obras?.length ? <span className="text-primary font-medium">{client.obras.length}</span> : '—'}
+                                </span>
                               </td>
                             );
                           }
@@ -1375,7 +1390,7 @@ const Clientes = () => {
 
                           return (
                             <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
-                              {value || '—'}
+                              <span onClick={onTextClick}>{value || '—'}</span>
                             </td>
                           );
                         })}
@@ -1436,14 +1451,24 @@ const Clientes = () => {
                   ) : paginatedContatos.map(contato => {
                     const camposExtras = (contato as any).campos_extras || {};
 
-                    const navigateToContatoDetail = () => {
+                    // Mesma lógica de clique-em-texto-vs-fora-do-texto usada na tabela de
+                    // Empresas (ver comentário lá).
+                    const openContatoDetail = () => {
                       if (hasTextSelection()) return;
                       const slug = slugify(contato.nome_contato || 'contato');
                       navigate(`/contatos/${slug}-${contato.id}`);
                     };
+                    const onTextClick = (e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      openContatoDetail();
+                    };
+                    const openContatoPainel = () => {
+                      if (hasTextSelection()) return;
+                      setPanelContato(contato);
+                    };
 
                     return (
-                      <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`} onClick={navigateToContatoDetail}>
+                      <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`} onClick={openContatoPainel}>
                         <td className="py-2.5 px-4 w-10" onClick={e => e.stopPropagation()}>
                           <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
                         </td>
@@ -1462,7 +1487,7 @@ const Clientes = () => {
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <User className="h-4 w-4 text-primary" />
                                   </div>
-                                  <span className="font-semibold text-sm whitespace-nowrap text-foreground">{contato.nome_contato || 'Sem nome'}</span>
+                                  <span className="font-semibold text-sm whitespace-nowrap text-foreground" onClick={onTextClick}>{contato.nome_contato || 'Sem nome'}</span>
                                 </div>
                               </td>
                             );
@@ -1471,14 +1496,14 @@ const Clientes = () => {
                           if (colId === 'empresa') {
                             return (
                               <td key={colId} className="py-2.5 px-4 text-sm font-medium text-foreground whitespace-nowrap">
-                                {value || '—'}
+                                <span onClick={onTextClick}>{value || '—'}</span>
                               </td>
                             );
                           }
 
                           return (
                             <td key={colId} className={cn("py-2.5 px-4 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
-                              {value || '—'}
+                              <span onClick={onTextClick}>{value || '—'}</span>
                             </td>
                           );
                         })}
@@ -1504,6 +1529,177 @@ const Clientes = () => {
           </>
         )}
       </div>
+
+      {/* Painel lateral de detalhe rápido de Empresa (clique na linha fora do texto) */}
+      <Sheet open={!!panelEmpresa} onOpenChange={(open) => !open && setPanelEmpresa(null)}>
+        {panelEmpresa && (() => {
+          const Icon = getTipoIcon(panelEmpresa.tipo);
+          return (
+            <SheetContent className="sm:max-w-xl overflow-y-auto">
+              <SheetHeader className="pb-6 border-b">
+                <SheetTitle className="flex items-center gap-2">
+                  <Icon className="h-5 w-5 text-primary shrink-0" />
+                  <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">{panelEmpresa.empresa}</span>
+                </SheetTitle>
+                <SheetDescription>{getTipoLabel(panelEmpresa.tipo, customTipos)}</SheetDescription>
+              </SheetHeader>
+
+              <div className="py-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                  {panelEmpresa.razao_social && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Building2 className="h-3 w-3" /> Razão social
+                      </Label>
+                      <p className="text-sm font-medium">{panelEmpresa.razao_social}</p>
+                    </div>
+                  )}
+                  {panelEmpresa.cnpj && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <IdCard className="h-3 w-3" /> CNPJ / CPF
+                      </Label>
+                      <p className="text-sm font-medium">{panelEmpresa.cnpj}</p>
+                    </div>
+                  )}
+                  {panelEmpresa.email && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Mail className="h-3 w-3" /> E-mail
+                      </Label>
+                      <p className="text-sm font-medium">{panelEmpresa.email}</p>
+                    </div>
+                  )}
+                  {panelEmpresa.telefone && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Phone className="h-3 w-3" /> Telefone
+                      </Label>
+                      <p className="text-sm font-medium">{panelEmpresa.telefone}</p>
+                    </div>
+                  )}
+                  {panelEmpresa.endereco && (
+                    <div className="space-y-1 md:col-span-2">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <MapPin className="h-3 w-3" /> Endereço
+                      </Label>
+                      <p className="text-sm font-medium">{panelEmpresa.endereco}</p>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="h-3 w-3" /> Obras vinculadas
+                    </Label>
+                    <p className="text-sm font-medium">{panelEmpresa.obras?.length ?? 0}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3" /> Data de cadastro
+                    </Label>
+                    <p className="text-sm font-medium">{formatDateBR(panelEmpresa.created_at) || '—'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
+                <div className="flex w-full justify-end gap-2">
+                  <Button variant="outline" onClick={() => setPanelEmpresa(null)}>Fechar</Button>
+                  <Button
+                    className="gap-2"
+                    onClick={() => {
+                      const slug = slugify(panelEmpresa.empresa || 'cliente');
+                      navigate(`/clientes/${slug}-${panelEmpresa.id}`);
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4" /> Abrir página completa
+                  </Button>
+                </div>
+              </SheetFooter>
+            </SheetContent>
+          );
+        })()}
+      </Sheet>
+
+      {/* Painel lateral de detalhe rápido de Contato (clique na linha fora do texto) */}
+      <Sheet open={!!panelContato} onOpenChange={(open) => !open && setPanelContato(null)}>
+        {panelContato && (
+          <SheetContent className="sm:max-w-xl overflow-y-auto">
+            <SheetHeader className="pb-6 border-b">
+              <SheetTitle className="flex items-center gap-2">
+                <User className="h-5 w-5 text-primary shrink-0" />
+                <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">{panelContato.nome_contato || 'Sem nome'}</span>
+              </SheetTitle>
+              <SheetDescription>Detalhes do contato.</SheetDescription>
+            </SheetHeader>
+
+            <div className="py-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                {panelContato.cliente?.empresa && (
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Building2 className="h-3 w-3" /> Empresa
+                    </Label>
+                    <p
+                      className="text-sm font-medium hover:text-primary transition-colors cursor-pointer"
+                      onClick={() => {
+                        const slug = slugify(panelContato.cliente.empresa || 'cliente');
+                        navigate(`/clientes/${slug}-${panelContato.cliente.id}`);
+                      }}
+                    >
+                      {panelContato.cliente.empresa}
+                    </p>
+                  </div>
+                )}
+                {panelContato.cargo && (
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Briefcase className="h-3 w-3" /> Cargo
+                    </Label>
+                    <p className="text-sm font-medium">{panelContato.cargo}</p>
+                  </div>
+                )}
+                {panelContato.email && (
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Mail className="h-3 w-3" /> E-mail
+                    </Label>
+                    <p className="text-sm font-medium">{panelContato.email}</p>
+                  </div>
+                )}
+                {panelContato.telefone && (
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Phone className="h-3 w-3" /> Telefone
+                    </Label>
+                    <p className="text-sm font-medium">{panelContato.telefone}</p>
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Calendar className="h-3 w-3" /> Data de cadastro
+                  </Label>
+                  <p className="text-sm font-medium">{formatDateBR(panelContato.created_at) || '—'}</p>
+                </div>
+              </div>
+            </div>
+
+            <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
+              <div className="flex w-full justify-end gap-2">
+                <Button variant="outline" onClick={() => setPanelContato(null)}>Fechar</Button>
+                <Button
+                  className="gap-2"
+                  onClick={() => {
+                    const slug = slugify(panelContato.nome_contato || 'contato');
+                    navigate(`/contatos/${slug}-${panelContato.id}`);
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4" /> Abrir página completa
+                </Button>
+              </div>
+            </SheetFooter>
+          </SheetContent>
+        )}
+      </Sheet>
 
       <AlertDialog open={!!confirmDeleteTipo} onOpenChange={(o) => !o && setConfirmDeleteTipo(null)}>
         <AlertDialogContent>
