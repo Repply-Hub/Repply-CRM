@@ -3,7 +3,12 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  /* O seletor .light acompanha :root para que uma subárvore possa voltar ao tema
+     claro mesmo dentro de um wrapper .dark — é o que permite as seções creme da
+     landing page conviverem com o resto dela, que é escuro por tokens. Não muda
+     nada no app: o ThemeProvider já aplica a classe `light` no <html>, onde os
+     dois seletores coincidem. */
+  :root, .light {
     /* Repply Brand System V2.0 */
     /* Repply Orange #FF5A1F · Deep Black #0A0A0A · Pure White #FFFFFF */
 
@@ -72,6 +77,14 @@
     --shadow-card: 0 1px 3px hsl(0 0% 4% / 0.04), 0 4px 12px hsl(0 0% 4% / 0.03);
     --shadow-card-hover: 0 2px 8px hsl(0 0% 4% / 0.06), 0 8px 24px hsl(0 0% 4% / 0.05);
     --shadow-brand: 0 4px 16px hsl(16 100% 56% / 0.25);
+
+    /* Landing page — constantes de marca, não variam com o tema do usuário.
+       Herdam para dentro de .dark, então ficam disponíveis na LP inteira.
+       --lp-ink é mais profundo que o --background do dark (7%) porque a LP usa
+       o preto da marca (#0A0A0A), não o cinza do app. */
+    --lp-ink: 0 0% 4%;
+    --lp-ink-elevado: 0 0% 7%;
+    --lp-cream: 45 20% 96%;
   }
 
   .dark {
@@ -141,6 +154,29 @@
   html, body, #root {
     height: 100%;
     overflow: hidden;
+  }
+  /* Páginas públicas longas (landing, cadastro, assinatura) precisam do scroll
+     nativo do documento, que o overflow:hidden acima remove. A classe é ligada
+     pelo hook usePaginaRolavel e removida ao sair da página, então o app nunca
+     rola: o AppLayout já se contém sozinho em h-screen + overflow-hidden.
+     No eixo X usamos clip, e não hidden, de propósito — overflow-x:hidden faria
+     o eixo Y computar para auto e quebraria o position:sticky da navegação. */
+  html.pagina-rolavel,
+  html.pagina-rolavel body,
+  html.pagina-rolavel #root {
+    height: auto;
+    min-height: 100%;
+    overflow-y: visible;
+    overflow-x: clip;
+  }
+  html.pagina-rolavel {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html.pagina-rolavel {
+      scroll-behavior: auto;
+    }
   }
   body {
     @apply bg-background text-foreground antialiased;

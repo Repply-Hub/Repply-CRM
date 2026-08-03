@@ -31,7 +31,7 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
+      return new Response(JSON.stringify({ error: "Sessão não identificada. Entre novamente no sistema." }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -47,7 +47,7 @@ serve(async (req) => {
       req.json(),
     ]);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      return new Response(JSON.stringify({ error: "Sua sessão expirou. Atualize a página e entre de novo." }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -68,7 +68,7 @@ serve(async (req) => {
     const { data: userData } = await supabase
       .from("usuarios").select("id, empresa_id").eq("user_id", user.id).single();
     if (!userData) {
-      return new Response(JSON.stringify({ error: "User not found" }), {
+      return new Response(JSON.stringify({ error: "Seu usuário não foi encontrado no sistema. Fale com o gestor da empresa." }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -84,12 +84,12 @@ serve(async (req) => {
       api_instance_name: string | null; status: string;
     } | null;
     if (!config) {
-      return new Response(JSON.stringify({ error: "WhatsApp não configurado" }), {
+      return new Response(JSON.stringify({ error: "Seu usuário não tem WhatsApp vinculado. Peça ao gestor para liberar em Configurações." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (config.status !== "connected") {
-      return new Response(JSON.stringify({ error: "Instância desconectada" }), {
+      return new Response(JSON.stringify({ error: "O WhatsApp está desconectado. Reconecte em Configurações e tente de novo." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -167,7 +167,7 @@ serve(async (req) => {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: "Internal error", detail: String(err) }), {
+    return new Response(JSON.stringify({ error: "Erro inesperado. Tente de novo em instantes.", detail: String(err) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

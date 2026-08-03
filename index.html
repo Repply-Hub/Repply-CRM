@@ -10,7 +10,12 @@
       content="o CRM para representantes comerciais. Pipeline de vendas, controle de carteira e dashboards, tudo em um só lugar."
     />
     <meta name="author" content="Repply" />
-    <link rel="canonical" href="https://md-representacoes.lovable.app" />
+    <!-- O canonical apontava para o domínio de preview do Lovable, com o nome
+         antigo do produto. Enquanto "/" era rota protegida isso não tinha efeito;
+         agora que é uma landing pública, declarar o domínio errado faria os
+         buscadores consolidarem o ranqueamento fora do site real. Sem a tag, cada
+         página é canônica de si mesma — restaurar só quando o domínio definitivo
+         estiver definido. -->
 
     <meta property="og:type" content="website" />
     <meta

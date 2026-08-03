@@ -12,7 +12,7 @@ const NovoPedido = () => {
     <AppLayout
       headerContent={
         <div className="flex items-center gap-2 min-w-0">
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/pedidos')}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/app')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">Novo Negócio</h1>
@@ -21,11 +21,11 @@ const NovoPedido = () => {
     >
       <NovoNegocioDialog
         open
-        onOpenChange={(open) => { if (!open) navigate('/pedidos'); }}
+        onOpenChange={(open) => { if (!open) navigate('/app'); }}
         clienteId={searchParams.get('clienteId') || undefined}
         status={searchParams.get('status') || undefined}
         funilId={searchParams.get('funilId') || undefined}
-        onCreated={() => navigate('/')}
+        onCreated={() => navigate('/app')}
       />
     </AppLayout>
   );

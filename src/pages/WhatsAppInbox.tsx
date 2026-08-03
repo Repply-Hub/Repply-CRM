@@ -4779,8 +4779,10 @@ export default function WhatsAppInbox() {
         ...quoted,
       });
       marcarLida.mutate(conversaId);
-    } catch {
-      toast.error("Erro ao enviar áudio");
+    } catch (err) {
+      // Idem: a mutação já avisou com o motivo real vindo do servidor. Um segundo
+      // toast genérico aqui só encobriria a explicação boa.
+      console.error('[whatsapp] falha ao enviar áudio:', err);
     } finally {
       setIsUploading(false);
       // Adia pro próximo tick: o textarea ainda está com `disabled` no DOM neste
@@ -4859,10 +4861,11 @@ export default function WhatsAppInbox() {
         });
       }
       marcarLida.mutate(conversaId);
-    } catch (err: any) {
-      // onError do mutation já mostra toast e remove otimista; aqui só garantimos
-      // que o estado não fique travado em caso de erro não capturado
-      if (err?.message) toast.error(err.message);
+    } catch (err) {
+      // Sem toast aqui: o onError da mutação já avisou, e repetir mostrava a
+      // mesma mensagem duas vezes na tela. Este catch existe só para o estado
+      // não ficar travado em "enviando".
+      console.error('[whatsapp] falha ao enviar:', err);
     } finally {
       isSendingRef.current = false;
       // Adia pro próximo tick: o textarea ainda está com `disabled` no DOM neste

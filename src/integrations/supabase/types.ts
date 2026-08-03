@@ -1077,6 +1077,66 @@ export type Database = {
         }
         Relationships: []
       }
+      empresa_assinaturas: {
+        Row: {
+          ativado_em: string | null
+          cancel_at_period_end: boolean
+          current_period_end: string | null
+          empresa_id: string
+          origem: string
+          plan_status: string
+          plano_slug: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_status: string | null
+          ultimo_evento_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativado_em?: string | null
+          cancel_at_period_end?: boolean
+          current_period_end?: string | null
+          empresa_id: string
+          origem?: string
+          plan_status?: string
+          plano_slug?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string | null
+          ultimo_evento_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativado_em?: string | null
+          cancel_at_period_end?: boolean
+          current_period_end?: string | null
+          empresa_id?: string
+          origem?: string
+          plan_status?: string
+          plano_slug?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string | null
+          ultimo_evento_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresa_assinaturas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "empresa_assinaturas_plano_slug_fkey"
+            columns: ["plano_slug"]
+            isOneToOne: false
+            referencedRelation: "planos"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       empresas: {
         Row: {
           banner_url: string | null
@@ -2303,6 +2363,80 @@ export type Database = {
           },
         ]
       }
+      planos: {
+        Row: {
+          beneficios: Json
+          created_at: string
+          descricao: string | null
+          intervalo: string
+          moeda: string
+          nome: string
+          ordem: number
+          preco_centavos: number
+          selo: string | null
+          slug: string
+          stripe_price_id: string | null
+          visivel: boolean
+        }
+        Insert: {
+          beneficios?: Json
+          created_at?: string
+          descricao?: string | null
+          intervalo?: string
+          moeda?: string
+          nome: string
+          ordem?: number
+          preco_centavos: number
+          selo?: string | null
+          slug: string
+          stripe_price_id?: string | null
+          visivel?: boolean
+        }
+        Update: {
+          beneficios?: Json
+          created_at?: string
+          descricao?: string | null
+          intervalo?: string
+          moeda?: string
+          nome?: string
+          ordem?: number
+          preco_centavos?: number
+          selo?: string | null
+          slug?: string
+          stripe_price_id?: string | null
+          visivel?: boolean
+        }
+        Relationships: []
+      }
+      stripe_eventos: {
+        Row: {
+          empresa_id: string | null
+          id: string
+          processado_em: string
+          tipo: string | null
+        }
+        Insert: {
+          empresa_id?: string | null
+          id: string
+          processado_em?: string
+          tipo?: string | null
+        }
+        Update: {
+          empresa_id?: string | null
+          id?: string
+          processado_em?: string
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stripe_eventos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sidebar_empresa_padrao: {
         Row: {
           created_at: string
@@ -3168,6 +3302,7 @@ export type Database = {
       }
       delete_current_user: { Args: never; Returns: undefined }
       delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
+      empresa_plano_ativo: { Args: never; Returns: boolean }
       get_my_empresa_id: { Args: never; Returns: string }
       get_my_usuario_id: { Args: never; Returns: string }
       get_my_vendedor_id: { Args: never; Returns: string }

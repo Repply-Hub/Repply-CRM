@@ -198,7 +198,7 @@ export default function LinhasIgnoradas() {
           variant="ghost"
           size="sm"
           className="-ml-2 shrink-0 self-start"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/app')}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar para Negócios

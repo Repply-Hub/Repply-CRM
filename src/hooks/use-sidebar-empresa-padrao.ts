@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
-import { SidebarItem } from '@/hooks/use-sidebar-preferences';
+import { SidebarItem, normalizarPipeline } from '@/hooks/use-sidebar-preferences';
 
 export function useSidebarEmpresaPadrao(empresaId?: string) {
   return useQuery({
@@ -14,7 +14,7 @@ export function useSidebarEmpresaPadrao(empresaId?: string) {
         .maybeSingle();
 
       if (!data || !Array.isArray(data.items) || data.items.length === 0) return null;
-      return data.items as unknown as SidebarItem[];
+      return normalizarPipeline(data.items as unknown as SidebarItem[]);
     },
     enabled: !!empresaId,
   });
@@ -51,8 +51,13 @@ export function useSaveSidebarEmpresaPadrao() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (items: SidebarItem[]) => {
+    mutationFn: async (itemsBrutos: SidebarItem[]) => {
       if (!empresaId) throw new Error('Empresa não identificada');
+      // Normaliza no ponto de escrita porque este hook tem dois chamadores: o
+      // editor da sidebar (que já manda dado limpo) e o "restaurar versão" do
+      // histórico, que devolve linhas antigas cruas — e gravá-las sujaria o
+      // banco e o log, que é append-only.
+      const items = normalizarPipeline(itemsBrutos);
       const { data: existing } = await supabase
         .from('sidebar_empresa_padrao')
         .select('id')

@@ -64,6 +64,34 @@ async function ensureResponsavel(
   }
 }
 
+/**
+ * Responde uma recusa E registra o motivo em webhook_debug.
+ *
+ * O registro que já existia ficava depois de todas as validações iniciais, então
+ * justamente os erros mais comuns — WhatsApp desconectado, sem vínculo, sessão
+ * expirada — não deixavam rastro nenhum, e diagnosticar dependia de adivinhação.
+ */
+async function recusar(
+  supabase: ReturnType<typeof createClient>,
+  motivo: string,
+  mensagem: string,
+  status: number,
+  contexto: Record<string, unknown> = {},
+) {
+  try {
+    await supabase.from("webhook_debug").insert({
+      payload: { _envio_recusado: true, motivo, status, ...contexto },
+    });
+  } catch (e) {
+    console.error("[whatsapp-send] falha ao registrar recusa:", e);
+  }
+  console.error(`[whatsapp-send] recusado (${status}): ${motivo}`);
+  return new Response(JSON.stringify({ error: mensagem }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -77,9 +105,7 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return await recusar(supabase, "sem_authorization", "Sessão não identificada. Entre novamente no sistema.", 401);
     }
 
     const userClient = createClient(
@@ -94,9 +120,8 @@ serve(async (req) => {
       req.json(),
     ]);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return await recusar(supabase, "jwt_invalido", "Sua sessão expirou. Atualize a página e entre de novo.", 401,
+        { detalhe: authError?.message ?? null });
     }
 
     const {
@@ -105,9 +130,8 @@ serve(async (req) => {
     } = body;
 
     if (!telefone) {
-      return new Response(JSON.stringify({ error: "telefone obrigatório" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return await recusar(supabase, "sem_telefone", "Esta conversa está sem número de telefone. Abra outra conversa ou recarregue a página.", 400,
+        { conversa_id: conversa_id ?? null });
     }
 
     const { data: userData } = await supabase
@@ -115,9 +139,8 @@ serve(async (req) => {
       .select("id, empresa_id, nome, empresas:empresa_id(whatsapp_assinar_remetente)")
       .eq("user_id", user.id).single();
     if (!userData) {
-      return new Response(JSON.stringify({ error: "User not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return await recusar(supabase, "usuario_nao_encontrado", "Seu usuário não foi encontrado no sistema. Fale com o gestor da empresa.", 404,
+        { user_id: user.id });
     }
     const assinarRemetente = (userData.empresas as { whatsapp_assinar_remetente: boolean } | null)
       ?.whatsapp_assinar_remetente ?? true;
@@ -133,14 +156,12 @@ serve(async (req) => {
       api_instance_name: string | null; status: string;
     } | null;
     if (!config) {
-      return new Response(JSON.stringify({ error: "WhatsApp não configurado" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return await recusar(supabase, "sem_instancia_vinculada", "Seu usuário não tem WhatsApp vinculado. Peça ao gestor para liberar em Configurações.", 400,
+        { user_id: user.id, usuario_id: userData.id });
     }
     if (config.status !== "connected") {
-      return new Response(JSON.stringify({ error: "Instância desconectada" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return await recusar(supabase, "instancia_desconectada", "O WhatsApp está desconectado. Reconecte em Configurações e tente de novo.", 400,
+        { instancia_id: config.id, instance_name: config.instance_name, status_instancia: config.status });
     }
 
     const digits = telefone.replace(/\D/g, "");
@@ -160,9 +181,7 @@ serve(async (req) => {
     if (tipo === 'texto' || !media_url) {
       // --- Texto ---
       if (!mensagem) {
-        return new Response(JSON.stringify({ error: "mensagem obrigatória para texto" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return await recusar(supabase, "mensagem_vazia", "Escreva uma mensagem antes de enviar.", 400, { tipo });
       }
       wapiUrl = `${baseUrl}/send/text`;
       try {
@@ -218,7 +237,7 @@ serve(async (req) => {
     });
 
     if (fetchError) {
-      return new Response(JSON.stringify({ error: "Erro de rede ao contactar WhatsApp", detail: fetchError }), {
+      return new Response(JSON.stringify({ error: "Não foi possível falar com o servidor do WhatsApp. Tente de novo em instantes.", detail: fetchError }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -226,8 +245,10 @@ serve(async (req) => {
       let wapiError = "";
       try { wapiError = JSON.parse(responseText)?.error ?? ""; } catch { /* ok */ }
       const userMessage = wapiError.includes("not on WhatsApp")
-        ? "Número não possui WhatsApp"
-        : wapiError || `Erro ao enviar (status ${wapiStatus})`;
+        ? "Este número não tem WhatsApp."
+        // O texto cru do provedor vem em inglês e costuma ser técnico demais para
+        // o usuário final; só é aproveitado quando não há caso conhecido.
+        : wapiError || `O WhatsApp recusou o envio (código ${wapiStatus}). Tente de novo em instantes.`;
       return new Response(JSON.stringify({ error: userMessage, detail: responseText }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -282,7 +303,7 @@ serve(async (req) => {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: "Internal error", detail: String(err) }), {
+    return new Response(JSON.stringify({ error: "Erro inesperado ao enviar a mensagem.", detail: String(err) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

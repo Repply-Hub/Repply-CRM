@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { NavLink } from '@/components/layout/NavLink';
-import { useSidebarPreferences, SidebarItem } from '@/hooks/use-sidebar-preferences';
+import { useSidebarPreferences, SidebarItem, ROTA_APP } from '@/hooks/use-sidebar-preferences';
 import { useSaveSidebarEmpresaPadrao } from '@/hooks/use-sidebar-empresa-padrao';
 import { usePermissoes } from '@/hooks/use-permissoes';
 import { getIconComponent, getFaviconUrl, getFaviconFallbackUrl } from '@/lib/sidebar-icons';
@@ -385,7 +385,9 @@ export function AppSidebar() {
                           ) : (
                             <NavLink
                               to={item.path}
-                              end={item.path === '/'}
+                              // Cobre os dois valores: linhas antigas do banco
+                              // ainda podem trazer '/' antes de serem relidas.
+                              end={item.path === ROTA_APP || item.path === '/'}
                               className="hover:bg-sidebar-accent/60 rounded-lg transition-all duration-150 relative"
                               activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-sm"
                             >

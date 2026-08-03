@@ -12,9 +12,12 @@ export interface SidebarItem {
   isExternal?: boolean; // path é uma URL completa (http/https), abre em nova aba
 }
 
+/** Onde vive a home do app. A raiz "/" passou a ser a landing page pública. */
+export const ROTA_APP = '/app';
+
 export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard', visible: true },
-  { id: 'pipeline', path: '/', label: 'Negócios', icon: 'Kanban', visible: true },
+  { id: 'pipeline', path: ROTA_APP, label: 'Negócios', icon: 'Kanban', visible: true },
   { id: 'clientes', path: '/clientes', label: 'Clientes', icon: 'Users', visible: true },
   { id: 'obras', path: '/obras', label: 'Obras', icon: 'HardHat', visible: true },
   { id: 'fabricantes', path: '/fabricantes', label: 'Fabricantes', icon: 'Factory', visible: true },
@@ -42,6 +45,22 @@ function fixChatWhatsappIcons(list: SidebarItem[]): SidebarItem[] {
   });
 }
 
+// Os paths ficam gravados no banco (sidebar_preferences por usuário e
+// sidebar_empresa_padrao por empresa), então mudar só o DEFAULT não migra
+// ninguém: o item 'pipeline' salvo continuaria apontando para '/', que agora é a
+// landing page. Esta função é o mecanismo de migração — roda em toda leitura,
+// nos três caminhos de retorno, e reescreve o path antigo. Por isso não é
+// preciso migration de dados.
+export function normalizarPipeline(list: SidebarItem[]): SidebarItem[] {
+  return list.map(i => {
+    if (i.id === 'pipeline') return { ...i, path: ROTA_APP, label: 'Negócios', icon: 'Kanban' };
+    // Item personalizado apontando para a raiz cairia na landing. Provável em
+    // atalhos criados quando o pipeline ainda morava lá.
+    if (!i.isExternal && i.path === '/') return { ...i, path: ROTA_APP };
+    return i;
+  });
+}
+
 export function useSidebarPreferences() {
   const { user, profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
@@ -64,8 +83,10 @@ export function useSidebarPreferences() {
             .eq('empresa_id', empresaId)
             .maybeSingle();
           if (empresaPadrao && Array.isArray(empresaPadrao.items) && empresaPadrao.items.length > 0) {
-            return fixChatWhatsappIcons(
-              (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id))
+            return normalizarPipeline(
+              fixChatWhatsappIcons(
+                (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id))
+              )
             );
           }
         }
@@ -73,13 +94,12 @@ export function useSidebarPreferences() {
       }
 
       // Merge saved preferences with defaults to handle new items added after save.
-      // Remove o antigo item 'pedidos' (Lista de Negócios) — funcionalidade unificada em 'pipeline' (/).
-      // Garante que 'pipeline' aponte para / com label 'Negócios'.
+      // Remove o antigo item 'pedidos' (Lista de Negócios) — funcionalidade unificada em 'pipeline'.
       const rawSaved = data.items as unknown as SidebarItem[];
       const needsCleanup = rawSaved.some(i => REMOVED_IDS.has(i.id));
-      const saved = fixChatWhatsappIcons(rawSaved
-        .filter(i => !REMOVED_IDS.has(i.id))
-        .map(i => i.id === 'pipeline' ? { ...i, path: '/', label: 'Negócios', icon: 'Kanban' } : i));
+      const saved = normalizarPipeline(
+        fixChatWhatsappIcons(rawSaved.filter(i => !REMOVED_IDS.has(i.id)))
+      );
       const savedIds = new Set(saved.map(i => i.id));
 
       // Itens novos adicionados ao padrão da empresa depois que este usuário salvou
@@ -93,7 +113,11 @@ export function useSidebarPreferences() {
           .eq('empresa_id', empresaId)
           .maybeSingle();
         if (empresaPadrao && Array.isArray(empresaPadrao.items) && empresaPadrao.items.length > 0) {
-          empresaPadraoItems = (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id));
+          // Também normaliza: itens do padrão da empresa entram no merge abaixo
+          // e trariam o path antigo para quem ainda não tem esse id salvo.
+          empresaPadraoItems = normalizarPipeline(
+            (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id))
+          );
         }
       }
 

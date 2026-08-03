@@ -291,7 +291,7 @@ const EditarPedido = () => {
       setPdfUrl(newPdfUrl);
       setPdfFile(null);
       toast.success('Negócio atualizado com sucesso!');
-      navigate('/pedidos');
+      navigate('/app');
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -364,7 +364,7 @@ const EditarPedido = () => {
   const headerContent = (
     <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
       <SidebarTrigger className="shrink-0 h-8 w-8 md:hidden" />
-      <Button variant="ghost" size="icon" className="shrink-0 -ml-1 h-8 w-8" onClick={() => navigate('/pedidos')}>
+      <Button variant="ghost" size="icon" className="shrink-0 -ml-1 h-8 w-8" onClick={() => navigate('/app')}>
         <ArrowLeft className="h-4 w-4" />
       </Button>
 

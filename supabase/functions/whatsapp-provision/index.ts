@@ -46,7 +46,7 @@ serve(async (req) => {
     );
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Missing authorization" }, 401);
+    if (!authHeader) return json({ error: "Sessão não identificada. Entre novamente no sistema." }, 401);
 
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -55,7 +55,7 @@ serve(async (req) => {
     );
 
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) return json({ error: "Unauthorized" }, 401);
+    if (authError || !user) return json({ error: "Sua sessão expirou. Atualize a página e entre de novo." }, 401);
 
     const { data: callerData, error: callerError } = await supabase
       .from("usuarios")
@@ -63,7 +63,7 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
-    if (callerError || !callerData) return json({ error: "User not found" }, 404);
+    if (callerError || !callerData) return json({ error: "Seu usuário não foi encontrado no sistema. Fale com o gestor da empresa." }, 404);
 
     // Lê o body (pode ser vazio para auto-provisionamento do próprio usuário)
     let body: Record<string, any> = {};
@@ -75,7 +75,7 @@ serve(async (req) => {
     if (action === "delete" && target_usuario_id) {
       const managerRoles = ["admin", "empresa", "gestor"];
       if (!managerRoles.includes(callerData.role)) {
-        return json({ error: "Forbidden" }, 403);
+        return json({ error: "Você não tem permissão para esta ação." }, 403);
       }
 
       const { data: target } = await supabase
@@ -115,7 +115,7 @@ serve(async (req) => {
     if (target_usuario_id) {
       const managerRoles = ["admin", "empresa", "gestor"];
       if (!managerRoles.includes(callerData.role)) {
-        return json({ error: "Forbidden" }, 403);
+        return json({ error: "Você não tem permissão para esta ação." }, 403);
       }
 
       const { data: target } = await supabase
@@ -265,6 +265,6 @@ serve(async (req) => {
 
   } catch (err) {
     console.error("[whatsapp-provision] erro inesperado", err);
-    return json({ error: "Internal error", detail: String(err) }, 500);
+    return json({ error: "Erro inesperado. Tente de novo em instantes.", detail: String(err) }, 500);
   }
 });

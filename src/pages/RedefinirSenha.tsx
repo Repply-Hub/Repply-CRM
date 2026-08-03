@@ -37,7 +37,7 @@ export default function RedefinirSenha() {
       toast.error("Erro ao redefinir senha. O link pode ter expirado.");
     } else {
       toast.success("Senha redefinida com sucesso!");
-      navigate("/");
+      navigate("/app");
     }
     setLoading(false);
   };

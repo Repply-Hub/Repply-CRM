@@ -354,7 +354,7 @@ const ContatoDetalhe = () => {
                             {format(new Date(p.data_pedido), "dd/MM/yyyy", { locale: ptBR })}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="sm" onClick={() => navigate(`/`)} className="h-8 text-xs">
+                            <Button variant="ghost" size="sm" onClick={() => navigate(`/app`)} className="h-8 text-xs">
                               Ver Negócio
                             </Button>
                           </TableCell>

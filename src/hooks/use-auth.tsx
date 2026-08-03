@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -17,6 +18,18 @@ interface AuthContextType {
   loading: boolean;
   profileLoaded: boolean;
   profileAttempted: boolean;
+  /**
+   * Rebusca o perfil sob demanda (voltar do checkout, polling da tela de
+   * assinatura). Difere do fetchProfile interno em três pontos deliberados:
+   *  - funciona DEPOIS do load inicial, quando o fetchProfile já não roda mais;
+   *  - NUNCA seta profile = null, nem em erro nem em "zero linhas", porque zerar
+   *    o perfil com sessão viva dispara o auto-signout de sessão órfã no
+   *    ProtectedRoute;
+   *  - não toca em nenhum ref ou flag do fetchProfile.
+   * Retorna o perfil mais recente que conseguiu: o novo em caso de sucesso, o
+   * atual (inalterado) em qualquer falha.
+   */
+  refreshProfile: () => Promise<any | null>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, nome: string) => Promise<{ error: Error | null }>;
   signUpEmpresa: (email: string, password: string, nome: string, nomeEmpresa: string, cnpjEmpresa?: string) => Promise<{ error: Error | null }>;
@@ -26,6 +39,38 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const isJwtExpiredError = (err: any) =>
+  !!err && (err.message?.includes("JWT expired") || err.code === "PGRST301" || err.status === 401);
+
+// O embed da assinatura é o que alimenta o gate de plano. Com plano B porque o
+// deploy do front e o `supabase db push` são independentes: enquanto a tabela
+// não existir — ou enquanto o cache de esquema do PostgREST estiver frio — a
+// consulta com embed falha, e sem a alternativa o perfil viria nulo, o que o
+// ProtectedRoute trata como sessão órfã e desloga TODA a base de uma vez.
+const SELECT_COM_ASSINATURA = "*, empresas(*, empresa_assinaturas(*))";
+const SELECT_SIMPLES = "*, empresas(*)";
+
+// Fora do componente de propósito: não depende de nada do estado, e definida
+// aqui ela tem identidade estável — o refreshProfile é um useCallback com
+// dependências vazias, e uma função recriada a cada render viraria uma captura
+// silenciosa da primeira versão.
+const buscarPerfil = async (userId: string) => {
+  const comEmbed = await supabase
+    .from("usuarios")
+    .select(SELECT_COM_ASSINATURA)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!comEmbed.error) return comEmbed;
+
+  // Erro de JWT é tratado por quem chama (com refresh e nova tentativa); não
+  // adianta cair para a consulta simples, que falharia igual.
+  if (isJwtExpiredError(comEmbed.error)) return comEmbed;
+
+  console.warn("[AUTH] embed de assinatura indisponível, seguindo sem ele:", comEmbed.error.message);
+  return supabase.from("usuarios").select(SELECT_SIMPLES).eq("user_id", userId).maybeSingle();
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
@@ -34,9 +79,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileAttempted, setProfileAttempted] = useState(false);
   const profileLoadedRef = useRef(false);
   const fetchingRef = useRef(false);
-
-  const isJwtExpiredError = (err: any) =>
-    !!err && (err.message?.includes("JWT expired") || err.code === "PGRST301" || err.status === 401);
+  // Espelhos síncronos de profile/session: o refreshProfile é chamado de dentro
+  // de intervalos e callbacks que capturam closure antiga, e ler o state por
+  // closure devolveria valor obsoleto.
+  const profileRef = useRef<any | null>(null);
+  const sessionRef = useRef<Session | null>(null);
+  const refreshEmVooRef = useRef<Promise<any | null> | null>(null);
+  // Cada escrita bem-sucedida do perfil incrementa esta versão. Serve para uma
+  // resposta lenta não sobrescrever outra mais recente que já chegou.
+  const versaoPerfilRef = useRef(0);
 
   const fetchProfile = async (userId: string) => {
     console.log("[AUTH] fetchProfile ENTER — fetchingRef:", fetchingRef.current, "profileLoadedRef:", profileLoadedRef.current);
@@ -45,13 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     fetchingRef.current = true;
+    const versaoInicial = versaoPerfilRef.current;
     try {
       console.log("[AUTH] fetchProfile — iniciando query para userId:", userId);
-      let { data, error } = await supabase
-        .from("usuarios")
-        .select("*, empresas(*)")
-        .eq("user_id", userId)
-        .maybeSingle();
+      let { data, error } = await buscarPerfil(userId);
 
       console.log("[AUTH] fetchProfile — resposta recebida:", { data: !!data, error: error?.message });
 
@@ -59,11 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("[AUTH] fetchProfile — JWT expirado, forçando refreshSession() e tentando novamente");
         const { error: refreshError } = await supabase.auth.refreshSession();
         if (!refreshError) {
-          const retry = await supabase
-            .from("usuarios")
-            .select("*, empresas(*)")
-            .eq("user_id", userId)
-            .maybeSingle();
+          const retry = await buscarPerfil(userId);
           data = retry.data;
           error = retry.error;
           console.log("[AUTH] fetchProfile — retry após refresh:", { data: !!data, error: error?.message });
@@ -72,15 +116,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Esta busca pode ter demorado tanto que um refreshProfile já resgatou o
+      // perfil no meio do caminho (é o cenário do safetyTimer). Nesse caso o
+      // dado aqui é mais velho que o que está na tela, e escrevê-lo faria o
+      // perfil regredir — inclusive devolvendo ao paywall alguém que acabou de
+      // pagar, ou deslogando um usuário válido se a resposta vier vazia.
+      if (versaoPerfilRef.current !== versaoInicial) {
+        console.log("[AUTH] fetchProfile — resposta obsoleta, descartada em favor de um refresh mais recente");
+        return;
+      }
+
       if (error) {
         console.error("Erro ao buscar perfil:", error);
-        setProfile(null);
+        // Não zera um perfil que já existe: zerar setaria profile=null junto com
+        // profileAttempted=true, e o ProtectedRoute deslogaria o usuário tratando
+        // como sessão órfã. Sem perfil anterior (órfã de verdade), o
+        // comportamento continua idêntico ao anterior.
+        setProfile((anterior) => anterior ?? null);
       } else {
+        versaoPerfilRef.current += 1;
+        profileRef.current = data;
         setProfile(data);
       }
     } catch (err) {
       console.error("Exceção ao buscar perfil:", err);
-      setProfile(null);
+      if (versaoPerfilRef.current !== versaoInicial) return;
+      setProfile((anterior) => anterior ?? null);
     } finally {
       console.log("[AUTH] fetchProfile FINALLY — setProfileLoaded(true), setLoading(false)");
       setProfileLoaded(true);
@@ -91,6 +152,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("[AUTH] fetchProfile EXIT");
     }
   };
+
+  /**
+   * Ver a documentação completa na interface AuthContextType.
+   *
+   * useCallback com dependências vazias é proposital: a tela de assinatura põe
+   * esta função em array de dependências de efeito para fazer polling. Se a
+   * identidade mudasse a cada render, o intervalo seria destruído e recriado a
+   * cada tick — por isso a função lê sessão e perfil por ref, nunca por closure.
+   *
+   * Não consulta fetchingRef de propósito: quando o safetyTimer dispara, a busca
+   * travada deixa fetchingRef em true para sempre e nenhuma tentativa volta a
+   * rodar. Este refresh é a única saída desse estado; respeitar o guard herdaria
+   * o impasse.
+   */
+  const refreshProfile = useCallback(async (): Promise<any | null> => {
+    // Um clique em "já paguei" somado a um tick do polling não podem virar duas
+    // queries: quem chega depois compartilha a mesma promessa.
+    if (refreshEmVooRef.current) return refreshEmVooRef.current;
+
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) {
+      console.log("[AUTH] refreshProfile — sem sessão, nada a fazer");
+      return profileRef.current;
+    }
+
+    const executar = async (): Promise<any | null> => {
+      try {
+        let { data, error } = await buscarPerfil(userId);
+
+        if (error && isJwtExpiredError(error)) {
+          // Caso clássico do retorno do checkout: o usuário passou minutos fora
+          // da aba e o token expirou enquanto estava no provedor de pagamento.
+          const { error: erroRefresh } = await supabase.auth.refreshSession();
+          if (!erroRefresh) {
+            const retry = await buscarPerfil(userId);
+            data = retry.data;
+            error = retry.error;
+          }
+        }
+
+        if (error) {
+          console.error("[AUTH] refreshProfile — erro, preservando perfil atual:", error.message);
+          return profileRef.current;
+        }
+
+        if (!data) {
+          // Query bem-sucedida com zero linhas. Pode ser usuário realmente
+          // removido, mas também pode ser uma policy de RLS nova filtrando
+          // demais. Decidir que a sessão é órfã é responsabilidade exclusiva da
+          // busca de boot, onde a ausência é inequívoca.
+          console.warn("[AUTH] refreshProfile — zero linhas, preservando perfil atual");
+          return profileRef.current;
+        }
+
+        // A sessão pode ter trocado enquanto a query voava — logout em outra
+        // aba, ou troca de conta. Escrever aqui colocaria o perfil de um usuário
+        // em cima da sessão de outro.
+        if (sessionRef.current?.user?.id !== userId) {
+          console.warn("[AUTH] refreshProfile — a sessão mudou durante a busca, resultado descartado");
+          return profileRef.current;
+        }
+
+        versaoPerfilRef.current += 1;
+        profileRef.current = data;
+        setProfile(data);
+        return data;
+      } catch (err) {
+        console.error("[AUTH] refreshProfile — exceção, preservando perfil atual:", err);
+        return profileRef.current;
+      }
+    };
+
+    const promessa = executar();
+    refreshEmVooRef.current = promessa;
+    promessa.finally(() => {
+      // Só limpa se ainda for este o voo corrente, para não apagar um refresh novo.
+      if (refreshEmVooRef.current === promessa) refreshEmVooRef.current = null;
+    });
+    return promessa;
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -124,6 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (session?.user) {
+          sessionRef.current = session;
           setSession(session);
           console.log("[AUTH] onAuthStateChange — session set, profileLoadedRef:", profileLoadedRef.current, "| fetchingRef:", fetchingRef.current);
           if (!profileLoadedRef.current) {
@@ -134,6 +276,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } else {
           console.log("[AUTH] onAuthStateChange — sem sessão, limpando estado e setLoading(false)");
+          sessionRef.current = null;
+          profileRef.current = null;
           setSession(null);
           setProfile(null);
           setProfileLoaded(false);
@@ -198,6 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       profileLoaded,
       profileAttempted,
+      refreshProfile,
       signIn,
       signUp,
       signUpEmpresa,

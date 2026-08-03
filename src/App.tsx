@@ -3,10 +3,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Suspense, lazy, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
+import { TelaBloqueio } from "@/components/shared/TelaBloqueio";
+import { Button } from "@/components/ui/button";
+import { PAYWALL_ATIVO, planoBloqueado } from "@/lib/plano-gate";
 
 const Negocios = lazy(() => import("./pages/Negocios"));
 const Clientes = lazy(() => import("./pages/Clientes"));
@@ -31,6 +34,9 @@ const AdminWhatsAppInstancias = lazy(
 );
 const HistoricoAlteracoes = lazy(() => import("./pages/HistoricoAlteracoes"));
 
+const Landing = lazy(() => import("./pages/Landing"));
+const Cadastro = lazy(() => import("./pages/Cadastro"));
+const Assinar = lazy(() => import("./pages/Assinar"));
 const Login = lazy(() => import("./pages/Login"));
 const EsqueciSenha = lazy(() => import("./pages/EsqueciSenha"));
 const RedefinirSenha = lazy(() => import("./pages/RedefinirSenha"));
@@ -46,15 +52,35 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({
+  children,
+  requerPlano = true,
+}: {
+  children: React.ReactNode;
+  /**
+   * false = rota autenticada, porém fora do gate de plano. Só /assinar usa:
+   * gatear a própria tela de assinatura criaria um loop de redirecionamento.
+   * O padrão é true para que qualquer rota nova nasça protegida por omissão.
+   */
+  requerPlano?: boolean;
+}) {
   const { session, profile, loading, profileLoaded, profileAttempted } =
     useAuth();
+  const location = useLocation();
 
   const handleSignOut = async () => {
-    await import("@/integrations/supabase/client").then(({ supabase }) =>
-      supabase.auth.signOut(),
-    );
-    window.location.href = "/";
+    // O finally é obrigatório: se o signOut rejeitar (rede caindo, por exemplo),
+    // sem ele a navegação nunca aconteceria e o usuário ficaria preso na tela
+    // "Redirecionando..." do caminho de sessão órfã. replace em vez de href para
+    // não deixar a tela anterior no histórico, já que ela não é mais acessível.
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Erro ao sair:", err);
+    } finally {
+      window.location.replace("/");
+    }
   };
 
   // Sessão órfã (usuário deletado do banco mas sessão ainda no localStorage): faz logout automático.
@@ -81,43 +107,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Usuário soft-deletado: perfil existe mas foi suspenso pelo admin
   if (profileAttempted && session && profile && profile.deleted_at) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <div className="max-w-md w-full bg-card p-8 rounded-lg shadow-lg border text-center space-y-6">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-8 w-8 text-destructive"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-foreground">
-              Conta Suspensa
-            </h2>
-            <p className="text-muted-foreground">
-              Sua conta foi desativada pelo administrador. Entre em contato para
-              reativar o acesso.
-            </p>
-          </div>
-          <button
-            onClick={handleSignOut}
-            className="w-full py-2 px-4 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors"
-          >
-            Sair e entrar com outra conta
-          </button>
-        </div>
-      </div>
+      <TelaBloqueio
+        titulo="Conta suspensa"
+        descricao="Sua conta foi desativada pelo administrador. Entre em contato para reativar o acesso."
+      >
+        <Button onClick={handleSignOut} className="w-full">
+          Sair e entrar com outra conta
+        </Button>
+      </TelaBloqueio>
     );
   }
 
@@ -130,43 +127,40 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     profile.role !== "admin"
   ) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <div className="max-w-md w-full bg-card p-8 rounded-lg shadow-lg border text-center space-y-6">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-8 w-8 text-destructive"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-foreground">
-              Acesso Restrito
-            </h2>
-            <p className="text-muted-foreground">
-              Sua conta foi criada mas ainda não está vinculada a uma empresa.
-              Entre em contato com o suporte.
-            </p>
-          </div>
-          <button
-            onClick={handleSignOut}
-            className="w-full py-2 px-4 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors"
-          >
-            Sair
-          </button>
-        </div>
-      </div>
+      <TelaBloqueio
+        titulo="Acesso restrito"
+        descricao="Sua conta foi criada mas ainda não está vinculada a uma empresa. Peça o código de acesso ao gestor da sua empresa ou fale com o suporte."
+      >
+        <Button onClick={handleSignOut} className="w-full">
+          Sair
+        </Button>
+      </TelaBloqueio>
+    );
+  }
+
+  // Gate de plano.
+  //
+  // Libera por construção: planoBloqueado é denylist, então só barra com um
+  // plan_status explicitamente ruim. Coluna ausente (front no ar antes da
+  // migration, que é o estado de hoje), null ou valor desconhecido liberam —
+  // com allowlist, um descompasso entre o deploy do front e o `supabase db
+  // push` trancaria toda a base pagante de uma vez.
+  //
+  // Quando o safetyTimer dispara temos profileLoaded=true e profile=null, e o
+  // fluxo chega até aqui porque todos os blocos acima exigem profileAttempted.
+  // Nesse caso libera, via o `profile &&`: sem perfil não há informação alguma
+  // sobre a assinatura, e bloquear jogaria um cliente pagante no paywall por
+  // dez segundos de rede ruim. O estado não sobrevive a um reload, o app fica
+  // degradado (quase toda query depende de empresa_id) e a barreira real dos
+  // dados é a RLS, não este if — que é conveniência de navegação.
+  //
+  // <Navigate> retornado no render, e não navigate() em efeito, para a página
+  // protegida não chegar a pintar um frame antes do redirecionamento.
+  if (PAYWALL_ATIVO && requerPlano && profile && planoBloqueado(profile)) {
+    // O destino original vai no state para a tela de assinatura devolver o
+    // usuário ao lugar de onde ele veio depois de reativar.
+    return (
+      <Navigate to="/assinar" replace state={{ de: location.pathname + location.search }} />
     );
   }
 
@@ -218,11 +212,32 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { session, loading, profileLoaded } = useAuth();
-  // Only redirect to / when we're sure profile state is settled to avoid
-  // navigating into app with partial profile data which can cause render errors.
-  if (!loading && profileLoaded && session) return <Navigate to="/" replace />;
+  // Só redireciona quando o estado do perfil está assentado, para não entrar no
+  // app com dados parciais e quebrar a renderização.
+  if (!loading && profileLoaded && session) return <Navigate to="/app" replace />;
   return <>{children}</>;
 }
+
+/**
+ * A raiz é pública, mas quem já tem sessão vai direto para dentro do sistema.
+ *
+ * Enquanto a sessão existe e o perfil ainda está carregando, mostra o fallback
+ * neutro em vez da landing. Isso importa porque "/" ERA a home do app: a base
+ * inteira tem esse endereço em favoritos e no histórico, e renderizar a página
+ * de vendas nesse intervalo faria um cliente pagante encarar marketing por
+ * centenas de milissegundos — ou pelos 10 segundos do safetyTimer, se a busca do
+ * perfil travar. O visitante anônimo não é afetado: para ele `session` é nula e
+ * a landing aparece de imediato.
+ *
+ * Não avalia o plano aqui de propósito — quem decide entre /app e /assinar é o
+ * gate do ProtectedRoute, num lugar só.
+ */
+const LandingRoute = () => {
+  const { session, loading, profileLoaded } = useAuth();
+  if (session && (loading || !profileLoaded)) return <PageFallback />;
+  if (!loading && profileLoaded && session) return <Navigate to="/app" replace />;
+  return <Landing />;
+};
 
 const DashboardWrapper = () => {
   const { profile } = useAuth();
@@ -233,7 +248,7 @@ const DashboardWrapper = () => {
 };
 
 // Admin master não tem acesso à página de Negócios (ver AppSidebar), então a
-// rota raiz precisa cair no dashboard administrativo em vez do pipeline.
+// home do app cai no dashboard administrativo em vez do pipeline.
 const RootRoute = () => {
   const { profile } = useAuth();
   if (profile?.role === "admin") {
@@ -244,24 +259,39 @@ const RootRoute = () => {
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
-  if (profile && profile.role !== "admin") return <Navigate to="/" replace />;
+  if (profile && profile.role !== "admin") return <Navigate to="/app" replace />;
   return <>{children}</>;
 }
 
 function GestorRoute({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
   const isGestor = profile?.role === "admin" || profile?.role === "gestor" || profile?.role === "empresa";
-  if (profile && !isGestor) return <Navigate to="/" replace />;
+  if (profile && !isGestor) return <Navigate to="/app" replace />;
   return <>{children}</>;
 }
 
 const AppRoutes = () => (
   <Routes>
+    {/* Landing pública na raiz. Quem já tem sessão é levado para /app. */}
+    <Route path="/" element={<LandingRoute />} />
     <Route
       path="/login"
       element={
         <AuthRoute>
           <Login />
+        </AuthRoute>
+      }
+    />
+    {/* Com AuthRoute como as demais telas de entrada: sem ele, um usuário já
+        logado veria o formulário e, ao enviá-lo, o signUp trocaria a sessão
+        atual pela da conta nova — deslogando a pessoa da própria empresa sem
+        aviso. Quando o cadastro passar a fazer login automático (junto do
+        checkout), o redirecionamento terá de ser explícito no handler. */}
+    <Route
+      path="/cadastro"
+      element={
+        <AuthRoute>
+          <Cadastro />
         </AuthRoute>
       }
     />
@@ -274,8 +304,19 @@ const AppRoutes = () => (
       }
     />
     <Route path="/redefinir-senha" element={<RedefinirSenha />} />
+    {/* Autenticada, mas fora do gate de plano — senão o paywall redirecionaria
+        para si mesmo indefinidamente. */}
     <Route
-      path="/"
+      path="/assinar"
+      element={
+        <ProtectedRoute requerPlano={false}>
+          <Assinar />
+        </ProtectedRoute>
+      }
+    />
+    {/* Home do app: saiu de "/" para dar lugar à landing. */}
+    <Route
+      path="/app"
       element={
         <ProtectedRoute>
           <RootRoute />
@@ -306,7 +347,7 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
-    <Route path="/pedidos" element={<Navigate to="/" replace />} />
+    <Route path="/pedidos" element={<Navigate to="/app" replace />} />
     <Route
       path="/pedidos/novo"
       element={

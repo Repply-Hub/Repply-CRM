@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.whatsapp-webhook]
 verify_jwt = false
+
+# O Stripe chama este endpoint sem JWT do Supabase: a autenticidade vem da
+# assinatura no header stripe-signature, conferida dentro da função.
+# stripe-checkout e stripe-portal NÃO entram aqui — exigem sessão do usuário.
+[functions.stripe-webhook]
+verify_jwt = false

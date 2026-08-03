@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
+import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
 
 const MENSAGEM_TOAST_MAX_CHARS = 100;
 
@@ -631,7 +632,11 @@ export function useWaSendMessage() {
         clearTimeout(timeoutId);
       }
 
-      if (res.error) throw res.error;
+      // A biblioteca lança um erro genérico ANTES de ler o corpo da resposta; a
+      // explicação real da função vem em error.context. Sem isto, "instância
+      // desconectada", "número não tem WhatsApp" e mais oito causas distintas
+      // apareceriam todas como a mesma frase em inglês.
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao enviar mensagem');
       if (res.data?.error) throw new Error(res.data.error);
       return res.data;
     },
@@ -747,7 +752,7 @@ export function useWaReagir() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
-      if (res.error) throw res.error;
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao reagir à mensagem');
       if (res.data?.error) throw new Error(res.data.error);
       return res.data;
     },
@@ -792,7 +797,7 @@ export function useWaExcluirMensagem() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
-      if (res.error) throw res.error;
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao excluir mensagem');
       if (res.data?.error) throw new Error(res.data.error);
       return res.data;
     },
@@ -874,6 +879,15 @@ export function useWaConfig() {
         .maybeSingle();
       return (data?.instancia as WaConfig | null) ?? null;
     },
+    // Este dado decide se a tela deixa a pessoa digitar e enviar. Com o padrão
+    // global (1 minuto de validade e sem revalidar ao focar a janela), uma aba
+    // aberta há horas seguia acreditando que o WhatsApp estava conectado: a
+    // verificação da tela passava, o envio saía e só a função — que lê o banco na
+    // hora — recusava, já com a mensagem digitada perdida. A consulta é barata e
+    // o custo de errar é uma mensagem que não sai.
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 }
 
@@ -891,7 +905,7 @@ export function useWaProvision() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
-      if (res.error) throw res.error;
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao ativar o WhatsApp');
       if (res.data?.error) throw new Error(res.data.error);
       return res.data as { success: boolean; instanceName: string; alreadyProvisioned?: boolean };
     },
@@ -1226,7 +1240,7 @@ export function useWaFetchContactPhoto() {
       const { data, error } = await supabase.functions.invoke('whatsapp-contact-photo', {
         body: { conversa_id: conversaId },
       });
-      if (error) throw error;
+      if (error) throw await erroLegivelDaFunction(error, 'Erro ao carregar a foto do contato');
       return {
         conversaId,
         fotoPerfilUrl: data?.foto_perfil_url as string | null,
@@ -1256,7 +1270,7 @@ export function useWaRenomearContato() {
       const { data, error } = await supabase.functions.invoke('whatsapp-contact-rename', {
         body: { conversa_id: conversaId, nome },
       });
-      if (error) throw error;
+      if (error) throw await erroLegivelDaFunction(error, 'Erro ao renomear o contato');
       return { conversaId, nomeContato: data?.nome_contato as string };
     },
     onSuccess: ({ conversaId, nomeContato }) => {
@@ -1282,7 +1296,7 @@ export function useWaFetchGroupParticipantes() {
       const { data, error } = await supabase.functions.invoke('whatsapp-group-participants', {
         body: { conversa_id: conversaId },
       });
-      if (error) throw error;
+      if (error) throw await erroLegivelDaFunction(error, 'Erro ao carregar os participantes');
       return { conversaId, participantes: (data?.participantes ?? []) as { nome: string | null; telefone: string }[] };
     },
     onSuccess: ({ conversaId, participantes }) => {
@@ -1306,7 +1320,7 @@ export function useWaParticipantePhoto(telefone: string | null | undefined) {
       const { data, error } = await supabase.functions.invoke('whatsapp-participant-photo', {
         body: { telefone },
       });
-      if (error) throw error;
+      if (error) throw await erroLegivelDaFunction(error, 'Erro ao carregar a foto do participante');
       return (data?.foto_perfil_url ?? null) as string | null;
     },
   });
@@ -1466,7 +1480,7 @@ export function useWaCriarGrupo() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
-      if (res.error) throw res.error;
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao criar o grupo');
       if (res.data?.error) throw new Error(res.data.error);
       return res.data.conversa as WaConversa;
     },

@@ -76,6 +76,21 @@ export default {
           negotiation: "hsl(var(--kanban-negotiation))",
           closed: "hsl(var(--kanban-closed))",
         },
+        // Landing page — constantes de marca, fora do sistema claro/escuro do app.
+        lp: {
+          ink: "hsl(var(--lp-ink))",
+          "ink-elevado": "hsl(var(--lp-ink-elevado))",
+          cream: "hsl(var(--lp-cream))",
+        },
+      },
+      // As fontes já são carregadas no index.html e aplicadas por seletor em
+      // body/h1-h4; mapeá-las aqui é o que permite usar font-display num <div>
+      // ou <span> da landing. Nenhuma classe font-sans/font-display existia no
+      // projeto antes disto, então não há regressão de tipografia.
+      fontFamily: {
+        sans: ["Satoshi", "system-ui", "-apple-system", "sans-serif"],
+        display: ["General Sans", "Satoshi", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -99,10 +114,26 @@ export default {
             height: "0",
           },
         },
+        // Landing page
+        "lp-surgir": {
+          from: { opacity: "0", transform: "translateY(16px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "lp-card-entra": {
+          from: { opacity: "0", transform: "translateY(-8px) scale(0.97)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        "lp-pulsar": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.45" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "lp-surgir": "lp-surgir 0.6s ease-out both",
+        "lp-card-entra": "lp-card-entra 0.35s ease-out both",
+        "lp-pulsar": "lp-pulsar 2s ease-in-out infinite",
       },
     },
   },
