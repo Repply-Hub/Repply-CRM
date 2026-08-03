@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { PLANOS, type Plano } from '@/lib/planos';
+import { PLANOS, type IntervaloPlano, type Plano } from '@/lib/planos';
 
 /**
  * Catálogo de planos vindo do banco, com o conteúdo estático de `lib/planos.ts`
@@ -17,7 +17,7 @@ export function usePlanos() {
     queryFn: async (): Promise<Plano[] | null> => {
       const { data, error } = await supabase
         .from('planos')
-        .select('slug, nome, descricao, preco_centavos, beneficios, selo, visivel, ordem')
+        .select('slug, nome, descricao, preco_centavos, intervalo, beneficios, selo, visivel, ordem')
         .eq('visivel', true)
         .order('ordem');
 
@@ -32,7 +32,10 @@ export function usePlanos() {
         nome: linha.nome,
         descricao: linha.descricao ?? '',
         // O banco guarda em centavos para não depender de ponto flutuante.
-        precoMensal: linha.preco_centavos / 100,
+        preco: linha.preco_centavos / 100,
+        // Só 'month' e 'year' são renderizáveis; qualquer outro valor cai em
+        // 'year', que é o ciclo vigente — melhor que exibir um rótulo vazio.
+        intervalo: (linha.intervalo === 'month' ? 'month' : 'year') as IntervaloPlano,
         destaque: true,
         selo: linha.selo ?? undefined,
         beneficios: Array.isArray(linha.beneficios) ? (linha.beneficios as string[]) : [],

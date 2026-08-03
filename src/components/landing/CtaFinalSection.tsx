@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatarPrecoBRL } from '@/lib/planos';
+import { formatarPrecoBRL, rotuloIntervalo } from '@/lib/planos';
 import { usePlanos } from '@/hooks/use-planos';
 
 export function CtaFinalSection() {
@@ -34,8 +34,9 @@ export function CtaFinalSection() {
             Pronto para tirar a carteira do WhatsApp?
           </h2>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-lp-ink/80">
-            Crie a conta da empresa e chame seu time pelo código. {formatarPrecoBRL(plano.precoMensal)} por
-            mês, usuários ilimitados, cancele quando quiser.
+            Crie a conta da empresa e chame seu time pelo código.{' '}
+            {formatarPrecoBRL(plano.preco)}
+            {rotuloIntervalo(plano.intervalo)}, usuários ilimitados, cancele quando quiser.
           </p>
         </div>
 

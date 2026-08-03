@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatarPrecoBRL } from '@/lib/planos';
+import { adjetivoIntervalo, formatarPrecoBRL, rotuloIntervalo } from '@/lib/planos';
 import { usePlanos } from '@/hooks/use-planos';
 import { Eyebrow, LPSection } from './LPSection';
 
@@ -31,9 +31,9 @@ export function PrecosSection() {
 
         <p className="mt-5 flex items-baseline justify-center gap-2">
           <span className="font-display text-6xl font-bold tabular-nums tracking-tight text-foreground sm:text-7xl">
-            {formatarPrecoBRL(plano.precoMensal)}
+            {formatarPrecoBRL(plano.preco)}
           </span>
-          <span className="text-lg text-muted-foreground">/mês</span>
+          <span className="text-lg text-muted-foreground">{rotuloIntervalo(plano.intervalo)}</span>
         </p>
 
         <ul className="mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-x-5 gap-y-2.5">
@@ -57,7 +57,8 @@ export function PrecosSection() {
             </Link>
           </Button>
           <p className="mt-4 text-xs text-muted-foreground">
-            Valor de lançamento, mantido enquanto a assinatura ficar ativa. Cobrança mensal no cartão.
+            Valor de lançamento, mantido enquanto a assinatura ficar ativa. Cobrança{' '}
+            {adjetivoIntervalo(plano.intervalo)} no cartão, com renovação automática.
           </p>
         </div>
       </div>

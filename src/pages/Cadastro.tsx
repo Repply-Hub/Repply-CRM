@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { traduzirErroAuth } from "@/lib/erros-auth";
-import { formatarPrecoBRL } from "@/lib/planos";
+import { formatarPrecoBRL, rotuloIntervalo } from "@/lib/planos";
 import { usePlanos } from "@/hooks/use-planos";
 import { toast } from "sonner";
 
@@ -77,7 +77,8 @@ function EscolhaCaminho({ onEscolher }: { onEscolher: (c: Caminho) => void }) {
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               Você vira o gestor, convida o time e assina o plano de{" "}
-              {formatarPrecoBRL(plano.precoMensal)}/mês.
+              {formatarPrecoBRL(plano.preco)}
+              {rotuloIntervalo(plano.intervalo)}.
             </p>
           </div>
         </div>
@@ -287,7 +288,8 @@ function FormEmpresa({ onVoltar }: { onVoltar: () => void }) {
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Plano de {formatarPrecoBRL(plano.precoMensal)}/mês com usuários ilimitados. Cancele quando quiser.
+        Plano de {formatarPrecoBRL(plano.preco)}
+        {rotuloIntervalo(plano.intervalo)} com usuários ilimitados. Cancele quando quiser.
       </p>
     </form>
   );

@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { TelaBloqueio } from "@/components/shared/TelaBloqueio";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/layout/Logo";
-import { formatarPrecoBRL } from "@/lib/planos";
+import { formatarPrecoBRL, rotuloIntervalo } from "@/lib/planos";
 import { usePlanos } from "@/hooks/use-planos";
 import {
   PAYWALL_ATIVO,
@@ -262,9 +262,9 @@ export default function Assinar() {
 
           <p className="mt-4 flex items-baseline justify-center gap-1.5">
             <span className="font-display text-5xl font-bold tabular-nums text-card-foreground">
-              {formatarPrecoBRL(plano.precoMensal)}
+              {formatarPrecoBRL(plano.preco)}
             </span>
-            <span className="text-sm text-muted-foreground">/mês</span>
+            <span className="text-sm text-muted-foreground">{rotuloIntervalo(plano.intervalo)}</span>
           </p>
 
           <ul className="mt-7 space-y-3 text-left">
