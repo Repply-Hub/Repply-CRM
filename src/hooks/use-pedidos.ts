@@ -36,7 +36,7 @@ export interface PedidosFilters {
   dateFrom?: string;
   dateTo?: string;
   onlyAttention?: boolean;
-  /** Busca por cliente/fabricante — hoje usada só na query de stats (RPC), não no fetch paginado da lista/kanban. */
+  /** Busca por cliente/fabricante — aplicada tanto na query de stats (RPC) quanto no fetch paginado da lista/kanban. */
   search?: string;
   /** Oculta negócios criados via importação em massa (import_hash preenchido). Não é enviado à
    *  query de stats (usePedidosStats) de propósito — os totais do cabeçalho continuam contando
@@ -61,16 +61,35 @@ export function usePedidos(
   filters?: PedidosFilters,
   enabled = true,
 ) {
-  const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId } = filters ?? {};
+  const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId, search } = filters ?? {};
 
   return useQuery({
-    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId],
+    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId, search],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
       if (empresaId) {
         usuarioIds = await resolveUsuarioIds(empresaId, vendedorIds);
         if (usuarioIds.length === 0) return { data: [], count: 0 };
+      }
+
+      // Busca por texto casa contra colunas de tabelas relacionadas (cliente/fabricante), que o
+      // PostgREST não filtra via `.or()` sobre um `.select()` com embeds — por isso resolvemos os
+      // ids que batem com o termo em duas consultas enxutas (cada uma já restrita pela RLS de
+      // clientes/fabricantes) e então filtramos pedidos por esses ids.
+      const trimmedSearch = search?.trim();
+      let matchedClienteIds: string[] = [];
+      let matchedFabricanteIds: string[] = [];
+      if (trimmedSearch) {
+        const [{ data: clienteMatches }, { data: fabricanteMatches }] = await Promise.all([
+          supabase.from('clientes').select('id').ilike('empresa', `%${trimmedSearch}%`),
+          supabase.from('fabricantes').select('id').ilike('nome', `%${trimmedSearch}%`),
+        ]);
+        matchedClienteIds = (clienteMatches ?? []).map(c => c.id);
+        matchedFabricanteIds = (fabricanteMatches ?? []).map(f => f.id);
+        if (matchedClienteIds.length === 0 && matchedFabricanteIds.length === 0) {
+          return { data: [], count: 0 };
+        }
       }
 
       let query = supabase
@@ -118,11 +137,20 @@ export function usePedidos(
 
       if (onlyAttention) {
         const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
-        query = query.lte('created_at', cutoff);
+        // "Fechamento" (ganho) e "Perdido" são etapas finais — nunca contam como "parado",
+        // já que o alerta de dias na etapa também não aparece pra elas no front.
+        query = query.lte('created_at', cutoff).not('status', 'in', '(fechamento,perdido)');
       }
 
       if (hideImportados) {
         query = query.is('import_hash', null);
+      }
+
+      if (trimmedSearch) {
+        const orParts: string[] = [];
+        if (matchedClienteIds.length > 0) orParts.push(`cliente_id.in.(${matchedClienteIds.join(',')})`);
+        if (matchedFabricanteIds.length > 0) orParts.push(`fabricante_id.in.(${matchedFabricanteIds.join(',')})`);
+        query = query.or(orParts.join(','));
       }
 
       const { data, error, count } = await query;
@@ -199,12 +227,12 @@ export function usePedidosOptions(empresaId?: string) {
 }
 
 export function usePedidosStats(empresaId?: string, stages?: string[], filters?: PedidosFilters) {
-  const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, search, funilId } = filters ?? {};
+  const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, search, funilId, hideImportados } = filters ?? {};
 
   return useQuery({
     // Reage a filtros e busca — NUNCA a page/pageSize/"Exibir"/"Ver mais", que não fazem
     // parte da queryKey aqui de propósito (o header precisa do total real, não do carregado).
-    queryKey: ['pedidos_stats', empresaId, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, search, funilId],
+    queryKey: ['pedidos_stats', empresaId, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, search, funilId, hideImportados],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
@@ -223,6 +251,7 @@ export function usePedidosStats(empresaId?: string, stages?: string[], filters?:
         p_only_attention: !!onlyAttention,
         p_funil_id: funilId ?? null,
         p_marcador_ids: marcadorIds && marcadorIds.length > 0 ? marcadorIds : null,
+        p_hide_importados: !!hideImportados,
       });
       if (error) throw error;
       const row = data?.[0];

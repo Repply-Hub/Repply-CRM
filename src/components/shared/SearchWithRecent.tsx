@@ -21,6 +21,9 @@ interface SearchWithRecentProps {
   storageKey: string;
   className?: string;
   showAddressSuggestions?: boolean;
+  /** Indica que uma busca/filtro externo (ex.: query no servidor) está em andamento — mostra o
+   *  mesmo spinner usado para as sugestões de endereço, para o usuário saber que o conteúdo está carregando. */
+  loading?: boolean;
 }
 
 export function SearchWithRecent({
@@ -30,6 +33,7 @@ export function SearchWithRecent({
   storageKey,
   className,
   showAddressSuggestions = false,
+  loading = false,
 }: SearchWithRecentProps) {
   const [open, setOpen] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
@@ -134,7 +138,7 @@ export function SearchWithRecent({
                 }}
                 className="pl-9 pr-10 h-10 w-full"
               />
-              {searching && (
+              {(searching || loading) && (
                 <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground z-10" />
               )}
             </div>

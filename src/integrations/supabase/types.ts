@@ -3383,6 +3383,24 @@ export type Database = {
               total_valor: number
             }[]
           }
+        | {
+            Args: {
+              p_date_from?: string
+              p_date_to?: string
+              p_fabricante_ids?: string[]
+              p_funil_id?: string
+              p_hide_importados?: boolean
+              p_marcador_ids?: string[]
+              p_only_attention?: boolean
+              p_search?: string
+              p_stages?: string[]
+              p_usuario_ids?: string[]
+            }
+            Returns: {
+              total_count: number
+              total_valor: number
+            }[]
+          }
       restaurar_usuario_por_email: {
         Args: {
           p_email: string

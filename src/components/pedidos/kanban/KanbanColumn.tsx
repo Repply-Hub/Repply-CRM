@@ -90,7 +90,10 @@ export const KanbanColumn = memo(function KanbanColumn({
       <div className="flex items-center gap-2.5 mb-1 px-1 shrink-0">
         <div className={cn('h-2 w-2 rounded-full ring-2 ring-offset-1 ring-offset-background', `bg-${safeColor}`, `ring-${safeColor}/30`)} />
         <h3 className="text-sm font-bold text-foreground tracking-tight">{safeLabel}</h3>
-        <span className="ml-auto text-[11px] font-semibold bg-secondary text-secondary-foreground px-2.5 py-0.5 rounded-full tabular-nums">
+        {isFetching && !isLoading && (
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />
+        )}
+        <span className={cn('text-[11px] font-semibold bg-secondary text-secondary-foreground px-2.5 py-0.5 rounded-full tabular-nums', (!isFetching || isLoading) && 'ml-auto')}>
           {stageTotal}
         </span>
       </div>

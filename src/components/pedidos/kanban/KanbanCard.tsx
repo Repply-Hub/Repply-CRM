@@ -22,7 +22,10 @@ const formatDate = (value: string) => {
 
 export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visibleColumns, columns, stageLabel, stageColorClass }: KanbanCardProps & { onClick?: (id: string) => void }) {
   const navigate = useNavigate();
-  const isAlert = order.daysInStage >= order.alertDays;
+  // "Fechamento" (ganho) e "Perdido" são etapas finais — negócio parado nelas não é um
+  // alerta de estagnação, é o resultado esperado do funil.
+  const isEtapaFinal = order.stage === 'fechamento' || order.stage === 'perdido';
+  const isAlert = !isEtapaFinal && order.daysInStage >= order.alertDays;
 
   return (
     <Draggable draggableId={order.id} index={index}>
