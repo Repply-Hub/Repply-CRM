@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, ChevronDown, Users, X, HardHat, ListChecks, FileText, Contact, Tag, CalendarDays, UserCheck } from 'lucide-react';
+import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, Users, X, HardHat, ListChecks, FileText, Contact, Tag, CalendarDays, UserCheck } from 'lucide-react';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { toast } from 'sonner';
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
@@ -86,7 +86,6 @@ const ClienteDetalhe = () => {
   const deleteContato = useDeleteContato();
   const { data: contatos } = useContatos();
   const [editOpen, setEditOpen] = useState(false);
-  const [enderecoOpen, setEnderecoOpen] = useState(true);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const [addContatoOpen, setAddContatoOpen] = useState(false);
   const [addObraOpen, setAddObraOpen] = useState(false);
@@ -96,11 +95,11 @@ const ClienteDetalhe = () => {
   const createObra = useCreateObra();
   const [novaObra, setNovaObra] = useState({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
   const [pedidosPage, setPedidosPage] = useState(1);
-  const PEDIDOS_PAGE_SIZE = 5;
+  const [pedidosPageSize, setPedidosPageSize] = useState(5);
   const [addTarefaOpen, setAddTarefaOpen] = useState(false);
   const [novoNegocioOpen, setNovoNegocioOpen] = useState(false);
   const [tarefasPage, setTarefasPage] = useState(1);
-  const TAREFAS_PAGE_SIZE = 5;
+  const [tarefasPageSize, setTarefasPageSize] = useState(5);
 
   const copyInfo = async (label: string, value?: string | null) => {
     if (!value?.trim()) return;
@@ -117,17 +116,17 @@ const ClienteDetalhe = () => {
     (pedidos ?? []).find(p => p.id === viewOrderId),
   [pedidos, viewOrderId]);
   const pedidosCliente = useMemo(() => (pedidos ?? []).filter(p => p.cliente_id === id), [pedidos, id]);
-  const totalPedidosPages = Math.max(1, Math.ceil(pedidosCliente.length / PEDIDOS_PAGE_SIZE));
-  const paginatedPedidos = useMemo(() => 
-    pedidosCliente.slice((pedidosPage - 1) * PEDIDOS_PAGE_SIZE, pedidosPage * PEDIDOS_PAGE_SIZE),
-    [pedidosCliente, pedidosPage]
+  const totalPedidosPages = Math.max(1, Math.ceil(pedidosCliente.length / pedidosPageSize));
+  const paginatedPedidos = useMemo(() =>
+    pedidosCliente.slice((pedidosPage - 1) * pedidosPageSize, pedidosPage * pedidosPageSize),
+    [pedidosCliente, pedidosPage, pedidosPageSize]
   );
   const contatosExtras = (contatos ?? []).filter((c: any) => cliente && c.empresa === cliente.empresa);
   const tarefasCliente = useMemo(() => (tarefas ?? []).filter(t => t.cliente_id === id), [tarefas, id]);
-  const totalTarefasPages = Math.max(1, Math.ceil(tarefasCliente.length / TAREFAS_PAGE_SIZE));
+  const totalTarefasPages = Math.max(1, Math.ceil(tarefasCliente.length / tarefasPageSize));
   const paginatedTarefas = useMemo(() =>
-    tarefasCliente.slice((tarefasPage - 1) * TAREFAS_PAGE_SIZE, tarefasPage * TAREFAS_PAGE_SIZE),
-    [tarefasCliente, tarefasPage]
+    tarefasCliente.slice((tarefasPage - 1) * tarefasPageSize, tarefasPage * tarefasPageSize),
+    [tarefasCliente, tarefasPage, tarefasPageSize]
   );
 
   // Edit form state
@@ -632,27 +631,18 @@ const ClienteDetalhe = () => {
             return (
               <Card className="md:col-span-3 border-border/40">
                 <CardContent className="pt-4">
-                  <button
-                    type="button"
-                    className="flex items-center justify-between w-full gap-2 mb-0 cursor-pointer"
-                    onClick={() => setEnderecoOpen(o => !o)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Endereço</p>
-                    </div>
-                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${enderecoOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {enderecoOpen && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
-                      {fields.map(f => (
-                        <div key={f.label}>
-                          <p className="text-xs text-muted-foreground">{f.label}</p>
-                          <p className="text-sm font-medium text-foreground">{f.value}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 mb-4">
+                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Endereço</p>
+                  </div>
+                  <div className="flex flex-wrap justify-between gap-x-6 gap-y-2">
+                    {fields.map(f => (
+                      <div key={f.label} className="shrink-0">
+                        <p className="text-xs text-muted-foreground whitespace-nowrap">{f.label}</p>
+                        <p className="text-sm font-medium text-foreground whitespace-nowrap">{f.value}</p>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -1033,14 +1023,15 @@ const ClienteDetalhe = () => {
                 </Table>
               </div>
             )}
-            {pedidosCliente.length > PEDIDOS_PAGE_SIZE && (
+            {pedidosCliente.length > pedidosPageSize && (
               <ListPagination
                 page={pedidosPage}
                 totalPages={totalPedidosPages}
                 totalItems={pedidosCliente.length}
-                pageSize={PEDIDOS_PAGE_SIZE}
+                pageSize={pedidosPageSize}
                 onPageChange={setPedidosPage}
-                onPageSizeChange={() => {}}
+                onPageSizeChange={(size) => { setPedidosPageSize(size); setPedidosPage(1); }}
+                pageSizeOptions={[5, 10, 25, 50]}
                 itemLabel="negócio"
                 className="mt-4 border-t pt-4"
               />
@@ -1101,14 +1092,15 @@ const ClienteDetalhe = () => {
                 </Table>
               </div>
             )}
-            {tarefasCliente.length > TAREFAS_PAGE_SIZE && (
+            {tarefasCliente.length > tarefasPageSize && (
               <ListPagination
                 page={tarefasPage}
                 totalPages={totalTarefasPages}
                 totalItems={tarefasCliente.length}
-                pageSize={TAREFAS_PAGE_SIZE}
+                pageSize={tarefasPageSize}
                 onPageChange={setTarefasPage}
-                onPageSizeChange={() => {}}
+                onPageSizeChange={(size) => { setTarefasPageSize(size); setTarefasPage(1); }}
+                pageSizeOptions={[5, 10, 25, 50]}
                 itemLabel="tarefa"
                 className="mt-4 border-t pt-4"
               />
