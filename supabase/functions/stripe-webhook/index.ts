@@ -209,7 +209,7 @@ async function aplicarAssinatura(
     planoSlug = (plano as { slug: string } | null)?.slug ?? null;
   }
 
-  const fimPeriodo = (sub as unknown as { current_period_end?: number }).current_period_end;
+  const fimPeriodo = resolverFimDoPeriodo(sub);
 
   const patch: Record<string, unknown> = {
     empresa_id: empresaId,
@@ -232,6 +232,29 @@ async function aplicarAssinatura(
   if (error) throw error;
 
   console.log(`[stripe-webhook] empresa=${empresaId} status=${statusStripe} liberado=${liberado}`);
+}
+
+/**
+ * Fim do ciclo pago, em epoch de segundos.
+ *
+ * O campo mudou de lugar: até 2025 vinha no topo da Subscription, e passou a
+ * viver em cada item (`items.data[].current_period_end`), porque uma assinatura
+ * pode ter itens com ciclos diferentes. Ler só o topo devolvia `undefined` e
+ * gravava NULL na coluna — foi o que aconteceu na primeira assinatura de teste:
+ * tudo ativou certo, mas o app ficou sem saber quando renova.
+ *
+ * Entre vários itens, vale o que vence primeiro: é a data em que a assinatura
+ * como um todo precisa de uma nova cobrança.
+ */
+function resolverFimDoPeriodo(sub: Stripe.Subscription): number | undefined {
+  const doTopo = (sub as unknown as { current_period_end?: unknown }).current_period_end;
+  if (typeof doTopo === "number") return doTopo;
+
+  const dosItens = (sub.items?.data ?? [])
+    .map((item) => (item as unknown as { current_period_end?: unknown }).current_period_end)
+    .filter((valor): valor is number => typeof valor === "number");
+
+  return dosItens.length ? Math.min(...dosItens) : undefined;
 }
 
 /** Converte o status do Stripe no vocabulário da coluna plan_status. */
