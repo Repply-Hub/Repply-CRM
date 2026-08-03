@@ -60,7 +60,11 @@ TableHead.displayName = "TableHead";
 
 const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <td ref={ref} className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)} {...props} />
+    // overflow-hidden + text-ellipsis: sem isso, uma célula com whitespace-nowrap e conteúdo
+    // mais largo que a coluna força a coluna a crescer mesmo com table-layout:fixed (o texto não
+    // pode quebrar linha nem ser cortado, então o navegador estica a coluna pra caber). Não afeta
+    // células sem whitespace-nowrap, já que text-overflow:ellipsis só atua em overflow sem quebra.
+    <td ref={ref} className={cn("p-4 align-middle overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0", className)} {...props} />
   ),
 );
 TableCell.displayName = "TableCell";

@@ -11,6 +11,21 @@ interface TablePreset {
   visibleColumns: string[];
   customLabels: Record<string, string>;
   pageSize: number;
+  columnWidths?: Record<string, number>;
+}
+
+const MIN_COLUMN_WIDTH = 60;
+const MAX_COLUMN_WIDTH = 640;
+
+// Satura qualquer valor fora da faixa (defesa contra larguras corrompidas persistidas antes do
+// mecanismo de <colgroup>/largura explícita da tabela existir, quando um arraste podia salvar um
+// valor absurdo por causa do navegador redistribuindo colunas de forma imprevisível).
+function clampColumnWidth(width: number): number {
+  return Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, Math.round(width)));
+}
+
+function sanitizeColumnWidths(widths: Record<string, number>): Record<string, number> {
+  return Object.fromEntries(Object.entries(widths).map(([id, w]) => [id, clampColumnWidth(w)]));
 }
 
 interface TableSettingsOptions {
@@ -74,6 +89,11 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem(`${key}_column_widths`);
+    return saved ? sanitizeColumnWidths(JSON.parse(saved)) : {};
+  });
+
   // 2. Database Sync
   // Load from DB
   useEffect(() => {
@@ -96,6 +116,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
           if (data.labels_personalizados) setCustomLabels(data.labels_personalizados as any);
           if (data.tamanho_pagina) setPageSize(data.tamanho_pagina);
           if (data.modelos) setPresets(data.modelos as any);
+          if (data.larguras_colunas) setColumnWidths(sanitizeColumnWidths(data.larguras_colunas as any));
         }
       } catch (err) {
         console.error('Erro ao carregar configurações da tabela:', err);
@@ -125,6 +146,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
             labels_personalizados: customLabels,
             tamanho_pagina: pageSize,
             modelos: presets,
+            larguras_colunas: columnWidths,
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'empresa_id, tabela_key'
@@ -138,7 +160,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     }, 1000);
 
     return () => clearTimeout(saveTimeout);
-  }, [empresaId, key, columns, visibleColumns, customLabels, pageSize, presets]);
+  }, [empresaId, key, columns, visibleColumns, customLabels, pageSize, presets, columnWidths]);
 
   // 3. Persistence (LocalStorage as fallback/cache)
   // Listen for storage changes (e.g. from ImportPedidosDialog)
@@ -175,6 +197,14 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
           setPresets(parsed);
         } catch {}
       }
+
+      const savedWidths = localStorage.getItem(`${key}_column_widths`);
+      if (savedWidths) {
+        try {
+          const parsed = JSON.parse(savedWidths) as Record<string, number>;
+          setColumnWidths(sanitizeColumnWidths(parsed));
+        } catch {}
+      }
     };
 
     window.addEventListener('storage', handler);
@@ -200,6 +230,10 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
   useEffect(() => {
     localStorage.setItem(`${key}_presets`, JSON.stringify(presets));
   }, [key, presets]);
+
+  useEffect(() => {
+    localStorage.setItem(`${key}_column_widths`, JSON.stringify(columnWidths));
+  }, [key, columnWidths]);
 
   // 4. Actions
   const handleRename = useCallback((columnId: string, newLabel: string) => {
@@ -269,6 +303,12 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     return customLabels[columnId] || col?.label || columnId;
   }, [columns, customLabels]);
 
+  // Redimensionar colunas (estilo Excel) — largura em pixels, arrastando a borda direita do
+  // cabeçalho. `undefined`/ausente = largura padrão (auto) da coluna.
+  const setColumnWidth = useCallback((columnId: string, width: number) => {
+    setColumnWidths(prev => ({ ...prev, [columnId]: clampColumnWidth(width) }));
+  }, []);
+
   const savePreset = useCallback((name: string) => {
     if (!name.trim()) return;
     const newPreset: TablePreset = {
@@ -277,11 +317,12 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
       columns,
       visibleColumns,
       customLabels,
-      pageSize
+      pageSize,
+      columnWidths
     };
     setPresets(prev => [...prev, newPreset]);
     toast.success(`Modelo "${name}" salvo com sucesso!`);
-  }, [columns, visibleColumns, customLabels, pageSize]);
+  }, [columns, visibleColumns, customLabels, pageSize, columnWidths]);
 
   const loadPreset = useCallback((presetId: string) => {
     const preset = presets.find(p => p.id === presetId);
@@ -290,6 +331,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
       setVisibleColumns(preset.visibleColumns);
       setCustomLabels(preset.customLabels);
       setPageSize(preset.pageSize);
+      setColumnWidths(preset.columnWidths ? sanitizeColumnWidths(preset.columnWidths) : {});
       toast.success(`Modelo "${preset.name}" aplicado!`);
     }
   }, [presets]);
@@ -308,6 +350,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     setColumns(defaultColumns);
     setVisibleColumns(defaultColumns.map(c => c.id));
     setCustomLabels({});
+    setColumnWidths({});
     toast.success('Configurações restauradas para o padrão');
   }, [defaultColumns]);
 
@@ -327,6 +370,8 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
     savePreset,
     loadPreset,
     deletePreset,
-    resetToDefaults
+    resetToDefaults,
+    columnWidths,
+    setColumnWidth
   };
 }

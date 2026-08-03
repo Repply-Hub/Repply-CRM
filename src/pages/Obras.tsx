@@ -38,6 +38,7 @@ import { StatusObrasDialog } from '@/components/obras/StatusObrasDialog';
 import { cn, hasTextSelection } from '@/lib/utils';
 import { FilterButton } from '@/components/shared/FilterButton';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
+import { ResizableTh } from '@/components/shared/ResizableTh';
 import { supabase } from '@/integrations/supabase/client';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { EnderecoAutocomplete } from '@/components/obras/EnderecoAutocomplete';
@@ -157,7 +158,9 @@ export default function Obras() {
     presets,
     savePreset,
     loadPreset,
-    deletePreset
+    deletePreset,
+    columnWidths,
+    setColumnWidth,
   } = useTableSettings({
     key: 'obras',
     defaultColumns: OBRA_FIELDS,
@@ -264,6 +267,13 @@ export default function Obras() {
     const startIndex = (page - 1) * pageSize;
     return filtered.slice(startIndex, startIndex + pageSize);
   }, [filtered, page, pageSize]);
+
+  // Larguras resolvidas na mesma ordem das colunas visíveis, usadas no <colgroup> e nos
+  // cabeçalhos — a tabela precisa de largura própria explícita (não w-full/auto) + colgroup,
+  // senão o navegador redistribui as larguras proporcionalmente ao redimensionar uma coluna.
+  const OBRAS_CHECKBOX_COL_WIDTH = 40;
+  const resolvedObraColWidths = visibleColumns.map((colId) => columnWidths[colId] ?? (colId === 'actions' ? 80 : 150));
+  const obrasTableTotalWidth = OBRAS_CHECKBOX_COL_WIDTH + resolvedObraColWidths.reduce((a, b) => a + b, 0);
 
   const toggleSelectAllPage = () => {
     if (selectedIds.length === paginatedObras.length && paginatedObras.every(o => selectedIds.includes(o.id))) {
@@ -436,20 +446,31 @@ export default function Obras() {
                 </div>
                 
                 <div className="rounded-lg border border-border/60 overflow-auto bg-card flex-1 min-h-0">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm table-fixed" style={{ width: obrasTableTotalWidth }}>
+                    <colgroup>
+                      <col style={{ width: OBRAS_CHECKBOX_COL_WIDTH }} />
+                      {visibleColumns.map((colId, i) => (
+                        <col key={colId} style={{ width: resolvedObraColWidths[i] }} />
+                      ))}
+                    </colgroup>
                     <thead className="sticky top-0 z-10 bg-muted">
                       <tr className="border-b bg-muted/50">
                         <th className="h-14 px-2.5 w-10 text-center">
-                          <Checkbox 
+                          <Checkbox
                             checked={selectedIds.length > 0 && selectedIds.length === paginatedObras.length && paginatedObras.every(o => selectedIds.includes(o.id))}
                             onCheckedChange={toggleSelectAllPage}
                           />
                         </th>
-                        {visibleColumns.map(colId => (
+                        {visibleColumns.map((colId, i) => (
                           colId === 'actions' ? (
-                            <th key={colId} className="text-left h-14 px-2.5 font-semibold text-muted-foreground text-xs whitespace-nowrap">
+                            <ResizableTh
+                              key={colId}
+                              width={resolvedObraColWidths[i]}
+                              onResize={(w) => setColumnWidth(colId, w)}
+                              className="text-left h-14 px-2.5 font-semibold text-muted-foreground text-xs whitespace-nowrap"
+                            >
                               {getLabel(colId)}
-                            </th>
+                            </ResizableTh>
                           ) : (
                             <SortableTh
                               key={colId}
@@ -460,6 +481,8 @@ export default function Obras() {
                               onSort={(key, direction) => { setSortColumn(key); setSortDirection(direction); }}
                               ascLabel={colId === 'created_at' ? 'Mais antigas primeiro' : 'Ordenar A-Z'}
                               descLabel={colId === 'created_at' ? 'Mais recentes primeiro' : 'Ordenar Z-A'}
+                              width={resolvedObraColWidths[i]}
+                              onResize={(w) => setColumnWidth(colId, w)}
                             />
                           )
                         ))}

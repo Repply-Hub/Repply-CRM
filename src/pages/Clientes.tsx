@@ -392,13 +392,22 @@ const Clientes = () => {
     savePreset,
     loadPreset,
     deletePreset,
-    resetToDefaults
+    resetToDefaults,
+    columnWidths,
+    setColumnWidth,
   } = activeTab === 'empresas' ? empresasSettings : contatosSettings;
 
   const empresas = clients ?? [];
   const contatos = contatosList ?? [];
   const isLoading = activeTab === 'empresas' ? loadingClientes : loadingContatos;
   const totalCount = (clients?.length ?? 0) + (contatosList?.length ?? 0);
+
+  // Larguras resolvidas na mesma ordem das colunas visíveis, usadas no <colgroup> e nos
+  // cabeçalhos — a tabela precisa de largura própria explícita (não w-full/auto) + colgroup,
+  // senão o navegador redistribui as larguras proporcionalmente ao redimensionar uma coluna.
+  const CLIENTES_CHECKBOX_COL_WIDTH = 40;
+  const resolvedClienteColWidths = visibleColumns.map((colId) => columnWidths[colId] ?? 150);
+  const clientesTableTotalWidth = CLIENTES_CHECKBOX_COL_WIDTH + resolvedClienteColWidths.reduce((a, b) => a + b, 0);
 
   // Ordena por qualquer coluna visível (acionado pelo dropdown no cabeçalho da
   // tabela — ver SortableTh), reaproveitando getColumnValue pra ler o mesmo
@@ -1289,13 +1298,19 @@ const Clientes = () => {
         ) : activeTab === 'empresas' ? (
           <>
             <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-auto flex-1 min-h-0">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-fixed" style={{ width: clientesTableTotalWidth }}>
+                <colgroup>
+                  <col style={{ width: CLIENTES_CHECKBOX_COL_WIDTH }} />
+                  {visibleColumns.map((colId, i) => (
+                    <col key={colId} style={{ width: resolvedClienteColWidths[i] }} />
+                  ))}
+                </colgroup>
                 <thead className="sticky top-0 z-10 bg-muted">
                   <tr className="border-b bg-muted/50">
                     <th className="h-14 px-2.5 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
-                    {visibleColumns.map(colId => (
+                    {visibleColumns.map((colId, i) => (
                       <SortableTh
                         key={colId}
                         label={getLabel(colId)}
@@ -1305,6 +1320,8 @@ const Clientes = () => {
                         onSort={handleSort}
                         ascLabel={colId === 'data_criacao' ? 'Mais antigos primeiro' : 'Ordenar A-Z'}
                         descLabel={colId === 'data_criacao' ? 'Mais recentes primeiro' : 'Ordenar Z-A'}
+                        width={resolvedClienteColWidths[i]}
+                        onResize={(w) => setColumnWidth(colId, w)}
                       />
                     ))}
                   </tr>
@@ -1355,12 +1372,12 @@ const Clientes = () => {
 
                           if (colId === 'empresa') {
                             return (
-                              <td key={colId} className="py-1.5 px-2.5">
-                                <div className="flex items-center gap-2.5">
+                              <td key={colId} className="py-1.5 px-2.5 overflow-hidden">
+                                <div className="flex items-center gap-2.5 min-w-0">
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <Icon className="h-4 w-4 text-primary" />
                                   </div>
-                                  <span className="font-semibold text-sm whitespace-nowrap text-foreground" onClick={onTextClick}>{client.empresa}</span>
+                                  <span className="font-semibold text-sm truncate text-foreground" onClick={onTextClick}>{client.empresa}</span>
                                 </div>
                               </td>
                             );
@@ -1389,7 +1406,7 @@ const Clientes = () => {
                           }
 
                           return (
-                            <td key={colId} className={cn("py-1.5 px-2.5 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
+                            <td key={colId} className={cn("py-1.5 px-2.5 overflow-hidden text-ellipsis whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
                               <span onClick={onTextClick}>{value || '—'}</span>
                             </td>
                           );
@@ -1417,13 +1434,19 @@ const Clientes = () => {
         ) : (
           <>
             <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-auto flex-1 min-h-0">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-fixed" style={{ width: clientesTableTotalWidth }}>
+                <colgroup>
+                  <col style={{ width: CLIENTES_CHECKBOX_COL_WIDTH }} />
+                  {visibleColumns.map((colId, i) => (
+                    <col key={colId} style={{ width: resolvedClienteColWidths[i] }} />
+                  ))}
+                </colgroup>
                 <thead className="sticky top-0 z-10 bg-muted">
                   <tr className="border-b bg-muted/50">
                     <th className="h-14 px-2.5 w-10">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </th>
-                    {visibleColumns.map(colId => (
+                    {visibleColumns.map((colId, i) => (
                       <SortableTh
                         key={colId}
                         label={getLabel(colId)}
@@ -1433,6 +1456,8 @@ const Clientes = () => {
                         onSort={handleSort}
                         ascLabel={colId === 'data_criacao' ? 'Mais antigos primeiro' : 'Ordenar A-Z'}
                         descLabel={colId === 'data_criacao' ? 'Mais recentes primeiro' : 'Ordenar Z-A'}
+                        width={resolvedClienteColWidths[i]}
+                        onResize={(w) => setColumnWidth(colId, w)}
                       />
                     ))}
                   </tr>
@@ -1482,12 +1507,12 @@ const Clientes = () => {
 
                           if (colId === 'nome_contato') {
                             return (
-                              <td key={colId} className="py-1.5 px-2.5">
-                                <div className="flex items-center gap-2.5">
+                              <td key={colId} className="py-1.5 px-2.5 overflow-hidden">
+                                <div className="flex items-center gap-2.5 min-w-0">
                                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                     <User className="h-4 w-4 text-primary" />
                                   </div>
-                                  <span className="font-semibold text-sm whitespace-nowrap text-foreground" onClick={onTextClick}>{contato.nome_contato || 'Sem nome'}</span>
+                                  <span className="font-semibold text-sm truncate text-foreground" onClick={onTextClick}>{contato.nome_contato || 'Sem nome'}</span>
                                 </div>
                               </td>
                             );
@@ -1495,14 +1520,14 @@ const Clientes = () => {
 
                           if (colId === 'empresa') {
                             return (
-                              <td key={colId} className="py-1.5 px-2.5 text-sm font-medium text-foreground whitespace-nowrap">
+                              <td key={colId} className="py-1.5 px-2.5 text-sm font-medium text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
                                 <span onClick={onTextClick}>{value || '—'}</span>
                               </td>
                             );
                           }
 
                           return (
-                            <td key={colId} className={cn("py-1.5 px-2.5 whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
+                            <td key={colId} className={cn("py-1.5 px-2.5 overflow-hidden text-ellipsis whitespace-nowrap", isCustom ? "text-xs text-muted-foreground" : "text-sm text-foreground font-normal")}>
                               <span onClick={onTextClick}>{value || '—'}</span>
                             </td>
                           );

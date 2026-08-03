@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useDeferredValue, memo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { parse, isValid, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { parse, isValid, startOfMonth, endOfMonth } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
@@ -45,6 +45,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ImportDialog } from '@/components/ImportDialog';
 import { ListPagination } from '@/components/shared/ListPagination';
+import { ResizableTh } from '@/components/shared/ResizableTh';
 import { KanbanColumn } from '@/components/pedidos/kanban/KanbanColumn';
 import { FilterButton } from '@/components/shared/FilterButton';
 import { toast } from 'sonner';
@@ -115,7 +116,10 @@ const PedidoRow = memo(({
 }) => {
   const camposExtras = pedido.campos_extras || {};
   const daysInStage = Math.floor((Date.now() - new Date(pedido.created_at).getTime()) / 86400000);
-  const isAlert = daysInStage >= 7;
+  // "Fechamento" (ganho) e "Perdido" são etapas finais — negócio parado nelas não é um
+  // alerta de estagnação, é o resultado esperado do funil.
+  const isEtapaFinal = pedido.status === 'fechamento' || pedido.status === 'perdido';
+  const isAlert = !isEtapaFinal && daysInStage >= 7;
 
   return (
     <TableRow className={`cursor-pointer hover:bg-muted/30 ${selected ? 'bg-primary/5' : ''}`} onClick={onClick}>
@@ -337,7 +341,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     savePreset,
     loadPreset,
     deletePreset,
-    resetToDefaults
+    resetToDefaults,
+    columnWidths,
+    setColumnWidth,
   } = useTableSettings({
     key: 'pedidos',
     defaultColumns: PEDIDOS_COLUMNS,
@@ -433,8 +439,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [selectedMarcadores, setSelectedMarcadores] = useState<string[]>([]);
   const [showOnlyAttention, setShowOnlyAttention] = useState(false);
   const [hideImportados, setHideImportados] = useState(false);
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  // Por padrão, o filtro de Período já entra selecionado no mês atual — "Limpar filtros"
+  // continua zerando pra nenhum período (ver clearPipelineFilters), esse default e' só o
+  // estado inicial ao abrir a aba.
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
+  const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -478,18 +487,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
     dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
     onlyAttention: showOnlyAttention || undefined,
-    // Usado só pela query de stats (header) — o fetch paginado da lista/kanban continua
-    // filtrando a busca no cliente sobre o que já foi carregado.
+    // Usada tanto pela query de stats (header) quanto pelo fetch paginado da lista/kanban —
+    // ambos aplicam o mesmo filtro no servidor, então total/páginas e linhas exibidas ficam consistentes.
     search: deferredSearch.trim() || undefined,
-    // Filtro puramente visual: usePedidosStats ignora esse campo de propósito, então os
-    // totais do cabeçalho continuam somando negócios importados mesmo com o filtro ligado.
+    // Também enviado pra usePedidosStats — sem isso, o total/paginação do cabeçalho continuava
+    // contando negócios importados mesmo com a lista escondendo-os, podendo mostrar "N negócios"
+    // com a tabela vazia quando todos os resultados eram importados.
     hideImportados: hideImportados || undefined,
     funilId,
   }), [selectedVendedores, selectedFabricantes, selectedMarcadores, dateFrom, dateTo, showOnlyAttention, deferredSearch, hideImportados, funilId]);
 
   // Essa query só serve a view Lista agora — desabilitada no Kanban, já que cada coluna
   // busca seus próprios dados de forma independente.
-  const { data: pedidosData, isLoading: isPedidosLoading } = usePedidos(
+  const { data: pedidosData, isLoading: isPedidosLoading, isFetching: isPedidosFetching } = usePedidos(
     empresaId,
     page - 1,
     pageSize,
@@ -497,8 +507,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     pedidosFilters,
     !showKanban,
   );
-  const { data: pedidosStats } = usePedidosStats(empresaId, activeStages, pedidosFilters);
+  const { data: pedidosStats, isFetching: isStatsFetching } = usePedidosStats(empresaId, activeStages, pedidosFilters);
   const isLoading = isUserLoading || (!showKanban && isPedidosLoading);
+  // Com `placeholderData: keepPreviousData`, trocar de página/filtro/busca mantém o conteúdo
+  // anterior visível sem acionar `isLoading` de novo — sem isso o usuário não tinha nenhum
+  // sinal de que uma nova busca já estava em andamento no servidor.
+  const isRefetching = !isLoading && (isPedidosFetching || isStatsFetching);
   const pedidos = useMemo(() => pedidosData?.data ?? [], [pedidosData]);
   const totalCount = pedidosStats?.count ?? 0;
   const totalValor = pedidosStats?.valor ?? 0;
@@ -581,48 +595,29 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // Removido useEffect que forçava a substituição das colunas individuais pela coluna "negocio"
   // para permitir que o usuário escolha ver as colunas separadamente.
 
-  const baseListPedidos = useMemo(() => {
-    const all = pedidos;
-    if (!isPipelineMode) return all;
-    return all.filter(p => {
-      if (selectedVendedores.length > 0 && !selectedVendedores.includes(p.usuario_id)) return false;
-      if (selectedFabricantes.length > 0 && !selectedFabricantes.includes(p.fabricante_id)) return false;
-      if (selectedMarcadores.length > 0 && !selectedMarcadores.includes(p.marcador_id ?? '')) return false;
-      if (showOnlyAttention) {
-        const days = Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000);
-        if (days < 7) return false;
-      }
-      if (p.data_pedido) {
-        const pedidoDate = parseISO(p.data_pedido);
-        if (dateFrom && startOfDay(pedidoDate) < startOfDay(dateFrom)) return false;
-        if (dateTo && startOfDay(pedidoDate) > endOfDay(dateTo)) return false;
-      } else if (dateFrom || dateTo) {
-        // Se tem filtro de data mas o pedido não tem data, oculta
-        return false;
-      }
-      return true;
-    });
-  }, [pedidos, isPipelineMode, selectedVendedores, selectedFabricantes, selectedMarcadores, showOnlyAttention, dateFrom, dateTo]);
-
-  const filtered = useMemo(() => {
-    const q = deferredSearch.trim().toLowerCase();
-    return baseListPedidos.filter(p => {
-      if (selectedStages.length > 0 && !selectedStages.includes(p.status)) return false;
-      if (!q) return true;
-      const empresa = (p.cliente?.empresa ?? '').toLowerCase();
-      const fab = (p.fabricante?.nome ?? '').toLowerCase();
-      return empresa.includes(q) || fab.includes(q);
-    });
-  }, [baseListPedidos, deferredSearch, selectedStages]);
-
-  // A Lista já vem paginada diretamente do servidor (dataPageSize = pageSize),
-  // então `filtered` já representa a página atual — sem re-fatiar localmente.
+  // `pedidos` já vem do servidor paginado e filtrado por TODOS os critérios (vendedor,
+  // fabricante, marcador, etapa, atenção, data, busca, importados) através dos mesmos
+  // `pedidosFilters`/`activeStages` usados por usePedidosStats — reaplicar esses filtros aqui
+  // no cliente é redundante e, pior, arriscava divergir do total/paginação do rodapé (o próprio
+  // bug reportado: rodapé contando N negócios com a tabela mostrando outra coisa). O rodapé
+  // (totalCount/totalPages) e as linhas exibidas (`filtered`) agora vêm sempre da mesma fonte.
+  const filtered = pedidos;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const paginated = filtered;
   const visibleColumnCount = Math.max(
     1,
     tableVisibleColumns.filter(id => id !== 'acoes').length + (tableVisibleColumns.includes('acoes') ? 2 : 0) + 1
   );
+
+  // Larguras resolvidas (persistida ou padrão) na MESMA ordem das colunas visíveis — usadas
+  // tanto no <colgroup> quanto nos cabeçalhos, pra nunca ficarem dessincronizadas. A tabela
+  // precisa de uma largura própria explícita (não w-full/auto) + colgroup: sem isso o navegador
+  // redistribui/ajusta as larguras de coluna proporcionalmente ao redimensionar, ignorando o
+  // valor exato escolhido pelo usuário (comportamento de table-layout:fixed com largura automática).
+  const CHECKBOX_COL_WIDTH = 40;
+  const visibleColumnDefs = columns.filter(col => tableVisibleColumns.includes(col.id));
+  const resolvedColWidths = visibleColumnDefs.map(col => columnWidths[col.id] ?? (col.id === 'acoes' ? 80 : 150));
+  const tableTotalWidth = CHECKBOX_COL_WIDTH + resolvedColWidths.reduce((a, b) => a + b, 0);
 
   useEffect(() => {
     localStorage.setItem('negocios_search', search);
@@ -1521,6 +1516,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               onValueChange={handleSearchChange}
               storageKey="negocios_recent_searches"
               className="order-last w-full sm:order-none sm:w-auto sm:min-w-[240px] sm:shrink-0"
+              loading={isRefetching}
             />
 
             <div className="shrink-0">{filtrosPopover}</div>
@@ -1590,19 +1586,30 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
 
               <div className="w-full rounded-xl border border-border overflow-hidden flex-1 min-h-0 flex flex-col">
-                <Table wrapperClassName="flex-1 min-h-0">
+                <Table wrapperClassName="flex-1 min-h-0" className="table-fixed" style={{ width: tableTotalWidth }}>
+                  <colgroup>
+                    <col style={{ width: CHECKBOX_COL_WIDTH }} />
+                    {visibleColumnDefs.map((col, i) => (
+                      <col key={col.id} style={{ width: resolvedColWidths[i] }} />
+                    ))}
+                  </colgroup>
                   <TableHeader className="sticky top-0 z-10 bg-muted">
                     <TableRow className="bg-muted/50">
                       <TableHead className="w-10 h-14 px-2.5">
                         <Checkbox checked={allPageSelected || deleteAllFilteredMode} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
-                      {columns.filter(col => tableVisibleColumns.includes(col.id)).map(col => (
-                        <TableHead key={col.id} className={cn(
-                          "whitespace-nowrap h-14 px-2.5 text-xs font-semibold",
-                          col.id === 'acoes' ? "w-[80px] text-center" : "min-w-[150px]"
-                        )}>
+                      {visibleColumnDefs.map((col, i) => (
+                        <ResizableTh
+                          key={col.id}
+                          width={resolvedColWidths[i]}
+                          onResize={(w) => setColumnWidth(col.id, w)}
+                          className={cn(
+                            "whitespace-nowrap h-14 px-2.5 text-xs font-semibold",
+                            col.id === 'acoes' && "text-center"
+                          )}
+                        >
                           {getLabel(col.id)}
-                        </TableHead>
+                        </ResizableTh>
                       ))}
                     </TableRow>
                   </TableHeader>

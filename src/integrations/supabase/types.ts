@@ -739,6 +739,7 @@ export type Database = {
           empresa_id: string
           id: string
           labels_personalizados: Json
+          larguras_colunas: Json
           modelos: Json
           tabela_key: string
           tamanho_pagina: number
@@ -751,6 +752,7 @@ export type Database = {
           empresa_id: string
           id?: string
           labels_personalizados?: Json
+          larguras_colunas?: Json
           modelos?: Json
           tabela_key: string
           tamanho_pagina?: number
@@ -763,6 +765,7 @@ export type Database = {
           empresa_id?: string
           id?: string
           labels_personalizados?: Json
+          larguras_colunas?: Json
           modelos?: Json
           tabela_key?: string
           tamanho_pagina?: number

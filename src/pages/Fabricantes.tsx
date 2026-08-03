@@ -88,6 +88,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ListPagination } from "@/components/shared/ListPagination";
+import { ResizableTh } from "@/components/shared/ResizableTh";
 import { ProductImageUpload } from "@/components/catalogo/ProductImageUpload";
 import { ImportCatalogoDialog } from "@/components/catalogo/ImportCatalogoDialog";
 import { GlobalImportCatalogoDialog } from "@/components/catalogo/GlobalImportCatalogoDialog";
@@ -455,6 +456,8 @@ const Fabricantes = () => {
     savePreset: savePrecoPreset,
     loadPreset: loadPrecoPreset,
     deletePreset: deletePrecoPreset,
+    columnWidths: precoColumnWidths,
+    setColumnWidth: setPrecoColumnWidth,
   } = useTableSettings({
     key: "fabricantes_precos",
     defaultColumns: PRECOS_COLUMNS,
@@ -480,6 +483,15 @@ const Fabricantes = () => {
 
   const hasFilters = filtroCategoria !== "todas";
   const activeFilterCount = filtroCategoria !== "todas" ? 1 : 0;
+
+  // Larguras resolvidas na mesma ordem das colunas visíveis, usadas no <colgroup> e nos
+  // cabeçalhos — a tabela precisa de largura própria explícita (não w-full/auto) + colgroup,
+  // senão o navegador redistribui as larguras proporcionalmente ao redimensionar uma coluna.
+  const PRECO_CHECKBOX_COL_WIDTH = 40;
+  const resolvedPrecoColWidths = visiblePrecoColumns.map(
+    (colId) => precoColumnWidths[colId] ?? (colId === "imagem" ? 64 : colId === "acoes" ? 80 : 150),
+  );
+  const precoTableTotalWidth = PRECO_CHECKBOX_COL_WIDTH + resolvedPrecoColWidths.reduce((a, b) => a + b, 0);
 
   // precoColumns is now handled by the hook
 
@@ -791,7 +803,13 @@ const Fabricantes = () => {
                       </div>
                     ) : precosFiltrados.length > 0 ? (
                       <div className="rounded-lg border border-border/50 overflow-auto flex-1 min-h-0">
-                        <Table>
+                        <Table className="table-fixed" style={{ width: precoTableTotalWidth }}>
+                          <colgroup>
+                            <col style={{ width: PRECO_CHECKBOX_COL_WIDTH }} />
+                            {visiblePrecoColumns.map((colId, i) => (
+                              <col key={colId} style={{ width: resolvedPrecoColWidths[i] }} />
+                            ))}
+                          </colgroup>
                           <TableHeader className="sticky top-0 bg-background/95 backdrop-blur z-10 shadow-sm">
                             <TableRow className="bg-muted/30 hover:bg-muted/30">
                               <TableHead className="w-10 px-4 py-3">
@@ -805,17 +823,15 @@ const Fabricantes = () => {
                                   aria-label="Selecionar todos"
                                 />
                               </TableHead>
-                              {visiblePrecoColumns.map((colId) => (
-                                <TableHead
+                              {visiblePrecoColumns.map((colId, i) => (
+                                <ResizableTh
                                   key={colId}
-                                  className={cn(
-                                    "text-xs font-semibold whitespace-nowrap px-4 py-3",
-                                    colId === "imagem" && "w-16",
-                                    colId === "acoes" && "w-20",
-                                  )}
+                                  width={resolvedPrecoColWidths[i]}
+                                  onResize={(w) => setPrecoColumnWidth(colId, w)}
+                                  className="text-xs font-semibold whitespace-nowrap px-4 py-3"
                                 >
                                   {getPrecoLabel(colId)}
-                                </TableHead>
+                                </ResizableTh>
                               ))}
                             </TableRow>
                           </TableHeader>

@@ -24,6 +24,7 @@ import { format, subDays, subMonths, subYears, startOfDay, endOfDay } from 'date
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { ListPagination } from '@/components/shared/ListPagination';
+import { ResizableTh } from '@/components/shared/ResizableTh';
 import { supabase } from '@/integrations/supabase/client';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { TarefaKanbanColumn } from '@/components/tarefas/TarefaKanbanColumn';
@@ -135,7 +136,9 @@ export default function Tarefas() {
     savePreset,
     loadPreset,
     deletePreset,
-    resetToDefaults
+    resetToDefaults,
+    columnWidths,
+    setColumnWidth,
   } = useTableSettings({
     key: 'tarefas',
     defaultColumns: TAREFA_COLUMNS,
@@ -227,6 +230,14 @@ export default function Tarefas() {
   const currentPageIds = paginated.map(t => t.id);
   const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selected.has(id));
   const someSelected = selected.size > 0;
+
+  // Larguras resolvidas na mesma ordem das colunas visíveis, usadas no <colgroup> e nos
+  // cabeçalhos — a tabela precisa de largura própria explícita (não w-full/auto) + colgroup,
+  // senão o navegador redistribui as larguras proporcionalmente ao redimensionar uma coluna.
+  const TAREFAS_CHECKBOX_COL_WIDTH = 40;
+  const TAREFAS_ACOES_COL_WIDTH = 80;
+  const resolvedTarefaColWidths = visibleColumns.map((colId) => columnWidths[colId] ?? 150);
+  const tarefasTableTotalWidth = TAREFAS_CHECKBOX_COL_WIDTH + TAREFAS_ACOES_COL_WIDTH + resolvedTarefaColWidths.reduce((a, b) => a + b, 0);
 
   const toggleOne = (id: string) => {
     setSelected(prev => {
@@ -537,16 +548,32 @@ export default function Tarefas() {
 
             {/* Desktop: table layout */}
             <div className="hidden md:flex flex-col rounded-xl border border-border/60 border-b-0 rounded-b-none overflow-hidden shadow-[var(--shadow-card)] flex-1 min-h-0">
-              <Table wrapperClassName="flex-1 min-h-0">
+              <Table wrapperClassName="flex-1 min-h-0" className="table-fixed" style={{ width: tarefasTableTotalWidth }}>
+                <colgroup>
+                  <col style={{ width: TAREFAS_CHECKBOX_COL_WIDTH }} />
+                  {visibleColumns.map((colId, i) => (
+                    <col
+                      key={colId}
+                      style={{ width: resolvedTarefaColWidths[i] }}
+                      className={cn((colId === 'responsavel' || colId === 'prazo_final') && "hidden lg:table-column", colId === 'projeto' && "hidden xl:table-column")}
+                    />
+                  ))}
+                  <col style={{ width: TAREFAS_ACOES_COL_WIDTH }} />
+                </colgroup>
                 <TableHeader className="sticky top-0 z-10 bg-muted">
                   <TableRow className="bg-muted/50 border-b border-border/60">
                     <TableHead className="w-10 h-14 px-2.5">
                       <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                     </TableHead>
-                    {visibleColumns.map(colId => (
-                      <TableHead key={colId} className={cn("text-xs font-semibold whitespace-nowrap h-14 px-2.5", (colId === 'responsavel' || colId === 'prazo_final') && "hidden lg:table-cell", colId === 'projeto' && "hidden xl:table-cell")}>
+                    {visibleColumns.map((colId, i) => (
+                      <ResizableTh
+                        key={colId}
+                        width={resolvedTarefaColWidths[i]}
+                        onResize={(w) => setColumnWidth(colId, w)}
+                        className={cn("text-xs font-semibold whitespace-nowrap h-14 px-2.5", (colId === 'responsavel' || colId === 'prazo_final') && "hidden lg:table-cell", colId === 'projeto' && "hidden xl:table-cell")}
+                      >
                         {getLabel(colId)}
-                      </TableHead>
+                      </ResizableTh>
                     ))}
                     <TableHead className="w-[80px] text-xs font-semibold whitespace-nowrap h-14 px-2.5">Ações</TableHead>
                   </TableRow>
