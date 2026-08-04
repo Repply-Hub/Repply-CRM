@@ -26,3 +26,16 @@ verify_jwt = false
 # stripe-checkout e stripe-portal NÃO entram aqui — exigem sessão do usuário.
 [functions.stripe-webhook]
 verify_jwt = false
+
+# Retorno do OAuth do Nylas: é o NAVEGADOR voltando do provedor, sem JWT do
+# Supabase. A autenticidade vem do `state` de uso único, gerado em
+# email-conectar e consumido aqui.
+[functions.email-callback]
+verify_jwt = false
+
+# O Nylas chama sem JWT; a autenticidade vem do HMAC em x-nylas-signature,
+# conferido sobre o corpo cru dentro da função.
+[functions.email-webhook]
+verify_jwt = false
+
+# email-conectar e email-enviar NÃO entram aqui — exigem sessão do usuário.

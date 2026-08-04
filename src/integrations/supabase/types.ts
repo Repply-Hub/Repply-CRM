@@ -1080,6 +1080,170 @@ export type Database = {
         }
         Relationships: []
       }
+      email_contas: {
+        Row: {
+          conectado_em: string
+          conectado_por: string | null
+          criado_em: string
+          email: string
+          empresa_id: string
+          id: string
+          nome_exibicao: string | null
+          pasta_inbox_id: string | null
+          pasta_sent_id: string | null
+          provedor: string
+          status: string
+          ultima_sync_em: string | null
+          ultimo_erro: string | null
+          updated_at: string
+        }
+        Insert: {
+          conectado_em?: string
+          conectado_por?: string | null
+          criado_em?: string
+          email: string
+          empresa_id: string
+          id?: string
+          nome_exibicao?: string | null
+          pasta_inbox_id?: string | null
+          pasta_sent_id?: string | null
+          provedor: string
+          status?: string
+          ultima_sync_em?: string | null
+          ultimo_erro?: string | null
+          updated_at?: string
+        }
+        Update: {
+          conectado_em?: string
+          conectado_por?: string | null
+          criado_em?: string
+          email?: string
+          empresa_id?: string
+          id?: string
+          nome_exibicao?: string | null
+          pasta_inbox_id?: string | null
+          pasta_sent_id?: string | null
+          provedor?: string
+          status?: string
+          ultima_sync_em?: string | null
+          ultimo_erro?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_contas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_mensagens: {
+        Row: {
+          anexos: Json
+          assunto: string | null
+          bcc: Json
+          cc: Json
+          conta_id: string
+          corpo_html: string | null
+          criado_em: string
+          data_mensagem: string
+          destinatarios: Json
+          direcao: string
+          empresa_id: string
+          enviado_por: string | null
+          envio_erro: string | null
+          envio_status: string | null
+          excluido: boolean
+          favorito: boolean
+          id: string
+          lido: boolean
+          nylas_message_id: string
+          nylas_thread_id: string | null
+          pastas: string[]
+          remetente_email: string | null
+          remetente_nome: string | null
+          reply_to: Json
+          snippet: string | null
+          tem_anexo: boolean
+          updated_at: string
+        }
+        Insert: {
+          anexos?: Json
+          assunto?: string | null
+          bcc?: Json
+          cc?: Json
+          conta_id: string
+          corpo_html?: string | null
+          criado_em?: string
+          data_mensagem: string
+          destinatarios?: Json
+          direcao: string
+          empresa_id: string
+          enviado_por?: string | null
+          envio_erro?: string | null
+          envio_status?: string | null
+          excluido?: boolean
+          favorito?: boolean
+          id?: string
+          lido?: boolean
+          nylas_message_id: string
+          nylas_thread_id?: string | null
+          pastas?: string[]
+          remetente_email?: string | null
+          remetente_nome?: string | null
+          reply_to?: Json
+          snippet?: string | null
+          tem_anexo?: boolean
+          updated_at?: string
+        }
+        Update: {
+          anexos?: Json
+          assunto?: string | null
+          bcc?: Json
+          cc?: Json
+          conta_id?: string
+          corpo_html?: string | null
+          criado_em?: string
+          data_mensagem?: string
+          destinatarios?: Json
+          direcao?: string
+          empresa_id?: string
+          enviado_por?: string | null
+          envio_erro?: string | null
+          envio_status?: string | null
+          excluido?: boolean
+          favorito?: boolean
+          id?: string
+          lido?: boolean
+          nylas_message_id?: string
+          nylas_thread_id?: string | null
+          pastas?: string[]
+          remetente_email?: string | null
+          remetente_nome?: string | null
+          reply_to?: Json
+          snippet?: string | null
+          tem_anexo?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_mensagens_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "email_contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_mensagens_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresa_assinaturas: {
         Row: {
           ativado_em: string | null
