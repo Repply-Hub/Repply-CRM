@@ -11,6 +11,7 @@ import {
 import {
   Building2, Users, Loader2, ChevronDown, ChevronRight, Search,
   TrendingUp, MessageSquare, Mail, Clock, RefreshCw, Gift, Timer, Ban,
+  CalendarPlus, CreditCard,
 } from 'lucide-react';
 import {
   useEmpresasCS, useUsuariosDaEmpresa, useDefinirPlano,
@@ -27,6 +28,17 @@ function desde(iso: string | null): { texto: string; dias: number | null } {
   if (dias < 30) return { texto: `há ${dias} dias`, dias };
   const meses = Math.floor(dias / 30);
   return { texto: `há ${meses} ${meses === 1 ? 'mês' : 'meses'}`, dias };
+}
+
+/** Data curta. O ano so aparece quando nao e o corrente — reduz ruido na linha. */
+function data(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const mesmoAno = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString('pt-BR', mesmoAno
+    ? { day: '2-digit', month: 'short' }
+    : { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
 const COR_SITUACAO: Record<SituacaoCS, string> = {
@@ -106,7 +118,28 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
             <div className="min-w-0">
               <p className="truncate font-medium text-foreground">{empresa.nome ?? '(sem nome)'}</p>
               <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1" title="Data de cadastro da empresa">
+                  <CalendarPlus className="h-3 w-3" />
+                  entrou {data(empresa.criada_em)}
+                </span>
+                <span>·</span>
+                {/* "Pagou" só quando existe assinatura no Stripe por trás. As
+                    empresas legacy têm `ativado_em` preenchido com o instante em
+                    que a migration de grandfathering rodou — exibir aquilo como
+                    pagamento seria inventar receita que não houve. */}
+                {empresa.tem_assinatura_stripe && empresa.ativado_em ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-600" title="Data do primeiro pagamento confirmado">
+                    <CreditCard className="h-3 w-3" />
+                    pagou {data(empresa.ativado_em)}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1" title="Nunca houve cobrança confirmada">
+                    <CreditCard className="h-3 w-3" />
+                    nunca pagou
+                  </span>
+                )}
+                <span>·</span>
+                <span className="inline-flex items-center gap-1" title="Login mais recente de qualquer pessoa da empresa">
                   <Clock className="h-3 w-3" />
                   {acesso.texto}
                 </span>

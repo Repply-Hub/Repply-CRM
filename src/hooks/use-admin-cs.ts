@@ -25,6 +25,10 @@ export interface EmpresaCS {
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
   tem_customer_stripe: boolean;
+  /** Assinatura de verdade por tras — e o que separa "pagou" de "foi liberado". */
+  tem_assinatura_stripe: boolean;
+  /** Quando o acesso foi liberado. So significa "pagou" se tem_assinatura_stripe. */
+  ativado_em: string | null;
   usuarios: number;
   usuarios_ativos_7d: number;
   ultimo_acesso: string | null;
