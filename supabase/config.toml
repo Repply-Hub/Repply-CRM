@@ -44,5 +44,5 @@ verify_jwt = false
 [functions.email-sync]
 verify_jwt = false
 
-# email-conectar, email-enviar e email-desconectar NÃO entram aqui — exigem
-# sessão do usuário.
+# email-conectar, email-enviar, email-desconectar e email-mensagem NÃO entram
+# aqui — exigem sessão do usuário.

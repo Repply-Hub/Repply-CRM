@@ -122,6 +122,27 @@ export function useEmailEmpresa() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  /**
+   * Corpo completo de uma mensagem, sob demanda.
+   *
+   * A listagem do Nylas devolve `snippet`, não `body` — ler o corpo custa uma
+   * chamada por mensagem. Por isso ele é buscado ao abrir, e a Edge Function
+   * cacheia na linha para a segunda abertura sair do banco.
+   */
+  const carregarCorpo = async (mensagemId: string): Promise<string | null> => {
+    const { data, error } = await supabase.functions.invoke('email-mensagem', {
+      body: { mensagem_id: mensagemId },
+    });
+    if (error) {
+      const e = await erroLegivelDaFunction(error, 'Não foi possível abrir a mensagem');
+      toast.error(e.message);
+      return null;
+    }
+    // A lista guarda o snippet; trocar pelo corpo real exige refetch.
+    queryClient.invalidateQueries({ queryKey: ['received_emails'] });
+    return (data?.corpo_html as string) ?? '';
+  };
+
   const enviarMutation = useMutation({
     mutationFn: async (params: {
       to: string | string[];
@@ -193,5 +214,6 @@ export function useEmailEmpresa() {
     sincronizar: (opcoes?: { limit?: number; backfill?: boolean }) =>
       sincronizarMutation.mutate(opcoes),
     isSyncing: sincronizarMutation.isPending,
+    carregarCorpo,
   };
 }

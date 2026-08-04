@@ -66,7 +66,7 @@ const Emails = () => {
   // (isConnected/connectedEmail/sendEmail), então a troca é de import. A
   // diferença de modelo é que a caixa agora é da EMPRESA, compartilhada pelo
   // time, e não uma conta por usuário.
-  const { isConnected, connectedEmail, enviarEmail: sendEmail, sincronizar, isSyncing } =
+  const { isConnected, connectedEmail, enviarEmail: sendEmail, sincronizar, isSyncing, carregarCorpo } =
     useEmailEmpresa();
   const [formData, setFormData] = useState({
     destinatario: "",
@@ -203,9 +203,11 @@ const Emails = () => {
         lido: m.lido,
         criado_em: m.data_mensagem,
         data_recebimento: m.data_mensagem,
-        // O corpo só é preenchido quando alguém abre a mensagem: a listagem do
-        // Nylas devolve snippet, não body. Até lá o snippet é o que existe.
+        // O corpo só é preenchido quando alguém abre: a listagem do Nylas
+        // devolve snippet, não body. Até lá o snippet é o que existe — e
+        // `temCorpo` distingue os dois, para saber se vale buscar ao abrir.
         corpo_html: m.corpo_html ?? m.snippet ?? "",
+        temCorpo: !!m.corpo_html,
         gmail_message_id: m.nylas_message_id,
         remetente: m.remetente_nome
           ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
@@ -679,6 +681,9 @@ const Emails = () => {
                             queryClient.invalidateQueries({ queryKey: ["received_emails"] });
                           }
                           
+                          // Abre já com o snippet e troca pelo corpo quando ele
+                          // chegar: esperar a ida ao Nylas antes de abrir daria
+                          // a sensação de clique que não responde.
                           setSelectedEmail({
                             ...email,
                             destinatario: email.destinatarios?.[0] || "",
@@ -686,8 +691,21 @@ const Emails = () => {
                             corpo: "",
                             html: email.corpo_html,
                             created_at: email.criado_em,
+                            carregandoCorpo: !email.temCorpo,
                             type: "received"
                           });
+
+                          if (!email.temCorpo) {
+                            const corpo = await carregarCorpo(email.id);
+                            setSelectedEmail((atual: any) =>
+                              // Só escreve se a pessoa ainda estiver nesta
+                              // mensagem — ela pode ter clicado em outra
+                              // enquanto a busca voava.
+                              atual?.id === email.id
+                                ? { ...atual, html: corpo ?? atual.html, carregandoCorpo: false }
+                                : atual,
+                            );
+                          }
                         }}
 
                       >
@@ -787,6 +805,15 @@ const Emails = () => {
             </div>
 
             <div className="text-base text-slate-800 leading-relaxed min-h-[200px] bg-white p-4 rounded-lg border border-slate-100">
+              {/* Enquanto o corpo completo não chega, o que está na tela é o
+                  resumo — dizer isso evita o usuário achar que o e-mail veio
+                  truncado. */}
+              {selectedEmail?.carregandoCorpo && (
+                <div className="mb-3 flex items-center gap-2 text-xs text-slate-500">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Carregando o conteúdo completo...
+                </div>
+              )}
               {selectedEmail?.html ? (
                 <div 
                   className="prose prose-sm max-w-none text-slate-800"
