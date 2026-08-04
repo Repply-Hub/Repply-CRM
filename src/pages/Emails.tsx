@@ -131,23 +131,46 @@ const Emails = () => {
   const { data: sentData, isLoading: isSentLoading } = useQuery({
     queryKey: ["emails", searchTerm, pageSent],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { emails: [], count: 0 };
-
+      // Sem filtro por user_id: a caixa é da EMPRESA e o time inteiro
+      // compartilha. Quem limita as linhas é o RLS de email_mensagens, por
+      // empresa_id — filtrar por usuário aqui esconderia do time o que um
+      // colega enviou pela mesma caixa.
       let query = supabase
-        .from("emails")
-        .select("id, user_id, destinatario, remetente, assunto, corpo, html, status, created_at, updated_at", { count: "exact" })
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
+        .from("email_mensagens")
+        .select(
+          "id, assunto, corpo_html, snippet, destinatarios, remetente_email, envio_status, data_mensagem",
+          { count: "exact" },
+        )
+        .eq("direcao", "enviado")
+        .eq("excluido", false)
+        .order("data_mensagem", { ascending: false })
         .range(pageSent * PAGE_SIZE, (pageSent + 1) * PAGE_SIZE - 1);
 
       if (searchTerm) {
-        query = query.or(`destinatario.ilike.%${searchTerm}%,assunto.ilike.%${searchTerm}%,corpo.ilike.%${searchTerm}%`);
+        query = query.or(`assunto.ilike.%${searchTerm}%,snippet.ilike.%${searchTerm}%`);
       }
 
       const { data, error, count } = await query;
       if (error) throw error;
-      return { emails: data || [], count: count || 0 };
+
+      // Remapeia para o formato que o JSX já consome, para a troca de origem
+      // não obrigar a reescrever a renderização inteira.
+      const emails = (data ?? []).map((m) => {
+        const dest = Array.isArray(m.destinatarios) ? m.destinatarios : [];
+        return {
+          id: m.id,
+          destinatario: dest.map((d: { email?: string }) => d?.email).filter(Boolean).join(", "),
+          remetente: m.remetente_email,
+          assunto: m.assunto,
+          corpo: m.snippet ?? "",
+          html: m.corpo_html ?? "",
+          status: m.envio_status ?? "enviado",
+          created_at: m.data_mensagem,
+          updated_at: m.data_mensagem,
+        };
+      });
+
+      return { emails, count: count || 0 };
     },
   });
 
@@ -157,23 +180,41 @@ const Emails = () => {
   const { data: receivedData, isLoading: isReceivedLoading } = useQuery({
     queryKey: ["received_emails", pageReceived],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { emails: [], count: 0 };
-
       const { data, error, count } = await supabase
-        .from("emails_recebidos")
-        .select("id, lido, criado_em, user_id, data_recebimento, corpo_html, gmail_message_id, remetente, destinatarios, assunto", { count: "exact" })
-        .eq("user_id", user.id)
+        .from("email_mensagens")
+        .select(
+          "id, lido, data_mensagem, corpo_html, snippet, nylas_message_id, remetente_nome, remetente_email, destinatarios, assunto",
+          { count: "exact" },
+        )
+        .eq("direcao", "recebido")
         .eq("excluido", false)
-        .order("criado_em", { ascending: false })
+        .order("data_mensagem", { ascending: false })
         .range(pageReceived * PAGE_SIZE, (pageReceived + 1) * PAGE_SIZE - 1);
-      
+
       if (error) {
         console.error("Erro ao buscar e-mails recebidos:", error);
         throw error;
       }
-      
-      return { emails: data || [], count: count || 0 };
+
+      const emails = (data ?? []).map((m) => ({
+        id: m.id,
+        lido: m.lido,
+        criado_em: m.data_mensagem,
+        data_recebimento: m.data_mensagem,
+        // O corpo só é preenchido quando alguém abre a mensagem: a listagem do
+        // Nylas devolve snippet, não body. Até lá o snippet é o que existe.
+        corpo_html: m.corpo_html ?? m.snippet ?? "",
+        gmail_message_id: m.nylas_message_id,
+        remetente: m.remetente_nome
+          ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
+          : (m.remetente_email ?? ""),
+        destinatarios: Array.isArray(m.destinatarios)
+          ? m.destinatarios.map((d: { email?: string }) => d?.email).filter(Boolean)
+          : [],
+        assunto: m.assunto,
+      }));
+
+      return { emails, count: count || 0 };
     },
   });
 
@@ -200,24 +241,13 @@ const Emails = () => {
         </div>
       `;
 
-      const resData = await sendEmail(data.destinatario, data.assunto, htmlBody);
-
-      const { error: dbError } = await supabase.from("emails").insert({
-        destinatario: data.destinatario,
-        remetente: connectedEmail || "MD Representações",
-        assunto: data.assunto,
-        corpo: data.corpo,
-        html: htmlBody,
-        status: "sent",
-        user_id: (await supabase.auth.getUser()).data.user?.id,
-      });
-
-      if (dbError) throw dbError;
-
-      return resData;
+      // O registro em email_mensagens é feito pela Edge Function, que é quem
+      // conhece o id devolvido pelo Nylas. Gravar também daqui criaria duas
+      // linhas para o mesmo envio — e o cliente nem tem INSERT nessa tabela.
+      return await sendEmail(data.destinatario, data.assunto, htmlBody);
     },
     onSuccess: () => {
-      toast.success(`E-mail enviado com sucesso via Gmail!`);
+      toast.success("E-mail enviado.");
       setIsComposeOpen(false);
       setFormData({ 
         destinatario: "", 
@@ -232,18 +262,15 @@ const Emails = () => {
   });
 
   const deleteEmailMutation = useMutation({
-    mutationFn: async ({ id, type }: { id: string; type: "sent" | "received" }) => {
-      if (type === "sent") {
-        const { error } = await supabase.from("emails").delete().eq("id", id);
-        if (error) throw error;
-      } else {
-        // Para recebidos, usamos exclusão lógica para evitar que o sync traga de volta
-        const { error } = await supabase
-          .from("emails_recebidos")
-          .update({ excluido: true })
-          .eq("id", id);
-        if (error) throw error;
-      }
+    mutationFn: async ({ id }: { id: string; type: "sent" | "received" }) => {
+      // Exclusão lógica nos dois casos. Apagar de verdade faria o webhook e o
+      // sync trazerem a mensagem de volta na próxima entrega — e o cliente nem
+      // tem DELETE em email_mensagens (só UPDATE de lido/favorito/excluido).
+      const { error } = await supabase
+        .from("email_mensagens")
+        .update({ excluido: true })
+        .eq("id", id);
+      if (error) throw error;
     },
     onSuccess: (_, variables) => {
       toast.success("E-mail excluído com sucesso");
@@ -258,18 +285,12 @@ const Emails = () => {
   });
 
   const bulkDeleteMutation = useMutation({
-    mutationFn: async ({ ids, type }: { ids: string[]; type: "sent" | "received" }) => {
-      if (type === "sent") {
-        const { error } = await supabase.from("emails").delete().in("id", ids);
-        if (error) throw error;
-      } else {
-        // Para recebidos, usamos exclusão lógica
-        const { error } = await supabase
-          .from("emails_recebidos")
-          .update({ excluido: true })
-          .in("id", ids);
-        if (error) throw error;
-      }
+    mutationFn: async ({ ids }: { ids: string[]; type: "sent" | "received" }) => {
+      const { error } = await supabase
+        .from("email_mensagens")
+        .update({ excluido: true })
+        .in("id", ids);
+      if (error) throw error;
     },
     onSuccess: (_, variables) => {
       toast.success(`${variables.ids.length} e-mail(s) excluído(s) com sucesso`);
@@ -286,7 +307,7 @@ const Emails = () => {
   const bulkUpdateReadStatusMutation = useMutation({
     mutationFn: async ({ ids, lido }: { ids: string[]; lido: boolean }) => {
       const { error } = await supabase
-        .from("emails_recebidos")
+        .from("email_mensagens")
         .update({ lido })
         .in("id", ids);
       if (error) throw error;
@@ -637,27 +658,15 @@ const Emails = () => {
                         className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''} ${!email.lido ? 'bg-muted/20' : ''}`}
                         onClick={async () => {
                           if (!email.lido) {
-                            // Atualiza localmente para feedback imediato
+                            // Marca lido só no CRM. O provedor não é atualizado
+                            // de propósito: espelhar o "lido" de volta para a
+                            // caixa faria a mensagem sumir como nova do celular
+                            // do gestor porque um vendedor abriu aqui — e a
+                            // caixa é compartilhada pelo time inteiro.
                             await supabase
-                              .from("emails_recebidos")
+                              .from("email_mensagens")
                               .update({ lido: true })
                               .eq("id", email.id);
-                            
-                            // Tenta atualizar no Gmail também se tiver o hook configurado
-                            try {
-                              const { data: { session } } = await supabase.auth.getSession();
-                              if (session?.access_token && email.gmail_message_id) {
-                                await supabase.functions.invoke('gmail-sync-inbox', {
-                                  method: 'POST',
-                                  body: { 
-                                    action: 'mark_as_read', 
-                                    messageId: email.gmail_message_id 
-                                  }
-                                });
-                              }
-                            } catch (e) {
-                              console.error("Erro ao sincronizar status de lido com Gmail:", e);
-                            }
 
                             queryClient.invalidateQueries({ queryKey: ["received_emails"] });
                           }
