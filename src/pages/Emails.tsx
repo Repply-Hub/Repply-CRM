@@ -42,6 +42,8 @@ import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
 import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { GerenciarCaixaDialog } from "@/components/email/GerenciarCaixaDialog";
+import { BarraPastas, type PastaSelecionada } from "@/components/email/BarraPastas";
+import { useEmailPastas } from "@/hooks/use-email-pastas";
 
 /** Uma linha da caixa de entrada, no formato que a listagem devolve. */
 interface MensagemRecebida {
@@ -75,6 +77,8 @@ const Emails = () => {
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [respondendo, setRespondendo] = useState(false);
   const [gerenciarCaixaAberto, setGerenciarCaixaAberto] = useState(false);
+  // Marcador escolhido na barra lateral. null = a aba manda sozinha.
+  const [pastaSelecionada, setPastaSelecionada] = useState<PastaSelecionada>(null);
   const [emailToDelete, setEmailToDelete] = useState<{ id: string; type: "sent" | "received" } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>("received");
@@ -87,7 +91,8 @@ const Emails = () => {
   // diferença de modelo é que a caixa agora é da EMPRESA, compartilhada pelo
   // time, e não uma conta por usuário.
   const { isConnected, connectedEmail, enviarEmail: sendEmail, sincronizar, isSyncing, carregarCorpo,
-    podeGerenciarCaixa } = useEmailEmpresa();
+    podeGerenciarCaixa, conta } = useEmailEmpresa();
+  const { data: pastas = [], isLoading: pastasCarregando } = useEmailPastas(conta?.id);
   const [formData, setFormData] = useState({
     destinatario: "",
     assunto: "",
@@ -218,17 +223,26 @@ const Emails = () => {
   const totalSent = sentData?.count || 0;
 
   const { data: receivedData, isLoading: isReceivedLoading } = useQuery({
-    queryKey: ["received_emails", pageReceived],
+    queryKey: ["received_emails", pageReceived, pastaSelecionada],
     queryFn: async () => {
       // Mesma regra da caixa de enviados: nada de `corpo_html` na listagem.
-      const { data, error, count } = await supabase
+      let consulta = supabase
         .from("email_mensagens")
         .select(
           "id, lido, data_mensagem, snippet, nylas_message_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem",
           { count: "exact" },
         )
         .eq("direcao", "recebido")
-        .eq("excluido", false)
+        .eq("excluido", false);
+
+      // O marcador escolhido na barra lateral. `pastas` é TEXT[] com os ids do
+      // provedor, que o sync já grava em cada mensagem — `contains` vira o
+      // operador `@>` do Postgres, que usa índice se um dia houver um GIN aqui.
+      if (pastaSelecionada) {
+        consulta = consulta.contains("pastas", [pastaSelecionada]);
+      }
+
+      const { data, error, count } = await consulta
         .order("data_mensagem", { ascending: false })
         .range(pageReceived * PAGE_SIZE, (pageReceived + 1) * PAGE_SIZE - 1);
 
@@ -478,6 +492,12 @@ const Emails = () => {
     });
   };
 
+  const escolherPasta = (p: PastaSelecionada) => {
+    // Outro marcador = outra contagem; ficar na pagina 3 mostraria vazio.
+    setPastaSelecionada(p);
+    setPageReceived(0);
+  };
+
   const fecharCompositor = (aberto: boolean) => {
     setIsComposeOpen(aberto);
     if (!aberto) setRespondendo(false);
@@ -695,7 +715,21 @@ const Emails = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden relative">
+        {/* A barra fica FORA do TabsContent, ao lado dele: ela vale para a tela
+            inteira, e repeti-la dentro de cada aba a faria remontar (perdendo a
+            rolagem) a cada troca de Recebidos/Enviados. */}
+        <div className="flex flex-1 overflow-hidden">
+          {isConnected && (
+            <BarraPastas
+              pastas={pastas}
+              carregando={pastasCarregando}
+              selecionada={pastaSelecionada}
+              onSelecionar={escolherPasta}
+              totalSemFiltro={activeTab === "sent" ? totalSent : totalReceived}
+            />
+          )}
+
+          <div className="relative min-w-0 flex-1 overflow-hidden">
           <TabsContent value="sent" className="m-0 h-full overflow-hidden">
             <div className="h-full overflow-hidden flex flex-col bg-background">
               <div className="flex-1 overflow-y-auto">
@@ -920,6 +954,7 @@ const Emails = () => {
               )}
             </div>
           </TabsContent>
+          </div>
         </div>
       </Tabs>
 

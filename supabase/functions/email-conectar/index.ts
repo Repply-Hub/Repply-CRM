@@ -66,6 +66,32 @@ serve(async (req) => {
       return json({ error: "Provedor não suportado." }, 400);
     }
 
+    // UMA caixa por empresa. Recusa aqui, antes de mandar a pessoa ao provedor:
+    // deixá-la autorizar no Google para só então descobrir que não pode é perda
+    // de tempo dela — e ainda cria um grant no Nylas que precisaria ser revogado
+    // depois (conta conectada é a unidade de cobrança deles).
+    //
+    // O email-callback repete a checagem, porque duas pessoas podem começar o
+    // fluxo ao mesmo tempo e este ponto não seguraria a segunda.
+    const { data: jaConectada } = await supabase
+      .from("email_contas")
+      .select("email, status")
+      .eq("empresa_id", caller.empresa_id)
+      .maybeSingle();
+
+    if (jaConectada) {
+      return json(
+        {
+          error:
+            `A empresa já tem a caixa ${jaConectada.email} conectada. ` +
+            `Para usar outro endereço, desconecte essa primeiro em E-mails.`,
+          code: "empresa_ja_tem_caixa",
+          email_conectado: jaConectada.email,
+        },
+        409,
+      );
+    }
+
     // Duas UUID concatenadas: 64 chars, bem abaixo do teto de 256 do Nylas, e
     // aleatoriedade suficiente para não ser adivinhável.
     const state = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, "");

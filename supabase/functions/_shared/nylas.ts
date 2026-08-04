@@ -72,6 +72,115 @@ export interface RespostaNylas<T> {
 }
 
 /**
+ * Pasta no Nylas. No Google, "pasta" e "marcador" são a mesma coisa: os
+ * marcadores que a pessoa criou no Gmail (001 - ELIZABETH, 004 - DECA…) chegam
+ * aqui como pastas comuns, com id no formato `Label_<números>`.
+ */
+export interface PastaNylas {
+  id: string;
+  name?: string;
+  /** `\inbox`, `\sent`, `\trash`, `\spam`, `\drafts`… presente nas de sistema. */
+  attributes?: string[];
+  total_count?: number;
+  unread_count?: number;
+}
+
+/** Lista as pastas do grant. Devolve [] em falha — nunca lança. */
+export async function buscarPastas(grantId: string): Promise<PastaNylas[]> {
+  try {
+    const resp = await chamarNylas<PastaNylas[]>(`/v3/grants/${grantId}/folders`, {
+      method: "GET",
+      timeoutMs: 20_000,
+    });
+    if (!resp.ok) {
+      console.warn("[nylas] /folders recusado:", resp.status, resp.texto.slice(0, 200));
+      return [];
+    }
+    return resp.body.data ?? [];
+  } catch (e) {
+    console.warn("[nylas] falha de rede em /folders:", e);
+    return [];
+  }
+}
+
+/**
+ * Acha as pastas de sistema que o sync usa como filtro.
+ *
+ * O filtro `in` da API exige o ID, não o nome. Prefere o atributo ao nome
+ * porque o nome muda com o idioma da conta ("Enviados" numa conta em pt-BR).
+ */
+export function pastasDeSistema(pastas: PastaNylas[]): {
+  inbox: string | null;
+  sent: string | null;
+} {
+  let inbox: string | null = null;
+  let sent: string | null = null;
+  for (const p of pastas) {
+    const nome = (p.name ?? "").toLowerCase();
+    const attrs = (p.attributes ?? []).map((a) => a.toLowerCase());
+    if (!inbox && (attrs.includes("\\inbox") || nome === "inbox")) inbox = p.id;
+    if (!sent && (attrs.includes("\\sent") || nome === "sent" || nome === "sent mail")) {
+      sent = p.id;
+    }
+  }
+  return { inbox, sent };
+}
+
+/**
+ * Espelha a lista de pastas do provedor em `email_pastas`.
+ *
+ * Apaga o que sumiu lá: marcador excluído no Gmail tem de sumir da barra
+ * lateral, senão a pessoa clica num filtro que nunca mais terá mensagem.
+ *
+ * Nunca lança: pasta é conveniência de navegação, e falhar aqui não pode
+ * derrubar uma conexão que no mais deu certo.
+ */
+export async function gravarPastas(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  contaId: string,
+  empresaId: string,
+  pastas: PastaNylas[],
+): Promise<number> {
+  if (!pastas.length) return 0;
+  try {
+    const linhas = pastas
+      .filter((p) => p.id)
+      .map((p) => ({
+        conta_id: contaId,
+        empresa_id: empresaId,
+        pasta_id: p.id,
+        // Sem nome não dá para exibir; o id cru é melhor que uma linha em branco.
+        nome: (p.name ?? "").trim() || p.id,
+        atributos: (p.attributes ?? []).map((a) => a.toLowerCase()),
+        total_mensagens: p.total_count ?? null,
+        nao_lidas: p.unread_count ?? null,
+        atualizado_em: new Date().toISOString(),
+      }));
+
+    const { error } = await supabase
+      .from("email_pastas")
+      .upsert(linhas, { onConflict: "conta_id,pasta_id" });
+    if (error) {
+      console.error("[nylas] falha ao gravar pastas:", error);
+      return 0;
+    }
+
+    const idsVivos = linhas.map((l) => l.pasta_id);
+    await supabase
+      .from("email_pastas")
+      .delete()
+      .eq("conta_id", contaId)
+      .not("pasta_id", "in", `(${idsVivos.map((i) => `"${i}"`).join(",")})`);
+
+    return linhas.length;
+  } catch (e) {
+    console.error("[nylas] exceção ao gravar pastas:", e);
+    return 0;
+  }
+}
+
+/**
  * Chamada autenticada à API do Nylas.
  *
  * `timeoutMs` é explícito porque o `fetch` do Deno não tem timeout padrão: uma

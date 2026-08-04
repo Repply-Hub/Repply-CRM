@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Archive, Loader2, Mail, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useCompartilhamentoCaixa } from '@/hooks/use-email-pastas';
 import { useEmailEmpresa, ROTULO_PROVEDOR } from '@/hooks/use-email-empresa';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,6 +38,7 @@ interface Props {
 export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
   const { conta, connectedEmail, desconectar, isDisconnecting } = useEmailEmpresa();
   const [confirmando, setConfirmando] = useState<'preservar' | 'apagar' | null>(null);
+  const { pessoas, alternar, isSalvando } = useCompartilhamentoCaixa(open ? conta?.id : null);
 
   /**
    * Quanto está em jogo — e, principalmente, QUANTO do que sobra dá para ler.
@@ -116,6 +120,60 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
 
         {!confirmando ? (
           <>
+            {/* Quem enxerga a caixa. Vem antes de desconectar de propósito: é a
+                ação do dia a dia, e desconectar é irreversível. */}
+            <div className="min-w-0 space-y-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-sm font-medium text-foreground">Quem tem acesso</p>
+                <p className="text-xs text-muted-foreground">
+                  Gestores sempre enxergam
+                </p>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Libere o time para receber e responder por esta caixa. É assim que o
+                atendimento compartilha um endereço só.
+              </p>
+
+              <div className="max-h-56 overflow-y-auto rounded-lg border">
+                {pessoas.length === 0 ? (
+                  <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                    Nenhum usuário na empresa.
+                  </p>
+                ) : (
+                  pessoas.map((p) => {
+                    // Gestor/dono não entra na lista: o acesso dele não vem daqui,
+                    // vem do papel. Deixar a caixinha marcada e travada explica
+                    // isso melhor do que escondê-lo.
+                    const porPapel = p.role === 'gestor' || p.role === 'empresa' || p.role === 'admin';
+                    return (
+                      <label
+                        key={p.usuarioId}
+                        className={cn(
+                          'flex items-center gap-3 border-b px-3 py-2 last:border-b-0',
+                          porPapel ? 'opacity-60' : 'cursor-pointer hover:bg-muted/40',
+                        )}
+                      >
+                        <Checkbox
+                          checked={porPapel || p.liberadoExplicitamente}
+                          disabled={porPapel || isSalvando}
+                          onCheckedChange={(v) => alternar(p.usuarioId, v === true)}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm text-foreground">
+                            {p.nome || p.email || '—'}
+                          </span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {porPapel ? `${p.role} · acesso pelo cargo` : p.email}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
             <p className="text-sm text-muted-foreground">
               Para usar outro endereço, desconecte este primeiro. Depois a tela de e-mails
               oferece a conexão da caixa nova.

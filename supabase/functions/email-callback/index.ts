@@ -2,12 +2,15 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   appUrl,
+  buscarPastas,
   callbackUri,
   chamarNylas,
   corsHeaders,
+  gravarPastas,
   nylasApiKey,
   nylasBase,
   nylasClientId,
+  pastasDeSistema,
 } from "../_shared/nylas.ts";
 
 /**
@@ -107,30 +110,52 @@ serve(async (req) => {
     const emailConta = dadosTroca.email;
     const provedor = dadosTroca.provider ?? estado.provedor;
 
+    // ---- uma caixa por empresa -------------------------------------------
+    // Última barreira. O email-conectar já recusa antes de mandar a pessoa ao
+    // provedor, mas duas pessoas podem ter começado o fluxo ao mesmo tempo, ou
+    // alguém pode ter deixado a aba aberta e voltado depois.
+    //
+    // Isto ANTES existia como `upsert(onConflict: "empresa_id")`, o que é bem
+    // pior do que não checar: a segunda conexão SOBRESCREVIA a primeira em
+    // silêncio. O grant antigo ficava órfão no Nylas — e conta conectada é a
+    // unidade de cobrança deles — e as mensagens já sincronizadas passavam a
+    // apontar para uma conta que ninguém autorizou.
+    const { data: jaConectada } = await supabase
+      .from("email_contas")
+      .select("id, email")
+      .eq("empresa_id", estado.empresa_id)
+      .maybeSingle();
+
+    if (jaConectada) {
+      // Reconectar a MESMA caixa é legítimo: é o caminho de quem teve o acesso
+      // revogado pelo provedor e está renovando.
+      const mesmaCaixa =
+        (jaConectada.email ?? "").trim().toLowerCase() === (emailConta ?? "").trim().toLowerCase();
+      if (!mesmaCaixa) {
+        console.warn(
+          `[email-callback] empresa ${estado.empresa_id} já tem ${jaConectada.email}; recusando ${emailConta}`,
+        );
+        // Revoga o grant recém-criado: ele não vai ser usado, e deixá-lo vivo
+        // custa assinatura no Nylas para sempre.
+        try {
+          await chamarNylas(`/v3/grants/${grantId}`, { method: "DELETE", timeoutMs: 15_000 });
+        } catch (e) {
+          console.error("[email-callback] não consegui revogar o grant recusado:", e);
+        }
+        return voltar({ conexao: "erro", motivo: "empresa_ja_tem_caixa" });
+      }
+    }
+
     // ---- pastas ----------------------------------------------------------
     // O filtro `in` da API do Nylas exige o ID da pasta, não o nome — no Google
     // é o id da label. Resolvido uma vez aqui e cacheado, para o sync não gastar
     // uma chamada a /folders por execução.
-    let pastaInbox: string | null = null;
-    let pastaSent: string | null = null;
-    try {
-      const pastas = await chamarNylas<Array<{ id: string; name?: string; attributes?: string[] }>>(
-        `/v3/grants/${grantId}/folders`,
-        { method: "GET", timeoutMs: 20_000 },
-      );
-      for (const p of pastas.body.data ?? []) {
-        const nome = (p.name ?? "").toLowerCase();
-        const attrs = (p.attributes ?? []).map((a) => a.toLowerCase());
-        if (!pastaInbox && (attrs.includes("\\inbox") || nome === "inbox")) pastaInbox = p.id;
-        if (!pastaSent && (attrs.includes("\\sent") || nome === "sent" || nome === "sent mail")) {
-          pastaSent = p.id;
-        }
-      }
-    } catch (e) {
-      // Não é fatal: o sync consegue trabalhar sem filtro de pasta, só menos
-      // preciso. Conectar e falhar por causa disso seria desproporcional.
-      console.warn("[email-callback] não consegui resolver pastas:", e);
-    }
+    //
+    // A lista INTEIRA é guardada agora (antes só os ids de entrada/enviados
+    // eram aproveitados e o resto ia fora): são os marcadores que a pessoa já
+    // organizou no provedor, e é deles que a barra lateral é feita.
+    const pastas = await buscarPastas(grantId);
+    const { inbox: pastaInbox, sent: pastaSent } = pastasDeSistema(pastas);
 
     // ---- grava conta -----------------------------------------------------
     const { data: conta, error: erroConta } = await supabase
@@ -180,7 +205,27 @@ serve(async (req) => {
       return voltar({ conexao: "erro", motivo: "gravacao_falhou" });
     }
 
-    console.log(`[email-callback] conectado empresa=${estado.empresa_id} provedor=${provedor}`);
+    // Pastas depois do grant: só aqui existe `conta.id`. Falhar aqui não
+    // invalida a conexão — a caixa funciona sem a barra lateral, e o sync
+    // seguinte tenta de novo.
+    const quantas = await gravarPastas(supabase, conta.id, estado.empresa_id, pastas);
+
+    // Quem conectou entra na lista de acesso. Se for gestor já enxergaria de
+    // qualquer jeito, mas a linha deixa explícito na tela de compartilhamento
+    // quem é o dono da conexão — e cobre o caso de a pessoa deixar de ser
+    // gestor depois.
+    if (estado.usuario_id) {
+      await supabase
+        .from("email_conta_usuarios")
+        .upsert(
+          { conta_id: conta.id, usuario_id: estado.usuario_id, criado_por: estado.usuario_id },
+          { onConflict: "conta_id,usuario_id" },
+        );
+    }
+
+    console.log(
+      `[email-callback] conectado empresa=${estado.empresa_id} provedor=${provedor} pastas=${quantas}`,
+    );
     return voltar({ conexao: "ok" });
   } catch (err) {
     console.error("[email-callback]", err);
