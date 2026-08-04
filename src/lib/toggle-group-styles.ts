@@ -15,14 +15,24 @@ export const TOGGLE_TRIGGER_CLASS =
 /**
  * Contador dentro de uma aba (ex.: "Recebidos [12]").
  *
- * O padrão anterior era `bg-primary/10 text-primary` fixo, e ele quebrava nos
- * dois estados: na aba ATIVA o fundo é laranja sólido, então laranja a 10%
- * sobre laranja com texto laranja dava contraste de 1,00:1 — o número
- * desaparecia por completo. Na aba inativa dava 2,77:1, também abaixo dos
- * 4,5:1 da WCAG.
+ * HISTÓRICO, porque este chip já quebrou duas vezes por motivos diferentes:
  *
- * Agora o chip inverte junto com a aba: neutro quando inativa (18,2:1) e
- * branco com número em laranja escuro quando ativa (5,4:1).
+ * 1. `bg-primary/10 text-primary` fixo. Na aba ATIVA o fundo é laranja sólido,
+ *    então laranja a 10% sobre laranja com texto laranja dava 1,00:1 — o número
+ *    sumia por completo. Na inativa, 2,77:1.
+ * 2. `bg-primary-foreground` + `text-accent-foreground` na aba ativa. Resolveu o
+ *    tema claro (5,4:1) e QUEBROU o escuro, porque os dois tokens se movem em
+ *    direções opostas entre os temas: `--primary-foreground` é branco nos dois,
+ *    mas `--accent-foreground` vai de laranja escuro (claro) para pêssego
+ *    clarinho #FFD8C2 (escuro). Pêssego sobre branco = 1,32:1.
+ *
+ * A lição das duas: par de tokens só é seguro quando AMBOS viram junto. Daqui em
+ * diante o chip usa `background`/`foreground`, que é o par que o tema inteiro
+ * inverte de uma vez:
+ *
+ *              chip                    número no chip     chip sobre a aba
+ *   claro      #FFFFFF                 18,9:1             3,1:1 sobre o laranja
+ *   escuro     #121212                 15,8:1             5,6:1 sobre o laranja
  *
  * `tabular-nums` mantém a largura estável enquanto a contagem muda, para a
  * aba não "pular" a cada sincronização.
@@ -30,7 +40,7 @@ export const TOGGLE_TRIGGER_CLASS =
 export const TOGGLE_BADGE_CLASS =
   "ml-1 h-5 min-w-[20px] justify-center border-none px-1.5 tabular-nums " +
   "bg-muted text-foreground " +
-  "group-data-[state=active]:bg-primary-foreground group-data-[state=active]:text-accent-foreground";
+  "group-data-[state=active]:bg-background group-data-[state=active]:text-foreground";
 
 // Variante para @radix-ui/react-toggle-group (ToggleGroupItem usa data-state="on"|"off").
 export const TOGGLE_ITEM_CLASS =

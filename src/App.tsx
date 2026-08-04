@@ -215,18 +215,36 @@ function ProtectedRoute({
     );
   }
 
-  // O administrador global não opera o CRM de ninguém — só as telas de /admin.
+  // O administrador global não opera o CRM de ninguém — fica nas telas dele.
   //
   // Esconder os itens do menu (AppSidebar) não bastaria: as rotas continuam
   // alcançáveis digitando a URL, por um link antigo ou pelo histórico do
   // navegador. E as telas de dados, ao montar, disparam as consultas da empresa
-  // — que hoje voltam vazias por RLS, mas render de tela vazia com spinner
-  // eterno é pior do que não entrar.
+  // — que hoje voltam vazias por RLS, mas tela vazia com spinner eterno é pior
+  // do que não entrar.
   //
-  // Isto é navegação, não segurança: quem impede a leitura são as policies
-  // (migration 20260804195019). Aqui é só para o admin não cair numa tela que
-  // não é dele.
-  if (profileAttempted && profile?.role === "admin" && !location.pathname.startsWith("/admin")) {
+  // /configuracoes está LIBERADA, e a primeira versão desta guarda estava errada
+  // ao bloqueá-la. Aquela tela não tem conteúdo de cliente — tem administração
+  // de conta — e concentra três coisas que só existem ali:
+  //   · o próprio perfil do admin: é o único lugar do app que chama
+  //     updateUser({ email }) e updateUser({ password }). Sem ela, o avatar do
+  //     cabeçalho e o do rodapé da sidebar viravam links mortos e o admin não
+  //     trocava a própria senha nem o próprio e-mail estando logado;
+  //   · reativar usuário removido por engano (aba Usuários, em modo admin) —
+  //     a tela de Empresas só LÊ os usuários de cada assinante;
+  //   · editar nome, CNPJ e código de acesso de uma empresa (aba Empresa).
+  // São justamente as ferramentas de suporte do admin. O banco sempre permitiu
+  // (usuarios e empresas mantiveram is_admin()); quem havia tirado o acesso era
+  // esta guarda.
+  //
+  // Isto é navegação, não segurança: quem impede a leitura de conteúdo são as
+  // policies (migration 20260804195019).
+  const ROTAS_DO_ADMIN_GERAL = ["/admin", "/configuracoes"];
+  if (
+    profileAttempted &&
+    profile?.role === "admin" &&
+    !ROTAS_DO_ADMIN_GERAL.some((r) => location.pathname.startsWith(r))
+  ) {
     return <Navigate to="/admin/empresas" replace />;
   }
 

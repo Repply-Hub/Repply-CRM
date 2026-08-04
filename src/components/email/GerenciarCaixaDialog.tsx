@@ -96,9 +96,14 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+        {/* `min-w-0` em todo filho que possa crescer: o DialogContent é um GRID,
+            e item de grid tem `min-width: auto`, ou seja, se recusa a encolher
+            abaixo do próprio conteúdo. Sem isto, um endereço de e-mail comprido
+            empurra a caixa inteira para além do `max-w` e o diálogo vaza da
+            tela — foi exatamente o que aconteceu aqui. */}
+        <div className="flex min-w-0 items-start gap-3 rounded-lg border bg-muted/40 px-4 py-3">
           <Mail className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate font-medium text-foreground">{connectedEmail}</p>
             <p className="text-xs text-muted-foreground">
               {conta?.provedor ? ROTULO_PROVEDOR[conta.provedor] : '—'}
@@ -116,15 +121,15 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
               oferece a conexão da caixa nova.
             </p>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex min-w-0 flex-col gap-2">
               {/* Manter primeiro: é a opção reversível. Apagar não tem volta. */}
               <Button
                 variant="outline"
-                className="h-auto justify-start gap-3 px-4 py-3 text-left"
+                className="h-auto w-full min-w-0 justify-start gap-3 whitespace-normal px-4 py-3 text-left"
                 onClick={() => setConfirmando('preservar')}
               >
                 <Archive className="h-4 w-4 shrink-0" />
-                <span className="flex flex-col gap-0.5">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="font-medium">Desconectar e manter o histórico</span>
                   <span className="text-xs font-normal text-muted-foreground">
                     {contagem && soPrevia > 0 ? (
@@ -142,11 +147,11 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
 
               <Button
                 variant="outline"
-                className="h-auto justify-start gap-3 px-4 py-3 text-left"
+                className="h-auto w-full min-w-0 justify-start gap-3 whitespace-normal px-4 py-3 text-left"
                 onClick={() => setConfirmando('apagar')}
               >
                 <Trash2 className="h-4 w-4 shrink-0" />
-                <span className="flex flex-col gap-0.5">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="font-medium">Desconectar e apagar o histórico</span>
                   <span className="text-xs font-normal text-muted-foreground">
                     Remove do CRM tudo que já foi sincronizado desta caixa.
@@ -157,9 +162,9 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
           </>
         ) : (
           <>
-            <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+            <div className="flex min-w-0 items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-              <div className="space-y-1 text-sm">
+              <div className="min-w-0 flex-1 space-y-1 text-sm">
                 <p className="font-medium text-foreground">
                   {confirmando === 'apagar'
                     ? `Apagar ${totalMensagens ?? 0} ${(totalMensagens ?? 0) === 1 ? 'mensagem' : 'mensagens'}?`

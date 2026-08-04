@@ -548,7 +548,7 @@ export default function Tarefas() {
 
             {/* Desktop: table layout */}
             <div className="hidden md:flex flex-col rounded-xl border border-border/60 border-b-0 rounded-b-none overflow-hidden shadow-[var(--shadow-card)] flex-1 min-h-0">
-              <Table wrapperClassName="flex-1 min-h-0" className="table-fixed" style={{ width: tarefasTableTotalWidth }}>
+              <Table wrapperClassName="flex-1 min-h-0" className="w-full table-fixed" style={{ minWidth: tarefasTableTotalWidth }}>
                 <colgroup>
                   <col style={{ width: TAREFAS_CHECKBOX_COL_WIDTH }} />
                   {visibleColumns.map((colId, i) => (
@@ -559,6 +559,10 @@ export default function Tarefas() {
                     />
                   ))}
                   <col style={{ width: TAREFAS_ACOES_COL_WIDTH }} />
+                  {/* Folga: sem largura, absorve o espaco que sobra quando a
+                      tela e mais larga que a soma das colunas. Sem ela a tabela
+                      parava na largura somada e deixava um vazio a direita. */}
+                  <col />
                 </colgroup>
                 <TableHeader className="sticky top-0 z-10 bg-muted">
                   <TableRow className="bg-muted/50 border-b border-border/60">
@@ -576,11 +580,12 @@ export default function Tarefas() {
                       </ResizableTh>
                     ))}
                     <TableHead className="w-[80px] text-xs font-semibold whitespace-nowrap h-14 px-2.5">Ações</TableHead>
+                    <TableHead className="h-14 p-0" aria-hidden />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginated.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Nenhuma tarefa encontrada</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={visibleColumns.length + 3} className="text-center py-12 text-muted-foreground">Nenhuma tarefa encontrada</TableCell></TableRow>
                   ) : paginated.map(t => {
                     const si = getStatusInfo(t.status);
                     const isOverdue = t.prazo_final && new Date(t.prazo_final) < new Date() && t.status !== 'concluida';
@@ -637,6 +642,10 @@ export default function Tarefas() {
                             </Button>
                           </div>
                         </TableCell>
+                        {/* Par da coluna de folga do cabeçalho. Sem esta célula
+                            a linha teria uma coluna a menos que o <colgroup>, e
+                            o navegador alinharia tudo errado. */}
+                        <TableCell className="p-0" />
                       </TableRow>
                     );
                   })}
