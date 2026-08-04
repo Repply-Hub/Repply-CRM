@@ -2,36 +2,24 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { 
-  Mail, 
-  Send, 
-  Inbox, 
-  Search, 
-  Plus, 
-  Loader2, 
-  History,
-  Settings,
+import {
+  Mail,
+  Send,
+  Inbox,
+  Search,
+  Loader2,
   RefreshCw,
   PenBox,
   Trash2,
-  MoreVertical,
   CheckSquare,
-  Square,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS, TOGGLE_BADGE_CLASS } from "@/lib/toggle-group-styles";
@@ -49,13 +37,38 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useSearchParams } from "react-router-dom";
 import { useEmailEmpresa } from "@/hooks/use-email-empresa";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
-import { LeitorEmail } from "@/components/email/LeitorEmail";
+import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
+import { CompositorEmail } from "@/components/email/CompositorEmail";
+
+/** Uma linha da caixa de entrada, no formato que a listagem devolve. */
+interface MensagemRecebida {
+  id: string;
+  lido: boolean;
+  criado_em: string | null;
+  data_recebimento: string | null;
+  snippet: string;
+  gmail_message_id: string | null;
+  remetente: string;
+  destinatarios: string[];
+  assunto: string | null;
+}
+
+interface PaginaRecebidos {
+  emails: MensagemRecebida[];
+  count: number;
+}
 
 const Emails = () => {
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedEmail, setSelectedEmail] = useState<any>(null);
+  // A busca só vira consulta depois que a digitação para. Enquanto o termo
+  // cru estava na queryKey, cada tecla disparava uma ida ao servidor —
+  // "orcamento" custava dez requisições, e a resposta de cada letra podia
+  // chegar fora de ordem.
+  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [selectedEmail, setSelectedEmail] = useState<EmailAberto | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [respondendo, setRespondendo] = useState(false);
   const [emailToDelete, setEmailToDelete] = useState<{ id: string; type: "sent" | "received" } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>("received");
@@ -84,6 +97,16 @@ const Emails = () => {
       setIsComposeOpen(true);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setBuscaAplicada(searchTerm.trim());
+      // Voltar à primeira página: um termo novo tem outra contagem de
+      // resultados, e continuar na página 3 mostraria uma lista vazia.
+      setPageSent(0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
   const queryClient = useQueryClient();
 
   // Retorno do OAuth: o email-callback devolve o navegador para cá com
@@ -132,16 +155,22 @@ const Emails = () => {
   });
 
   const { data: sentData, isLoading: isSentLoading } = useQuery({
-    queryKey: ["emails", searchTerm, pageSent],
+    queryKey: ["emails", buscaAplicada, pageSent],
     queryFn: async () => {
       // Sem filtro por user_id: a caixa é da EMPRESA e o time inteiro
       // compartilha. Quem limita as linhas é o RLS de email_mensagens, por
       // empresa_id — filtrar por usuário aqui esconderia do time o que um
       // colega enviou pela mesma caixa.
+      //
+      // `corpo_html` NÃO entra aqui: a lista só mostra remetente, assunto e
+      // prévia, e trazer o corpo de 15 mensagens fazia a página pesar 79 kB em
+      // vez de 5,7 kB — com apenas 3 das 15 tendo corpo em cache. Conforme o
+      // time fosse abrindo mensagens, cada uma engordaria a listagem para
+      // sempre. O corpo é buscado ao abrir, por `carregarCorpo`.
       let query = supabase
         .from("email_mensagens")
         .select(
-          "id, assunto, corpo_html, snippet, destinatarios, remetente_email, envio_status, data_mensagem",
+          "id, assunto, snippet, destinatarios, remetente_email, envio_status, data_mensagem",
           { count: "exact" },
         )
         .eq("direcao", "enviado")
@@ -149,8 +178,8 @@ const Emails = () => {
         .order("data_mensagem", { ascending: false })
         .range(pageSent * PAGE_SIZE, (pageSent + 1) * PAGE_SIZE - 1);
 
-      if (searchTerm) {
-        query = query.or(`assunto.ilike.%${searchTerm}%,snippet.ilike.%${searchTerm}%`);
+      if (buscaAplicada) {
+        query = query.or(`assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%`);
       }
 
       const { data, error, count } = await query;
@@ -166,7 +195,7 @@ const Emails = () => {
           remetente: m.remetente_email,
           assunto: m.assunto,
           corpo: m.snippet ?? "",
-          html: m.corpo_html ?? "",
+          html: "",
           status: m.envio_status ?? "enviado",
           created_at: m.data_mensagem,
           updated_at: m.data_mensagem,
@@ -175,6 +204,7 @@ const Emails = () => {
 
       return { emails, count: count || 0 };
     },
+    placeholderData: keepPreviousData,
   });
 
   const emails = sentData?.emails || [];
@@ -183,10 +213,11 @@ const Emails = () => {
   const { data: receivedData, isLoading: isReceivedLoading } = useQuery({
     queryKey: ["received_emails", pageReceived],
     queryFn: async () => {
+      // Mesma regra da caixa de enviados: nada de `corpo_html` na listagem.
       const { data, error, count } = await supabase
         .from("email_mensagens")
         .select(
-          "id, lido, data_mensagem, corpo_html, snippet, nylas_message_id, remetente_nome, remetente_email, destinatarios, assunto",
+          "id, lido, data_mensagem, snippet, nylas_message_id, remetente_nome, remetente_email, destinatarios, assunto",
           { count: "exact" },
         )
         .eq("direcao", "recebido")
@@ -204,11 +235,9 @@ const Emails = () => {
         lido: m.lido,
         criado_em: m.data_mensagem,
         data_recebimento: m.data_mensagem,
-        // O corpo só é preenchido quando alguém abre: a listagem do Nylas
-        // devolve snippet, não body. Até lá o snippet é o que existe — e
-        // `temCorpo` distingue os dois, para saber se vale buscar ao abrir.
-        corpo_html: m.corpo_html ?? m.snippet ?? "",
-        temCorpo: !!m.corpo_html,
+        // A listagem do Nylas devolve snippet, não body — e é o snippet que a
+        // linha mostra como prévia. O corpo inteiro só é buscado ao abrir.
+        snippet: m.snippet ?? "",
         gmail_message_id: m.nylas_message_id,
         remetente: m.remetente_nome
           ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
@@ -221,6 +250,7 @@ const Emails = () => {
 
       return { emails, count: count || 0 };
     },
+    placeholderData: keepPreviousData,
   });
 
   const receivedEmails = receivedData?.emails || [];
@@ -254,9 +284,10 @@ const Emails = () => {
     onSuccess: () => {
       toast.success("E-mail enviado.");
       setIsComposeOpen(false);
-      setFormData({ 
-        destinatario: "", 
-        assunto: "", 
+      setRespondendo(false);
+      setFormData({
+        destinatario: "",
+        assunto: "",
         corpo: ""
       });
       queryClient.invalidateQueries({ queryKey: ["emails"] });
@@ -353,22 +384,112 @@ const Emails = () => {
     sendEmailMutation.mutate(formData);
   };
 
+  /** "Fulano <fulano@x.com>" -> "fulano@x.com". */
+  const soEndereco = (valor?: string | null) => {
+    const bruto = (valor ?? "").trim();
+    const m = bruto.match(/<([^>]+)>/);
+    return (m ? m[1] : bruto).trim();
+  };
+
   /** Monta a resposta a partir da mensagem aberta e abre o compositor. */
   const responderMensagem = () => {
     if (!selectedEmail) return;
     const assunto = selectedEmail.assunto ?? "";
     const replySubject = assunto.toLowerCase().startsWith("re:") ? assunto : `Re: ${assunto}`;
     const quando = selectedEmail.created_at || selectedEmail.criado_em;
+    const citado = selectedEmail.snippet || selectedEmail.corpo || "";
 
     setFormData({
       ...formData,
-      destinatario: selectedEmail.remetente || selectedEmail.destinatario || "",
+      // Só o endereço: o campo trazia "Nome <e-mail>" inteiro, que é o que o
+      // leitor exibe, não o que o provedor aceita como destinatário.
+      destinatario: soEndereco(selectedEmail.remetente || selectedEmail.destinatario),
       assunto: replySubject,
-      corpo: `\n\n--- Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:\n\n${selectedEmail.corpo || ""}`,
+      corpo: `\n\n--- Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:\n\n${citado}`,
     });
-    setSelectedEmail(null);
+    // O e-mail aberto CONTINUA aberto atrás do compositor. Fechá-lo aqui era o
+    // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
+    setRespondendo(true);
     setIsComposeOpen(true);
   };
+
+  /** Marca como lida sem segurar a abertura da mensagem. */
+  const marcarLido = (id: string) => {
+    // Escreve direto na lista que já está na tela, em vez de invalidar a
+    // consulta: trocar um booleano não justifica refazer a busca inteira.
+    queryClient.setQueryData<PaginaRecebidos>(["received_emails", pageReceived], (antigo) =>
+      antigo
+        ? { ...antigo, emails: antigo.emails.map((m) => (m.id === id ? { ...m, lido: true } : m)) }
+        : antigo,
+    );
+
+    supabase
+      .from("email_mensagens")
+      .update({ lido: true })
+      .eq("id", id)
+      .then(({ error }) => {
+        // Falhar aqui é cosmético — a próxima leitura da lista corrige o selo.
+        if (error) console.warn("[email] não consegui marcar como lida:", error.message);
+      });
+  };
+
+  /**
+   * Abre a mensagem imediatamente, com o snippet, e troca pelo corpo quando ele
+   * chega — em vez de segurar a tela até o corpo estar em mãos.
+   */
+  const abrirComCorpo = async (base: EmailAberto) => {
+    setSelectedEmail({ ...base, html: "", carregandoCorpo: true });
+
+    const corpo = await carregarCorpo(base.id);
+    setSelectedEmail((atual) =>
+      // Só escreve se a pessoa ainda estiver nesta mensagem — ela pode ter
+      // clicado em outra enquanto a busca voava.
+      atual?.id === base.id ? { ...atual, html: corpo ?? atual.html, carregandoCorpo: false } : atual,
+    );
+  };
+
+  /**
+   * Abre uma mensagem recebida.
+   *
+   * Antes, o clique esperava o UPDATE de "lido" terminar no servidor antes de
+   * qualquer coisa aparecer na tela, e ainda invalidava a listagem inteira.
+   * Eram duas idas ao servidor entre o clique e a mensagem abrir.
+   */
+  const abrirRecebido = (email: MensagemRecebida) => {
+    if (!email.lido) marcarLido(email.id);
+    void abrirComCorpo({
+      ...email,
+      destinatario: email.destinatarios?.[0] || "",
+      remetente: email.remetente,
+      corpo: email.snippet ?? "",
+      created_at: email.criado_em,
+      type: "received",
+    });
+  };
+
+  const fecharCompositor = (aberto: boolean) => {
+    setIsComposeOpen(aberto);
+    if (!aberto) setRespondendo(false);
+  };
+
+  // Um único compositor, montado nas duas telas — a listagem e o leitor. É o
+  // que permite responder sem sair do e-mail aberto.
+  const compositor = (
+    <CompositorEmail
+      open={isComposeOpen}
+      onOpenChange={fecharCompositor}
+      valores={formData}
+      onChange={setFormData}
+      onEnviar={handleSubmit}
+      onDescartar={() => {
+        setFormData({ destinatario: "", assunto: "", corpo: "" });
+        fecharCompositor(false);
+      }}
+      isConnected={isConnected}
+      isEnviando={sendEmailMutation.isPending}
+      titulo={respondendo ? "Responder" : "Nova mensagem"}
+    />
+  );
 
   // Leitura ocupa a tela inteira, como no Gmail. Antes era um modal, mas e-mail
   // é conteúdo para ler, não confirmação de ação: o modal empilhava um contexto
@@ -392,6 +513,8 @@ const Emails = () => {
           }
           onResponder={responderMensagem}
         />
+
+        {compositor}
 
         <AlertDialog
           open={!!emailToDelete}
@@ -533,92 +656,13 @@ const Emails = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
-              <DialogTrigger asChild>
-                <Button className="h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm gap-2 text-sm font-bold px-4 transition-all">
-                  <PenBox className="h-4 w-4" />
-                  Escrever
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-xl border-none shadow-2xl">
-                <div className="bg-[#404040] text-white px-4 py-2 flex justify-between items-center">
-                  <span className="text-sm font-medium">Nova mensagem</span>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-white hover:bg-white/10" onClick={() => setIsComposeOpen(false)}>
-                      <Plus className="h-4 w-4 rotate-45" />
-                    </Button>
-                  </div>
-                </div>
-                <form onSubmit={handleSubmit} className="p-0 space-y-0">
-                  <div className="px-4 border-b">
-                    <div className="flex items-center gap-2 py-2">
-                      <span className="text-sm text-muted-foreground min-w-[60px]">Para</span>
-                      <Input
-                        id="to"
-                        placeholder="email@exemplo.com"
-                        className="border-none shadow-none focus-visible:ring-0 px-0 h-8 bg-transparent"
-                        value={formData.destinatario}
-                        onChange={(e) => setFormData({ ...formData, destinatario: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="px-4 border-b">
-                    <div className="flex items-center gap-2 py-2">
-                      <span className="text-sm text-muted-foreground min-w-[60px]">Assunto</span>
-                      <Input
-                        id="subject"
-                        placeholder="Assunto"
-                        className="border-none shadow-none focus-visible:ring-0 px-0 h-8 font-medium bg-transparent"
-                        value={formData.assunto}
-                        onChange={(e) => setFormData({ ...formData, assunto: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <Textarea
-                      id="body"
-                      placeholder="Escreva sua mensagem aqui..."
-                      className="min-h-[300px] border-none focus-visible:ring-0 p-0 resize-none text-base"
-                      value={formData.corpo}
-                      onChange={(e) => setFormData({ ...formData, corpo: e.target.value })}
-                    />
-                  </div>
-                  <div className="p-4 flex justify-between items-center bg-muted/10">
-                    <div className="flex gap-2 items-center">
-                      {!isConnected ? (
-                        // Sem caixa conectada não há de onde enviar. O caminho
-                        // para conectar fica na própria aba de e-mails, atrás
-                        // deste diálogo — daí fechar em vez de navegar para fora.
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setIsComposeOpen(false)}
-                          className="rounded-full px-6 flex gap-2 items-center"
-                        >
-                          <Mail className="h-4 w-4" />
-                          Conectar uma caixa para enviar
-                        </Button>
-                      ) : (
-                        <Button type="submit" className="rounded-full px-6 bg-[#0b57d0] hover:bg-[#0842a0]" disabled={sendEmailMutation.isPending}>
-                          {sendEmailMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            <Send className="h-4 w-4 mr-2" />
-                          )}
-                          Enviar
-                        </Button>
-                      )}
-                      <Button type="button" variant="ghost" size="icon" className="rounded-full">
-                        <Trash2 className="h-5 w-5 text-muted-foreground" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {/* Logo URL removed to keep it company-exclusive */}
-                    </div>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button
+              onClick={() => setIsComposeOpen(true)}
+              className="h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm gap-2 text-sm font-bold px-4 transition-all"
+            >
+              <PenBox className="h-4 w-4" />
+              Escrever
+            </Button>
           </div>
         </div>
 
@@ -641,7 +685,7 @@ const Emails = () => {
                       <div 
                         key={email.id} 
                         className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''}`}
-                        onClick={() => setSelectedEmail({ ...email, type: "sent" })}
+                        onClick={() => void abrirComCorpo({ ...email, type: "sent" })}
                       >
                         <div className="flex items-center gap-3 shrink-0">
                           <Checkbox 
@@ -737,48 +781,12 @@ const Emails = () => {
                       <div 
                         key={email.id} 
                         className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''} ${!email.lido ? 'bg-muted/20' : ''}`}
-                        onClick={async () => {
-                          if (!email.lido) {
-                            // Marca lido só no CRM. O provedor não é atualizado
-                            // de propósito: espelhar o "lido" de volta para a
-                            // caixa faria a mensagem sumir como nova do celular
-                            // do gestor porque um vendedor abriu aqui — e a
-                            // caixa é compartilhada pelo time inteiro.
-                            await supabase
-                              .from("email_mensagens")
-                              .update({ lido: true })
-                              .eq("id", email.id);
-
-                            queryClient.invalidateQueries({ queryKey: ["received_emails"] });
-                          }
-                          
-                          // Abre já com o snippet e troca pelo corpo quando ele
-                          // chegar: esperar a ida ao Nylas antes de abrir daria
-                          // a sensação de clique que não responde.
-                          setSelectedEmail({
-                            ...email,
-                            destinatario: email.destinatarios?.[0] || "",
-                            remetente: email.remetente,
-                            corpo: "",
-                            html: email.corpo_html,
-                            created_at: email.criado_em,
-                            carregandoCorpo: !email.temCorpo,
-                            type: "received"
-                          });
-
-                          if (!email.temCorpo) {
-                            const corpo = await carregarCorpo(email.id);
-                            setSelectedEmail((atual: any) =>
-                              // Só escreve se a pessoa ainda estiver nesta
-                              // mensagem — ela pode ter clicado em outra
-                              // enquanto a busca voava.
-                              atual?.id === email.id
-                                ? { ...atual, html: corpo ?? atual.html, carregandoCorpo: false }
-                                : atual,
-                            );
-                          }
-                        }}
-
+                        // Marca lido só no CRM. O provedor não é atualizado de
+                        // propósito: espelhar o "lido" de volta para a caixa
+                        // faria a mensagem sumir como nova do celular do gestor
+                        // porque um vendedor abriu aqui — e a caixa é
+                        // compartilhada pelo time inteiro.
+                        onClick={() => abrirRecebido(email)}
                       >
                         <div className="flex items-center gap-3 shrink-0">
                           <Checkbox 
@@ -793,7 +801,12 @@ const Emails = () => {
                         </div>
                         <div className="flex-1 truncate overflow-hidden">
                           <span className={`text-sm ${!email.lido ? 'font-bold text-foreground' : 'font-normal text-foreground'} mr-2 shrink-0`}>{email.assunto}</span>
-                          <span className="text-sm text-muted-foreground opacity-60">- {email.corpo_html ? "Conteúdo HTML" : ""}</span>
+                          {/* Prévia de verdade. Antes dizia literalmente
+                              "Conteúdo HTML", que não conta nada sobre a
+                              mensagem — e o snippet já vinha do Nylas. */}
+                          {email.snippet && (
+                            <span className="text-sm text-muted-foreground opacity-60">- {email.snippet}</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-3">
                           <div className={`shrink-0 text-xs ${!email.lido ? 'font-bold text-foreground' : 'font-normal text-muted-foreground'}`}>
@@ -848,6 +861,8 @@ const Emails = () => {
           </TabsContent>
         </div>
       </Tabs>
+
+      {compositor}
 
       <AlertDialog open={!!emailToDelete} onOpenChange={(open) => !open && setEmailToDelete(null)}>
         <AlertDialogContent>

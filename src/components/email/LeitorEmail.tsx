@@ -10,6 +10,8 @@ export interface EmailAberto {
   destinatario?: string | null;
   html?: string | null;
   corpo?: string | null;
+  /** Prévia curta vinda do provedor; é o que aparece enquanto o corpo carrega. */
+  snippet?: string | null;
   criado_em?: string | null;
   created_at?: string | null;
   carregandoCorpo?: boolean;

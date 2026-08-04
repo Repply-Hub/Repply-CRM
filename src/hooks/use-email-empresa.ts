@@ -126,13 +126,37 @@ export function useEmailEmpresa() {
   });
 
   /**
-   * Corpo completo de uma mensagem, sob demanda.
+   * Corpo completo de uma mensagem, sob demanda — em três degraus, do mais
+   * barato para o mais caro:
    *
-   * A listagem do Nylas devolve `snippet`, não `body` — ler o corpo custa uma
-   * chamada por mensagem. Por isso ele é buscado ao abrir, e a Edge Function
-   * cacheia na linha para a segunda abertura sair do banco.
+   *   1. cache do react-query  — reabrir a mesma mensagem é instantâneo;
+   *   2. a própria linha       — uma consulta pequena (~1 kB), porque a Edge
+   *                              Function grava o corpo ali na primeira
+   *                              abertura, inclusive a de um colega;
+   *   3. Edge Function/Nylas   — ~1 s, só quando ninguém abriu ainda.
+   *
+   * A versão anterior ia direto ao degrau 3 sempre, e ainda chamava
+   * `invalidateQueries(['received_emails'])` no fim — o que refazia a busca da
+   * listagem inteira a cada e-mail aberto. Nada disso é preciso: quem guarda o
+   * corpo agora é o cache por mensagem, e a lista não carrega mais corpo nenhum.
    */
   const carregarCorpo = async (mensagemId: string): Promise<string | null> => {
+    const chave = ['email_corpo', mensagemId];
+
+    const emCache = queryClient.getQueryData<string>(chave);
+    if (emCache) return emCache;
+
+    const { data: linha } = await supabase
+      .from('email_mensagens')
+      .select('corpo_html')
+      .eq('id', mensagemId)
+      .maybeSingle();
+
+    if (linha?.corpo_html) {
+      queryClient.setQueryData(chave, linha.corpo_html);
+      return linha.corpo_html;
+    }
+
     const { data, error } = await supabase.functions.invoke('email-mensagem', {
       body: { mensagem_id: mensagemId },
     });
@@ -141,9 +165,10 @@ export function useEmailEmpresa() {
       toast.error(e.message);
       return null;
     }
-    // A lista guarda o snippet; trocar pelo corpo real exige refetch.
-    queryClient.invalidateQueries({ queryKey: ['received_emails'] });
-    return (data?.corpo_html as string) ?? '';
+
+    const corpo = (data?.corpo_html as string) ?? '';
+    if (corpo) queryClient.setQueryData(chave, corpo);
+    return corpo;
   };
 
   const enviarMutation = useMutation({
