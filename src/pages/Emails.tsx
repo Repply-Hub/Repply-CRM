@@ -13,6 +13,7 @@ import {
   Loader2, 
   History,
   Settings,
+  RefreshCw,
   PenBox,
   Trash2,
   MoreVertical,
@@ -65,7 +66,8 @@ const Emails = () => {
   // (isConnected/connectedEmail/sendEmail), então a troca é de import. A
   // diferença de modelo é que a caixa agora é da EMPRESA, compartilhada pelo
   // time, e não uma conta por usuário.
-  const { isConnected, connectedEmail, enviarEmail: sendEmail } = useEmailEmpresa();
+  const { isConnected, connectedEmail, enviarEmail: sendEmail, sincronizar, isSyncing } =
+    useEmailEmpresa();
   const [formData, setFormData] = useState({
     destinatario: "",
     assunto: "",
@@ -441,14 +443,20 @@ const Emails = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="rounded-full hover:bg-muted shrink-0"
-                onClick={() => window.location.href = '/configuracoes?tab=perfil'}
-              >
-                <Settings className="h-5 w-5 text-muted-foreground" />
-              </Button>
+              {isConnected && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full hover:bg-muted shrink-0"
+                  onClick={() => sincronizar({ limit: 20 })}
+                  disabled={isSyncing}
+                  title="Buscar as mensagens mais recentes"
+                >
+                  <RefreshCw
+                    className={`h-5 w-5 text-muted-foreground ${isSyncing ? "animate-spin" : ""}`}
+                  />
+                </Button>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

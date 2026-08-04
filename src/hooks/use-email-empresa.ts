@@ -94,6 +94,34 @@ export function useEmailEmpresa() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const sincronizarMutation = useMutation({
+    mutationFn: async (opcoes?: { limit?: number; backfill?: boolean }) => {
+      const { data, error } = await supabase.functions.invoke('email-sync', {
+        body: { limit: opcoes?.limit ?? 20, backfill: opcoes?.backfill ?? false },
+      });
+      if (error) throw await erroLegivelDaFunction(error, 'Não foi possível sincronizar');
+      return data as { novas: number; atualizadas: number; erros?: string[] };
+    },
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ['received_emails'] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['email_conta'] });
+
+      if (r.erros?.length) {
+        // Erro por conta não é falha da sincronização inteira: o que deu certo
+        // já entrou, e esconder o resto faria o usuário achar que não veio nada.
+        toast.warning(`Sincronizado com ressalvas: ${r.erros[0]}`);
+        return;
+      }
+      if (r.novas > 0) {
+        toast.success(`${r.novas} ${r.novas === 1 ? 'mensagem nova' : 'mensagens novas'}.`);
+      } else {
+        toast.info('Nenhuma mensagem nova.');
+      }
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const enviarMutation = useMutation({
     mutationFn: async (params: {
       to: string | string[];
@@ -161,5 +189,9 @@ export function useEmailEmpresa() {
     isSending: enviarMutation.isPending,
     isConnecting: conectarMutation.isPending,
     precisaReconectar: conta?.status === 'revogada',
+
+    sincronizar: (opcoes?: { limit?: number; backfill?: boolean }) =>
+      sincronizarMutation.mutate(opcoes),
+    isSyncing: sincronizarMutation.isPending,
   };
 }

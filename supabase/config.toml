@@ -38,4 +38,11 @@ verify_jwt = false
 [functions.email-webhook]
 verify_jwt = false
 
-# email-conectar e email-enviar NÃO entram aqui — exigem sessão do usuário.
+# Atende dois chamadores com credenciais diferentes: o pg_cron com service_role
+# e o navegador com JWT de usuário. A distinção é feita dentro da função, que
+# recusa quem não apresentar nenhuma das duas.
+[functions.email-sync]
+verify_jwt = false
+
+# email-conectar, email-enviar e email-desconectar NÃO entram aqui — exigem
+# sessão do usuário.
