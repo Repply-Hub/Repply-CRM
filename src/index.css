@@ -36,8 +36,13 @@
 
     /* Orange Soft #FFE9DC */
     --accent: 22 100% 93%;
-    /* Orange Deep #E54A12 */
-    --accent-foreground: 16 85% 48%;
+    /* Orange Deep escurecido de 48% para 40% de luminosidade.
+       A dupla accent/accent-foreground é o estado de hover de todo botão
+       `ghost` e `outline` do app. Em 48% o contraste sobre o fundo pêssego era
+       de 3,42:1 — abaixo dos 4,5:1 que a WCAG pede para texto normal, e na
+       prática o rótulo sumia no tema claro. Em 40% vai a 4,66:1 e passa.
+       O tema escuro não muda: lá é texto claro sobre fundo escuro. */
+    --accent-foreground: 16 85% 40%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
