@@ -43,6 +43,33 @@ export function AppSidebar() {
   const { state, setOpen, isMobile } = useSidebar();
   const { signOut, user } = useAuth();
   const collapsed = !isMobile && state === 'collapsed';
+  const [saindo, setSaindo] = useState(false);
+
+  /**
+   * Sair pelo menu.
+   *
+   * Antes era `onClick={() => signOut()}`: sem await, sem tratamento e sem
+   * navegação. Quando o signOut falhava por rede, o SDK não removia a sessão
+   * nem emitia SIGNED_OUT — e como é esse evento que faz o app trocar de tela,
+   * o clique não produzia efeito NENHUM. A pessoa clicava em "Sair", continuava
+   * logada e só descobria ao atualizar a página. Agora ou sai, ou avisa.
+   */
+  const sair = useCallback(async () => {
+    if (saindo) return;
+    setSaindo(true);
+    try {
+      const { error } = await signOut();
+      if (error) {
+        toast.error('Não foi possível sair agora. Verifique a conexão e tente de novo.');
+        setSaindo(false);
+      }
+      // Sem else: no sucesso o SIGNED_OUT redireciona e este componente é
+      // desmontado — mexer no estado aqui só geraria aviso do React.
+    } catch {
+      toast.error('Não foi possível sair agora. Verifique a conexão e tente de novo.');
+      setSaindo(false);
+    }
+  }, [saindo, signOut]);
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState<SidebarItem[]>([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -464,8 +491,9 @@ export function AppSidebar() {
                 )}
               </Link>
               <button
-                onClick={() => signOut()}
-                className={`flex items-center overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 ${collapsed ? 'justify-center' : 'gap-3'}`}
+                onClick={sair}
+                disabled={saindo}
+                className={`flex items-center overflow-hidden w-full rounded-lg px-2 py-2 hover:bg-sidebar-accent/50 transition-all duration-150 disabled:opacity-60 ${collapsed ? 'justify-center' : 'gap-3'}`}
               >
                 <LogOut className="h-4 w-4 shrink-0 text-sidebar-foreground/50" />
                 {!collapsed && <span className="text-[13px] text-sidebar-foreground/70">Sair</span>}

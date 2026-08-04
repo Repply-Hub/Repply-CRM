@@ -34,7 +34,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, nome: string) => Promise<{ error: Error | null }>;
   signUpEmpresa: (email: string, password: string, nome: string, nomeEmpresa: string, cnpjEmpresa?: string) => Promise<{ error: Error | null }>;
   signUpFuncionario: (email: string, password: string, nome: string, codigoEmpresa: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
+  signOut: () => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -97,6 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     fetchingRef.current = true;
     const versaoInicial = versaoPerfilRef.current;
+    // Só vira true quando a resposta é de fato aproveitada. É o que distingue
+    // "terminei de carregar o perfil" de "a resposta chegou tarde e foi jogada
+    // fora" — os dois marcavam profileLoaded antes.
+    let concluiu = false;
     try {
       console.log("[AUTH] fetchProfile — iniciando query para userId:", userId);
       let { data, error } = await buscarPerfil(userId);
@@ -126,6 +130,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // A sessão pode ter trocado (ou acabado) enquanto esta busca voava.
+      // Escrever aqui colocaria o perfil de um usuário sobre a sessão de outro
+      // — é a mesma checagem que refreshProfile já faz antes de gravar.
+      if (sessionRef.current?.user?.id !== userId) {
+        console.log("[AUTH] fetchProfile — a sessão mudou durante a busca, resposta descartada");
+        return;
+      }
+
       if (error) {
         console.error("Erro ao buscar perfil:", error);
         // Não zera um perfil que já existe: zerar setaria profile=null junto com
@@ -138,17 +150,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileRef.current = data;
         setProfile(data);
       }
+      concluiu = true;
     } catch (err) {
       console.error("Exceção ao buscar perfil:", err);
       if (versaoPerfilRef.current !== versaoInicial) return;
+      if (sessionRef.current?.user?.id !== userId) return;
       setProfile((anterior) => anterior ?? null);
+      concluiu = true;
     } finally {
-      console.log("[AUTH] fetchProfile FINALLY — setProfileLoaded(true), setLoading(false)");
-      setProfileLoaded(true);
-      setProfileAttempted(true);
-      profileLoadedRef.current = true;
+      // `fetchingRef` sempre é liberado — senão um fetch que morreu no meio
+      // trancaria todos os seguintes.
       fetchingRef.current = false;
-      setLoading(false);
+
+      // O RESTO só vale se a resposta foi realmente aproveitada. Antes este
+      // bloco rodava incondicionalmente, e era esse o bug do logout:
+      //
+      // 1. a pessoa sai; o ramo SIGNED_OUT zera profileLoadedRef...
+      // 2. ...mas não cancela um fetchProfile já em voo;
+      // 3. a resposta atrasada chegava aqui e regravava profileLoadedRef=true,
+      //    mesmo tendo sido descartada logo acima;
+      // 4. no login seguinte, o onAuthStateChange via profileLoadedRef=true e
+      //    registrava "fetchProfile já concluído anteriormente, nada a fazer" —
+      //    o perfil do NOVO usuário nunca era buscado.
+      //
+      // Daí o "saio e entro de novo e preciso atualizar a página".
+      if (concluiu) {
+        console.log("[AUTH] fetchProfile FINALLY — setProfileLoaded(true), setLoading(false)");
+        setProfileLoaded(true);
+        setProfileAttempted(true);
+        profileLoadedRef.current = true;
+        setLoading(false);
+      } else {
+        console.log("[AUTH] fetchProfile FINALLY — resposta descartada, estado preservado");
+      }
       console.log("[AUTH] fetchProfile EXIT");
     }
   };
@@ -276,6 +310,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } else {
           console.log("[AUTH] onAuthStateChange — sem sessão, limpando estado e setLoading(false)");
+          // Invalida qualquer fetchProfile em voo. Sem isto, a guarda de
+          // obsolescência lá em cima não cobria o logout (ela compara a versão,
+          // que ninguém incrementava aqui), e uma resposta atrasada ressuscitava
+          // o perfil do usuário que acabou de sair.
+          versaoPerfilRef.current += 1;
           sessionRef.current = null;
           profileRef.current = null;
           setSession(null);
@@ -330,8 +369,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
+  /**
+   * Sai da sessão.
+   *
+   * Devolve o erro em vez de engoli-lo. O SDK do Supabase, quando a chamada de
+   * signOut falha por rede (offline, timeout, 5xx), NÃO remove a sessão local e
+   * NÃO emite o evento SIGNED_OUT — ele apenas devolve `{ error }`. Como aqui o
+   * retorno era descartado e o app depende do SIGNED_OUT para trocar de tela,
+   * o clique em "Sair" ficava silenciosamente sem efeito nenhum: nada mudava
+   * até a pessoa atualizar a página. Quem chama agora consegue avisar.
+   */
+  const signOut = async (): Promise<{ error: Error | null }> => {
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error("[AUTH] signOut falhou:", error.message);
+    return { error: (error as Error) ?? null };
   };
 
   return (

@@ -23,6 +23,16 @@ export default defineConfig(({ mode }) => ({
       },
     },
   ].filter(Boolean),
+  // Identifica o build nos erros gravados em `app_erros`. Sem isto não dá para
+  // separar "erro da versão velha que o usuário ainda tinha em cache" de "erro
+  // da versão que acabou de subir" — distinção que importa aqui, porque chunk
+  // velho depois de deploy é uma das causas que estamos tratando.
+  // A Vercel expõe o commit em VERCEL_GIT_COMMIT_SHA; fora dela vira "local".
+  define: {
+    __BUILD_ID__: JSON.stringify(
+      (process.env.VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 8),
+    ),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

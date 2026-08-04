@@ -1,26 +1,29 @@
 import { Component, type ReactNode, type ErrorInfo } from "react";
 import { Button } from "@/components/ui/button";
+import { registrarErro } from "@/lib/registrar-erro";
 
 interface Props {
   children: ReactNode;
   fallback?:
     | ReactNode
-    | ((error: Error | null, reset: () => void) => ReactNode);
+    | ((error: Error | null, reset: () => void, codigo: string | null) => ReactNode);
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
+  /** Código curto de `app_erros`, para o usuário repassar. */
+  codigo: string | null;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, codigo: null };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, codigo: null };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
@@ -37,10 +40,23 @@ export class ErrorBoundary extends Component<Props, State> {
     } catch (e) {
       // ignore
     }
+
+    // Persiste o erro e mostra o código na tela quando ele chegar. Sem `await`
+    // e sem `catch` aqui porque `registrarErro` já é à prova de falha e devolve
+    // null — gravar o erro nunca pode virar um segundo erro sobre a tela que já
+    // quebrou. O setState só roda se o componente ainda estiver montado, que é
+    // o caso: o fallback continua na tela.
+    void registrarErro({
+      mensagem: error?.message ?? "Erro desconhecido",
+      stack: error?.stack,
+      componentStack: info?.componentStack,
+    }).then((codigo) => {
+      if (codigo) this.setState({ codigo });
+    });
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, codigo: null });
   };
 
   render() {
@@ -48,8 +64,12 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) {
         if (typeof this.props.fallback === "function") {
           return (
-            this.props.fallback as (e: Error | null, r: () => void) => ReactNode
-          )(this.state.error, this.handleReset);
+            this.props.fallback as (
+              e: Error | null,
+              r: () => void,
+              c: string | null,
+            ) => ReactNode
+          )(this.state.error, this.handleReset, this.state.codigo);
         }
         return this.props.fallback;
       }
@@ -70,6 +90,17 @@ export class ErrorBoundary extends Component<Props, State> {
           <p className="text-xs text-muted-foreground max-w-lg">
             {errorMessage}
           </p>
+
+          {/* O código liga o relato de quem viu a tela à linha em `app_erros`.
+              Sem ele, o erro só existia no console do navegador do usuário. */}
+          {this.state.codigo && (
+            <p className="text-xs text-muted-foreground">
+              Código do erro:{" "}
+              <span className="font-mono font-semibold text-foreground">
+                {this.state.codigo}
+              </span>
+            </p>
+          )}
 
           {isDev && (
             <div className="mt-3 w-full max-w-xl text-left bg-muted/5 p-3 rounded-md border border-border/40 overflow-auto max-h-48">

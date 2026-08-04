@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -218,7 +218,15 @@ function ProfileTab() {
     },
     onSuccess: async () => {
       toast.success('Conta excluída.');
-      await signOut();
+      // A linha em `usuarios` já foi apagada pelo RPC. Se o signOut falhar por
+      // rede, o SDK mantém a sessão local e não emite SIGNED_OUT — a pessoa
+      // ficaria numa tela logada com a conta inexistente. O replace garante a
+      // saída de qualquer jeito; o token restante deixa de valer no servidor.
+      try {
+        await signOut();
+      } finally {
+        window.location.replace('/');
+      }
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -512,8 +520,17 @@ function ProfileTab() {
 
 const Configuracoes = () => {
   const [searchParams] = useSearchParams();
-  const defaultTab = searchParams.get('tab') === 'usuarios' ? 'vendedores' : (searchParams.get('tab') || 'perfil');
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  const abaDaUrl = searchParams.get('tab') === 'usuarios' ? 'vendedores' : (searchParams.get('tab') || 'perfil');
+  const [activeTab, setActiveTab] = useState(abaDaUrl);
+
+  // Sem isto, o `?tab=` só era lido na PRIMEIRA montagem. Estando já em
+  // /configuracoes, clicar no avatar do topo (`?tab=perfil`) ou no item
+  // "Usuários" da sidebar (`?tab=usuarios`) mudava a URL e não mudava a aba: a
+  // rota é a mesma, então a página não remonta e o useState não roda de novo.
+  // Só um F5 resolvia — era um dos "cliquei e não aconteceu nada".
+  useEffect(() => {
+    setActiveTab(abaDaUrl);
+  }, [abaDaUrl]);
   // A aba de Usuários usa layout de altura fixa (scroll interno nos cards); as demais rolam a página normalmente.
   const noPageScroll = activeTab === 'vendedores';
   const [alertDays, setAlertDays] = useState('5');

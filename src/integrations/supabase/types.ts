@@ -39,6 +39,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_erros: {
+        Row: {
+          component_stack: string | null
+          criado_em: string
+          empresa_id: string | null
+          id: string
+          mensagem: string
+          rota: string | null
+          stack: string | null
+          user_agent: string | null
+          user_id: string | null
+          versao: string | null
+        }
+        Insert: {
+          component_stack?: string | null
+          criado_em?: string
+          empresa_id?: string | null
+          id?: string
+          mensagem: string
+          rota?: string | null
+          stack?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          versao?: string | null
+        }
+        Update: {
+          component_stack?: string | null
+          criado_em?: string
+          empresa_id?: string | null
+          id?: string
+          mensagem?: string
+          rota?: string | null
+          stack?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          versao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_erros_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_permissoes: {
         Row: {
           acao: string

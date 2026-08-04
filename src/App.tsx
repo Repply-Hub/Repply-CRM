@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
@@ -10,38 +10,42 @@ import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { TelaBloqueio } from "@/components/shared/TelaBloqueio";
 import { Button } from "@/components/ui/button";
 import { PAYWALL_ATIVO, planoBloqueado } from "@/lib/plano-gate";
+// Todas as páginas entram por aqui, e não pelo `lazy` do React: o wrapper
+// traduz "o arquivo desta página sumiu do servidor depois de um deploy" num
+// erro reconhecível, em vez de deixar virar o "Algo deu errado" genérico.
+import { lazyComRetry, ErroDeVersao } from "@/lib/lazy-com-retry";
 
-const Negocios = lazy(() => import("./pages/Negocios"));
-const Clientes = lazy(() => import("./pages/Clientes"));
-const ClienteDetalhe = lazy(() => import("./pages/ClienteDetalhe"));
-const ContatoDetalhe = lazy(() => import("./pages/ContatoDetalhe"));
-const NovoPedido = lazy(() => import("./pages/NovoPedido"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const Configuracoes = lazy(() => import("./pages/Configuracoes"));
-const Obras = lazy(() => import("./pages/Obras"));
-const Fabricantes = lazy(() => import("./pages/Fabricantes"));
-const Portal = lazy(() => import("./pages/Portal"));
-const EditarPedido = lazy(() => import("./pages/EditarPedido"));
-const Calendario = lazy(() => import("./pages/Calendario"));
-const Tarefas = lazy(() => import("./pages/Tarefas"));
-const Chat = lazy(() => import("./pages/Chat"));
-const Emails = lazy(() => import("./pages/Emails"));
-const WhatsAppInbox = lazy(() => import("./pages/WhatsAppInbox"));
-const LinhasIgnoradas = lazy(() => import("./pages/LinhasIgnoradas"));
-const AdminWhatsAppInstancias = lazy(
+const Negocios = lazyComRetry(() => import("./pages/Negocios"));
+const Clientes = lazyComRetry(() => import("./pages/Clientes"));
+const ClienteDetalhe = lazyComRetry(() => import("./pages/ClienteDetalhe"));
+const ContatoDetalhe = lazyComRetry(() => import("./pages/ContatoDetalhe"));
+const NovoPedido = lazyComRetry(() => import("./pages/NovoPedido"));
+const Dashboard = lazyComRetry(() => import("./pages/Dashboard"));
+const AdminDashboard = lazyComRetry(() => import("./pages/AdminDashboard"));
+const Configuracoes = lazyComRetry(() => import("./pages/Configuracoes"));
+const Obras = lazyComRetry(() => import("./pages/Obras"));
+const Fabricantes = lazyComRetry(() => import("./pages/Fabricantes"));
+const Portal = lazyComRetry(() => import("./pages/Portal"));
+const EditarPedido = lazyComRetry(() => import("./pages/EditarPedido"));
+const Calendario = lazyComRetry(() => import("./pages/Calendario"));
+const Tarefas = lazyComRetry(() => import("./pages/Tarefas"));
+const Chat = lazyComRetry(() => import("./pages/Chat"));
+const Emails = lazyComRetry(() => import("./pages/Emails"));
+const WhatsAppInbox = lazyComRetry(() => import("./pages/WhatsAppInbox"));
+const LinhasIgnoradas = lazyComRetry(() => import("./pages/LinhasIgnoradas"));
+const AdminWhatsAppInstancias = lazyComRetry(
   () => import("./pages/AdminWhatsAppInstancias"),
 );
-const HistoricoAlteracoes = lazy(() => import("./pages/HistoricoAlteracoes"));
-const AdminEmpresas = lazy(() => import("./pages/AdminEmpresas"));
+const HistoricoAlteracoes = lazyComRetry(() => import("./pages/HistoricoAlteracoes"));
+const AdminEmpresas = lazyComRetry(() => import("./pages/AdminEmpresas"));
 
-const Landing = lazy(() => import("./pages/Landing"));
-const Cadastro = lazy(() => import("./pages/Cadastro"));
-const Assinar = lazy(() => import("./pages/Assinar"));
-const Login = lazy(() => import("./pages/Login"));
-const EsqueciSenha = lazy(() => import("./pages/EsqueciSenha"));
-const RedefinirSenha = lazy(() => import("./pages/RedefinirSenha"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+const Landing = lazyComRetry(() => import("./pages/Landing"));
+const Cadastro = lazyComRetry(() => import("./pages/Cadastro"));
+const Assinar = lazyComRetry(() => import("./pages/Assinar"));
+const Login = lazyComRetry(() => import("./pages/Login"));
+const EsqueciSenha = lazyComRetry(() => import("./pages/EsqueciSenha"));
+const RedefinirSenha = lazyComRetry(() => import("./pages/RedefinirSenha"));
+const NotFound = lazyComRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +56,91 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+/** Sai da sessão e volta para a raiz, aconteça o que acontecer. */
+async function sairEVoltarParaRaiz() {
+  // O finally é obrigatório: se o signOut rejeitar (rede caindo, por exemplo),
+  // sem ele a navegação nunca aconteceria e o usuário ficaria preso na tela
+  // "Redirecionando...". replace em vez de href para não deixar a tela anterior
+  // no histórico, já que ela não é mais acessível.
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    await supabase.auth.signOut();
+  } catch (err) {
+    console.error("Erro ao sair:", err);
+  } finally {
+    window.location.replace("/");
+  }
+}
+
+/**
+ * Tela de erro — usada pelo boundary da raiz e pelo das páginas.
+ *
+ * Distingue dois casos que antes caíam no mesmo "Algo deu errado":
+ *
+ * 1. `ErroDeVersao` — a página que a pessoa tentou abrir pertence a uma versão
+ *    anterior do sistema, porque saiu um deploy com a aba aberta. Não é bug: é
+ *    o app pedindo para recarregar. Dizer "algo deu errado" aqui era assustar
+ *    à toa e não indicava a saída.
+ * 2. Erro de verdade — mostra a mensagem (que antes ficava escondida em
+ *    produção) e o código curto de `app_erros`, para o suporte conseguir achar
+ *    o que houve em vez de depender de print de tela.
+ */
+function TelaDeErro({ error, codigo }: { error: Error | null; codigo: string | null }) {
+  const ehVersao = error instanceof ErroDeVersao || error?.name === "ErroDeVersao";
+
+  const recarregar = () => {
+    // Navegação completa com cache-buster: só isso recria os módulos que o
+    // React guardou como rejeitados. O `_r` é retirado da URL depois pelo
+    // UrlCleaner. Uso `replace` para não empilhar histórico a cada tentativa —
+    // com `href`, clicar duas vezes gerava `?_r=1&_r=2`.
+    const url = new URL(window.location.href);
+    url.searchParams.set("_r", String(Date.now()));
+    window.location.replace(url.toString());
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center p-8">
+      <p className="text-lg font-semibold text-foreground">
+        {ehVersao ? "Saiu uma versão nova do sistema" : "Algo deu errado"}
+      </p>
+
+      <p className="max-w-md text-sm text-muted-foreground">
+        {ehVersao
+          ? "Esta aba está aberta desde antes da última atualização. Recarregue para continuar — nada do seu trabalho foi perdido."
+          : "A tela não conseguiu carregar. Recarregar costuma resolver."}
+      </p>
+
+      {!ehVersao && error?.message && (
+        <p className="max-w-lg rounded bg-muted/30 px-3 py-2 font-mono text-xs text-muted-foreground">
+          {error.message}
+        </p>
+      )}
+
+      {!ehVersao && codigo && (
+        <p className="text-xs text-muted-foreground">
+          Código do erro:{" "}
+          <span className="font-mono font-semibold text-foreground">{codigo}</span>
+        </p>
+      )}
+
+      <div className="flex gap-3">
+        <button
+          onClick={recarregar}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          {ehVersao ? "Recarregar" : "Recarregar (forçado)"}
+        </button>
+        <button
+          onClick={sairEVoltarParaRaiz}
+          className="px-4 py-2 bg-muted text-foreground rounded-md text-sm font-medium hover:bg-muted/90 transition-colors border"
+        >
+          Sair
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ProtectedRoute({
   children,
@@ -69,20 +158,7 @@ function ProtectedRoute({
     useAuth();
   const location = useLocation();
 
-  const handleSignOut = async () => {
-    // O finally é obrigatório: se o signOut rejeitar (rede caindo, por exemplo),
-    // sem ele a navegação nunca aconteceria e o usuário ficaria preso na tela
-    // "Redirecionando..." do caminho de sessão órfã. replace em vez de href para
-    // não deixar a tela anterior no histórico, já que ela não é mais acessível.
-    try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error("Erro ao sair:", err);
-    } finally {
-      window.location.replace("/");
-    }
-  };
+  const handleSignOut = sairEVoltarParaRaiz;
 
   // Sessão órfã (usuário deletado do banco mas sessão ainda no localStorage): faz logout automático.
   // profileAttempted só vira true dentro do finally de fetchProfile (sucesso ou erro real) — o
@@ -165,46 +241,24 @@ function ProtectedRoute({
     );
   }
 
-  // Key no ErrorBoundary força remount quando o perfil ou sessão muda —
-  // evita que um ErrorBoundary previamente com estado de erro continue mostrando o fallback
-  const ebKey = profile?.id ?? session?.user?.id ?? "anon";
+  // A `key` inclui a ROTA, e essa é a correção mais importante deste arquivo.
+  //
+  // Antes ela era só `profile?.id ?? session?.user?.id ?? "anon"`, que não muda
+  // ao navegar. E o react-router não põe key nos elementos de rota: como toda
+  // rota protegida renderiza o mesmo componente `ProtectedRoute` na mesma
+  // posição da árvore, o React reconcilia como UPDATE, não como mount. O fiber
+  // do ErrorBoundary sobrevivia à troca de rota com `hasError: true` grudado.
+  //
+  // Na prática: um único erro em QUALQUER página travava todas as outras. Como
+  // a sidebar mora dentro da página, ela sumia junto, e a pessoa ficava sem
+  // conteúdo e sem menu — só o F5 devolvia o app. Era o "cliquei na aba e não
+  // apareceu nada" relatado.
+  const ebKey = `${profile?.id ?? session?.user?.id ?? "anon"}|${location.pathname}`;
 
   return (
     <ErrorBoundary
       key={ebKey}
-      fallback={(error) => (
-        <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center p-8">
-          <p className="text-lg font-semibold text-destructive">
-            Algo deu errado
-          </p>
-          {process.env.NODE_ENV !== "production" && error && (
-            <p className="text-xs text-muted-foreground max-w-lg font-mono bg-muted/30 px-3 py-2 rounded">
-              {error.message}
-            </p>
-          )}
-          <div className="flex gap-3">
-            <button
-              onClick={() => {
-                const sep = window.location.search ? "&" : "?";
-                window.location.href =
-                  window.location.pathname +
-                  window.location.search +
-                  sep +
-                  `_r=${Date.now()}`;
-              }}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              Recarregar (forçado)
-            </button>
-            <button
-              onClick={handleSignOut}
-              className="px-4 py-2 bg-muted text-muted-foreground rounded-md text-sm font-medium hover:bg-muted/90 transition-colors border"
-            >
-              Sair
-            </button>
-          </div>
-        </div>
-      )}
+      fallback={(error, _reset, codigo) => <TelaDeErro error={error} codigo={codigo} />}
     >
       {children}
     </ErrorBoundary>
@@ -533,9 +587,29 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <UrlCleaner />
-            <Suspense fallback={<PageFallback />}>
-              <AppRoutes />
-            </Suspense>
+            {/* Boundary da RAIZ. O único ErrorBoundary do app ficava dentro do
+                ProtectedRoute, então as rotas públicas — `/`, `/login`,
+                `/cadastro`, `/redefinir-senha` e o 404 — não tinham nenhum. Lá
+                um erro subia até o topo e o React 18 desmontava a árvore
+                inteira: página branca, sem nem a tela de erro.
+
+                Isso importa especialmente no logout, que leva justamente para
+                `/login`: se o chunk dessa página fosse de uma versão anterior,
+                sair do sistema deixava a tela em branco. Era o "faço logout e
+                preciso atualizar a página".
+
+                Fica DENTRO dos providers para a tela de erro poder usar tema e
+                tokens, e ACIMA do Suspense para pegar também a rejeição do
+                import de uma página. */}
+            <ErrorBoundary
+              fallback={(error, _reset, codigo) => (
+                <TelaDeErro error={error} codigo={codigo} />
+              )}
+            >
+              <Suspense fallback={<PageFallback />}>
+                <AppRoutes />
+              </Suspense>
+            </ErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
