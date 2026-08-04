@@ -39,6 +39,26 @@ import {
 // admin não pode depender de alguém lembrar de editar um `||` no meio do JSX.
 const ADMIN_ONLY_IDS = new Set(['admin_wa_instancias', 'usuarios_admin', 'admin_empresas']);
 
+/**
+ * O que o administrador global vê — e SÓ isso.
+ *
+ * Ele não opera o CRM de ninguém: o trabalho dele é gerir assinantes. Antes, o
+ * admin caía junto com gestor/dono no ramo "vê tudo que estiver visível", então
+ * o menu dele trazia Negócios, Clientes, Tarefas, Chat, E-mails — telas de dados
+ * de empresa que, além de não servirem para nada no trabalho dele, o levavam a
+ * abrir a caixa de e-mail de um cliente.
+ *
+ * `usuarios_admin` ficou de fora de propósito: aquele item aponta para
+ * `/configuracoes?tab=usuarios`, uma tela DA EMPRESA, e o admin não tem empresa
+ * (`empresa_id` nulo). O painel de Empresas já lista os usuários de cada
+ * assinante ao expandir o card, que é a informação que ele realmente precisa.
+ *
+ * Isto é conveniência de navegação, não segurança: a barreira real são as
+ * policies de RLS, que desde a migration 20260804195019 não deixam mais o admin
+ * ler conteúdo de empresa nenhuma.
+ */
+const ITENS_DO_ADMIN_GERAL = ['admin_empresas', 'admin_wa_instancias'];
+
 export function AppSidebar() {
   const { state, setOpen, isMobile } = useSidebar();
   const { signOut, user } = useAuth();
@@ -107,10 +127,15 @@ export function AppSidebar() {
 
   // Filter visible items, and for non-gestores also check permissoes_usuario
   const visibleItems = items.filter(i => {
+    // O admin global tem uma lista PRÓPRIA e fechada, avaliada antes de
+    // qualquer outra regra — inclusive antes de `i.visible`, para uma
+    // preferência salva não conseguir devolver as telas de dados ao menu dele.
+    if (isAdmin) return ITENS_DO_ADMIN_GERAL.includes(i.id);
+
     if (!i.visible) return false;
 
     // Itens exclusivos do admin master nunca aparecem para outros perfis
-    if (!isAdmin && ADMIN_ONLY_IDS.has(i.id)) return false;
+    if (ADMIN_ONLY_IDS.has(i.id)) return false;
 
     if (isGestor) return true; // gestores/empresa see all visible items
     // For vendedores e cargos customizados: check if they have pode_ver permission for this module

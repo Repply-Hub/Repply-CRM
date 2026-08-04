@@ -215,6 +215,21 @@ function ProtectedRoute({
     );
   }
 
+  // O administrador global não opera o CRM de ninguém — só as telas de /admin.
+  //
+  // Esconder os itens do menu (AppSidebar) não bastaria: as rotas continuam
+  // alcançáveis digitando a URL, por um link antigo ou pelo histórico do
+  // navegador. E as telas de dados, ao montar, disparam as consultas da empresa
+  // — que hoje voltam vazias por RLS, mas render de tela vazia com spinner
+  // eterno é pior do que não entrar.
+  //
+  // Isto é navegação, não segurança: quem impede a leitura são as policies
+  // (migration 20260804195019). Aqui é só para o admin não cair numa tela que
+  // não é dele.
+  if (profileAttempted && profile?.role === "admin" && !location.pathname.startsWith("/admin")) {
+    return <Navigate to="/admin/empresas" replace />;
+  }
+
   // Gate de plano.
   //
   // Libera por construção: planoBloqueado é denylist, então só barra com um
@@ -294,23 +309,16 @@ const LandingRoute = () => {
   return <Landing />;
 };
 
-const DashboardWrapper = () => {
-  const { profile } = useAuth();
-  if (profile?.role === "admin") {
-    return <AdminEmpresas />;
-  }
-  return <Dashboard />;
-};
+// Antes estes dois desviavam o admin para <AdminEmpresas/> renderizando-o
+// dentro de /dashboard e /app. Agora quem faz isso é a guarda do ProtectedRoute,
+// que redireciona para /admin/empresas — uma URL só, em vez da mesma tela
+// aparecendo em três endereços diferentes. Estes componentes voltam a ser só o
+// que o nome diz.
+const DashboardWrapper = () => <Dashboard />;
 
 // Admin master não tem acesso à página de Negócios (ver AppSidebar), então a
 // home do app cai no painel de empresas em vez do pipeline.
-const RootRoute = () => {
-  const { profile } = useAuth();
-  if (profile?.role === "admin") {
-    return <AdminEmpresas />;
-  }
-  return <Negocios defaultView="pipeline" />;
-};
+const RootRoute = () => <Negocios defaultView="pipeline" />;
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
