@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -519,18 +519,28 @@ function ProfileTab() {
 }
 
 const Configuracoes = () => {
-  const [searchParams] = useSearchParams();
-  const abaDaUrl = searchParams.get('tab') === 'usuarios' ? 'vendedores' : (searchParams.get('tab') || 'perfil');
-  const [activeTab, setActiveTab] = useState(abaDaUrl);
-
-  // Sem isto, o `?tab=` só era lido na PRIMEIRA montagem. Estando já em
+  // A URL é a ÚNICA fonte da verdade da aba — não há estado local espelhando.
+  //
+  // Antes, `?tab=` era lido só na primeira montagem: estando já em
   // /configuracoes, clicar no avatar do topo (`?tab=perfil`) ou no item
-  // "Usuários" da sidebar (`?tab=usuarios`) mudava a URL e não mudava a aba: a
-  // rota é a mesma, então a página não remonta e o useState não roda de novo.
-  // Só um F5 resolvia — era um dos "cliquei e não aconteceu nada".
-  useEffect(() => {
-    setActiveTab(abaDaUrl);
-  }, [abaDaUrl]);
+  // "Usuários" da sidebar mudava a URL e não mudava a aba, porque a rota é a
+  // mesma e a página não remonta. Só um F5 resolvia.
+  //
+  // A primeira tentativa de correção foi um useEffect sincronizando URL -> estado,
+  // e ela era incompleta: como o clique numa aba mudava só o estado, os dois
+  // saíam de sincronia, e daí em diante clicar num link cujo `?tab=` fosse igual
+  // ao valor JÁ derivado não disparava o efeito (a dependência é uma string e
+  // não mudava). Na prática: abrir Configurações, clicar em "Usuários" e depois
+  // clicar no avatar não voltava para o Perfil — exatamente o caso que a
+  // correção dizia resolver.
+  //
+  // Sem estado espelhado não há como divergir: trocar de aba escreve na URL, e
+  // a aba mostrada sempre sai de lá. `replace` para não encher o histórico com
+  // uma entrada por clique de aba.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const abaDaUrl = searchParams.get('tab') === 'usuarios' ? 'vendedores' : (searchParams.get('tab') || 'perfil');
+  const activeTab = abaDaUrl;
+  const setActiveTab = (aba: string) => setSearchParams({ tab: aba }, { replace: true });
   // A aba de Usuários usa layout de altura fixa (scroll interno nos cards); as demais rolam a página normalmente.
   const noPageScroll = activeTab === 'vendedores';
   const [alertDays, setAlertDays] = useState('5');
