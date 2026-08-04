@@ -49,6 +49,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useSearchParams } from "react-router-dom";
 import { useEmailEmpresa } from "@/hooks/use-email-empresa";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
+import { LeitorEmail } from "@/components/email/LeitorEmail";
 
 const Emails = () => {
   const [searchParams] = useSearchParams();
@@ -352,9 +353,79 @@ const Emails = () => {
     sendEmailMutation.mutate(formData);
   };
 
+  /** Monta a resposta a partir da mensagem aberta e abre o compositor. */
+  const responderMensagem = () => {
+    if (!selectedEmail) return;
+    const assunto = selectedEmail.assunto ?? "";
+    const replySubject = assunto.toLowerCase().startsWith("re:") ? assunto : `Re: ${assunto}`;
+    const quando = selectedEmail.created_at || selectedEmail.criado_em;
+
+    setFormData({
+      ...formData,
+      destinatario: selectedEmail.remetente || selectedEmail.destinatario || "",
+      assunto: replySubject,
+      corpo: `\n\n--- Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:\n\n${selectedEmail.corpo || ""}`,
+    });
+    setSelectedEmail(null);
+    setIsComposeOpen(true);
+  };
+
+  // Leitura ocupa a tela inteira, como no Gmail. Antes era um modal, mas e-mail
+  // é conteúdo para ler, não confirmação de ação: o modal empilhava um contexto
+  // sobre o outro, prendia a rolagem e obrigava a fechar para voltar à lista.
+  if (selectedEmail) {
+    return (
+      <AppLayout
+        title="E-mail"
+        subtitle={connectedEmail ?? "Caixa da empresa"}
+        mainClassName="flex-1 overflow-hidden p-0"
+      >
+        <LeitorEmail
+          email={selectedEmail}
+          emailDaConta={connectedEmail}
+          onVoltar={() => setSelectedEmail(null)}
+          onExcluir={() =>
+            setEmailToDelete({
+              id: selectedEmail.id,
+              type: selectedEmail.type || (selectedEmail.criado_em ? "received" : "sent"),
+            })
+          }
+          onResponder={responderMensagem}
+        />
+
+        <AlertDialog
+          open={!!emailToDelete}
+          onOpenChange={(open) => !open && setEmailToDelete(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir este e-mail?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Ele sai da sua caixa no CRM. A mensagem original continua na conta de
+                e-mail — nada é apagado no provedor.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (emailToDelete) deleteEmailMutation.mutate(emailToDelete);
+                  setEmailToDelete(null);
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout title="E-mail" subtitle={connectedEmail ?? "Caixa da empresa"} mainClassName="flex-1 overflow-hidden p-0">
-      <Tabs 
+      <Tabs
         defaultValue="received" 
         className="flex flex-col h-full bg-background overflow-hidden"
         onValueChange={(val) => {
@@ -777,95 +848,6 @@ const Emails = () => {
           </TabsContent>
         </div>
       </Tabs>
-
-      <Dialog open={!!selectedEmail} onOpenChange={(open) => !open && setSelectedEmail(null)}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col p-0 border shadow-2xl rounded-2xl bg-card">
-          <div className="p-6 overflow-y-auto">
-            <div className="flex justify-between items-start mb-8">
-              <div>
-                <h2 className="text-2xl font-normal text-foreground mb-6">{selectedEmail?.assunto}</h2>
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-bold uppercase">
-                    {(selectedEmail?.remetente || selectedEmail?.destinatario || "?")[0]}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-foreground">{selectedEmail?.remetente || "Eu"}</span>
-                      <span className="text-xs text-muted-foreground">&lt;{selectedEmail?.remetente || connectedEmail}&gt;</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      para {selectedEmail?.destinatario}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {selectedEmail && format(new Date(selectedEmail.created_at || selectedEmail.criado_em), "dd 'de' MMM. 'de' yyyy, HH:mm", { locale: ptBR })}
-              </div>
-            </div>
-
-            <div className="text-base text-slate-800 leading-relaxed min-h-[200px] bg-white p-4 rounded-lg border border-slate-100">
-              {/* Enquanto o corpo completo não chega, o que está na tela é o
-                  resumo — dizer isso evita o usuário achar que o e-mail veio
-                  truncado. */}
-              {selectedEmail?.carregandoCorpo && (
-                <div className="mb-3 flex items-center gap-2 text-xs text-slate-500">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Carregando o conteúdo completo...
-                </div>
-              )}
-              {selectedEmail?.html ? (
-                <div 
-                  className="prose prose-sm max-w-none text-slate-800"
-                  dangerouslySetInnerHTML={{ __html: selectedEmail.html }} 
-                />
-              ) : (
-                <div className="whitespace-pre-wrap text-slate-800">
-                  {selectedEmail?.corpo}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="p-4 border-t bg-muted/5 flex justify-between gap-2">
-            <Button 
-              variant="ghost" 
-              className="rounded-full px-4 text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-2"
-              onClick={() => {
-                setEmailToDelete({ 
-                  id: selectedEmail.id, 
-                  type: selectedEmail.type || (selectedEmail.criado_em ? "received" : "sent") 
-                });
-              }}
-            >
-              <Trash2 className="h-4 w-4" /> Excluir
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" className="rounded-full px-6" onClick={() => setSelectedEmail(null)}>
-                Fechar
-              </Button>
-              <Button 
-                className="rounded-full px-6 gap-2"
-                onClick={() => {
-                  const replySubject = selectedEmail?.assunto.toLowerCase().startsWith("re:") 
-                    ? selectedEmail.assunto 
-                    : `Re: ${selectedEmail?.assunto}`;
-                  
-                  setFormData({
-                    ...formData,
-                    destinatario: selectedEmail?.remetente || selectedEmail?.destinatario,
-                    assunto: replySubject,
-                    corpo: `\n\n--- Em ${format(new Date(selectedEmail.created_at || selectedEmail.criado_em), "dd/MM/yyyy HH:mm")}, ${selectedEmail.remetente} escreveu:\n\n${selectedEmail.corpo || ""}`
-                  });
-                  setSelectedEmail(null);
-                  setIsComposeOpen(true);
-                }}
-              >
-                <History className="h-4 w-4" /> Responder
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={!!emailToDelete} onOpenChange={(open) => !open && setEmailToDelete(null)}>
         <AlertDialogContent>
