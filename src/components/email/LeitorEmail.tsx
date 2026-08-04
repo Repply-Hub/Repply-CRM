@@ -88,7 +88,11 @@ export function LeitorEmail({ email, emailDaConta, onVoltar, onExcluir, onRespon
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-6 py-6">
+        {/* max-w-5xl (1024px), não 3xl (768px): a maioria dos e-mails de sistema
+            é montada em tabela de largura fixa maior que 768, então em 3xl a
+            mensagem chegava cortada à direita e só aparecia inteira rolando na
+            horizontal — dentro de uma tela que já rola na vertical. */}
+        <div className="mx-auto w-full max-w-5xl px-6 py-6">
           <h1 className="mb-6 font-normal text-[1.375rem] leading-snug text-foreground">
             {email.assunto || '(sem assunto)'}
           </h1>
