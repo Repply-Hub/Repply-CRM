@@ -158,30 +158,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile((anterior) => anterior ?? null);
       concluiu = true;
     } finally {
-      // `fetchingRef` sempre é liberado — senão um fetch que morreu no meio
-      // trancaria todos os seguintes.
-      fetchingRef.current = false;
-
-      // O RESTO só vale se a resposta foi realmente aproveitada. Antes este
-      // bloco rodava incondicionalmente, e era esse o bug do logout:
+      // Os quatro sinalizadores daqui têm papéis DIFERENTES, e tratá-los como
+      // um bloco só era o bug. Separando:
       //
+      // `fetchingRef` e `loading`/`profileLoaded` são sobre a TELA não travar.
+      // Liberam sempre: um fetch que morreu no meio não pode deixar o app
+      // girando nem impedir a próxima tentativa.
+      fetchingRef.current = false;
+      setLoading(false);
+      setProfileLoaded(true);
+
+      // `profileLoadedRef` e `profileAttempted` são sobre "este perfil é
+      // confiável", e SÓ podem valer quando a resposta foi mesmo aproveitada.
+      //
+      // Era exatamente aqui que morava o bug do logout:
       // 1. a pessoa sai; o ramo SIGNED_OUT zera profileLoadedRef...
       // 2. ...mas não cancela um fetchProfile já em voo;
-      // 3. a resposta atrasada chegava aqui e regravava profileLoadedRef=true,
-      //    mesmo tendo sido descartada logo acima;
-      // 4. no login seguinte, o onAuthStateChange via profileLoadedRef=true e
+      // 3. a resposta atrasada chegava e regravava profileLoadedRef = true,
+      //    mesmo tendo sido descartada por obsolescência logo acima;
+      // 4. no login seguinte o onAuthStateChange via essa flag ligada e
       //    registrava "fetchProfile já concluído anteriormente, nada a fazer" —
       //    o perfil do NOVO usuário nunca era buscado.
       //
-      // Daí o "saio e entro de novo e preciso atualizar a página".
+      // `profileAttempted` fica de fora pelo mesmo motivo que o safetyTimer não
+      // o marca: com ele ligado e profile nulo, o ProtectedRoute trata como
+      // sessão órfã e desloga. Uma resposta descartada não é evidência de que
+      // o usuário sumiu do banco.
       if (concluiu) {
-        console.log("[AUTH] fetchProfile FINALLY — setProfileLoaded(true), setLoading(false)");
-        setProfileLoaded(true);
+        console.log("[AUTH] fetchProfile FINALLY — perfil aproveitado");
         setProfileAttempted(true);
         profileLoadedRef.current = true;
-        setLoading(false);
       } else {
-        console.log("[AUTH] fetchProfile FINALLY — resposta descartada, estado preservado");
+        console.log("[AUTH] fetchProfile FINALLY — resposta descartada; refs preservados para a próxima tentativa");
       }
       console.log("[AUTH] fetchProfile EXIT");
     }

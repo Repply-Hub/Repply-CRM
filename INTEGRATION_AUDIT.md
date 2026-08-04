@@ -226,3 +226,25 @@
 - [ ] `supabase/functions/gmail-callback/index.ts` — fallback `APP_URL` (linha ~69)
 - [ ] `supabase/functions/portal-scraper/index.ts` — URLs dos portais governamentais (se mudar de estado)
 - [ ] `supabase/functions/scrape-licencas-idema/index.ts` — URL do IDEMA-RN (se mudar de estado)
+
+---
+
+## Hospedagem (Vercel) — `vercel.json`
+
+O arquivo é curto mas cada regra existe por um motivo, e JSON não aceita comentário
+(a Vercel **recusa** propriedades desconhecidas como `"//"` dentro das regras e o
+deploy falha na validação — já aconteceu).
+
+**`rewrites`** — `/(.*) -> /index.html`. É o que faz uma SPA funcionar com URLs
+diretas. Efeito colateral importante: como é catch-all, um arquivo que **não
+existe** não devolve 404, devolve o HTML com status 200. É por isso que, depois de
+um deploy, um chunk antigo falha por *MIME type* e não por "arquivo não
+encontrado" — e por isso `src/lib/lazy-com-retry.ts` detecta pela mensagem, não
+pelo status.
+
+**`headers`**:
+
+| Caminho | Cache-Control | Por quê |
+|---|---|---|
+| `/assets/(.*)` | `max-age=31536000, immutable` | O Vite põe hash do conteúdo no nome, então um arquivo com determinado nome nunca muda. Sem isto vale o padrão da Vercel (`max-age=0, must-revalidate`) e o navegador revalida ~500 kB de JS a cada carregamento. |
+| `/` e `/index.html` | `max-age=0, must-revalidate` | O oposto: é o `index.html` que aponta para os arquivos com hash. Se ele ficar em cache, o navegador continua pedindo os arquivos da versão anterior mesmo depois de um deploy. |
