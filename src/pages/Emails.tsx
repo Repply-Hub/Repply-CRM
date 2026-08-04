@@ -10,6 +10,7 @@ import {
   Loader2,
   RefreshCw,
   Settings,
+  Archive,
   PenBox,
   Trash2,
   CheckSquare,
@@ -49,6 +50,8 @@ interface MensagemRecebida {
   criado_em: string | null;
   data_recebimento: string | null;
   snippet: string;
+  /** Endereço da caixa que recebeu, quando ela já foi desconectada. */
+  caixaOrigem: string | null;
   gmail_message_id: string | null;
   remetente: string;
   destinatarios: string[];
@@ -173,7 +176,7 @@ const Emails = () => {
       let query = supabase
         .from("email_mensagens")
         .select(
-          "id, assunto, snippet, destinatarios, remetente_email, envio_status, data_mensagem",
+          "id, assunto, snippet, destinatarios, remetente_email, envio_status, data_mensagem, caixa_origem",
           { count: "exact" },
         )
         .eq("direcao", "enviado")
@@ -200,6 +203,7 @@ const Emails = () => {
           corpo: m.snippet ?? "",
           html: "",
           status: m.envio_status ?? "enviado",
+          caixaOrigem: m.caixa_origem ?? null,
           created_at: m.data_mensagem,
           updated_at: m.data_mensagem,
         };
@@ -220,7 +224,7 @@ const Emails = () => {
       const { data, error, count } = await supabase
         .from("email_mensagens")
         .select(
-          "id, lido, data_mensagem, snippet, nylas_message_id, remetente_nome, remetente_email, destinatarios, assunto",
+          "id, lido, data_mensagem, snippet, nylas_message_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem",
           { count: "exact" },
         )
         .eq("direcao", "recebido")
@@ -241,6 +245,10 @@ const Emails = () => {
         // A listagem do Nylas devolve snippet, não body — e é o snippet que a
         // linha mostra como prévia. O corpo inteiro só é buscado ao abrir.
         snippet: m.snippet ?? "",
+        // Preenchido quando a caixa de origem foi desconectada preservando o
+        // histórico. Enquanto a conta existe fica nulo, e o endereço vem de
+        // email_contas.
+        caixaOrigem: m.caixa_origem ?? null,
         gmail_message_id: m.nylas_message_id,
         remetente: m.remetente_nome
           ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
@@ -781,7 +789,7 @@ const Emails = () => {
                   <div className="flex justify-center py-20">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
-                ) : !isConnected ? (
+                ) : !isConnected && receivedEmails.length === 0 ? (
                   // Antes do "caixa vazia": sem conta conectada a lista está
                   // vazia por falta de conexão, não por falta de e-mail, e
                   // mostrar "sua caixa está limpa" esconderia a ação necessária.
@@ -798,6 +806,23 @@ const Emails = () => {
                   </div>
                 ) : (
                   <div className="divide-y divide-border/50">
+                    {/* Sem caixa conectada mas COM histórico: quem desconectou
+                        escolheu preservar, e a promessa foi que as mensagens
+                        continuariam aqui. Antes esta aba trocava a lista inteira
+                        pelo card de conexão, então o histórico preservado ficava
+                        invisível — a opção não entregava nada. Agora o convite a
+                        reconectar aparece acima do histórico, sem escondê-lo. */}
+                    {!isConnected && (
+                      <div className="border-b bg-muted/30 px-4 py-4">
+                        <div className="mx-auto w-full max-w-2xl">
+                          <ConectarEmailCard />
+                          <p className="mt-3 text-center text-xs text-muted-foreground">
+                            Abaixo está o histórico das caixas anteriores. Ele continua
+                            disponível para consulta, mas não recebe mensagens novas.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {receivedEmails.map((email) => (
                       <div 
                         key={email.id} 
@@ -827,6 +852,21 @@ const Emails = () => {
                               mensagem — e o snippet já vinha do Nylas. */}
                           {email.snippet && (
                             <span className="text-sm text-muted-foreground opacity-60">- {email.snippet}</span>
+                          )}
+                          {/* Só aparece em mensagem de caixa já desconectada.
+                              Sem isto, depois de trocar de endereço a lista
+                              misturaria mensagens de duas caixas sem nenhuma
+                              forma de saber qual é qual — que era justamente o
+                              motivo de existir a coluna caixa_origem. */}
+                          {email.caixaOrigem && (
+                            <Badge
+                              variant="secondary"
+                              className="ml-2 h-5 shrink-0 gap-1 border-none bg-muted px-1.5 text-[11px] font-normal text-muted-foreground"
+                              title={`Recebido na caixa ${email.caixaOrigem}, que não está mais conectada`}
+                            >
+                              <Archive className="h-3 w-3" />
+                              {email.caixaOrigem}
+                            </Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-3">
