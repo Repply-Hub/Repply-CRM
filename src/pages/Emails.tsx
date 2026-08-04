@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from "@/lib/toggle-group-styles";
+import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS, TOGGLE_BADGE_CLASS } from "@/lib/toggle-group-styles";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -489,7 +489,7 @@ const Emails = () => {
                 >
                   <Inbox className="h-4 w-4" />
                   <span className="hidden sm:inline">Recebidos</span>
-                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
+                  <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
                     {totalReceived}
                   </Badge>
                 </TabsTrigger>
@@ -499,7 +499,7 @@ const Emails = () => {
                 >
                   <Send className="h-4 w-4" />
                   <span className="hidden sm:inline">Enviados</span>
-                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[20px] justify-center bg-primary/10 text-primary border-none">
+                  <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
                     {totalSent}
                   </Badge>
                 </TabsTrigger>
