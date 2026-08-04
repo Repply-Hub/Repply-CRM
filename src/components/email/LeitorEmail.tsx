@@ -58,26 +58,31 @@ export function LeitorEmail({ email, emailDaConta, onVoltar, onExcluir, onRespon
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Barra de ações. Fixa no topo para que "voltar" e "excluir" continuem
-          alcançáveis em e-mail longo, sem obrigar a rolar de volta. */}
-      <div className="flex shrink-0 items-center gap-1 border-b px-3 py-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onVoltar}
-          className="rounded-full"
-          title="Voltar para a lista"
-        >
-          <ArrowLeft className="h-5 w-5" />
+          alcançáveis em e-mail longo, sem obrigar a rolar de volta.
+          "Voltar" leva rótulo, e não só a seta: é a saída da tela, e ícone
+          solto obriga a passar o mouse para descobrir o que faz. */}
+      <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
+        <Button variant="ghost" size="sm" onClick={onVoltar} className="gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Voltar
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onExcluir}
-          className="rounded-full text-muted-foreground hover:text-destructive"
-          title="Excluir"
-        >
-          <Trash2 className="h-5 w-5" />
-        </Button>
+
+        <div className="ml-auto flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={onResponder} className="gap-2">
+            <Reply className="h-4 w-4" />
+            Responder
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onExcluir}
+            className="text-muted-foreground hover:text-destructive"
+            title="Excluir"
+            aria-label="Excluir"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -125,21 +130,41 @@ export function LeitorEmail({ email, emailDaConta, onVoltar, onExcluir, onRespon
             </div>
           )}
 
-          {/* Fundo claro fixo, mesmo no tema escuro: o HTML de e-mail é escrito
-              assumindo papel branco e costuma trazer cores próprias de texto.
-              Renderizar sobre fundo escuro produz texto preto no preto — é o
-              motivo de Gmail e Outlook manterem esta área clara sempre. */}
-          <div className="overflow-hidden rounded-lg border bg-white">
-            <div className="px-5 py-4 text-[0.9375rem] leading-relaxed text-slate-800">
-              {email.html ? (
-                <div
-                  className="prose prose-sm max-w-none text-slate-800 [&_a]:text-blue-600 [&_img]:max-w-full [&_table]:max-w-full"
-                  dangerouslySetInnerHTML={{ __html: email.html }}
-                />
-              ) : (
-                <div className="whitespace-pre-wrap">{email.corpo || ''}</div>
-              )}
-            </div>
+          {/* Papel branco por padrão, como Gmail e Outlook: o HTML de e-mail é
+              escrito assumindo fundo claro, e renderizar sobre o tema escuro
+              produziria preto no preto na maioria das mensagens.
+
+              O que NÃO fazemos aqui é impor cor ao conteúdo. A versão anterior
+              aplicava `prose` e `text-slate-800`, que sobrescrevem as cores que
+              o próprio e-mail define — num e-mail de fundo escuro com texto
+              claro (o da Make é exatamente isso), o título e os links viravam
+              escuro sobre escuro e sumiam. Cor, fonte e espaçamento são do
+              remetente; nós só damos a tela e contemos o transbordo.
+
+              `color-scheme: light` impede o navegador de reinterpretar cores
+              em modo escuro dentro deste bloco. */}
+          <div
+            className="overflow-hidden rounded-lg border bg-white"
+            style={{ colorScheme: 'light' }}
+          >
+            {email.html ? (
+              <div
+                // Espaçamento sim, cor não: um e-mail de texto simples sem
+                // wrapper próprio ficaria colado na borda. Em mensagens que
+                // trazem fundo próprio isso vira uma moldura branca fina, que é
+                // como o Gmail também as mostra.
+                //
+                // A rolagem horizontal é o preço de aceitar HTML alheio: muitos
+                // e-mails são tabelas de largura fixa (600px é o padrão do
+                // mercado) e sem isto empurrariam a página inteira.
+                className="overflow-x-auto p-4 [&_img]:h-auto [&_img]:max-w-full [&_table]:max-w-full"
+                dangerouslySetInnerHTML={{ __html: email.html }}
+              />
+            ) : (
+              <div className="whitespace-pre-wrap px-5 py-4 text-[0.9375rem] leading-relaxed text-slate-800">
+                {email.corpo || ''}
+              </div>
+            )}
           </div>
 
           {anexos.length > 0 && (
@@ -167,8 +192,9 @@ export function LeitorEmail({ email, emailDaConta, onVoltar, onExcluir, onRespon
             </div>
           )}
 
-          {/* Responder no fim do texto, e não numa barra fixa: é onde a pessoa
-              termina de ler e é onde o Gmail coloca. */}
+          {/* Responder aparece duas vezes de propósito, como no Gmail: na barra
+              do topo, alcançável a qualquer momento, e aqui — onde a pessoa
+              acabou de ler e é quando ela decide responder. */}
           <div className="mt-6 flex gap-2 pb-6">
             <Button variant="outline" className="rounded-full px-5 gap-2" onClick={onResponder}>
               <Reply className="h-4 w-4" />
