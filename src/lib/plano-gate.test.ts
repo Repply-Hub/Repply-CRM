@@ -31,6 +31,7 @@ function profileFake(
     ownerId?: string;
     deletedAt?: string | null;
     empresasComoArray?: boolean;
+    fimDoPeriodo?: string | null;
   } = {},
 ) {
   const empresa: Record<string, unknown> = {
@@ -43,7 +44,11 @@ function profileFake(
     if (over.naEmpresa) {
       empresa.plan_status = over.planStatus;
     } else {
-      const assinatura = { empresa_id: 'empresa-1', plan_status: over.planStatus };
+      const assinatura: Record<string, unknown> = {
+        empresa_id: 'empresa-1',
+        plan_status: over.planStatus,
+      };
+      if ('fimDoPeriodo' in over) assinatura.current_period_end = over.fimDoPeriodo;
       empresa.empresa_assinaturas = over.assinaturaComoArray ? [assinatura] : assinatura;
     }
   } else if (!over.semAssinatura) {
@@ -302,5 +307,45 @@ describe('podeGerenciarAssinatura', () => {
     const p = profileFake({ role: 'vendedor' });
     delete (p.empresas as Record<string, unknown>).owner_id;
     expect(podeGerenciarAssinatura(p, sessionFake())).toBe(false);
+  });
+});
+
+describe('trial liberado pelo painel de CS — vale ate a data, nao para sempre', () => {
+  const ONTEM = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const AMANHA = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+
+  it('libera enquanto o trial esta no prazo', () => {
+    expect(planoBloqueado(profileFake({ planStatus: 'trialing', fimDoPeriodo: AMANHA }))).toBe(false);
+  });
+
+  it('BLOQUEIA quando o trial venceu', () => {
+    // Sem esta regra, `trialing` nunca entra na denylist e o botao de
+    // "liberar 7 dias" viraria acesso vitalicio.
+    expect(planoBloqueado(profileFake({ planStatus: 'trialing', fimDoPeriodo: ONTEM }))).toBe(true);
+  });
+
+  it('libera trial sem data — espelha empresa_plano_ativo()', () => {
+    // O webhook do Stripe ja gravou trial sem current_period_end; trancar por
+    // causa de campo vazio custa mais que liberar a mais por alguns dias.
+    expect(planoBloqueado(profileFake({ planStatus: 'trialing', fimDoPeriodo: null }))).toBe(false);
+    expect(planoBloqueado(profileFake({ planStatus: 'trialing' }))).toBe(false);
+  });
+
+  it('data invalida nao bloqueia', () => {
+    expect(planoBloqueado(profileFake({ planStatus: 'trialing', fimDoPeriodo: 'nao-e-data' }))).toBe(false);
+  });
+
+  it('a data so vale para trial: cortesia vencida segue liberada', () => {
+    // 'active' com data no passado e o caso de quem pagou e o Stripe ainda nao
+    // confirmou a renovacao. Bloquear ali geraria falso positivo em cliente bom.
+    expect(planoBloqueado(profileFake({ planStatus: 'active', fimDoPeriodo: ONTEM }))).toBe(false);
+  });
+
+  it('admin com trial vencido continua liberado', () => {
+    expect(planoBloqueado(profileFake({ role: 'admin', planStatus: 'trialing', fimDoPeriodo: ONTEM }))).toBe(false);
+  });
+
+  it('inactive segue bloqueado, com data ou sem', () => {
+    expect(planoBloqueado(profileFake({ planStatus: 'inactive', fimDoPeriodo: AMANHA }))).toBe(true);
   });
 });

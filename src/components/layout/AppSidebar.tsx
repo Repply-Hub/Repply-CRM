@@ -34,6 +34,11 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 
+// Itens que só existem para o admin master. Conjunto nomeado em vez de uma
+// cadeia de comparações: o filtro cresceu para três ids e a próxima tela de
+// admin não pode depender de alguém lembrar de editar um `||` no meio do JSX.
+const ADMIN_ONLY_IDS = new Set(['admin_wa_instancias', 'usuarios_admin', 'admin_empresas']);
+
 export function AppSidebar() {
   const { state, setOpen, isMobile } = useSidebar();
   const { signOut, user } = useAuth();
@@ -78,7 +83,7 @@ export function AppSidebar() {
     if (!i.visible) return false;
 
     // Itens exclusivos do admin master nunca aparecem para outros perfis
-    if (!isAdmin && (i.id === 'admin_wa_instancias' || i.id === 'usuarios_admin')) return false;
+    if (!isAdmin && ADMIN_ONLY_IDS.has(i.id)) return false;
 
     if (isGestor) return true; // gestores/empresa see all visible items
     // For vendedores e cargos customizados: check if they have pode_ver permission for this module

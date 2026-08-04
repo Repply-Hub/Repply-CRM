@@ -135,6 +135,20 @@ export function nomeDaEmpresa(
   return typeof nome === 'string' && nome.trim() !== '' ? nome : padrao;
 }
 
+/**
+ * Fim do ciclo pago, quando o perfil trouxe a assinatura embutida.
+ *
+ * Só é consultado para `trialing`: nos demais status quem decide é o
+ * `plan_status`, e olhar a data mudaria o comportamento de quem paga em dia
+ * durante a janela entre o vencimento e a confirmação do Stripe.
+ */
+function fimDoPeriodo(profile: ProfileComPlano | null | undefined): Date | null {
+  const bruto = extrairAssinatura(profile)?.current_period_end;
+  if (typeof bruto !== 'string' || !bruto.trim()) return null;
+  const d = new Date(bruto);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function statusPlano(profile: ProfileComPlano | null | undefined): StatusPlano {
   // Sem profile não dá para afirmar nada sobre a assinatura.
   if (!profile) return 'desconhecido';
@@ -146,6 +160,19 @@ export function statusPlano(profile: ProfileComPlano | null | undefined): Status
 
   const status = planStatusBruto(profile);
   if (status === null) return 'desconhecido';
+
+  // Teste liberado pelo painel de CS: vale só até a data marcada. Sem esta
+  // checagem, `trialing` — que não está na denylist — seria acesso vitalício,
+  // e o botão de "liberar 7 dias" na prática liberaria para sempre.
+  //
+  // Data ausente continua liberando: o webhook do Stripe já gravou trial sem
+  // `current_period_end`, e trancar alguém por causa de um campo vazio é mais
+  // caro que liberar a mais por alguns dias. Espelha empresa_plano_ativo().
+  if (status === 'trialing') {
+    const fim = fimDoPeriodo(profile);
+    return fim && fim.getTime() <= Date.now() ? 'bloqueado' : 'liberado';
+  }
+
   return STATUS_BLOQUEADOS.includes(status) ? 'bloqueado' : 'liberado';
 }
 

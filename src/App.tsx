@@ -33,6 +33,7 @@ const AdminWhatsAppInstancias = lazy(
   () => import("./pages/AdminWhatsAppInstancias"),
 );
 const HistoricoAlteracoes = lazy(() => import("./pages/HistoricoAlteracoes"));
+const AdminEmpresas = lazy(() => import("./pages/AdminEmpresas"));
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Cadastro = lazy(() => import("./pages/Cadastro"));
@@ -242,24 +243,30 @@ const LandingRoute = () => {
 const DashboardWrapper = () => {
   const { profile } = useAuth();
   if (profile?.role === "admin") {
-    return <AdminDashboard />;
+    return <AdminEmpresas />;
   }
   return <Dashboard />;
 };
 
 // Admin master não tem acesso à página de Negócios (ver AppSidebar), então a
-// home do app cai no dashboard administrativo em vez do pipeline.
+// home do app cai no painel de empresas em vez do pipeline.
 const RootRoute = () => {
   const { profile } = useAuth();
   if (profile?.role === "admin") {
-    return <AdminDashboard />;
+    return <AdminEmpresas />;
   }
   return <Negocios defaultView="pipeline" />;
 };
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
-  if (profile && profile.role !== "admin") return <Navigate to="/app" replace />;
+  // Nega quando NÃO confirmou ser admin — inclusive com profile nulo. A versão
+  // anterior era `profile && profile.role !== 'admin'`, que libera quando o
+  // perfil não carregou: é o estado em que o safetyTimer de 10s do use-auth
+  // dispara sem perfil. Enquanto isso só expunha a tela de instâncias o dano
+  // era pequeno; agora que há uma tela listando todos os clientes e alterando
+  // plano, a dúvida tem que negar.
+  if (profile?.role !== "admin") return <Navigate to="/app" replace />;
   return <>{children}</>;
 }
 
@@ -469,6 +476,16 @@ const AppRoutes = () => (
         <ProtectedRoute>
           <AdminRoute>
             <AdminWhatsAppInstancias />
+          </AdminRoute>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/empresas"
+      element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AdminEmpresas />
           </AdminRoute>
         </ProtectedRoute>
       }
