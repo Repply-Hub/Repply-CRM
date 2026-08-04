@@ -95,16 +95,26 @@ export function ConectarEmailCard() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Desconectar {conta.email}?</AlertDialogTitle>
+              {/* O texto anterior dizia que "as mensagens já sincronizadas saem
+                  daqui", o que era verdade quando o banco apagava em cascata.
+                  Desde que desconectar passou a preservar por padrão, isso
+                  virou mentira — e mentir num diálogo de confirmação é pior do
+                  que não ter diálogo. Quem quiser apagar usa o gerenciador da
+                  caixa, na tela de e-mails, onde a escolha é explícita. */}
               <AlertDialogDescription>
-                O time deixa de enviar e receber e-mail pelo CRM, e as mensagens já
-                sincronizadas saem daqui. Nada é apagado na caixa original — você pode
-                reconectar quando quiser.
+                O time deixa de enviar e receber e-mail pelo CRM. As mensagens já
+                sincronizadas continuam aqui, marcadas com o endereço de origem, e nada
+                é apagado na caixa original — você pode reconectar quando quiser.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => desconectar()}
+                // O `catch` vazio é necessário: `desconectar` devolve a promessa
+                // do mutateAsync, que REJEITA em erro. Quem avisa o usuário é o
+                // onError do hook (toast); sem o catch sobraria uma rejeição não
+                // tratada no console a cada falha.
+                onClick={() => { void desconectar().catch(() => {}); }}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 Desconectar

@@ -1188,6 +1188,7 @@ export type Database = {
       }
       email_mensagens: {
         Row: {
+          caixa_origem: string | null
           anexos: Json
           assunto: string | null
           bcc: Json
@@ -1217,6 +1218,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          caixa_origem?: string | null
           anexos?: Json
           assunto?: string | null
           bcc?: Json
@@ -1246,6 +1248,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          caixa_origem?: string | null
           anexos?: Json
           assunto?: string | null
           bcc?: Json

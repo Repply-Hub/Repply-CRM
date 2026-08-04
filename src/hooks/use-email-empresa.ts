@@ -83,13 +83,30 @@ export function useEmailEmpresa() {
   });
 
   const desconectarMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.functions.invoke('email-desconectar', { body: {} });
+    mutationFn: async (opcoes?: { preservarMensagens?: boolean }) => {
+      // O padrão do servidor é preservar. Mandar explícito para o comportamento
+      // não depender de quem chama esquecer de decidir.
+      const preservar = opcoes?.preservarMensagens ?? true;
+      const { data, error } = await supabase.functions.invoke('email-desconectar', {
+        body: { preservar_mensagens: preservar },
+      });
       if (error) throw await erroLegivelDaFunction(error, 'Não foi possível desconectar');
+      return data as { preservou?: boolean; mensagens?: number } | null;
     },
-    onSuccess: () => {
+    onSuccess: (r) => {
       queryClient.invalidateQueries({ queryKey: ['email_conta'] });
-      toast.success('Caixa de e-mail desconectada.');
+      // As listas apontavam para uma conta que não existe mais.
+      queryClient.invalidateQueries({ queryKey: ['received_emails'] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+
+      const n = r?.mensagens ?? 0;
+      if (r?.preservou === false && n > 0) {
+        toast.success(`Caixa desconectada. ${n} ${n === 1 ? 'mensagem apagada' : 'mensagens apagadas'}.`);
+      } else if (r?.preservou && n > 0) {
+        toast.success(`Caixa desconectada. ${n} ${n === 1 ? 'mensagem mantida' : 'mensagens mantidas'} no histórico.`);
+      } else {
+        toast.success('Caixa de e-mail desconectada.');
+      }
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -226,7 +243,16 @@ export function useEmailEmpresa() {
   return {
     conta: conta ?? null,
     conectar: (provedor: ProvedorEmail) => conectarMutation.mutate(provedor),
-    desconectar: () => desconectarMutation.mutate(),
+    /** `preservarMensagens` decide o destino do histórico já sincronizado. */
+    desconectar: (opcoes?: { preservarMensagens?: boolean }) =>
+      desconectarMutation.mutateAsync(opcoes),
+    isDisconnecting: desconectarMutation.isPending,
+    /**
+     * Quem pode ligar/desligar a caixa da empresa. Espelha a lista que a Edge
+     * Function `email-desconectar` valida no servidor — aqui é só para não
+     * mostrar um botão que vai falhar; a barreira de verdade é lá.
+     */
+    podeGerenciarCaixa: ['admin', 'empresa', 'gestor'].includes(profile?.role ?? ''),
     enviarEmail: (to: string | string[], subject: string, body: string) =>
       enviarMutation.mutateAsync({ to, subject, body }),
     enviar: enviarMutation.mutateAsync,

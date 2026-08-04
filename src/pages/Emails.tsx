@@ -9,6 +9,7 @@ import {
   Search,
   Loader2,
   RefreshCw,
+  Settings,
   PenBox,
   Trash2,
   CheckSquare,
@@ -39,6 +40,7 @@ import { useEmailEmpresa } from "@/hooks/use-email-empresa";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
 import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
+import { GerenciarCaixaDialog } from "@/components/email/GerenciarCaixaDialog";
 
 /** Uma linha da caixa de entrada, no formato que a listagem devolve. */
 interface MensagemRecebida {
@@ -69,6 +71,7 @@ const Emails = () => {
   const [selectedEmail, setSelectedEmail] = useState<EmailAberto | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [respondendo, setRespondendo] = useState(false);
+  const [gerenciarCaixaAberto, setGerenciarCaixaAberto] = useState(false);
   const [emailToDelete, setEmailToDelete] = useState<{ id: string; type: "sent" | "received" } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>("received");
@@ -80,8 +83,8 @@ const Emails = () => {
   // (isConnected/connectedEmail/sendEmail), então a troca é de import. A
   // diferença de modelo é que a caixa agora é da EMPRESA, compartilhada pelo
   // time, e não uma conta por usuário.
-  const { isConnected, connectedEmail, enviarEmail: sendEmail, sincronizar, isSyncing, carregarCorpo } =
-    useEmailEmpresa();
+  const { isConnected, connectedEmail, enviarEmail: sendEmail, sincronizar, isSyncing, carregarCorpo,
+    podeGerenciarCaixa } = useEmailEmpresa();
   const [formData, setFormData] = useState({
     destinatario: "",
     assunto: "",
@@ -653,6 +656,24 @@ const Emails = () => {
                   />
                 </Button>
               )}
+              {/* Único caminho para trocar de caixa. O card de conexão — que tem
+                  o botão de desconectar — só aparece quando NÃO há caixa
+                  conectada, então depois de conectar não sobrava saída.
+                  Escondido de quem não é dono nem gestor só para não oferecer
+                  uma ação que o servidor vai recusar; a barreira real está na
+                  Edge Function. */}
+              {isConnected && podeGerenciarCaixa && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full hover:bg-muted shrink-0"
+                  onClick={() => setGerenciarCaixaAberto(true)}
+                  title={`Gerenciar a caixa conectada (${connectedEmail ?? ""})`}
+                  aria-label="Gerenciar a caixa de e-mail da empresa"
+                >
+                  <Settings className="h-5 w-5 text-muted-foreground" />
+                </Button>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -863,6 +884,11 @@ const Emails = () => {
       </Tabs>
 
       {compositor}
+
+      <GerenciarCaixaDialog
+        open={gerenciarCaixaAberto}
+        onOpenChange={setGerenciarCaixaAberto}
+      />
 
       <AlertDialog open={!!emailToDelete} onOpenChange={(open) => !open && setEmailToDelete(null)}>
         <AlertDialogContent>

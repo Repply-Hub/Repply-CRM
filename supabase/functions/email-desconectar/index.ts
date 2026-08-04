@@ -43,9 +43,22 @@ serve(async (req) => {
       return json({ error: "Só o gestor da empresa pode desconectar a caixa." }, 403);
     }
 
+    // Quem desconecta escolhe o destino do histórico. O padrão é PRESERVAR:
+    // apagar correspondência é irreversível, e o caso comum aqui é trocar de
+    // endereço, não abandonar o que já foi recebido. Só apaga quem pedir.
+    let preservarMensagens = true;
+    try {
+      const corpo = await req.json();
+      if (corpo && typeof corpo.preservar_mensagens === "boolean") {
+        preservarMensagens = corpo.preservar_mensagens;
+      }
+    } catch {
+      // Corpo vazio ou inválido: fica no padrão seguro.
+    }
+
     const { data: conta } = await supabase
       .from("email_contas")
-      .select("id")
+      .select("id, email")
       .eq("empresa_id", caller.empresa_id)
       .maybeSingle();
 
@@ -82,7 +95,50 @@ serve(async (req) => {
       }
     }
 
-    // O CASCADE em email_conta_grants e email_mensagens leva o resto junto.
+    // O histórico é resolvido ANTES de apagar a conta, porque é a remoção dela
+    // que dispara o comportamento do banco (hoje ON DELETE SET NULL).
+    let mensagensAfetadas = 0;
+
+    if (preservarMensagens) {
+      // Carimba de qual caixa cada mensagem veio. Depois que a conta some, o
+      // endereço não existe em lugar nenhum — e sem ele o histórico preservado
+      // vira uma lista de mensagens de origem desconhecida, ainda mais depois
+      // de conectar outro endereço.
+      const { count, error: erroCarimbo } = await supabase
+        .from("email_mensagens")
+        .update({ caixa_origem: conta.email }, { count: "exact" })
+        .eq("conta_id", conta.id)
+        .is("caixa_origem", null);
+
+      if (erroCarimbo) {
+        console.error("[email-desconectar] falha ao carimbar a origem:", erroCarimbo);
+        return json(
+          { error: "Não foi possível preparar o histórico. Nada foi alterado." },
+          500,
+        );
+      }
+      mensagensAfetadas = count ?? 0;
+    } else {
+      // Apagar é explícito desde que o vínculo virou ON DELETE SET NULL: sem
+      // isto a conta some e as mensagens ficam. Feito antes de apagar a conta
+      // para que uma falha aqui não deixe órfãs que ninguém pediu.
+      const { count, error: erroApagar } = await supabase
+        .from("email_mensagens")
+        .delete({ count: "exact" })
+        .eq("conta_id", conta.id);
+
+      if (erroApagar) {
+        console.error("[email-desconectar] falha ao apagar as mensagens:", erroApagar);
+        return json(
+          { error: "Não foi possível apagar as mensagens. Nada foi alterado." },
+          500,
+        );
+      }
+      mensagensAfetadas = count ?? 0;
+    }
+
+    // O CASCADE em email_conta_grants leva a credencial junto. As mensagens
+    // seguem a regra resolvida acima.
     const { error: erroDelete } = await supabase
       .from("email_contas")
       .delete()
@@ -93,8 +149,11 @@ serve(async (req) => {
       return json({ error: "Acesso revogado, mas o registro não foi limpo. Recarregue a página." }, 500);
     }
 
-    console.log(`[email-desconectar] empresa=${caller.empresa_id}`);
-    return json({ ok: true });
+    console.log(
+      `[email-desconectar] empresa=${caller.empresa_id} caixa=${conta.email} ` +
+        `historico=${preservarMensagens ? "preservado" : "apagado"} mensagens=${mensagensAfetadas}`,
+    );
+    return json({ ok: true, preservou: preservarMensagens, mensagens: mensagensAfetadas });
   } catch (err) {
     console.error("[email-desconectar]", err);
     return json({ error: "Erro inesperado ao desconectar.", detail: String(err) }, 500);
