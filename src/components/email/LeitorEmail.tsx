@@ -12,6 +12,8 @@ export interface EmailAberto {
   corpo?: string | null;
   /** Prévia curta vinda do provedor; é o que aparece enquanto o corpo carrega. */
   snippet?: string | null;
+  /** Endereço da caixa de origem, quando ela já foi desconectada. */
+  caixaOrigem?: string | null;
   criado_em?: string | null;
   created_at?: string | null;
   carregandoCorpo?: boolean;
@@ -133,6 +135,18 @@ export function LeitorEmail({ email, emailDaConta, onVoltar, onExcluir, onRespon
             <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
               Carregando o conteúdo completo...
+            </div>
+          )}
+
+          {/* Mensagem de caixa desconectada cujo corpo nunca chegou a ser
+              buscado. Dizer isso é melhor do que mostrar só a prévia e deixar a
+              pessoa achando que o e-mail veio truncado ou que algo falhou. */}
+          {!email.carregandoCorpo && !email.html && email.caixaOrigem && (
+            <div className="mb-4 rounded-lg border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+              Só a prévia desta mensagem foi guardada. Ela veio de{' '}
+              <span className="font-medium text-foreground">{email.caixaOrigem}</span>, uma caixa
+              que não está mais conectada — o conteúdo completo continua na conta original, no
+              provedor.
             </div>
           )}
 

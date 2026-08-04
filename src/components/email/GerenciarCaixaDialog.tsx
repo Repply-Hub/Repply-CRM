@@ -36,19 +36,38 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
   const { conta, connectedEmail, desconectar, isDisconnecting } = useEmailEmpresa();
   const [confirmando, setConfirmando] = useState<'preservar' | 'apagar' | null>(null);
 
-  // Contagem real, para a confirmação dizer o tamanho do que está em jogo em vez
-  // de um genérico "as mensagens serão apagadas".
-  const { data: totalMensagens } = useQuery({
+  /**
+   * Quanto está em jogo — e, principalmente, QUANTO do que sobra dá para ler.
+   *
+   * A distinção não é detalhe: a sincronização nunca baixa o corpo das
+   * mensagens, só a prévia. O corpo é buscado sob demanda, quando alguém abre.
+   * Na prática a esmagadora maioria do histórico existe só como assunto +
+   * prévia — e, depois de desconectar, o corpo fica inalcançável para sempre,
+   * porque buscá-lo exigiria a credencial que acabou de ser revogada.
+   *
+   * Dizer só "N mensagens" seria tecnicamente verdadeiro e enganoso: a pessoa
+   * escolheria "manter" imaginando um arquivo consultável.
+   */
+  const { data: contagem } = useQuery({
     queryKey: ['email_mensagens_da_conta', conta?.id],
     queryFn: async () => {
-      const { count } = await supabase
-        .from('email_mensagens')
-        .select('id', { count: 'exact', head: true })
-        .eq('conta_id', conta!.id);
-      return count ?? 0;
+      const base = () =>
+        supabase
+          .from('email_mensagens')
+          .select('id', { count: 'exact', head: true })
+          .eq('conta_id', conta!.id);
+
+      const [{ count: total }, { count: completas }] = await Promise.all([
+        base(),
+        base().not('corpo_html', 'is', null),
+      ]);
+      return { total: total ?? 0, completas: completas ?? 0 };
     },
     enabled: open && !!conta?.id,
   });
+
+  const totalMensagens = contagem?.total;
+  const soPrevia = contagem ? contagem.total - contagem.completas : 0;
 
   const executar = async (preservar: boolean) => {
     try {
@@ -108,7 +127,15 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
                 <span className="flex flex-col gap-0.5">
                   <span className="font-medium">Desconectar e manter o histórico</span>
                   <span className="text-xs font-normal text-muted-foreground">
-                    As mensagens continuam no CRM, marcadas com o endereço de origem.
+                    {contagem && soPrevia > 0 ? (
+                      <>
+                        {contagem.completas} {contagem.completas === 1 ? 'mensagem fica' : 'mensagens ficam'}{' '}
+                        completa{contagem.completas === 1 ? '' : 's'}; as outras {soPrevia} ficam só com
+                        remetente, assunto e prévia — o conteúdo delas não será mais recuperável.
+                      </>
+                    ) : (
+                      <>As mensagens continuam no CRM, marcadas com o endereço de origem.</>
+                    )}
                   </span>
                 </span>
               </Button>
@@ -139,9 +166,18 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
                     : 'Desconectar esta caixa?'}
                 </p>
                 <p className="text-muted-foreground">
-                  {confirmando === 'apagar'
-                    ? 'Não há como desfazer pelo CRM. As mensagens originais continuam na conta de e-mail no provedor — aqui elas somem.'
-                    : 'O time perde o acesso a esta caixa pelo CRM até alguém conectar outra. As mensagens já recebidas ficam.'}
+                  {confirmando === 'apagar' ? (
+                    'Não há como desfazer pelo CRM. As mensagens originais continuam na conta de e-mail no provedor — aqui elas somem.'
+                  ) : soPrevia > 0 ? (
+                    <>
+                      O time perde o acesso a esta caixa pelo CRM até alguém conectar outra. O
+                      histórico fica para consulta, mas o conteúdo completo de {soPrevia}{' '}
+                      {soPrevia === 1 ? 'mensagem' : 'mensagens'} não terá como ser recuperado — ele
+                      continua apenas na conta original, no provedor.
+                    </>
+                  ) : (
+                    'O time perde o acesso a esta caixa pelo CRM até alguém conectar outra. As mensagens já recebidas ficam.'
+                  )}
                 </p>
               </div>
             </div>

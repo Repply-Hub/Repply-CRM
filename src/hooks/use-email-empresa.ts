@@ -165,7 +165,7 @@ export function useEmailEmpresa() {
 
     const { data: linha } = await supabase
       .from('email_mensagens')
-      .select('corpo_html')
+      .select('corpo_html, conta_id')
       .eq('id', mensagemId)
       .maybeSingle();
 
@@ -173,6 +173,16 @@ export function useEmailEmpresa() {
       queryClient.setQueryData(chave, linha.corpo_html);
       return linha.corpo_html;
     }
+
+    // Mensagem de caixa já desconectada (conta_id nulo) e sem corpo em cache: o
+    // conteúdo completo não existe mais em lugar nenhum acessível — buscá-lo
+    // exigiria a credencial da caixa, que foi revogada no provedor.
+    //
+    // Sem esta saída, a chamada iria à Edge Function só para receber 409 e o
+    // usuário veria "Credencial da caixa não encontrada. Reconecte." — que
+    // engana duas vezes: sugere um defeito onde houve uma escolha, e propõe uma
+    // ação que não recupera este corpo. Melhor ficar com a prévia, em silêncio.
+    if (linha && linha.conta_id === null) return null;
 
     const { data, error } = await supabase.functions.invoke('email-mensagem', {
       body: { mensagem_id: mensagemId },
