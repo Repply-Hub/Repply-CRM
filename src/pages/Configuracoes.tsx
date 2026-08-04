@@ -24,7 +24,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
 import { DominioTab } from '@/components/configuracoes/DominioTab';
-import { GmailSettings } from '@/components/email/GmailSettings';
 import { WhatsAppInstanciasTab } from '@/components/configuracoes/WhatsAppInstanciasTab';
 import { EmpresasTab } from '@/components/configuracoes/EmpresasTab';
 
@@ -401,7 +400,12 @@ function ProfileTab() {
         )}
 
         <CustomizeTab />
-        <GmailSettings />
+        {/* GmailSettings sai daqui: a conexão de e-mail passou a ser da EMPRESA,
+            via Nylas, e mora na própria aba de E-mails. Deixar os dois caminhos
+            visíveis daria duas portas para conectar e-mail fazendo coisas
+            diferentes — e esta liga uma conta por usuário, que não é mais o
+            modelo. O componente e as functions do Gmail continuam no repo até o
+            Nylas provar estabilidade; só não têm mais entrada na interface. */}
       </div>
 
       <div className="space-y-6">
