@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import {
   useEmpresasCS, useUsuariosDaEmpresa, useDefinirPlano,
-  situacaoDaEmpresa, ROTULO_SITUACAO,
+  situacaoDaEmpresa, diasDeTrial, ROTULO_SITUACAO,
   type EmpresaCS, type SituacaoCS, type AcaoPlano,
 } from '@/hooks/use-admin-cs';
 
@@ -67,6 +67,7 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
   const definirPlano = useDefinirPlano();
 
   const situacao = situacaoDaEmpresa(empresa);
+  const dias = diasDeTrial(empresa);
   const acesso = desde(empresa.ultimo_acesso);
   // 14 dias sem ninguém entrar é o limiar que separa "operando" de "esfriando".
   const frio = acesso.dias !== null && acesso.dias >= 14;
@@ -150,8 +151,17 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
               </Button>
               <span className="ml-auto self-center text-xs text-muted-foreground">
                 código <span className="font-mono">{empresa.codigo_acesso}</span>
-                {empresa.current_period_end && (
-                  <> · vence {new Date(empresa.current_period_end).toLocaleDateString('pt-BR')}</>
+                {dias !== null && (
+                  <>
+                    {' · '}
+                    {/* Dias restantes, não a data: "vence em 2 dias" é o que faz
+                        alguém agir; "vence 11/08" exige contar de cabeça. */}
+                    <span className={dias <= 2 ? 'font-medium text-amber-600' : undefined}>
+                      {dias > 0
+                        ? `teste vence em ${dias} ${dias === 1 ? 'dia' : 'dias'}`
+                        : `teste venceu há ${Math.abs(dias)} ${Math.abs(dias) === 1 ? 'dia' : 'dias'}`}
+                    </span>
+                  </>
                 )}
               </span>
             </div>

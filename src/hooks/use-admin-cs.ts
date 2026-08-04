@@ -46,44 +46,14 @@ export interface UsuarioCS {
 export type AcaoPlano = 'trial' | 'cortesia' | 'bloquear';
 
 /** Situação comercial derivada, que é como a tela agrupa as empresas. */
-export type SituacaoCS = 'pagante' | 'trial' | 'trial_vencido' | 'cortesia' | 'nunca_pagou' | 'bloqueada';
-
-/**
- * Traduz o par (plan_status, origem) na leitura comercial.
- *
- * O banco guarda o estado técnico; a tela precisa da pergunta de negócio —
- * "essa empresa paga, testa ou está parada?". Manter a tradução aqui, e não
- * espalhada no JSX, é o que permite mudar a régua num lugar só.
- */
-export function situacaoDaEmpresa(e: EmpresaCS): SituacaoCS {
-  const status = (e.plan_status ?? '').toLowerCase();
-  const origem = (e.origem ?? '').toLowerCase();
-
-  if (status === 'trialing') {
-    const fim = e.current_period_end ? new Date(e.current_period_end) : null;
-    return fim && fim.getTime() <= Date.now() ? 'trial_vencido' : 'trial';
-  }
-  if (['inactive', 'canceled', 'unpaid'].includes(status)) {
-    // Nunca teve customer no Stripe = cadastrou e não chegou a pagar. Já ter
-    // tido customer significa que pagou e depois caiu — são dois trabalhos de
-    // CS diferentes: um é ativação, o outro é retenção.
-    return e.tem_customer_stripe ? 'bloqueada' : 'nunca_pagou';
-  }
-  // 'legacy' são as empresas que já usavam antes de existir cobrança;
-  // 'cortesia' foram liberadas de propósito pelo painel. Nenhuma das duas paga,
-  // e é isso que interessa na leitura comercial.
-  if (origem === 'legacy' || origem === 'cortesia') return 'cortesia';
-  return 'pagante';
-}
-
-export const ROTULO_SITUACAO: Record<SituacaoCS, string> = {
-  pagante: 'Pagante',
-  trial: 'Em teste',
-  trial_vencido: 'Teste vencido',
-  cortesia: 'Cortesia',
-  nunca_pagou: 'Cadastrou, não pagou',
-  bloqueada: 'Pagamento parado',
-};
+// A classificação comercial vive em lib/situacao-empresa.ts: é regra de negócio
+// pura, testável sem mock, e este hook não deve ser dependência para exercitá-la.
+export {
+  situacaoDaEmpresa,
+  diasDeTrial,
+  ROTULO_SITUACAO,
+  type SituacaoCS,
+} from '@/lib/situacao-empresa';
 
 export function useEmpresasCS() {
   return useQuery({
