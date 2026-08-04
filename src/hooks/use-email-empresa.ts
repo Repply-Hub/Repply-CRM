@@ -97,7 +97,10 @@ export function useEmailEmpresa() {
   const sincronizarMutation = useMutation({
     mutationFn: async (opcoes?: { limit?: number; backfill?: boolean }) => {
       const { data, error } = await supabase.functions.invoke('email-sync', {
-        body: { limit: opcoes?.limit ?? 20, backfill: opcoes?.backfill ?? false },
+        // backfill por padrão: quando a pessoa CLICA em atualizar, ela quer as
+        // N mais recentes da caixa, não "o que mudou desde a última varredura".
+        // O modo incremental serve ao cron, que roda sozinho e sem plateia.
+        body: { limit: opcoes?.limit ?? 20, backfill: opcoes?.backfill ?? true },
       });
       if (error) throw await erroLegivelDaFunction(error, 'Não foi possível sincronizar');
       return data as { novas: number; atualizadas: number; erros?: string[] };

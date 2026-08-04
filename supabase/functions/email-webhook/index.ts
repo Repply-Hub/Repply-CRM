@@ -174,10 +174,11 @@ serve(async (req) => {
         return json({ error: "persist_failed" }, 500);
       }
 
-      await supabase
-        .from("email_contas")
-        .update({ ultima_sync_em: new Date().toISOString() })
-        .eq("id", conta.id);
+      // NÃO mexer em `ultima_sync_em` aqui. Esse campo é o cursor da varredura
+      // do email-sync ("até onde já puxamos a caixa"), não um carimbo de última
+      // atividade. Atualizá-lo a cada mensagem recebida fazia o sync seguinte
+      // pedir ao Nylas só o que chegou depois de agora — ou seja, nada — e o
+      // botão de sincronizar não trazia mensagem alguma.
     }
 
     return json({ received: true });
