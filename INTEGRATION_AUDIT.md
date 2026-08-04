@@ -235,16 +235,31 @@ O arquivo é curto mas cada regra existe por um motivo, e JSON não aceita comen
 (a Vercel **recusa** propriedades desconhecidas como `"//"` dentro das regras e o
 deploy falha na validação — já aconteceu).
 
-**`rewrites`** — `/(.*) -> /index.html`. É o que faz uma SPA funcionar com URLs
-diretas. Efeito colateral importante: como é catch-all, um arquivo que **não
-existe** não devolve 404, devolve o HTML com status 200. É por isso que, depois de
-um deploy, um chunk antigo falha por *MIME type* e não por "arquivo não
-encontrado" — e por isso `src/lib/lazy-com-retry.ts` detecta pela mensagem, não
-pelo status.
+**`rewrites`** — `/((?!assets/).*) -> /index.html`. É o que faz uma SPA funcionar
+com URLs diretas.
+
+A exclusão de `/assets` **não é decoração**. Enquanto o padrão era catch-all
+(`/(.*)`), um arquivo inexistente não devolvia 404: devolvia o HTML com status
+200. Somado ao cache longo abaixo, isso fazia o navegador guardar **HTML sob a
+URL de um `.js`** — e, como o nome do arquivo deriva do conteúdo, um trecho
+revertido no futuro voltaria com o mesmo nome e seria servido do cache
+envenenado, sem consulta ao servidor e sem conserto por recarregamento. Com a
+exclusão, um asset ausente volta a ser 404 de verdade.
+
+> Ao mexer neste padrão, valide antes com `path-to-regexp` contra deep links
+> reais (`/clientes`, `/pedidos/:id/editar`): errar aqui faz toda navegação
+> direta virar 404 em produção.
 
 **`headers`**:
 
 | Caminho | Cache-Control | Por quê |
 |---|---|---|
-| `/assets/(.*)` | `max-age=31536000, immutable` | O Vite põe hash do conteúdo no nome, então um arquivo com determinado nome nunca muda. Sem isto vale o padrão da Vercel (`max-age=0, must-revalidate`) e o navegador revalida ~500 kB de JS a cada carregamento. |
+| `/assets/(.*)` | `max-age=604800` (7 dias) | O Vite põe hash do conteúdo no nome, então o arquivo nunca muda e poderia ser cacheado para sempre. Sem cache nenhum vale o padrão da Vercel (`max-age=0, must-revalidate`) e o navegador revalida ~500 kB de JS a cada carregamento. |
 | `/` e `/index.html` | `max-age=0, must-revalidate` | O oposto: é o `index.html` que aponta para os arquivos com hash. Se ele ficar em cache, o navegador continua pedindo os arquivos da versão anterior mesmo depois de um deploy. |
+
+**Por que 7 dias e não `immutable` de 1 ano**, que seria o padrão da indústria para
+arquivo com hash: a Vercel aplica o cabeçalho também à resposta **404** de um
+asset que sumiu, e não há como condicionar cabeçalho a status. Um 404 guardado
+por um ano recria o mesmo problema do cache envenenado. Sete dias cobrem
+praticamente todo o ganho de visita repetida e fazem qualquer 404 acidental se
+curar sozinho numa semana, em vez de exigir limpar o cache do navegador.
