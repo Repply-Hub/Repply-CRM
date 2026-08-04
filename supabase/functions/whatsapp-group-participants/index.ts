@@ -68,6 +68,34 @@ serve(async (req) => {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // A conversa acima foi lida com SERVICE_ROLE, que ignora RLS. Esta é a mais
+    // grave das três funções sem checagem de empresa: ela devolve a LISTA DE
+    // PARTICIPANTES de um grupo — nomes e telefones de terceiros. Sem a
+    // comparação abaixo, qualquer usuário autenticado de QUALQUER empresa lia os
+    // participantes do grupo de outra empresa só passando o id, que vem do corpo
+    // da requisição.
+    //
+    // A checagem precisa vir ANTES dos retornos rápidos logo abaixo (grupo vazio
+    // e participantes já em cache) — senão o cache entregaria a lista sem nunca
+    // passar por aqui.
+    //
+    // 404 em vez de 403 para não confirmar que o id existe.
+    const { data: quemChamou } = await supabase
+      .from("usuarios")
+      .select("empresa_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!quemChamou?.empresa_id || quemChamou.empresa_id !== conversa.empresa_id) {
+      console.warn(
+        `[whatsapp-group-participants] acesso negado: user=${user.id} tentou a conversa ${conversa_id} da empresa ${conversa.empresa_id}`,
+      );
+      return new Response(JSON.stringify({ error: "Conversa não encontrada" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!conversa.is_group) {
       return new Response(JSON.stringify({ participantes: [] }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },

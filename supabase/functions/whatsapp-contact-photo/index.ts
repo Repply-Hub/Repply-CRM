@@ -88,6 +88,28 @@ serve(async (req) => {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // A conversa acima foi lida com SERVICE_ROLE, que ignora RLS. Sem esta
+    // checagem, qualquer usuário autenticado — de QUALQUER empresa — buscava a
+    // foto de perfil de um contato de outra empresa passando o id, e o telefone
+    // vinha junto. O `conversa_id` vem do corpo: é entrada do cliente.
+    //
+    // 404 em vez de 403 para não confirmar que o id existe.
+    const { data: quemChamou } = await supabase
+      .from("usuarios")
+      .select("empresa_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!quemChamou?.empresa_id || quemChamou.empresa_id !== conversa.empresa_id) {
+      console.warn(
+        `[whatsapp-contact-photo] acesso negado: user=${user.id} tentou a conversa ${conversa_id} da empresa ${conversa.empresa_id}`,
+      );
+      return new Response(JSON.stringify({ error: "Conversa não encontrada" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // foto_perfil_expires_at nulo cobre tanto fotos salvas antes desta coluna
     // existir quanto respostas da uazapi sem o parâmetro `oe` — em ambos os casos
     // não sabemos se ainda é válida, então força uma revalidação em vez de

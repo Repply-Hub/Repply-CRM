@@ -58,6 +58,29 @@ serve(async (req) => {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // A conversa acima foi lida com SERVICE_ROLE, que ignora RLS. Sem esta
+    // checagem, qualquer usuário autenticado — de QUALQUER empresa — renomeava a
+    // conversa de outra empresa só passando o id, e ainda recebia o telefone do
+    // contato de volta. O `conversa_id` vem do corpo da requisição: é entrada do
+    // cliente, não credencial.
+    //
+    // Responde 404, e não 403, de propósito: 403 confirmaria que aquele id
+    // existe, o que já é informação sobre a base de outra empresa.
+    const { data: quemChamou } = await supabase
+      .from("usuarios")
+      .select("empresa_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!quemChamou?.empresa_id || quemChamou.empresa_id !== conversa.empresa_id) {
+      console.warn(
+        `[whatsapp-contact-rename] acesso negado: user=${user.id} tentou a conversa ${conversa_id} da empresa ${conversa.empresa_id}`,
+      );
+      return new Response(JSON.stringify({ error: "Conversa não encontrada" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     // /contact/add da uazapi só edita a agenda de contatos individuais — grupos
     // não têm entrada de agenda equivalente, então o nome só é atualizado localmente.
     if (conversa.is_group) {
