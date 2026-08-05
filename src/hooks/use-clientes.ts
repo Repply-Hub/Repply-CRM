@@ -25,7 +25,16 @@ async function fetchAllClientes() {
   return allData;
 }
 
-export function useClientes() {
+/**
+ * Todos os clientes da empresa, paginando de 1000 em 1000.
+ *
+ * `enabled` existe porque esta consulta é CARA — 1.305 clientes com `obras(*)`
+ * e um join de usuários — e telas que só precisam dela dentro de um diálogo
+ * (o "Nova tarefa" do WhatsApp, por exemplo) a disparavam na abertura da tela,
+ * toda vez, para um diálogo que quase nunca é aberto. Quem não passa nada
+ * continua com o comportamento de antes.
+ */
+export function useClientes(opcoes?: { enabled?: boolean }) {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
 
@@ -35,6 +44,7 @@ export function useClientes() {
       if (isAdmin) return [];
       return fetchAllClientes();
     },
+    enabled: opcoes?.enabled ?? true,
   });
 }
 

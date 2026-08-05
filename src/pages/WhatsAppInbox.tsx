@@ -3330,15 +3330,34 @@ export default function WhatsAppInbox() {
   const conversaAtiva = conversas.find((c) => c.id === conversaAtivaId) ?? null;
   const [atribuicaoModalOpen, setAtribuicaoModalOpen] = useState(false);
 
-  // Mesmo padrão de formulário/campos do modal de criação em src/pages/Tarefas.tsx.
+  const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
+
+  /**
+   * Mesmo padrão de formulário/campos do modal de criação em src/pages/Tarefas.tsx.
+   *
+   * As três consultas abaixo alimentam APENAS o diálogo "Nova tarefa", e eram
+   * disparadas na abertura da tela de WhatsApp — toda vez, para todo mundo.
+   * `useClientes()` pagina 1.305 clientes de 1000 em 1000 trazendo `obras(*)`;
+   * `usePedidosOptions` traz até 500 pedidos com dois joins. Um diálogo que
+   * quase nunca é aberto custava isso a cada entrada na inbox.
+   *
+   * Agora só carregam quando o diálogo abre. O atraso de abrir é o preço, e é
+   * o certo: quem abre espera; quem não abre não paga.
+   */
   const createTarefa = useCreateTarefa();
   const empresaIdTarefas =
     profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
-  const { data: clientesTarefas = [] } = useClientes();
-  const { data: pedidosOptionsTarefas = [] } =
-    usePedidosOptions(empresaIdTarefas);
+
+  // As colunas do kanban CONTINUAM sempre carregadas: são poucas linhas de
+  // configuração, e `abrirNovaTarefa` usa a primeira delas para preencher o
+  // status — adiar isso faria a primeira abertura cair no fallback "pendente".
   const { data: kanbanColunasTarefas = [] } =
     useTarefasKanbanColunas(empresaIdTarefas);
+
+  // Estas duas, sim, só quando o diálogo abre.
+  const { data: clientesTarefas = [] } = useClientes({ enabled: novaTarefaOpen });
+  const { data: pedidosOptionsTarefas = [] } =
+    usePedidosOptions(novaTarefaOpen ? empresaIdTarefas : undefined);
   const KANBAN_STAGES_TAREFAS = useMemo(
     () =>
       kanbanColunasTarefas.map((c) => ({
@@ -3348,7 +3367,6 @@ export default function WhatsAppInbox() {
       })),
     [kanbanColunasTarefas],
   );
-  const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
   const [tarefaForm, setTarefaForm] = useState({
     titulo: "",
     descricao: "",
@@ -7268,7 +7286,17 @@ export default function WhatsAppInbox() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {conversaAtiva && (
+      {/* `leadSheetOpen` na condição, e não só `conversaAtiva`.
+
+          Montado sempre que havia conversa aberta, o painel rodava os próprios
+          hooks mesmo invisível: `useWaMensagens(conversa.id)` para a MESMA
+          conversa já carregada pela tela, mais `useTarefasPorConversa`. E como o
+          nome do canal realtime inclui `Date.now()`, os dois hooks abriam canais
+          DISTINTOS para a mesma conversa — sem dedupe — e dois `refetchInterval`
+          de 20 s. Toda conversa aberta custava o dobro de consulta, o dobro de
+          canal e o dobro de polling, para um painel que quase sempre está
+          fechado. */}
+      {conversaAtiva && leadSheetOpen && (
         <LeadSheet
           conversa={conversaAtiva}
           participantesGrupo={participantesGrupo}

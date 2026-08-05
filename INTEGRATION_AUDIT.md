@@ -128,6 +128,34 @@
 3. Webhook URL se atualiza automaticamente via `SUPABASE_URL` — ok se Supabase for novo
 4. Instâncias individuais (`api_key` em `configuracoes_wapi`) são criadas pelo fluxo de provisionamento — não precisam ser migradas manualmente
 
+#### Risco aceito: o token da instância está legível em `webhook_debug`
+
+Medido em 05/08/2026, e **mantido por decisão do dono do produto** — registrado aqui para
+que ninguém o descubra de novo achando que é novidade.
+
+- `public.webhook_debug` está com **RLS desabilitada** e tem ~61 mil linhas.
+- **~1.621 dessas linhas contêm o `api_key` da instância conectada em texto plano** — o valor
+  bate exatamente com `configuracoes_wapi.api_key`. A uazapi manda o próprio token dentro do
+  payload do webhook, e nós gravamos o payload inteiro.
+- Consequência: quem tiver a chave publicável do app (que é pública, vai no bundle do
+  navegador) lê o token e passa a poder enviar, ler e desconectar o WhatsApp da empresa
+  direto na API da uazapi.
+- Relacionado: o frontend também fala direto com a uazapi usando esse token, no fluxo de QR
+  (`src/hooks/use-whatsapp-inbox.ts`, `useWaConnect` e vizinhos), então ele trafega no
+  navegador de qualquer forma.
+
+Se um dia for corrigir, a ordem importa: remover o token das linhas existentes, parar de
+gravá-lo, criar a policy, **e só então** habilitar a RLS — habilitar RLS sem policy tranca
+todo mundo, inclusive o diagnóstico.
+
+#### Grupos: o JID é literal
+
+`whatsapp_conversas.telefone` guarda o JID do grupo **sem** o sufixo `@g.us`, e em dois
+formatos: moderno (`120363…`, só dígitos) e legado (`5511988345626-1425926780`, com hífen).
+Qualquer código que monte o destino **não pode** aplicar `replace(/\D/g,"")` — isso apaga o
+hífen e produz um JID inexistente, para o qual a uazapi responde 200 com um chat vazio e
+não entrega nada. Foi um bug real, silencioso por meses (corrigido em 05/08/2026).
+
 ---
 
 ### 5. Lovable AI (Análise de PDF)

@@ -195,7 +195,10 @@ export function useWaConversas() {
             .map((c) => c.id === updated.id ? { ...updated, responsaveis: c.responsaveis } : c)
             .sort(compareConversas)
         );
-        qc.invalidateQueries({ queryKey: ['unread_wa_count'] });
+        // A invalidação de `unread_wa_count` que existia aqui era DUPLICADA:
+        // `useUnreadWaMessages` tem a própria assinatura na mesma tabela e
+        // reagia ao mesmo evento. Com a tela de WhatsApp aberta, cada UPDATE de
+        // conversa disparava dois refetches da consulta mais cara do sistema.
       })
       .subscribe((status, err) => {
         if (err) console.error('[wa_conversas] falha na subscription realtime:', status, err);
@@ -924,19 +927,21 @@ export function useWaProvision() {
 
 export function useUnreadWaMessages() {
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  const empresaId = profile?.empresa_id ?? null;
   // Guarda o último nao_lidas conhecido por conversa para detectar incrementos
   // (chegada de mensagem nova) mesmo com a tela de WhatsApp fechada.
   const prevNaoLidasRef = useRef<Record<string, number>>({});
 
   const query = useQuery<number>({
-    queryKey: ['unread_wa_count'],
+    // A empresa entra na chave: sem isso, trocar de conta na mesma aba reaproveita
+    // a contagem da anterior até o próximo refetch.
+    queryKey: ['unread_wa_count', empresaId],
     queryFn: async () => {
-      const empresaId = await getEmpresaId();
-      if (!empresaId) return 0;
       const { data } = await supabase
         .from('whatsapp_conversas')
         .select('id, nao_lidas')
-        .eq('empresa_id', empresaId)
+        .eq('empresa_id', empresaId!)
         .eq('arquivada', false)
         .gt('nao_lidas', 0);
       (data ?? []).forEach((r) => {
@@ -944,15 +949,52 @@ export function useUnreadWaMessages() {
       });
       return (data ?? []).reduce((sum, r) => sum + (r.nao_lidas ?? 0), 0);
     },
+    // `getEmpresaId()` fazia `auth.getUser()` + um `select` em usuarios A CADA
+    // execução — 3 idas ao servidor por refetch, numa consulta que já acumulou
+    // 213 mil chamadas. O `profile` já está em memória.
+    enabled: !!empresaId,
+    // Este número é um badge. Não justifica refazer a consulta mais de uma vez
+    // por meio minuto, mesmo que algo peça.
+    staleTime: 30_000,
   });
+
+  /**
+   * Coalescência das invalidações.
+   *
+   * Antes, CADA evento de `whatsapp_conversas` chamava `invalidateQueries`, e
+   * `invalidateQueries` ignora `staleTime` — então cada evento virava um refetch
+   * imediato. Numa rajada de webhook (dezenas de conversas atualizadas em
+   * segundos) isso vira dezenas de consultas idênticas em sequência.
+   *
+   * O resultado medido: 213.738 chamadas, 7,98 h de CPU de banco — 21% do banco
+   * inteiro gasto num contador de badge, que é a consulta nº 1 do sistema.
+   *
+   * Uma janela de 3 s transforma a rajada inteira num refetch só. O badge não
+   * precisa de precisão ao segundo.
+   */
+  const invalidacaoPendente = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const agendarInvalidacao = useCallback(() => {
+    if (invalidacaoPendente.current) return;
+    invalidacaoPendente.current = setTimeout(() => {
+      invalidacaoPendente.current = null;
+      qc.invalidateQueries({ queryKey: ['unread_wa_count'] });
+    }, 3_000);
+  }, [qc]);
 
   // Assinatura global (sempre montada via AppSidebar) para garantir que o toast
   // dispare mesmo se o usuário não estiver com a tela de WhatsApp aberta no momento.
   useEffect(() => {
+    if (!empresaId) return;
     const channel = supabase
       .channel(`wa-unread-rt-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversas' }, (payload) => {
-        qc.invalidateQueries({ queryKey: ['unread_wa_count'] });
+      // `filter` de empresa: sem ele, TODO cliente de TODA empresa recebia TODO
+      // evento de conversa e reagia a ele — inclusive disparando o toast de
+      // "nova mensagem" a partir de dados de outra empresa.
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'whatsapp_conversas',
+        filter: `empresa_id=eq.${empresaId}`,
+      }, (payload) => {
+        agendarInvalidacao();
 
         if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
           const row = payload.new as WaConversa;
@@ -980,8 +1022,17 @@ export function useUnreadWaMessages() {
       .subscribe((status, err) => {
         if (err) console.error('[unread_wa_count] falha na subscription realtime:', status, err);
       });
-    return () => { supabase.removeChannel(channel); };
-  }, [qc]);
+    return () => {
+      // Cancela a invalidação em voo junto com o canal: sem isto, desmontar e
+      // remontar (troca de rota) deixa um timer órfão pedindo refetch de uma
+      // query que pode nem existir mais.
+      if (invalidacaoPendente.current) {
+        clearTimeout(invalidacaoPendente.current);
+        invalidacaoPendente.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [qc, empresaId, agendarInvalidacao]);
 
   return query;
 }
