@@ -3571,23 +3571,59 @@ export default function WhatsAppInbox() {
   const buscarMensagens = useWaBuscarMensagens();
   const fetchContactPhoto = useWaFetchContactPhoto();
   const fotoRequestedRef = useRef<Set<string>>(new Set());
+  /**
+   * Busca as fotos de perfil que faltam — com FREIO.
+   *
+   * Como estava, este efeito percorria as 529 conversas e disparava
+   * `whatsapp-contact-photo` para toda foto vencida. Como os links do WhatsApp
+   * expiram em dias, quase todas estão sempre vencidas: cada carga da inbox
+   * virava uma rajada de centenas de chamadas paralelas, cada uma fazendo um
+   * fetch síncrono a `/chat/details` na uazapi com o MESMO token.
+   *
+   * Era a nossa própria tela derrubando o provedor. Em 15 dias: 2.038 respostas
+   * 504 "Request timeout" de `/chat/details` — 97% de todos os erros da
+   * integração — e invocações da Edge Function penduradas por 47 segundos. É a
+   * origem da "instabilidade", e ela é auto-infligida.
+   *
+   * Dois freios:
+   *
+   * 1. `is_group` em vez de `telefone.includes("@g.us")`. O filtro antigo NUNCA
+   *    excluía grupo nenhum, porque o JID é gravado sem o sufixo (o webhook o
+   *    remove). Pior: `/chat/details` de um grupo de JID legado é impossível de
+   *    resolver, então a foto nunca era gravada, a URL seguia "vencida" e as 28
+   *    conversas de grupo eram repedidas em TODA carga, para sempre.
+   *
+   * 2. Teto por carga, das conversas mais recentes para trás. Foto de perfil é
+   *    enfeite: quem está no topo da lista é quem a pessoa vai olhar, e o resto
+   *    chega nas próximas visitas. Melhor uma lista com alguns avatares
+   *    genéricos do que a integração inteira saturada.
+   */
+  const MAX_FOTOS_POR_CARGA = 12;
   useEffect(() => {
-    conversas.forEach((c) => {
-      // Links de foto do WhatsApp expiram (ver foto_perfil_expires_at) — sem
-      // expires_at conhecido também conta como vencida, pra revalidar fotos
-      // salvas antes dessa checagem existir.
-      const fotoVencida =
+    let pedidas = 0;
+    for (const c of conversas) {
+      if (pedidas >= MAX_FOTOS_POR_CARGA) break;
+      // `foto_perfil_expires_at` virou o único critério: ele é "não pergunte
+      // antes disto". Serve tanto para o link que o WhatsApp expira quanto para
+      // o "este contato não tem foto", que a function agora grava com uma
+      // semana de validade.
+      //
+      // A condição antiga tinha `!c.foto_perfil_url ||` na frente, e era esse
+      // OU que fazia as 65 conversas sem foto serem repedidas em toda carga,
+      // para sempre — nenhuma delas podia ser satisfeita.
+      const podePerguntar =
         !c.foto_perfil_expires_at ||
         new Date(c.foto_perfil_expires_at).getTime() <= Date.now();
       if (
-        (!c.foto_perfil_url || fotoVencida) &&
-        !c.telefone.includes("@g.us") &&
+        podePerguntar &&
+        !c.is_group &&
         !fotoRequestedRef.current.has(c.id)
       ) {
         fotoRequestedRef.current.add(c.id);
         fetchContactPhoto.mutate(c.id);
+        pedidas++;
       }
-    });
+    }
   }, [conversas, fetchContactPhoto]);
   // Backfill dos participantes de grupos criados antes do rastreio existir (ou fora
   // do CRM): a uazapi só devolve a lista completa de membros via /group/list, então

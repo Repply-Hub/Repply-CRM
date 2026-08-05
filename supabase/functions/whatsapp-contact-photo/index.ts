@@ -142,9 +142,17 @@ serve(async (req) => {
 
     const baseUrl = config.instance_url.replace(/\/$/, "");
     const digits = conversa.telefone.replace(/\D/g, "");
-    const isGroup = conversa.telefone.includes("@g.us") || digits.length > 14;
+
+    // MESMO cuidado do whatsapp-send: o JID de grupo é literal, nunca passa por
+    // `replace(/\D/g,"")`. Os JIDs legados têm hífen (`5511988345626-1425926780`)
+    // e limpá-lo produz um destino inexistente — a uazapi devolve 200 com um
+    // chat vazio, a foto nunca é gravada, a URL segue "vencida" e a tela repede
+    // a mesma foto impossível em toda carga, para sempre.
+    const isGroup = conversa.telefone.includes("@g.us") ||
+      conversa.telefone.includes("-") ||
+      digits.length > 14;
     const number = isGroup
-      ? (conversa.telefone.includes("@g.us") ? conversa.telefone : `${digits}@g.us`)
+      ? (conversa.telefone.endsWith("@g.us") ? conversa.telefone : `${conversa.telefone}@g.us`)
       : (digits.startsWith("55") ? digits : `55${digits}`);
 
     let responseText = "";
@@ -166,10 +174,14 @@ serve(async (req) => {
     let wapiResult: unknown = null;
     try { wapiResult = JSON.parse(responseText); } catch { /* ok */ }
 
-    // Debug: guarda a resposta bruta para validar o nome exato do campo de imagem
-    await supabase.from("webhook_debug").insert({
-      payload: { _debug: "chat-details", url: `${baseUrl}/chat/details`, status: wapiStatus, response: responseText },
-    });
+    // Havia aqui um insert em `webhook_debug` a CADA chamada, cujo propósito
+    // declarado era "validar o nome exato do campo de imagem" — uma investigação
+    // que já terminou; `findImageUrl` acima é o resultado dela.
+    //
+    // Removido porque essa gravação escalava junto com a rajada de fotos: uma
+    // linha por conversa por carga da inbox, numa tabela que já passa de 61 mil
+    // linhas. O erro continua visível: 502 com o corpo cru no `detail`, mais o
+    // log da própria function.
 
     if (wapiStatus < 200 || wapiStatus >= 300) {
       return new Response(JSON.stringify({ error: "Erro ao buscar foto", detail: responseText }), {
@@ -178,13 +190,37 @@ serve(async (req) => {
     }
 
     const fotoUrl = findImageUrl(wapiResult);
-    const expiresAt = fotoUrl ? extractExpiresAt(fotoUrl) : null;
-    if (fotoUrl) {
-      await supabase
-        .from("whatsapp_conversas")
-        .update({ foto_perfil_url: fotoUrl, foto_perfil_expires_at: expiresAt })
-        .eq("id", conversa_id);
-    }
+
+    /**
+     * "Este contato não tem foto" também é uma resposta, e precisa ser lembrada.
+     *
+     * Antes, quando o provedor respondia 200 sem imagem — contato com foto
+     * restrita por privacidade, ou grupo — nada era gravado. `foto_perfil_url`
+     * seguia nulo, `foto_perfil_expires_at` seguia nulo, e a tela considerava a
+     * foto "vencida": a MESMA busca impossível era refeita a cada carga da
+     * inbox, para sempre.
+     *
+     * Medido nesta empresa: 65 conversas sem foto e 21 grupos = 86 chamadas
+     * condenadas por carga, por usuário, indefinidamente — contra apenas 3
+     * fotos genuinamente vencidas.
+     *
+     * Uma semana é o suficiente: quem põe foto de perfil não tem pressa para
+     * aparecer no CRM, e o custo de perguntar de novo é alto.
+     */
+    const SEM_FOTO_REPERGUNTAR_EM_DIAS = 7;
+    const expiresAt = fotoUrl
+      ? extractExpiresAt(fotoUrl)
+      : new Date(Date.now() + SEM_FOTO_REPERGUNTAR_EM_DIAS * 86_400_000).toISOString();
+
+    await supabase
+      .from("whatsapp_conversas")
+      .update({
+        // Só sobrescreve a URL quando encontrou uma; do contrário mantém a que
+        // já estava lá e apenas adia a próxima pergunta.
+        ...(fotoUrl ? { foto_perfil_url: fotoUrl } : {}),
+        foto_perfil_expires_at: expiresAt,
+      })
+      .eq("id", conversa_id);
 
     return new Response(JSON.stringify({ foto_perfil_url: fotoUrl, foto_perfil_expires_at: expiresAt }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
