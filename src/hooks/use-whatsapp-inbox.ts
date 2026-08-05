@@ -500,37 +500,62 @@ export interface WaMensagemBusca {
   } | null;
 }
 
-// RLS de whatsapp_mensagens (wa_mensagens_access) já restringe o resultado às
-// conversas que o usuário pode acessar — não precisa filtrar usuário aqui.
+/**
+ * Busca por texto nas mensagens — via RPC, e não por consulta direta.
+ *
+ * A consulta direta com `.ilike()` NUNCA conseguia usar o índice trigram: sob
+ * RLS o Postgres não pode avaliar o `ilike` antes das cláusulas da policy,
+ * porque `texticlike` não é leakproof. O texto virava filtro DEPOIS de
+ * `can_access_wa_conversa()`, e o custo passava a ser proporcional a quantas
+ * linhas era preciso varrer até juntar 100 resultados — quanto mais RARO o
+ * termo, pior. Medido na sessão de um vendedor real:
+ *
+ *   '%pedido%'  ->   2.063 ms   (820 ocorrências, enche o limite logo)
+ *   '%obra%'    ->   4.376 ms
+ *   '%zxqwvk%'  ->  12.013 ms   -> morria no statement_timeout de 8 s
+ *
+ * Ou seja: procurar por algo que não existe — exatamente quando a pessoa mais
+ * espera a tela responder — dava erro.
+ *
+ * `wa_buscar_mensagens` é SECURITY DEFINER e aplica as MESMAS duas cláusulas da
+ * policy (`empresa_id = get_my_empresa_id()` e `can_access_wa_conversa`)
+ * explicitamente, só que com o trigram cortando primeiro. Mesmo resultado,
+ * verificado lado a lado: 22 ms para o termo raro.
+ */
 export function useWaBuscarMensagens() {
   return useMutation({
     mutationFn: async ({ termo, from, to }: { termo: string; from?: Date; to?: Date }) => {
-      const empresaId = await getEmpresaId();
-      if (!empresaId || !termo.trim()) return [] as WaMensagemBusca[];
+      if (!termo.trim()) return [] as WaMensagemBusca[];
 
-      let query = supabase
-        .from('whatsapp_mensagens')
-        .select('id, conversa_id, conteudo, created_at, direcao, conversa:whatsapp_conversas(id, nome_contato, telefone, foto_perfil_url, is_group)')
-        .eq('empresa_id', empresaId)
-        .eq('is_nota_interna', false)
-        .ilike('conteudo', `%${termo.trim()}%`)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const inicio = from ? new Date(from) : null;
+      inicio?.setHours(0, 0, 0, 0);
+      const fim = to ? new Date(to) : null;
+      fim?.setHours(23, 59, 59, 999);
 
-      if (from) {
-        const inicio = new Date(from);
-        inicio.setHours(0, 0, 0, 0);
-        query = query.gte('created_at', inicio.toISOString());
-      }
-      if (to) {
-        const fim = new Date(to);
-        fim.setHours(23, 59, 59, 999);
-        query = query.lte('created_at', fim.toISOString());
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await supabase.rpc('wa_buscar_mensagens', {
+        p_termo: termo.trim(),
+        p_de: inicio ? inicio.toISOString() : undefined,
+        p_ate: fim ? fim.toISOString() : undefined,
+        p_limite: 100,
+      });
       if (error) throw error;
-      return (data as any) as WaMensagemBusca[];
+
+      // A RPC devolve as colunas da conversa achatadas (o PostgREST não aninha
+      // resultado de função); a tela consome o formato aninhado de antes.
+      return ((data ?? []) as any[]).map((r) => ({
+        id: r.id,
+        conversa_id: r.conversa_id,
+        conteudo: r.conteudo,
+        created_at: r.created_at,
+        direcao: r.direcao,
+        conversa: {
+          id: r.conversa_id,
+          nome_contato: r.conversa_nome_contato,
+          telefone: r.conversa_telefone,
+          foto_perfil_url: r.conversa_foto_perfil_url,
+          is_group: r.conversa_is_group,
+        },
+      })) as WaMensagemBusca[];
     },
   });
 }

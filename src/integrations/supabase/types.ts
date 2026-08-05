@@ -3806,6 +3806,34 @@ export type Database = {
         Args: { _usuario_id: string }
         Returns: boolean
       }
+      /**
+       * Busca por texto nas mensagens de WhatsApp.
+       *
+       * É RPC, e não consulta direta, porque sob RLS o `ilike` não pode ser
+       * avaliado antes da policy (`texticlike` não é leakproof) e o índice
+       * trigram nunca era usado — termo raro chegava a 12 s e morria no
+       * `statement_timeout`. A função é SECURITY DEFINER e aplica as mesmas
+       * duas cláusulas da policy explicitamente.
+       */
+      wa_buscar_mensagens: {
+        Args: {
+          p_termo: string
+          p_de?: string
+          p_ate?: string
+          p_limite?: number
+        }
+        Returns: {
+          id: string
+          conversa_id: string
+          conteudo: string
+          created_at: string
+          direcao: string
+          conversa_nome_contato: string | null
+          conversa_telefone: string | null
+          conversa_foto_perfil_url: string | null
+          conversa_is_group: boolean | null
+        }[]
+      }
       wa_iniciar_conversa: {
         Args: {
           p_cliente_id?: string

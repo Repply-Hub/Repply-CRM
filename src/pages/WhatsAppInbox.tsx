@@ -3354,9 +3354,11 @@ export default function WhatsAppInbox() {
   const { data: kanbanColunasTarefas = [] } =
     useTarefasKanbanColunas(empresaIdTarefas);
 
-  // Estas duas, sim, só quando o diálogo abre.
-  const { data: clientesTarefas = [] } = useClientes({ enabled: novaTarefaOpen });
-  const { data: pedidosOptionsTarefas = [] } =
+  // Estas duas, sim, só quando o diálogo abre. `isFetching` alimenta a mensagem
+  // dos selects enquanto as listas não chegam.
+  const { data: clientesTarefas = [], isFetching: carregandoClientes } =
+    useClientes({ enabled: novaTarefaOpen });
+  const { data: pedidosOptionsTarefas = [], isFetching: carregandoPedidos } =
     usePedidosOptions(novaTarefaOpen ? empresaIdTarefas : undefined);
   const KANBAN_STAGES_TAREFAS = useMemo(
     () =>
@@ -7446,6 +7448,17 @@ export default function WhatsAppInbox() {
                   }
                   placeholder="Vincular a uma empresa"
                   contentClassName="w-[min(28rem,90vw)]"
+                  // Antes, as duas listas já estavam carregadas muito antes de o
+                  // diálogo abrir — ao custo de buscá-las em toda entrada na
+                  // inbox. Agora que só carregam ao abrir, "lista vazia" passou
+                  // a ser o estado inicial garantido, e o texto padrão
+                  // ("Nenhuma opção encontrada") faria a pessoa concluir que não
+                  // há clientes cadastrados e salvar a tarefa sem vínculo.
+                  emptyMessage={
+                    carregandoClientes
+                      ? "Carregando empresas..."
+                      : "Nenhuma opção encontrada."
+                  }
                 />
               </div>
               <div className="space-y-1.5">
@@ -7464,6 +7477,11 @@ export default function WhatsAppInbox() {
                   }
                   placeholder="Vincular a um negócio"
                   contentClassName="w-[min(28rem,90vw)]"
+                  emptyMessage={
+                    carregandoPedidos
+                      ? "Carregando negócios..."
+                      : "Nenhuma opção encontrada."
+                  }
                 />
               </div>
             </div>
