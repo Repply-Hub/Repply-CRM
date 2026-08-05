@@ -1300,7 +1300,13 @@ export type Database = {
           assunto: string | null
           bcc: Json
           cc: Json
-          conta_id: string
+          /**
+           * NULO quando a caixa de origem foi desconectada preservando o
+           * histórico (migration 20260804184305, `ON DELETE SET NULL`). São 142
+           * das 548 linhas em produção — declarar como `string` fazia o
+           * TypeScript garantir algo que o banco não garante.
+           */
+          conta_id: string | null
           corpo_html: string | null
           criado_em: string
           data_mensagem: string

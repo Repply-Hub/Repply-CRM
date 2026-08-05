@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { ArrowLeft, Trash2, Reply, Loader2, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -12,6 +14,11 @@ export interface EmailAberto {
   corpo?: string | null;
   /** Prévia curta vinda do provedor; é o que aparece enquanto o corpo carrega. */
   snippet?: string | null;
+  /**
+   * Id da mensagem no provedor (`email_mensagens.nylas_message_id`), NÃO o id
+   * da linha. É o que o Nylas precisa para amarrar uma resposta à conversa.
+   */
+  gmail_message_id?: string | null;
   /** Endereço da caixa de origem, quando ela já foi desconectada. */
   caixaOrigem?: string | null;
   criado_em?: string | null;
@@ -58,6 +65,37 @@ export function LeitorEmail({ email, emailDaConta, onVoltar, onExcluir, onRespon
   const data = email.created_at ?? email.criado_em;
   const inicial = (nome || '?').trim()[0]?.toUpperCase() ?? '?';
   const anexos = email.anexos ?? [];
+
+  /**
+   * O corpo do e-mail é HTML escrito por QUALQUER PESSOA DO MUNDO — basta
+   * escrever para o endereço da empresa. Injetá-lo cru era um XSS armazenado:
+   * `<img src=x onerror="...">` roda no domínio do CRM, com a sessão do
+   * Supabase de quem abriu ao alcance. (React não executa `<script>` inserido
+   * por `innerHTML`, mas manipuladores inline como `onerror`/`onload` e URLs
+   * `javascript:` executam normalmente — a proteção do React não cobre isto.)
+   *
+   * `FORBID_TAGS`/`FORBID_ATTR` além do padrão do DOMPurify porque e-mail é o
+   * pior caso de HTML alheio:
+   *  - `style` como TAG (não o atributo) permite CSS que vaza dados via
+   *    `background: url(...)` em seletores de atributo;
+   *  - `target` sem `rel` daria `window.opener` à página aberta.
+   *
+   * `ADD_ATTR: ['target']` não entra: os links abrem na própria aba, e é
+   * melhor assim do que abrir uma aba nova com opener exposto.
+   *
+   * `useMemo` porque sanitizar um e-mail com tabela de 600px não é de graça e
+   * o componente rerenderiza a cada troca de estado do leitor.
+   */
+  const corpoSeguro = useMemo(
+    () =>
+      email.html
+        ? DOMPurify.sanitize(email.html, {
+            FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'form', 'base', 'link'],
+            FORBID_ATTR: ['target', 'formaction', 'ping', 'srcset'],
+          })
+        : '',
+    [email.html],
+  );
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -178,7 +216,7 @@ export function LeitorEmail({ email, emailDaConta, onVoltar, onExcluir, onRespon
                 // e-mails são tabelas de largura fixa (600px é o padrão do
                 // mercado) e sem isto empurrariam a página inteira.
                 className="overflow-x-auto p-4 [&_img]:h-auto [&_img]:max-w-full [&_table]:max-w-full"
-                dangerouslySetInnerHTML={{ __html: email.html }}
+                dangerouslySetInnerHTML={{ __html: corpoSeguro }}
               />
             ) : (
               <div className="whitespace-pre-wrap px-5 py-4 text-[0.9375rem] leading-relaxed text-slate-800">

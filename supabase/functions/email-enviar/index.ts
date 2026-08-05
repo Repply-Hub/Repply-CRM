@@ -215,8 +215,22 @@ serve(async (req) => {
     const enviada = resp.body.data;
 
     // ---- registra ---------------------------------------------------------
-    // ON CONFLICT DO NOTHING porque o webhook message.created pode chegar antes
-    // desta resposta HTTP voltar — os dois caminhos gravam a mesma mensagem.
+    // O webhook `message.created` corre com esta resposta HTTP e quase sempre
+    // CHEGA PRIMEIRO — medido: das 27 mensagens enviadas em produção, 27 foram
+    // criadas pelo webhook. Com `ignoreDuplicates: true`, que era o que estava
+    // aqui, este upsert virava um no-op silencioso e três colunas que SÓ este
+    // caminho conhece nunca eram gravadas: `enviado_por` (quem clicou em
+    // enviar), `corpo_html` (o texto que a pessoa escreveu) e `envio_status`.
+    //
+    // Isso não era cosmético. A regra de acesso reconhece "o que eu enviei" por
+    // `enviado_por`; com ela sempre nula, quem tem acesso só a um marcador
+    // mandava um e-mail novo e ele sumia da própria caixa de enviados.
+    //
+    // Mesclar é seguro nos dois sentidos da corrida: `mensagemParaLinha` (o
+    // caminho do webhook) não inclui `corpo_html`, `enviado_por` nem
+    // `envio_status`, e este payload não inclui `pastas` nem `excluido` — o
+    // PostgREST só toca nas colunas presentes, então nenhum dos dois apaga o
+    // que o outro escreveu.
     const { error: erroInsert } = await supabase
       .from("email_mensagens")
       .upsert(
@@ -239,7 +253,7 @@ serve(async (req) => {
           enviado_por: caller.id,
           data_mensagem: new Date((enviada.date ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),
         },
-        { onConflict: "conta_id,nylas_message_id", ignoreDuplicates: true },
+        { onConflict: "conta_id,nylas_message_id" },
       );
 
     if (erroInsert) {

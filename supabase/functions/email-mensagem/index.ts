@@ -70,7 +70,7 @@ serve(async (req) => {
     // empresa a quem tivesse só um marcador — bastando ter guardado o id de
     // quando o acesso era mais amplo. Reduzir a liberação de alguém não teria
     // efeito nenhum aqui.
-    const [{ data: mensagem }, { data: autorizada }] = await Promise.all([
+    const [{ data: mensagem }, { data: autorizada, error: erroAutorizacao }] = await Promise.all([
       supabase
         .from("email_mensagens")
         .select("id, conta_id, corpo_html, anexos, nylas_message_id")
@@ -83,6 +83,18 @@ serve(async (req) => {
         .eq("id", mensagemId)
         .maybeSingle(),
     ]);
+
+    // Falha de INFRAESTRUTURA na leitura de autorização não é "não pode": é
+    // "não sei". As duas acabam sem linha, e tratá-las igual transformaria um
+    // soluço de rede num "Mensagem não encontrada" — a pessoa concluiria que o
+    // e-mail sumiu, e o log registraria um acesso negado que nunca houve.
+    if (erroAutorizacao) {
+      console.error("[email-mensagem] falha ao verificar acesso:", erroAutorizacao);
+      return json(
+        { error: "Não consegui verificar seu acesso a esta mensagem. Tente de novo." },
+        503,
+      );
+    }
 
     // Mesma resposta para "não existe" e "não é sua": quem não pode ler também
     // não pode descobrir que a mensagem existe.

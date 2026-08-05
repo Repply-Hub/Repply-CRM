@@ -268,8 +268,30 @@ export function useEmailEmpresa() {
      * mostrar um botão que vai falhar; a barreira de verdade é lá.
      */
     podeGerenciarCaixa: ['admin', 'empresa', 'gestor'].includes(profile?.role ?? ''),
-    enviarEmail: (to: string | string[], subject: string, body: string) =>
-      enviarMutation.mutateAsync({ to, subject, body }),
+    /**
+     * `respondendoA` é o `nylas_message_id` da mensagem que está sendo
+     * respondida — e não é opcional por capricho.
+     *
+     * O Nylas usa esse id para montar os cabeçalhos `In-Reply-To` e
+     * `References`. Sem eles a resposta sai como mensagem SOLTA: o cliente do
+     * destinatário não a encosta na conversa, e o provedor devolve a cópia
+     * enviada com uma thread própria. Aqui dentro isso tem uma consequência
+     * pesada — a regra de acesso por marcador reconhece a resposta justamente
+     * por ela pertencer à conversa de origem, então quem tem acesso a um
+     * marcador responderia e não veria a própria resposta.
+     */
+    enviarEmail: (
+      to: string | string[],
+      subject: string,
+      body: string,
+      respondendoA?: string | null,
+    ) =>
+      enviarMutation.mutateAsync({
+        to,
+        subject,
+        body,
+        ...(respondendoA ? { reply_to_message_id: respondendoA } : {}),
+      }),
     enviar: enviarMutation.mutateAsync,
 
     // Nomes iguais aos do useGmail, para a tela não precisar mudar.

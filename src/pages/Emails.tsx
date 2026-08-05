@@ -82,6 +82,8 @@ const Emails = () => {
   const [emailToDelete, setEmailToDelete] = useState<{ id: string; type: "sent" | "received" } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>("received");
+  /** `nylas_message_id` da mensagem sendo respondida; nulo num e-mail novo. */
+  const [respondendoA, setRespondendoA] = useState<string | null>(null);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [pageSent, setPageSent] = useState(0);
   const [pageReceived, setPageReceived] = useState(0);
@@ -114,7 +116,13 @@ const Emails = () => {
       setBuscaAplicada(searchTerm.trim());
       // Voltar à primeira página: um termo novo tem outra contagem de
       // resultados, e continuar na página 3 mostraria uma lista vazia.
+      //
+      // AS DUAS abas. Antes só `pageSent` era zerada, o que não incomodava
+      // porque a busca nem chegava a Recebidos; agora que chega, estando na
+      // página 3 e digitando um termo com 5 resultados a lista vem vazia — e o
+      // paginador some junto, então não sobra nem o botão de voltar.
       setPageSent(0);
+      setPageReceived(0);
     }, 350);
     return () => clearTimeout(t);
   }, [searchTerm]);
@@ -348,12 +356,13 @@ const Emails = () => {
       // O registro em email_mensagens é feito pela Edge Function, que é quem
       // conhece o id devolvido pelo Nylas. Gravar também daqui criaria duas
       // linhas para o mesmo envio — e o cliente nem tem INSERT nessa tabela.
-      return await sendEmail(data.destinatario, data.assunto, htmlBody);
+      return await sendEmail(data.destinatario, data.assunto, htmlBody, respondendoA);
     },
     onSuccess: () => {
       toast.success("E-mail enviado.");
       setIsComposeOpen(false);
       setRespondendo(false);
+      setRespondendoA(null);
       setFormData({
         destinatario: "",
         assunto: "",
@@ -380,6 +389,11 @@ const Emails = () => {
     onSuccess: (_, variables) => {
       toast.success("E-mail excluído com sucesso");
       queryClient.invalidateQueries({ queryKey: [variables.type === "sent" ? "emails" : "received_emails"] });
+      // Chave própria, e o react-query casa por PREFIXO EXATO de elemento:
+      // invalidar ["received_emails"] não atinge ["received_emails_total"].
+      // Sem esta linha o número ao lado de "Todas" continuaria contando as
+      // mensagens que acabaram de ser excluídas.
+      queryClient.invalidateQueries({ queryKey: ["received_emails_total"] });
       if (selectedEmail?.id === variables.id) {
         setSelectedEmail(null);
       }
@@ -400,6 +414,11 @@ const Emails = () => {
     onSuccess: (_, variables) => {
       toast.success(`${variables.ids.length} e-mail(s) excluído(s) com sucesso`);
       queryClient.invalidateQueries({ queryKey: [variables.type === "sent" ? "emails" : "received_emails"] });
+      // Chave própria, e o react-query casa por PREFIXO EXATO de elemento:
+      // invalidar ["received_emails"] não atinge ["received_emails_total"].
+      // Sem esta linha o número ao lado de "Todas" continuaria contando as
+      // mensagens que acabaram de ser excluídas.
+      queryClient.invalidateQueries({ queryKey: ["received_emails_total"] });
       setSelectedIds([]);
       setIsBulkDeleting(false);
     },
@@ -476,6 +495,12 @@ const Emails = () => {
       assunto: replySubject,
       corpo: `\n\n--- Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:\n\n${citado}`,
     });
+    // Guarda a QUAL mensagem se está respondendo, no id do provedor. É o que o
+    // Nylas usa para montar In-Reply-To/References; sem isso a resposta sai
+    // solta, o destinatário a recebe fora da conversa e — aqui dentro — quem
+    // tem acesso por marcador não enxerga a própria resposta, porque a regra a
+    // reconhece justamente por pertencer à conversa de origem.
+    setRespondendoA(selectedEmail.gmail_message_id ?? null);
     // O e-mail aberto CONTINUA aberto atrás do compositor. Fechá-lo aqui era o
     // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
     setRespondendo(true);
@@ -558,7 +583,12 @@ const Emails = () => {
 
   const fecharCompositor = (aberto: boolean) => {
     setIsComposeOpen(aberto);
-    if (!aberto) setRespondendo(false);
+    if (!aberto) {
+      setRespondendo(false);
+      // Sem isto, escrever um e-mail NOVO logo depois de fechar uma resposta
+      // sairia amarrado à conversa antiga.
+      setRespondendoA(null);
+    }
   };
 
   // Um único compositor, montado nas duas telas — a listagem e o leitor. É o
@@ -637,8 +667,16 @@ const Emails = () => {
 
   return (
     <AppLayout title="E-mail" subtitle={connectedEmail ?? "Caixa da empresa"} mainClassName="flex-1 overflow-hidden p-0">
+      {/* CONTROLADO (`value`, não `defaultValue`). Com `defaultValue` o Radix
+          guarda a aba internamente e ignora o estado do React: `activeTab`
+          existia só como espelho, e chamar `setActiveTab` de fora — como faz o
+          `escolherPasta` ao clicar num marcador estando em Enviados — mudava a
+          variável sem mudar a aba na tela. A partir daí tudo que depende de
+          `activeTab` (o contador da barra, o marcador aceso, o "selecionar
+          todos", o tipo passado ao compositor) passava a falar de uma aba
+          diferente da que a pessoa está vendo. */}
       <Tabs
-        defaultValue="received" 
+        value={activeTab}
         className="flex flex-col h-full bg-background overflow-hidden"
         onValueChange={(val) => {
           setActiveTab(val);
