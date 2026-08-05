@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Archive, Loader2, Mail, Trash2 } from 'lucide-react';
+import { AlertTriangle, Archive, ChevronDown, Loader2, Mail, Tag, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useCompartilhamentoCaixa } from '@/hooks/use-email-pastas';
+import {
+  useCompartilhamentoCaixa,
+  useEmailPastas,
+  type UsuarioDaCaixa,
+} from '@/hooks/use-email-pastas';
 import { useEmailEmpresa, ROTULO_PROVEDOR } from '@/hooks/use-email-empresa';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,10 +39,22 @@ interface Props {
  * das vezes, então a decisão é explícita — e "manter" vem primeiro por ser o
  * caminho reversível.
  */
+/** Resume, numa linha, o que a pessoa enxerga hoje. */
+function resumoDoAcesso(p: UsuarioDaCaixa): string {
+  if (p.porPapel) return `${p.role} · acesso pelo cargo`;
+  if (p.caixaInteira) return 'Caixa inteira';
+  if (p.marcadores.length === 1) return '1 marcador';
+  if (p.marcadores.length > 1) return `${p.marcadores.length} marcadores`;
+  return 'Sem acesso';
+}
+
 export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
   const { conta, connectedEmail, desconectar, isDisconnecting } = useEmailEmpresa();
   const [confirmando, setConfirmando] = useState<'preservar' | 'apagar' | null>(null);
+  const [expandido, setExpandido] = useState<string | null>(null);
   const { pessoas, alternar, isSalvando } = useCompartilhamentoCaixa(open ? conta?.id : null);
+  const { data: pastas = [] } = useEmailPastas(open ? conta?.id : null);
+  const marcadores = pastas.filter((p) => !p.ehSistema);
 
   /**
    * Quanto está em jogo — e, principalmente, QUANTO do que sobra dá para ler.
@@ -131,43 +147,100 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Libere o time para receber e responder por esta caixa. É assim que o
-                atendimento compartilha um endereço só.
+                Libere a caixa inteira ou só um marcador. Quem enxerga um marcador
+                também responde por ele — é assim que o atendimento divide um
+                endereço só entre várias pessoas.
               </p>
 
-              <div className="max-h-56 overflow-y-auto rounded-lg border">
+              <div className="max-h-64 overflow-y-auto rounded-lg border">
                 {pessoas.length === 0 ? (
                   <p className="px-3 py-4 text-center text-xs text-muted-foreground">
                     Nenhum usuário na empresa.
                   </p>
                 ) : (
                   pessoas.map((p) => {
-                    // Gestor/dono não entra na lista: o acesso dele não vem daqui,
-                    // vem do papel. Deixar a caixinha marcada e travada explica
-                    // isso melhor do que escondê-lo.
-                    const porPapel = p.role === 'gestor' || p.role === 'empresa' || p.role === 'admin';
+                    const aberto = expandido === p.usuarioId;
                     return (
-                      <label
-                        key={p.usuarioId}
-                        className={cn(
-                          'flex items-center gap-3 border-b px-3 py-2 last:border-b-0',
-                          porPapel ? 'opacity-60' : 'cursor-pointer hover:bg-muted/40',
+                      <div key={p.usuarioId} className="border-b last:border-b-0">
+                        {/* Gestor/dono não abre: o acesso dele não vem daqui, vem
+                            do papel. Dizer isso na linha explica melhor do que
+                            escondê-lo da lista. */}
+                        <button
+                          type="button"
+                          disabled={p.porPapel}
+                          onClick={() => setExpandido(aberto ? null : p.usuarioId)}
+                          className={cn(
+                            'flex w-full items-center gap-3 px-3 py-2 text-left',
+                            p.porPapel ? 'opacity-60' : 'hover:bg-muted/40',
+                          )}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm text-foreground">
+                              {p.nome || p.email || '—'}
+                            </span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {resumoDoAcesso(p)}
+                            </span>
+                          </span>
+                          {!p.porPapel && (
+                            <ChevronDown
+                              className={cn(
+                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                                aberto && 'rotate-180',
+                              )}
+                            />
+                          )}
+                        </button>
+
+                        {aberto && (
+                          <div className="space-y-1 bg-muted/30 px-3 pb-3 pl-4">
+                            <label className="flex cursor-pointer items-center gap-3 py-1">
+                              <Checkbox
+                                checked={p.caixaInteira}
+                                disabled={isSalvando}
+                                onCheckedChange={(v) =>
+                                  alternar(p.usuarioId, null, v === true)
+                                }
+                              />
+                              <span className="text-sm text-foreground">Caixa inteira</span>
+                            </label>
+
+                            {marcadores.length === 0 ? (
+                              <p className="py-1 text-xs text-muted-foreground">
+                                Esta caixa não tem marcadores. Eles aparecem aqui depois
+                                da próxima sincronização.
+                              </p>
+                            ) : (
+                              marcadores.map((m) => (
+                                <label
+                                  key={m.pastaId}
+                                  className={cn(
+                                    'flex items-center gap-3 py-1',
+                                    p.caixaInteira ? 'opacity-50' : 'cursor-pointer',
+                                  )}
+                                >
+                                  {/* Com a caixa inteira liberada o marcador já
+                                      está incluído. Travado e marcado diz isso
+                                      sem apagar a escolha anterior: desmarcar
+                                      "caixa inteira" devolve o que a pessoa
+                                      tinha. */}
+                                  <Checkbox
+                                    checked={p.caixaInteira || p.marcadores.includes(m.pastaId)}
+                                    disabled={p.caixaInteira || isSalvando}
+                                    onCheckedChange={(v) =>
+                                      alternar(p.usuarioId, m.pastaId, v === true)
+                                    }
+                                  />
+                                  <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                                    {m.nome}
+                                  </span>
+                                </label>
+                              ))
+                            )}
+                          </div>
                         )}
-                      >
-                        <Checkbox
-                          checked={porPapel || p.liberadoExplicitamente}
-                          disabled={porPapel || isSalvando}
-                          onCheckedChange={(v) => alternar(p.usuarioId, v === true)}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm text-foreground">
-                            {p.nome || p.email || '—'}
-                          </span>
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {porPapel ? `${p.role} · acesso pelo cargo` : p.email}
-                          </span>
-                        </span>
-                      </label>
+                      </div>
                     );
                   })
                 )}

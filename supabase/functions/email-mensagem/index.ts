@@ -57,18 +57,43 @@ serve(async (req) => {
     if (caller.deleted_at) return json({ error: "Conta suspensa." }, 403);
     if (!caller.empresa_id) return json({ error: "Conta sem empresa vinculada." }, 403);
 
-    // O service_role ignora o RLS, então o filtro por empresa é manual e
-    // obrigatório: sem ele, qualquer usuário logado leria o e-mail de outra
-    // empresa passando o id. É a checagem que falta em três functions do
-    // WhatsApp e que eu não vou repetir aqui.
-    const { data: mensagem } = await supabase
-      .from("email_mensagens")
-      .select("id, conta_id, corpo_html, anexos, nylas_message_id")
-      .eq("id", mensagemId)
-      .eq("empresa_id", caller.empresa_id)
-      .maybeSingle();
+    // Duas leituras da MESMA linha, com credenciais diferentes.
+    //
+    // O service_role ignora o RLS, então quem autoriza é a leitura do
+    // `userClient`: ela passa por `email_mensagens_select`, que é
+    // `tenho_acesso_a_mensagem(conta_id, pastas)` — a regra por MARCADOR.
+    //
+    // Filtrar só por `empresa_id` era o recorte certo enquanto o acesso era por
+    // CAIXA. Deixou de ser no momento em que a unidade virou (conta, usuário,
+    // marcador): esta rota é a que devolve `corpo_html` e `anexos`, e sem a
+    // segunda leitura ela entregaria o conteúdo de QUALQUER mensagem da
+    // empresa a quem tivesse só um marcador — bastando ter guardado o id de
+    // quando o acesso era mais amplo. Reduzir a liberação de alguém não teria
+    // efeito nenhum aqui.
+    const [{ data: mensagem }, { data: autorizada }] = await Promise.all([
+      supabase
+        .from("email_mensagens")
+        .select("id, conta_id, corpo_html, anexos, nylas_message_id")
+        .eq("id", mensagemId)
+        .eq("empresa_id", caller.empresa_id)
+        .maybeSingle(),
+      userClient
+        .from("email_mensagens")
+        .select("id")
+        .eq("id", mensagemId)
+        .maybeSingle(),
+    ]);
 
-    if (!mensagem) return json({ error: "Mensagem não encontrada." }, 404);
+    // Mesma resposta para "não existe" e "não é sua": quem não pode ler também
+    // não pode descobrir que a mensagem existe.
+    if (!mensagem || !autorizada) {
+      if (mensagem && !autorizada) {
+        console.warn(
+          `[email-mensagem] acesso negado: user=${user.id} mensagem=${mensagemId} empresa=${caller.empresa_id}`,
+        );
+      }
+      return json({ error: "Mensagem não encontrada." }, 404);
+    }
 
     // Cache: uma vez buscado, o corpo não muda.
     if (mensagem.corpo_html) {

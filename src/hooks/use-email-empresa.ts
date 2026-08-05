@@ -126,6 +126,11 @@ export function useEmailEmpresa() {
       queryClient.invalidateQueries({ queryKey: ['received_emails'] });
       queryClient.invalidateQueries({ queryKey: ['emails'] });
       queryClient.invalidateQueries({ queryKey: ['email_conta'] });
+      // A varredura é o ÚNICO momento em que a lista de marcadores é espelhada
+      // do provedor. Sem invalidar aqui, quem acabou de sincronizar continuaria
+      // vendo a barra lateral antiga até o staleTime de 60 s vencer — e, na
+      // primeira sincronização depois de conectar, veria uma barra vazia.
+      queryClient.invalidateQueries({ queryKey: ['email_pastas'] });
 
       if (r.erros?.length) {
         // Erro por conta não é falha da sincronização inteira: o que deu certo

@@ -216,6 +216,61 @@
 - [ ] Migrations rodadas
 - [ ] Bucket `whatsapp-media` criado com políticas corretas
 - [ ] RLS (Row Level Security) verificada nas tabelas críticas
+- [ ] **Cron funcionando de verdade** — ver a seção abaixo, não basta agendar
+
+---
+
+## Cron (`pg_cron` + `pg_net`) — quebrado no projeto atual
+
+Dois jobs estão agendados: `eventos-lembrete` (5 min) e `email-sync` (15 min).
+**Nenhum dos dois jamais executou com sucesso.** Em 05/08/2026 havia 3656
+execuções registradas em `cron.job_run_details`, todas com status `failed`,
+desde a criação do job em 23/07. Consequência real: os lembretes de evento nunca
+foram enviados, e o espelho de marcadores da caixa de e-mail só é atualizado
+quando alguém clica em atualizar na tela.
+
+Como conferir em qualquer projeto:
+
+```sql
+select j.jobname, d.status, count(*), max(d.start_time), max(d.return_message)
+from cron.job_run_details d join cron.job j on j.jobid = d.jobid
+group by 1, 2;
+```
+
+São três causas empilhadas — a de cima esconde as de baixo:
+
+1. **`cron.use_background_workers = off`** → `job startup timeout`.
+   Com o parâmetro desligado, o pg_cron abre conexão libpq em `cron.host` e não
+   consegue autenticar. É de contexto `postmaster`: **exige reiniciar o banco**
+   (Dashboard → Settings → Database → Custom Postgres Config).
+
+2. **`app.settings.service_role_key` não definida** → HTTP 401.
+   O comando monta `Authorization: Bearer ` vazio e a Edge Function recusa.
+   Não está nem no `vault.secrets`. Corrigir com:
+
+   ```sql
+   ALTER DATABASE postgres SET app.settings.service_role_key = '<service_role>';
+   ```
+
+   (a chave está em Dashboard → Settings → API; **nunca** commitar).
+
+3. **Precedência de operador no comando** → `22P02 invalid input syntax for json`.
+   `::` liga mais forte que `||`, então `'…' || chave || '"}'::jsonb` converte
+   só o `"}`. Já corrigido em
+   `20260805123341_corrige_precedencia_jsonb_nos_crons.sql`; o padrão certo é
+   envolver a concatenação inteira em parênteses antes do cast.
+
+Depois de resolver 1 e 2, validar disparando na mão e conferindo a resposta:
+
+```sql
+select net.http_post(
+  url := 'https://<ref>.supabase.co/functions/v1/email-sync',
+  headers := ('{"Content-Type":"application/json","Authorization":"Bearer '
+              || current_setting('app.settings.service_role_key', true) || '"}')::jsonb,
+  body := '{"limit":50}'::jsonb);
+-- alguns segundos depois:
+select id, status_code, left(content, 200) from net._http_response order by id desc limit 1;
+```
 
 ### Google Cloud Console
 - [ ] Novo projeto OAuth criado (ou credenciais adicionadas ao existente)

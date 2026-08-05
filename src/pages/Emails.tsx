@@ -223,7 +223,7 @@ const Emails = () => {
   const totalSent = sentData?.count || 0;
 
   const { data: receivedData, isLoading: isReceivedLoading } = useQuery({
-    queryKey: ["received_emails", pageReceived, pastaSelecionada],
+    queryKey: ["received_emails", pageReceived, pastaSelecionada, buscaAplicada],
     queryFn: async () => {
       // Mesma regra da caixa de enviados: nada de `corpo_html` na listagem.
       let consulta = supabase
@@ -240,6 +240,16 @@ const Emails = () => {
       // operador `@>` do Postgres, que usa índice se um dia houver um GIN aqui.
       if (pastaSelecionada) {
         consulta = consulta.contains("pastas", [pastaSelecionada]);
+      }
+
+      // A busca do topo é UMA só para a tela inteira, mas só a aba Enviados a
+      // aplicava: procurar em Recebidos devolvia a caixa inteira, como se nada
+      // tivesse sido digitado. Mesmos campos das duas: assunto e prévia — o
+      // corpo não está na listagem para procurar.
+      if (buscaAplicada) {
+        consulta = consulta.or(
+          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%`,
+        );
       }
 
       const { data, error, count } = await consulta
@@ -280,6 +290,40 @@ const Emails = () => {
 
   const receivedEmails = receivedData?.emails || [];
   const totalReceived = receivedData?.count || 0;
+
+  /**
+   * Quantas mensagens a aba Recebidos tem IGNORANDO o marcador — o número que
+   * fica ao lado de "Todas" na barra lateral.
+   *
+   * Precisa ser uma consulta própria porque `totalReceived` vem do mesmo
+   * `select` que já aplicou o `contains`: com um marcador escolhido, os dois
+   * números seriam idênticos e "Todas" mostraria a contagem do marcador, como
+   * se a caixa inteira tivesse encolhido.
+   *
+   * `head: true` — só o cabeçalho com a contagem, nenhuma linha trafega. E só
+   * roda quando há marcador escolhido; sem ele, `totalReceived` já é a resposta.
+   */
+  const { data: totalRecebidosSemMarcador } = useQuery({
+    queryKey: ["received_emails_total", buscaAplicada],
+    queryFn: async () => {
+      let consulta = supabase
+        .from("email_mensagens")
+        .select("id", { count: "exact", head: true })
+        .eq("direcao", "recebido")
+        .eq("excluido", false);
+
+      if (buscaAplicada) {
+        consulta = consulta.or(
+          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%`,
+        );
+      }
+
+      const { count } = await consulta;
+      return count ?? 0;
+    },
+    enabled: isConnected && !!pastaSelecionada,
+    placeholderData: keepPreviousData,
+  });
 
   const sendEmailMutation = useMutation({
     mutationFn: async (data: { destinatario: string; assunto: string; corpo: string }) => {
@@ -442,10 +486,18 @@ const Emails = () => {
   const marcarLido = (id: string) => {
     // Escreve direto na lista que já está na tela, em vez de invalidar a
     // consulta: trocar um booleano não justifica refazer a busca inteira.
-    queryClient.setQueryData<PaginaRecebidos>(["received_emails", pageReceived], (antigo) =>
-      antigo
-        ? { ...antigo, emails: antigo.emails.map((m) => (m.id === id ? { ...m, lido: true } : m)) }
-        : antigo,
+    // A chave tem de ser a MESMA da consulta que alimenta a lista, item por
+    // item: `setQueryData` com uma chave a menos escreve num cache que ninguém
+    // lê, e o selo de não-lida ficava na tela até a próxima busca.
+    queryClient.setQueryData<PaginaRecebidos>(
+      ["received_emails", pageReceived, pastaSelecionada, buscaAplicada],
+      (antigo) =>
+        antigo
+          ? {
+              ...antigo,
+              emails: antigo.emails.map((m) => (m.id === id ? { ...m, lido: true } : m)),
+            }
+          : antigo,
     );
 
     supabase
@@ -496,6 +548,12 @@ const Emails = () => {
     // Outro marcador = outra contagem; ficar na pagina 3 mostraria vazio.
     setPastaSelecionada(p);
     setPageReceived(0);
+    // Marcador só faz sentido em Recebidos: a cópia enviada que o Gmail guarda
+    // carrega apenas SENT, nunca os marcadores da conversa, então filtrar
+    // Enviados por um marcador daria sempre lista vazia. Clicar num marcador
+    // estando em Enviados quer dizer "quero ver esse marcador" — levar para a
+    // aba onde ele funciona é mais útil do que aplicar um filtro estéril.
+    if (p) setActiveTab("received");
   };
 
   const fecharCompositor = (aberto: boolean) => {
@@ -723,9 +781,18 @@ const Emails = () => {
             <BarraPastas
               pastas={pastas}
               carregando={pastasCarregando}
-              selecionada={pastaSelecionada}
+              // Em Enviados nada fica destacado: o marcador não filtra aquela
+              // aba, e mostrar um item aceso ali afirmaria um filtro que não
+              // existe.
+              selecionada={activeTab === "sent" ? null : pastaSelecionada}
               onSelecionar={escolherPasta}
-              totalSemFiltro={activeTab === "sent" ? totalSent : totalReceived}
+              totalSemFiltro={
+                activeTab === "sent"
+                  ? totalSent
+                  : pastaSelecionada
+                    ? (totalRecebidosSemMarcador ?? totalReceived)
+                    : totalReceived
+              }
             />
           )}
 

@@ -214,13 +214,25 @@ serve(async (req) => {
     // qualquer jeito, mas a linha deixa explícito na tela de compartilhamento
     // quem é o dono da conexão — e cobre o caso de a pessoa deixar de ser
     // gestor depois.
+    //
+    // INSERT tolerando 23505, e NÃO upsert: a unicidade de "caixa inteira" é
+    // um índice PARCIAL (`... WHERE pasta_id IS NULL`), e índice parcial não é
+    // inferível por ON CONFLICT — o Postgres devolve 42P10 e a gravação morre.
+    // O upsert que estava aqui apontava para uma constraint que a migration
+    // 20260805115403 removeu, então falharia de qualquer forma.
     if (estado.usuario_id) {
-      await supabase
+      const { error: erroAcesso } = await supabase
         .from("email_conta_usuarios")
-        .upsert(
-          { conta_id: conta.id, usuario_id: estado.usuario_id, criado_por: estado.usuario_id },
-          { onConflict: "conta_id,usuario_id" },
-        );
+        .insert({
+          conta_id: conta.id,
+          usuario_id: estado.usuario_id,
+          pasta_id: null, // caixa inteira: quem conectou vê tudo
+          criado_por: estado.usuario_id,
+        });
+      // 23505 = reconexão da mesma caixa pela mesma pessoa. Já está liberada.
+      if (erroAcesso && erroAcesso.code !== "23505") {
+        console.error("[email-callback] falha ao liberar quem conectou:", erroAcesso);
+      }
     }
 
     console.log(

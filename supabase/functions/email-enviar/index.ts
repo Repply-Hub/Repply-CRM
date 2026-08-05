@@ -89,11 +89,29 @@ serve(async (req) => {
     }
 
     // ---- conta conectada --------------------------------------------------
-    const { data: conta } = await supabase
-      .from("email_contas")
-      .select("id, email, nome_exibicao, status")
-      .eq("empresa_id", caller.empresa_id)
-      .maybeSingle();
+    // Duas leituras da MESMA linha, de propósito, com credenciais diferentes:
+    //
+    //  - a de serviço responde "existe? está viva?", e é o que produz mensagem
+    //    de erro útil;
+    //  - a do usuário responde "esta pessoa pode?", porque passa pela RLS de
+    //    email_contas, que é `tenho_acesso_a_caixa(id)` — a MESMA regra que
+    //    decide o que a tela mostra.
+    //
+    // Replicar a regra aqui em TypeScript seria uma segunda fonte de verdade
+    // que dessincroniza no primeiro ajuste de política. Deixar o banco decidir
+    // custa uma consulta e nunca diverge.
+    const [{ data: conta }, { data: contaVisivel }] = await Promise.all([
+      supabase
+        .from("email_contas")
+        .select("id, email, nome_exibicao, status")
+        .eq("empresa_id", caller.empresa_id)
+        .maybeSingle(),
+      userClient
+        .from("email_contas")
+        .select("id")
+        .eq("empresa_id", caller.empresa_id)
+        .maybeSingle(),
+    ]);
 
     if (!conta) {
       return json(
@@ -105,6 +123,26 @@ serve(async (req) => {
       return json(
         { error: "A conexão com o e-mail expirou. Reconecte a caixa.", code: "conta_revogada" },
         409,
+      );
+    }
+
+    // Enviar é falar EM NOME da empresa, com o endereço dela no remetente. Sem
+    // esta checagem qualquer pessoa com login mandava e-mail pela caixa do
+    // atendimento sem nunca ter recebido acesso a ela.
+    //
+    // Quem tem um marcador só continua passando: você pediu que quem enxerga o
+    // marcador possa responder por ele, e `tenho_acesso_a_caixa` devolve
+    // verdadeiro para qualquer liberação — inteira ou de um marcador.
+    if (!contaVisivel) {
+      console.warn(
+        `[email-enviar] acesso negado: usuario=${caller.id} conta=${conta.id} empresa=${caller.empresa_id}`,
+      );
+      return json(
+        {
+          error: "Você não tem acesso a esta caixa de e-mail. Peça a um gestor para liberar.",
+          code: "sem_acesso_a_caixa",
+        },
+        403,
       );
     }
 

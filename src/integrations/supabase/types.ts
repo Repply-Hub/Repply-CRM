@@ -1127,6 +1127,113 @@ export type Database = {
         }
         Relationships: []
       }
+      email_conexao_estados: {
+        Row: {
+          criado_em: string
+          empresa_id: string
+          expira_em: string
+          provedor: string
+          state: string
+          usuario_id: string | null
+        }
+        Insert: {
+          criado_em?: string
+          empresa_id: string
+          expira_em?: string
+          provedor: string
+          state: string
+          usuario_id?: string | null
+        }
+        Update: {
+          criado_em?: string
+          empresa_id?: string
+          expira_em?: string
+          provedor?: string
+          state?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_conexao_estados_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_conta_grants: {
+        Row: {
+          atualizado_em: string
+          conta_id: string
+          criado_em: string
+          grant_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          conta_id: string
+          criado_em?: string
+          grant_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          conta_id?: string
+          criado_em?: string
+          grant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_conta_grants_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: true
+            referencedRelation: "email_contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_conta_usuarios: {
+        Row: {
+          conta_id: string
+          criado_em: string
+          criado_por: string | null
+          id: string
+          /** Marcador liberado. NULO = a caixa inteira. */
+          pasta_id: string | null
+          usuario_id: string
+        }
+        Insert: {
+          conta_id: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          pasta_id?: string | null
+          usuario_id: string
+        }
+        Update: {
+          conta_id?: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          pasta_id?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_conta_usuarios_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "email_contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_conta_usuarios_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_contas: {
         Row: {
           conectado_em: string
@@ -1287,6 +1394,58 @@ export type Database = {
           },
           {
             foreignKeyName: "email_mensagens_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_pastas: {
+        Row: {
+          atributos: string[]
+          atualizado_em: string
+          conta_id: string
+          empresa_id: string
+          id: string
+          nao_lidas: number | null
+          nome: string
+          /** Id da pasta no provedor. No Google, `Label_<números>`. */
+          pasta_id: string
+          total_mensagens: number | null
+        }
+        Insert: {
+          atributos?: string[]
+          atualizado_em?: string
+          conta_id: string
+          empresa_id: string
+          id?: string
+          nao_lidas?: number | null
+          nome: string
+          pasta_id: string
+          total_mensagens?: number | null
+        }
+        Update: {
+          atributos?: string[]
+          atualizado_em?: string
+          conta_id?: string
+          empresa_id?: string
+          id?: string
+          nao_lidas?: number | null
+          nome?: string
+          pasta_id?: string
+          total_mensagens?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_pastas_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "email_contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_pastas_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"

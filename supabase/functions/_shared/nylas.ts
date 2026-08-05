@@ -85,22 +85,103 @@ export interface PastaNylas {
   unread_count?: number;
 }
 
-/** Lista as pastas do grant. Devolve [] em falha — nunca lança. */
+/**
+ * Lista TODAS as pastas do grant, seguindo a paginação. Devolve [] em falha —
+ * nunca lança.
+ *
+ * A paginação não é detalhe: `/folders` devolve 50 por página por padrão, e uma
+ * caixa de atendimento organizada passa disso com facilidade. Sem seguir o
+ * cursor, os marcadores além do quinquagésimo simplesmente não existiriam para
+ * o CRM — não apareceriam na barra lateral nem na tela de compartilhamento, e
+ * `gravarPastas` ainda APAGARIA os que já estivessem gravados, por considerá-los
+ * excluídos no provedor.
+ */
 export async function buscarPastas(grantId: string): Promise<PastaNylas[]> {
+  const todas: PastaNylas[] = [];
+  let cursor: string | null = null;
+
   try {
-    const resp = await chamarNylas<PastaNylas[]>(`/v3/grants/${grantId}/folders`, {
-      method: "GET",
-      timeoutMs: 20_000,
-    });
-    if (!resp.ok) {
-      console.warn("[nylas] /folders recusado:", resp.status, resp.texto.slice(0, 200));
-      return [];
+    // Teto de páginas como rede de segurança: um cursor que se repetisse por
+    // bug do provedor daria laço infinito dentro da Edge Function.
+    for (let pagina = 0; pagina < 20; pagina++) {
+      const params = new URLSearchParams({ limit: "200" });
+      if (cursor) params.set("page_token", cursor);
+
+      const resp = await chamarNylas<PastaNylas[]>(
+        `/v3/grants/${grantId}/folders?${params.toString()}`,
+        { method: "GET", timeoutMs: 20_000 },
+      );
+
+      if (!resp.ok) {
+        console.warn("[nylas] /folders recusado:", resp.status, resp.texto.slice(0, 200));
+        // O que já veio vale mais do que nada — mas só se a PRIMEIRA página
+        // deu certo. Falhar no meio devolve o parcial, e quem chama decide.
+        return todas;
+      }
+
+      todas.push(...(resp.body.data ?? []));
+      cursor = resp.body.next_cursor ?? null;
+      if (!cursor) break;
+
+      if (pagina === 19) {
+        console.warn(`[nylas] /folders passou de 20 páginas no grant ${grantId}; truncado`);
+      }
     }
-    return resp.body.data ?? [];
+    return todas;
   } catch (e) {
     console.warn("[nylas] falha de rede em /folders:", e);
-    return [];
+    return todas;
   }
+}
+
+/** Atributos com que o Nylas marca pasta de sistema, em qualquer provedor. */
+const ATRIBUTOS_DE_SISTEMA = [
+  "\\inbox",
+  "\\sent",
+  "\\drafts",
+  "\\trash",
+  "\\spam",
+  "\\junk",
+  "\\archive",
+  "\\all",
+  "\\important",
+  "\\starred",
+  "\\flagged",
+];
+
+/**
+ * Ids que o próprio Gmail usa para os rótulos DELE e que chegam sem atributo
+ * nenhum. Sem esta lista, `CATEGORY_PERSONAL` e `UNREAD` passariam por marcador
+ * criado pela pessoa e virariam pasta na barra lateral — os dados reais desta
+ * caixa têm 35 mensagens em CATEGORY_PERSONAL e 3 em UNREAD.
+ *
+ * Não atrapalha outro provedor: id de pasta do Microsoft é opaco e não casa.
+ */
+const IDS_DE_SISTEMA_DO_GOOGLE = new RegExp(
+  "^(" +
+    // Pastas e estados basicos.
+    "INBOX|SENT|DRAFT|DRAFTS|SPAM|TRASH|STARRED|UNREAD|IMPORTANT|CHAT" +
+    // Abas da caixa de entrada: CATEGORY_PERSONAL, CATEGORY_PROMOTIONS…
+    "|CATEGORY_[A-Z]+" +
+    // As "superestrelas" do Gmail. Sao doze ids fixos, cada um uma marcacao
+    // visual que a pessoa aplica clicando na estrela — nao sao pastas dela, e
+    // apareceriam na barra lateral com nomes como "YELLOW_STAR".
+    "|(YELLOW|RED|ORANGE|GREEN|BLUE|PURPLE)_(STAR|BANG)" +
+    "|ORANGE_GUILLEMET|GREEN_CHECK|BLUE_INFO|PURPLE_QUESTION" +
+  ")$",
+);
+
+/**
+ * Pasta criada pelo provedor, e não pela pessoa.
+ *
+ * O que NÃO cai aqui é marcador do usuário — o "001 - ELIZABETH" que ela
+ * organizou no Gmail. Só esses viram filtro na barra lateral e unidade de
+ * compartilhamento; oferecer "Não lidas" como se fosse pasta dela seria ruído.
+ */
+export function ehPastaDeSistema(p: PastaNylas): boolean {
+  const attrs = (p.attributes ?? []).map((a) => a.toLowerCase());
+  if (attrs.some((a) => ATRIBUTOS_DE_SISTEMA.includes(a))) return true;
+  return IDS_DE_SISTEMA_DO_GOOGLE.test((p.id ?? "").trim());
 }
 
 /**
