@@ -86,7 +86,10 @@ export function DateRangePicker({ value, onChange }: Props) {
                   setPendingFrom(undefined);
                 }
               }}
-              numberOfMonths={2}
+              // Com 2 painéis a navegação da lib é sempre vinculada (trocar mês/ano em
+              // qualquer dropdown desloca os dois calendários juntos como um par
+              // contínuo) — não dá pra navegar cada um isolado. Um painel só resolve.
+              numberOfMonths={1}
               locale={ptBR}
               className="pointer-events-auto"
               captionLayout="dropdown-buttons"
