@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 // staleTime/gcTime/refetchOnWindowFocus no mesmo padrão de usePedidos (src/hooks/use-pedidos.ts)
@@ -105,6 +105,10 @@ export function useDashboardStats(
       }) as DashboardStats;
     },
     enabled: !!empresaId,
+    // Mantém os dados do filtro anterior na tela enquanto o novo filtro carrega —
+    // sem isso, trocar fabricante/responsável/período derrubava a tela inteira pro
+    // spinner de full-page a cada mudança, porque a queryKey muda com os filtros.
+    placeholderData: keepPreviousData,
     ...DASHBOARD_QUERY_OPTS,
   });
 }

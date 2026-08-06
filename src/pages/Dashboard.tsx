@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { subMonths, isWithinInterval, parseISO, startOfDay, endOfDay, format } from 'date-fns';
+import { startOfMonth, endOfMonth, isWithinInterval, parseISO, startOfDay, endOfDay, format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -16,6 +16,7 @@ import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePi
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/DashboardChartTooltip';
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PlanoVendasSection } from '@/components/dashboard/PlanoVendasSection';
 
 
 const formatCurrency = (v: number) =>
@@ -36,14 +37,15 @@ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent
 
 const Dashboard = () => {
   const [dateRange, setDateRange] = useState<DateRange>({
-    from: subMonths(new Date(), 60),
-    to: new Date(),
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
   });
   const [fabricaSort, setFabricaSort] = useState<'maior' | 'menor'>('maior');
   const [vendedorId, setVendedorId] = useState<string>('todos');
   const [fabricanteId, setFabricanteId] = useState<string>('todos');
 
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isGestor = profile?.role === 'admin' || profile?.role === 'gestor' || profile?.role === 'empresa';
   const { data: userData } = useQuery({
     queryKey: ['usuario_perfil', user?.id],
     queryFn: async () => {
@@ -85,13 +87,16 @@ const Dashboard = () => {
   // KPIs, segmentação e rendimento por fábrica/vendedor vêm agregados do servidor
   // (RPC dashboard_stats) em vez de puxar centenas de linhas de `pedidos` com joins
   // pro cliente só pra somar — ver supabase/migrations/20260722100000_dashboard_stats_rpc.sql.
-  const { data: stats, isLoading: loadStats } = useDashboardStats(empresaId, {
+  const { data: stats, isLoading: loadStats, isFetching: fetchingStats } = useDashboardStats(empresaId, {
     usuarioId: vendedorId !== 'todos' ? vendedorId : undefined,
     fabricanteId: fabricanteId !== 'todos' ? fabricanteId : undefined,
     dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
     dateTo: format(dateRange.to, 'yyyy-MM-dd'),
   });
 
+  // loadStats só fica true na primeira carga (sem dado nenhum ainda pra mostrar) —
+  // trocas de filtro reaproveitam os dados anteriores (placeholderData: keepPreviousData
+  // em use-dashboard.ts) e só acendem fetchingStats, sem derrubar a tela pro spinner full-page.
   const isLoading = loadFat || loadStats;
 
   const filteredFaturamento = useMemo(() => {
@@ -185,7 +190,7 @@ const Dashboard = () => {
   return (
     <AppLayout title="Dashboard" subtitle="Visão analítica do desempenho comercial">
       <ErrorBoundary>
-      <div className="p-6 w-full">
+      <div className={`p-6 w-full transition-opacity duration-200 ${fetchingStats && !isLoading ? 'opacity-60' : 'opacity-100'}`}>
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {kpis.map((kpi) => (
@@ -210,6 +215,17 @@ const Dashboard = () => {
             </Card>
           ))}
         </div>
+
+        {/* Plano de Vendas */}
+        {empresaId && (
+          <PlanoVendasSection
+            empresaId={empresaId}
+            isGestor={isGestor}
+            currentUsuarioId={profile?.id}
+            vendedores={(vendedores ?? []).map(v => ({ usuario_id: v.usuario_id ?? '', usuario_nome: v.usuario_nome ?? '' }))}
+            fabricantes={fabricantes}
+          />
+        )}
 
         {/* Filtros */}
         <div className="mb-8 flex flex-col sm:flex-row flex-wrap gap-4 justify-end items-end">
@@ -249,6 +265,12 @@ const Dashboard = () => {
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Período</p>
             <DateRangePicker value={dateRange} onChange={setDateRange} />
           </div>
+          {fetchingStats && !isLoading && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground pb-2.5">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Atualizando...
+            </div>
+          )}
         </div>
 
 
