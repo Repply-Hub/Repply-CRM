@@ -54,11 +54,16 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
       let hasMore = true;
       const allEvents: EventoRow[] = [];
 
+      // Eventos "empresa" devem aparecer para todo mundo da empresa, mesmo sem
+      // estar marcado como participante — "responsáveis" é só informativo, não
+      // controle de acesso (a RLS libera o SELECT nesse caso; ver migration
+      // 20260806110000). Eventos "pessoal" continuam restritos a quem é
+      // participante (linha própria).
       while (hasMore) {
         const { data, error } = await supabase
           .from('eventos')
           .select('*')
-          .eq('user_id', user!.id)
+          .or(`user_id.eq.${user!.id},tipo_calendario.eq.empresa`)
           .order('inicio')
           .range(from, from + pageSize - 1);
 
@@ -73,7 +78,21 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
         from += pageSize;
       }
 
-      return allEvents;
+      // Eventos "empresa" com vários participantes geram uma linha por pessoa
+      // (mesmo grupo_id) — sem isso o mesmo evento apareceria duplicado no
+      // calendário, uma vez por responsável. Mantém 1 linha por grupo,
+      // preferindo a própria cópia do usuário (para refletir seu lembrete e
+      // permissão de edição) quando ele for um dos participantes.
+      const porGrupo = new Map<string, EventoRow>();
+      for (const row of allEvents) {
+        const chave = row.grupo_id ?? row.id;
+        const atual = porGrupo.get(chave);
+        if (!atual || row.user_id === user!.id) {
+          porGrupo.set(chave, row);
+        }
+      }
+
+      return Array.from(porGrupo.values());
     },
   });
 
@@ -117,6 +136,11 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
           tipoCalendario: e.tipo_calendario as CalendarType,
           cor: e.cor,
           editavel: true,
+          // Quem só está vendo um evento "empresa" por transparência (não é
+          // participante nem organizador) pode abrir e ler, mas não salvar —
+          // a RLS de update/delete já exige user_id/criado_por = auth.uid(),
+          // então isso só evita chamadas que a policy rejeitaria de qualquer forma.
+          podeEditar: e.user_id === user!.id || e.criado_por === user!.id,
           lembreteMinutos: e.lembrete_minutos,
           grupoId: e.grupo_id,
           criadoPor: e.criado_por,
@@ -162,7 +186,7 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
     }
 
     return result;
-  }, [eventos, pedidos, contatos, visibleCalendars]);
+  }, [eventos, pedidos, contatos, visibleCalendars, user]);
 
   return events;
 }

@@ -151,6 +151,17 @@ export function EventDialog({
     set('participantes', next);
   };
 
+  const todosParticipantesSelecionados =
+    funcionariosDisponiveis.length > 0 &&
+    funcionariosDisponiveis.every((u: { user_id: string }) => (form.participantes ?? []).includes(u.user_id));
+
+  const toggleTodosParticipantes = () => {
+    set(
+      'participantes',
+      todosParticipantesSelecionados ? [] : funcionariosDisponiveis.map((u: { user_id: string }) => u.user_id),
+    );
+  };
+
   const handleSubmit = () => {
     if (!form.titulo.trim()) return;
     onSave(form);
@@ -163,15 +174,23 @@ export function EventDialog({
   // editar, só o organizador original pode adicionar/remover participantes —
   // um convidado só enxerga a lista, sem poder alterá-la.
   const podeGerenciarParticipantes = !isEditing || editingEvent?.criadoPor === user?.id;
+  // Evento "empresa" visível pra empresa inteira, mas cujo usuário logado não
+  // é participante nem organizador: pode abrir e ler, não pode salvar/excluir.
+  const somenteLeitura = isEditing && editingEvent?.podeEditar === false;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-[560px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>{isEditing ? 'Editar evento' : 'Novo evento'}</DialogTitle>
+          {somenteLeitura && (
+            <p className="text-xs text-muted-foreground">
+              Evento visível para toda a empresa. Somente o organizador pode editá-lo ou excluí-lo.
+            </p>
+          )}
         </DialogHeader>
 
-        <div className="space-y-4 py-2 px-6 overflow-y-auto flex-1 min-h-0">
+        <fieldset disabled={somenteLeitura} className="space-y-4 py-2 px-6 overflow-y-auto flex-1 min-h-0 border-0 m-0 min-w-0">
           {/* Título */}
           <div className="space-y-1.5">
             <Label htmlFor="titulo">Título</Label>
@@ -251,6 +270,18 @@ export function EventDialog({
                     }}
                   >
                     <CommandInput placeholder="Buscar funcionário..." />
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b">
+                      <span className="text-xs text-muted-foreground">
+                        {participantesSelecionados.length} de {funcionariosDisponiveis.length} selecionado(s)
+                      </span>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-primary hover:underline"
+                        onClick={toggleTodosParticipantes}
+                      >
+                        {todosParticipantesSelecionados ? 'Limpar seleção' : 'Selecionar todos'}
+                      </button>
+                    </div>
                     <CommandList className="max-h-[240px] overflow-y-auto overflow-x-hidden">
                       <CommandEmpty className="py-6 text-center text-sm">
                         Nenhum funcionário encontrado.
@@ -347,24 +378,30 @@ export function EventDialog({
               onChange={(e) => set('descricao', e.target.value)}
             />
           </div>
-        </div>
+        </fieldset>
 
         <DialogFooter className="gap-2 px-6 py-4 border-t shrink-0">
-          {isEditing && onDelete && editingEvent && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mr-auto text-destructive hover:text-destructive"
-              onClick={() => { onDelete(editingEvent.id); onClose(); }}
-            >
-              <Trash2 className="h-4 w-4 mr-1.5" />
-              Excluir
-            </Button>
+          {somenteLeitura ? (
+            <Button variant="outline" size="sm" className="ml-auto" onClick={onClose}>Fechar</Button>
+          ) : (
+            <>
+              {isEditing && onDelete && editingEvent && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mr-auto text-destructive hover:text-destructive"
+                  onClick={() => { onDelete(editingEvent.id); onClose(); }}
+                >
+                  <Trash2 className="h-4 w-4 mr-1.5" />
+                  Excluir
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
+              <Button size="sm" onClick={handleSubmit} disabled={!form.titulo.trim()}>
+                {isEditing ? 'Salvar' : 'Criar'}
+              </Button>
+            </>
           )}
-          <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
-          <Button size="sm" onClick={handleSubmit} disabled={!form.titulo.trim()}>
-            {isEditing ? 'Salvar' : 'Criar'}
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

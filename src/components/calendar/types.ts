@@ -11,6 +11,9 @@ export interface CalendarEvent {
   tipoCalendario: CalendarType;
   cor: string;
   editavel: boolean;
+  // Se false, o usuário está vendo o evento (ex.: evento "empresa" do qual não
+  // é participante/organizador) mas não pode salvar alterações nem excluir.
+  podeEditar?: boolean;
   lembreteMinutos?: number | null;
   grupoId?: string;
   criadoPor?: string;
