@@ -235,19 +235,21 @@ export function useMarkAsRead() {
 
 export function useMarkAllAsRead() {
   const qc = useQueryClient();
-  const { user } = useAuth();
-  
+  const { user, profile } = useAuth();
+
   return useMutation({
     mutationFn: async () => {
       if (!user) return;
-      
-      // Mark notifications as read
-      await supabase
-        .from('notificacoes')
-        .update({ lida: true })
-        .eq('usuario_id', user.id)
-        .eq('lida', false);
-        
+
+      // Mark notifications as read (notificacoes.usuario_id referencia usuarios.id, não o uid do auth)
+      if (profile?.id) {
+        await supabase
+          .from('notificacoes')
+          .update({ lida: true })
+          .eq('usuario_id', profile.id)
+          .eq('lida', false);
+      }
+
       // Mark emails as read
       await supabase
         .from('emails_recebidos')

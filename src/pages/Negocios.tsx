@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useDeferredValue, memo, lazy, Suspense } from 'react';
+import { useEffect, useMemo, useState, useCallback, useDeferredValue, useRef, memo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parse, isValid, startOfMonth, endOfMonth } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
@@ -622,6 +622,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const visibleColumnDefs = columns.filter(col => tableVisibleColumns.includes(col.id));
   const resolvedColWidths = visibleColumnDefs.map(col => columnWidths[col.id] ?? (col.id === 'acoes' ? 80 : 150));
   const tableTotalWidth = CHECKBOX_COL_WIDTH + resolvedColWidths.reduce((a, b) => a + b, 0);
+
+  // Largura visível (viewport) da área da tabela — usada pra manter o texto de "nenhum
+  // resultado" centralizado na parte visível quando a tabela é mais larga que o container
+  // e tem scroll horizontal (senão o texto centraliza na largura total da tabela, não na tela).
+  const tableViewportRef = useRef<HTMLDivElement>(null);
+  const [tableViewportWidth, setTableViewportWidth] = useState(0);
+  useEffect(() => {
+    const el = tableViewportRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setTableViewportWidth(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('negocios_search', search);
@@ -1622,7 +1635,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 )}
               </div>
 
-              <div className="w-full rounded-xl border border-border overflow-hidden flex-1 min-h-0 flex flex-col">
+              <div ref={tableViewportRef} className="w-full rounded-xl border border-border overflow-hidden flex-1 min-h-0 flex flex-col">
                 <Table wrapperClassName="flex-1 min-h-0" className="table-fixed" style={{ width: tableTotalWidth }}>
                   <colgroup>
                     <col style={{ width: CHECKBOX_COL_WIDTH }} />
@@ -1653,8 +1666,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   <TableBody>
                     {paginated.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={tableVisibleColumns.length + 1} className="py-12 text-center text-muted-foreground">
-                          Nenhum negócio encontrado
+                        <TableCell colSpan={tableVisibleColumns.length + 1} className="p-0 overflow-visible">
+                          <div
+                            className="sticky left-0 flex items-center justify-center py-12 text-muted-foreground"
+                            style={{ width: tableViewportWidth || '100%' }}
+                          >
+                            Nenhum negócio encontrado
+                          </div>
                         </TableCell>
                       </TableRow>
                     ) : (
