@@ -257,10 +257,8 @@ serve(async (req) => {
     const uazapiInstance = config.api_instance_name ?? config.instance_name;
     const baseUrl = config.instance_url.replace(/\/$/, "");
 
-    let wapiStatus = 0;
-    let responseText = "";
-    let fetchError = "";
     let wapiUrl = "";
+    let wapiOptions: RequestInit;
 
     if (tipo === 'texto' || !media_url) {
       // --- Texto ---
@@ -268,20 +266,16 @@ serve(async (req) => {
         return await recusar(supabase, "mensagem_vazia", "Escreva uma mensagem antes de enviar.", 400, { tipo });
       }
       wapiUrl = `${baseUrl}/send/text`;
-      try {
-        const res = await fetch(wapiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", token: config.api_key },
-          body: JSON.stringify({
-            instanceName: uazapiInstance,
-            number: phone,
-            text: assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem,
-            ...(quoted_wamid ? { replyid: rawMessageId(quoted_wamid) } : {}),
-          }),
-        });
-        wapiStatus = res.status;
-        responseText = await res.text().catch(() => "");
-      } catch (e) { fetchError = String(e); }
+      wapiOptions = {
+        method: "POST",
+        headers: { "Content-Type": "application/json", token: config.api_key },
+        body: JSON.stringify({
+          instanceName: uazapiInstance,
+          number: phone,
+          text: assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem,
+          ...(quoted_wamid ? { replyid: rawMessageId(quoted_wamid) } : {}),
+        }),
+      };
     } else {
       // --- Mídia: POST /send/media ---
       const typeMap: Record<string, string> = {
@@ -301,22 +295,54 @@ serve(async (req) => {
       if (media_mime) wapiBody.mimetype = media_mime;
       if (quoted_wamid) wapiBody.replyid = rawMessageId(quoted_wamid);
 
-      try {
-        const res = await fetch(wapiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", token: config.api_key },
-          body: JSON.stringify(wapiBody),
-        });
-        wapiStatus = res.status;
-        responseText = await res.text().catch(() => "");
-      } catch (e) { fetchError = String(e); }
+      wapiOptions = {
+        method: "POST",
+        headers: { "Content-Type": "application/json", token: config.api_key },
+        body: JSON.stringify(wapiBody),
+      };
     }
+
+    const enviarUmaVez = async (): Promise<{ status: number; texto: string; erroFetch: string }> => {
+      try {
+        const res = await fetch(wapiUrl, wapiOptions);
+        return { status: res.status, texto: await res.text().catch(() => ""), erroFetch: "" };
+      } catch (e) {
+        return { status: 0, texto: "", erroFetch: String(e) };
+      }
+    };
+
+    let envio = await enviarUmaVez();
+
+    /**
+     * A uazapi (Baileys por baixo) às vezes falha em resolver o LID — a identidade
+     * anônima que o WhatsApp usa para rotear mensagens, substituindo o JID por
+     * telefone — na primeira tentativa: "no LID found for <jid> from server". Na
+     * prática costuma ser transitório (o cache de LID da instância ainda não
+     * sincronizou aquele contato) e uma segunda tentativa alguns segundos depois
+     * resolve sozinha. Sem esse retry, todo destino nessa situação falhava com um
+     * erro técnico em inglês mesmo quando reenviar manualmente teria funcionado.
+     */
+    let repetidoPorLid = false;
+    if (envio.status < 200 || envio.status >= 300) {
+      let erroInicial = "";
+      try { erroInicial = JSON.parse(envio.texto)?.error ?? ""; } catch { /* ok */ }
+      if (/no lid found/i.test(erroInicial)) {
+        repetidoPorLid = true;
+        await new Promise((r) => setTimeout(r, 1500));
+        envio = await enviarUmaVez();
+      }
+    }
+
+    const wapiStatus = envio.status;
+    const responseText = envio.texto;
+    const fetchError = envio.erroFetch;
 
     // Debug — aguardado para garantir que erros sejam registrados antes do retorno
     await supabase.from("webhook_debug").insert({
       payload: {
         _debug: true, url: wapiUrl, status: wapiStatus, response: responseText, fetch_error: fetchError || null,
         replyid_enviado: quoted_wamid ? rawMessageId(quoted_wamid) : null,
+        repetido_por_lid: repetidoPorLid,
       }
     });
 
@@ -330,6 +356,8 @@ serve(async (req) => {
       try { wapiError = JSON.parse(responseText)?.error ?? ""; } catch { /* ok */ }
       const userMessage = wapiError.includes("not on WhatsApp")
         ? "Este número não tem WhatsApp."
+        : /no lid found/i.test(wapiError)
+        ? "Não foi possível confirmar este número no WhatsApp agora. Tente novamente em instantes."
         // O texto cru do provedor vem em inglês e costuma ser técnico demais para
         // o usuário final; só é aproveitado quando não há caso conhecido.
         : wapiError || `O WhatsApp recusou o envio (código ${wapiStatus}). Tente de novo em instantes.`;
