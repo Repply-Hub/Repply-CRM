@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { resolveClienteId, resolveFabricanteId, resolveObraId, resolveMarcadorId, resetResolveCache, preloadResolveCache } from '@/lib/import/resolve-entities';
+import { resolveClienteId, resolveFabricanteId, resolveMarcadorId, resetResolveCache, preloadResolveCache } from '@/lib/import/resolve-entities';
 import { computeRowHash } from '@/lib/import/row-hash';
 import { resolveEspelhoPdfUrls, type ResolvePdfResult } from '@/lib/import/resolve-pedido-pdf';
 import { matchPedidoStatusToColuna, type ImportKanbanColuna } from '@/components/import-pedidos/importPedidosUtils';
@@ -230,7 +230,10 @@ export function useBulkImport() {
 
           const clienteNome = String(row.cliente ?? '').trim();
           const fabricanteNome = String(row.fabricante ?? '').trim();
-          const obraNome = String(row.obra ?? '').trim();
+          // Coluna "Obra/Endereço" da planilha vira texto livre em endereco_entrega —
+          // a importação de negócios nunca cria/vincula registros na tabela `obras`,
+          // que é uma entidade própria cadastrada manualmente por cliente.
+          const enderecoEntrega = String(row.obra ?? '').trim();
 
           if (!clienteNome || !fabricanteNome) {
             throw new Error('Cliente e Fabricante são obrigatórios');
@@ -238,7 +241,6 @@ export function useBulkImport() {
 
           const clienteId = await resolveClienteId(clienteNome, vendedorId);
           const fabricanteId = await resolveFabricanteId(fabricanteNome);
-          const obraId = obraNome ? await resolveObraId(obraNome, clienteId) : undefined;
           const marcadorNome = String(row.marcador ?? '').trim();
           const marcadorId = marcadorNome && empresaId ? await resolveMarcadorId(marcadorNome, empresaId) : undefined;
 
@@ -259,7 +261,7 @@ export function useBulkImport() {
             cliente_id: clienteId,
             fabricante_id: fabricanteId,
             funil_id: funilId,
-            obra_id: obraId,
+            endereco_entrega: enderecoEntrega || null,
             valor_total: row.valor,
             observacoes: row.observacoes,
             data_pedido: row.data_pedido,

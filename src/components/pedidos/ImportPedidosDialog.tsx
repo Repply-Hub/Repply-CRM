@@ -423,7 +423,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       }
 
       // Pré-processa linhas: enriquece campos_extras e resolve usuario_id para gestor.
-      // Resolução de clientes/fabricantes/obras, hashing e batch paralelo ficam no hook.
+      // Resolução de clientes/fabricantes, hashing e batch paralelo ficam no hook.
       const enrichedRows: Record<string, unknown>[] = rows.map(r => {
         const campos_extras = { ...(r.campos_extras || {}) };
         const match = isGestorNow && r.vendedor ? matchUsuarioByNome(r.vendedor, usuariosParaMatch) : null;
@@ -757,7 +757,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Cliente</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Fabricante</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Negócio</TableHead>
-                    <TableHead className="text-xs sticky top-0 bg-muted/50">Obra</TableHead>
+                    <TableHead className="text-xs sticky top-0 bg-muted/50">Endereço</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Vendedor</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Valor</TableHead>
                     <TableHead className="text-xs sticky top-0 bg-muted/50">Etapa</TableHead>

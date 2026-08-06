@@ -22,7 +22,7 @@ Ao final, os dados são inseridos em lote no Supabase com estratégias de resili
 src/
 ├── lib/import/
 │   ├── file-parser.ts          # Leitura e parse do arquivo (CSV/XLSX)
-│   └── resolve-entities.ts     # Resolução de FKs (cliente, fabricante, obra)
+│   └── resolve-entities.ts     # Resolução de FKs (cliente, fabricante)
 │
 ├── components/
 │   ├── ImportPedidosDialog.tsx  # Wizard de importação de Negócios
@@ -123,7 +123,7 @@ Cada tipo de campo possui uma função de sanitização dedicada:
 | `negocio`       | não         | text     | Nome/título do negócio |
 | `cliente`       | **sim**     | text     | Nome da empresa cliente |
 | `contato`       | não         | text     | Nome do contato |
-| `obra`          | não         | text     | Nome da obra/projeto |
+| `obra`          | não         | text     | Endereço de entrega (texto livre — **não** cria/vincula registros em `obras`) |
 | `fabricante`    | **sim**     | text     | Nome do fabricante |
 | `valor`         | não         | number   | Valor total |
 | `vendedor`      | não         | text     | Nome do vendedor |
@@ -137,7 +137,7 @@ Cada tipo de campo possui uma função de sanitização dedicada:
 ```
 1. Validação → cliente e fabricante devem estar mapeados
        ↓
-2. Carrega lookup tables (clientes, fabricantes, vendedores, obras)
+2. Carrega lookup tables (clientes, fabricantes, vendedores)
    em blocos de 1.000 linhas
        ↓
 3. Resolve entidades (cria se não existir — ver seção 5)
@@ -154,18 +154,22 @@ Cada tipo de campo possui uma função de sanitização dedicada:
 ```ts
 {
   cliente_id,
-  obra_id,
+  endereco_entrega,  // texto livre da coluna `obra` — nunca vira obra_id
   fabricante_id,
-  usuario_id,       // vendedor logado ou resolvido pelo nome
+  usuario_id,        // vendedor logado ou resolvido pelo nome
   status,
   valor_total,
   observacoes,
-  campos_extras,    // colunas extras mapeadas como JSON
+  campos_extras,     // colunas extras mapeadas como JSON
   data_pedido,
   created_at,
   prazo_resposta
 }
 ```
+
+`obra_id` nunca é preenchido pela importação — a entidade `obras` só é criada/vinculada manualmente
+pela UI (`NovoNegocioDialog`), pois é um cadastro próprio por cliente (com endereço, SPE/CNPJ etc.),
+diferente do campo de texto livre `endereco_entrega` do negócio.
 
 ---
 
@@ -181,10 +185,6 @@ Utilizado exclusivamente pelo fluxo de **Negócios**. Resolve ou cria registros 
 ### `resolveFabricanteId(nome)`
 1. Busca por `nome` (case-insensitive)
 2. Se não encontrar: cria novo fabricante (catálogo compartilhado, sem `usuario_id`)
-
-### `resolveObraId(nome, clienteId)`
-1. Busca por `nome_obra` dentro do cliente
-2. Se não encontrar: cria com `status: 'ativa'`
 
 **Cache de sessão:** um `Map` por entidade previne queries duplicadas para nomes repetidos na mesma importação.
 
@@ -362,7 +362,8 @@ Arquivo (CSV/XLSX)
    ┌──────────────────────────────┐
    │  Negócios?                   │
    │  resolve-entities.ts         │
-   │  → cliente / fabricante / obra│
+   │  → cliente / fabricante      │
+   │  (endereço vira texto livre) │
    └──────────────┬───────────────┘
                   │
                   ▼

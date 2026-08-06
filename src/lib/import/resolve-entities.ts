@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 const cache = {
   clientes: new Map<string, string>(),
   fabricantes: new Map<string, string>(),
-  obras: new Map<string, string>(),
   marcadores: new Map<string, string>(),
 };
 
@@ -22,10 +21,6 @@ function dedupeByNormalizedKey(names: string[]): string[] {
     if (!seen.has(key)) seen.set(key, n);
   }
   return [...seen.values()];
-}
-
-function obraKey(clienteId: string, nome: string): string {
-  return `${clienteId}::${normalizeKey(nome)}`;
 }
 
 function marcadorKey(empresaId: string, nome: string): string {
@@ -76,18 +71,21 @@ function buildOrFilter(column: string, values: string[]): string {
 export function resetResolveCache() {
   cache.clientes.clear();
   cache.fabricantes.clear();
-  cache.obras.clear();
   cache.marcadores.clear();
 }
 
 /**
  * Pré-carrega o cache de entidades para toda a lista de linhas da planilha.
  *
- * Antes do loop linha-a-linha, extrai os nomes únicos de cliente/fabricante/obra,
+ * Antes do loop linha-a-linha, extrai os nomes únicos de cliente/fabricante,
  * cruza com o banco em poucos SELECTs em lote (OR ilike, chunks de 50) e cria os
  * faltantes num único INSERT por entidade. Após retornar, todas as chamadas a
- * resolveClienteId / resolveFabricanteId / resolveObraId são cache hits — sem
- * queries adicionais independente do tamanho do arquivo.
+ * resolveClienteId / resolveFabricanteId são cache hits — sem queries adicionais
+ * independente do tamanho do arquivo.
+ *
+ * Nota: importação de negócios nunca cria `obras` — a coluna mapeada para
+ * "Endereço de Entrega" vira texto livre em `pedidos.endereco_entrega`, sem
+ * tocar a entidade obra (que é cadastrada manualmente, vinculada ao cliente).
  *
  * Nota: busca clientes por `empresa` (ilike). Clientes armazenados apenas em
  * `razao_social` não serão pré-carregados e serão resolvidos linha-a-linha como
@@ -172,62 +170,6 @@ export async function preloadResolveCache(
       }
     }
   }
-
-  // ── Obras (segunda passada — depende de cliente_id já resolvido) ──────────
-  const obraRows = rows.filter(
-    r => String(r.obra ?? '').trim() && String(r.cliente ?? '').trim()
-  );
-
-  if (obraRows.length > 0) {
-    // Agrupa nomes únicos de obra por cliente_id já resolvido no passo anterior
-    const obrasByCliente = new Map<string, Set<string>>();
-    for (const r of obraRows) {
-      const clienteId = cache.clientes.get(normalizeKey(String(r.cliente ?? '')));
-      if (!clienteId) continue;
-      if (!obrasByCliente.has(clienteId)) obrasByCliente.set(clienteId, new Set());
-      obrasByCliente.get(clienteId)!.add(String(r.obra!).trim());
-    }
-
-    if (obrasByCliente.size > 0) {
-      const clienteIds = [...obrasByCliente.keys()];
-
-      // Uma SELECT por lote de cliente_ids — traz obras de todos os clientes relevantes
-      for (let i = 0; i < clienteIds.length; i += CHUNK) {
-        const chunk = clienteIds.slice(i, i + CHUNK);
-        const { data } = await supabase
-          .from('obras')
-          .select('id, nome_obra, cliente_id')
-          .in('cliente_id', chunk);
-        data?.forEach(o => {
-          if (o.nome_obra) cache.obras.set(obraKey(o.cliente_id, o.nome_obra), o.id);
-        });
-      }
-
-      // Identifica obras faltantes e cria em um único INSERT em lote
-      const missingObras: Array<{ nome_obra: string; cliente_id: string; status: string }> = [];
-      for (const [clienteId, nomes] of obrasByCliente) {
-        for (const nome of nomes) {
-          if (!cache.obras.has(obraKey(clienteId, nome))) {
-            missingObras.push({ nome_obra: nome, cliente_id: clienteId, status: 'ativa' });
-          }
-        }
-      }
-
-      if (missingObras.length > 0) {
-        const { data: created, error } = await supabase
-          .from('obras')
-          .insert(missingObras)
-          .select('id, nome_obra, cliente_id');
-        if (error) {
-          console.error('Criação de obras em lote falhou no preload:', error.message);
-        } else {
-          created?.forEach(o => {
-            if (o.nome_obra) cache.obras.set(obraKey(o.cliente_id, o.nome_obra), o.id);
-          });
-        }
-      }
-    }
-  }
 }
 
 /**
@@ -270,26 +212,6 @@ export async function resolveFabricanteId(nome: string): Promise<string> {
 
   if (error || !created) throw new Error(`Não foi possível criar fabricante "${nome}": ${error?.message}`);
   cache.fabricantes.set(key, created.id);
-  return created.id;
-}
-
-/** Busca obra por nome dentro do cliente; cria se não achar. Após preload, sempre cache hit. */
-export async function resolveObraId(nome: string, clienteId: string): Promise<string | undefined> {
-  if (!nome) return undefined;
-  const key = obraKey(clienteId, nome);
-  if (cache.obras.has(key)) return cache.obras.get(key)!;
-
-  const { data: existing } = await supabase
-    .from('obras').select('id').eq('cliente_id', clienteId).ilike('nome_obra', escapeIlikeWildcards(nome)).limit(1).maybeSingle();
-  if (existing) { cache.obras.set(key, existing.id); return existing.id; }
-
-  const { data: created, error } = await supabase
-    .from('obras')
-    .insert({ nome_obra: nome, cliente_id: clienteId, status: 'ativa' })
-    .select('id').single();
-
-  if (error || !created) throw new Error(`Não foi possível criar obra "${nome}": ${error?.message}`);
-  cache.obras.set(key, created.id);
   return created.id;
 }
 
