@@ -12,6 +12,8 @@ export interface CalendarEvent {
   cor: string;
   editavel: boolean;
   lembreteMinutos?: number | null;
+  grupoId?: string;
+  criadoPor?: string;
 }
 
 export interface EventoForm {
@@ -22,7 +24,7 @@ export interface EventoForm {
   diaInteiro: boolean;
   tipoCalendario: CalendarType;
   cor: string;
-  participantes?: string[]; // user_ids (auth) — usado só na criação
+  participantes?: string[]; // user_ids (auth) dos participantes do evento
   lembreteMinutos: number | null; // antecedência em minutos p/ notificar os participantes
 }
 

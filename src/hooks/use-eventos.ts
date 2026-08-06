@@ -16,6 +16,8 @@ interface EventoRow {
   tipo_calendario: string;
   cor: string;
   lembrete_minutos: number | null;
+  grupo_id: string;
+  criado_por: string;
   updated_at?: string;
 }
 
@@ -116,6 +118,8 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
           cor: e.cor,
           editavel: true,
           lembreteMinutos: e.lembrete_minutos,
+          grupoId: e.grupo_id,
+          criadoPor: e.criado_por,
         });
       }
     });
@@ -163,6 +167,28 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
   return events;
 }
 
+// Ids dos participantes (linhas-irmãs) de um evento, para popular o campo
+// "Participantes" ao abrir a edição de um evento já cadastrado.
+export function useEventoParticipantes(grupoId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['evento-participantes', grupoId],
+    enabled: !!grupoId,
+    // Evita refetch automático (ex.: foco de janela) enquanto o diálogo de
+    // edição está aberto, o que sobrescreveria seleções feitas pelo usuário
+    // antes de salvar. A invalidação explícita em useUpdateEvento cobre a
+    // única mudança real dessa lista.
+    staleTime: Infinity,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('eventos')
+        .select('user_id')
+        .eq('grupo_id', grupoId!);
+      if (error) throw error;
+      return (data as { user_id: string }[]).map((r) => r.user_id);
+    },
+  });
+}
+
 // --- Mutations ---
 
 export function useCreateEvento() {
@@ -181,12 +207,18 @@ export function useCreateEvento() {
       // Cria uma linha por participante selecionado no formulário (o próprio
       // usuário pode se incluir ou se remover explicitamente). Se ninguém
       // ficar selecionado, cai de volta para o criador, evitando um evento
-      // órfão que não aparece em calendário nenhum.
+      // órfão que não aparece em calendário nenhum. Todas as linhas
+      // compartilham o mesmo grupo_id, o que permite editar os participantes
+      // depois — quem cria é registrado em criado_por e é quem poderá
+      // gerenciar o grupo na edição.
       const selecionados = form.participantes ?? [];
       const targets = new Set<string>(selecionados.length > 0 ? selecionados : [user!.id]);
+      const grupoId = crypto.randomUUID();
 
       const rows = Array.from(targets).map((uid) => ({
         user_id: uid,
+        grupo_id: grupoId,
+        criado_por: user!.id,
         titulo: form.titulo,
         descricao: form.descricao || null,
         inicio,
@@ -247,10 +279,21 @@ export function useBulkCreateEventos() {
 }
 
 export function useUpdateEvento() {
+  const { user } = useAuth();
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, form }: { id: string; form: EventoForm }) => {
+    mutationFn: async ({
+      id,
+      form,
+      grupoId,
+      criadoPor,
+    }: {
+      id: string;
+      form: EventoForm;
+      grupoId?: string;
+      criadoPor?: string;
+    }) => {
       const inicio = form.diaInteiro
         ? new Date(form.inicio + 'T00:00:00').toISOString()
         : new Date(form.inicio).toISOString();
@@ -258,23 +301,68 @@ export function useUpdateEvento() {
         ? new Date(form.fim + 'T23:59:59').toISOString()
         : new Date(form.fim).toISOString();
 
-      const { error } = await supabase
+      const campos = {
+        titulo: form.titulo,
+        descricao: form.descricao || null,
+        inicio,
+        fim,
+        dia_inteiro: form.diaInteiro,
+        tipo_calendario: form.tipoCalendario,
+        cor: form.cor,
+        lembrete_minutos: form.lembreteMinutos,
+        updated_at: new Date().toISOString(),
+      };
+
+      const souOrganizador = !!grupoId && criadoPor === user!.id;
+
+      if (!souOrganizador) {
+        // Participante comum: só pode alterar a própria cópia do evento.
+        const { error } = await supabase.from('eventos').update(campos).eq('id', id);
+        if (error) throw error;
+        return;
+      }
+
+      // Organizador: propaga os campos comuns para todas as linhas do grupo
+      // e reconcilia os participantes (adiciona/remove linhas).
+      const { data: existentes, error: fetchError } = await supabase
         .from('eventos')
-        .update({
-          titulo: form.titulo,
-          descricao: form.descricao || null,
-          inicio,
-          fim,
-          dia_inteiro: form.diaInteiro,
-          tipo_calendario: form.tipoCalendario,
-          cor: form.cor,
-          lembrete_minutos: form.lembreteMinutos,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-      if (error) throw error;
+        .select('user_id')
+        .eq('grupo_id', grupoId!);
+      if (fetchError) throw fetchError;
+
+      const existentesIds = new Set((existentes as { user_id: string }[]).map((r) => r.user_id));
+      const selecionados = form.participantes ?? [];
+      const alvo = new Set<string>(selecionados.length > 0 ? selecionados : [criadoPor!]);
+
+      const { error: updateError } = await supabase.from('eventos').update(campos).eq('grupo_id', grupoId!);
+      if (updateError) throw updateError;
+
+      const remover = [...existentesIds].filter((uid) => !alvo.has(uid));
+      if (remover.length > 0) {
+        const { error: delError } = await supabase
+          .from('eventos')
+          .delete()
+          .eq('grupo_id', grupoId!)
+          .in('user_id', remover);
+        if (delError) throw delError;
+      }
+
+      const adicionar = [...alvo].filter((uid) => !existentesIds.has(uid));
+      if (adicionar.length > 0) {
+        const rows = adicionar.map((uid) => ({
+          user_id: uid,
+          grupo_id: grupoId!,
+          criado_por: criadoPor!,
+          ...campos,
+        }));
+        const { error: insError } = await supabase.from('eventos').insert(rows);
+        if (insError) throw insError;
+      }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['eventos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['eventos'] });
+      qc.invalidateQueries({ queryKey: ['evento-participantes'] });
+    },
   });
 }
 

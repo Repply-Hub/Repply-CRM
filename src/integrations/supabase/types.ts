@@ -1568,9 +1568,11 @@ export type Database = {
         Row: {
           cor: string
           created_at: string
+          criado_por: string
           descricao: string | null
           dia_inteiro: boolean
           fim: string
+          grupo_id: string
           id: string
           inicio: string
           lembrete_enviado: boolean
@@ -1583,9 +1585,11 @@ export type Database = {
         Insert: {
           cor?: string
           created_at?: string
+          criado_por: string
           descricao?: string | null
           dia_inteiro?: boolean
           fim: string
+          grupo_id?: string
           id?: string
           inicio: string
           lembrete_enviado?: boolean
@@ -1598,9 +1602,11 @@ export type Database = {
         Update: {
           cor?: string
           created_at?: string
+          criado_por?: string
           descricao?: string | null
           dia_inteiro?: boolean
           fim?: string
+          grupo_id?: string
           id?: string
           inicio?: string
           lembrete_enviado?: boolean
@@ -2279,6 +2285,64 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
             referencedColumns: ["usuario_id"]
+          },
+        ]
+      }
+      metas_vendas: {
+        Row: {
+          ano: number
+          created_at: string
+          empresa_id: string
+          fabricante_id: string
+          id: string
+          mes: number
+          meta_valor: number
+          updated_at: string
+          usuario_id: string
+        }
+        Insert: {
+          ano: number
+          created_at?: string
+          empresa_id: string
+          fabricante_id: string
+          id?: string
+          mes: number
+          meta_valor?: number
+          updated_at?: string
+          usuario_id: string
+        }
+        Update: {
+          ano?: number
+          created_at?: string
+          empresa_id?: string
+          fabricante_id?: string
+          id?: string
+          mes?: number
+          meta_valor?: number
+          updated_at?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_vendas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metas_vendas_fabricante_id_fkey"
+            columns: ["fabricante_id"]
+            isOneToOne: false
+            referencedRelation: "fabricantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metas_vendas_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3714,6 +3778,15 @@ export type Database = {
           logradouro: string
           numero: string
           uf: string
+        }[]
+      }
+      plano_vendas_progresso: {
+        Args: { p_ano: number; p_mes: number; p_usuario_id?: string }
+        Returns: {
+          fabricante_id: string
+          fabricante_nome: string
+          meta_valor: number
+          vendido_valor: number
         }[]
       }
       pedidos_stats:

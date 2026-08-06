@@ -204,7 +204,7 @@ export default function Calendario() {
   const handleSave = (form: EventoForm) => {
     if (editingEvent) {
       updateEvento(
-        { id: editingEvent.id, form },
+        { id: editingEvent.id, form, grupoId: editingEvent.grupoId, criadoPor: editingEvent.criadoPor },
         {
           onSuccess: () => toast.success("Evento atualizado"),
           onError: () => toast.error("Erro ao atualizar evento"),

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/command';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useAuth } from '@/hooks/use-auth';
+import { useEventoParticipantes } from '@/hooks/use-eventos';
 import type { CalendarEvent, EventoForm, CalendarType } from './types';
 import { EVENT_PRESET_COLORS, CALENDAR_COLORS } from './types';
 import { EventDateTimeField } from './EventDateTimeField';
@@ -76,6 +77,9 @@ export function EventDialog({
   const [participantesOpen, setParticipantesOpen] = useState(false);
   const { user } = useAuth();
   const { data: usuarios, refetch: refetchUsuarios } = useVendedores();
+  const { data: participantesExistentes } = useEventoParticipantes(
+    open && editingEvent ? editingEvent.grupoId : null,
+  );
 
   // Funcionários da empresa, incluindo o próprio usuário logado (aparece como "Você", no topo)
   const funcionariosDisponiveis = useMemo(() => {
@@ -110,6 +114,8 @@ export function EventDialog({
         diaInteiro: editingEvent.diaInteiro,
         tipoCalendario: editingEvent.tipoCalendario,
         cor: editingEvent.cor,
+        // A lista real de participantes chega depois, pela query de
+        // participantes existentes (useEventoParticipantes) — ver efeito abaixo.
         participantes: [],
         lembreteMinutos: editingEvent.lembreteMinutos ?? null,
       });
@@ -121,6 +127,14 @@ export function EventDialog({
       });
     }
   }, [open, editingEvent, initialData, user?.id]);
+
+  // Preenche os participantes do evento assim que a busca resolve (chega
+  // depois da abertura do modal, por isso é um efeito separado do de cima).
+  useEffect(() => {
+    if (open && editingEvent && participantesExistentes) {
+      setForm((prev) => ({ ...prev, participantes: participantesExistentes }));
+    }
+  }, [open, editingEvent, participantesExistentes]);
 
   const set = <K extends keyof EventoForm>(key: K, value: EventoForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -145,6 +159,10 @@ export function EventDialog({
 
   const isEditing = !!editingEvent;
   const participantesSelecionados = form.participantes ?? [];
+  // Ao criar, quem está preenchendo o formulário é sempre o organizador. Ao
+  // editar, só o organizador original pode adicionar/remover participantes —
+  // um convidado só enxerga a lista, sem poder alterá-la.
+  const podeGerenciarParticipantes = !isEditing || editingEvent?.criadoPor === user?.id;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -204,8 +222,8 @@ export function EventDialog({
             />
           </div>
 
-          {/* Participantes (só ao criar) */}
-          {!isEditing && funcionariosDisponiveis.length > 0 && (
+          {/* Participantes */}
+          {funcionariosDisponiveis.length > 0 && (
             <div className="space-y-1.5">
               <Label>Participantes</Label>
               <Popover open={participantesOpen} onOpenChange={setParticipantesOpen}>
@@ -213,6 +231,7 @@ export function EventDialog({
                   <Button
                     type="button"
                     variant="outline"
+                    disabled={!podeGerenciarParticipantes}
                     className="w-full justify-between font-normal h-10"
                   >
                     <span className="flex items-center gap-2 min-w-0">
@@ -271,20 +290,24 @@ export function EventDialog({
                     return (
                       <Badge key={uid} variant="secondary" className="gap-1">
                         {isSelf ? 'Você' : u.nome}
-                        <button
-                          type="button"
-                          className="ml-1 hover:text-destructive"
-                          onClick={() => toggleParticipante(uid)}
-                        >
-                          ×
-                        </button>
+                        {podeGerenciarParticipantes && (
+                          <button
+                            type="button"
+                            className="ml-1 hover:text-destructive"
+                            onClick={() => toggleParticipante(uid)}
+                          >
+                            ×
+                          </button>
+                        )}
                       </Badge>
                     );
                   })}
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                O evento será adicionado ao calendário de cada participante.
+                {podeGerenciarParticipantes
+                  ? 'O evento será adicionado ao calendário de cada participante.'
+                  : 'Somente quem organizou o evento pode alterar os participantes.'}
               </p>
             </div>
           )}
