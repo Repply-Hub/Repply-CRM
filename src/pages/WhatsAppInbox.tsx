@@ -6668,14 +6668,14 @@ export default function WhatsAppInbox() {
                                     <div className="max-w-[75%] items-center">
                                       <div
                                         className={cn(
-                                          "px-3 py-2 break-words rounded-2xl bg-zinc-300/50 dark:bg-zinc-700/50 text-foreground",
+                                          "px-3 py-2 break-words rounded-2xl bg-amber-100 dark:bg-amber-950/50 border border-amber-200/70 dark:border-amber-900/50 text-foreground",
                                           msg.id === destacadaMsgId &&
                                             "ring-2 ring-primary ring-offset-2 ring-offset-background",
                                         )}
                                       >
-                                        <p className="text-xs text-center whitespace-pre-wrap text-muted-foreground">
-                                          <StickyNote className="inline-block h-3 w-3 mr-1 -mt-0.5" />
-                                          <span className="font-semibold">
+                                        <p className="text-xs text-center whitespace-pre-wrap text-foreground">
+                                          <StickyNote className="inline-block h-3 w-3 mr-1 -mt-0.5 text-amber-600 dark:text-amber-400" />
+                                          <span className="font-semibold text-amber-800 dark:text-amber-300">
                                             Nota interna
                                             {/* Notas de sistema (assumir/direcionar/fechar conversa,
                                                 adicionar/remover responsável) já embutem o nome do
