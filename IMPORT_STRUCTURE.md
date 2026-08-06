@@ -101,18 +101,30 @@ Cada tipo de campo possui uma função de sanitização dedicada:
 | `email`  | Lowercase |
 | `number` | Converte formato BR (`1.234,56` → `1234.56`), remove `R$` |
 | `date`   | Aceita serial Excel, `DD/MM/YYYY`, `DD-MM-YYYY` → ISO 8601 |
-| `status` | Normaliza para estágios do pipeline (ver tabela abaixo) |
+| `status` | Passa direto (só trim + espaços colapsados) — ver "Normalização de Status" abaixo |
 
 ### Normalização de Status
 
-| Entrada (parcial)                    | Valor normalizado |
-|--------------------------------------|-------------------|
-| fech / ganho / concluid / won        | `fechamento`      |
-| negocia / tratativa                  | `negociacao`      |
-| enviad / apresentad / proposta       | `enviado`         |
-| elabora / orcamento / cotacao        | `elaboracao`      |
-| novo / lead                          | `novo lead`       |
-| qualquer outro                       | texto normalizado |
+Ao contrário dos outros tipos, o campo `status` **não** é reduzido a um valor genérico no
+passo de sanitização (`sanitizeFieldValue`, `MappingStep.tsx`) — as etapas do pipeline são
+configuráveis por empresa via `kanban_colunas` (não um enum fixo), então adivinhar um valor
+genérico ali só descartaria informação antes da hora (ex.: uma tabela fixa antiga reduzia
+"negociação perdida" a `negociacao` antes mesmo de "perdido" ser considerado).
+
+O texto da planilha segue intacto até `matchPedidoStatusToColuna`
+(`src/components/import-pedidos/importPedidosUtils.ts`), chamado em `use-bulk-import.ts`
+logo antes do INSERT em `pedidos`, com as colunas reais do funil escolhido já carregadas.
+Essa função resolve, em ordem:
+
+1. Match exato contra `nome` ou `slug` de uma coluna real (cobre etapas renomeadas/customizadas)
+2. Contém / é contido (parcial) contra `nome` ou `slug`
+3. Sinônimos conhecidos — `fech/ganho/concluid/won`, `perdid/perda/cancelad/lost/reprovad/recusad/declinad`,
+   `negocia/tratativa`, `enviad/apresentad/proposta`, `elabora/orcamento/cotacao`, `novo lead` —
+   apontando para a coluna real cujo slug bate com o slug padrão do sistema
+4. Se nada bater: cai na primeira coluna do funil, respeitando a ordem configurada
+
+A prévia do wizard (`ImportPedidosDialog.tsx`) usa a mesma função para mostrar o badge real
+(nome + cor) da coluna em que cada linha vai cair, em vez de um rótulo solto sem cor.
 
 ---
 

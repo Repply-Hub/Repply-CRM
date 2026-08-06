@@ -5,6 +5,7 @@ import {
   getSheetHeaders,
   matchPedidoStatusToColuna,
 } from './importPedidosUtils';
+import { sanitizeFieldValue } from '@/components/import/MappingStep';
 
 describe('importPedidosUtils', () => {
   const rows = [
@@ -124,5 +125,17 @@ describe('matchPedidoStatusToColuna', () => {
 
   it('sem colunas carregadas, usa novo_lead como último fallback', () => {
     expect(matchPedidoStatusToColuna('qualquer coisa', [])).toBe('novo_lead');
+  });
+
+  // Regressão: sanitizeFieldValue (MappingStep.tsx) rodava ANTES de matchPedidoStatusToColuna
+  // e "adivinhava" um valor genérico com uma tabela fixa incompleta (sem "perdido"), que
+  // engolia parte do texto antes da etapa real poder ser casada — ex.: "negociações perdidas"
+  // virava "negociacao" (perdendo "perdida") e caía sempre em Negociação, nunca em Perdido.
+  it('preserva o texto da planilha através da sanitização, então casa com a coluna real', () => {
+    const sanitizedGanho = sanitizeFieldValue('Negócios Ganhos', 'status');
+    const sanitizedPerdido = sanitizeFieldValue('Negociações Perdidas', 'status');
+
+    expect(matchPedidoStatusToColuna(sanitizedGanho, colunasPadrao)).toBe('fechamento');
+    expect(matchPedidoStatusToColuna(sanitizedPerdido, colunasPadrao)).toBe('perdido');
   });
 });

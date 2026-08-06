@@ -19,6 +19,7 @@ import { useBulkImport } from '@/hooks/use-bulk-import';
 import { useAuth } from '@/hooks/use-auth';
 import { useFunis } from '@/hooks/use-funis';
 import { useIsGestor } from '@/hooks/use-novo-pedido';
+import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useQuery } from '@tanstack/react-query';
 import { matchUsuarioByNome, type UsuarioLite } from '@/lib/import/match-usuario';
 
@@ -29,6 +30,7 @@ import {
   detectImportPedidosMapping,
   getImportedPedidosRows,
   getSheetHeaders,
+  matchPedidoStatusToColuna,
   type FieldKey,
 } from '@/components/import-pedidos/importPedidosUtils';
 
@@ -76,6 +78,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: funis } = useFunis(empresaId);
   const [funilId, setFunilId] = useState<string | undefined>(undefined);
+  // Colunas reais do funil selecionado — usadas na prévia pra mostrar o badge de etapa
+  // de verdade (mesma cor/nome do Kanban), em vez de um mapa fixo de 5 palavras-chave
+  // que não conhece as etapas customizadas da empresa.
+  const { data: kanbanColunas } = useKanbanColunas(empresaId, funilId);
   const { data: isGestor } = useIsGestor();
   // Usuários da empresa para vincular a coluna Responsável/Vendedor por nome (só gestores atribuem para outros).
   const { data: usuariosEmpresa } = useQuery({
@@ -483,12 +489,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     }
   };
 
-  const stageLabel = (s: string) => {
-    const labels: Record<string, string> = {
-      'novo lead': 'Novo Lead', elaboracao: 'Elaboração', enviado: 'Enviado',
-      negociacao: 'Negociação', fechamento: 'Fechamento',
-    };
-    return labels[s] || s;
+  // Resolve o texto cru da planilha pra coluna real do funil (mesma lógica usada no
+  // insert, em use-bulk-import.ts) — a prévia mostra exatamente a etapa em que o negócio
+  // vai cair, com o badge de verdade, em vez de um texto solto sem cor.
+  const resolveStageColuna = (rawStatus: string) => {
+    if (!kanbanColunas || kanbanColunas.length === 0) return null;
+    const slug = matchPedidoStatusToColuna(rawStatus, kanbanColunas);
+    return kanbanColunas.find(c => c.slug === slug) ?? null;
   };
 
   return (
@@ -808,7 +815,14 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                       <TableCell className="text-xs whitespace-nowrap">
                         {r.valor ? r.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                       </TableCell>
-                      <TableCell className="text-xs whitespace-nowrap">{stageLabel(r.status)}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {(() => {
+                          const coluna = resolveStageColuna(r.status);
+                          return coluna
+                            ? <Badge className={`bg-${coluna.cor} text-white`}>{coluna.nome}</Badge>
+                            : <span className="text-muted-foreground">{r.status || '-'}</span>;
+                        })()}
+                      </TableCell>
                       <TableCell className="text-xs whitespace-nowrap">{r.marcador || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
                         {r.data_pedido ? r.data_pedido.split('-').reverse().join('/') : '-'}

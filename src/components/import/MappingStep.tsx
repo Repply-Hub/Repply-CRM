@@ -228,15 +228,13 @@ export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): str
     }
     return raw;
   }
-  if (type === 'status') {
-    const normalized = normalizeText(raw);
-    if (/fech|ganho|concluid|won/.test(normalized)) return 'fechamento';
-    if (/negocia|tratativa/.test(normalized)) return 'negociacao';
-    if (/enviad|apresentad|proposta/.test(normalized)) return 'enviado';
-    if (/elabora|orcamento|cotacao|andamento/.test(normalized)) return 'elaboracao';
-    if (/novo|lead/.test(normalized)) return 'novo lead';
-    return normalized.replace(/\s+/g, ' ') || undefined;
-  }
+  // `status` não tem sanitização própria de propósito: as etapas do pipeline são
+  // configuráveis por empresa (kanban_colunas), não um enum fixo — reduzir o texto da
+  // planilha aqui a um punhado de palavras-chave descartava informação (ex.: "negociação
+  // perdida" virava "negociacao" antes de "perdido" nem chegar a ser considerado) e
+  // impedia a etapa real ser casada depois. O texto segue intacto até
+  // `matchPedidoStatusToColuna` (importPedidosUtils.ts), que já busca as colunas reais do
+  // funil e sabe resolver sinônimos (inclusive "perdido").
   return raw.replace(/\s+/g, ' ').trim() || undefined;
 }
 
