@@ -448,6 +448,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleteAllFilteredMode, setDeleteAllFilteredMode] = useState(false);
+  // Ids excluídos manualmente enquanto deleteAllFilteredMode está ativo — sem isso, desmarcar
+  // um único item (numa página que não carrega os N ids filtrados no cliente) derrubava o modo
+  // "todos" inteiro e caía pra seleção da página atual, mostrando "excluir 9" em vez de "excluir 99".
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
   const bulkDeleteMutation = useBulkDeletePedidos();
@@ -682,15 +686,26 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [updateStatus, KANBAN_STAGES]);
 
   const currentPageIds = paginated.map(p => p.id);
-  const allPageSelected = currentPageIds.length > 0 && currentPageIds.every(id => selected.has(id));
-  const someSelected = selected.size > 0 || deleteAllFilteredMode;
+  // No modo "todos os filtrados", uma linha está selecionada por padrão, a menos que tenha
+  // sido explicitamente excluída — por isso o cálculo de "página inteira selecionada" e a
+  // contagem exibida precisam descontar excludedIds em vez de olhar só pro `selected` local.
+  const allPageSelected = currentPageIds.length > 0 && (
+    deleteAllFilteredMode
+      ? currentPageIds.every(id => !excludedIds.has(id))
+      : currentPageIds.every(id => selected.has(id))
+  );
+  const selectedCount = deleteAllFilteredMode ? Math.max(0, totalCount - excludedIds.size) : selected.size;
+  const someSelected = selectedCount > 0;
 
   const toggleOne = (id: string) => {
     if (deleteAllFilteredMode) {
-      // Estava no modo "todos os filtrados" (sem ids carregados) — ao desmarcar um item
-      // específico, cai para seleção manual desta página, exceto o item clicado.
-      setDeleteAllFilteredMode(false);
-      setSelected(new Set(currentPageIds.filter(pid => pid !== id)));
+      // Continua no modo "todos os filtrados": só acumula/desfaz a exclusão desse item
+      // específico, sem descartar a seleção dos outros N-1 itens.
+      setExcludedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      });
       return;
     }
     setSelected(prev => {
@@ -701,8 +716,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   };
 
   const toggleAll = () => {
-    if (allPageSelected || deleteAllFilteredMode) {
-      setDeleteAllFilteredMode(false);
+    if (deleteAllFilteredMode) {
+      setExcludedIds(prev => {
+        const next = new Set(prev);
+        if (allPageSelected) {
+          currentPageIds.forEach(id => next.add(id));
+        } else {
+          currentPageIds.forEach(id => next.delete(id));
+        }
+        return next;
+      });
+      return;
+    }
+    if (allPageSelected) {
       setSelected(prev => {
         const next = new Set(prev);
         currentPageIds.forEach(id => next.delete(id));
@@ -721,6 +747,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const selectPageOnly = () => {
     setDeleteAllFilteredMode(false);
+    setExcludedIds(new Set());
     setSelected(prev => {
       const next = new Set(prev);
       currentPageIds.forEach(id => next.add(id));
@@ -731,8 +758,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const selectAllFiltered = () => {
     // Não carregamos milhares de ids no cliente: a exclusão em massa, nesse modo,
-    // roda uma única query no servidor com os mesmos filtros ativos (empresa/funil/etapa).
+    // roda uma única query no servidor com os mesmos filtros ativos (empresa/funil/etapa),
+    // descontando excludedIds quando o usuário desmarcar itens individualmente.
     setSelected(new Set());
+    setExcludedIds(new Set());
     setDeleteAllFilteredMode(true);
     setSelectAllDialogOpen(false);
   };
@@ -742,7 +771,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
     try {
       const removed = deleteAllFilteredMode
-        ? await bulkDeleteMutation.mutateAsync({ empresaId, stages: activeStages, filters: pedidosFilters })
+        ? await bulkDeleteMutation.mutateAsync({
+            empresaId,
+            stages: activeStages,
+            filters: pedidosFilters,
+            excludeIds: excludedIds.size > 0 ? Array.from(excludedIds) : undefined,
+          })
         : await bulkDeleteMutation.mutateAsync({ ids: Array.from(selected) });
 
       if (removed > 0) {
@@ -751,6 +785,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
       setSelected(new Set());
       setDeleteAllFilteredMode(false);
+      setExcludedIds(new Set());
       setDeleteConfirmText('');
       setConfirmDeleteOpen(false);
     } catch (err: any) {
@@ -894,7 +929,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             variant="destructive"
             disabled={!someSelected}
             onClick={() => setConfirmDeleteOpen(true)}
-            badge={someSelected ? (deleteAllFilteredMode ? totalCount : selected.size) : undefined}
+            badge={someSelected ? selectedCount : undefined}
           />
         </ColumnSettingsPopover>
       </div>
@@ -919,8 +954,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     handleKanbanStagesChange,
     selected.size,
     deleteAllFilteredMode,
+    excludedIds.size,
     totalCount,
     someSelected,
+    selectedCount,
     setImportOpen,
     setImportDialogMounted,
     setColunasDialogOpen,
@@ -1580,7 +1617,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 {someSelected && (
                   <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
                     <Trash2 className="h-4 w-4" />
-                    Excluir {deleteAllFilteredMode ? totalCount : selected.size}
+                    Excluir {selectedCount}
                   </Button>
                 )}
               </div>
@@ -1596,7 +1633,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   <TableHeader className="sticky top-0 z-10 bg-muted">
                     <TableRow className="bg-muted/50">
                       <TableHead className="w-10 h-14 px-2.5">
-                        <Checkbox checked={allPageSelected || deleteAllFilteredMode} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                        <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
                       {visibleColumnDefs.map((col, i) => (
                         <ResizableTh
@@ -1625,7 +1662,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                         <PedidoRow
                           key={p.id}
                           pedido={p}
-                          selected={selected.has(p.id) || deleteAllFilteredMode}
+                          selected={deleteAllFilteredMode ? !excludedIds.has(p.id) : selected.has(p.id)}
                           onToggle={() => toggleOne(p.id)}
                           onClick={() => setViewOrderId(p.id)}
                           visibleColumns={tableVisibleColumns}
@@ -1698,7 +1735,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Excluir {deleteAllFilteredMode ? totalCount : selected.size} negócio(s)?
+              Excluir {selectedCount} negócio(s)?
             </AlertDialogTitle>
             <AlertDialogDescription>
               Esta ação não pode ser desfeita. Todos os itens e histórico de contatos vinculados também serão removidos.
@@ -1706,7 +1743,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           </AlertDialogHeader>
           {deleteAllFilteredMode && (
             <p className="text-sm font-medium text-foreground -mt-2">
-              {totalCount} negócios · Total: {totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {selectedCount} negócios{excludedIds.size === 0 ? ` · Total: ${totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
             </p>
           )}
           <div className="space-y-1.5">
