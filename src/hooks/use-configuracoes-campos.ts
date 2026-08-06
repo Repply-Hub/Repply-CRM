@@ -13,9 +13,25 @@ export interface ConfiguracaoCampo {
   label: string | null;
   tipo: string;
   obrigatorio: boolean;
+  /** Só relevante para entidade='pedidos': 'global' (padrão, obrigatório sempre) ou
+   * 'etapas' (obrigatório só nas kanban_coluna_id listadas em `etapasObrigatorias`). */
+  obrigatorio_escopo: 'global' | 'etapas';
+  /** kanban_coluna_ids vinculadas quando obrigatorio_escopo='etapas'. Conjunto vazio
+   * nesse escopo significa "não obrigatório em etapa nenhuma no momento". */
+  etapasObrigatorias: string[];
   ordem: number;
   etapa: string | null;
   created_by: string | null;
+}
+
+/** Resolve se `campo` é obrigatório dado que o pedido está (ou vai passar a estar) na
+ * etapa `kanbanColunaId`. Único lugar que sabe interpretar `obrigatorio_escopo` — usar
+ * sempre isto em vez de checar `campo.obrigatorio` diretamente para campos de pedidos. */
+export function isCampoObrigatorioNaEtapa(campo: Pick<ConfiguracaoCampo, 'obrigatorio' | 'obrigatorio_escopo' | 'etapasObrigatorias'>, kanbanColunaId?: string | null): boolean {
+  if (!campo.obrigatorio) return false;
+  if (campo.obrigatorio_escopo !== 'etapas') return true;
+  if (!kanbanColunaId) return false;
+  return campo.etapasObrigatorias.includes(kanbanColunaId);
 }
 
 // Fallback de rótulo só para as linhas padrão "originais" (label NULL no banco).
@@ -55,14 +71,65 @@ export function useConfiguracoesCampos(entidade: EntidadeCampos, empresaId?: str
     queryFn: async () => {
       const { data, error } = await supabase
         .from('configuracoes_campos')
-        .select('*')
+        .select('*, configuracoes_campos_etapas(kanban_coluna_id)')
         .eq('empresa_id', empresaId!)
         .eq('entidade', entidade)
         .order('ordem', { ascending: true });
       if (error) throw error;
-      return (data ?? []) as ConfiguracaoCampo[];
+      return (data ?? []).map((row: any) => ({
+        ...row,
+        etapasObrigatorias: (row.configuracoes_campos_etapas ?? []).map((e: any) => e.kanban_coluna_id),
+      })) as ConfiguracaoCampo[];
     },
     enabled: !!empresaId,
+  });
+}
+
+export function useSetObrigatorioEscopo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; escopo: 'global' | 'etapas' }) => {
+      const { error } = await supabase
+        .from('configuracoes_campos')
+        .update({ obrigatorio_escopo: input.escopo })
+        .eq('id', input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['configuracoes_campos'] });
+    },
+    onError: (err: any) => toast.error(err?.message || 'Erro ao atualizar escopo do campo'),
+  });
+}
+
+// Substitui o conjunto inteiro de etapas vinculadas a um campo (delete + insert). Não é
+// transacional: uma falha entre as duas chamadas deixa o campo temporariamente sem
+// nenhuma etapa vinculada (ou seja, "nunca obrigatório" enquanto isso) — aceitável aqui
+// porque é só configuração, e o fallback é sempre o lado seguro (não obrigatório demais).
+export function useSetCampoEtapas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { configuracaoCampoId: string; kanbanColunaIds: string[] }) => {
+      const { error: delError } = await supabase
+        .from('configuracoes_campos_etapas')
+        .delete()
+        .eq('configuracao_campo_id', input.configuracaoCampoId);
+      if (delError) throw delError;
+
+      if (input.kanbanColunaIds.length > 0) {
+        const { error: insError } = await supabase
+          .from('configuracoes_campos_etapas')
+          .insert(input.kanbanColunaIds.map(kanbanColunaId => ({
+            configuracao_campo_id: input.configuracaoCampoId,
+            kanban_coluna_id: kanbanColunaId,
+          })));
+        if (insError) throw insError;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['configuracoes_campos'] });
+    },
+    onError: (err: any) => toast.error(err?.message || 'Erro ao atualizar etapas do campo'),
   });
 }
 

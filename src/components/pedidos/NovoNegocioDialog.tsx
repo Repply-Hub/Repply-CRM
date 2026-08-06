@@ -16,7 +16,7 @@ import { useFunis } from '@/hooks/use-funis';
 import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCreatePedidoCompleto } from '@/hooks/use-novo-pedido';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { useAuth } from '@/hooks/use-auth';
-import { useConfiguracoesCampos, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
+import { useConfiguracoesCampos, resolveFieldLabel, isCampoObrigatorioNaEtapa } from '@/hooks/use-configuracoes-campos';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
@@ -233,11 +233,18 @@ function NovoNegocioFormContent({
   };
 
   // Validation
+  // Etapa do KANBAN em que o negócio está sendo criado (não confundir com `step`, que é
+  // o passo do wizard) — resolve qual kanban_coluna_id corresponde ao `status` escolhido,
+  // usado para saber se campos com obrigatoriedade restrita a etapas se aplicam aqui.
+  const currentKanbanColunaId = kanbanColunas?.find(c => c.slug === status)?.id;
+
   // Helper de leitura da config: campos que ainda não têm linha na config
   // (empresas antigas antes desta migration) caem no `fallback`, que reflete o
   // comportamento hardcoded que esses campos tinham antes de virarem configuráveis.
-  const obrigatorio = (key: string, fallback: boolean) =>
-    camposConfig?.find(c => c.campo_key === key)?.obrigatorio ?? fallback;
+  const obrigatorio = (key: string, fallback: boolean) => {
+    const campo = camposConfig?.find(c => c.campo_key === key);
+    return campo ? isCampoObrigatorioNaEtapa(campo, currentKanbanColunaId) : fallback;
+  };
 
   // Um único mapa de valores cobre os campos das duas etapas do wizard; qual
   // etapa cada campo pertence vem da própria config (`etapa`), então não
@@ -265,7 +272,7 @@ function NovoNegocioFormContent({
       etapaAlvo === 'step2' ? c.etapa === 'Itens do Negócio' : c.etapa !== 'Itens do Negócio'
     );
     for (const campo of camposDaEtapa) {
-      if (!campo.obrigatorio) continue;
+      if (!isCampoObrigatorioNaEtapa(campo, currentKanbanColunaId)) continue;
       const valor = campo.origem === 'padrao' ? valoresPadrao[campo.campo_key] : camposExtras[campo.campo_key];
       if (!valor || !valor.trim()) {
         return resolveFieldLabel(campo);
@@ -707,7 +714,7 @@ function NovoNegocioFormContent({
               {/* Campos customizados */}
               {(camposConfig ?? []).filter(c => c.origem === 'customizado').map(campo => (
                 <div key={campo.id} className="space-y-2">
-                  <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+                  <Label>{campo.label}{isCampoObrigatorioNaEtapa(campo, currentKanbanColunaId) && ' *'}</Label>
                   <Input
                     value={camposExtras[campo.campo_key] ?? ''}
                     onChange={e => setCamposExtras(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}

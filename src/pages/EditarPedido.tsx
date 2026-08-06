@@ -21,7 +21,7 @@ import { useCreateObra } from '@/hooks/use-mutations';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
 import { usePedidoHistoricoStatus } from '@/hooks/use-pedidos';
 import { useAuth } from '@/hooks/use-auth';
-import { useConfiguracoesCampos, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
+import { useConfiguracoesCampos, resolveFieldLabel, isCampoObrigatorioNaEtapa } from '@/hooks/use-configuracoes-campos';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
@@ -213,6 +213,10 @@ const EditarPedido = () => {
     return true;
   };
 
+  // Etapa do KANBAN em que o negócio está sendo salvo — usada para saber se campos com
+  // obrigatoriedade restrita a etapas se aplicam ao status atualmente selecionado.
+  const currentKanbanColunaId = kanbanColunas?.find(c => c.slug === status)?.id;
+
   const validateStep2 = () => {
     const valoresPadrao: Record<string, string | undefined> = {
       cliente_id: clienteId,
@@ -229,7 +233,7 @@ const EditarPedido = () => {
       itens: itens.length > 0 ? 'ok' : undefined,
     };
     for (const campo of camposConfig ?? []) {
-      if (!campo.obrigatorio) continue;
+      if (!isCampoObrigatorioNaEtapa(campo, currentKanbanColunaId)) continue;
       const valor = campo.origem === 'padrao' ? valoresPadrao[campo.campo_key] : camposExtras[campo.campo_key];
       if (!valor || !valor.trim()) {
         const label = campo.origem === 'padrao' ? resolveFieldLabel(campo) : campo.label;
@@ -661,7 +665,7 @@ const EditarPedido = () => {
 
                 {(camposConfig ?? []).filter(c => c.origem === 'customizado').map(campo => (
                   <div key={campo.id} className="space-y-2">
-                    <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+                    <Label>{campo.label}{isCampoObrigatorioNaEtapa(campo, currentKanbanColunaId) && ' *'}</Label>
                     <Input
                       value={camposExtras[campo.campo_key] ?? ''}
                       onChange={e => setCamposExtras(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}

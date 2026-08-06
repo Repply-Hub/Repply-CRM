@@ -21,6 +21,7 @@ import {
 } from '@/hooks/use-kanban-colunas';
 import { useDeleteFunil, type Funil } from '@/hooks/use-funis';
 import { FunisDialog } from '@/components/pedidos/kanban/FunisDialog';
+import { useConfiguracoesCampos, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
 
 interface Props {
     open: boolean;
@@ -115,6 +116,18 @@ export function KanbanColunasDialog({
 
     const [excluindo, setExcluindo] = useState<DraftColuna | null>(null);
     const [targetSlug, setTargetSlug] = useState<string>('');
+
+    // Campos de Negócios que ficariam sem NENHUMA etapa vinculada se esta coluna for
+    // excluída — nesse estado eles passam a não ser exigidos em etapa alguma (ver
+    // isCampoObrigatorioNaEtapa). Vale avisar o gestor antes de excluir.
+    const { data: camposConfig } = useConfiguracoesCampos('pedidos', empresaId);
+    const camposQueFicariamSemEtapa = useMemo(() => {
+        if (!excluindo) return [];
+        return (camposConfig ?? []).filter(c =>
+            c.obrigatorio && c.obrigatorio_escopo === 'etapas' &&
+            c.etapasObrigatorias.length === 1 && c.etapasObrigatorias[0] === excluindo.id
+        );
+    }, [camposConfig, excluindo]);
 
     const [funisManagerOpen, setFunisManagerOpen] = useState(false);
     const [addingOpen, setAddingOpen] = useState(false);
@@ -523,6 +536,13 @@ export function KanbanColunasDialog({
                                 : 'Ao salvar as alterações, os negócios atualmente nesta coluna serão movidos para a coluna escolhida abaixo. Esta ação não poderá ser desfeita.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    {camposQueFicariamSemEtapa.length > 0 && (
+                        <p className="text-sm text-destructive">
+                            {camposQueFicariamSemEtapa.length === 1
+                                ? `O campo "${resolveFieldLabel(camposQueFicariamSemEtapa[0])}" está configurado como obrigatório só nesta etapa e ficará sem nenhuma etapa vinculada (deixará de ser exigido) — revise em Configurações → Campos.`
+                                : `Os campos ${camposQueFicariamSemEtapa.map(c => `"${resolveFieldLabel(c)}"`).join(', ')} estão configurados como obrigatórios só nesta etapa e ficarão sem nenhuma etapa vinculada (deixarão de ser exigidos) — revise em Configurações → Campos.`}
+                        </p>
+                    )}
                     {!excluindo?.isNew && (
                         <div className="space-y-1.5">
                             <Label>Mover negócios para:</Label>

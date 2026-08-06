@@ -51,6 +51,29 @@ export function useKanbanColunas(empresaId?: string | null, funilId?: string | n
   });
 }
 
+export interface KanbanColunaComFunil extends KanbanColuna {
+  funil: { nome: string } | null;
+}
+
+// Todas as colunas de TODOS os funis da empresa, com o nome do funil junto — usado só
+// pelo seletor de "obrigatório em quais etapas" na tela de configuração de campos, que
+// (diferente do Kanban) não está preso a um único funil por vez.
+export function useKanbanColunasEmpresa(empresaId?: string | null) {
+  return useQuery<KanbanColunaComFunil[]>({
+    queryKey: ['kanban_colunas_empresa', empresaId ?? null],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('kanban_colunas')
+        .select('*, funil:funis(nome)')
+        .eq('empresa_id', empresaId!)
+        .order('ordem', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as KanbanColunaComFunil[];
+    },
+    enabled: !!empresaId,
+  });
+}
+
 export function useCreateKanbanColuna() {
   const qc = useQueryClient();
   return useMutation({

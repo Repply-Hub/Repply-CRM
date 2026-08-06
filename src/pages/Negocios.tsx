@@ -12,6 +12,7 @@ import { useMarcadores } from '@/hooks/use-marcadores';
 import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { useFunis } from '@/hooks/use-funis';
+import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
 import { usePedidos, usePedidosStats, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
@@ -298,6 +299,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   }, [funilId]);
 
   const { data: kanbanColunas } = useKanbanColunas(empresaId, funilId);
+  const { data: camposConfigPedidos } = useConfiguracoesCampos('pedidos', empresaId);
 
   const KANBAN_STAGES = useMemo(
     () => (kanbanColunas ?? []).map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
@@ -447,6 +449,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  // Move de kanban bloqueado por campo obrigatório na etapa de destino ainda não preenchido.
+  const [blockedMove, setBlockedMove] = useState<{ pedidoId: string; targetLabel: string; missingLabels: string[] } | null>(null);
   const [deleteAllFilteredMode, setDeleteAllFilteredMode] = useState(false);
   // Ids excluídos manualmente enquanto deleteAllFilteredMode está ativo — sem isso, desmarcar
   // um único item (numa página que não carrega os N ids filtrados no cliente) derrubava o modo
@@ -701,13 +705,50 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     const { draggableId, source, destination } = result;
     if (source.droppableId === destination.droppableId) return;
     const label = KANBAN_STAGES.find(s => s.key === destination.droppableId)?.label ?? destination.droppableId;
+
+    // Bloqueia o move se algum campo obrigatório-nesta-etapa ainda não está preenchido.
+    // Só checa campos cujo valor já está em memória (PedidoWithRelations) — campos como
+    // origem_lead/itens/proximo_contato vivem em outras tabelas e não são checados aqui
+    // (continuam validados normalmente ao criar/editar o negócio).
+    const targetColunaId = kanbanColunas?.find(c => c.slug === destination.droppableId)?.id;
+    const pedido = kanbanPedidosFlat.find(p => p.id === draggableId);
+    if (pedido && targetColunaId) {
+      const valoresPadrao: Record<string, string | number | null | undefined> = {
+        cliente_id: pedido.cliente_id,
+        fabricante_id: pedido.fabricante_id,
+        vendedor_id: pedido.usuario_id,
+        obra_id: pedido.obra_id,
+        endereco_entrega: pedido.endereco_entrega,
+        prazo_resposta: pedido.prazo_resposta,
+        anexo_pdf: pedido.pdf_url,
+        data_pedido: pedido.data_pedido,
+        observacoes: pedido.observacoes,
+        valor_manual: pedido.valor_total,
+      };
+      const missingLabels = (camposConfigPedidos ?? [])
+        .filter(campo => isCampoObrigatorioNaEtapa(campo, targetColunaId))
+        // origem_lead/itens/proximo_contato vivem fora de PedidoWithRelations, e "status" é
+        // o próprio campo sendo alterado — nenhum dos quatro é checável aqui.
+        .filter(campo => campo.origem !== 'padrao' || campo.campo_key in valoresPadrao)
+        .filter(campo => {
+          const valor = campo.origem === 'padrao' ? valoresPadrao[campo.campo_key] : pedido.campos_extras?.[campo.campo_key];
+          return valor === null || valor === undefined || (typeof valor === 'string' && !valor.trim());
+        })
+        .map(campo => resolveFieldLabel(campo));
+
+      if (missingLabels.length > 0) {
+        setBlockedMove({ pedidoId: draggableId, targetLabel: label, missingLabels });
+        return;
+      }
+    }
+
     try {
       await updateStatus.mutateAsync({ id: draggableId, status: destination.droppableId });
       toast.success(`Negócio movido para "${label}"`);
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao mover o negócio');
     }
-  }, [updateStatus, KANBAN_STAGES]);
+  }, [updateStatus, KANBAN_STAGES, kanbanColunas, kanbanPedidosFlat, camposConfigPedidos]);
 
   const currentPageIds = paginated.map(p => p.id);
   // No modo "todos os filtrados", uma linha está selecionada por padrão, a menos que tenha
@@ -1620,19 +1661,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             />
 
             <div className="shrink-0">{filtrosPopover}</div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-10 gap-2 shrink-0"
-              disabled={totalCount === 0}
-              onClick={() => setBulkEditOpen(true)}
-            >
-              <ArrowRightLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Ação em massa</span>
-              {totalCount > 0 && <Badge variant="secondary" className="ml-0.5 h-5 px-1.5">{totalCount}</Badge>}
-            </Button>
-
             <div className="shrink-0">{optionsPopover}</div>
 
             {isPipelineMode && hasPipelineFilters && (
@@ -1865,6 +1893,23 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <Button variant="outline" onClick={selectPageOnly}>Apenas esta página ({currentPageIds.length})</Button>
             <Button variant="default" onClick={selectAllFiltered}>Todos ({totalCount})</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!blockedMove} onOpenChange={(open) => { if (!open) setBlockedMove(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Não é possível mover para "{blockedMove?.targetLabel}"</AlertDialogTitle>
+            <AlertDialogDescription>
+              Preencha os campos obrigatórios desta etapa antes de mover o negócio: {blockedMove?.missingLabels.join(', ')}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button onClick={() => { if (blockedMove) navigate(`/pedidos/${blockedMove.pedidoId}/editar`); setBlockedMove(null); }}>
+              Editar negócio
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

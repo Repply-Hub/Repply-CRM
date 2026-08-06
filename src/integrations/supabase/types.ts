@@ -712,6 +712,7 @@ export type Database = {
           id: string
           label: string | null
           obrigatorio: boolean
+          obrigatorio_escopo: string
           ordem: number
           origem: string
           tipo: string
@@ -727,6 +728,7 @@ export type Database = {
           id?: string
           label?: string | null
           obrigatorio?: boolean
+          obrigatorio_escopo?: string
           ordem?: number
           origem: string
           tipo?: string
@@ -742,6 +744,7 @@ export type Database = {
           id?: string
           label?: string | null
           obrigatorio?: boolean
+          obrigatorio_escopo?: string
           ordem?: number
           origem?: string
           tipo?: string
@@ -774,6 +777,42 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      configuracoes_campos_etapas: {
+        Row: {
+          configuracao_campo_id: string
+          created_at: string
+          id: string
+          kanban_coluna_id: string
+        }
+        Insert: {
+          configuracao_campo_id: string
+          created_at?: string
+          id?: string
+          kanban_coluna_id: string
+        }
+        Update: {
+          configuracao_campo_id?: string
+          created_at?: string
+          id?: string
+          kanban_coluna_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configuracoes_campos_etapas_configuracao_campo_id_fkey"
+            columns: ["configuracao_campo_id"]
+            isOneToOne: false
+            referencedRelation: "configuracoes_campos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "configuracoes_campos_etapas_kanban_coluna_id_fkey"
+            columns: ["kanban_coluna_id"]
+            isOneToOne: false
+            referencedRelation: "kanban_colunas"
             referencedColumns: ["id"]
           },
         ]

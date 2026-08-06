@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import {
+  ConfiguracaoCampo,
   EntidadeCampos,
   useConfiguracoesCampos,
   useToggleObrigatorioCampo,
   useCreateCampoCustomizado,
   useDeleteCampoCustomizado,
+  useSetObrigatorioEscopo,
+  useSetCampoEtapas,
   resolveFieldLabel,
 } from '@/hooks/use-configuracoes-campos';
+import { useKanbanColunasEmpresa, type KanbanColunaComFunil } from '@/hooks/use-kanban-colunas';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -15,13 +19,90 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { cn } from '@/lib/utils';
-import { Loader2, Trash2, Briefcase, Building2, Contact, HardHat, Plus } from 'lucide-react';
+import { Loader2, Trash2, Briefcase, Building2, Contact, HardHat, Plus, Settings2 } from 'lucide-react';
+
+// Campos padrão de Negócios cujo valor não está disponível no card do Kanban em memória
+// (vivem em outras tabelas — itens_pedido, historico_contatos — ou não têm coluna própria
+// persistida). A obrigatoriedade por etapa continua valendo ao criar/editar, só não é
+// checada ao arrastar o card no board.
+const CAMPOS_SEM_GARANTIA_DRAG = ['origem_lead', 'itens', 'proximo_contato'];
+
+function EscopoEtapasControl({ campo, colunasPorFunil }: { campo: ConfiguracaoCampo; colunasPorFunil: [string, KanbanColunaComFunil[]][] }) {
+  const setEscopo = useSetObrigatorioEscopo();
+  const setEtapas = useSetCampoEtapas();
+
+  const toggleEtapa = (kanbanColunaId: string, checked: boolean) => {
+    const next = checked
+      ? [...campo.etapasObrigatorias, kanbanColunaId]
+      : campo.etapasObrigatorias.filter(id => id !== kanbanColunaId);
+    setEtapas.mutate({ configuracaoCampoId: campo.id, kanbanColunaIds: next });
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-muted-foreground">
+          <Settings2 className="h-3 w-3" />
+          {campo.obrigatorio_escopo === 'etapas' ? `${campo.etapasObrigatorias.length} etapa(s)` : 'Sempre'}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 space-y-3" align="end">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-semibold">Obrigatório em quais etapas do funil?</Label>
+          <RadioGroup
+            value={campo.obrigatorio_escopo}
+            onValueChange={(v) => setEscopo.mutate({ id: campo.id, escopo: v as 'global' | 'etapas' })}
+          >
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <RadioGroupItem value="global" /> Sempre
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <RadioGroupItem value="etapas" /> Apenas em etapas específicas
+            </label>
+          </RadioGroup>
+        </div>
+        {campo.obrigatorio_escopo === 'etapas' && (
+          <div className="space-y-2 border-t pt-2 max-h-56 overflow-y-auto">
+            {colunasPorFunil.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nenhuma etapa de funil encontrada.</p>
+            ) : (
+              colunasPorFunil.map(([funilNome, colunas]) => (
+                <div key={funilNome} className="space-y-1">
+                  {colunasPorFunil.length > 1 && (
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{funilNome}</p>
+                  )}
+                  {colunas.map(col => (
+                    <label key={col.id} className="flex items-center gap-2 text-sm py-0.5 cursor-pointer">
+                      <Checkbox
+                        checked={campo.etapasObrigatorias.includes(col.id)}
+                        onCheckedChange={(checked) => toggleEtapa(col.id, checked === true)}
+                      />
+                      {col.nome}
+                    </label>
+                  ))}
+                </div>
+              ))
+            )}
+            {CAMPOS_SEM_GARANTIA_DRAG.includes(campo.campo_key) && (
+              <p className="text-[10px] text-muted-foreground border-t pt-1.5">
+                Este campo não é checado ao arrastar o card no Kanban — a obrigatoriedade por etapa só é aplicada ao criar ou editar o negócio.
+              </p>
+            )}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const ENTIDADE_OPCOES: { value: EntidadeCampos; label: string; icon: typeof Briefcase }[] = [
   { value: 'pedidos', label: 'Negócios', icon: Briefcase },
@@ -45,6 +126,19 @@ function EntidadeCamposPanel({ entidade, empresaId, meuUsuarioId }: { entidade: 
   const toggleObrigatorio = useToggleObrigatorioCampo();
   const createCampo = useCreateCampoCustomizado();
   const deleteCampo = useDeleteCampoCustomizado();
+
+  // Obrigatoriedade por etapa só existe para Negócios — é a única entidade com conceito
+  // de funil/etapa kanban (clientes/contatos/obras não têm pipeline).
+  const { data: kanbanColunasEmpresa } = useKanbanColunasEmpresa(entidade === 'pedidos' ? empresaId : undefined);
+  const colunasPorFunil = useMemo(() => {
+    const grupos = new Map<string, KanbanColunaComFunil[]>();
+    for (const col of kanbanColunasEmpresa ?? []) {
+      const nome = col.funil?.nome ?? 'Funil';
+      if (!grupos.has(nome)) grupos.set(nome, []);
+      grupos.get(nome)!.push(col);
+    }
+    return Array.from(grupos.entries());
+  }, [kanbanColunasEmpresa]);
 
   const [novoLabel, setNovoLabel] = useState('');
   const [novoObrigatorio, setNovoObrigatorio] = useState(false);
@@ -100,6 +194,9 @@ function EntidadeCamposPanel({ entidade, empresaId, meuUsuarioId }: { entidade: 
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      {entidade === 'pedidos' && campo.obrigatorio && (
+                        <EscopoEtapasControl campo={campo} colunasPorFunil={colunasPorFunil} />
+                      )}
                       <span className="text-xs text-muted-foreground">{campo.obrigatorio ? 'Obrigatório' : 'Opcional'}</span>
                       <Switch
                         checked={campo.obrigatorio}
@@ -131,6 +228,9 @@ function EntidadeCamposPanel({ entidade, empresaId, meuUsuarioId }: { entidade: 
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
+                  {entidade === 'pedidos' && campo.obrigatorio && (
+                    <EscopoEtapasControl campo={campo} colunasPorFunil={colunasPorFunil} />
+                  )}
                   <Switch
                     checked={campo.obrigatorio}
                     onCheckedChange={checked => toggleObrigatorio.mutate({ id: campo.id, obrigatorio: checked })}
