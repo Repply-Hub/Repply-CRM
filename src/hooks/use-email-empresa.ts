@@ -112,12 +112,26 @@ export function useEmailEmpresa() {
   });
 
   const sincronizarMutation = useMutation({
-    mutationFn: async (opcoes?: { limit?: number; backfill?: boolean; silencioso?: boolean }) => {
+    mutationFn: async (opcoes?: {
+      limit?: number;
+      backfill?: boolean;
+      silencioso?: boolean;
+      /** Varrer SÓ estes marcadores (ids do provedor), em vez da caixa toda. */
+      pastas?: string[];
+    }) => {
       const { data, error } = await supabase.functions.invoke('email-sync', {
         // backfill por padrão: quando a pessoa CLICA em atualizar, ela quer as
         // N mais recentes da caixa, não "o que mudou desde a última varredura".
         // O modo incremental serve ao cron, que roda sozinho e sem plateia.
-        body: { limit: opcoes?.limit ?? 20, backfill: opcoes?.backfill ?? true },
+        body: {
+          limit: opcoes?.limit ?? 20,
+          backfill: opcoes?.backfill ?? true,
+          // Varredura dirigida: a tela pede um marcador específico quando a
+          // pessoa abre um que ainda não tem mensagem aqui. Sem isto, o único
+          // jeito de preencher aquele marcador seria esperar a varredura
+          // completa chegar nele — que, numa caixa grande, pode ser a próxima.
+          ...(opcoes?.pastas?.length ? { pastas: opcoes.pastas } : {}),
+        },
       });
       if (error) throw await erroLegivelDaFunction(error, 'Não foi possível sincronizar');
       return data as { novas: number; atualizadas: number; erros?: string[] };
@@ -316,9 +330,18 @@ export function useEmailEmpresa() {
     isConnecting: conectarMutation.isPending,
     precisaReconectar: conta?.status === 'revogada',
 
-    /** `silencioso` = varredura que a tela dispara sozinha; não avisa nada. */
-    sincronizar: (opcoes?: { limit?: number; backfill?: boolean; silencioso?: boolean }) =>
-      sincronizarMutation.mutate(opcoes),
+    /**
+     * `silencioso` = varredura que a tela dispara sozinha; não avisa nada.
+     * `pastas` = varre só esses marcadores, em vez da caixa inteira.
+     */
+    sincronizar: (opcoes?: {
+      limit?: number;
+      backfill?: boolean;
+      silencioso?: boolean;
+      pastas?: string[];
+    }) => sincronizarMutation.mutate(opcoes),
+    /** Promessa da mesma varredura, para quem precisa esperar terminar. */
+    sincronizarAsync: sincronizarMutation.mutateAsync,
     isSyncing: sincronizarMutation.isPending,
     carregarCorpo,
   };

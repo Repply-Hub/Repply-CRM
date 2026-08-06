@@ -107,6 +107,39 @@ export function useEmailPastas(contaId?: string | null) {
   });
 }
 
+/**
+ * Quantas mensagens o CRM tem em cada pasta, e quantas estão por ler.
+ *
+ * Existe porque `email_pastas.nao_lidas` é o número do PROVEDOR — conta a
+ * etiqueta inteira no Gmail, inclusive o que nunca foi sincronizado. Usar aquele
+ * número no badge fazia a barra prometer mensagens que a lista não tinha.
+ *
+ * A RPC é SECURITY INVOKER, então a RLS de email_mensagens recorta por pessoa:
+ * quem foi liberado só num marcador não descobre o tamanho dos outros pelo
+ * badge.
+ */
+export function useContagemPorPasta(contaId?: string | null) {
+  return useQuery({
+    queryKey: ['email_contagem_por_pasta', contaId],
+    queryFn: async (): Promise<Map<string, { total: number; naoLidas: number }>> => {
+      const { data, error } = await supabase.rpc('email_contagem_por_marcador', {
+        p_conta_id: contaId!,
+      });
+      if (error) {
+        console.warn('[email] não consegui contar as pastas:', error.message);
+        return new Map();
+      }
+      const mapa = new Map<string, { total: number; naoLidas: number }>();
+      for (const r of (data ?? []) as Array<{ pasta_id: string; total: number; nao_lidas: number }>) {
+        mapa.set(r.pasta_id, { total: Number(r.total), naoLidas: Number(r.nao_lidas) });
+      }
+      return mapa;
+    },
+    enabled: !!contaId,
+    staleTime: 30_000,
+  });
+}
+
 export interface UsuarioDaCaixa {
   usuarioId: string;
   nome: string | null;

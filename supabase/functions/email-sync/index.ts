@@ -30,14 +30,14 @@ const LIMITE_PADRAO = 20;
 const LIMITE_MAXIMO = 200; // teto da API do Nylas
 
 /**
- * Quantos marcadores varrer por conta, além de entrada e enviados.
+ * Orçamento de tempo por execução.
  *
- * Cada um é uma ida à rede de até 60 s. O limite da Edge Function é 150 s de
- * CPU/tempo de parede, então 12 + 2 já é folgado para o pior caso realista —
- * e um teto explícito é melhor do que um sync que às vezes estoura e não grava
- * nada.
+ * Substitui o teto fixo de 12 marcadores, que era a causa de um sintoma que
+ * ninguém explicava: a caixa tem 29 marcadores, então 17 nunca eram varridos e
+ * abriam vazios na tela. Cortar por TEMPO cobre a caixa inteira quando ela cabe
+ * e degrada em partes quando não cabe — em vez de ignorar sempre os mesmos.
  */
-const MAX_MARCADORES_POR_SYNC = 12;
+const ORCAMENTO_MS = 90_000;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -100,12 +100,24 @@ serve(async (req) => {
       return json({ ok: true, contas: 0, novas: 0, atualizadas: 0, aviso: "sem_conta_conectada" });
     }
 
+    const comecouEm = Date.now();
     let novas = 0;
     let atualizadas = 0;
     let pastasEspelhadas = 0;
     const erros: string[] = [];
 
-    for (const conta of contas) {
+    for (const [indice, conta] of contas.entries()) {
+      /**
+       * Fatia do orçamento que cabe a esta conta.
+       *
+       * Um prazo único para a execução inteira faria a primeira caixa consumir
+       * tudo e a última não receber nem a entrada — no cron, que varre todas as
+       * empresas, a mesma caixa ficaria sempre no fim da fila. Dividindo em
+       * fatias acumuladas, cada conta tem seu quinhão e a soma continua sendo o
+       * orçamento total, sem risco de estourar o limite de parede.
+       */
+      const prazoDaConta = comecouEm + Math.floor((ORCAMENTO_MS * (indice + 1)) / contas.length);
+
       const { data: grantRow } = await supabase
         .from("email_conta_grants")
         .select("grant_id")
@@ -146,9 +158,23 @@ serve(async (req) => {
         erros.push(`${conta.email}: não consegui ler as pastas`);
       }
 
-      // INBOX alimenta "Recebidos" e SENT alimenta "Enviados". Buscar sem filtro
-      // traria spam e lixeira junto.
-      const deSistema = [conta.pasta_inbox_id, conta.pasta_sent_id].filter(Boolean) as string[];
+      // Entrada, enviados, spam e lixeira. Os dois últimos passaram a ser
+      // buscados porque a barra lateral agora os oferece como filtro próprio —
+      // e a tela de Recebidos, em compensação, passou a EXCLUIR mensagens que
+      // carreguem SPAM ou TRASH, para lixo não se misturar com trabalho.
+      //
+      // Os ids vêm do espelho de pastas em vez de colunas próprias em
+      // email_contas: no Gmail são literalmente "SPAM" e "TRASH", mas no
+      // Microsoft são opacos, e o atributo é o único jeito que vale nos dois.
+      const idPorAtributo = (attr: string) =>
+        pastasDaCaixa.find((p) => (p.attributes ?? []).some((a) => a.toLowerCase() === attr))?.id;
+
+      const deSistema = [
+        conta.pasta_inbox_id,
+        conta.pasta_sent_id,
+        idPorAtributo("\\spam") ?? idPorAtributo("\\junk"),
+        idPorAtributo("\\trash"),
+      ].filter(Boolean) as string[];
 
       // E os marcadores, um por um. No Gmail o marcador é aditivo: a mensagem
       // que está na entrada com o marcador X tem folders [INBOX, Label_X] e já
@@ -161,17 +187,31 @@ serve(async (req) => {
       // entrada.
       const marcadores = pastasDaCaixa.filter((p) => p.id && !ehPastaDeSistema(p)).map((p) => p.id);
 
-      // Teto de chamadas por conta. Uma caixa com 40 marcadores levaria o sync a
-      // 42 idas à rede e estouraria o tempo da função — aí NADA sincroniza, que
-      // é pior do que sincronizar quase tudo.
-      const escolhidos = marcadores.slice(0, MAX_MARCADORES_POR_SYNC);
-      if (marcadores.length > escolhidos.length) {
-        // Nunca cortar em silêncio: sem esta linha o resultado "ok" mentiria
-        // sobre a cobertura.
-        console.warn(
-          `[email-sync] ${conta.email}: ${marcadores.length} marcadores, varrendo ${escolhidos.length}`,
-        );
-      }
+      /**
+       * Quais marcadores varrer.
+       *
+       * O teto fixo de 12 era a causa de um sintoma que ninguém explicava: a
+       * caixa tem 29 marcadores, então 17 NUNCA eram varridos. "006 - NAMBEI"
+       * mostrava 3 na barra (número do Gmail) e abria vazio, porque não havia
+       * uma única mensagem dele aqui — e o mesmo valia para PADO, ISOVER,
+       * ASPERBRAS, DM2 e outros.
+       *
+       * Agora o corte é por TEMPO, não por contagem: varre enquanto couber no
+       * orçamento e para antes de estourar. Uma caixa pequena é coberta inteira;
+       * uma enorme é coberta em partes, e o que ficou de fora aparece no
+       * resultado em vez de sumir.
+       *
+       * `pastas` no corpo pede uma varredura DIRIGIDA — é o que a tela usa ao
+       * abrir um marcador que ainda não tem mensagem aqui, para buscar aquele e
+       * só aquele, na hora.
+       */
+      const pedidas = Array.isArray(body?.pastas)
+        ? (body.pastas as unknown[]).filter((p): p is string => typeof p === "string" && !!p)
+        : null;
+
+      const escolhidos = pedidas
+        ? marcadores.filter((m) => pedidas.includes(m))
+        : marcadores;
 
       // Conta sem pastas resolvidas (falha no callback): busca sem filtro, que é
       // pior mas melhor do que não trazer nada.
@@ -179,7 +219,22 @@ serve(async (req) => {
         ? [...deSistema, ...escolhidos]
         : [null];
 
+      // Se a varredura cobriu a caixa inteira. Vira falso quando o tempo acaba
+      // no meio — e é o que decide se `ultima_sync_em` pode avançar.
+      let cobriuTudo = true;
+
       for (const pasta of alvos) {
+        // Corte por TEMPO. A função tem limite de parede, e estourar significa
+        // NADA gravado — pior do que gravar quase tudo. As pastas de sistema
+        // vêm primeiro na lista justamente para nunca serem as sacrificadas.
+        if (Date.now() > prazoDaConta) {
+          const faltaram = alvos.length - alvos.indexOf(pasta);
+          console.warn(`[email-sync] ${conta.email}: tempo esgotado, ${faltaram} pasta(s) fora`);
+          erros.push(`${conta.email}: ${faltaram} pasta(s) ficaram para a próxima varredura`);
+          cobriuTudo = false;
+          break;
+        }
+
         const params = new URLSearchParams({ limit: String(limite) });
         if (pasta) params.set("in", pasta);
         if (desde) params.set("received_after", String(desde));
@@ -243,10 +298,25 @@ serve(async (req) => {
         }
       }
 
-      await supabase
-        .from("email_contas")
-        .update({ ultima_sync_em: new Date().toISOString(), ultimo_erro: null })
-        .eq("id", conta.id);
+      /**
+       * O carimbo só avança quando a varredura cobriu a caixa INTEIRA.
+       *
+       * `ultima_sync_em` é a fronteira do modo incremental: tudo anterior a ele
+       * é considerado já trazido. Carimbar depois de uma varredura PARCIAL —
+       * dirigida a um marcador só, ou interrompida pelo tempo — declararia
+       * sincronizado o que nunca foi buscado, e as mensagens antigas dos
+       * marcadores que ficaram de fora se tornariam inalcançáveis para sempre:
+       * a varredura seguinte pediria ao provedor só o que chegou depois.
+       *
+       * Errar para o lado de repetir trabalho é barato. Errar para o outro lado
+       * perde e-mail em silêncio.
+       */
+      if (pedidas === null && cobriuTudo) {
+        await supabase
+          .from("email_contas")
+          .update({ ultima_sync_em: new Date().toISOString(), ultimo_erro: null })
+          .eq("id", conta.id);
+      }
     }
 
     // Limpeza dos states de OAuth vencidos. Sai daqui além de email-conectar

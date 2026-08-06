@@ -15,7 +15,8 @@ import {
   Trash2,
   CheckSquare,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Tag
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,8 +24,16 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS, TOGGLE_BADGE_CLASS } from "@/lib/toggle-group-styles";
+import {
+  TOGGLE_LIST_CLASS,
+  TOGGLE_TRIGGER_CLASS,
+  TOGGLE_BADGE_CLASS,
+  TOGGLE_BUTTON_CLASS,
+  TOGGLE_BUTTON_ACTIVE,
+  TOGGLE_BUTTON_INACTIVE,
+} from "@/lib/toggle-group-styles";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,8 +51,13 @@ import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
 import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { GerenciarCaixaDialog } from "@/components/email/GerenciarCaixaDialog";
-import { BarraPastas, type PastaSelecionada } from "@/components/email/BarraPastas";
-import { useEmailPastas } from "@/hooks/use-email-pastas";
+import {
+  BarraPastas,
+  PASTA_SPAM,
+  PASTA_LIXEIRA,
+  type PastaSelecionada,
+} from "@/components/email/BarraPastas";
+import { useEmailPastas, useContagemPorPasta } from "@/hooks/use-email-pastas";
 
 /** Uma linha da caixa de entrada, no formato que a listagem devolve. */
 interface MensagemRecebida {
@@ -79,6 +93,7 @@ const Emails = () => {
   const [gerenciarCaixaAberto, setGerenciarCaixaAberto] = useState(false);
   // Marcador escolhido na barra lateral. null = a aba manda sozinha.
   const [pastaSelecionada, setPastaSelecionada] = useState<PastaSelecionada>(null);
+  const [somenteNaoLidas, setSomenteNaoLidas] = useState(false);
   const [emailToDelete, setEmailToDelete] = useState<{ id: string; type: "sent" | "received" } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>("received");
@@ -92,9 +107,10 @@ const Emails = () => {
   // (isConnected/connectedEmail/sendEmail), então a troca é de import. A
   // diferença de modelo é que a caixa agora é da EMPRESA, compartilhada pelo
   // time, e não uma conta por usuário.
-  const { isConnected, connectedEmail, enviarEmail: sendEmail, sincronizar, isSyncing, carregarCorpo,
-    podeGerenciarCaixa, conta } = useEmailEmpresa();
+  const { isConnected, connectedEmail, enviarEmail: sendEmail, sincronizar, sincronizarAsync,
+    isSyncing, carregarCorpo, podeGerenciarCaixa, conta } = useEmailEmpresa();
   const { data: pastas = [], isLoading: pastasCarregando } = useEmailPastas(conta?.id);
+  const { data: contagens = new Map() } = useContagemPorPasta(conta?.id);
 
   /**
    * Espelha os marcadores sozinho quando eles ainda não existem.
@@ -275,7 +291,13 @@ const Emails = () => {
   const totalSent = sentData?.count || 0;
 
   const { data: receivedData, isLoading: isReceivedLoading } = useQuery({
-    queryKey: ["received_emails", pageReceived, pastaSelecionada, buscaAplicada],
+    queryKey: [
+      "received_emails",
+      pageReceived,
+      pastaSelecionada,
+      buscaAplicada,
+      somenteNaoLidas,
+    ],
     queryFn: async () => {
       // Mesma regra da caixa de enviados: nada de `corpo_html` na listagem.
       let consulta = supabase
@@ -292,7 +314,25 @@ const Emails = () => {
       // operador `@>` do Postgres, que usa índice se um dia houver um GIN aqui.
       if (pastaSelecionada) {
         consulta = consulta.contains("pastas", [pastaSelecionada]);
+      } else {
+        /**
+         * Sem pasta escolhida, "Recebidos" é a CAIXA DE ENTRADA — e lixo não
+         * entra nela.
+         *
+         * `direcao` é decidida só pelo remetente (ver mensagemParaLinha), sem
+         * olhar em que pasta a mensagem está. Então spam e lixeira caíam aqui
+         * como qualquer outra: hoje mesmo há 2 mensagens da lixeira contadas
+         * nos 337 e aparecendo na lista. Com spam passando a ser sincronizado,
+         * isso deixaria de ser duas linhas e viraria volume.
+         *
+         * Elas continuam alcançáveis — pelos itens Spam e Lixeira da barra.
+         */
+        consulta = consulta
+          .not("pastas", "cs", `{${PASTA_SPAM}}`)
+          .not("pastas", "cs", `{${PASTA_LIXEIRA}}`);
       }
+
+      if (somenteNaoLidas) consulta = consulta.eq("lido", false);
 
       // A busca do topo é UMA só para a tela inteira, mas só a aba Enviados a
       // aplicava: procurar em Recebidos devolvia a caixa inteira, como se nada
@@ -356,13 +396,19 @@ const Emails = () => {
    * roda quando há marcador escolhido; sem ele, `totalReceived` já é a resposta.
    */
   const { data: totalRecebidosSemMarcador } = useQuery({
-    queryKey: ["received_emails_total", buscaAplicada],
+    queryKey: ["received_emails_total", buscaAplicada, somenteNaoLidas],
     queryFn: async () => {
       let consulta = supabase
         .from("email_mensagens")
         .select("id", { count: "exact", head: true })
         .eq("direcao", "recebido")
-        .eq("excluido", false);
+        .eq("excluido", false)
+        // Os MESMOS cortes da listagem sem marcador. Se "Todas" contasse spam e
+        // lixeira, o badge prometeria mensagens que a lista, por regra, esconde.
+        .not("pastas", "cs", `{${PASTA_SPAM}}`)
+        .not("pastas", "cs", `{${PASTA_LIXEIRA}}`);
+
+      if (somenteNaoLidas) consulta = consulta.eq("lido", false);
 
       if (buscaAplicada) {
         consulta = consulta.or(
@@ -376,6 +422,66 @@ const Emails = () => {
     enabled: isConnected && !!pastaSelecionada,
     placeholderData: keepPreviousData,
   });
+
+  /**
+   * Marcador aberto e vazio → busca aquele marcador na hora.
+   *
+   * A varredura completa cobre a caixa inteira, mas leva o tempo que leva: numa
+   * caixa com dezenas de marcadores, o que a pessoa acabou de clicar pode ser o
+   * último da fila. Clicar num marcador e ver "nada aqui" quando o Gmail mostra
+   * mensagens é a diferença entre a funcionalidade parecer quebrada e parecer
+   * lenta.
+   *
+   * Só dispara sem busca e sem o filtro de não lidas: com um deles ativo, lista
+   * vazia é resposta legítima ("não achei nada"), não falta de sincronização.
+   *
+   * Uma tentativa por marcador por sessão (`Set` no ref). Marcador realmente
+   * vazio no provedor continua vazio depois da varredura, e sem essa trava a
+   * tela ficaria pedindo a mesma busca a cada refetch.
+   */
+  const marcadoresBuscadosRef = useRef(new Set<string>());
+  const [marcadorEmBusca, setMarcadorEmBusca] = useState<string | null>(null);
+
+  /** Nome do marcador aberto, para as mensagens de tela falarem dele pelo nome. */
+  const nomeDaPastaSelecionada =
+    pastaSelecionada === PASTA_SPAM
+      ? "Spam"
+      : pastaSelecionada === PASTA_LIXEIRA
+        ? "Lixeira"
+        : (pastas.find((p) => p.pastaId === pastaSelecionada)?.nome ?? "este marcador");
+
+  useEffect(() => {
+    if (!isConnected || !pastaSelecionada) return;
+    if (activeTab !== "received") return;
+    if (isReceivedLoading || buscaAplicada || somenteNaoLidas) return;
+    if (totalReceived > 0) return;
+    if (marcadoresBuscadosRef.current.has(pastaSelecionada)) return;
+
+    marcadoresBuscadosRef.current.add(pastaSelecionada);
+    const alvo = pastaSelecionada;
+    setMarcadorEmBusca(alvo);
+    void sincronizarAsync({
+      limit: 100,
+      backfill: true,
+      silencioso: true,
+      pastas: [alvo],
+    })
+      .catch(() => {
+        // Falhou: solta a trava para uma segunda tentativa valer a pena, já que
+        // a primeira não chegou a responder se o marcador tem ou não mensagem.
+        marcadoresBuscadosRef.current.delete(alvo);
+      })
+      .finally(() => setMarcadorEmBusca((atual) => (atual === alvo ? null : atual)));
+  }, [
+    isConnected,
+    pastaSelecionada,
+    activeTab,
+    isReceivedLoading,
+    buscaAplicada,
+    somenteNaoLidas,
+    totalReceived,
+    sincronizarAsync,
+  ]);
 
   const sendEmailMutation = useMutation({
     mutationFn: async (data: { destinatario: string; assunto: string; corpo: string }) => {
@@ -559,7 +665,7 @@ const Emails = () => {
     // item: `setQueryData` com uma chave a menos escreve num cache que ninguém
     // lê, e o selo de não-lida ficava na tela até a próxima busca.
     queryClient.setQueryData<PaginaRecebidos>(
-      ["received_emails", pageReceived, pastaSelecionada, buscaAplicada],
+      ["received_emails", pageReceived, pastaSelecionada, buscaAplicada, somenteNaoLidas],
       (antigo) =>
         antigo
           ? {
@@ -569,13 +675,22 @@ const Emails = () => {
           : antigo,
     );
 
-    supabase
-      .from("email_mensagens")
-      .update({ lido: true })
-      .eq("id", id)
+    // A gravação passa pela Edge Function, e não mais por um UPDATE direto,
+    // porque agora ela tem DOIS destinos: a linha daqui e a caixa no provedor.
+    // Sem o segundo, a próxima varredura trazia o `unread` do Gmail por cima e
+    // a mensagem voltava a aparecer como nova — o trabalho de ler não durava.
+    //
+    // Numa caixa compartilhada isso significa que ler aqui marca lido para o
+    // time inteiro, inclusive no celular. É o comportamento de uma caixa de
+    // atendimento, e o inverso exigiria um "lido" por pessoa que nunca bateria
+    // com o número do provedor.
+    void supabase.functions
+      .invoke("email-marcar-lido", { body: { mensagem_id: id, lido: true } })
       .then(({ error }) => {
         // Falhar aqui é cosmético — a próxima leitura da lista corrige o selo.
         if (error) console.warn("[email] não consegui marcar como lida:", error.message);
+        // O badge de não lidas da barra lateral mudou de valor.
+        else queryClient.invalidateQueries({ queryKey: ["email_contagem_por_pasta"] });
       });
   };
 
@@ -800,6 +915,40 @@ const Emails = () => {
               </TabsList>
             )}
 
+            {/* Somente não lidas.
+                Fica FORA do bloco que a barra de seleção em massa substitui, e
+                fora do contêiner `hidden md:flex` da busca — senão sumiria no
+                celular, que é justamente onde triar o que falta ler importa
+                mais. Só na aba Recebidos: "não lida" não quer dizer nada em
+                Enviados. Mesmo padrão de botão do filtro do WhatsApp Inbox. */}
+            {activeTab === "received" && selectedIds.length === 0 && (
+              <div className={cn(TOGGLE_LIST_CLASS, "w-fit shrink-0")}>
+                {[
+                  { valor: false, rotulo: "Todas" },
+                  { valor: true, rotulo: "Não lidas" },
+                ].map((opt) => (
+                  <button
+                    key={String(opt.valor)}
+                    type="button"
+                    onClick={() => {
+                      setSomenteNaoLidas(opt.valor);
+                      // Outra contagem, outra paginação: ficar na página 3 de
+                      // um filtro com 6 resultados mostraria lista vazia.
+                      setPageReceived(0);
+                    }}
+                    className={cn(
+                      TOGGLE_BUTTON_CLASS,
+                      somenteNaoLidas === opt.valor
+                        ? TOGGLE_BUTTON_ACTIVE
+                        : TOGGLE_BUTTON_INACTIVE,
+                    )}
+                  >
+                    {opt.rotulo}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center gap-2 flex-1 max-w-md hidden md:flex">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
@@ -875,6 +1024,7 @@ const Emails = () => {
                     ? (totalRecebidosSemMarcador ?? totalReceived)
                     : totalReceived
               }
+              contagens={contagens}
             />
           )}
 
@@ -980,12 +1130,56 @@ const Emails = () => {
                     <ConectarEmailCard />
                   </div>
                 ) : !receivedEmails || receivedEmails.length === 0 ? (
+                  /* Lista vazia tem CAUSAS diferentes, e "sua caixa está limpa"
+                     só é verdade numa delas. Um marcador que ainda não foi
+                     sincronizado com essa frase fazia a funcionalidade parecer
+                     quebrada — o Gmail mostrava mensagens e o CRM dizia que não
+                     havia nenhuma. */
                   <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-center px-4">
-                    <Inbox className="h-16 w-16 mb-4 opacity-10" />
-                    <h3 className="font-medium text-lg mb-1">Sua caixa de entrada está limpa</h3>
-                    <p className="max-w-xs text-sm opacity-60">
-                      Os e-mails recebidos em {connectedEmail} aparecem aqui automaticamente.
-                    </p>
+                    {marcadorEmBusca && marcadorEmBusca === pastaSelecionada ? (
+                      <>
+                        <Loader2 className="mb-4 h-10 w-10 animate-spin opacity-30" />
+                        <h3 className="mb-1 text-lg font-medium">
+                          Buscando as mensagens de {nomeDaPastaSelecionada}…
+                        </h3>
+                        <p className="max-w-xs text-sm opacity-60">
+                          É a primeira vez que este marcador é aberto aqui. Da próxima
+                          vez já estará pronto.
+                        </p>
+                      </>
+                    ) : pastaSelecionada ? (
+                      <>
+                        <Tag className="mb-4 h-16 w-16 opacity-10" />
+                        <h3 className="mb-1 text-lg font-medium">
+                          Nenhuma mensagem em {nomeDaPastaSelecionada}
+                        </h3>
+                        <p className="max-w-xs text-sm opacity-60">
+                          {somenteNaoLidas
+                            ? "Não há mensagens por ler neste marcador."
+                            : buscaAplicada
+                              ? `Nada encontrado para “${buscaAplicada}” neste marcador.`
+                              : "Este marcador não tem mensagens sincronizadas. Use o botão de atualizar para buscar de novo."}
+                        </p>
+                      </>
+                    ) : somenteNaoLidas || buscaAplicada ? (
+                      <>
+                        <Inbox className="mb-4 h-16 w-16 opacity-10" />
+                        <h3 className="mb-1 text-lg font-medium">Nada por aqui</h3>
+                        <p className="max-w-xs text-sm opacity-60">
+                          {somenteNaoLidas
+                            ? "Tudo lido — nenhuma mensagem por ler."
+                            : `Nada encontrado para “${buscaAplicada}”.`}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <Inbox className="mb-4 h-16 w-16 opacity-10" />
+                        <h3 className="mb-1 text-lg font-medium">Sua caixa de entrada está limpa</h3>
+                        <p className="max-w-xs text-sm opacity-60">
+                          Os e-mails recebidos em {connectedEmail} aparecem aqui automaticamente.
+                        </p>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="divide-y divide-border/50">
@@ -1010,11 +1204,7 @@ const Emails = () => {
                       <div 
                         key={email.id} 
                         className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''} ${!email.lido ? 'bg-muted/20' : ''}`}
-                        // Marca lido só no CRM. O provedor não é atualizado de
-                        // propósito: espelhar o "lido" de volta para a caixa
-                        // faria a mensagem sumir como nova do celular do gestor
-                        // porque um vendedor abriu aqui — e a caixa é
-                        // compartilhada pelo time inteiro.
+                        // Marca lido aqui E no provedor (ver `marcarLido`).
                         onClick={() => abrirRecebido(email)}
                       >
                         <div className="flex items-center gap-3 shrink-0">

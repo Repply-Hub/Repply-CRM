@@ -168,7 +168,39 @@ serve(async (req) => {
     if (bcc.length) payload.bcc = bcc;
     // O Nylas acrescenta In-Reply-To e References sozinho a partir daqui — é o
     // que mantém a resposta na mesma conversa no cliente do destinatário.
+    //
+    // Mas RESPONDER a uma conversa exige poder LER aquela conversa. Sem esta
+    // checagem, `reply_to_message_id` era o único campo do envio que escapava
+    // da regra por marcador: quem foi liberado só em "004 - DECA" podia
+    // emendar uma resposta em qualquer conversa da caixa cujo id conhecesse, e
+    // o destinatário veria a mensagem entrar na thread original — no cliente
+    // dele, indistinguível de uma resposta legítima do atendimento.
+    //
+    // Quem autoriza é o `userClient`, pela mesma RLS que decide o que a tela
+    // mostra (`tenho_acesso_a_mensagem`), e não uma segunda regra em
+    // TypeScript que dessincronizaria no primeiro ajuste de política.
     if (typeof body?.reply_to_message_id === "string" && body.reply_to_message_id) {
+      const { data: original, error: erroOriginal } = await userClient
+        .from("email_mensagens")
+        .select("id")
+        .eq("conta_id", conta.id)
+        .eq("nylas_message_id", body.reply_to_message_id)
+        .maybeSingle();
+
+      if (erroOriginal) {
+        console.error("[email-enviar] falha ao verificar a conversa:", erroOriginal);
+        return json({ error: "Não consegui verificar seu acesso a esta conversa." }, 503);
+      }
+      if (!original) {
+        console.warn(
+          `[email-enviar] resposta negada: usuario=${caller.id} mensagem=${body.reply_to_message_id}`,
+        );
+        return json(
+          { error: "Você não tem acesso à conversa que está respondendo.", code: "sem_acesso_a_conversa" },
+          403,
+        );
+      }
+
       payload.reply_to_message_id = body.reply_to_message_id;
     }
 
