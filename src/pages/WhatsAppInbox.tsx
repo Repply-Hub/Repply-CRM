@@ -198,6 +198,7 @@ import {
 import { ptBR } from "date-fns/locale";
 import { cn, autoResizeTextarea } from "@/lib/utils";
 import { downloadFile } from "@/lib/download-file";
+import { linkifyText } from "@/lib/linkify";
 import {
   TOGGLE_LIST_CLASS,
   TOGGLE_BUTTON_CLASS,
@@ -1542,7 +1543,7 @@ function MessageContent({
         />
         {msg.conteudo && !PLACEHOLDERS.includes(msg.conteudo) && (
           <p className={cn("text-sm mt-1.5 px-2 pb-0.5", textCls)}>
-            {msg.conteudo}
+            {linkifyText(msg.conteudo)}
           </p>
         )}
       </div>
@@ -1589,7 +1590,7 @@ function MessageContent({
         />
         {msg.conteudo && !PLACEHOLDERS.includes(msg.conteudo) && (
           <p className={cn("text-sm mt-1.5 px-2 pb-0.5", textCls)}>
-            {msg.conteudo}
+            {linkifyText(msg.conteudo)}
           </p>
         )}
       </div>
@@ -1688,7 +1689,7 @@ function MessageContent({
 
   return (
     <span className="text-sm whitespace-pre-wrap break-words">
-      {msg.conteudo}
+      {linkifyText(msg.conteudo)}
       <span
         className={cn(
           "float-right flex items-center gap-1 select-none ml-2 mt-1 translate-y-0.5",
@@ -2338,7 +2339,7 @@ function LeadSheet({
             <StickyNote className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs break-words">{n.conteudo}</p>
+            <p className="text-xs break-words">{linkifyText(n.conteudo)}</p>
             <p className="text-[10px] text-muted-foreground">
               {format(new Date(n.created_at), "dd/MM/yyyy HH:mm", {
                 locale: ptBR,
@@ -6687,7 +6688,7 @@ export default function WhatsAppInbox() {
                                               : ""}
                                             :
                                           </span>{" "}
-                                          {msg.conteudo}
+                                          {linkifyText(msg.conteudo)}
                                         </p>
                                       </div>
                                       <div className="flex items-center gap-1 mt-0.5 justify-center">
@@ -6886,7 +6887,7 @@ export default function WhatsAppInbox() {
                       <div key={n.id} className="flex items-start gap-2">
                         <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                         <p className="text-sm text-amber-900 dark:text-amber-200 flex-1 break-words">
-                          {n.conteudo}
+                          {linkifyText(n.conteudo)}
                           <span className="text-amber-700/70 dark:text-amber-300/60">
                             {" "}
                             ·{" "}

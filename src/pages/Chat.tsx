@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, autoResizeTextarea } from '@/lib/utils';
 import { downloadFile } from '@/lib/download-file';
+import { linkifyText } from '@/lib/linkify';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
 import { validateFile } from '@/lib/file-validation';
 import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
@@ -1907,7 +1908,7 @@ const Chat = () => {
                                     )}
                                   </div>
                                 )}
-                                {msg.conteudo && !(msg.arquivo_url && msg.conteudo === msg.arquivo_nome) && msg.conteudo}
+                                {msg.conteudo && !(msg.arquivo_url && msg.conteudo === msg.arquivo_nome) && linkifyText(msg.conteudo)}
                               </div>
                               <p className={`flex items-center gap-0.5 text-[9px] text-muted-foreground mt-0.5 ${isMe ? 'justify-end mr-1' : 'ml-1'}`}>
                                 {format(new Date(msg.created_at), 'HH:mm', { locale: ptBR })}
