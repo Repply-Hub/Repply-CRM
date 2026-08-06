@@ -104,18 +104,34 @@ export async function buscarPastas(grantId: string): Promise<PastaNylas[]> {
     // Teto de páginas como rede de segurança: um cursor que se repetisse por
     // bug do provedor daria laço infinito dentro da Edge Function.
     for (let pagina = 0; pagina < 20; pagina++) {
-      const params = new URLSearchParams({ limit: "200" });
-      if (cursor) params.set("page_token", cursor);
+      /**
+       * A PRIMEIRA página vai SEM parâmetro nenhum, de propósito.
+       *
+       * Essa é a única forma comprovada de chamar este endpoint neste projeto:
+       * é como o email-callback original resolvia INBOX e SENT, e as duas
+       * caixas conectadas têm `pasta_inbox_id`/`pasta_sent_id` preenchidos por
+       * ela. Mandar `limit`/`page_token` numa conta Google, onde os rótulos vêm
+       * todos de uma vez, é aposta não verificada — e se o provedor recusasse,
+       * `buscarPastas` devolveria vazio e o espelho de marcadores simplesmente
+       * não aconteceria, em silêncio.
+       *
+       * A paginação continua existindo, mas só é usada quando o PRÓPRIO
+       * provedor oferece um `next_cursor`. Assim ela ajuda quem pagina (o
+       * Microsoft) sem arriscar quem não pagina.
+       */
+      const caminho = cursor
+        ? `/v3/grants/${grantId}/folders?page_token=${encodeURIComponent(cursor)}`
+        : `/v3/grants/${grantId}/folders`;
 
-      const resp = await chamarNylas<PastaNylas[]>(
-        `/v3/grants/${grantId}/folders?${params.toString()}`,
-        { method: "GET", timeoutMs: 20_000 },
-      );
+      const resp = await chamarNylas<PastaNylas[]>(caminho, {
+        method: "GET",
+        timeoutMs: 20_000,
+      });
 
       if (!resp.ok) {
         console.warn("[nylas] /folders recusado:", resp.status, resp.texto.slice(0, 200));
-        // O que já veio vale mais do que nada — mas só se a PRIMEIRA página
-        // deu certo. Falhar no meio devolve o parcial, e quem chama decide.
+        // O que já veio vale mais do que nada — quem chama decide o que fazer
+        // com uma lista parcial.
         return todas;
       }
 

@@ -11,6 +11,8 @@ export interface PastaEmail {
   naoLidas: number | null;
   /** Pasta do provedor (Entrada, Enviados, Lixeira) e não marcador do usuário. */
   ehSistema: boolean;
+  /** Quando esta linha foi espelhada do provedor pela última vez. */
+  atualizadoEm: string | null;
 }
 
 /**
@@ -61,7 +63,7 @@ export function useEmailPastas(contaId?: string | null) {
     queryFn: async (): Promise<PastaEmail[]> => {
       const { data, error } = await supabase
         .from('email_pastas')
-        .select('id, pasta_id, nome, atributos, nao_lidas')
+        .select('id, pasta_id, nome, atributos, nao_lidas, atualizado_em')
         .eq('conta_id', contaId!)
         .order('nome');
 
@@ -81,6 +83,7 @@ export function useEmailPastas(contaId?: string | null) {
           ehSistema:
             attrs.some((a) => ATRIBUTOS_DE_SISTEMA.includes(a)) ||
             IDS_DE_SISTEMA_DO_GOOGLE.test((p.pasta_id ?? '').trim()),
+          atualizadoEm: p.atualizado_em ?? null,
         };
       });
     },

@@ -112,7 +112,7 @@ export function useEmailEmpresa() {
   });
 
   const sincronizarMutation = useMutation({
-    mutationFn: async (opcoes?: { limit?: number; backfill?: boolean }) => {
+    mutationFn: async (opcoes?: { limit?: number; backfill?: boolean; silencioso?: boolean }) => {
       const { data, error } = await supabase.functions.invoke('email-sync', {
         // backfill por padrão: quando a pessoa CLICA em atualizar, ela quer as
         // N mais recentes da caixa, não "o que mudou desde a última varredura".
@@ -122,7 +122,7 @@ export function useEmailEmpresa() {
       if (error) throw await erroLegivelDaFunction(error, 'Não foi possível sincronizar');
       return data as { novas: number; atualizadas: number; erros?: string[] };
     },
-    onSuccess: (r) => {
+    onSuccess: (r, opcoes) => {
       queryClient.invalidateQueries({ queryKey: ['received_emails'] });
       queryClient.invalidateQueries({ queryKey: ['emails'] });
       queryClient.invalidateQueries({ queryKey: ['email_conta'] });
@@ -131,6 +131,12 @@ export function useEmailEmpresa() {
       // vendo a barra lateral antiga até o staleTime de 60 s vencer — e, na
       // primeira sincronização depois de conectar, veria uma barra vazia.
       queryClient.invalidateQueries({ queryKey: ['email_pastas'] });
+
+      // `silencioso` é a varredura que a própria tela dispara para preencher os
+      // marcadores que faltam. Ninguém pediu por ela, então ninguém precisa ser
+      // avisado do resultado — um "Nenhuma mensagem nova" toda vez que a tela
+      // abre seria ruído puro.
+      if (opcoes?.silencioso) return;
 
       if (r.erros?.length) {
         // Erro por conta não é falha da sincronização inteira: o que deu certo
@@ -144,7 +150,15 @@ export function useEmailEmpresa() {
         toast.info('Nenhuma mensagem nova.');
       }
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error, opcoes) => {
+      // Falha do disparo automático também é silenciosa: a pessoa não pediu, e
+      // a barra simplesmente segue sem os marcadores. O erro fica no console.
+      if (opcoes?.silencioso) {
+        console.warn('[email] não consegui espelhar os marcadores:', err.message);
+        return;
+      }
+      toast.error(err.message);
+    },
   });
 
   /**
@@ -302,7 +316,8 @@ export function useEmailEmpresa() {
     isConnecting: conectarMutation.isPending,
     precisaReconectar: conta?.status === 'revogada',
 
-    sincronizar: (opcoes?: { limit?: number; backfill?: boolean }) =>
+    /** `silencioso` = varredura que a tela dispara sozinha; não avisa nada. */
+    sincronizar: (opcoes?: { limit?: number; backfill?: boolean; silencioso?: boolean }) =>
       sincronizarMutation.mutate(opcoes),
     isSyncing: sincronizarMutation.isPending,
     carregarCorpo,

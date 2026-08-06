@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +95,50 @@ const Emails = () => {
   const { isConnected, connectedEmail, enviarEmail: sendEmail, sincronizar, isSyncing, carregarCorpo,
     podeGerenciarCaixa, conta } = useEmailEmpresa();
   const { data: pastas = [], isLoading: pastasCarregando } = useEmailPastas(conta?.id);
+
+  /**
+   * Espelha os marcadores sozinho quando eles ainda não existem.
+   *
+   * A lista de pastas só é gravada em dois momentos: ao CONECTAR a caixa
+   * (email-callback) e a cada VARREDURA (email-sync). Uma caixa conectada antes
+   * de o espelhamento existir — como a `atendimento@`, ligada em 04/08 — nunca
+   * passou por nenhum dos dois, e a barra de marcadores ficava permanentemente
+   * vazia. E não havia como sair desse estado sem alguém apertar o ícone de
+   * atualizar, que ninguém aperta: em toda a janela de log não houve UMA chamada
+   * ao email-sync. As mensagens já carregavam 10 marcadores; faltavam só os
+   * nomes.
+   *
+   * Deixar uma funcionalidade dependendo de um clique que ninguém dá é o mesmo
+   * que não entregá-la. Então a tela se conserta: se está conectada e não há
+   * marcador nenhum, dispara uma varredura silenciosa.
+   *
+   * Também renova quando o espelho está VELHO, e não só quando está vazio: um
+   * marcador criado no Gmail hoje não apareceria nunca se a condição fosse
+   * apenas "está vazio", porque depois do primeiro espelhamento a lista deixa de
+   * ser vazia para sempre. Um dia é folgado — quem cria uma pasta não espera
+   * vê-la no CRM no mesmo minuto — e mantém isto longe de virar tráfego.
+   *
+   * Uma vez por sessão (`useRef`), e não a cada render: se a caixa realmente não
+   * tiver marcador nenhum no provedor, `pastas` continua vazio e isto viraria um
+   * laço de chamadas à API do Nylas a cada atualização da tela.
+   */
+  const espelhouPastasRef = useRef(false);
+  useEffect(() => {
+    if (!isConnected || !conta?.id || pastasCarregando) return;
+    if (espelhouPastasRef.current) return;
+
+    const UM_DIA = 24 * 60 * 60 * 1000;
+    const maisRecente = pastas.reduce<number>((maior, p) => {
+      const t = p.atualizadoEm ? new Date(p.atualizadoEm).getTime() : 0;
+      return t > maior ? t : maior;
+    }, 0);
+    const precisaEspelhar = pastas.length === 0 || Date.now() - maisRecente > UM_DIA;
+    if (!precisaEspelhar) return;
+
+    espelhouPastasRef.current = true;
+    void sincronizar({ limit: 20, silencioso: true });
+  }, [isConnected, conta?.id, pastasCarregando, pastas, sincronizar]);
+
   const [formData, setFormData] = useState({
     destinatario: "",
     assunto: "",

@@ -137,6 +137,13 @@ serve(async (req) => {
           conta.empresa_id,
           pastasDaCaixa,
         );
+      } else {
+        // Sem pastas, o espelho não acontece e a barra de marcadores fica
+        // vazia — que é exatamente o sintoma que ninguém conseguia explicar.
+        // Um `if` sem `else` transformava essa falha em silêncio; agora ela
+        // aparece no resultado da varredura e no log.
+        console.warn(`[email-sync] ${conta.email}: /folders devolveu vazio`);
+        erros.push(`${conta.email}: não consegui ler as pastas`);
       }
 
       // INBOX alimenta "Recebidos" e SENT alimenta "Enviados". Buscar sem filtro
