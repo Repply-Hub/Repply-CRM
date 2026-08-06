@@ -3746,6 +3746,20 @@ export type Database = {
           total_pedidos: number
         }[]
       }
+      dashboard_velocidade_fabricante: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_fabricante_id?: string
+          p_usuario_id?: string
+        }
+        Returns: {
+          dias_medio_resposta: number | null
+          fabricante_id: string
+          fabricante_nome: string
+          total_pedidos: number
+        }[]
+      }
       delete_current_user: { Args: never; Returns: undefined }
       delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
       empresa_plano_ativo: { Args: never; Returns: boolean }
