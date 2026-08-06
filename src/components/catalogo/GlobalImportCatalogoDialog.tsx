@@ -172,7 +172,10 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
       const isValid = fabId && row.descricao_material && Number(row.preco_unitario) > 0;
 
       if (!isValid) {
-        ignoredRows.push(rawData[index]);
+        // Guarda os campos já mapeados (fabricante_nome, descricao_material...), não os
+        // cabeçalhos brutos da planilha — é o que permite reeditar e reenviar depois em
+        // Linhas Ignoradas com os nomes de campo que o sistema reconhece.
+        ignoredRows.push(row);
         return;
       }
 
@@ -219,7 +222,8 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
             usuario_id: user.id,
             tipo_importacao: 'catalogo_geral',
             dados_originais: row,
-            motivo_ignorado: 'Falta Fabricante, Descrição ou Preço'
+            motivo_ignorado: 'Falta Fabricante, Descrição ou Preço',
+            nome_arquivo: fileName || null,
           }));
           
           const { error: ignoreError } = await supabase

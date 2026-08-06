@@ -37,25 +37,128 @@ const FIELD_LABELS: Record<string, string> = {
   complemento: 'Complemento', bairro: 'Bairro', cidade: 'Cidade', uf: 'UF', cep: 'CEP',
   data_criacao: 'Data de Criação', cliente: 'Cliente', fabricante: 'Fabricante',
   obra: 'Obra', valor: 'Valor', observacoes: 'Observações', status: 'Status',
-  data_pedido: 'Data do Negócio',
+  data_pedido: 'Data do Negócio', nome_contato: 'Nome do Contato', cargo: 'Cargo',
+  classificacao: 'Classificação', fabricante_nome: 'Fabricante',
+  descricao_material: 'Produto', preco_unitario: 'Preço', referencia: 'Referência',
+  categoria: 'Categoria', unidade: 'Unidade de Medida', estoque_disponivel: 'Estoque Disponível',
+  imagem_url: 'Foto (URL)',
 };
 
 const REQUIRED_FIELDS: Record<string, Set<string>> = {
   clientes: new Set(['tipo']),
+  clientes_empresas: new Set(['empresa', 'razao_social', 'cnpj']),
+  clientes_contatos: new Set(['empresa', 'nome_contato']),
   negocios: new Set(['cliente', 'fabricante', 'valor']),
+  catalogo_geral: new Set(['fabricante_nome', 'descricao_material', 'preco_unitario']),
 };
 
 // Fields that are internal/processed and shouldn't be shown for editing
 const SKIP_FIELDS = new Set([
   'usuario_id', 'cliente_id', 'fabricante_id', 'obra_id',
   'import_hash', 'campos_extras', '__dateError',
+  'criado_por_usuario_id', 'criado_por_nome',
 ]);
 
 // Fallback field list per type when dados_originais has only internal fields
 const FALLBACK_FIELDS: Record<string, string[]> = {
   clientes: ['empresa', 'razao_social', 'tipo', 'cnpj', 'email', 'telefone', 'cidade', 'uf'],
+  clientes_empresas: ['empresa', 'razao_social', 'tipo', 'cnpj', 'email', 'telefone', 'cidade', 'uf'],
+  clientes_contatos: ['empresa', 'nome_contato', 'cargo', 'email', 'telefone'],
   negocios: ['cliente', 'fabricante', 'obra', 'valor', 'status', 'data_pedido', 'observacoes'],
+  catalogo_geral: ['fabricante_nome', 'descricao_material', 'preco_unitario', 'unidade', 'categoria', 'referencia'],
 };
+
+async function logLinhaIgnoradaRetry(tipo: string, dados: Record<string, unknown>, motivo: string, nomeArquivo?: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('linhas_ignoradas_importacao').insert({
+    usuario_id: user.id,
+    tipo_importacao: tipo,
+    dados_originais: dados,
+    motivo_ignorado: motivo,
+    nome_arquivo: nomeArquivo ?? null,
+  });
+}
+
+// Import de Contatos não passa pelo hook useBulkImport (que só sabe inserir em `clientes`
+// e `pedidos`), então o reenvio de uma linha ignorada de contato insere direto na tabela —
+// mesma lógica de resolução de cliente_id por nome da ImportClientesDialog original.
+async function retryContato(fields: Record<string, string>, nomeArquivo?: string) {
+  try {
+    if (!fields.empresa && !fields.nome_contato) {
+      throw new Error('Falta Empresa ou Nome');
+    }
+    const { data: vid, error: vidError } = await supabase.rpc('get_my_vendedor_id');
+    if (vidError || !vid) throw new Error('Não foi possível identificar seu usuário.');
+
+    let clienteId: string | null = null;
+    if (fields.empresa) {
+      const { data: cliente } = await supabase
+        .from('clientes')
+        .select('id')
+        .ilike('empresa', fields.empresa.trim())
+        .maybeSingle();
+      clienteId = cliente?.id ?? null;
+    }
+
+    const { error } = await supabase.from('contatos').insert({
+      empresa: fields.empresa || 'Sem empresa',
+      cliente_id: clienteId,
+      nome_contato: fields.nome_contato || fields.empresa || null,
+      email: fields.email || null,
+      telefone: fields.telefone || null,
+      cargo: fields.cargo || null,
+      logradouro: fields.logradouro || null,
+      numero: fields.numero || null,
+      complemento: fields.complemento || null,
+      bairro: fields.bairro || null,
+      cidade: fields.cidade || null,
+      uf: fields.uf || null,
+      cep: fields.cep || null,
+      classificacao: fields.classificacao || null,
+      data_criacao: fields.data_criacao || null,
+      usuario_id: vid,
+    });
+    if (error) throw error;
+  } catch (err) {
+    await logLinhaIgnoradaRetry('clientes_contatos', fields, (err as Error).message, nomeArquivo);
+    throw err;
+  }
+}
+
+// Import de Catálogo também não passa pelo useBulkImport — reenvia direto pra
+// tabela_precos, resolvendo o fabricante pelo nome (mesma regra da GlobalImportCatalogoDialog).
+async function retryCatalogo(fields: Record<string, string>, nomeArquivo?: string) {
+  try {
+    const precoNum = Number(fields.preco_unitario);
+    if (!fields.fabricante_nome || !fields.descricao_material || !(precoNum > 0)) {
+      throw new Error('Falta Fabricante, Descrição ou Preço');
+    }
+    const { data: fab, error: fabError } = await supabase
+      .from('fabricantes')
+      .select('id')
+      .ilike('nome', fields.fabricante_nome.trim())
+      .maybeSingle();
+    if (fabError) throw fabError;
+    if (!fab) throw new Error('Fabricante não encontrado — verifique se o nome está exatamente igual ao cadastrado');
+
+    const { error } = await supabase.from('tabela_precos').insert({
+      fabricante_id: fab.id,
+      descricao_material: fields.descricao_material,
+      referencia: fields.referencia || null,
+      categoria: fields.categoria || null,
+      unidade: fields.unidade || null,
+      imagem_url: fields.imagem_url || null,
+      estoque_disponivel: fields.estoque_disponivel ? Number(fields.estoque_disponivel) : null,
+      preco_unitario: precoNum,
+      vigente: true,
+    });
+    if (error) throw error;
+  } catch (err) {
+    await logLinhaIgnoradaRetry('catalogo_geral', fields, (err as Error).message, nomeArquivo);
+    throw err;
+  }
+}
 
 export default function LinhasIgnoradas() {
   const navigate = useNavigate();
@@ -158,21 +261,36 @@ export default function LinhasIgnoradas() {
     if (!retryRow || isRetrying) return;
     setIsRetrying(true);
     try {
-      // Delete the original row first — if it fails again the hook creates a fresh one
+      // Apaga a linha original primeiro — se falhar de novo, o hook (clientes/negócios) ou
+      // a função de retry (contatos/catálogo) recria a linha ignorada com os dados
+      // atualizados e o novo motivo, então uma tentativa que falha nunca se perde.
       await supabase.from('linhas_ignoradas_importacao').delete().eq('id', retryRow.id);
 
-      const payload = [retryFields as Record<string, unknown>];
-      const summary = retryRow.tipo_importacao === 'clientes'
-        ? await importClientes(payload, retryRow.nome_arquivo)
-        : await importNegocios(payload, retryRow.nome_arquivo);
+      const tipo = retryRow.tipo_importacao as string;
+      let success = false;
 
-      if (summary.inserted > 0) {
+      if (tipo === 'clientes' || tipo === 'clientes_empresas') {
+        const summary = await importClientes([retryFields as Record<string, unknown>], retryRow.nome_arquivo);
+        success = summary.inserted > 0;
+      } else if (tipo === 'clientes_contatos') {
+        await retryContato(retryFields, retryRow.nome_arquivo);
+        success = true;
+      } else if (tipo === 'catalogo_geral') {
+        await retryCatalogo(retryFields, retryRow.nome_arquivo);
+        success = true;
+      } else {
+        const summary = await importNegocios([retryFields as Record<string, unknown>], retryRow.nome_arquivo);
+        success = summary.inserted > 0;
+      }
+
+      if (success) {
         toast.success('Linha importada com sucesso!');
         setRetryRow(null);
       }
       queryClient.invalidateQueries({ queryKey: ['linhas_ignoradas_importacao'] });
     } catch (err) {
       toast.error('Erro ao tentar importar: ' + (err as Error).message);
+      queryClient.invalidateQueries({ queryKey: ['linhas_ignoradas_importacao'] });
     } finally {
       setIsRetrying(false);
     }

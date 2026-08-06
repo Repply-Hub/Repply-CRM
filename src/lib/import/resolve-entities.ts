@@ -8,7 +8,7 @@ const cache = {
   marcadores: new Map<string, string>(),
 };
 
-function normalizeKey(name: string): string {
+export function normalizeKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
@@ -43,7 +43,7 @@ function slugifyMarcador(str: string): string {
  * contenham esses caracteres literalmente (ex: "100% Acabamentos") não sejam
  * interpretados como padrão de busca.
  */
-function escapeIlikeWildcards(value: string): string {
+export function escapeIlikeWildcards(value: string): string {
   return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }
 
@@ -54,7 +54,7 @@ function escapeIlikeWildcards(value: string): string {
  * (ex: "Azevedo & Coelho (SP)", "Cyrela S.A."), o que sem essa escapagem
  * corrompe a query inteira e derruba o lote com 400 Bad Request.
  */
-function escapeOrValue(value: string): string {
+export function escapeOrValue(value: string): string {
   const needsQuoting = /[,.:()]/.test(value);
   if (!needsQuoting) return value;
   const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -62,7 +62,7 @@ function escapeOrValue(value: string): string {
 }
 
 /** Constrói filtro OR ilike para o Supabase .or(), com valores devidamente escapados. */
-function buildOrFilter(column: string, values: string[]): string {
+export function buildOrFilter(column: string, values: string[]): string {
   return values
     .map(v => `${column}.ilike.${escapeOrValue(escapeIlikeWildcards(v))}`)
     .join(',');

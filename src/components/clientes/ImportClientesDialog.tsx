@@ -15,6 +15,7 @@ import { MappingStep, sanitizeImportedRows, type ExtraMappingValue } from '@/com
 import { ImportInstructionsStep } from '@/components/import/ImportInstructionsStep';
 import { stringToEndereco, fetchCepData, maskCep, unmaskCep } from '@/lib/cep';
 import { matchUsuarioByNome, type UsuarioLite } from '@/lib/import/match-usuario';
+import { normalizeKey, buildOrFilter } from '@/lib/import/resolve-entities';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
@@ -361,6 +362,29 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     if (file) handleFile(file);
   };
 
+  interface ClienteExistente {
+    id: string;
+    empresa: string | null;
+    tipo: string | null;
+    cnpj: string | null;
+    razao_social: string | null;
+    email: string | null;
+    telefone: string | null;
+    logradouro: string | null;
+    numero: string | null;
+    complemento: string | null;
+    bairro: string | null;
+    cidade: string | null;
+    uf: string | null;
+    cep: string | null;
+    nome_contato: string | null;
+    classificacao: string | null;
+    data_criacao: string | null;
+    campos_extras: Record<string, string> | null;
+    usuario_id: string;
+    criado_por_usuario_id: string | null;
+  }
+
   const hasValue = (value: unknown) => {
     if (value === null || value === undefined) return false;
     if (typeof value === 'string') return value.trim().length > 0;
@@ -376,6 +400,23 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     const merged = { ...current };
     Object.entries(incoming).forEach(([key, value]) => {
       if (hasValue(value)) merged[key] = value;
+    });
+    return merged;
+  };
+
+  // Mesma ideia de mergeExtraFields, mas com prioridade invertida: usada só ao
+  // atualizar um cliente já existente no banco (ver bloco de import de empresas
+  // abaixo) — nunca sobrescreve um campo_extra que o cadastro já tinha, só
+  // acrescenta os que estavam faltando. mergeExtraFields continua com a
+  // prioridade original (linha do arquivo mais recente vence) porque é usada
+  // pra deduplicar linhas duplicadas dentro do próprio arquivo, não contra o banco.
+  const mergeExtraFieldsKeepExisting = (
+    existing: Record<string, string> = {},
+    incoming: Record<string, string> = {},
+  ) => {
+    const merged = { ...existing };
+    Object.entries(incoming).forEach(([key, value]) => {
+      if (!hasValue(merged[key]) && hasValue(value)) merged[key] = value;
     });
     return merged;
   };
@@ -542,13 +583,17 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
   const handleImport = async () => {
     const allRows = getMappedRows();
     const rows = previewRowsSnapshot.length > 0 ? [...previewRowsSnapshot] : allRows;
-    const ignoredRows = rawData.filter((_, index) => {
-      const mappedRow = allRows[index];
-      if (!mappedRow) return true;
-      return target === 'contatos' 
-        ? !(mappedRow.empresa || mappedRow.nome_contato) 
-        : !(mappedRow.empresa || mappedRow.razao_social || mappedRow.cnpj);
-    });
+    // getMappedRows() já filtra linhas inválidas, então seu índice não corresponde mais ao
+    // de rawData — usar a versão não-filtrada (mas ainda mapeada campo a campo) para achar
+    // as linhas ignoradas mantém o índice alinhado e guarda os nomes de campo canônicos
+    // (empresa, cnpj, nome_contato...) em vez dos cabeçalhos originais da planilha, que a
+    // tela de Linhas Ignoradas não sabe reassociar de volta aos campos do sistema.
+    const allRowsUnfiltered = getMappedRowsBase(undefined, false);
+    const ignoredRows = allRowsUnfiltered.filter((mappedRow) =>
+      target === 'contatos'
+        ? !(mappedRow.empresa || mappedRow.nome_contato)
+        : !(mappedRow.empresa || mappedRow.razao_social || mappedRow.cnpj)
+    );
 
     if (rows.length === 0) {
       toast.error('Nenhum registro válido após o mapeamento');
@@ -572,7 +617,8 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             usuario_id: user.id,
             tipo_importacao: `clientes_${target}`,
             dados_originais: row,
-            motivo_ignorado: target === 'contatos' ? 'Falta Empresa ou Nome' : 'Falta Empresa, Razão Social ou CNPJ'
+            motivo_ignorado: target === 'contatos' ? 'Falta Empresa ou Nome' : 'Falta Empresa, Razão Social ou CNPJ',
+            nome_arquivo: fileName || null,
           }));
           
           const { error: ignoreError } = await supabase
@@ -700,46 +746,83 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
             criado_por_usuario_id: r.criado_por_usuario_id || null,
           }));
 
+          const EXISTING_CLIENTE_COLUMNS = 'id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras,usuario_id,criado_por_usuario_id';
+
           const cnpjs = Array.from(new Set(preparedBatch.map(r => r.cnpj).filter(Boolean))) as string[];
-          const existingByKey = new Map<string, any>();
+          const existingByCnpj = new Map<string, ClienteExistente>();
           if (cnpjs.length > 0) {
             const { data: existingRows, error: existingError } = await supabase
               .from('clientes')
-              .select('id,empresa,tipo,cnpj,razao_social,email,telefone,logradouro,numero,complemento,bairro,cidade,uf,cep,nome_contato,classificacao,data_criacao,campos_extras,usuario_id,criado_por_usuario_id')
+              .select(EXISTING_CLIENTE_COLUMNS)
               .in('cnpj', cnpjs)
               .eq('usuario_id', vid);
             if (existingError) throw existingError;
-            existingRows?.forEach(row => {
-              if (row.cnpj) existingByKey.set(row.cnpj, row);
+            (existingRows as ClienteExistente[] | null)?.forEach(row => {
+              if (row.cnpj) existingByCnpj.set(row.cnpj, row);
             });
           }
 
+          // Fallback por nome (empresa, depois razão social) pras linhas que não bateram
+          // por CNPJ — sem isso, um cliente que a importação de Negócios já criou só com o
+          // nome (resolveClienteId, sem CNPJ) virava duplicata aqui em vez de ser
+          // completado. Mesmo padrão de ilike em chunks de 50 usado em resolve-entities.ts.
+          const semCnpjMatch = preparedBatch.filter(r => !r.cnpj || !existingByCnpj.has(r.cnpj));
+          const buscarExistentesPorColuna = async (coluna: 'empresa' | 'razao_social', valores: string[]) => {
+            const map = new Map<string, ClienteExistente>();
+            const unicos = Array.from(new Set(valores.map(v => v?.trim()).filter((v): v is string => Boolean(v))));
+            const CHUNK = 50;
+            for (let j = 0; j < unicos.length; j += CHUNK) {
+              const chunk = unicos.slice(j, j + CHUNK);
+              const { data: existingRows, error: existingError } = await supabase
+                .from('clientes')
+                .select(EXISTING_CLIENTE_COLUMNS)
+                .eq('usuario_id', vid)
+                .or(buildOrFilter(coluna, chunk));
+              if (existingError) throw existingError;
+              (existingRows as ClienteExistente[] | null)?.forEach((row) => {
+                const valor = row[coluna];
+                if (valor) map.set(normalizeKey(valor), row);
+              });
+            }
+            return map;
+          };
+
+          const existingByEmpresa = await buscarExistentesPorColuna('empresa', semCnpjMatch.map(r => r.empresa));
+          const aindaSemMatch = semCnpjMatch.filter(r => !(r.empresa && existingByEmpresa.has(normalizeKey(r.empresa))));
+          const existingByRazaoSocial = await buscarExistentesPorColuna('razao_social', aindaSemMatch.map(r => r.razao_social || ''));
+
           const batch = preparedBatch.map((incoming) => {
-            const existing = incoming.cnpj ? existingByKey.get(incoming.cnpj) : undefined;
+            const existing = (incoming.cnpj && existingByCnpj.get(incoming.cnpj))
+              ?? (incoming.empresa && existingByEmpresa.get(normalizeKey(incoming.empresa)))
+              ?? (incoming.razao_social && existingByRazaoSocial.get(normalizeKey(incoming.razao_social)))
+              ?? undefined;
             if (!existing) {
               return incoming;
             }
+            // Reaproveita o cadastro existente em vez de duplicar — só preenche os campos
+            // que estavam faltando nele, nunca sobrescreve um dado já cadastrado (nem o que
+            // veio da importação de Negócios, nem o que foi editado manualmente depois).
             return {
               id: existing.id,
-              empresa: hasValue(incoming.empresa) ? incoming.empresa : existing.empresa,
-              tipo: hasValue(incoming.tipo) ? incoming.tipo : existing.tipo || 'construtora',
-              cnpj: incoming.cnpj,
-              razao_social: hasValue(incoming.razao_social) ? incoming.razao_social : existing.razao_social,
-              email: hasValue(incoming.email) ? incoming.email : existing.email,
-              telefone: hasValue(incoming.telefone) ? incoming.telefone : existing.telefone,
-              logradouro: hasValue(incoming.logradouro) ? incoming.logradouro : existing.logradouro,
-              numero: hasValue(incoming.numero) ? incoming.numero : existing.numero,
-              complemento: hasValue(incoming.complemento) ? incoming.complemento : existing.complemento,
-              bairro: hasValue(incoming.bairro) ? incoming.bairro : existing.bairro,
-              cidade: hasValue(incoming.cidade) ? incoming.cidade : existing.cidade,
-              uf: hasValue(incoming.uf) ? incoming.uf : existing.uf,
-              cep: hasValue(incoming.cep) ? incoming.cep : existing.cep,
-              nome_contato: hasValue(incoming.nome_contato) ? incoming.nome_contato : existing.nome_contato,
-              classificacao: hasValue(incoming.classificacao) ? incoming.classificacao : existing.classificacao,
-              data_criacao: hasValue(incoming.data_criacao) ? incoming.data_criacao : existing.data_criacao,
-              campos_extras: mergeExtraFields(existing.campos_extras || {}, incoming.campos_extras || {}),
+              empresa: hasValue(existing.empresa) ? existing.empresa : incoming.empresa,
+              tipo: hasValue(existing.tipo) ? existing.tipo : (incoming.tipo || 'construtora'),
+              cnpj: hasValue(existing.cnpj) ? existing.cnpj : incoming.cnpj,
+              razao_social: hasValue(existing.razao_social) ? existing.razao_social : incoming.razao_social,
+              email: hasValue(existing.email) ? existing.email : incoming.email,
+              telefone: hasValue(existing.telefone) ? existing.telefone : incoming.telefone,
+              logradouro: hasValue(existing.logradouro) ? existing.logradouro : incoming.logradouro,
+              numero: hasValue(existing.numero) ? existing.numero : incoming.numero,
+              complemento: hasValue(existing.complemento) ? existing.complemento : incoming.complemento,
+              bairro: hasValue(existing.bairro) ? existing.bairro : incoming.bairro,
+              cidade: hasValue(existing.cidade) ? existing.cidade : incoming.cidade,
+              uf: hasValue(existing.uf) ? existing.uf : incoming.uf,
+              cep: hasValue(existing.cep) ? existing.cep : incoming.cep,
+              nome_contato: hasValue(existing.nome_contato) ? existing.nome_contato : incoming.nome_contato,
+              classificacao: hasValue(existing.classificacao) ? existing.classificacao : incoming.classificacao,
+              data_criacao: hasValue(existing.data_criacao) ? existing.data_criacao : incoming.data_criacao,
+              campos_extras: mergeExtraFieldsKeepExisting(existing.campos_extras || {}, incoming.campos_extras || {}),
               usuario_id: existing.usuario_id,
-              criado_por_usuario_id: hasValue(incoming.criado_por_usuario_id) ? incoming.criado_por_usuario_id : existing.criado_por_usuario_id,
+              criado_por_usuario_id: hasValue(existing.criado_por_usuario_id) ? existing.criado_por_usuario_id : incoming.criado_por_usuario_id,
             };
           }) as any[];
           console.debug('[ImportClientes] batch final clientes', batch.slice(0, 5));
@@ -1009,7 +1092,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-bold text-amber-900">Verifique antes de importar</span>
                   <p className="text-[11px] text-amber-800 leading-relaxed">
-                    Confira os dados na prévia abaixo. Registros existentes com o mesmo CNPJ serão atualizados, não duplicados.
+                    Confira os dados na prévia abaixo. Registros existentes com o mesmo CNPJ, nome da empresa ou razão social são atualizados (preenchendo só o que estiver faltando), não duplicados.
                   </p>
                 </div>
               </div>

@@ -25,13 +25,15 @@ src/
 │   └── resolve-entities.ts     # Resolução de FKs (cliente, fabricante)
 │
 ├── components/
-│   ├── ImportPedidosDialog.tsx  # Wizard de importação de Negócios
+│   ├── ImportPedidosDialog.tsx      # Wizard de importação de Negócios
+│   ├── clientes/
+│   │   └── ImportClientesDialog.tsx # Wizard de importação de Clientes/Contatos (o real — usado por Clientes.tsx)
 │   ├── import/
-│   │   └── ImportDataDialog.tsx # Wizard de importação de Clientes
-│   └── ImportDialog.tsx         # Componente base genérico
+│   │   └── ImportDataDialog.tsx     # Wizard genérico (empresas/negócios) — usado só por Fabricantes.tsx e Negocios.tsx via o alias ImportDialog.tsx, não por Clientes.tsx
+│   └── ImportDialog.tsx             # Re-export de ImportDataDialog
 │
 └── pages/
-    ├── Clientes.tsx             # Integra ImportDataDialog
+    ├── Clientes.tsx             # Integra ImportClientesDialog (target="empresas" | "contatos")
     └── Negocios.tsx             # Integra ImportPedidosDialog
 
 supabase/functions/
@@ -190,7 +192,7 @@ Utilizado exclusivamente pelo fluxo de **Negócios**. Resolve ou cria registros 
 
 ---
 
-## 6. Importação de Clientes — `ImportDataDialog.tsx`
+## 6. Importação de Clientes — `ImportClientesDialog.tsx`
 
 Suporta dois **alvos**:
 
@@ -235,14 +237,29 @@ Suporta dois **alvos**:
 
 ### Estratégia de Upsert (Empresas)
 
+Busca um cliente já existente (do mesmo `usuario_id` de quem está importando) em três tentativas,
+na ordem — a primeira que bater vence:
+
 ```
-CNPJ presente e já existe no banco?
-  ├─ Sim → UPDATE: mantém valores existentes, sobrescreve apenas campos não-vazios
-  │         Mescla campos_extras (JSON)
-  └─ Não → INSERT novo registro
+1. CNPJ (exato)
+2. empresa (ilike, normalizado)
+3. razao_social (ilike, normalizado)
+      │
+      ├─ Achou → UPDATE: preenche só os campos que estavam vazios no cadastro existente
+      │           (nunca sobrescreve um valor já cadastrado — nem o do próprio arquivo,
+      │           nem um editado manualmente depois). Mescla campos_extras (JSON) do
+      │           mesmo jeito: só adiciona chaves que ainda não existiam.
+      └─ Não achou → INSERT novo registro
 ```
 
-Linhas duplicadas por CNPJ dentro do próprio arquivo são **mescladas** antes do insert (prioriza valor não-vazio).
+O fallback por nome existe especificamente porque a importação de Negócios
+(`resolve-entities.ts` → `resolveClienteId`) cria clientes só com `empresa` preenchido, sem
+CNPJ — sem esse fallback, importar as Empresas depois duplicava esse cliente em vez de
+completar o cadastro.
+
+Linhas duplicadas por CNPJ dentro do próprio arquivo são **mescladas** antes do insert
+(prioriza o valor não-vazio da linha mais recente do arquivo — regra diferente da usada
+contra o banco, onde o cadastro já existente sempre vence).
 
 ### Tamanho dos Lotes
 
@@ -289,11 +306,33 @@ Linhas que falham na validação ou no insert são registradas em `linhas_ignora
 ```ts
 {
   usuario_id,          // quem importou
-  tipo_importacao,     // "clientes_empresas" | "clientes_contatos" | "negocios"
-  dados_originais,     // linha original do arquivo (JSON)
-  motivo_ignorado      // mensagem de erro
+  tipo_importacao,     // "clientes" | "clientes_empresas" | "clientes_contatos" | "negocios" | "catalogo_geral"
+  dados_originais,     // linha já mapeada para os campos canônicos do sistema (não os
+                        // cabeçalhos originais da planilha) — necessário para reeditar
+  motivo_ignorado,     // mensagem de erro
+  nome_arquivo         // nome do arquivo de origem, usado para agrupar na tela
 }
 ```
+
+`dados_originais` guarda os campos já mapeados (ex.: `empresa`, `cnpj`, `nome_contato`,
+`fabricante_nome`, `descricao_material`) em vez dos cabeçalhos brutos do arquivo — a tela de
+revisão não tem acesso ao mapeamento de colunas escolhido no wizard, então gravar os nomes
+de campo do sistema é o que permite reabrir a linha depois e editá-la com sentido.
+
+### Revisão e reenvio — `src/pages/LinhasIgnoradas.tsx`
+
+Cada linha ignorada pode ser reaberta num diálogo que edita os campos e tenta importar de
+novo, roteando por `tipo_importacao`:
+
+| `tipo_importacao`                    | Reenviado via |
+|---------------------------------------|---------------|
+| `clientes` / `clientes_empresas`      | `useBulkImport().importClientes` (tabela `clientes`) |
+| `clientes_contatos`                   | insert direto em `contatos`, resolvendo `cliente_id` pelo nome da empresa |
+| `negocios`                            | `useBulkImport().importNegocios` (resolve cliente/fabricante pelo nome) |
+| `catalogo_geral`                      | insert direto em `tabela_precos`, resolvendo `fabricante_id` pelo nome |
+
+A linha original é apagada antes da nova tentativa; se ela falhar de novo, é recriada com os
+dados editados e o novo motivo — uma tentativa malsucedida nunca é perdida silenciosamente.
 
 ---
 
@@ -316,9 +355,11 @@ Processamento alternativo via IA (Gemini Flash) — **não integrado ao fluxo pa
 
 ### `Clientes.tsx`
 ```tsx
-<ImportDataDialog
-  target="empresas"   // ou "contatos"
-  onSuccess={() => queryClient.invalidateQueries(['clientes'])}
+<ImportClientesDialog
+  open={importOpen}
+  onOpenChange={setImportOpen}
+  hideTrigger
+  target={activeTab}   // "empresas" ou "contatos"
 />
 ```
 
