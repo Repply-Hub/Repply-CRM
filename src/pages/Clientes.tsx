@@ -52,7 +52,7 @@ const CLIENTE_FIELDS: ColumnDefinition[] = [
   { id: 'email', label: 'E-mail' },
   { id: 'telefone', label: 'Telefone' },
   { id: 'logradouro', label: 'Logradouro / Rua' },
-  { id: 'numero', label: 'Número' },
+  { id: 'numero', label: 'Número', type: 'number' },
   { id: 'complemento', label: 'Complemento' },
   { id: 'bairro', label: 'Bairro' },
   { id: 'cidade', label: 'Cidade' },
@@ -480,15 +480,32 @@ const Clientes = () => {
         av = getTipoLabel(a.tipo, customTipos);
         bv = getTipoLabel(b.tipo, customTipos);
       }
-      if (colId === 'data_criacao') {
+      if (colId === 'data_criacao' || column?.type === 'date') {
         const at = av ? new Date(av as string).getTime() : 0;
         const bt = bv ? new Date(bv as string).getTime() : 0;
         return (at - bt) * dir;
+      }
+      if (column?.type === 'number' || column?.type === 'currency') {
+        const an = Number(String(av ?? '').replace(',', '.'));
+        const bn = Number(String(bv ?? '').replace(',', '.'));
+        if (!Number.isNaN(an) && !Number.isNaN(bn)) return (an - bn) * dir;
       }
       const as = (av ?? '').toString().toLowerCase();
       const bs = (bv ?? '').toString().toLowerCase();
       return as.localeCompare(bs, 'pt-BR') * dir;
     });
+  };
+
+  // Rótulos do menu de ordenação por coluna: numérico/moeda usa "0-9" em vez de "A-Z",
+  // já que a coluna não tem alfabeto.
+  const getSortLabels = (colId: string, columnDefs: ColumnDefinition[]) => {
+    if (colId === 'data_criacao') return { asc: 'Mais antigos primeiro', desc: 'Mais recentes primeiro' };
+    const column = columnDefs.find(col => col.id === colId);
+    if (column?.type === 'date') return { asc: 'Mais antigos primeiro', desc: 'Mais recentes primeiro' };
+    if (colId === 'cnpj' || column?.type === 'number' || column?.type === 'currency') {
+      return { asc: 'Ordenar 0-9', desc: 'Ordenar 9-0' };
+    }
+    return { asc: 'Ordenar A-Z', desc: 'Ordenar Z-A' };
   };
 
   const handleSort = (colId: string, direction: SortDirection) => {
@@ -1489,8 +1506,8 @@ const Clientes = () => {
                         currentSortKey={sortColumn}
                         currentDirection={sortDirection}
                         onSort={handleSort}
-                        ascLabel={colId === 'data_criacao' ? 'Mais antigos primeiro' : colId === 'cnpj' ? 'Ordenar 0-9' : 'Ordenar A-Z'}
-                        descLabel={colId === 'data_criacao' ? 'Mais recentes primeiro' : colId === 'cnpj' ? 'Ordenar 9-0' : 'Ordenar Z-A'}
+                        ascLabel={getSortLabels(colId, columns).asc}
+                        descLabel={getSortLabels(colId, columns).desc}
                         width={resolvedClienteColWidths[i]}
                         onResize={(w) => setColumnWidth(colId, w)}
                       />
@@ -1625,8 +1642,8 @@ const Clientes = () => {
                         currentSortKey={sortColumn}
                         currentDirection={sortDirection}
                         onSort={handleSort}
-                        ascLabel={colId === 'data_criacao' ? 'Mais antigos primeiro' : colId === 'cnpj' ? 'Ordenar 0-9' : 'Ordenar A-Z'}
-                        descLabel={colId === 'data_criacao' ? 'Mais recentes primeiro' : colId === 'cnpj' ? 'Ordenar 9-0' : 'Ordenar Z-A'}
+                        ascLabel={getSortLabels(colId, columns).asc}
+                        descLabel={getSortLabels(colId, columns).desc}
                         width={resolvedClienteColWidths[i]}
                         onResize={(w) => setColumnWidth(colId, w)}
                       />

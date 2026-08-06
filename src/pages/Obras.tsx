@@ -175,10 +175,20 @@ export default function Obras() {
         variant: 'outline' as const 
       };
     }
-    return { 
-      label: status.nome, 
-      variant: 'default' as const 
+    return {
+      label: status.nome,
+      variant: 'default' as const
     };
+  };
+
+  // Rótulos do menu de ordenação por coluna: numérico/moeda usa "0-9" em vez de "A-Z",
+  // já que a coluna não tem alfabeto.
+  const getSortLabels = (colId: string) => {
+    if (colId === 'created_at') return { asc: 'Mais antigas primeiro', desc: 'Mais recentes primeiro' };
+    const column = columns.find(c => c.id === colId);
+    if (column?.type === 'date') return { asc: 'Mais antigas primeiro', desc: 'Mais recentes primeiro' };
+    if (column?.type === 'number' || column?.type === 'currency') return { asc: 'Ordenar 0-9', desc: 'Ordenar 9-0' };
+    return { asc: 'Ordenar A-Z', desc: 'Ordenar Z-A' };
   };
 
   useEffect(() => {
@@ -214,6 +224,7 @@ export default function Obras() {
     }
 
     const getSortValue = (o: any) => {
+      if (sortColumn?.startsWith('custom_')) return (o.campos_extras || {})[sortColumn];
       switch (sortColumn) {
         case 'status': return getStatusInfo(o.status).label;
         case 'cliente': return (o.clientes as any)?.empresa;
@@ -225,14 +236,20 @@ export default function Obras() {
       }
     };
 
+    const sortColumnDef = columns.find(c => c.id === sortColumn);
     const dir = sortDirection === 'asc' ? 1 : -1;
     list.sort((a, b) => {
       const av = getSortValue(a);
       const bv = getSortValue(b);
-      if (sortColumn === 'created_at') {
+      if (sortColumn === 'created_at' || sortColumnDef?.type === 'date') {
         const at = av ? new Date(av).getTime() : 0;
         const bt = bv ? new Date(bv).getTime() : 0;
         return (at - bt) * dir;
+      }
+      if (sortColumnDef?.type === 'number' || sortColumnDef?.type === 'currency') {
+        const an = Number(String(av ?? '').replace(',', '.'));
+        const bn = Number(String(bv ?? '').replace(',', '.'));
+        if (!Number.isNaN(an) && !Number.isNaN(bn)) return (an - bn) * dir;
       }
       const as = (av ?? '').toString().toLowerCase();
       const bs = (bv ?? '').toString().toLowerCase();
@@ -240,7 +257,7 @@ export default function Obras() {
     });
 
     return list;
-  }, [obras, search, statusFilter, sortColumn, sortDirection, statusObras]);
+  }, [obras, search, statusFilter, sortColumn, sortDirection, statusObras, columns]);
 
   const obrasParaMapa = useMemo(
     () =>
@@ -479,8 +496,8 @@ export default function Obras() {
                               currentSortKey={sortColumn}
                               currentDirection={sortDirection}
                               onSort={(key, direction) => { setSortColumn(key); setSortDirection(direction); }}
-                              ascLabel={colId === 'created_at' ? 'Mais antigas primeiro' : 'Ordenar A-Z'}
-                              descLabel={colId === 'created_at' ? 'Mais recentes primeiro' : 'Ordenar Z-A'}
+                              ascLabel={getSortLabels(colId).asc}
+                              descLabel={getSortLabels(colId).desc}
                               width={resolvedObraColWidths[i]}
                               onResize={(w) => setColumnWidth(colId, w)}
                             />
