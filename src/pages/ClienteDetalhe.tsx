@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, Users, X, HardHat, ListChecks, FileText, Contact, Tag, CalendarDays, UserCheck } from 'lucide-react';
+import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, Users, X, HardHat, ListChecks, FileText, Contact, Tag, CalendarDays, UserCheck, Search } from 'lucide-react';
 import { KANBAN_STAGES } from '@/data/mockData';
 import { toast } from 'sonner';
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
@@ -96,6 +96,9 @@ const ClienteDetalhe = () => {
   const [novaObra, setNovaObra] = useState({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
   const [pedidosPage, setPedidosPage] = useState(1);
   const [pedidosPageSize, setPedidosPageSize] = useState(5);
+  const [pedidosBusca, setPedidosBusca] = useState('');
+  const [pedidosFiltroFabricante, setPedidosFiltroFabricante] = useState('todos');
+  const [pedidosFiltroEtapa, setPedidosFiltroEtapa] = useState('todas');
   const [addTarefaOpen, setAddTarefaOpen] = useState(false);
   const [novoNegocioOpen, setNovoNegocioOpen] = useState(false);
   const [tarefasPage, setTarefasPage] = useState(1);
@@ -116,10 +119,35 @@ const ClienteDetalhe = () => {
     (pedidos ?? []).find(p => p.id === viewOrderId),
   [pedidos, viewOrderId]);
   const pedidosCliente = useMemo(() => (pedidos ?? []).filter(p => p.cliente_id === id), [pedidos, id]);
-  const totalPedidosPages = Math.max(1, Math.ceil(pedidosCliente.length / pedidosPageSize));
+  const fabricantesDoCliente = useMemo(() => {
+    const mapa = new Map<string, string>();
+    pedidosCliente.forEach(p => {
+      const fab = (p as any).fabricante;
+      if (fab?.id) mapa.set(fab.id, fab.nome);
+    });
+    return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [pedidosCliente]);
+  const pedidosFiltrados = useMemo(() => {
+    const termo = pedidosBusca.trim().toLowerCase();
+    return pedidosCliente.filter(p => {
+      if (pedidosFiltroFabricante !== 'todos' && (p as any).fabricante?.id !== pedidosFiltroFabricante) return false;
+      if (pedidosFiltroEtapa !== 'todas' && p.status !== pedidosFiltroEtapa) return false;
+      if (termo) {
+        const alvo = [
+          (p as any).fabricante?.nome,
+          (p as any).vendedor?.nome,
+          (p as any).obra?.nome_obra,
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!alvo.includes(termo)) return false;
+      }
+      return true;
+    });
+  }, [pedidosCliente, pedidosBusca, pedidosFiltroFabricante, pedidosFiltroEtapa]);
+  const pedidosFiltrosAtivos = pedidosBusca.trim() !== '' || pedidosFiltroFabricante !== 'todos' || pedidosFiltroEtapa !== 'todas';
+  const totalPedidosPages = Math.max(1, Math.ceil(pedidosFiltrados.length / pedidosPageSize));
   const paginatedPedidos = useMemo(() =>
-    pedidosCliente.slice((pedidosPage - 1) * pedidosPageSize, pedidosPage * pedidosPageSize),
-    [pedidosCliente, pedidosPage, pedidosPageSize]
+    pedidosFiltrados.slice((pedidosPage - 1) * pedidosPageSize, pedidosPage * pedidosPageSize),
+    [pedidosFiltrados, pedidosPage, pedidosPageSize]
   );
   const contatosExtras = (contatos ?? []).filter((c: any) => cliente && c.empresa === cliente.empresa);
   const tarefasCliente = useMemo(() => (tarefas ?? []).filter(t => t.cliente_id === id), [tarefas, id]);
@@ -990,44 +1018,103 @@ const ClienteDetalhe = () => {
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <div className="rounded-lg border border-border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Fabricante</TableHead>
-                      <TableHead>Valor</TableHead>
-                      <TableHead>Etapa</TableHead>
-                      <TableHead>Data</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pedidosCliente.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                          Nenhum negócio encontrado para este cliente.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      paginatedPedidos.map(p => (
-                        <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setViewOrderId(p.id)}>
-                          <TableCell className="font-medium">{(p as any).fabricante?.nome ?? '-'}</TableCell>
-                          <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                          <TableCell>
-                            <Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">{new Date(p.data_pedido).toLocaleDateString('pt-BR')}</TableCell>
-                        </TableRow>
-                      ))
+              <>
+                {pedidosCliente.length > 0 && (
+                  <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por fabricante, vendedor ou obra..."
+                        value={pedidosBusca}
+                        onChange={(e) => { setPedidosBusca(e.target.value); setPedidosPage(1); }}
+                        className="pl-9"
+                      />
+                    </div>
+                    <Select
+                      value={pedidosFiltroFabricante}
+                      onValueChange={(v) => { setPedidosFiltroFabricante(v); setPedidosPage(1); }}
+                    >
+                      <SelectTrigger className="w-full sm:w-[200px]">
+                        <SelectValue placeholder="Fabricante" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os fabricantes</SelectItem>
+                        {fabricantesDoCliente.map(f => (
+                          <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={pedidosFiltroEtapa}
+                      onValueChange={(v) => { setPedidosFiltroEtapa(v); setPedidosPage(1); }}
+                    >
+                      <SelectTrigger className="w-full sm:w-[180px]">
+                        <SelectValue placeholder="Etapa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todas">Todas as etapas</SelectItem>
+                        {KANBAN_STAGES.map(s => (
+                          <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {pedidosFiltrosAtivos && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setPedidosBusca('');
+                          setPedidosFiltroFabricante('todos');
+                          setPedidosFiltroEtapa('todas');
+                          setPedidosPage(1);
+                        }}
+                      >
+                        <X className="h-4 w-4 mr-1" /> Limpar
+                      </Button>
                     )}
-                  </TableBody>
-                </Table>
-              </div>
+                  </div>
+                )}
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead>Fabricante</TableHead>
+                        <TableHead>Valor</TableHead>
+                        <TableHead>Etapa</TableHead>
+                        <TableHead>Data</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pedidosFiltrados.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                            {pedidosCliente.length === 0
+                              ? 'Nenhum negócio encontrado para este cliente.'
+                              : 'Nenhum negócio encontrado com os filtros aplicados.'}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        paginatedPedidos.map(p => (
+                          <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setViewOrderId(p.id)}>
+                            <TableCell className="font-medium">{(p as any).fabricante?.nome ?? '-'}</TableCell>
+                            <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                            <TableCell>
+                              <Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{new Date(p.data_pedido).toLocaleDateString('pt-BR')}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
-            {pedidosCliente.length > pedidosPageSize && (
+            {pedidosFiltrados.length > pedidosPageSize && (
               <ListPagination
                 page={pedidosPage}
                 totalPages={totalPedidosPages}
-                totalItems={pedidosCliente.length}
+                totalItems={pedidosFiltrados.length}
                 pageSize={pedidosPageSize}
                 onPageChange={setPedidosPage}
                 onPageSizeChange={(size) => { setPedidosPageSize(size); setPedidosPage(1); }}

@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, FileWarning, Check, Calendar, Briefcase, ExternalLink, IdCard } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, FileWarning, Check, Calendar, Briefcase, ExternalLink, IdCard, Tag, UserCheck } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
@@ -226,6 +226,60 @@ const buildRowSearchText = (row: Record<string, any>, tipoLabel?: string) => {
 
 type ViewTab = 'empresas' | 'contatos';
 
+// Lista de checkboxes com busca local, usada em todos os submenus de filtro
+// (Tipo, UF, Cidade, Classificação, Criado por) — listas como Cidade/Criado por
+// crescem demais pra rolar procurando, então cada submenu ganha sua própria caixa
+// de busca (estado interno, isolado por instância).
+function FilterCheckboxList({
+  options,
+  selected,
+  onToggle,
+  emptyMessage = 'Nenhuma opção disponível.',
+  searchPlaceholder = 'Buscar...',
+}: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  emptyMessage?: string;
+  searchPlaceholder?: string;
+}) {
+  const [search, setSearch] = useState('');
+  const term = search.trim().toLowerCase();
+  const filteredOptions = term ? options.filter(o => o.label.toLowerCase().includes(term)) : options;
+
+  return (
+    <div className="flex flex-col">
+      <div className="px-2 pt-2 pb-1">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
+      </div>
+      {options.length === 0 ? (
+        <p className="text-xs text-muted-foreground px-3 py-4 text-center">{emptyMessage}</p>
+      ) : filteredOptions.length === 0 ? (
+        <p className="text-xs text-muted-foreground px-3 py-4 text-center">Nenhum resultado para "{search.trim()}".</p>
+      ) : (
+        <ScrollArea className="h-56">
+          <div className="space-y-1 p-2 pt-0 pr-3">
+            {filteredOptions.map(opt => (
+              <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                <Checkbox checked={selected.includes(opt.value)} onCheckedChange={() => onToggle(opt.value)} />
+                <span className="truncate">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  );
+}
+
 const Clientes = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -255,7 +309,11 @@ const Clientes = () => {
   const deleteCliente = useDeleteCliente();
   const deleteContato = useDeleteContato();
   const [search, setSearch] = useState(() => localStorage.getItem('clientes_search') || '');
-  const [tipoFilter, setTipoFilter] = useState<string>('todos');
+  const [selectedTipos, setSelectedTipos] = useState<string[]>([]);
+  const [selectedUfs, setSelectedUfs] = useState<string[]>([]);
+  const [selectedCidades, setSelectedCidades] = useState<string[]>([]);
+  const [selectedClassificacoes, setSelectedClassificacoes] = useState<string[]>([]);
+  const [selectedCriadores, setSelectedCriadores] = useState<string[]>([]);
   const [sortColumn, setSortColumn] = useState<string>('empresa');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
@@ -318,7 +376,7 @@ const Clientes = () => {
     const remaining = baseTipos.filter(v => v !== value && !(isCustom ? hiddenTipos : [...hiddenTipos, value]).includes(v));
     const fallback = remaining[0] ?? customTipos.find(t => t.value !== value)?.value ?? '';
     if (tipo === value) setTipo(fallback);
-    if (tipoFilter === value) setTipoFilter('todos');
+    setSelectedTipos(prev => prev.filter(v => v !== value));
     toast.success('Tipo excluído');
     setConfirmDeleteTipo(null);
   };
@@ -347,7 +405,7 @@ const Clientes = () => {
         setHiddenTipos(next);
         localStorage.setItem('clientes_hidden_tipos', JSON.stringify(next));
         if (newTipoTarget === 'form') setTipo(value);
-        else setTipoFilter(value);
+        else setSelectedTipos(prev => prev.includes(value) ? prev : [...prev, value]);
         setNewTipoName('');
         setNewTipoOpen(false);
         toast.success(`Tipo "${tipoLabels[value] ?? label}" reativado`);
@@ -360,7 +418,7 @@ const Clientes = () => {
     setCustomTipos(next);
     localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
     if (newTipoTarget === 'form') setTipo(value);
-    else setTipoFilter(value);
+    else setSelectedTipos(prev => prev.includes(value) ? prev : [...prev, value]);
     setNewTipoName('');
     setNewTipoOpen(false);
     toast.success(`Tipo "${label}" criado`);
@@ -438,12 +496,34 @@ const Clientes = () => {
     setSortDirection(direction);
   };
 
+  const toggleFilter = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
+    setList(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]);
+  };
+
+  // Opções derivadas dos valores que já existem em empresas — mesma ideia dos filtros
+  // de Vendedor/Fabricante/Marcador em Negócios, só que sem hook próprio: aqui os
+  // valores já vêm carregados junto com useClientes().
+  const ufsDisponiveis = Array.from(new Set(empresas.map((c: any) => c.uf).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b, 'pt-BR'));
+  const cidadesDisponiveis = Array.from(new Set(empresas.map((c: any) => c.cidade).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b, 'pt-BR'));
+  const classificacoesDisponiveis = Array.from(new Set(empresas.map((c: any) => c.classificacao).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b, 'pt-BR'));
+  const criadoresDisponiveis = (() => {
+    const mapa = new Map<string, string>();
+    empresas.forEach((c: any) => {
+      if (c.criado_por_usuario_id && c.criado_por_usuario?.nome) mapa.set(c.criado_por_usuario_id, c.criado_por_usuario.nome);
+    });
+    return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  })();
+
   const filteredEmpresas = sortRows(
-    empresas.filter(c => {
+    empresas.filter((c: any) => {
       const s = search.toLowerCase();
       const matchSearch = !s || buildRowSearchText(c, getTipoLabel(c.tipo, customTipos)).includes(s);
-      const matchTipo = tipoFilter === 'todos' || c.tipo === tipoFilter;
-      return matchSearch && matchTipo;
+      const matchTipo = selectedTipos.length === 0 || selectedTipos.includes(c.tipo);
+      const matchUf = selectedUfs.length === 0 || (c.uf && selectedUfs.includes(c.uf));
+      const matchCidade = selectedCidades.length === 0 || (c.cidade && selectedCidades.includes(c.cidade));
+      const matchClassificacao = selectedClassificacoes.length === 0 || (c.classificacao && selectedClassificacoes.includes(c.classificacao));
+      const matchCriador = selectedCriadores.length === 0 || (c.criado_por_usuario_id && selectedCriadores.includes(c.criado_por_usuario_id));
+      return matchSearch && matchTipo && matchUf && matchCidade && matchClassificacao && matchCriador;
     }),
     sortColumn,
     sortDirection,
@@ -462,8 +542,10 @@ const Clientes = () => {
 
   const filtered = activeTab === 'empresas' ? filteredEmpresas : filteredContatos;
   
-  const hasFilters = tipoFilter !== 'todos' || search !== '';
-  const activeFilterCount = (tipoFilter !== 'todos' ? 1 : 0);
+  const hasFilters = selectedTipos.length > 0 || selectedUfs.length > 0 || selectedCidades.length > 0
+    || selectedClassificacoes.length > 0 || selectedCriadores.length > 0 || search !== '';
+  const activeFilterCount = selectedTipos.length + selectedUfs.length + selectedCidades.length
+    + selectedClassificacoes.length + selectedCriadores.length;
 
   
   // Hook replaces currentColumns calculation
@@ -485,10 +567,21 @@ const Clientes = () => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
+  // Muitas empresas (principalmente importadas) têm em `tipo` um valor de texto livre
+  // que nunca virou um tipo padrão nem um "customizado" (ex.: "construtora - 3 níveis",
+  // "condomínios", "cliente"). Sem incluir esses valores reais aqui, o filtro de Tipo
+  // nunca bate com eles — a empresa existe, mas nenhuma opção do filtro a alcança.
+  const tiposConhecidos = new Set([...baseTipos, ...customTipos.map(t => t.value)]);
+  const tiposNaoMapeados = Array.from(new Set(
+    empresas
+      .map((c: any) => c.tipo)
+      .filter((t: string) => t && !tiposConhecidos.has(t)),
+  )).sort((a: string, b: string) => a.localeCompare(b, 'pt-BR'));
+
   const tipoFilterOptions = [
-    { value: 'todos', label: 'Todos os tipos' },
     ...baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => ({ value: v, label: tipoLabels[v] })),
     ...customTipos,
+    ...tiposNaoMapeados.map((v: string) => ({ value: v, label: v })),
   ];
 
   const handleCnpjChange = (value: string) => {
@@ -742,7 +835,11 @@ const Clientes = () => {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab as ViewTab);
-    setTipoFilter('todos');
+    setSelectedTipos([]);
+    setSelectedUfs([]);
+    setSelectedCidades([]);
+    setSelectedClassificacoes([]);
+    setSelectedCriadores([]);
     setSearch('');
     setSortColumn(tab === 'empresas' ? 'empresa' : 'nome_contato');
     setSortDirection('asc');
@@ -862,7 +959,11 @@ const Clientes = () => {
             hasFilters={hasFilters}
             activeFilterCount={activeFilterCount}
             onClear={() => {
-              setTipoFilter('todos');
+              setSelectedTipos([]);
+              setSelectedUfs([]);
+              setSelectedCidades([]);
+              setSelectedClassificacoes([]);
+              setSelectedCriadores([]);
             }}
             popoverClassName="w-64"
           >
@@ -871,39 +972,109 @@ const Clientes = () => {
               <StandardPopoverMenu
                 label="Tipo"
                 icon={Settings2}
-                badge={tipoFilter !== 'todos' ? 1 : undefined}
+                badge={selectedTipos.length > 0 ? selectedTipos.length : undefined}
                 side="left"
                 align="start"
                 sideOffset={10}
                 popoverClassName="w-64"
               >
                 <div className="flex flex-col h-full">
-                  <div className="p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Selecionar Tipo</p>
-                      <button
-                        className="text-[10px] font-bold text-primary hover:underline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setNewTipoTarget('filter');
-                          setNewTipoOpen(true);
-                        }}
-                      >
-                        Gerenciar
-                      </button>
-                    </div>
-                    <Select value={tipoFilter} onValueChange={(v) => { setTipoFilter(v); setPage(1); }}>
-                      <SelectTrigger className="w-full h-9">
-                        <SelectValue placeholder="Todos os tipos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {tipoFilterOptions.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center justify-between px-3 pt-3 pb-1">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tipo</p>
+                    <button
+                      className="text-[10px] font-bold text-primary hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNewTipoTarget('filter');
+                        setNewTipoOpen(true);
+                      }}
+                    >
+                      Gerenciar
+                    </button>
                   </div>
+                  <FilterCheckboxList
+                    options={tipoFilterOptions}
+                    selected={selectedTipos}
+                    onToggle={(v) => { toggleFilter(selectedTipos, setSelectedTipos, v); setPage(1); }}
+                    searchPlaceholder="Buscar tipo..."
+                  />
                 </div>
+              </StandardPopoverMenu>
+
+              {/* Submenu UF */}
+              <StandardPopoverMenu
+                label="UF"
+                icon={MapPin}
+                badge={selectedUfs.length > 0 ? selectedUfs.length : undefined}
+                side="left"
+                align="start"
+                sideOffset={10}
+                popoverClassName="w-56"
+              >
+                <FilterCheckboxList
+                  options={ufsDisponiveis.map((uf: string) => ({ value: uf, label: uf }))}
+                  selected={selectedUfs}
+                  onToggle={(v) => { toggleFilter(selectedUfs, setSelectedUfs, v); setPage(1); }}
+                  emptyMessage="Nenhuma UF cadastrada."
+                  searchPlaceholder="Buscar UF..."
+                />
+              </StandardPopoverMenu>
+
+              {/* Submenu Cidade */}
+              <StandardPopoverMenu
+                label="Cidade"
+                icon={Building2}
+                badge={selectedCidades.length > 0 ? selectedCidades.length : undefined}
+                side="left"
+                align="start"
+                sideOffset={10}
+                popoverClassName="w-64"
+              >
+                <FilterCheckboxList
+                  options={cidadesDisponiveis.map((cidade: string) => ({ value: cidade, label: cidade }))}
+                  selected={selectedCidades}
+                  onToggle={(v) => { toggleFilter(selectedCidades, setSelectedCidades, v); setPage(1); }}
+                  emptyMessage="Nenhuma cidade cadastrada."
+                  searchPlaceholder="Buscar cidade..."
+                />
+              </StandardPopoverMenu>
+
+              {/* Submenu Classificação */}
+              <StandardPopoverMenu
+                label="Classificação"
+                icon={Tag}
+                badge={selectedClassificacoes.length > 0 ? selectedClassificacoes.length : undefined}
+                side="left"
+                align="start"
+                sideOffset={10}
+                popoverClassName="w-56"
+              >
+                <FilterCheckboxList
+                  options={classificacoesDisponiveis.map((c: string) => ({ value: c, label: c }))}
+                  selected={selectedClassificacoes}
+                  onToggle={(v) => { toggleFilter(selectedClassificacoes, setSelectedClassificacoes, v); setPage(1); }}
+                  emptyMessage="Nenhuma classificação cadastrada."
+                  searchPlaceholder="Buscar classificação..."
+                />
+              </StandardPopoverMenu>
+
+              {/* Submenu Criado por */}
+              <StandardPopoverMenu
+                label="Criado por"
+                icon={UserCheck}
+                badge={selectedCriadores.length > 0 ? selectedCriadores.length : undefined}
+                side="left"
+                align="start"
+                sideOffset={10}
+                popoverClassName="w-64"
+              >
+                <FilterCheckboxList
+                  options={criadoresDisponiveis.map(u => ({ value: u.id, label: u.nome }))}
+                  selected={selectedCriadores}
+                  onToggle={(v) => { toggleFilter(selectedCriadores, setSelectedCriadores, v); setPage(1); }}
+                  emptyMessage="Nenhum criador identificado."
+                  searchPlaceholder="Buscar responsável..."
+                />
               </StandardPopoverMenu>
             </div>
           </FilterButton>
@@ -1318,8 +1489,8 @@ const Clientes = () => {
                         currentSortKey={sortColumn}
                         currentDirection={sortDirection}
                         onSort={handleSort}
-                        ascLabel={colId === 'data_criacao' ? 'Mais antigos primeiro' : 'Ordenar A-Z'}
-                        descLabel={colId === 'data_criacao' ? 'Mais recentes primeiro' : 'Ordenar Z-A'}
+                        ascLabel={colId === 'data_criacao' ? 'Mais antigos primeiro' : colId === 'cnpj' ? 'Ordenar 0-9' : 'Ordenar A-Z'}
+                        descLabel={colId === 'data_criacao' ? 'Mais recentes primeiro' : colId === 'cnpj' ? 'Ordenar 9-0' : 'Ordenar Z-A'}
                         width={resolvedClienteColWidths[i]}
                         onResize={(w) => setColumnWidth(colId, w)}
                       />
@@ -1454,8 +1625,8 @@ const Clientes = () => {
                         currentSortKey={sortColumn}
                         currentDirection={sortDirection}
                         onSort={handleSort}
-                        ascLabel={colId === 'data_criacao' ? 'Mais antigos primeiro' : 'Ordenar A-Z'}
-                        descLabel={colId === 'data_criacao' ? 'Mais recentes primeiro' : 'Ordenar Z-A'}
+                        ascLabel={colId === 'data_criacao' ? 'Mais antigos primeiro' : colId === 'cnpj' ? 'Ordenar 0-9' : 'Ordenar A-Z'}
+                        descLabel={colId === 'data_criacao' ? 'Mais recentes primeiro' : colId === 'cnpj' ? 'Ordenar 9-0' : 'Ordenar Z-A'}
                         width={resolvedClienteColWidths[i]}
                         onResize={(w) => setColumnWidth(colId, w)}
                       />
