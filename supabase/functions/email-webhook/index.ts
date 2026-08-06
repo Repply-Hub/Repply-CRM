@@ -1,6 +1,64 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders, json, mensagemParaLinha, type MensagemNylas } from "../_shared/nylas.ts";
+import {
+  buscarPastas,
+  corsHeaders,
+  gravarPastas,
+  json,
+  mensagemParaLinha,
+  type MensagemNylas,
+} from "../_shared/nylas.ts";
+
+/**
+ * Garante que a caixa tenha os marcadores espelhados — sem depender de ninguém.
+ *
+ * A lista de pastas era gravada só ao CONECTAR a caixa ou numa VARREDURA. Uma
+ * caixa conectada antes de o espelhamento existir ficava presa: `email_pastas`
+ * vazia, barra de marcadores vazia, e nenhum caminho de saída que não passasse
+ * por alguém clicar em atualizar. Foi o que aconteceu com a `atendimento@` —
+ * ficou dois dias assim, com as mensagens já carregando 10 marcadores e nenhum
+ * nome para mostrar.
+ *
+ * O webhook é o único ponto do sistema que roda sozinho, a cada e-mail que
+ * chega. Então é aqui que a caixa se conserta.
+ *
+ * Três cuidados, todos deliberados:
+ *
+ *  - só age quando `email_pastas` está VAZIA para a conta. Depois do primeiro
+ *    sucesso isto vira um COUNT com `head: true` (nenhuma linha trafega) e
+ *    nada mais;
+ *  - roda DEPOIS de a mensagem estar gravada, para que uma falha aqui não
+ *    custe um e-mail;
+ *  - nunca lança. Espelhar marcador é conveniência de navegação; derrubar a
+ *    entrada de e-mail por causa disso seria trocar um problema pequeno por um
+ *    grande.
+ */
+async function garantirPastasEspelhadas(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  conta: { id: string; empresa_id: string; email: string },
+  grantId: string,
+): Promise<void> {
+  try {
+    const { count } = await supabase
+      .from("email_pastas")
+      .select("id", { count: "exact", head: true })
+      .eq("conta_id", conta.id);
+
+    if ((count ?? 0) > 0) return;
+
+    const pastas = await buscarPastas(grantId);
+    if (!pastas.length) {
+      console.warn(`[email-webhook] ${conta.email}: /folders devolveu vazio, marcadores seguem sem nome`);
+      return;
+    }
+
+    const quantas = await gravarPastas(supabase, conta.id, conta.empresa_id, pastas);
+    console.log(`[email-webhook] espelhou ${quantas} pastas de ${conta.email}`);
+  } catch (e) {
+    console.error("[email-webhook] falha ao espelhar pastas (ignorada de propósito):", e);
+  }
+}
 
 /**
  * Recebe as notificações do Nylas. Público (`verify_jwt = false`): o Nylas não
@@ -179,6 +237,9 @@ serve(async (req) => {
       // atividade. Atualizá-lo a cada mensagem recebida fazia o sync seguinte
       // pedir ao Nylas só o que chegou depois de agora — ou seja, nada — e o
       // botão de sincronizar não trazia mensagem alguma.
+
+      // A mensagem já está salva; daqui para baixo nada pode custar um e-mail.
+      await garantirPastasEspelhadas(supabase, conta, grantId);
     }
 
     return json({ received: true });
