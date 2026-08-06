@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -59,6 +60,7 @@ interface ImportPedidosDialogProps {
 }
 
 export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogProps) {
+  const navigate = useNavigate();
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, string | string[]>>(createEmptyMapping());
@@ -959,6 +961,19 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
         {step === 'done' && (
           <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
+            {importResult && (importResult.totalIgnoradosValidacao > 0 || importResult.totalDuplicados > 0 || importResult.totalFalharam > 0) && (
+              <Button
+                variant="outline"
+                className="h-10 px-6 font-bold"
+                onClick={() => {
+                  reset();
+                  onOpenChange(false);
+                  navigate('/importacao/ignoradas');
+                }}
+              >
+                Ver Linhas Ignoradas
+              </Button>
+            )}
             <Button onClick={() => { reset(); onOpenChange(false); }} className="h-10 px-6 font-bold">
               Fechar
             </Button>

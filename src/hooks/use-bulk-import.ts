@@ -115,7 +115,7 @@ export function useBulkImport() {
     }
   }
 
-  async function importNegocios(payload: Record<string, unknown>[], nomeArquivo?: string, funilIdParam?: string, empresaId?: string): Promise<ImportSummary> {
+  async function importNegocios(payload: Record<string, unknown>[], nomeArquivo?: string, funilIdParam?: string, empresaId?: string, options?: { ignoreDuplicateCheck?: boolean }): Promise<ImportSummary> {
     const vendedorId = await getVendedorId();
     resetResolveCache();
 
@@ -169,14 +169,18 @@ export function useBulkImport() {
       console.error('Erro ao computar hashes ou pré-carregar entidades:', (err as Error).message);
     }
 
-    // Carrega hashes já existentes no banco (chunks de 200 para não estourar URL do PostgREST)
+    // Carrega hashes já existentes no banco (chunks de 200 para não estourar URL do PostgREST).
+    // Pulado quando ignoreDuplicateCheck está ativo (reenvio deliberado de uma linha que o
+    // usuário confirmou manter mesmo sendo idêntica a um negócio já importado).
     const existingHashes = new Set<string>();
-    const HASH_CHUNK = 200;
-    for (let i = 0; i < rowHashes.length; i += HASH_CHUNK) {
-      const chunk = rowHashes.slice(i, i + HASH_CHUNK).filter(Boolean);
-      if (chunk.length === 0) continue;
-      const { data } = await supabase.from('pedidos').select('import_hash').in('import_hash', chunk);
-      data?.forEach(r => { if (r.import_hash) existingHashes.add(r.import_hash); });
+    if (!options?.ignoreDuplicateCheck) {
+      const HASH_CHUNK = 200;
+      for (let i = 0; i < rowHashes.length; i += HASH_CHUNK) {
+        const chunk = rowHashes.slice(i, i + HASH_CHUNK).filter(Boolean);
+        if (chunk.length === 0) continue;
+        const { data } = await supabase.from('pedidos').select('import_hash').in('import_hash', chunk);
+        data?.forEach(r => { if (r.import_hash) existingHashes.add(r.import_hash); });
+      }
     }
 
     let inserted = 0;

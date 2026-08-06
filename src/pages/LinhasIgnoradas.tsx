@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, Trash2, Eye, ChevronDown, ChevronUp, ChevronRight, FileSpreadsheet, RotateCcw, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Trash2, Eye, ChevronDown, ChevronUp, ChevronRight, FileSpreadsheet, RotateCcw, Loader2, CopyPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -90,6 +90,80 @@ const COMPARE_FIELDS: Array<{ key: string; label: string }> = [
 
 function normalizeCompareValue(v: unknown): string {
   return String(v ?? '').trim().toLowerCase();
+}
+
+function DuplicateComparisonTable({
+  linha,
+  hash,
+  pedidoExistente,
+}: {
+  linha: { created_at: string; dados_originais: unknown };
+  hash: string | undefined;
+  pedidoExistente: PedidoDuplicadoMatch | undefined;
+}) {
+  if (!hash) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Esta linha foi ignorada antes deste recurso passar a registrar o negócio
+        original — não é possível localizar o registro para comparar.
+      </p>
+    );
+  }
+  if (!pedidoExistente) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        O negócio que motivou esta duplicidade não foi encontrado (pode ter sido excluído).
+      </p>
+    );
+  }
+  const dados = (linha.dados_originais ?? {}) as Record<string, unknown>;
+  // Data de criação do negócio que estava sendo importado (vinda da própria planilha,
+  // via dados_originais.created_at) — não confundir com `linha.created_at`, que é apenas
+  // quando este registro de linha ignorada foi logado (ou seja, "agora").
+  const criadoEmOriginal = dados.created_at as string | undefined;
+  const criadoEmDiferente = criadoEmOriginal
+    ? new Date(criadoEmOriginal).getTime() !== new Date(pedidoExistente.created_at).getTime()
+    : false;
+
+  return (
+    <div className="rounded-md border overflow-hidden">
+      <div className="grid grid-cols-3 bg-muted/60 text-[11px] font-semibold text-foreground/70 px-3 py-1.5">
+        <span>Campo</span>
+        <span>Linha ignorada</span>
+        <span>Negócio existente</span>
+      </div>
+      {COMPARE_FIELDS.map(({ key, label }) => {
+        const original = dados[key];
+        let existente: unknown;
+        switch (key) {
+          case 'cliente': existente = pedidoExistente.cliente?.empresa; break;
+          case 'fabricante': existente = pedidoExistente.fabricante?.nome; break;
+          case 'valor': existente = pedidoExistente.valor_total; break;
+          case 'status': existente = pedidoExistente.status; break;
+          case 'data_pedido': existente = pedidoExistente.data_pedido; break;
+          case 'obra': existente = pedidoExistente.endereco_entrega; break;
+          case 'observacoes': existente = pedidoExistente.observacoes; break;
+          default: existente = undefined;
+        }
+        const diferente = normalizeCompareValue(original) !== normalizeCompareValue(existente);
+        return (
+          <div
+            key={key}
+            className={`grid grid-cols-3 text-xs px-3 py-1.5 border-t ${diferente ? 'bg-amber-500/10' : ''}`}
+          >
+            <span className="font-medium text-foreground/70">{label}</span>
+            <span className="break-all">{String(original ?? '—')}</span>
+            <span className="break-all">{String(existente ?? '—')}</span>
+          </div>
+        );
+      })}
+      <div className={`grid grid-cols-3 text-xs px-3 py-1.5 border-t ${criadoEmDiferente ? 'bg-amber-500/10' : ''}`}>
+        <span className="font-medium text-foreground/70">Criado em</span>
+        <span>{criadoEmOriginal ? format(new Date(criadoEmOriginal), "dd/MM/yyyy HH:mm", { locale: ptBR }) : '—'}</span>
+        <span>{format(new Date(pedidoExistente.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
+      </div>
+    </div>
+  );
 }
 
 // Fallback field list per type when dados_originais has only internal fields
@@ -250,6 +324,26 @@ export default function LinhasIgnoradas() {
     enabled: duplicateHashes.length > 0,
   });
 
+  const saveEditMutation = useMutation({
+    mutationFn: async ({ id, dadosOriginais, fields }: { id: string; dadosOriginais: Record<string, unknown>; fields: Record<string, string> }) => {
+      const merged = { ...dadosOriginais, ...fields };
+      const { error } = await supabase
+        .from('linhas_ignoradas_importacao')
+        .update({ dados_originais: merged })
+        .eq('id', id);
+      if (error) throw error;
+      return merged;
+    },
+    onSuccess: (merged) => {
+      queryClient.invalidateQueries({ queryKey: ['linhas_ignoradas_importacao'] });
+      setRetryRow((prev: any) => prev && { ...prev, dados_originais: merged });
+      toast.success('Alterações salvas');
+    },
+    onError: (err) => {
+      toast.error('Erro ao salvar alterações: ' + (err as Error).message);
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -319,7 +413,7 @@ export default function LinhasIgnoradas() {
     setRetryRow(linha);
   };
 
-  const handleRetrySubmit = async () => {
+  const handleRetrySubmit = async (forceKeepDuplicate = false) => {
     if (!retryRow || isRetrying) return;
     setIsRetrying(true);
     try {
@@ -341,12 +435,20 @@ export default function LinhasIgnoradas() {
         await retryCatalogo(retryFields, retryRow.nome_arquivo);
         success = true;
       } else {
-        const summary = await importNegocios([retryFields as Record<string, unknown>], retryRow.nome_arquivo);
+        // forceKeepDuplicate pula a checagem de hash — usado quando o usuário já revisou a
+        // comparação com o negócio existente e decidiu manter os dois mesmo assim.
+        const summary = await importNegocios(
+          [retryFields as Record<string, unknown>],
+          retryRow.nome_arquivo,
+          undefined,
+          undefined,
+          { ignoreDuplicateCheck: forceKeepDuplicate },
+        );
         success = summary.inserted > 0;
       }
 
       if (success) {
-        toast.success('Linha importada com sucesso!');
+        toast.success(forceKeepDuplicate ? 'Negócio mantido e importado como duplicado.' : 'Linha importada com sucesso!');
         setRetryRow(null);
       }
       queryClient.invalidateQueries({ queryKey: ['linhas_ignoradas_importacao'] });
@@ -542,55 +644,11 @@ export default function LinhasIgnoradas() {
                                     <p className="text-xs font-semibold text-foreground/70 mb-2">
                                       Comparação com o negócio já existente
                                     </p>
-                                    {!duplicadaHash ? (
-                                      <p className="text-xs text-muted-foreground">
-                                        Esta linha foi ignorada antes deste recurso passar a registrar o negócio
-                                        original — não é possível localizar o registro para comparar.
-                                      </p>
-                                    ) : !pedidoExistente ? (
-                                      <p className="text-xs text-muted-foreground">
-                                        O negócio que motivou esta duplicidade não foi encontrado (pode ter sido excluído).
-                                      </p>
-                                    ) : (
-                                      <div className="rounded-md border overflow-hidden">
-                                        <div className="grid grid-cols-3 bg-muted/60 text-[11px] font-semibold text-foreground/70 px-3 py-1.5">
-                                          <span>Campo</span>
-                                          <span>Linha ignorada</span>
-                                          <span>Negócio existente</span>
-                                        </div>
-                                        {COMPARE_FIELDS.map(({ key, label }) => {
-                                          const dados = (linha.dados_originais ?? {}) as Record<string, unknown>;
-                                          const original = dados[key];
-                                          let existente: unknown;
-                                          switch (key) {
-                                            case 'cliente': existente = pedidoExistente.cliente?.empresa; break;
-                                            case 'fabricante': existente = pedidoExistente.fabricante?.nome; break;
-                                            case 'valor': existente = pedidoExistente.valor_total; break;
-                                            case 'status': existente = pedidoExistente.status; break;
-                                            case 'data_pedido': existente = pedidoExistente.data_pedido; break;
-                                            case 'obra': existente = pedidoExistente.endereco_entrega; break;
-                                            case 'observacoes': existente = pedidoExistente.observacoes; break;
-                                            default: existente = undefined;
-                                          }
-                                          const diferente = normalizeCompareValue(original) !== normalizeCompareValue(existente);
-                                          return (
-                                            <div
-                                              key={key}
-                                              className={`grid grid-cols-3 text-xs px-3 py-1.5 border-t ${diferente ? 'bg-amber-500/10' : ''}`}
-                                            >
-                                              <span className="font-medium text-foreground/70">{label}</span>
-                                              <span className="break-all">{String(original ?? '—')}</span>
-                                              <span className="break-all">{String(existente ?? '—')}</span>
-                                            </div>
-                                          );
-                                        })}
-                                        <div className="grid grid-cols-3 text-xs px-3 py-1.5 border-t text-muted-foreground">
-                                          <span className="font-medium">Criado em</span>
-                                          <span>{format(new Date(linha.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
-                                          <span>{format(new Date(pedidoExistente.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
-                                        </div>
-                                      </div>
-                                    )}
+                                    <DuplicateComparisonTable
+                                      linha={linha}
+                                      hash={duplicadaHash}
+                                      pedidoExistente={pedidoExistente}
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -616,7 +674,13 @@ export default function LinhasIgnoradas() {
               Tentar importar novamente
             </DialogTitle>
             <DialogDescription>
-              Edite os campos abaixo e confirme para tentar a importação.
+              Edite os campos abaixo. Use "Salvar alterações" para corrigir a linha sem reenviar agora, ou
+              "Confirmar e Importar" para editar e tentar importar imediatamente.
+              {retryRow && isLinhaDuplicada(retryRow) && (
+                <span className="block mt-1">
+                  Se preferir manter os dois negócios mesmo sendo idênticos, use "Manter como duplicado".
+                </span>
+              )}
               {retryRow?.motivo_ignorado && (
                 <span className="block mt-1 text-destructive font-medium">
                   Motivo anterior: {retryRow.motivo_ignorado}
@@ -654,7 +718,30 @@ export default function LinhasIgnoradas() {
             <Button variant="outline" onClick={() => setRetryRow(null)} disabled={isRetrying}>
               Cancelar
             </Button>
-            <Button onClick={handleRetrySubmit} disabled={isRetrying}>
+            <Button
+              variant="outline"
+              onClick={() => retryRow && saveEditMutation.mutate({
+                id: retryRow.id,
+                dadosOriginais: retryRow.dados_originais ?? {},
+                fields: retryFields,
+              })}
+              disabled={isRetrying || saveEditMutation.isPending}
+            >
+              {saveEditMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar alterações
+            </Button>
+            {retryRow && isLinhaDuplicada(retryRow) && (
+              <Button
+                variant="outline"
+                onClick={() => handleRetrySubmit(true)}
+                disabled={isRetrying || saveEditMutation.isPending}
+                title="Importa mesmo sendo idêntico a um negócio já existente"
+              >
+                <CopyPlus className="h-4 w-4 mr-2" />
+                Manter como duplicado
+              </Button>
+            )}
+            <Button onClick={() => handleRetrySubmit()} disabled={isRetrying || saveEditMutation.isPending}>
               {isRetrying && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {isRetrying ? 'Importando...' : 'Confirmar e Importar'}
             </Button>
@@ -684,7 +771,13 @@ export default function LinhasIgnoradas() {
       </AlertDialog>
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent
+          className={
+            selectedRow && isLinhaDuplicada(selectedRow)
+              ? 'max-w-4xl max-h-[85vh] overflow-hidden flex flex-col'
+              : 'max-w-2xl max-h-[80vh] overflow-hidden flex flex-col'
+          }
+        >
           <DialogHeader>
             <DialogTitle>Detalhes da Linha Ignorada</DialogTitle>
             <DialogDescription>
@@ -692,6 +785,14 @@ export default function LinhasIgnoradas() {
             </DialogDescription>
           </DialogHeader>
 
+          {(() => {
+            const selectedDuplicada = selectedRow ? isLinhaDuplicada(selectedRow) : false;
+            const selectedDuplicadaHash = selectedDuplicada
+              ? (selectedRow?.dados_originais as Record<string, unknown> | null)?.__import_hash as string | undefined
+              : undefined;
+            const selectedPedidoExistente = selectedDuplicadaHash ? duplicateMatches?.get(selectedDuplicadaHash) : undefined;
+
+            return (
           <div className="flex-1 overflow-auto py-4">
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -714,19 +815,36 @@ export default function LinhasIgnoradas() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <span className="text-xs font-semibold text-muted-foreground">Dados da Linha</span>
-                <div className="bg-muted p-4 rounded-md font-mono text-xs space-y-2 border">
-                  {selectedRow?.dados_originais && Object.entries(selectedRow.dados_originais).filter(([key]) => key !== '__import_hash').map(([key, value]: [string, any]) => (
-                    <div key={key} className="flex border-b border-muted-foreground/10 pb-1 last:border-0">
-                      <span className="font-bold w-1/3 shrink-0">{key}:</span>
-                      <span className="break-all">{String(value ?? '—')}</span>
-                    </div>
-                  ))}
+              <div className={selectedDuplicada ? 'grid grid-cols-2 gap-4 items-start' : ''}>
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    {selectedDuplicada ? 'O que foi tentado importar' : 'Dados da Linha'}
+                  </span>
+                  <div className="bg-muted p-4 rounded-md font-mono text-xs space-y-2 border">
+                    {selectedRow?.dados_originais && Object.entries(selectedRow.dados_originais).filter(([key]) => key !== '__import_hash').map(([key, value]: [string, any]) => (
+                      <div key={key} className="flex border-b border-muted-foreground/10 pb-1 last:border-0">
+                        <span className="font-bold w-1/3 shrink-0">{key}:</span>
+                        <span className="break-all">{String(value ?? '—')}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
+                {selectedDuplicada && selectedRow && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold text-muted-foreground">A duplicação</span>
+                    <DuplicateComparisonTable
+                      linha={selectedRow}
+                      hash={selectedDuplicadaHash}
+                      pedidoExistente={selectedPedidoExistente}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
+            );
+          })()}
 
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
@@ -737,7 +855,7 @@ export default function LinhasIgnoradas() {
               }}
             >
               <RotateCcw className="h-4 w-4 mr-2" />
-              Tentar importar
+              Editar para importar novamente
             </Button>
             <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
               Fechar
