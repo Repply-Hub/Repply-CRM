@@ -224,7 +224,10 @@ export function useBulkImport() {
           // Deduplicação: hash já visto no banco ou em linhas anteriores deste import
           if (hash && existingHashes.has(hash)) {
             batchDuplicados++;
-            failures.push({ row, motivo: 'Duplicado: linha idêntica já importada anteriormente', logToIgnoradas: true });
+            // __import_hash vai junto em dados_originais só para a página de Linhas
+            // Ignoradas conseguir localizar o pedido já existente e montar a comparação
+            // lado a lado — não é um campo real da planilha.
+            failures.push({ row: { ...row, __import_hash: hash }, motivo: 'Duplicado: linha idêntica já importada anteriormente', logToIgnoradas: true });
             continue;
           }
 
