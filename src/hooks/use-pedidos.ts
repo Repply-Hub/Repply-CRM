@@ -342,33 +342,35 @@ export function useUpdatePedidoStatus() {
   });
 }
 
-const DELETE_BATCH_SIZE = 500;
-const DELETE_BATCH_DELAY_MS = 200;
+const BULK_BATCH_SIZE = 500;
+const BULK_BATCH_DELAY_MS = 200;
+
+export type BulkPedidosTarget = { ids: string[] } | { empresaId: string; stages?: string[]; filters?: PedidosFilters; excludeIds?: string[] };
 
 export function useBulkDeletePedidos() {
   const qc = useQueryClient();
   const { profile } = useAuth();
   const registrarAtividade = useRegistrarAtividade();
   return useMutation({
-    mutationFn: async (params: { ids: string[] } | { empresaId: string; stages?: string[]; filters?: PedidosFilters; excludeIds?: string[] }) => {
+    mutationFn: async (params: BulkPedidosTarget) => {
       if ('ids' in params) {
         const { ids } = params;
         if (ids.length === 0) return 0;
 
-        if (ids.length <= DELETE_BATCH_SIZE) {
+        if (ids.length <= BULK_BATCH_SIZE) {
           const { error, count } = await supabase.from('pedidos').delete({ count: 'exact' }).in('id', ids);
           if (error) throw error;
           return count ?? ids.length;
         }
 
         let deleted = 0;
-        for (let i = 0; i < ids.length; i += DELETE_BATCH_SIZE) {
-          const batch = ids.slice(i, i + DELETE_BATCH_SIZE);
+        for (let i = 0; i < ids.length; i += BULK_BATCH_SIZE) {
+          const batch = ids.slice(i, i + BULK_BATCH_SIZE);
           const { error, count } = await supabase.from('pedidos').delete({ count: 'exact' }).in('id', batch);
           if (error) throw error;
           deleted += count ?? batch.length;
-          if (i + DELETE_BATCH_SIZE < ids.length) {
-            await new Promise(resolve => setTimeout(resolve, DELETE_BATCH_DELAY_MS));
+          if (i + BULK_BATCH_SIZE < ids.length) {
+            await new Promise(resolve => setTimeout(resolve, BULK_BATCH_DELAY_MS));
           }
         }
         return deleted;
@@ -410,6 +412,102 @@ export function useBulkDeletePedidos() {
           tabela: 'pedidos',
           acao: 'DELETE',
           descricao,
+        });
+      }
+      qc.invalidateQueries({ queryKey: ['pedidos'] });
+      qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
+      qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
+      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
+      qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_velocidade_fabricante'] });
+    },
+  });
+}
+
+// Ambos os campos são opcionais — o chamador decide se altera a etapa, o marcador, ou os dois
+// juntos numa mesma chamada (é responsabilidade do chamador garantir que ao menos um esteja presente).
+export type BulkPedidosUpdates = { status?: string; marcador_id?: string | null };
+
+// Aplica a mesma etapa (status) e/ou o mesmo marcador a vários negócios de uma vez, num único
+// UPDATE — reaproveita o mesmo par de formatos de alvo do useBulkDeletePedidos (ids explícitos
+// vs. "todos os filtrados" resolvido no servidor via os filtros já ativos na tela).
+export function useBulkUpdatePedidos() {
+  const qc = useQueryClient();
+  const { profile } = useAuth();
+  const registrarAtividade = useRegistrarAtividade();
+  return useMutation({
+    mutationFn: async ({ target, updates }: { target: BulkPedidosTarget; updates: BulkPedidosUpdates }) => {
+      const updateData: Record<string, unknown> = {};
+      if (updates.status !== undefined) updateData.status = updates.status;
+      if (updates.marcador_id !== undefined) updateData.marcador_id = updates.marcador_id;
+      if (updates.status === 'fechamento') {
+        const now = new Date();
+        const offset = now.getTimezoneOffset();
+        const localDate = new Date(now.getTime() - (offset * 60 * 1000));
+        updateData.prazo_resposta = localDate.toISOString().split('T')[0];
+      }
+
+      if ('ids' in target) {
+        const { ids } = target;
+        if (ids.length === 0) return 0;
+
+        if (ids.length <= BULK_BATCH_SIZE) {
+          const { error, count } = await supabase.from('pedidos').update(updateData, { count: 'exact' }).in('id', ids);
+          if (error) throw error;
+          return count ?? ids.length;
+        }
+
+        let updated = 0;
+        for (let i = 0; i < ids.length; i += BULK_BATCH_SIZE) {
+          const batch = ids.slice(i, i + BULK_BATCH_SIZE);
+          const { error, count } = await supabase.from('pedidos').update(updateData, { count: 'exact' }).in('id', batch);
+          if (error) throw error;
+          updated += count ?? batch.length;
+          if (i + BULK_BATCH_SIZE < ids.length) {
+            await new Promise(resolve => setTimeout(resolve, BULK_BATCH_DELAY_MS));
+          }
+        }
+        return updated;
+      }
+
+      const { empresaId, stages, filters, excludeIds } = target;
+      const usuarioIds = await resolveUsuarioIds(empresaId, filters?.vendedorIds);
+      if (usuarioIds.length === 0) return 0;
+
+      let query = supabase.from('pedidos').update(updateData, { count: 'exact' }).in('usuario_id', usuarioIds);
+      if (excludeIds && excludeIds.length > 0) query = query.not('id', 'in', `(${excludeIds.join(',')})`);
+      if (stages && stages.length > 0) query = query.in('status', stages);
+      if (filters?.funilId) query = query.eq('funil_id', filters.funilId);
+      if (filters?.fabricanteIds && filters.fabricanteIds.length > 0) query = query.in('fabricante_id', filters.fabricanteIds);
+      if (filters?.marcadorIds && filters.marcadorIds.length > 0) query = query.in('marcador_id', filters.marcadorIds);
+      if (filters?.dateFrom) query = query.gte('data_pedido', filters.dateFrom);
+      if (filters?.dateTo) query = query.lte('data_pedido', filters.dateTo);
+      if (filters?.onlyAttention) {
+        const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
+        query = query.lte('created_at', cutoff);
+      }
+      if (filters?.hideImportados) {
+        query = query.is('import_hash', null);
+      }
+
+      const { error, count } = await query;
+      if (error) throw error;
+      return count ?? 0;
+    },
+    onSuccess: (count, { target, updates }) => {
+      const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
+      if (empresaId && profile?.id && count > 0) {
+        const campos = [
+          updates.status !== undefined ? 'a etapa' : null,
+          updates.marcador_id !== undefined ? 'o marcador' : null,
+        ].filter(Boolean).join(' e ');
+        const escopo = 'ids' in target ? 'selecionado(s) manualmente' : 'em massa (por filtro)';
+        registrarAtividade.mutate({
+          empresaId,
+          usuarioId: profile.id,
+          tabela: 'pedidos',
+          acao: 'UPDATE',
+          descricao: `Alterou ${campos} de ${count} negócio(s) ${escopo}`,
         });
       }
       qc.invalidateQueries({ queryKey: ['pedidos'] });

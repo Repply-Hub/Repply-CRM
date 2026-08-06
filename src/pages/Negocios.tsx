@@ -12,7 +12,7 @@ import { useMarcadores } from '@/hooks/use-marcadores';
 import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { useFunis } from '@/hooks/use-funis';
-import { usePedidos, usePedidosStats, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
+import { usePedidos, usePedidosStats, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
@@ -29,11 +29,11 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, Rows3, History, Tag
+  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, Rows3, History, Tag, ArrowRightLeft
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import type { PedidoRow } from '@/lib/generate-pdf';
@@ -457,6 +457,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const bulkDeleteMutation = useBulkDeletePedidos();
   const isDeleting = bulkDeleteMutation.isPending;
 
+  // Ação em massa (etapa + marcador num só bloco) opera sobre os MESMOS filtros usados pela
+  // tela (selectedStages, selectedVendedores, ... — ver pedidosFilters/activeStages logo abaixo),
+  // não sobre uma seleção manual de linhas — por isso funciona tanto no Kanban quanto na Lista.
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkApplyStatus, setBulkApplyStatus] = useState(false);
+  const [bulkApplyMarcador, setBulkApplyMarcador] = useState(false);
+  const [bulkNewStatus, setBulkNewStatus] = useState('');
+  const [bulkNewMarcadorId, setBulkNewMarcadorId] = useState('');
+  const bulkUpdateMutation = useBulkUpdatePedidos();
+  const isBulkUpdating = bulkUpdateMutation.isPending;
+
   // Column settings are now managed by useTableSettings hook
 
 
@@ -807,6 +818,36 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
+  // Alvo é sempre "os negócios que batem com os filtros atuais da tela" (pedidosFilters/
+  // activeStages, os mesmos usados pelo Kanban/Lista) — o modal edita esse MESMO estado de
+  // filtro em vez de duplicar uma cópia própria, então a contagem exibida (totalCount/totalValor)
+  // já reflete exatamente o que será alterado.
+  const handleBulkApply = async () => {
+    if (!empresaId) return;
+    const updates: { status?: string; marcador_id?: string | null } = {};
+    if (bulkApplyStatus && bulkNewStatus) updates.status = bulkNewStatus;
+    if (bulkApplyMarcador && bulkNewMarcadorId) updates.marcador_id = bulkNewMarcadorId === 'nenhum' ? null : bulkNewMarcadorId;
+    if (Object.keys(updates).length === 0) return;
+
+    try {
+      const updated = await bulkUpdateMutation.mutateAsync({
+        target: { empresaId, stages: activeStages, filters: pedidosFilters },
+        updates,
+      });
+      if (updated > 0) {
+        toast.success(`${updated} negócio(s) atualizado(s) com sucesso!`);
+      }
+      setBulkEditOpen(false);
+      setBulkApplyStatus(false);
+      setBulkApplyMarcador(false);
+      setBulkNewStatus('');
+      setBulkNewMarcadorId('');
+    } catch (err: any) {
+      console.error('[bulk-update pedidos]', err);
+      toast.error(err?.message || 'Erro inesperado ao aplicar a alteração em massa');
+    }
+  };
+
   const buildExportRows = (specificPedidoId?: string): { rows: PedidoRow[]; titulo: string } => {
     if (specificPedidoId) {
       const p = (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === specificPedidoId);
@@ -937,6 +978,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           />
 
           <ColumnSettingsItem
+            label="Ação em Massa"
+            icon={ArrowRightLeft}
+            disabled={totalCount === 0}
+            onClick={() => setBulkEditOpen(true)}
+            badge={totalCount > 0 ? totalCount : undefined}
+          />
+
+          <ColumnSettingsItem
             label="Excluir Selecionados"
             icon={Trash2}
             variant="destructive"
@@ -976,7 +1025,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setColunasDialogOpen,
     setMarcadoresDialogOpen,
     isPipelineMode,
-    setConfirmDeleteOpen
+    setConfirmDeleteOpen,
+    setBulkEditOpen
   ]);
 
     const filtrosPopover = useMemo(() => (
@@ -1570,6 +1620,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             />
 
             <div className="shrink-0">{filtrosPopover}</div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 gap-2 shrink-0"
+              disabled={totalCount === 0}
+              onClick={() => setBulkEditOpen(true)}
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Ação em massa</span>
+              {totalCount > 0 && <Badge variant="secondary" className="ml-0.5 h-5 px-1.5">{totalCount}</Badge>}
+            </Button>
+
             <div className="shrink-0">{optionsPopover}</div>
 
             {isPipelineMode && hasPipelineFilters && (
@@ -1805,6 +1868,183 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Ação em massa</DialogTitle>
+            <DialogDescription>
+              Altera a etapa e/ou o marcador de todos os negócios que atendem aos filtros abaixo — os mesmos filtros usados na tela.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Quais negócios</p>
+              {hasPipelineFilters && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearPipelineFilters}>
+                  Limpar filtros
+                </Button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Etapa</Label>
+                <ScrollArea className="h-28 rounded-md border p-2">
+                  <div className="space-y-1 pr-2">
+                    {KANBAN_STAGES.map(s => (
+                      <label key={s.key} className="flex items-center gap-2 py-1 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                        <Checkbox checked={selectedStages.includes(s.key)} onCheckedChange={() => toggleFilter(selectedStages, setSelectedStages, s.key)} />
+                        {s.label}
+                      </label>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Marcador</Label>
+                <ScrollArea className="h-28 rounded-md border p-2">
+                  <div className="space-y-1 pr-2">
+                    {(marcadores ?? []).map(m => (
+                      <label key={m.id} className="flex items-center gap-2 py-1 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                        <Checkbox checked={selectedMarcadores.includes(m.id)} onCheckedChange={() => toggleFilter(selectedMarcadores, setSelectedMarcadores, m.id)} />
+                        {m.nome}
+                      </label>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Vendedor</Label>
+                <ScrollArea className="h-28 rounded-md border p-2">
+                  <div className="space-y-1 pr-2">
+                    {(vendedores ?? []).map(v => (
+                      <label key={v.id} className="flex items-center gap-2 py-1 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                        <Checkbox checked={selectedVendedores.includes(v.id)} onCheckedChange={() => toggleFilter(selectedVendedores, setSelectedVendedores, v.id)} />
+                        {v.nome}
+                      </label>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Fabricante</Label>
+                <ScrollArea className="h-28 rounded-md border p-2">
+                  <div className="space-y-1 pr-2">
+                    {(fabricantes ?? []).map(f => (
+                      <label key={f.id} className="flex items-center gap-2 py-1 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                        <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
+                        {f.nome}
+                      </label>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Data início</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("w-full justify-start text-left font-normal h-9", !dateFrom && "text-muted-foreground")}>
+                      {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Selecione..."}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} captionLayout="dropdown-buttons" fromYear={1950} toYear={new Date().getFullYear()} className="[&_.rdp-nav]:hidden [&_.rdp-caption_label]:hidden" />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Data fim</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("w-full justify-start text-left font-normal h-9", !dateTo && "text-muted-foreground")}>
+                      {dateTo ? format(dateTo, "dd/MM/yyyy") : "Selecione..."}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} captionLayout="dropdown-buttons" fromYear={1950} toYear={new Date().getFullYear()} className="[&_.rdp-nav]:hidden [&_.rdp-caption_label]:hidden" />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={showOnlyAttention} onCheckedChange={() => setShowOnlyAttention(prev => !prev)} />
+                Atenção (7+ dias)
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={hideImportados} onCheckedChange={() => setHideImportados(prev => !prev)} />
+                Ocultar negócios importados
+              </label>
+            </div>
+
+            <div className="rounded-md bg-muted/50 px-3 py-2 text-sm font-medium">
+              {totalCount} negócio(s) encontrado(s){totalCount > 0 ? ` · Total: ${totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
+            </div>
+          </div>
+
+          <div className="h-px bg-border/50" />
+
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Alterar para</p>
+
+            <div className="flex items-center gap-3">
+              <Checkbox checked={bulkApplyStatus} onCheckedChange={(v) => setBulkApplyStatus(!!v)} id="bulk-apply-status" />
+              <Label htmlFor="bulk-apply-status" className="w-28 shrink-0 cursor-pointer font-normal">Nova etapa</Label>
+              <Select value={bulkNewStatus} onValueChange={setBulkNewStatus} disabled={!bulkApplyStatus}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Selecionar etapa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {KANBAN_STAGES.map(s => (
+                    <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Checkbox checked={bulkApplyMarcador} onCheckedChange={(v) => setBulkApplyMarcador(!!v)} id="bulk-apply-marcador" />
+              <Label htmlFor="bulk-apply-marcador" className="w-28 shrink-0 cursor-pointer font-normal">Novo marcador</Label>
+              <Select value={bulkNewMarcadorId} onValueChange={setBulkNewMarcadorId} disabled={!bulkApplyMarcador}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Selecionar marcador" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nenhum">Nenhum</SelectItem>
+                  {(marcadores ?? []).map(m => (
+                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkEditOpen(false)} disabled={isBulkUpdating}>Cancelar</Button>
+            <Button
+              onClick={handleBulkApply}
+              disabled={
+                isBulkUpdating ||
+                totalCount === 0 ||
+                (!bulkApplyStatus && !bulkApplyMarcador) ||
+                (bulkApplyStatus && !bulkNewStatus) ||
+                (bulkApplyMarcador && !bulkNewMarcadorId)
+              }
+            >
+              {isBulkUpdating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Aplicando...</> : `Aplicar a ${totalCount} negócio(s)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {importDialogMounted && (
         <Suspense fallback={null}>
