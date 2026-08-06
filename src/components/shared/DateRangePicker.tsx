@@ -29,8 +29,15 @@ interface Props {
 
 export function DateRangePicker({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
+  // Seleção em andamento (só o "from" clicado, aguardando o "to"). Sem isso, o
+  // primeiro clique já virava um range fechado (from === to) e era devolvido como
+  // `selected` pro Calendar — que aí interpretava o range como completo e tratava
+  // todo clique seguinte como o início de um range novo, nunca como o segundo
+  // extremo. Resultado: impossível escolher um período com datas diferentes.
+  const [pendingFrom, setPendingFrom] = useState<Date | undefined>(undefined);
 
   const handlePreset = (preset: (typeof presets)[number]) => {
+    setPendingFrom(undefined);
     onChange(preset.range());
     setOpen(false);
   };
@@ -68,12 +75,15 @@ export function DateRangePicker({ value, onChange }: Props) {
           <div className="p-3">
             <Calendar
               mode="range"
-              selected={{ from: value.from, to: value.to }}
+              selected={pendingFrom ? { from: pendingFrom, to: undefined } : { from: value.from, to: value.to }}
               onSelect={(range) => {
                 if (range?.from && range?.to) {
+                  setPendingFrom(undefined);
                   onChange({ from: range.from, to: range.to });
                 } else if (range?.from) {
-                  onChange({ from: range.from, to: range.from });
+                  setPendingFrom(range.from);
+                } else {
+                  setPendingFrom(undefined);
                 }
               }}
               numberOfMonths={2}
