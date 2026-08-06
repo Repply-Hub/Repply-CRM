@@ -188,6 +188,20 @@ const IDS_DE_SISTEMA_DO_GOOGLE = new RegExp(
 );
 
 /**
+ * Pastas que o provedor expõe pelo NOME, sem atributo e com id de rótulo comum.
+ *
+ * O Gmail publica as pastas do IMAP como se fossem rótulos do usuário —
+ * `[Gmail]`, `[Imap]/Rascunhos`, `Notes` — com ids `Label_4`, `Label_27`,
+ * `Label_185`. Não têm atributo nenhum e o id é um `Label_` legítimo, então nem
+ * a lista de atributos nem a de ids do Google os pega: só o nome denuncia.
+ *
+ * Foram exatamente as três que apareceram na primeira caixa espelhada, no meio
+ * dos 25 marcadores reais. Aqui isso também evita gastar uma varredura de
+ * mensagens em cada uma delas.
+ */
+const NOMES_DE_SISTEMA = /^(\[.*\]|Notes)(\/|$)/i;
+
+/**
  * Pasta criada pelo provedor, e não pela pessoa.
  *
  * O que NÃO cai aqui é marcador do usuário — o "001 - ELIZABETH" que ela
@@ -197,7 +211,8 @@ const IDS_DE_SISTEMA_DO_GOOGLE = new RegExp(
 export function ehPastaDeSistema(p: PastaNylas): boolean {
   const attrs = (p.attributes ?? []).map((a) => a.toLowerCase());
   if (attrs.some((a) => ATRIBUTOS_DE_SISTEMA.includes(a))) return true;
-  return IDS_DE_SISTEMA_DO_GOOGLE.test((p.id ?? "").trim());
+  if (IDS_DE_SISTEMA_DO_GOOGLE.test((p.id ?? "").trim())) return true;
+  return NOMES_DE_SISTEMA.test((p.name ?? "").trim());
 }
 
 /**
