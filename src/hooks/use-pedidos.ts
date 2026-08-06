@@ -337,7 +337,7 @@ export function useUpdatePedidoStatus() {
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
       qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
-      qc.invalidateQueries({ queryKey: ['vw_velocidade_por_fabricante'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_velocidade_fabricante'] });
     },
   });
 }
@@ -350,7 +350,7 @@ export function useBulkDeletePedidos() {
   const { profile } = useAuth();
   const registrarAtividade = useRegistrarAtividade();
   return useMutation({
-    mutationFn: async (params: { ids: string[] } | { empresaId: string; stages?: string[]; filters?: PedidosFilters }) => {
+    mutationFn: async (params: { ids: string[] } | { empresaId: string; stages?: string[]; filters?: PedidosFilters; excludeIds?: string[] }) => {
       if ('ids' in params) {
         const { ids } = params;
         if (ids.length === 0) return 0;
@@ -374,11 +374,12 @@ export function useBulkDeletePedidos() {
         return deleted;
       }
 
-      const { empresaId, stages, filters } = params;
+      const { empresaId, stages, filters, excludeIds } = params;
       const usuarioIds = await resolveUsuarioIds(empresaId, filters?.vendedorIds);
       if (usuarioIds.length === 0) return 0;
 
       let query = supabase.from('pedidos').delete({ count: 'exact' }).in('usuario_id', usuarioIds);
+      if (excludeIds && excludeIds.length > 0) query = query.not('id', 'in', `(${excludeIds.join(',')})`);
       if (stages && stages.length > 0) query = query.in('status', stages);
       if (filters?.funilId) query = query.eq('funil_id', filters.funilId);
       if (filters?.fabricanteIds && filters.fabricanteIds.length > 0) query = query.in('fabricante_id', filters.fabricanteIds);
@@ -416,7 +417,7 @@ export function useBulkDeletePedidos() {
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
       qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
-      qc.invalidateQueries({ queryKey: ['vw_velocidade_por_fabricante'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_velocidade_fabricante'] });
     },
   });
 }

@@ -7,6 +7,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
   Tooltip, Area, AreaChart,
 } from 'recharts';
+import type { TooltipProps } from 'recharts';
 import { TrendingUp, DollarSign, Target, Clock, Loader2, Factory } from 'lucide-react';
 import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante, useDashboardStats } from '@/hooks/use-dashboard';
 import { useQuery } from '@tanstack/react-query';
@@ -21,6 +22,66 @@ import { PlanoVendasSection } from '@/components/dashboard/PlanoVendasSection';
 
 const formatCurrency = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+// Fábricas além desse número entram agrupadas na fatia "Outros" da pizza de
+// faturamento — nenhuma fica de fora do gráfico, só sai da lista principal.
+const TOP_N_FABRICAS_PIZZA = 5;
+
+interface FabricaPizzaSlice {
+  fabrica: string;
+  valor: number;
+  outrosDetalhe?: { fabrica: string; valor: number }[];
+}
+
+function FabricaPizzaTooltip({ active, payload }: TooltipProps<number, string>) {
+  if (!active || !payload?.length) return null;
+  const data = payload[0]?.payload as FabricaPizzaSlice | undefined;
+  if (!data) return null;
+
+  if (data.outrosDetalhe && data.outrosDetalhe.length > 0) {
+    return (
+      <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs max-w-[240px]">
+        <p className="font-semibold text-popover-foreground mb-1.5">Outros — {formatCurrency(data.valor)}</p>
+        <div className="space-y-1 max-h-52 overflow-y-auto">
+          {data.outrosDetalhe.map((f) => (
+            <div key={f.fabrica} className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground truncate">{f.fabrica}</span>
+              <span className="font-semibold text-popover-foreground shrink-0">{formatCurrency(f.valor)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
+      <p className="font-semibold text-popover-foreground">{data.fabrica}</p>
+      <p className="text-muted-foreground">{formatCurrency(data.valor)}</p>
+    </div>
+  );
+}
+
+interface VelocidadePonto {
+  fabrica: string;
+  dias: number;
+  semDados?: boolean;
+}
+
+function VelocidadeTooltip({ active, payload }: TooltipProps<number, string>) {
+  if (!active || !payload?.length) return null;
+  const data = payload[0]?.payload as VelocidadePonto | undefined;
+  if (!data) return null;
+
+  return (
+    <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
+      <p className="font-semibold text-popover-foreground">{data.fabrica}</p>
+      <p className="text-muted-foreground">
+        {data.semDados ? 'Sem orçamento enviado registrado ainda' : `${data.dias} dia(s) até o orçamento, em média`}
+      </p>
+    </div>
+  );
+}
 
 const RADIAN = Math.PI / 180;
 const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
@@ -64,7 +125,6 @@ const Dashboard = () => {
 
   const { data: faturamento, isLoading: loadFat } = useFaturamentoMensal(empresaId);
   const { data: vendedores } = useIndicadoresVendedor(empresaId);
-  const { data: velocidade } = useVelocidadeFabricante(empresaId);
   const { data: fabricantesRaw } = useQuery({
     queryKey: ['fabricantes_filtro'],
     queryFn: async () => {
@@ -88,6 +148,15 @@ const Dashboard = () => {
   // (RPC dashboard_stats) em vez de puxar centenas de linhas de `pedidos` com joins
   // pro cliente só pra somar — ver supabase/migrations/20260722100000_dashboard_stats_rpc.sql.
   const { data: stats, isLoading: loadStats, isFetching: fetchingStats } = useDashboardStats(empresaId, {
+    usuarioId: vendedorId !== 'todos' ? vendedorId : undefined,
+    fabricanteId: fabricanteId !== 'todos' ? fabricanteId : undefined,
+    dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
+    dateTo: format(dateRange.to, 'yyyy-MM-dd'),
+  });
+
+  // Mesmos filtros de Período/Responsável/Fabricante do topo — antes esse card
+  // vinha só por empresaId e ignorava completamente esses filtros.
+  const { data: velocidade } = useVelocidadeFabricante(empresaId, {
     usuarioId: vendedorId !== 'todos' ? vendedorId : undefined,
     fabricanteId: fabricanteId !== 'todos' ? fabricanteId : undefined,
     dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
@@ -150,9 +219,13 @@ const Dashboard = () => {
     return data;
   }, [vendedores, vendedorId]);
 
+  // dias_medio_resposta vem null quando nenhum pedido do fabricante tem envio de
+  // orçamento registrado ainda (não é "0 dias" — é "sem dado"); plota 0 pra não
+  // quebrar a área do gráfico, mas o tooltip (VelocidadeTooltip) diferencia os dois casos.
   const velocidadeData = (velocidade ?? []).map(v => ({
     fabrica: v.fabricante_nome ?? '',
-    dias: 0, // A coluna tempo_medio_ate_orcamento_dias não existe na view atual
+    dias: v.dias_medio_resposta ?? 0,
+    semDados: v.dias_medio_resposta === null,
   }));
 
   // Já vem agregado e ordenado (desc) da RPC — só reordena/recorta pra UI.
@@ -165,8 +238,16 @@ const Dashboard = () => {
     return [...rendimentoFabrica].sort((a, b) => fabricaSort === 'maior' ? b.valor - a.valor : a.valor - b.valor);
   }, [rendimentoFabrica, fabricaSort]);
 
+  // Mostra todas as fábricas na pizza — sem cortar as menores, só agrupa o
+  // excedente em "Outros" (com o detalhe de cada uma disponível no hover via
+  // FabricaPizzaTooltip) em vez de escondê-las por completo do gráfico.
   const faturamentoPorFabricaPizza = useMemo(() => {
-    return [...rendimentoFabrica].slice(0, 5);
+    const sorted = [...rendimentoFabrica].sort((a, b) => b.valor - a.valor);
+    if (sorted.length <= TOP_N_FABRICAS_PIZZA) return sorted;
+    const top = sorted.slice(0, TOP_N_FABRICAS_PIZZA);
+    const outros = sorted.slice(TOP_N_FABRICAS_PIZZA);
+    const outrosTotal = outros.reduce((acc, f) => acc + f.valor, 0);
+    return [...top, { fabrica: 'Outros', valor: outrosTotal, outrosDetalhe: outros }];
   }, [rendimentoFabrica]);
 
   const rendimentoVendedor = stats?.rendimento_vendedor ?? [];
@@ -387,7 +468,7 @@ const Dashboard = () => {
           <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
             <CardHeader className="pb-1">
               <CardTitle className="text-sm font-bold">Velocidade de Resposta por Fábrica</CardTitle>
-              <CardDescription className="text-xs">Tempo médio até o orçamento (dias)</CardDescription>
+              <CardDescription className="text-xs">Dias até o primeiro orçamento enviado, em média</CardDescription>
             </CardHeader>
             <CardContent className="pt-2">
               <ResponsiveContainer width="100%" height={220}>
@@ -401,7 +482,7 @@ const Dashboard = () => {
                   <CartesianGrid {...commonGridProps} />
                   <XAxis dataKey="fabrica" {...commonAxisProps} />
                   <YAxis {...commonAxisProps} tickFormatter={v => `${v}d`} />
-                  <Tooltip content={<ChartTooltip formatValue={(v) => `${v} dias`} />} />
+                  <Tooltip content={<VelocidadeTooltip />} />
                   <Area
                     type="monotone"
                     dataKey="dias"
@@ -428,7 +509,7 @@ const Dashboard = () => {
               <CardTitle className="text-sm font-bold flex items-center gap-2">
                 <Factory className="h-4 w-4 text-primary" /> Faturamento por Fábrica
               </CardTitle>
-              <CardDescription className="text-xs">Distribuição do faturamento entre os principais fabricantes</CardDescription>
+              <CardDescription className="text-xs">Distribuição do faturamento por fabricante — os menores ficam agrupados em "Outros" (passe o mouse para detalhar)</CardDescription>
             </CardHeader>
             <CardContent className="pt-2">
               <ResponsiveContainer width="100%" height={260}>
@@ -447,24 +528,26 @@ const Dashboard = () => {
                     animationDuration={1000}
                     animationEasing="ease-out"
                   >
-                    {faturamentoPorFabricaPizza.map((_, idx) => (
-                      <Cell 
-                        key={`cell-${idx}`} 
-                        fill={[
-                          chartColors.primary,
-                          chartColors.success,
-                          chartColors.warning,
-                          'hsl(24, 100%, 47%)',
-                          'hsl(280, 65%, 60%)'
-                        ][idx % 5]} 
-                        stroke="hsl(var(--card))" 
-                        strokeWidth={2} 
+                    {faturamentoPorFabricaPizza.map((slice, idx) => (
+                      <Cell
+                        key={`cell-${idx}`}
+                        fill={
+                          slice.fabrica === 'Outros'
+                            ? chartColors.muted
+                            : [
+                                chartColors.primary,
+                                chartColors.success,
+                                chartColors.warning,
+                                'hsl(24, 100%, 47%)',
+                                'hsl(280, 65%, 60%)'
+                              ][idx % 5]
+                        }
+                        stroke="hsl(var(--card))"
+                        strokeWidth={2}
                       />
                     ))}
                   </Pie>
-                  <Tooltip
-                    content={<ChartTooltip formatValue={formatCurrency} />}
-                  />
+                  <Tooltip content={<FabricaPizzaTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>

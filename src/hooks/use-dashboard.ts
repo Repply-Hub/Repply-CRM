@@ -45,18 +45,42 @@ export function useIndicadoresVendedor(empresaId?: string) {
   });
 }
 
-export function useVelocidadeFabricante(empresaId?: string) {
+export interface VelocidadeFabricante {
+  fabricante_id: string;
+  fabricante_nome: string;
+  total_pedidos: number;
+  /** Dias médios entre a criação do negócio e o primeiro orçamento enviado.
+   *  null quando nenhum pedido do fabricante tem essa transição registrada
+   *  (não é "0 dias" — é "sem dado"). */
+  dias_medio_resposta: number | null;
+}
+
+// Antes lia vw_velocidade_por_fabricante, que perdeu a coluna de tempo médio
+// numa recriação anterior (o frontend hardcodava `dias: 0` pra todo mundo — ver
+// git blame de src/pages/Dashboard.tsx). RPC calcula de verdade a partir de
+// pedidos_historico_status e aceita os mesmos filtros de Período/Responsável/
+// Fabricante que dashboard_stats — ver
+// supabase/migrations/20260806100000_velocidade_fabricante_rpc.sql.
+export function useVelocidadeFabricante(
+  empresaId?: string,
+  filters?: { usuarioId?: string; fabricanteId?: string; dateFrom?: string; dateTo?: string },
+) {
+  const { usuarioId, fabricanteId, dateFrom, dateTo } = filters ?? {};
+
   return useQuery({
-    queryKey: ['vw_velocidade_por_fabricante', empresaId],
+    queryKey: ['dashboard_velocidade_fabricante', empresaId, usuarioId, fabricanteId, dateFrom, dateTo],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vw_velocidade_por_fabricante')
-        .select('*')
-        .eq('empresa_id', empresaId as string);
+      const { data, error } = await supabase.rpc('dashboard_velocidade_fabricante', {
+        p_usuario_id: usuarioId ?? null,
+        p_fabricante_id: fabricanteId ?? null,
+        p_date_from: dateFrom ?? null,
+        p_date_to: dateTo ?? null,
+      });
       if (error) throw error;
-      return data || [];
+      return (data ?? []) as VelocidadeFabricante[];
     },
     enabled: !!empresaId,
+    placeholderData: keepPreviousData,
     ...DASHBOARD_QUERY_OPTS,
   });
 }
