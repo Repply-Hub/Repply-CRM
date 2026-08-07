@@ -53,6 +53,68 @@ async function resolveUsuarioIds(empresaId: string, vendedorIds?: string[]): Pro
   return companyUsers?.map(u => u.id) ?? [];
 }
 
+// Defesa em profundidade para o caminho de ids explícitos (seleção manual do usuário) das
+// mutações em massa: a RLS já barra UPDATE/DELETE fora da empresa, mas aqui tratamos qualquer
+// id fora dela como IDOR — hard stop antes de tocar no banco, em vez de deixar a RLS
+// silenciosamente afetar 0 linhas para esses ids (o que mascararia o problema no retorno da
+// mutação, já que o `count` combinaria os ids válidos com os inválidos sem distinção).
+async function assertIdsBelongToEmpresa(ids: string[], empresaId: string): Promise<void> {
+  const usuarioIds = await resolveUsuarioIds(empresaId);
+  if (usuarioIds.length === 0) {
+    throw new Error('Não foi possível validar a empresa dos negócios selecionados.');
+  }
+  const { data, error } = await supabase
+    .from('pedidos')
+    .select('id')
+    .in('id', ids)
+    .in('usuario_id', usuarioIds);
+  if (error) throw error;
+  const validIds = new Set((data ?? []).map(row => row.id));
+  if (ids.some(id => !validIds.has(id))) {
+    throw new Error('Um ou mais negócios selecionados não pertencem à sua empresa.');
+  }
+}
+
+// "Fechamento" (ganho) e "Perdido" são etapas finais — nunca contam como "parado" pro filtro
+// Atenção, já que o alerta de dias na etapa também não aparece pra elas no front. Usado tanto no
+// fetch paginado quanto nas mutações em massa "por filtro", que precisam do mesmo recorte.
+const ETAPAS_FINAIS_ATENCAO = '(fechamento,perdido)';
+
+interface SearchMatches {
+  clienteIds: string[];
+  fabricanteIds: string[];
+  obraIds: string[];
+}
+
+// Busca por texto casa contra colunas de tabelas relacionadas (cliente/fabricante/obra), que o
+// PostgREST não filtra via `.or()` sobre um `.select()` com embeds — por isso resolvemos os ids
+// que batem com o termo em consultas enxutas (cada uma já restrita pela RLS da respectiva tabela)
+// e então filtramos pedidos por esses ids. Compartilhado pelo fetch paginado e pelas mutações em
+// massa "por filtro", que precisam do mesmo recorte que o usuário vê na tela.
+async function resolveSearchMatches(trimmedSearch: string): Promise<SearchMatches> {
+  const [{ data: clienteMatches }, { data: fabricanteMatches }, { data: obraMatches }] = await Promise.all([
+    supabase.from('clientes').select('id').ilike('empresa', `%${trimmedSearch}%`),
+    supabase.from('fabricantes').select('id').ilike('nome', `%${trimmedSearch}%`),
+    supabase.from('obras').select('id').ilike('nome_obra', `%${trimmedSearch}%`),
+  ]);
+  return {
+    clienteIds: (clienteMatches ?? []).map(c => c.id),
+    fabricanteIds: (fabricanteMatches ?? []).map(f => f.id),
+    obraIds: (obraMatches ?? []).map(o => o.id),
+  };
+}
+
+const hasNoSearchMatches = (matches: SearchMatches) =>
+  matches.clienteIds.length === 0 && matches.fabricanteIds.length === 0 && matches.obraIds.length === 0;
+
+const buildSearchOrClause = (matches: SearchMatches): string => {
+  const orParts: string[] = [];
+  if (matches.clienteIds.length > 0) orParts.push(`cliente_id.in.(${matches.clienteIds.join(',')})`);
+  if (matches.fabricanteIds.length > 0) orParts.push(`fabricante_id.in.(${matches.fabricanteIds.join(',')})`);
+  if (matches.obraIds.length > 0) orParts.push(`obra_id.in.(${matches.obraIds.join(',')})`);
+  return orParts.join(',');
+};
+
 export function usePedidos(
   empresaId?: string,
   page = 0,
@@ -73,23 +135,10 @@ export function usePedidos(
         if (usuarioIds.length === 0) return { data: [], count: 0 };
       }
 
-      // Busca por texto casa contra colunas de tabelas relacionadas (cliente/fabricante), que o
-      // PostgREST não filtra via `.or()` sobre um `.select()` com embeds — por isso resolvemos os
-      // ids que batem com o termo em duas consultas enxutas (cada uma já restrita pela RLS de
-      // clientes/fabricantes) e então filtramos pedidos por esses ids.
       const trimmedSearch = search?.trim();
-      let matchedClienteIds: string[] = [];
-      let matchedFabricanteIds: string[] = [];
-      if (trimmedSearch) {
-        const [{ data: clienteMatches }, { data: fabricanteMatches }] = await Promise.all([
-          supabase.from('clientes').select('id').ilike('empresa', `%${trimmedSearch}%`),
-          supabase.from('fabricantes').select('id').ilike('nome', `%${trimmedSearch}%`),
-        ]);
-        matchedClienteIds = (clienteMatches ?? []).map(c => c.id);
-        matchedFabricanteIds = (fabricanteMatches ?? []).map(f => f.id);
-        if (matchedClienteIds.length === 0 && matchedFabricanteIds.length === 0) {
-          return { data: [], count: 0 };
-        }
+      const searchMatches = trimmedSearch ? await resolveSearchMatches(trimmedSearch) : null;
+      if (searchMatches && hasNoSearchMatches(searchMatches)) {
+        return { data: [], count: 0 };
       }
 
       let query = supabase
@@ -137,20 +186,15 @@ export function usePedidos(
 
       if (onlyAttention) {
         const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
-        // "Fechamento" (ganho) e "Perdido" são etapas finais — nunca contam como "parado",
-        // já que o alerta de dias na etapa também não aparece pra elas no front.
-        query = query.lte('created_at', cutoff).not('status', 'in', '(fechamento,perdido)');
+        query = query.lte('created_at', cutoff).not('status', 'in', ETAPAS_FINAIS_ATENCAO);
       }
 
       if (hideImportados) {
         query = query.is('import_hash', null);
       }
 
-      if (trimmedSearch) {
-        const orParts: string[] = [];
-        if (matchedClienteIds.length > 0) orParts.push(`cliente_id.in.(${matchedClienteIds.join(',')})`);
-        if (matchedFabricanteIds.length > 0) orParts.push(`fabricante_id.in.(${matchedFabricanteIds.join(',')})`);
-        query = query.or(orParts.join(','));
+      if (searchMatches) {
+        query = query.or(buildSearchOrClause(searchMatches));
       }
 
       const { data, error, count } = await query;
@@ -357,6 +401,10 @@ export function useBulkDeletePedidos() {
         const { ids } = params;
         if (ids.length === 0) return 0;
 
+        const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
+        if (!empresaId) throw new Error('Empresa não identificada.');
+        await assertIdsBelongToEmpresa(ids, empresaId);
+
         if (ids.length <= BULK_BATCH_SIZE) {
           const { error, count } = await supabase.from('pedidos').delete({ count: 'exact' }).in('id', ids);
           if (error) throw error;
@@ -380,6 +428,13 @@ export function useBulkDeletePedidos() {
       const usuarioIds = await resolveUsuarioIds(empresaId, filters?.vendedorIds);
       if (usuarioIds.length === 0) return 0;
 
+      // Precisa espelhar exatamente o mesmo recorte de `usePedidos`/`usePedidosStats` — senão a
+      // exclusão "todos os filtrados" apaga mais do que o N mostrado/prometido no diálogo de
+      // confirmação (ver ETAPAS_FINAIS_ATENCAO e resolveSearchMatches acima).
+      const trimmedSearch = filters?.search?.trim();
+      const searchMatches = trimmedSearch ? await resolveSearchMatches(trimmedSearch) : null;
+      if (searchMatches && hasNoSearchMatches(searchMatches)) return 0;
+
       let query = supabase.from('pedidos').delete({ count: 'exact' }).in('usuario_id', usuarioIds);
       if (excludeIds && excludeIds.length > 0) query = query.not('id', 'in', `(${excludeIds.join(',')})`);
       if (stages && stages.length > 0) query = query.in('status', stages);
@@ -390,10 +445,13 @@ export function useBulkDeletePedidos() {
       if (filters?.dateTo) query = query.lte('data_pedido', filters.dateTo);
       if (filters?.onlyAttention) {
         const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
-        query = query.lte('created_at', cutoff);
+        query = query.lte('created_at', cutoff).not('status', 'in', ETAPAS_FINAIS_ATENCAO);
       }
       if (filters?.hideImportados) {
         query = query.is('import_hash', null);
+      }
+      if (searchMatches) {
+        query = query.or(buildSearchOrClause(searchMatches));
       }
 
       const { error, count } = await query;
@@ -451,6 +509,10 @@ export function useBulkUpdatePedidos() {
         const { ids } = target;
         if (ids.length === 0) return 0;
 
+        const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
+        if (!empresaId) throw new Error('Empresa não identificada.');
+        await assertIdsBelongToEmpresa(ids, empresaId);
+
         if (ids.length <= BULK_BATCH_SIZE) {
           const { error, count } = await supabase.from('pedidos').update(updateData, { count: 'exact' }).in('id', ids);
           if (error) throw error;
@@ -474,6 +536,10 @@ export function useBulkUpdatePedidos() {
       const usuarioIds = await resolveUsuarioIds(empresaId, filters?.vendedorIds);
       if (usuarioIds.length === 0) return 0;
 
+      const trimmedSearch = filters?.search?.trim();
+      const searchMatches = trimmedSearch ? await resolveSearchMatches(trimmedSearch) : null;
+      if (searchMatches && hasNoSearchMatches(searchMatches)) return 0;
+
       let query = supabase.from('pedidos').update(updateData, { count: 'exact' }).in('usuario_id', usuarioIds);
       if (excludeIds && excludeIds.length > 0) query = query.not('id', 'in', `(${excludeIds.join(',')})`);
       if (stages && stages.length > 0) query = query.in('status', stages);
@@ -484,10 +550,13 @@ export function useBulkUpdatePedidos() {
       if (filters?.dateTo) query = query.lte('data_pedido', filters.dateTo);
       if (filters?.onlyAttention) {
         const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
-        query = query.lte('created_at', cutoff);
+        query = query.lte('created_at', cutoff).not('status', 'in', ETAPAS_FINAIS_ATENCAO);
       }
       if (filters?.hideImportados) {
         query = query.is('import_hash', null);
+      }
+      if (searchMatches) {
+        query = query.or(buildSearchOrClause(searchMatches));
       }
 
       const { error, count } = await query;
