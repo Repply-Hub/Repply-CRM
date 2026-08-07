@@ -214,6 +214,29 @@ serve(async (req) => {
         { instancia_id: config.id, instance_name: config.instance_name, status_instancia: config.status });
     }
 
+    /**
+     * O `conversa_id` vem do corpo e era usado SEM verificar o dono — o insert
+     * da mensagem e (desde o fallback de variante) o rename do telefone
+     * escreviam em qualquer conversa cujo UUID o chamador conhecesse, inclusive
+     * de OUTRA empresa: o cliente daqui é service_role, que ignora a RLS.
+     *
+     * Um UUID alheio não é adivinhável, mas segurança por sorteio não é
+     * segurança. Conversa que não é da empresa do chamador: recusa antes de
+     * qualquer efeito.
+     */
+    if (conversa_id) {
+      const { data: conversaDoCaller } = await supabase
+        .from("whatsapp_conversas")
+        .select("id")
+        .eq("id", conversa_id)
+        .eq("empresa_id", userData.empresa_id)
+        .maybeSingle();
+      if (!conversaDoCaller) {
+        return await recusar(supabase, "conversa_de_outra_empresa", "Esta conversa não foi encontrada. Recarregue a página.", 404,
+          { conversa_id, usuario_id: userData.id });
+      }
+    }
+
     const digits = telefone.replace(/\D/g, "");
 
     /**
@@ -393,10 +416,17 @@ serve(async (req) => {
      * (o merge fica para a varredura da migração) e o envio segue normal.
      */
     if (varianteFuncionou && conversa_id) {
+      // Além da checagem de dono lá em cima: o rename só atinge a conversa que
+      // REALMENTE carrega o número tentado. A RLS de conversas é por
+      // responsável, não por empresa — sem o filtro de telefone, um usuário da
+      // mesma empresa com o UUID de uma conversa alheia conseguiria trocar a
+      // identidade dela por um número à escolha.
       const { error: erroRename } = await supabase
         .from("whatsapp_conversas")
         .update({ telefone: numeroUsado })
-        .eq("id", conversa_id);
+        .eq("id", conversa_id)
+        .eq("empresa_id", userData.empresa_id)
+        .eq("telefone", phone);
       if (erroRename) {
         console.warn("[whatsapp-send] variante funcionou mas não renomeei a conversa:", erroRename.message);
       } else {

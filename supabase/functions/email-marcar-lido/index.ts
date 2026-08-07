@@ -141,15 +141,29 @@ serve(async (req) => {
 
     // As mensagens de uma seleção podem, em tese, vir de contas diferentes.
     // Buscar os grants de uma vez evita uma consulta por mensagem.
-    const contas = [...new Set(mudam.map((m) => m.conta_id))];
-    const { data: grants } = await supabase
-      .from("email_conta_grants")
-      .select("conta_id, grant_id")
-      .in("conta_id", contas);
-
-    const grantPorConta = new Map<string, string>(
-      (grants ?? []).map((g: { conta_id: string; grant_id: string }) => [g.conta_id, g.grant_id]),
-    );
+    //
+    // `filter(Boolean)` é obrigatório: mensagens de caixas DESCONECTADAS têm
+    // `conta_id` NULO (o histórico preservado — 142 em produção, misturadas na
+    // lista), e um `null` dentro do `.in()` faz o PostgREST devolver 400. Sem o
+    // filtro, um lote com UMA mensagem arquivada derrubava a busca de grants
+    // inteira e NENHUMA mensagem era espelhada no provedor — em silêncio.
+    // Elas não têm provedor para avisar mesmo; o laço abaixo já as pula.
+    const contas = [...new Set(mudam.map((m) => m.conta_id).filter(Boolean))] as string[];
+    const grantPorConta = new Map<string, string>();
+    if (contas.length) {
+      const { data: grants, error: erroGrants } = await supabase
+        .from("email_conta_grants")
+        .select("conta_id, grant_id")
+        .in("conta_id", contas);
+      if (erroGrants) {
+        // Espelho é melhor-esforço; o CRM já gravou. Mas falha aqui não pode
+        // ser muda, senão vira o mesmo silêncio que este filtro conserta.
+        console.error("[email-marcar-lido] falha ao buscar grants:", erroGrants);
+      }
+      for (const g of (grants ?? []) as Array<{ conta_id: string; grant_id: string }>) {
+        grantPorConta.set(g.conta_id, g.grant_id);
+      }
+    }
 
     let enviadas = 0;
     let falhas = 0;
@@ -164,16 +178,30 @@ serve(async (req) => {
       if (!grantId || !m.nylas_message_id) continue;
 
       // O Nylas fala em `unread`, não em `lido` — é o inverso.
-      const resp = await chamarNylas(
-        `/v3/grants/${grantId}/messages/${encodeURIComponent(m.nylas_message_id)}`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ unread: !lido }),
-          // Curto de propósito: é uma escrita acessória, e o usuário está
-          // esperando a mensagem abrir. Estourar aqui não desfaz nada.
-          timeoutMs: 15_000,
-        },
-      );
+      //
+      // O try/catch é vital NUM LAÇO: `chamarNylas` LANÇA em timeout/queda de
+      // rede (AbortSignal), e sem ele a exceção da 3ª mensagem subia até o
+      // catch externo, virava 500 — a tela mostrava erro para um lote que JÁ
+      // está gravado como lido no CRM — e as mensagens restantes nunca eram
+      // espelhadas no provedor. Falha de rede aqui é só mais uma `falha`.
+      let resp: Awaited<ReturnType<typeof chamarNylas>>;
+      try {
+        resp = await chamarNylas(
+          `/v3/grants/${grantId}/messages/${encodeURIComponent(m.nylas_message_id)}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({ unread: !lido }),
+            // Curto de propósito: é uma escrita acessória, e o usuário está
+            // esperando a mensagem abrir. Estourar aqui não desfaz nada.
+            timeoutMs: 15_000,
+          },
+        );
+      } catch (e) {
+        falhas++;
+        ultimoMotivo = `sem resposta do provedor (${String(e).slice(0, 120)})`;
+        console.warn("[email-marcar-lido] rede falhou no espelho:", String(e));
+        continue;
+      }
 
       if (resp.ok) {
         enviadas++;
