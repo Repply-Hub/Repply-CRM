@@ -27,6 +27,7 @@ import { linkifyText } from '@/lib/linkify';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
 import { validateFile } from '@/lib/file-validation';
 import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
+import { ChatMessageSearch } from '@/components/chat/ChatMessageSearch';
 import {
   Sheet,
   SheetContent,
@@ -655,6 +656,7 @@ const Chat = () => {
   const recordingTimerRef = useRef<number | null>(null);
   const [respondendoA, setRespondendoA] = useState<ChatMessage | null>(null);
   const [destacadaMsgId, setDestacadaMsgId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingGrupoNome, setEditingGrupoNome] = useState(false);
   const [grupoNomeInput, setGrupoNomeInput] = useState('');
@@ -905,6 +907,7 @@ const Chat = () => {
   useEffect(() => {
     setRespondendoA(null);
     setReadReceiptsMsg(null);
+    setSearchOpen(false);
   }, [activeGrupoId, activeRecipientId]);
 
   const scrollToBottom = () => {
@@ -1349,8 +1352,17 @@ const Chat = () => {
                 </button>
               </SheetTrigger>
 
-              {isAdminEmpresa && (
-                <div className="ml-auto flex items-center gap-1">
+              <div className="ml-auto flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground"
+                  title="Buscar nesta conversa"
+                  onClick={() => setSearchOpen((v) => !v)}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+                {isAdminEmpresa && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Limpar chat">
@@ -1375,8 +1387,8 @@ const Chat = () => {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-                </div>
-              )}
+                )}
+              </div>
 
               <SheetContent className="w-full sm:max-w-md flex flex-col p-0">
                 <SheetHeader className="p-4 border-b">
@@ -1739,6 +1751,14 @@ const Chat = () => {
                 </DialogContent>
               </Dialog>
           </div>
+
+          {searchOpen && (
+            <ChatMessageSearch
+              messages={(messages ?? []).map((m) => ({ id: m.id, texto: m.conteudo }))}
+              onNavigate={irParaMensagem}
+              onClose={() => setSearchOpen(false)}
+            />
+          )}
 
           {/* Messages */}
           <div className="flex-1 relative flex flex-col min-h-0 overflow-hidden">

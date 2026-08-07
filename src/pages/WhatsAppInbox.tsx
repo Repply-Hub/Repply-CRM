@@ -45,6 +45,7 @@ import { usePedidosOptions } from "@/hooks/use-pedidos";
 import { useCreateTarefa, useTarefasPorConversa } from "@/hooks/use-tarefas";
 import { useTarefasKanbanColunas } from "@/hooks/use-tarefas-kanban-colunas";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
+import { ChatMessageSearch } from "@/components/chat/ChatMessageSearch";
 import { ProjetoSelect } from "@/components/tarefas/ProjetoSelect";
 import { ParticipantesMultiSelect } from "@/components/tarefas/ParticipantesMultiSelect";
 import { MarcadoresMultiSelect } from "@/components/tarefas/MarcadoresMultiSelect";
@@ -3651,6 +3652,11 @@ export default function WhatsAppInbox() {
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [confirmDeletarMassa, setConfirmDeletarMassa] = useState(false);
   const [leadSheetOpen, setLeadSheetOpen] = useState(false);
+  // Busca por texto entre as mensagens já carregadas da conversa ativa
+  // (equivalente à busca dentro de uma conversa no WhatsApp mobile) — abre
+  // como um dropdown ancorado no botão do header, não confundir com `busca`,
+  // que pesquisa entre conversas/contatos na sidebar.
+  const [buscaMensagensOpen, setBuscaMensagensOpen] = useState(false);
   const [abaInbox, setAbaInbox] = useState<"conversas" | "meus-chats">(
     "conversas",
   );
@@ -6332,6 +6338,51 @@ export default function WhatsAppInbox() {
                     </PopoverContent>
                   </Popover>
                   <div className="ml-auto flex shrink-0 items-center gap-1">
+                    <Popover
+                      open={buscaMensagensOpen}
+                      onOpenChange={setBuscaMensagensOpen}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground"
+                          title="Buscar mensagem nesta conversa"
+                        >
+                          <Search className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="end"
+                        className="w-[min(28rem,90vw)] p-0"
+                        onInteractOutside={(e) => {
+                          // O toast de "nova mensagem" (sonner) some e volta
+                          // durante uma rajada de mensagens recebidas, e o
+                          // Radix interpreta a interação nele como um clique
+                          // fora do popover — fechando a busca e derrubando o
+                          // texto digitado. Ignora interações que se originam
+                          // no toaster; um clique de verdade fora do popover
+                          // continua fechando normalmente.
+                          if (
+                            e.target instanceof Element &&
+                            e.target.closest("[data-sonner-toaster]")
+                          ) {
+                            e.preventDefault();
+                          }
+                        }}
+                      >
+                        <ChatMessageSearch
+                          className="rounded-md border-none"
+                          messages={mensagens.map((m) => ({
+                            id: m.id,
+                            texto: m.conteudo,
+                          }))}
+                          onNavigate={irParaMensagem}
+                          onClose={() => setBuscaMensagensOpen(false)}
+                          placeholder="Buscar mensagem nesta conversa..."
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <Button
                       variant="ghost"
                       size="sm"
