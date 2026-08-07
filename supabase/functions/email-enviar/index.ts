@@ -180,12 +180,28 @@ serve(async (req) => {
     // mostra (`tenho_acesso_a_mensagem`), e não uma segunda regra em
     // TypeScript que dessincronizaria no primeiro ajuste de política.
     if (typeof body?.reply_to_message_id === "string" && body.reply_to_message_id) {
-      const { data: original, error: erroOriginal } = await userClient
+      // SEM filtrar por `conta_id`, de propósito. Filtrar por ele parecia mais
+      // apertado e era só mais quebrado: as 142 mensagens de caixas já
+      // desconectadas ficam com `conta_id` NULO (o histórico que o usuário
+      // escolheu preservar), continuam listadas em Recebidos, e responder a
+      // qualquer uma delas passaria a devolver 403 dizendo que a pessoa não tem
+      // acesso — o que é falso, ela está olhando a mensagem na tela.
+      //
+      // Quem recorta é a RLS, que já trata `conta_id` nulo, e o `empresa_id` que
+      // ela impõe. Repetir o recorte aqui só acrescentava uma regra a mais para
+      // divergir.
+      //
+      // `limit(1)` em vez de `maybeSingle()`: reconectar uma caixa preservando o
+      // histórico pode deixar a MESMA `nylas_message_id` em duas linhas (a
+      // arquivada, com conta nula, e a nova). `maybeSingle` viraria erro nesse
+      // caso; para autorizar, achar uma já basta.
+      const { data: originais, error: erroOriginal } = await userClient
         .from("email_mensagens")
         .select("id")
-        .eq("conta_id", conta.id)
         .eq("nylas_message_id", body.reply_to_message_id)
-        .maybeSingle();
+        .limit(1);
+
+      const original = originais?.[0] ?? null;
 
       if (erroOriginal) {
         console.error("[email-enviar] falha ao verificar a conversa:", erroOriginal);

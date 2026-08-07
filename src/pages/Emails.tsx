@@ -47,6 +47,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSearchParams } from "react-router-dom";
 import { useEmailEmpresa } from "@/hooks/use-email-empresa";
+import { erroLegivelDaFunction } from "@/lib/erro-edge-function";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
 import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
@@ -579,16 +580,31 @@ const Emails = () => {
   });
 
   const bulkUpdateReadStatusMutation = useMutation({
+    // Pela Edge Function, e não por UPDATE direto, pelo MESMO motivo do clique
+    // individual: o "lido" precisa chegar ao provedor. Enquanto este caminho
+    // gravava só aqui, marcar 15 mensagens em massa durava até a varredura
+    // seguinte trazer o `unread` do Gmail por cima — e elas voltavam a aparecer
+    // como novas. Metade da funcionalidade é pior do que nenhuma, porque parece
+    // que funcionou.
     mutationFn: async ({ ids, lido }: { ids: string[]; lido: boolean }) => {
-      const { error } = await supabase
-        .from("email_mensagens")
-        .update({ lido })
-        .in("id", ids);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("email-marcar-lido", {
+        body: { mensagem_ids: ids, lido },
+      });
+      if (error) throw await erroLegivelDaFunction(error, "Não foi possível atualizar");
+      return data as { alteradas: number; falhas: number };
     },
-    onSuccess: () => {
-      toast.success("E-mails atualizados com sucesso");
+    onSuccess: (r) => {
+      // A gravação daqui sempre valeu; `falhas` é só o espelho no provedor.
+      if (r?.falhas) {
+        toast.warning(
+          "Marcado aqui, mas o provedor não confirmou todas. A próxima sincronização acerta.",
+        );
+      } else {
+        toast.success("E-mails atualizados com sucesso");
+      }
       queryClient.invalidateQueries({ queryKey: ["received_emails"] });
+      queryClient.invalidateQueries({ queryKey: ["received_emails_total"] });
+      queryClient.invalidateQueries({ queryKey: ["email_contagem_por_pasta"] });
       setSelectedIds([]);
     },
     onError: (error: any) => {
