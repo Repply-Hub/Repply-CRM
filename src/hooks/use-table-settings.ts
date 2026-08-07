@@ -28,6 +28,29 @@ function sanitizeColumnWidths(widths: Record<string, number>): Record<string, nu
   return Object.fromEntries(Object.entries(widths).map(([id, w]) => [id, clampColumnWidth(w)]));
 }
 
+// Colunas padrão adicionadas ao produto DEPOIS que o usuário já tinha uma configuração salva
+// (localStorage ou `configuracoes_tabelas`) nunca entram nessa configuração antiga — ela só guarda
+// o que existia no momento do save. Sem esse merge, uma coluna nova (ex.: "marcador", adicionada
+// numa feature posterior) fica pra sempre ausente da lista de colunas E invisível no card/tabela
+// pra qualquer empresa que já tivesse configuração salva antes da feature existir — o próprio bug
+// de "marcador sumiu do Kanban": o dado sempre esteve lá, só a coluna nunca chegou a ser conhecida
+// por essa empresa. Novas colunas ausentes entram anexadas ao fim e já visíveis por padrão.
+function mergeMissingDefaultColumns(
+  savedColumns: ColumnDefinition[],
+  savedVisible: string[],
+  defaultColumns: ColumnDefinition[]
+): { columns: ColumnDefinition[]; visibleColumns: string[] } {
+  const existingIds = new Set(savedColumns.map(c => c.id));
+  const missingDefaults = defaultColumns.filter(c => !existingIds.has(c.id));
+  if (missingDefaults.length === 0) {
+    return { columns: savedColumns, visibleColumns: savedVisible };
+  }
+  return {
+    columns: [...savedColumns, ...missingDefaults],
+    visibleColumns: Array.from(new Set([...savedVisible, ...missingDefaults.map(c => c.id)])),
+  };
+}
+
 interface TableSettingsOptions {
   key: string;
   defaultColumns: ColumnDefinition[];
@@ -50,8 +73,9 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
       try {
         const parsed = JSON.parse(saved) as ColumnDefinition[];
         const unique = Array.from(new Map(parsed.map(c => [c.id, c])).values());
-        
-        return unique.map(col => {
+        const { columns: merged } = mergeMissingDefaultColumns(unique, [], defaultColumns);
+
+        return merged.map(col => {
           return {
             ...col,
             locked: false // Garantir que nenhuma coluna esteja travada para edição
@@ -65,9 +89,18 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
   });
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem(`${key}_visible_columns`);
-    const initial = saved ? JSON.parse(saved) : defaultColumns.map(c => c.id);
-    return Array.from(new Set(initial)) as string[];
+    const savedVisibleRaw = localStorage.getItem(`${key}_visible_columns`);
+    const savedColumnsRaw = localStorage.getItem(`${key}_all_columns`);
+    if (!savedVisibleRaw) return defaultColumns.map(c => c.id);
+    const savedVisible = JSON.parse(savedVisibleRaw) as string[];
+    if (!savedColumnsRaw) return Array.from(new Set(savedVisible));
+    try {
+      const savedColumns = JSON.parse(savedColumnsRaw) as ColumnDefinition[];
+      const { visibleColumns: merged } = mergeMissingDefaultColumns(savedColumns, savedVisible, defaultColumns);
+      return merged;
+    } catch (e) {
+      return Array.from(new Set(savedVisible));
+    }
   });
 
   const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
@@ -111,8 +144,15 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
         if (error) throw error;
 
         if (data) {
-          if (data.colunas) setColumns(data.colunas as any);
-          if (data.colunas_visiveis) setVisibleColumns(data.colunas_visiveis as any);
+          if (data.colunas) {
+            const savedColumns = data.colunas as ColumnDefinition[];
+            const savedVisible = (data.colunas_visiveis as string[] | null) ?? [];
+            const merged = mergeMissingDefaultColumns(savedColumns, savedVisible, defaultColumns);
+            setColumns(merged.columns);
+            if (data.colunas_visiveis) setVisibleColumns(merged.visibleColumns);
+          } else if (data.colunas_visiveis) {
+            setVisibleColumns(data.colunas_visiveis as any);
+          }
           if (data.labels_personalizados) setCustomLabels(data.labels_personalizados as any);
           if (data.tamanho_pagina) setPageSize(data.tamanho_pagina);
           if (data.modelos) setPresets(data.modelos as any);
