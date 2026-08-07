@@ -1,21 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeWhatsappPhone } from "../_shared/whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-// Mesma normalização usada em whatsapp-webhook/whatsapp-send/whatsapp-group-create:
-// garante que o número BR sempre inclua o 9º dígito, no formato que a uazapi espera.
-function normalizeWhatsappPhone(raw: string): string {
-  let digits = (raw ?? "").replace(/\D/g, "");
-  if (digits.length > 11 && digits.startsWith("55")) digits = digits.slice(2);
-  if (digits.length === 10) {
-    digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
-  }
-  return `55${digits}`;
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeWhatsappPhone } from "../_shared/whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,18 +8,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-webhook-secret",
 };
 
-// WhatsApp/uazapi às vezes envia o JID de celulares BR sem o 9º dígito (número antigo).
-// Normaliza para o formato canônico (55 + DDD + 9 + número) para casar com conversas
-// criadas manualmente no app, evitando duas conversas para o mesmo contato.
-function normalizeWhatsappPhone(raw: string): string {
-  let digits = (raw ?? "").replace(/\D/g, "");
-  // só remove o "55" se for código de país (DDD 55 do RS também começa com "55")
-  if (digits.length > 11 && digits.startsWith("55")) digits = digits.slice(2);
-  if (digits.length === 10) {
-    digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
-  }
-  return `55${digits}`;
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -736,12 +725,48 @@ async function handleIncomingMessage(
     jaProcessada = !!msgExistente;
   }
 
-  const { data: existente } = await supabase
+  let { data: existente } = await supabase
     .from("whatsapp_conversas")
     .select("id, nao_lidas, nome_contato, nome_contato_editado_manualmente")
     .eq("empresa_id", empresaId)
     .eq("telefone", telefone)
     .maybeSingle();
+
+  /**
+   * Não achou? Procura a chave LEGADA com o 9º dígito antes de criar.
+   *
+   * A normalização antiga enfiava o 9 em qualquer número de 10 dígitos —
+   * inclusive FIXO, cujo JID real não tem o 9. Conversas criadas naquela época
+   * vivem com o número errado. Agora que a normalização parou de inventar o 9,
+   * o inbound desses contatos chega com o número certo, que não casa com a
+   * linha antiga — e sem este fallback cada mensagem criaria uma conversa
+   * DUPLICADA, rachando o histórico no meio.
+   *
+   * Ao encontrar a legada, corrige o telefone dela ali mesmo (colisão-safe):
+   * o inbound seguinte já casa direto. Só roda para a faixa ambígua [2-5]; um
+   * celular canônico (9+[6-9]) nunca entra aqui.
+   */
+  if (!existente && !isGroup && /^55\d{2}[2-5]\d{7}$/.test(telefone)) {
+    const chaveLegada = telefone.slice(0, 4) + "9" + telefone.slice(4);
+    const { data: legada } = await supabase
+      .from("whatsapp_conversas")
+      .select("id, nao_lidas, nome_contato, nome_contato_editado_manualmente")
+      .eq("empresa_id", empresaId)
+      .eq("telefone", chaveLegada)
+      .maybeSingle();
+    if (legada) {
+      const { error: erroRename } = await supabase
+        .from("whatsapp_conversas")
+        .update({ telefone })
+        .eq("id", legada.id);
+      if (erroRename) {
+        console.warn("[webhook] conversa legada encontrada mas não renomeada:", erroRename.message);
+      } else {
+        console.log(`[webhook] conversa ${legada.id} corrigida: ${chaveLegada} -> ${telefone}`);
+      }
+      existente = legada;
+    }
+  }
 
   let conversa: { id: string; nao_lidas: number } | null = null;
 
@@ -891,12 +916,28 @@ async function handleCallEvent(supabase: any, empresaId: string, payload: any) {
     .maybeSingle();
   if (msgExistente) return;
 
-  const { data: existente } = await supabase
+  let { data: existente } = await supabase
     .from("whatsapp_conversas")
     .select("id, nao_lidas")
     .eq("empresa_id", empresaId)
     .eq("telefone", telefone)
     .maybeSingle();
+
+  // Mesmo fallback de chave legada do fluxo de mensagens (ver comentário lá):
+  // a notificação de chamada de um fixo não pode rachar a conversa em duas.
+  if (!existente && !isGroupCall && /^55\d{2}[2-5]\d{7}$/.test(telefone)) {
+    const chaveLegada = telefone.slice(0, 4) + "9" + telefone.slice(4);
+    const { data: legada } = await supabase
+      .from("whatsapp_conversas")
+      .select("id, nao_lidas")
+      .eq("empresa_id", empresaId)
+      .eq("telefone", chaveLegada)
+      .maybeSingle();
+    if (legada) {
+      await supabase.from("whatsapp_conversas").update({ telefone }).eq("id", legada.id);
+      existente = legada;
+    }
+  }
 
   let conversaId: string | null = null;
   if (existente) {

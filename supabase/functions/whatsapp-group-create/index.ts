@@ -1,22 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeWhatsappPhone } from "../_shared/whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Mesma normalização usada no whatsapp-webhook/whatsapp-send: garante que o número BR
-// sempre inclua o 9º dígito, no formato que a uazapi espera (apenas dígitos, com DDI).
-function normalizeWhatsappPhone(raw: string): string {
-  let digits = (raw ?? "").replace(/\D/g, "");
-  // só remove o "55" se for código de país (DDD 55 do RS também começa com "55")
-  if (digits.length > 11 && digits.startsWith("55")) digits = digits.slice(2);
-  if (digits.length === 10) {
-    digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
-  }
-  return `55${digits}`;
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -135,7 +125,10 @@ serve(async (req) => {
     }
 
     const rawParticipants: any[] = wapiResult?.group?.Participants ?? [];
-    const participantes = rawParticipants.map((p) => ({
+    // Nome diferente do `participantes` do body (linha 45) de propósito: a
+    // redeclaração impedia o arquivo de COMPILAR — e é por isso que esta
+    // function ficou meses publicada numa versão antiga.
+    const participantesDoGrupo = rawParticipants.map((p) => ({
       nome: p?.DisplayName || null,
       telefone: String(p?.PhoneNumber ?? p?.JID ?? "").replace(/@.*$/, ""),
     })).filter((p) => p.telefone);
@@ -143,7 +136,7 @@ serve(async (req) => {
     const { data: conversa, error: convError } = await supabase
       .from("whatsapp_conversas")
       .upsert(
-        { empresa_id: userData.empresa_id, telefone, nome_contato: nome.trim(), arquivada: false, is_group: true, participantes },
+        { empresa_id: userData.empresa_id, telefone, nome_contato: nome.trim(), arquivada: false, is_group: true, participantes: participantesDoGrupo },
         { onConflict: "empresa_id,telefone" }
       )
       .select("*")

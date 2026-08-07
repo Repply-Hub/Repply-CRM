@@ -8,16 +8,31 @@ import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
 const MENSAGEM_TOAST_MAX_CHARS = 100;
 
 // WhatsApp/uazapi às vezes usa o JID de celulares BR sem o 9º dígito (número antigo).
-// Normaliza para o formato canônico (55 + DDD + 9 + número), igual ao whatsapp-webhook,
-// para casar com conversas já existentes do mesmo contato e evitar duplicidade.
-function normalizeWhatsappPhone(raw: string): string {
+// Normaliza para o formato canônico, igual ao _shared/whatsapp.ts das edge functions
+// (cópia local porque o frontend não importa de supabase/) — as duas pontas PRECISAM
+// concordar, senão a mesma pessoa vira duas conversas.
+//
+// O 9 só entra na faixa de celular ([6-9]): fixo começa com 2-5, e fixo com WhatsApp
+// existe (comum em empresa). A versão antiga enfiava o 9 em qualquer número de 10
+// dígitos, e isso criou conversas com números que não existem no WhatsApp — recebiam
+// normalmente (o webhook re-normalizava do mesmo jeito) e falhavam TODO envio.
+export function normalizeWhatsappPhone(raw: string): string {
   let digits = (raw ?? '').replace(/\D/g, '');
   // só remove o "55" se for código de país (DDD 55 do RS também começa com "55")
   if (digits.length > 11 && digits.startsWith('55')) digits = digits.slice(2);
-  if (digits.length === 10) {
+  if (digits.length === 10 && /^[6-9]$/.test(digits[2])) {
     digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
   }
   return `55${digits}`;
+}
+
+// A variante alternativa de um número ambíguo (9+[2-5] pode ser fixo com 9 espúrio;
+// [2-5] pode ser conta que usa o 9) — ou null quando o formato é inequívoco.
+// Espelha `varianteDoNumero` de _shared/whatsapp.ts.
+export function varianteDoNumero(numero: string): string | null {
+  if (/^55\d{2}9[2-5]\d{7}$/.test(numero)) return numero.slice(0, 4) + numero.slice(5);
+  if (/^55\d{2}[2-5]\d{7}$/.test(numero)) return numero.slice(0, 4) + '9' + numero.slice(4);
+  return null;
 }
 
 export interface WaResponsavel {
@@ -1516,7 +1531,23 @@ export function useWaNovaConversa() {
 
   return useMutation({
     mutationFn: async (params: { telefone: string; nome_contato?: string; cliente_id?: string }) => {
-      const telefone = normalizeWhatsappPhone(params.telefone);
+      let telefone = normalizeWhatsappPhone(params.telefone);
+
+      // Número ambíguo (fixo × conta que usa o 9): se JÁ existe conversa em
+      // qualquer uma das variantes, reaproveita a existente em vez de criar uma
+      // segunda — o histórico do contato não pode rachar em duas conversas por
+      // causa de um dígito. Quem decide qual variante é a verdadeira, quando
+      // nenhuma existe ainda, é o fallback do whatsapp-send no primeiro envio.
+      const alternativa = varianteDoNumero(telefone);
+      if (alternativa) {
+        const { data: existentes } = await supabase
+          .from('whatsapp_conversas')
+          .select('telefone')
+          .in('telefone', [telefone, alternativa])
+          .limit(2);
+        const exata = existentes?.find((c) => c.telefone === telefone);
+        if (!exata && existentes?.length) telefone = existentes[0].telefone;
+      }
 
       // RPC (SECURITY DEFINER) em vez de upsert client-side: se já existe conversa
       // para esse telefone atribuída a outra pessoa, o upsert direto caía no caminho

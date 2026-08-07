@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeWhatsappPhone, varianteDoNumero } from "../_shared/whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,17 +32,6 @@ function rawMessageId(wamid: string): string {
   return idx !== -1 ? wamid.slice(idx + 1) : wamid;
 }
 
-// Mesma normalização usada no whatsapp-webhook: garante que o número BR sempre
-// inclua o 9º dígito para casar com a conversa já existente do mesmo contato.
-function normalizeWhatsappPhone(raw: string): string {
-  let digits = (raw ?? "").replace(/\D/g, "");
-  // só remove o "55" se for código de país (DDD 55 do RS também começa com "55")
-  if (digits.length > 11 && digits.startsWith("55")) digits = digits.slice(2);
-  if (digits.length === 10) {
-    digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
-  }
-  return `55${digits}`;
-}
 
 /**
  * Lê a resposta do envio da uazapi e extrai o id da mensagem.
@@ -258,7 +248,8 @@ serve(async (req) => {
     const baseUrl = config.instance_url.replace(/\/$/, "");
 
     let wapiUrl = "";
-    let wapiOptions: RequestInit;
+    // O corpo do envio SEM o `number` — ele entra por tentativa em enviarUmaVez.
+    let wapiOptions: Record<string, unknown>;
 
     if (tipo === 'texto' || !media_url) {
       // --- Texto ---
@@ -267,14 +258,9 @@ serve(async (req) => {
       }
       wapiUrl = `${baseUrl}/send/text`;
       wapiOptions = {
-        method: "POST",
-        headers: { "Content-Type": "application/json", token: config.api_key },
-        body: JSON.stringify({
-          instanceName: uazapiInstance,
-          number: phone,
-          text: assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem,
-          ...(quoted_wamid ? { replyid: rawMessageId(quoted_wamid) } : {}),
-        }),
+        instanceName: uazapiInstance,
+        text: assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem,
+        ...(quoted_wamid ? { replyid: rawMessageId(quoted_wamid) } : {}),
       };
     } else {
       // --- Mídia: POST /send/media ---
@@ -286,7 +272,6 @@ serve(async (req) => {
       };
       wapiUrl = `${baseUrl}/send/media`;
       const wapiBody: Record<string, unknown> = {
-        number: phone,
         type: typeMap[tipo] ?? 'document',
         file: media_url,
       };
@@ -295,23 +280,28 @@ serve(async (req) => {
       if (media_mime) wapiBody.mimetype = media_mime;
       if (quoted_wamid) wapiBody.replyid = rawMessageId(quoted_wamid);
 
-      wapiOptions = {
-        method: "POST",
-        headers: { "Content-Type": "application/json", token: config.api_key },
-        body: JSON.stringify(wapiBody),
-      };
+      wapiOptions = wapiBody;
     }
 
-    const enviarUmaVez = async (): Promise<{ status: number; texto: string; erroFetch: string }> => {
+    // `number` entra por tentativa, e não mais chumbado no corpo: o fallback de
+    // variante (abaixo) precisa repetir o MESMO envio trocando só o destino.
+    const enviarUmaVez = async (
+      numeroDestino: string,
+    ): Promise<{ status: number; texto: string; erroFetch: string }> => {
       try {
-        const res = await fetch(wapiUrl, wapiOptions);
+        const res = await fetch(wapiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", token: config.api_key },
+          body: JSON.stringify({ ...wapiOptions, number: numeroDestino }),
+        });
         return { status: res.status, texto: await res.text().catch(() => ""), erroFetch: "" };
       } catch (e) {
         return { status: 0, texto: "", erroFetch: String(e) };
       }
     };
 
-    let envio = await enviarUmaVez();
+    let numeroUsado = phone;
+    let envio = await enviarUmaVez(numeroUsado);
 
     /**
      * A uazapi (Baileys por baixo) às vezes falha em resolver o LID — a identidade
@@ -329,7 +319,48 @@ serve(async (req) => {
       if (/no lid found/i.test(erroInicial)) {
         repetidoPorLid = true;
         await new Promise((r) => setTimeout(r, 1500));
-        envio = await enviarUmaVez();
+        envio = await enviarUmaVez(numeroUsado);
+      }
+    }
+
+    /**
+     * O número não existe? Tenta a variante com/sem o 9º dígito — UMA vez.
+     *
+     * A faixa 9+[2-5] é ambígua: contém tanto fixos que ganharam um 9 espúrio da
+     * normalização antiga (o JID real é sem 9 — caso "CST Construção", que
+     * nunca conseguiu receber um envio do CRM) quanto números genuínos que usam
+     * o 9 (conversas com dezenas de mensagens LIDAS). Nenhuma regra de faixa
+     * separa os dois — TODOS os dados de produção foram medidos e a fronteira
+     * não existe. Quem sabe qual variante existe é o WhatsApp, então pergunta-se
+     * a ele: falhou com "not on WhatsApp"/"no LID found" e o número tem
+     * variante? Tenta a outra.
+     *
+     * Quando a variante funciona, a conversa é CORRIGIDA no banco (mais abaixo,
+     * via numeroUsado): envio, foto de perfil e renomear passam a usar o número
+     * certo para sempre. Auto-conserto por contato, sem migração cega.
+     *
+     * Os dois erros são tratados como "número não existe" porque a uazapi usa os
+     * dois para o mesmo fato — medido: os MESMOS 6 números receberam ora um, ora
+     * o outro, e 100% das ocorrências de ambos eram este caso.
+     */
+    let varianteTentada: string | null = null;
+    let varianteFuncionou = false;
+    if (!isGroup && (envio.status < 200 || envio.status >= 300)) {
+      let erroAtual = "";
+      try { erroAtual = JSON.parse(envio.texto)?.error ?? ""; } catch { /* ok */ }
+      if (/not on whatsapp|no lid found/i.test(erroAtual)) {
+        const alternativa = varianteDoNumero(numeroUsado);
+        if (alternativa) {
+          varianteTentada = alternativa;
+          const envioAlternativo = await enviarUmaVez(alternativa);
+          if (envioAlternativo.status >= 200 && envioAlternativo.status < 300) {
+            envio = envioAlternativo;
+            numeroUsado = alternativa;
+            varianteFuncionou = true;
+          }
+          // Se a variante também falhou, fica a resposta ORIGINAL: o erro deve
+          // falar do número que a conversa mostra, não do palpite.
+        }
       }
     }
 
@@ -343,8 +374,35 @@ serve(async (req) => {
         _debug: true, url: wapiUrl, status: wapiStatus, response: responseText, fetch_error: fetchError || null,
         replyid_enviado: quoted_wamid ? rawMessageId(quoted_wamid) : null,
         repetido_por_lid: repetidoPorLid,
+        ...(varianteTentada
+          ? { variante_tentada: varianteTentada, variante_funcionou: varianteFuncionou }
+          : {}),
       }
     });
+
+    /**
+     * Auto-conserto: a variante funcionou, então o telefone gravado está errado.
+     *
+     * Corrigir aqui — e não só no envio atual — é o que faz o próximo envio já
+     * sair certo na primeira tentativa, a foto de perfil carregar e o webhook
+     * (que agora não inventa mais o 9) continuar casando os inbounds com ESTA
+     * conversa em vez de criar uma duplicata.
+     *
+     * À prova de colisão: se já existir conversa com o número corrigido, o
+     * UPDATE violaria o UNIQUE (empresa_id, telefone) — nesse caso não renomeia
+     * (o merge fica para a varredura da migração) e o envio segue normal.
+     */
+    if (varianteFuncionou && conversa_id) {
+      const { error: erroRename } = await supabase
+        .from("whatsapp_conversas")
+        .update({ telefone: numeroUsado })
+        .eq("id", conversa_id);
+      if (erroRename) {
+        console.warn("[whatsapp-send] variante funcionou mas não renomeei a conversa:", erroRename.message);
+      } else {
+        console.log(`[whatsapp-send] conversa ${conversa_id} corrigida para ${numeroUsado}`);
+      }
+    }
 
     if (fetchError) {
       return new Response(JSON.stringify({ error: "Não foi possível falar com o servidor do WhatsApp. Tente de novo em instantes.", detail: fetchError }), {
@@ -388,7 +446,7 @@ serve(async (req) => {
      * um erro visível a uma entrega imaginária.
      */
     if (!idDaMensagem) {
-      console.error("[whatsapp-send] 200 sem id de mensagem — destino provavelmente inexistente:", phone, responseText.slice(0, 300));
+      console.error("[whatsapp-send] 200 sem id de mensagem — destino provavelmente inexistente:", numeroUsado, responseText.slice(0, 300));
       return new Response(JSON.stringify({
         error: isGroup
           ? "O WhatsApp não reconheceu este grupo. Peça para alguém reabrir a conversa pelo celular e tente de novo."
@@ -411,9 +469,11 @@ serve(async (req) => {
     // Garante conversa e grava mensagem — operações em paralelo quando possível
     let conversaId = conversa_id;
     if (!conversaId) {
+      // `numeroUsado`, não `phone`: se o fallback de variante corrigiu o
+      // destino, a conversa nasce já com o número que o WhatsApp confirmou.
       const { data: conv } = await supabase.from("whatsapp_conversas")
         .upsert(
-          { empresa_id: userData.empresa_id, telefone: phone, ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, instancia_id: config.id },
+          { empresa_id: userData.empresa_id, telefone: numeroUsado, ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, instancia_id: config.id },
           { onConflict: "empresa_id,telefone" }
         ).select("id").single();
       conversaId = conv?.id;
