@@ -66,6 +66,10 @@ interface ItemPedido {
 const EditarPedido = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Volta pra tela anterior (preservando filtros/busca da URL de Negócios, ex.: período e
+  // etapas selecionadas) em vez de sempre mandar pra "/app" sem parâmetros — só cai no
+  // fallback se não houver histórico de navegação dentro do app (ex.: link direto/nova aba).
+  const closeEditor = () => (window.history.length > 1 ? navigate(-1) : navigate('/app'));
   const { data: pedidoData, isLoading: loadingPedido } = usePedidoCompleto(id ?? null);
   const { data: clientes } = useClientes();
   const { data: fabricantes } = useFabricantes();
@@ -295,7 +299,7 @@ const EditarPedido = () => {
       setPdfUrl(newPdfUrl);
       setPdfFile(null);
       toast.success('Negócio atualizado com sucesso!');
-      navigate('/app');
+      closeEditor();
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -368,7 +372,7 @@ const EditarPedido = () => {
   const headerContent = (
     <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
       <SidebarTrigger className="shrink-0 h-8 w-8 md:hidden" />
-      <Button variant="ghost" size="icon" className="shrink-0 -ml-1 h-8 w-8" onClick={() => navigate('/app')}>
+      <Button variant="ghost" size="icon" className="shrink-0 -ml-1 h-8 w-8" onClick={closeEditor}>
         <ArrowLeft className="h-4 w-4" />
       </Button>
 
@@ -548,6 +552,9 @@ const EditarPedido = () => {
                           }}
                           locale={ptBR}
                           initialFocus
+                          captionLayout="dropdown-buttons"
+                          fromYear={1950}
+                          toYear={new Date().getFullYear() + 1}
                           className={cn("p-3 pointer-events-auto")}
                         />
                       </PopoverContent>
@@ -576,6 +583,9 @@ const EditarPedido = () => {
                           }}
                           locale={ptBR}
                           initialFocus
+                          captionLayout="dropdown-buttons"
+                          fromYear={1950}
+                          toYear={new Date().getFullYear() + 1}
                           className={cn("p-3 pointer-events-auto")}
                         />
                         {prazoResposta && (
