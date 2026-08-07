@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
   Card,
@@ -532,11 +531,10 @@ const Fabricantes = () => {
     if (!deleteAlert) return;
     try {
       if (deleteAlert.type === "fab") {
-        const { error: precosError } = await supabase
-          .from("tabela_precos")
-          .delete()
-          .eq("fabricante_id", deleteAlert.id);
-        if (precosError) throw precosError;
+        // Não apagar tabela_precos manualmente antes: fabricantes.id tem ON DELETE CASCADE
+        // sobre tabela_precos, então o próprio delete do fabricante já cuida disso. Apagar
+        // antes separadamente arriscava excluir o catálogo mesmo quando o delete do
+        // fabricante era bloqueado (RLS ou FK), deixando o fabricante órfão sem produtos.
         await deleteFabricante.mutateAsync(deleteAlert.id);
         if (selectedFabId === deleteAlert.id) setSelectedFabId(null);
         toast.success("Fabricante excluído!");
@@ -551,7 +549,7 @@ const Fabricantes = () => {
           "Este fabricante possui negócios vinculados e não pode ser excluído.",
         );
       } else {
-        toast.error(msg);
+        toast.error(msg || "Erro ao excluir fabricante.");
       }
     }
     setDeleteAlert(null);

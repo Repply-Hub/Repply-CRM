@@ -177,8 +177,19 @@ export function useDeleteFabricante() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('fabricantes').delete().eq('id', id);
+      const { data, error } = await supabase
+        .from('fabricantes')
+        .delete()
+        .eq('id', id)
+        .select('id');
       if (error) throw error;
+      // RLS bloqueia silenciosamente (0 linhas, sem erro) quando o usuário não tem permissão
+      // de exclusão — sem essa checagem a UI reportaria sucesso com o registro intacto.
+      if (!data || data.length === 0) {
+        throw new Error(
+          'Você não tem permissão para excluir este fabricante, ou o registro já não existe mais.',
+        );
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fabricantes'] });
