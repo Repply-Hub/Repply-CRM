@@ -2337,7 +2337,7 @@ export type Database = {
           mes: number
           meta_valor: number
           updated_at: string
-          usuario_id: string
+          usuario_id: string | null
         }
         Insert: {
           ano: number
@@ -2348,7 +2348,7 @@ export type Database = {
           mes: number
           meta_valor?: number
           updated_at?: string
-          usuario_id: string
+          usuario_id?: string | null
         }
         Update: {
           ano?: number
@@ -2359,7 +2359,7 @@ export type Database = {
           mes?: number
           meta_valor?: number
           updated_at?: string
-          usuario_id?: string
+          usuario_id?: string | null
         }
         Relationships: [
           {
@@ -3774,7 +3774,7 @@ export type Database = {
         Args: {
           p_date_from?: string
           p_date_to?: string
-          p_fabricante_id?: string
+          p_fabricante_ids?: string[]
         }
         Returns: {
           qtd_fechado: number
@@ -3787,8 +3787,8 @@ export type Database = {
         Args: {
           p_date_from?: string
           p_date_to?: string
-          p_fabricante_id?: string
-          p_usuario_id?: string
+          p_fabricante_ids?: string[]
+          p_usuario_ids?: string[]
         }
         Returns: {
           pedidos_fechados: number
@@ -3805,8 +3805,8 @@ export type Database = {
         Args: {
           p_date_from?: string
           p_date_to?: string
-          p_fabricante_id?: string
-          p_usuario_id?: string
+          p_fabricante_ids?: string[]
+          p_usuario_ids?: string[]
         }
         Returns: {
           dias_medio_resposta: number | null
@@ -3850,11 +3850,32 @@ export type Database = {
         }[]
       }
       plano_vendas_progresso: {
-        Args: { p_ano: number; p_mes: number; p_usuario_id?: string }
+        Args: {
+          p_ano: number
+          p_fabricante_ids?: string[]
+          p_mes: number
+          p_usuario_ids?: string[]
+        }
         Returns: {
           fabricante_id: string
           fabricante_nome: string
           meta_valor: number
+          vendido_valor: number
+        }[]
+      }
+      plano_vendas_progresso_por_vendedor: {
+        Args: {
+          p_ano: number
+          p_fabricante_ids?: string[]
+          p_mes: number
+          p_usuario_ids?: string[]
+        }
+        Returns: {
+          fabricante_id: string
+          fabricante_nome: string
+          meta_valor: number
+          usuario_id: string
+          usuario_nome: string
           vendido_valor: number
         }[]
       }
@@ -3941,6 +3962,17 @@ export type Database = {
       set_whatsapp_assinar_remetente_global: {
         Args: { p_valor: boolean }
         Returns: number
+      }
+      upsert_meta_venda: {
+        Args: {
+          p_ano: number
+          p_empresa_id: string
+          p_fabricante_id: string
+          p_mes: number
+          p_meta_valor: number
+          p_usuario_id: string | null
+        }
+        Returns: undefined
       }
       usuario_in_my_empresa: { Args: { _usuario_id: string }; Returns: boolean }
       validar_codigo_empresa: { Args: { p_codigo: string }; Returns: Json }

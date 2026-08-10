@@ -41,21 +41,21 @@ export interface IndicadorVendedor {
 // filtros de Período/Fabricante do topo da tela (números que não batiam com o
 // resto da tela) e ficando mais caro conforme a base cresce. RPC aceita os
 // mesmos filtros de dashboard_stats/dashboard_velocidade_fabricante — ver
-// supabase/migrations/20260808120000_dashboard_indicadores_vendedor_rpc.sql.
-// Não recebe usuarioId: essa lista alimenta o próprio seletor "Responsável"
+// supabase/migrations/20260810140000_dashboard_filtros_multiplos.sql.
+// Não recebe usuarioIds: essa lista alimenta o próprio seletor "Responsável"
 // (e o Plano de Vendas), então precisa continuar trazendo todo mundo da
-// empresa — a filtragem por vendedor selecionado é feita no cliente.
+// empresa — a filtragem por vendedor(es) selecionado(s) é feita no cliente.
 export function useIndicadoresVendedor(
   empresaId?: string,
-  filters?: { fabricanteId?: string; dateFrom?: string; dateTo?: string },
+  filters?: { fabricanteIds?: string[]; dateFrom?: string; dateTo?: string },
 ) {
-  const { fabricanteId, dateFrom, dateTo } = filters ?? {};
+  const { fabricanteIds, dateFrom, dateTo } = filters ?? {};
 
   return useQuery({
-    queryKey: ['dashboard_indicadores_vendedor', empresaId, fabricanteId, dateFrom, dateTo],
+    queryKey: ['dashboard_indicadores_vendedor', empresaId, fabricanteIds, dateFrom, dateTo],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('dashboard_indicadores_vendedor', {
-        p_fabricante_id: fabricanteId ?? null,
+        p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
         p_date_from: dateFrom ?? null,
         p_date_to: dateTo ?? null,
       });
@@ -86,16 +86,16 @@ export interface VelocidadeFabricante {
 // supabase/migrations/20260806100000_velocidade_fabricante_rpc.sql.
 export function useVelocidadeFabricante(
   empresaId?: string,
-  filters?: { usuarioId?: string; fabricanteId?: string; dateFrom?: string; dateTo?: string },
+  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; dateFrom?: string; dateTo?: string },
 ) {
-  const { usuarioId, fabricanteId, dateFrom, dateTo } = filters ?? {};
+  const { usuarioIds, fabricanteIds, dateFrom, dateTo } = filters ?? {};
 
   return useQuery({
-    queryKey: ['dashboard_velocidade_fabricante', empresaId, usuarioId, fabricanteId, dateFrom, dateTo],
+    queryKey: ['dashboard_velocidade_fabricante', empresaId, usuarioIds, fabricanteIds, dateFrom, dateTo],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('dashboard_velocidade_fabricante', {
-        p_usuario_id: usuarioId ?? null,
-        p_fabricante_id: fabricanteId ?? null,
+        p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
+        p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
         p_date_from: dateFrom ?? null,
         p_date_to: dateTo ?? null,
       });
@@ -125,16 +125,16 @@ export interface DashboardStats {
 // (SECURITY INVOKER), então a RLS de pedidos já escopa para a empresa dele sozinha.
 export function useDashboardStats(
   empresaId?: string,
-  filters?: { usuarioId?: string; fabricanteId?: string; dateFrom?: string; dateTo?: string },
+  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; dateFrom?: string; dateTo?: string },
 ) {
-  const { usuarioId, fabricanteId, dateFrom, dateTo } = filters ?? {};
+  const { usuarioIds, fabricanteIds, dateFrom, dateTo } = filters ?? {};
 
   return useQuery({
-    queryKey: ['dashboard_stats', empresaId, usuarioId, fabricanteId, dateFrom, dateTo],
+    queryKey: ['dashboard_stats', empresaId, usuarioIds, fabricanteIds, dateFrom, dateTo],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('dashboard_stats', {
-        p_usuario_id: usuarioId ?? null,
-        p_fabricante_id: fabricanteId ?? null,
+        p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
+        p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
         p_date_from: dateFrom ?? null,
         p_date_to: dateTo ?? null,
       });

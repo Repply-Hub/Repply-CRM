@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePicker';
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelectSearch } from '@/components/shared/MultiSelectSearch';
 import { PlanoVendasSection } from '@/components/dashboard/PlanoVendasSection';
 
 // recharts (e os módulos d3-* que ele traz) é de longe o maior pedaço de código
@@ -40,8 +40,10 @@ const Dashboard = () => {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
-  const [vendedorId, setVendedorId] = useState<string>('todos');
-  const [fabricanteId, setFabricanteId] = useState<string>('todos');
+  // Array vazio = "Todos" (sem filtro) — os dois filtros aceitam mais de uma
+  // seleção, então não dá mais pra usar um sentinela tipo 'todos' como valor.
+  const [vendedorIds, setVendedorIds] = useState<string[]>([]);
+  const [fabricanteIds, setFabricanteIds] = useState<string[]>([]);
 
   const { profile } = useAuth();
   const isGestor = profile?.role === 'admin' || profile?.role === 'gestor' || profile?.role === 'empresa';
@@ -54,7 +56,7 @@ const Dashboard = () => {
   // Mesmos filtros de Período/Fabricante do topo — antes esse card ignorava
   // completamente esses filtros e reagregava o histórico inteiro de pedidos.
   const { data: vendedores } = useIndicadoresVendedor(empresaId, {
-    fabricanteId: fabricanteId !== 'todos' ? fabricanteId : undefined,
+    fabricanteIds,
     dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
     dateTo: format(dateRange.to, 'yyyy-MM-dd'),
   });
@@ -81,8 +83,8 @@ const Dashboard = () => {
   // (RPC dashboard_stats) em vez de puxar centenas de linhas de `pedidos` com joins
   // pro cliente só pra somar — ver supabase/migrations/20260722100000_dashboard_stats_rpc.sql.
   const { data: stats, isLoading: loadStats, isFetching: fetchingStats } = useDashboardStats(empresaId, {
-    usuarioId: vendedorId !== 'todos' ? vendedorId : undefined,
-    fabricanteId: fabricanteId !== 'todos' ? fabricanteId : undefined,
+    usuarioIds: vendedorIds,
+    fabricanteIds,
     dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
     dateTo: format(dateRange.to, 'yyyy-MM-dd'),
   });
@@ -90,8 +92,8 @@ const Dashboard = () => {
   // Mesmos filtros de Período/Responsável/Fabricante do topo — antes esse card
   // vinha só por empresaId e ignorava completamente esses filtros.
   const { data: velocidade } = useVelocidadeFabricante(empresaId, {
-    usuarioId: vendedorId !== 'todos' ? vendedorId : undefined,
-    fabricanteId: fabricanteId !== 'todos' ? fabricanteId : undefined,
+    usuarioIds: vendedorIds,
+    fabricanteIds,
     dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
     dateTo: format(dateRange.to, 'yyyy-MM-dd'),
   });
@@ -146,11 +148,11 @@ const Dashboard = () => {
       id: v.usuario_id
     }));
 
-    if (vendedorId !== 'todos') {
-      return data.filter(v => v.id === vendedorId);
+    if (vendedorIds.length > 0) {
+      return data.filter(v => vendedorIds.includes(v.id));
     }
     return data;
-  }, [vendedores, vendedorId]);
+  }, [vendedores, vendedorIds]);
 
   // dias_medio_resposta vem null quando nenhum pedido do fabricante tem envio de
   // orçamento registrado ainda (não é "0 dias" — é "sem dado"); plota 0 pra não
@@ -191,6 +193,40 @@ const Dashboard = () => {
     <AppLayout title="Dashboard" subtitle="Visão analítica do desempenho comercial">
       <ErrorBoundary>
       <div className={`p-6 w-full transition-opacity duration-200 ${fetchingStats && !isLoading ? 'opacity-60' : 'opacity-100'}`}>
+        {/* Filtros */}
+        <div className="mb-8 flex flex-col sm:flex-row flex-wrap gap-4 justify-end items-end">
+          <div className="w-full sm:w-56">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Fabricante</p>
+            <MultiSelectSearch
+              options={fabricantes.map((f) => ({ value: f.id, label: f.nome }))}
+              value={fabricanteIds}
+              onValueChange={setFabricanteIds}
+              placeholder="Todos"
+              className="h-10 bg-card border-border/60 shadow-sm"
+            />
+          </div>
+          <div className="w-full sm:w-56">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Responsável</p>
+            <MultiSelectSearch
+              options={(vendedores ?? []).map((v) => ({ value: v.usuario_id ?? '', label: v.usuario_nome ?? '' }))}
+              value={vendedorIds}
+              onValueChange={setVendedorIds}
+              placeholder="Todos"
+              className="h-10 bg-card border-border/60 shadow-sm"
+            />
+          </div>
+          <div className="w-full sm:w-auto">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Período</p>
+            <DateRangePicker value={dateRange} onChange={setDateRange} />
+          </div>
+          {fetchingStats && !isLoading && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground pb-2.5">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Atualizando...
+            </div>
+          )}
+        </div>
+
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {kpis.map((kpi) => (
@@ -222,58 +258,16 @@ const Dashboard = () => {
             empresaId={empresaId}
             isGestor={isGestor}
             currentUsuarioId={profile?.id}
+            // Não-gestor sempre vê o próprio plano; gestor segue o filtro
+            // "Responsável" do topo (array vazio = "Todos").
+            vendedorIds={isGestor ? vendedorIds : profile?.id ? [profile.id] : []}
+            fabricanteIds={fabricanteIds}
             vendedores={(vendedores ?? []).map(v => ({ usuario_id: v.usuario_id ?? '', usuario_nome: v.usuario_nome ?? '' }))}
             fabricantes={fabricantes}
+            ano={dateRange.from.getFullYear()}
+            mes={dateRange.from.getMonth() + 1}
           />
         )}
-
-        {/* Filtros */}
-        <div className="mb-8 flex flex-col sm:flex-row flex-wrap gap-4 justify-end items-end">
-          <div className="w-full sm:w-48">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Fabricante</p>
-            <Select value={fabricanteId} onValueChange={setFabricanteId}>
-              <SelectTrigger className="h-10 bg-card border-border/60 shadow-sm">
-                <SelectValue placeholder="Fabricante" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                {fabricantes.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-full sm:w-48">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Responsável</p>
-            <Select value={vendedorId} onValueChange={setVendedorId}>
-              <SelectTrigger className="h-10 bg-card border-border/60 shadow-sm">
-                <SelectValue placeholder="Responsável" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                {(vendedores ?? []).map((v) => (
-                  <SelectItem key={v.usuario_id} value={v.usuario_id || ''}>
-                    {v.usuario_nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-full sm:w-auto">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Período</p>
-            <DateRangePicker value={dateRange} onChange={setDateRange} />
-          </div>
-          {fetchingStats && !isLoading && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground pb-2.5">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Atualizando...
-            </div>
-          )}
-        </div>
-
-
 
         {/* Gráficos */}
         <Suspense fallback={<ChartsSkeleton />}>

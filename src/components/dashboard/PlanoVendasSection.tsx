@@ -13,10 +13,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Goal, Pencil, Trash2, Loader2, Copy } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { TOGGLE_LIST_CLASS, TOGGLE_ITEM_CLASS } from '@/lib/toggle-group-styles';
+import { Goal, Pencil, Trash2, Loader2, Copy, Users, User } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   usePlanoVendasProgresso,
+  usePlanoVendasProgressoPorVendedor,
   useMetasVendas,
   useUpsertMetaVenda,
   useDeleteMetaVenda,
@@ -100,8 +103,24 @@ interface PlanoVendasSectionProps {
   empresaId: string;
   isGestor: boolean;
   currentUsuarioId?: string;
+  // Segue o filtro "Responsável" do topo da página (array vazio = "Todos", vê o
+  // progresso agregado/por vendedor da empresa) — antes esta seção tinha um
+  // seletor de vendedor próprio, solto do resto dos cards. Como o filtro agora
+  // aceita mais de uma seleção, "editar metas" só faz sentido quando exatamente
+  // UM vendedor está selecionado (ver `vendedorUnico` no corpo do componente) —
+  // com 0 ou 2+, a seção mostra a visão agregada/por vendedor, sem alvo único
+  // pra editar.
+  vendedorIds: string[];
+  // Segue o filtro "Fabricante" do topo da página (array vazio = "Todos").
+  fabricanteIds: string[];
   vendedores: Vendedor[];
   fabricantes: Fabricante[];
+  // Mês/ano derivados do filtro de Período do topo da página (dateRange.from) —
+  // antes esta seção tinha seletores de Mês/Ano próprios, soltos do resto dos
+  // cards, então dava pra mostrar aqui um mês bem diferente do que os outros
+  // cards estavam exibindo.
+  ano: number;
+  mes: number;
 }
 
 function progressoCor(pct: number) {
@@ -110,11 +129,7 @@ function progressoCor(pct: number) {
   return 'text-muted-foreground';
 }
 
-export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vendedores, fabricantes }: PlanoVendasSectionProps) {
-  const now = new Date();
-  const [ano, setAno] = useState(now.getFullYear());
-  const [mes, setMes] = useState(now.getMonth() + 1);
-  const [vendedorId, setVendedorId] = useState<string | undefined>(currentUsuarioId);
+export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vendedorIds, fabricanteIds, vendedores, fabricantes, ano, mes }: PlanoVendasSectionProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [mostrarDetalhado, setMostrarDetalhado] = useState(
     () => localStorage.getItem(MOSTRAR_DETALHADO_KEY) === '1',
@@ -124,20 +139,52 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
     localStorage.setItem(MOSTRAR_DETALHADO_KEY, mostrarDetalhado ? '1' : '0');
   }, [mostrarDetalhado]);
 
-  useEffect(() => {
-    if (!vendedorId && currentUsuarioId) setVendedorId(currentUsuarioId);
-  }, [currentUsuarioId, vendedorId]);
+  // "Editar metas" e o resumo "Meta x realizado — Fulano" só existem quando dá
+  // pra apontar pra UMA pessoa específica — com 0 (Todos) ou 2+ selecionados,
+  // vira visão agregada/por vendedor (mostrarPorVendedor abaixo).
+  const vendedorUnico = vendedorIds.length === 1 ? vendedorIds[0] : undefined;
 
-  const { data: progresso, isLoading } = usePlanoVendasProgresso(ano, mes, vendedorId);
+  const { data: progresso, isLoading } = usePlanoVendasProgresso(
+    ano,
+    mes,
+    vendedorIds.length > 0 ? vendedorIds : undefined,
+    fabricanteIds.length > 0 ? fabricanteIds : undefined,
+  );
 
   const totalMeta = useMemo(() => (progresso ?? []).reduce((acc, p) => acc + p.meta_valor, 0), [progresso]);
   const totalVendido = useMemo(() => (progresso ?? []).reduce((acc, p) => acc + p.vendido_valor, 0), [progresso]);
   const totalPct = totalMeta > 0 ? (totalVendido / totalMeta) * 100 : 0;
 
-  const vendedorNome = vendedores.find(v => v.usuario_id === vendedorId)?.usuario_nome
-    ?? (vendedorId === currentUsuarioId ? 'Você' : '');
+  const vendedorNome = vendedores.find(v => v.usuario_id === vendedorUnico)?.usuario_nome
+    ?? (vendedorUnico === currentUsuarioId ? 'Você' : '');
 
-  const anos = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
+  // Detalhamento por vendedor — busca/mostra sempre que não há exatamente um
+  // vendedor selecionado (0 = Todos, 2+ = um subconjunto) pro gestor: antes só
+  // existia a soma da empresa aqui, e tinha que trocar o filtro "Responsável"
+  // um vendedor de cada vez pra inspecionar o plano de cada um.
+  const mostrarPorVendedor = isGestor && vendedorIds.length !== 1;
+  const { data: progressoPorVendedorRaw } = usePlanoVendasProgressoPorVendedor(
+    ano,
+    mes,
+    mostrarPorVendedor,
+    vendedorIds.length > 0 ? vendedorIds : undefined,
+    fabricanteIds.length > 0 ? fabricanteIds : undefined,
+  );
+  const porVendedor = useMemo(() => {
+    const porId = new Map<string, { usuario_id: string; usuario_nome: string; meta_valor: number; vendido_valor: number }>();
+    for (const linha of progressoPorVendedorRaw ?? []) {
+      const atual = porId.get(linha.usuario_id) ?? {
+        usuario_id: linha.usuario_id,
+        usuario_nome: linha.usuario_nome,
+        meta_valor: 0,
+        vendido_valor: 0,
+      };
+      atual.meta_valor += linha.meta_valor;
+      atual.vendido_valor += linha.vendido_valor;
+      porId.set(linha.usuario_id, atual);
+    }
+    return Array.from(porId.values()).sort((a, b) => b.vendido_valor - a.vendido_valor);
+  }, [progressoPorVendedorRaw]);
 
   return (
     <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300 mb-8">
@@ -152,39 +199,12 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isGestor && (
-              <Select value={vendedorId} onValueChange={setVendedorId}>
-                <SelectTrigger className="h-8 w-40 text-xs">
-                  <SelectValue placeholder="Vendedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendedores.map(v => (
-                    <SelectItem key={v.usuario_id} value={v.usuario_id}>{v.usuario_nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Select value={String(mes)} onValueChange={v => setMes(Number(v))}>
-              <SelectTrigger className="h-8 w-32 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MESES.map((nome, idx) => (
-                  <SelectItem key={idx} value={String(idx + 1)}>{nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={String(ano)} onValueChange={v => setAno(Number(v))}>
-              <SelectTrigger className="h-8 w-20 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {anos.map(a => (
-                  <SelectItem key={a} value={String(a)}>{a}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {isGestor && vendedorId && (
+            {/* Mês/ano seguem o filtro de Período do topo da página — ver
+                PlanoVendasSectionProps.ano/mes. */}
+            <span className="h-8 flex items-center px-2.5 rounded-md border border-border/60 bg-muted/40 text-xs font-medium text-muted-foreground">
+              {MESES[mes - 1]} de {ano}
+            </span>
+            {isGestor && vendedorUnico && (
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setEditOpen(true)}>
                 <Pencil className="h-3.5 w-3.5" /> Editar metas
               </Button>
@@ -252,16 +272,39 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
                 })}
               </div>
             )}
+
+            {mostrarPorVendedor && porVendedor.length > 0 && (
+              <div className="space-y-3 pt-1 border-t border-border/60">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider pt-3">
+                  Por vendedor
+                </p>
+                {porVendedor.map(v => {
+                  const pct = v.meta_valor > 0 ? (v.vendido_valor / v.meta_valor) * 100 : 0;
+                  return (
+                    <div key={v.usuario_id} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-card-foreground">{v.usuario_nome}</span>
+                        <span className="text-muted-foreground">
+                          {formatCurrency(v.vendido_valor)} / {formatCurrency(v.meta_valor)}{' '}
+                          <span className={`font-bold ${progressoCor(pct)}`}>({pct.toFixed(0)}%)</span>
+                        </span>
+                      </div>
+                      <Progress value={Math.min(pct, 100)} className="h-2.5" />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
 
-      {isGestor && vendedorId && (
+      {isGestor && vendedorUnico && (
         <EditarMetasDialog
           open={editOpen}
           onOpenChange={setEditOpen}
           empresaId={empresaId}
-          usuarioId={vendedorId}
+          usuarioId={vendedorUnico}
           vendedorNome={vendedorNome}
           ano={ano}
           mes={mes}
@@ -284,10 +327,22 @@ interface EditarMetasDialogProps {
 }
 
 function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorNome, ano, mes, fabricantes }: EditarMetasDialogProps) {
-  const { data: metas } = useMetasVendas(usuarioId, ano, mes);
+  // "Individual" edita a meta do vendedor aberto; "Equipe" edita uma meta que
+  // não é de ninguém em particular (usuario_id NULL), somada à visão agregada
+  // da empresa no Dashboard sem entrar na conta de nenhum vendedor específico.
+  const [escopo, setEscopo] = useState<'individual' | 'equipe'>('individual');
+  const scopedUsuarioId = escopo === 'individual' ? usuarioId : null;
+
+  // Reabrir o dialog (ou trocar de vendedor) sempre volta pro escopo individual
+  // — evita reabrir "preso" no modo Equipe de uma edição anterior.
+  useEffect(() => {
+    if (open) setEscopo('individual');
+  }, [open, usuarioId]);
+
+  const { data: metas } = useMetasVendas(open ? scopedUsuarioId : undefined, ano, mes);
   const anoAnterior = mes === 1 ? ano - 1 : ano;
   const mesAnterior = mes === 1 ? 12 : mes - 1;
-  const { data: metasMesAnterior } = useMetasVendas(open ? usuarioId : undefined, anoAnterior, mesAnterior);
+  const { data: metasMesAnterior } = useMetasVendas(open ? scopedUsuarioId : undefined, anoAnterior, mesAnterior);
   const upsertMeta = useUpsertMetaVenda();
   const deleteMeta = useDeleteMetaVenda();
 
@@ -309,10 +364,13 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorN
     });
   }, [metas]);
 
-  // Troca de vendedor ou período: descarta cópia pendente do mês anterior.
+  // Troca de vendedor/escopo/período: descarta valores e cópia pendente do mês
+  // anterior — senão um valor da meta individual ficava "vazando" visualmente
+  // ao trocar pra Equipe (ou vice-versa) até a query nova responder.
   useEffect(() => {
+    setValores({});
     setFabricantesCopiados(new Set());
-  }, [usuarioId, ano, mes]);
+  }, [scopedUsuarioId, ano, mes]);
 
   const linhas = useMemo(() => {
     const existentes = (metas ?? []).map(m => ({ id: m.id as string | undefined, fabricanteId: m.fabricante_id }));
@@ -336,7 +394,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorN
       return;
     }
     upsertMeta.mutate(
-      { empresaId, usuarioId, fabricanteId, ano, mes, metaValor: valor },
+      { empresaId, usuarioId: scopedUsuarioId, fabricanteId, ano, mes, metaValor: valor },
       { onError: () => toast.error('Erro ao salvar meta') },
     );
   };
@@ -384,7 +442,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorN
       return;
     }
     upsertMeta.mutate(
-      { empresaId, usuarioId, fabricanteId: novoFabricanteId, ano, mes, metaValor: valor },
+      { empresaId, usuarioId: scopedUsuarioId, fabricanteId: novoFabricanteId, ano, mes, metaValor: valor },
       {
         onSuccess: () => {
           setNovoFabricanteId('');
@@ -399,11 +457,27 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorN
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Editar metas — {vendedorNome}</DialogTitle>
+          <DialogTitle>
+            Editar metas — {escopo === 'individual' ? vendedorNome : 'Toda a equipe'}
+          </DialogTitle>
           <DialogDescription>
             {MESES[mes - 1]} de {ano} — meta de vendas por fabricante
           </DialogDescription>
         </DialogHeader>
+
+        <ToggleGroup
+          type="single"
+          value={escopo}
+          onValueChange={(v) => v && setEscopo(v as 'individual' | 'equipe')}
+          className={TOGGLE_LIST_CLASS}
+        >
+          <ToggleGroupItem value="individual" className={`${TOGGLE_ITEM_CLASS} flex-1 gap-1.5`}>
+            <User className="h-3.5 w-3.5" /> Individual
+          </ToggleGroupItem>
+          <ToggleGroupItem value="equipe" className={`${TOGGLE_ITEM_CLASS} flex-1 gap-1.5`}>
+            <Users className="h-3.5 w-3.5" /> Toda a equipe
+          </ToggleGroupItem>
+        </ToggleGroup>
 
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
