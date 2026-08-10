@@ -29,18 +29,41 @@ export function useFaturamentoMensal(empresaId?: string) {
   });
 }
 
-export function useIndicadoresVendedor(empresaId?: string) {
+export interface IndicadorVendedor {
+  usuario_id: string;
+  usuario_nome: string;
+  total_pedidos: number;
+  qtd_fechado: number;
+}
+
+// Antes lia vw_indicadores_usuario sem filtro nenhum: reagregava o histórico
+// INTEIRO de `pedidos` de cada usuário a cada carga do Dashboard, ignorando os
+// filtros de Período/Fabricante do topo da tela (números que não batiam com o
+// resto da tela) e ficando mais caro conforme a base cresce. RPC aceita os
+// mesmos filtros de dashboard_stats/dashboard_velocidade_fabricante — ver
+// supabase/migrations/20260808120000_dashboard_indicadores_vendedor_rpc.sql.
+// Não recebe usuarioId: essa lista alimenta o próprio seletor "Responsável"
+// (e o Plano de Vendas), então precisa continuar trazendo todo mundo da
+// empresa — a filtragem por vendedor selecionado é feita no cliente.
+export function useIndicadoresVendedor(
+  empresaId?: string,
+  filters?: { fabricanteId?: string; dateFrom?: string; dateTo?: string },
+) {
+  const { fabricanteId, dateFrom, dateTo } = filters ?? {};
+
   return useQuery({
-    queryKey: ['vw_indicadores_usuario', empresaId],
+    queryKey: ['dashboard_indicadores_vendedor', empresaId, fabricanteId, dateFrom, dateTo],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vw_indicadores_usuario')
-        .select('*')
-        .eq('empresa_id', empresaId as string);
+      const { data, error } = await supabase.rpc('dashboard_indicadores_vendedor', {
+        p_fabricante_id: fabricanteId ?? null,
+        p_date_from: dateFrom ?? null,
+        p_date_to: dateTo ?? null,
+      });
       if (error) throw error;
-      return data || [];
+      return (data ?? []) as IndicadorVendedor[];
     },
     enabled: !!empresaId,
+    placeholderData: keepPreviousData,
     ...DASHBOARD_QUERY_OPTS,
   });
 }

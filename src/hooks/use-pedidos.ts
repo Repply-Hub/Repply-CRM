@@ -380,7 +380,7 @@ export function useUpdatePedidoStatus() {
       qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
       qc.invalidateQueries({ queryKey: ['dashboard_velocidade_fabricante'] });
     },
   });
@@ -476,7 +476,7 @@ export function useBulkDeletePedidos() {
       qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
       qc.invalidateQueries({ queryKey: ['dashboard_velocidade_fabricante'] });
     },
   });
@@ -583,7 +583,7 @@ export function useBulkUpdatePedidos() {
       qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
       qc.invalidateQueries({ queryKey: ['dashboard_velocidade_fabricante'] });
     },
   });

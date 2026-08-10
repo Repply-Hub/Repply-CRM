@@ -3767,6 +3767,19 @@ export type Database = {
         Returns: boolean
       }
       criar_funil: { Args: { p_nome: string }; Returns: string }
+      dashboard_indicadores_vendedor: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_fabricante_id?: string
+        }
+        Returns: {
+          qtd_fechado: number
+          total_pedidos: number
+          usuario_id: string
+          usuario_nome: string
+        }[]
+      }
       dashboard_stats: {
         Args: {
           p_date_from?: string

@@ -472,7 +472,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       qc.invalidateQueries({ queryKey: ['pedidos'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['vw_indicadores_usuario'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
 
       setImportResult({
         totalNoArquivo: rawData.length,
