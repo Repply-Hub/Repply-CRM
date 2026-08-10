@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { usePedidosPorCliente } from '@/hooks/use-pedidos';
+import { getNomeNegocio } from '@/lib/nome-negocio';
 import { useTarefas } from '@/hooks/use-tarefas';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
@@ -305,7 +306,7 @@ const ClienteDetalhe = () => {
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-1">
               <DialogTitle className="text-foreground font-bold text-lg">
-                {selectedViewOrder?.cliente?.empresa ?? 'Detalhes do Negócio'}
+                {selectedViewOrder ? getNomeNegocio(selectedViewOrder) : 'Detalhes do Negócio'}
               </DialogTitle>
               <p className="text-sm text-muted-foreground">
                 {selectedViewOrder?.obra?.nome_obra ?? 'Sem obra vinculada'}

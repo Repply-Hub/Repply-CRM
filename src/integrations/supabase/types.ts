@@ -2526,6 +2526,7 @@ export type Database = {
           id: string
           import_hash: string | null
           marcador_id: string | null
+          nome: string | null
           obra_id: string | null
           observacoes: string | null
           origem_lead: string | null
@@ -2547,6 +2548,7 @@ export type Database = {
           id?: string
           import_hash?: string | null
           marcador_id?: string | null
+          nome?: string | null
           obra_id?: string | null
           observacoes?: string | null
           origem_lead?: string | null
@@ -2568,6 +2570,7 @@ export type Database = {
           id?: string
           import_hash?: string | null
           marcador_id?: string | null
+          nome?: string | null
           obra_id?: string | null
           observacoes?: string | null
           origem_lead?: string | null

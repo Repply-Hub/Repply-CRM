@@ -32,6 +32,8 @@ export interface UpdatePedidoPayload {
   usuario_id: string;
   obra_id?: string;
   status?: string;
+  /** Nome customizado do negócio. Ausente/null = usar nome automático ("empresa + fabricante"). */
+  nome?: string | null;
   marcador_id?: string | null;
   data_pedido: string;
   prazo_resposta?: string;
@@ -62,6 +64,7 @@ export function useUpdatePedidoCompleto() {
           fabricante_id: payload.fabricante_id,
           usuario_id: payload.usuario_id,
           obra_id: payload.obra_id || null,
+          nome: payload.nome || null,
           ...(payload.status ? { status: payload.status } : {}),
           marcador_id: payload.marcador_id || null,
           data_pedido: payload.data_pedido,

@@ -28,7 +28,9 @@ import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText, Upload, History } from 'lucide-react';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { FabricanteSelector } from '@/components/pedidos/FabricanteSelector';
+import { NomeNegocioField } from '@/components/pedidos/NomeNegocioField';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
+import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -111,6 +113,8 @@ const EditarPedido = () => {
   const [prazoResposta, setPrazoResposta] = useState<Date | undefined>();
   const [origemLead, setOrigemLead] = useState('');
   const [enderecoEntrega, setEnderecoEntrega] = useState('');
+  const [nome, setNome] = useState('');
+  const [nomeAutomatico, setNomeAutomatico] = useState(true);
 
   // Step 2 fields
   const [itens, setItens] = useState<ItemPedido[]>([]);
@@ -138,6 +142,8 @@ const EditarPedido = () => {
       setPrazoResposta(p.prazo_resposta ? new Date(p.prazo_resposta + 'T12:00:00') : undefined);
       setOrigemLead(p.origem_lead || '');
       setEnderecoEntrega(p.endereco_entrega || '');
+      setNome(p.nome || '');
+      setNomeAutomatico(!p.nome);
       setObservacoes(p.observacoes || '');
       setPdfUrl(p.pdf_url || '');
       setCamposExtras((p.campos_extras as Record<string, string> | null) || {});
@@ -158,6 +164,11 @@ const EditarPedido = () => {
   const { data: obras } = useObrasByCliente(clienteId || null);
   const selectedObra = useMemo(() => obras?.find(o => o.id === obraId), [obras, obraId]);
   const { data: tabelaPrecos } = useTabelaPrecos(fabricanteId || null);
+  const selectedFabricante = useMemo(() => fabricantes?.find(f => f.id === fabricanteId), [fabricantes, fabricanteId]);
+  const nomeAutomaticoPreview = useMemo(
+    () => getNomeNegocioAutomatico(selectedCliente, selectedFabricante),
+    [selectedCliente, selectedFabricante],
+  );
 
   const valorTotal = useMemo(() => itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0), [itens]);
 
@@ -280,6 +291,7 @@ const EditarPedido = () => {
         obra_id: obraId || undefined,
         status: status,
         marcador_id: marcadorId || null,
+        nome: nomeAutomatico ? null : (nome.trim() || null),
         data_pedido: format(dataPedido, 'yyyy-MM-dd'),
         prazo_resposta: prazoResposta ? format(prazoResposta, 'yyyy-MM-dd') : undefined,
         origem_lead: origemLead || undefined,
@@ -443,6 +455,14 @@ const EditarPedido = () => {
                     </Select>
                   </div>
                 </div>
+
+                <NomeNegocioField
+                  nome={nome}
+                  onNomeChange={setNome}
+                  automatico={nomeAutomatico}
+                  onAutomaticoChange={setNomeAutomatico}
+                  nomeAutomaticoPreview={nomeAutomaticoPreview}
+                />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">

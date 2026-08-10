@@ -19,6 +19,7 @@ import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
+import { getNomeNegocio } from '@/lib/nome-negocio';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,7 +141,7 @@ const PedidoRow = memo(({
   return (
     <TableRow className={`cursor-pointer hover:bg-muted/30 ${selected ? 'bg-primary/5' : ''}`} onClick={onClick}>
       <TableCell className="w-10 py-2 px-2.5" onClick={e => e.stopPropagation()}>
-        <Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Selecionar ${pedido.cliente?.empresa}`} />
+        <Checkbox checked={selected} onCheckedChange={onToggle} aria-label={`Selecionar ${getNomeNegocio(pedido)}`} />
       </TableCell>
       {columns.filter(col => visibleColumns.includes(col.id)).map(col => {
         const colId = col.id;
@@ -180,7 +181,7 @@ const PedidoRow = memo(({
           case 'negocio':
             return (
               <TableCell key={colId} className="min-w-[200px] font-medium py-2 px-2.5 whitespace-nowrap">
-                {[pedido.cliente?.empresa, pedido.fabricante?.nome].filter(Boolean).join(' | ') || '—'}
+                {getNomeNegocio(pedido)}
               </TableCell>
             );
           case 'cliente':
@@ -629,9 +630,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     
     if (value.trim() && showKanban) {
       const query = value.trim().toLowerCase();
-      const firstMatch = pipelineOrders.find(o => 
-        (o.clientName || '').toLowerCase().includes(query) || 
-        (o.obra || '').toLowerCase().includes(query) || 
+      const firstMatch = pipelineOrders.find(o =>
+        (o.nomeNegocio || '').toLowerCase().includes(query) ||
+        (o.obra || '').toLowerCase().includes(query) ||
         (o.fabricante || '').toLowerCase().includes(query)
       );
       
@@ -985,7 +986,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           etapa: stageLabel(p.status),
           data: p.data_pedido,
         }],
-        titulo: `Negócio - ${p.cliente?.empresa ?? p.id}`,
+        titulo: `Negócio - ${getNomeNegocio(p)}`,
       };
     }
 
@@ -1372,7 +1373,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-1">
               <SheetTitle className="text-foreground font-bold text-lg">
-                {selectedViewOrder?.cliente?.empresa ?? 'Detalhes do Negócio'}
+                {selectedViewOrder ? getNomeNegocio(selectedViewOrder) : 'Detalhes do Negócio'}
               </SheetTitle>
               <SheetDescription>
                 {selectedViewOrder?.obra?.nome_obra ?? 'Sem obra vinculada'}
@@ -1890,7 +1891,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm">Histórico de Contatos</CardTitle>
                     <p className="text-xs text-muted-foreground">
-                      {pedidos?.find(p => p.id === selectedOrder)?.cliente?.empresa}
+                      {(() => {
+                        const p = pedidos?.find(p => p.id === selectedOrder);
+                        return p ? getNomeNegocio(p) : '';
+                      })()}
                     </p>
                   </CardHeader>
                   <CardContent>
@@ -2050,7 +2054,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                         });
                       }}
                     />
-                    <span className="flex-1 truncate">{p.cliente?.empresa ?? 'Sem cliente'}</span>
+                    <span className="flex-1 truncate">{getNomeNegocio(p)}</span>
                     <span className="text-xs text-muted-foreground shrink-0">{stageLabel(p.status)}</span>
                   </label>
                 ))

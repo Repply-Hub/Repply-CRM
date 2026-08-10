@@ -62,10 +62,11 @@ export const KanbanColumn = memo(function KanbanColumn({
   const filteredRows = useMemo(() => {
     if (!q) return rawRows;
     return rawRows.filter(p => {
+      const nome = (p.nome ?? '').toLowerCase();
       const cliente = (p.cliente?.empresa ?? '').toLowerCase();
       const obra = (p.obra?.nome_obra ?? '').toLowerCase();
       const fabricante = (p.fabricante?.nome ?? '').toLowerCase();
-      return cliente.includes(q) || obra.includes(q) || fabricante.includes(q);
+      return nome.includes(q) || cliente.includes(q) || obra.includes(q) || fabricante.includes(q);
     });
   }, [rawRows, q]);
 

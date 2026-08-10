@@ -42,6 +42,7 @@ import {
 } from "@/hooks/use-whatsapp-inbox";
 import { useVendedores, useClientes } from "@/hooks/use-clientes";
 import { usePedidosOptions } from "@/hooks/use-pedidos";
+import { getNomeNegocio } from "@/lib/nome-negocio";
 import { useCreateTarefa, useTarefasPorConversa } from "@/hooks/use-tarefas";
 import { useTarefasKanbanColunas } from "@/hooks/use-tarefas-kanban-colunas";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
@@ -7518,10 +7519,7 @@ export default function WhatsAppInbox() {
                 <SearchableSelect
                   options={pedidosOptionsTarefas.map((p) => ({
                     value: p.id,
-                    label:
-                      [p.cliente?.empresa, p.fabricante?.nome]
-                        .filter(Boolean)
-                        .join(" — ") || "Negócio sem cliente",
+                    label: getNomeNegocio(p),
                   }))}
                   value={tarefaForm.pedido_id}
                   onValueChange={(v) =>

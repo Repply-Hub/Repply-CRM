@@ -6,6 +6,7 @@ import { useRegistrarAtividade } from './use-historico-alteracoes';
 export interface PedidoWithRelations {
   id: string;
   status: string;
+  nome: string | null;
   valor_total: number | null;
   data_pedido: string;
   created_at: string;
@@ -144,7 +145,7 @@ export function usePedidos(
       let query = supabase
         .from('pedidos')
         .select(`
-          id, status, valor_total, data_pedido, created_at, observacoes,
+          id, status, nome, valor_total, data_pedido, created_at, observacoes,
           cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
@@ -223,7 +224,7 @@ export function usePedidosPorCliente(clienteId?: string | null) {
       const { data, error } = await supabase
         .from('pedidos')
         .select(`
-          id, status, valor_total, data_pedido, created_at, observacoes,
+          id, status, nome, valor_total, data_pedido, created_at, observacoes,
           cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
@@ -243,6 +244,7 @@ export function usePedidosPorCliente(clienteId?: string | null) {
 export interface PedidoOption {
   id: string;
   status: string;
+  nome: string | null;
   cliente: { id: string; empresa: string } | null;
   fabricante: { id: string; nome: string } | null;
 }
@@ -259,7 +261,7 @@ export function usePedidosOptions(empresaId?: string) {
       if (usuarioIds.length === 0) return [];
       const { data, error } = await supabase
         .from('pedidos')
-        .select('id, status, cliente:clientes(id, empresa), fabricante:fabricantes(id, nome)')
+        .select('id, status, nome, cliente:clientes(id, empresa), fabricante:fabricantes(id, nome)')
         .in('usuario_id', usuarioIds)
         .order('created_at', { ascending: false })
         .limit(500);

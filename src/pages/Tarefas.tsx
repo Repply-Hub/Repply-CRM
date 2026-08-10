@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useVendedores, useClientes } from '@/hooks/use-clientes';
 import { usePedidosOptions } from '@/hooks/use-pedidos';
+import { getNomeNegocio } from '@/lib/nome-negocio';
 import { useObras } from '@/hooks/use-obras';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -766,9 +767,7 @@ export default function Tarefas() {
                       {selectedTarefa.pedido_id
                         ? (() => {
                             const p = pedidosOptions.find(o => o.id === selectedTarefa.pedido_id);
-                            return p
-                              ? [p.cliente?.empresa, p.fabricante?.nome].filter(Boolean).join(' — ') || 'Negócio sem cliente'
-                              : '—';
+                            return p ? getNomeNegocio(p) : '—';
                           })()
                         : '—'}
                     </p>

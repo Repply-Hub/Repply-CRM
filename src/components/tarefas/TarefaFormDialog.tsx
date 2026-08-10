@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useCreateTarefa, useUpdateTarefa, Tarefa } from '@/hooks/use-tarefas';
 import { useVendedores, useClientes } from '@/hooks/use-clientes';
 import { usePedidosOptions } from '@/hooks/use-pedidos';
+import { getNomeNegocio } from '@/lib/nome-negocio';
 import { useAuth } from '@/hooks/use-auth';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
@@ -168,7 +169,7 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
                   <SearchableSelect
                     options={pedidosOptions.map(p => ({
                       value: p.id,
-                      label: [p.cliente?.empresa, p.fabricante?.nome].filter(Boolean).join(' — ') || 'Negócio sem cliente',
+                      label: getNomeNegocio(p),
                     }))}
                     value={form.pedido_id}
                     onValueChange={v => setForm(f => ({ ...f, pedido_id: v }))}

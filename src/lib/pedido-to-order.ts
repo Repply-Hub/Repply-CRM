@@ -1,11 +1,13 @@
 import type { PedidoWithRelations } from '@/hooks/use-pedidos';
 import type { Order } from '@/types';
+import { getNomeNegocio } from '@/lib/nome-negocio';
 
 /** Converte um pedido (linha crua do banco) no formato leve usado pelos cards do Kanban. */
 export function mapPedidoToOrder(p: PedidoWithRelations): Order {
   return {
     id: p.id,
     clientName: p.cliente?.empresa ?? 'Sem cliente',
+    nomeNegocio: getNomeNegocio(p),
     obra: p.obra?.nome_obra ?? '-',
     fabricante: p.fabricante?.nome ?? '-',
     valor: p.valor_total ?? 0,

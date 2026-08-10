@@ -63,6 +63,8 @@ export interface NovoPedidoPayload {
   funil_id: string;
   obra_id?: string;
   status?: string;
+  /** Nome customizado do negócio. Ausente/null = usar nome automático ("empresa + fabricante"). */
+  nome?: string | null;
   marcador_id?: string | null;
   data_pedido: string;
   prazo_resposta?: string;
@@ -95,6 +97,7 @@ export function useCreatePedidoCompleto() {
           usuario_id: payload.usuario_id,
           funil_id: payload.funil_id,
           obra_id: payload.obra_id || null,
+          nome: payload.nome || null,
           data_pedido: payload.data_pedido,
           status: payload.status || 'novo_lead',
           marcador_id: payload.marcador_id || null,
