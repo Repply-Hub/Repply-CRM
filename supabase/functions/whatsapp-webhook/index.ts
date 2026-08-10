@@ -463,6 +463,12 @@ async function handleIncomingMessage(
   const wamid: string = msg.messageid ?? msg.id ?? "";
   // Para grupos, o nome da conversa é o nome do grupo; para individuais é o nome do contato
   const groupName: string = payload.chat?.wa_name ?? payload.chat?.name ?? "";
+  // wa_contactName é o nome salvo na AGENDA do celular conectado à instância — é o que
+  // aparece no app do WhatsApp real. wa_name é só o "push name" (nome de perfil que a
+  // própria pessoa define) e costuma divergir do nome salvo. Por isso wa_contactName tem
+  // prioridade máxima para chat individual; `name` é o fallback já resolvido pela uazapi
+  // (mistura wa_contactName/wa_name/dado interno), usado quando o contato não está salvo.
+  const contactSavedName: string = payload.chat?.wa_contactName ?? "";
   // Em chat individual, msg.senderName é quem ENVIOU aquela mensagem específica — para
   // mensagens de saída refletidas de WhatsApp Web/celular físico (sentByOtherChannel),
   // isso é o próprio nome do perfil da empresa (ex: "MD Representações"), não o do
@@ -472,8 +478,8 @@ async function handleIncomingMessage(
   const pushName: string = isGroup
     ? groupName || msg.senderName || ""
     : sentByOtherChannel
-      ? (payload.chat?.wa_name ?? payload.chat?.name ?? "")
-      : (msg.senderName ?? payload.chat?.wa_name ?? payload.chat?.name ?? "");
+      ? (contactSavedName || payload.chat?.name || payload.chat?.wa_name || "")
+      : (contactSavedName || payload.chat?.name || msg.senderName || payload.chat?.wa_name || "");
 
   // Em grupos, quem enviou a mensagem é o participante (msg.sender_pn / msg.senderName),
   // não o grupo em si — guarda separado para exibir "quem mandou o quê" na UI.
@@ -656,7 +662,13 @@ async function handleIncomingMessage(
   let quotedWamid: string | null = null;
   let quotedConteudo: string | null = null;
   let quotedTipo: string | null = null;
-  let quotedRemetenteNome: string | null = null;
+  // O nome de quem mandou a citação só é resolvido mais abaixo (depois da conversa):
+  // em conversa individual, uma mensagem citada de "entrada" nunca tem remetente_nome
+  // (esse campo só existe para saber QUAL participante falou dentro de um grupo — no
+  // 1:1 quem manda "entrada" é sempre o próprio contato), então o fallback precisa do
+  // nome_contato já resolvido, que só existe depois do upsert da conversa.
+  let quotedMsgDirecao: string | null = null;
+  let quotedMsgRemetenteNome: string | null = null;
 
   if (quotedRawId) {
     const { data: quotedMatches } = await supabase
@@ -670,10 +682,8 @@ async function handleIncomingMessage(
       quotedWamid = quotedMsg.wamid;
       quotedConteudo = quotedMsg.conteudo;
       quotedTipo = quotedMsg.tipo;
-      quotedRemetenteNome =
-        quotedMsg.direcao === "saida"
-          ? "Você"
-          : (quotedMsg.remetente_nome ?? null);
+      quotedMsgDirecao = quotedMsg.direcao;
+      quotedMsgRemetenteNome = quotedMsg.remetente_nome ?? null;
     }
   }
 
@@ -769,18 +779,20 @@ async function handleIncomingMessage(
   }
 
   let conversa: { id: string; nao_lidas: number } | null = null;
+  let nomeContatoResolvido: string | null = null;
 
   if (existente) {
+    // Um nome editado manualmente no CRM (via whatsapp-contact-rename) não pode ser
+    // sobrescrito pelo nome de perfil que chega em toda mensagem recebida — sem essa
+    // checagem, a edição manual "resetava" para o nome padrão do WhatsApp na próxima
+    // mensagem do contato.
+    nomeContatoResolvido = existente.nome_contato_editado_manualmente
+      ? existente.nome_contato
+      : (pushName || existente.nome_contato);
     const { data, error } = await supabase
       .from("whatsapp_conversas")
       .update({
-        // Um nome editado manualmente no CRM (via whatsapp-contact-rename) não pode ser
-        // sobrescrito pelo nome de perfil que chega em toda mensagem recebida — sem essa
-        // checagem, a edição manual "resetava" para o nome padrão do WhatsApp na próxima
-        // mensagem do contato.
-        nome_contato: existente.nome_contato_editado_manualmente
-          ? existente.nome_contato
-          : (pushName || existente.nome_contato),
+        nome_contato: nomeContatoResolvido,
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
         nao_lidas:
@@ -800,12 +812,13 @@ async function handleIncomingMessage(
     }
     conversa = data;
   } else {
+    nomeContatoResolvido = pushName || null;
     const { data, error } = await supabase
       .from("whatsapp_conversas")
       .insert({
         empresa_id: empresaId,
         telefone,
-        nome_contato: pushName || null,
+        nome_contato: nomeContatoResolvido,
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
         nao_lidas: sentByOtherChannel || jaProcessada ? 0 : 1,
@@ -821,6 +834,16 @@ async function handleIncomingMessage(
     }
     conversa = data;
   }
+
+  // Mesma regra usada no frontend (quotedNomeFor em WhatsAppInbox.tsx): citação de
+  // saída sempre foi "Você"; citação de entrada usa quem mandou dentro do grupo
+  // (remetente_nome) ou, faltando isso — sempre o caso em conversa individual —,
+  // o nome do contato já resolvido acima.
+  const quotedRemetenteNome: string | null = !quotedWamid
+    ? null
+    : quotedMsgDirecao === "saida"
+      ? "Você"
+      : (quotedMsgRemetenteNome ?? nomeContatoResolvido ?? null);
 
   const insertData: any = {
     conversa_id: conversa.id,

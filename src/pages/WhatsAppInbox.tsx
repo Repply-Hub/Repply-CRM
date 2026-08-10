@@ -3508,6 +3508,14 @@ export default function WhatsAppInbox() {
     });
     return grupos;
   }, [mensagens]);
+  // Menção com "@" em grupos: `mentionQuery` é o texto digitado depois do "@"
+  // (null = dropdown fechado), `mentionStartIndex` é a posição do "@" dentro de
+  // `texto`, e `mentionedParticipantes` guarda telefone->nome de quem já foi
+  // inserido, para montar o campo `mentions` no envio (ver handleSend).
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(null);
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+  const [mentionedParticipantes, setMentionedParticipantes] = useState<Map<string, string>>(new Map());
   // Participantes do grupo: os salvos na criação (via CRM) somados aos remetentes
   // distintos vistos nas mensagens (cobre membros que entraram depois ou grupos
   // criados fora do CRM, onde a uazapi não devolveu a lista completa).
@@ -3520,15 +3528,39 @@ export default function WhatsAppInbox() {
     }
     for (const msg of mensagens) {
       if (!msg.remetente_telefone) continue;
-      if (!vistos.has(msg.remetente_telefone)) {
+      const existente = vistos.get(msg.remetente_telefone);
+      if (!existente) {
         vistos.set(msg.remetente_telefone, {
           nome: msg.remetente_nome ?? null,
+          telefone: msg.remetente_telefone,
+        });
+      } else if (!existente.nome && msg.remetente_nome) {
+        // A uazapi (/group/list) não devolve nome de exibição dos participantes —
+        // só telefone/JID —, então quem entrou pela lista salva no grupo fica sem
+        // nome. As mensagens em si, porém, trazem o nome de quem mandou; usa isso
+        // para completar o nome que a lista de participantes não tinha.
+        vistos.set(msg.remetente_telefone, {
+          nome: msg.remetente_nome,
           telefone: msg.remetente_telefone,
         });
       }
     }
     return Array.from(vistos.values());
   }, [conversaAtiva?.is_group, conversaAtiva?.participantes, mensagens]);
+  // Sugestões do dropdown de menção (@), filtradas pelo texto digitado depois
+  // do "@". "Todos" é um item sintético (sem telefone real) que vira mentions:"all"
+  // no envio — mesmo atalho do "@Todos" do WhatsApp nativo.
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.trim().toLowerCase();
+    const todos = "todos".startsWith(q) || q === ""
+      ? [{ telefone: "all", nome: "Todos" }]
+      : [];
+    const pessoas = participantesGrupo
+      .filter((p) => (p.nome ?? formatPhone(p.telefone)).toLowerCase().includes(q))
+      .slice(0, 8);
+    return [...todos, ...pessoas];
+  }, [mentionQuery, participantesGrupo]);
   // Nomes exibidos no subtítulo do grupo: apenas os responsáveis pelo atendimento
   // atribuídos no CRM, sem duplicar nomes iguais.
   const nomesGrupo = useMemo(() => {
@@ -4859,8 +4891,7 @@ export default function WhatsAppInbox() {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (isSendingRef.current) return;
-    const msg = texto.trim();
-    if (!msg && attachments.length === 0) return;
+    if (!texto.trim() && attachments.length === 0) return;
     if (!conversaAtiva) return;
 
     if (!config || config.status !== "connected") {
@@ -4872,7 +4903,32 @@ export default function WhatsAppInbox() {
     const conversaId = conversaAtiva.id;
     const currentAttachments = attachments;
     const quoted = quotedParamsFor(respondendoA);
+    // Só entra no envio quem ainda está mencionado no texto final: se a pessoa
+    // apagou o "@Nome" depois de escolher no dropdown, a menção não deve ir.
+    // "all" ignora esse filtro — não há "@Todos " literal no texto de destaque.
+    const mentionsAtivas = Array.from(mentionedParticipantes.entries())
+      .filter(([telefone, nome]) => telefone === "all" || texto.includes(`@${nome}`));
+    const mentionsList = mentionsAtivas.map(([telefone]) => telefone);
+    const mentions = mentionsList.includes("all")
+      ? "all"
+      : mentionsList.length > 0
+        ? mentionsList.join(",")
+        : undefined;
+    // O WhatsApp só transforma "@algo" numa marcação clicável/destacada quando esse
+    // "algo" é o NÚMERO da pessoa (sem formatação) — quem troca isso pela etiqueta
+    // bonita com o nome é o app de quem recebe, usando a lista `mentions`. "@Nome"
+    // literal (o que aparece no textarea, pra ficar legível durante a digitação)
+    // não é reconhecido. Por isso o texto de fato ENVIADO troca "@Nome" por
+    // "@telefone" logo antes do envio — "Todos" fica como está, não tem "@all"
+    // literal no protocolo do WhatsApp.
+    let msg = texto.trim();
+    for (const [telefone, nome] of mentionsAtivas) {
+      if (telefone === "all") continue;
+      msg = msg.split(`@${nome}`).join(`@${telefone}`);
+    }
     setTexto("");
+    setMentionedParticipantes(new Map());
+    fecharMencao();
     clearAttachments();
     setRespondendoA(null);
 
@@ -4884,6 +4940,7 @@ export default function WhatsAppInbox() {
           mensagem: msg,
           conversa_id: conversaId,
           tipo: "texto",
+          ...(mentions ? { mentions } : {}),
           ...quoted,
         });
         marcarLida.mutate(conversaId);
@@ -4921,6 +4978,7 @@ export default function WhatsAppInbox() {
           media_url: uploadedUrls[i],
           media_mime: mimeForFile(file),
           nome_arquivo: file.name,
+          ...(i === 0 && mentions ? { mentions } : {}),
           ...(i === 0 ? quoted : {}),
         });
       }
@@ -4939,7 +4997,77 @@ export default function WhatsAppInbox() {
     }
   }
 
+  // Detecta se o usuário está digitando uma menção: um "@" precedido por início
+  // de texto ou espaço/quebra de linha, sem espaço entre ele e o cursor. Só
+  // ativa em grupos — mentions da uazapi funcionam apenas nesse contexto.
+  function handleTextoChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const newValue = e.target.value;
+    setTexto(newValue);
+    if (!conversaAtiva?.is_group) return;
+    const cursorPos = e.target.selectionStart;
+    const uptoCursor = newValue.slice(0, cursorPos);
+    const match = uptoCursor.match(/(?:^|[\s\n])@([^\s@]*)$/);
+    if (match) {
+      setMentionQuery(match[1]);
+      setMentionStartIndex(cursorPos - match[1].length - 1);
+      setMentionActiveIndex(0);
+    } else {
+      setMentionQuery(null);
+      setMentionStartIndex(null);
+    }
+  }
+
+  function fecharMencao() {
+    setMentionQuery(null);
+    setMentionStartIndex(null);
+  }
+
+  function handleSelectMention(p: { telefone: string; nome: string | null }) {
+    if (mentionStartIndex === null) return;
+    const label = p.nome || formatPhone(p.telefone);
+    const before = texto.slice(0, mentionStartIndex);
+    const after = texto.slice(mentionStartIndex + 1 + (mentionQuery?.length ?? 0));
+    const insercao = `@${label} `;
+    const novoTexto = before + insercao + after;
+    setTexto(novoTexto);
+    setMentionedParticipantes((prev) => {
+      const next = new Map(prev);
+      next.set(p.telefone, label);
+      return next;
+    });
+    fecharMencao();
+    // Adia pro próximo tick: precisa que o React já tenha aplicado o novo
+    // `value` no textarea antes de mexer em selectionRange.
+    requestAnimationFrame(() => {
+      const pos = before.length + insercao.length;
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(pos, pos);
+    });
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (mentionQuery !== null && mentionSuggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionActiveIndex((i) => (i + 1) % mentionSuggestions.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionActiveIndex((i) => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length);
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        handleSelectMention(mentionSuggestions[mentionActiveIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        fecharMencao();
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend(e as any);
@@ -6969,7 +7097,30 @@ export default function WhatsAppInbox() {
                 )}
 
                 {/* Input de envio */}
-                <div className="border-t border-border px-4 py-3 min-h-[4rem] flex flex-col justify-center">
+                <div className="relative border-t border-border px-4 py-3 min-h-[4rem] flex flex-col justify-center">
+                  {/* Dropdown de menção (@participante), só em grupos */}
+                  {mentionQuery !== null && mentionSuggestions.length > 0 && (
+                    <div className="absolute bottom-full left-4 mb-1 w-64 max-h-52 overflow-auto rounded-md border border-border bg-popover shadow-md z-20">
+                      <Command shouldFilter={false}>
+                        <CommandList>
+                          <CommandGroup>
+                            {mentionSuggestions.map((p, i) => (
+                              <CommandItem
+                                key={p.telefone}
+                                onSelect={() => handleSelectMention(p)}
+                                className={cn(
+                                  "cursor-pointer",
+                                  i === mentionActiveIndex && "bg-accent text-accent-foreground",
+                                )}
+                              >
+                                {p.nome || formatPhone(p.telefone)}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </div>
+                  )}
                   {!isConnected && config && (
                     <div className="mb-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 px-2">
                       <WifiOff className="h-3.5 w-3.5" />
@@ -7159,7 +7310,7 @@ export default function WhatsAppInbox() {
                               : "WhatsApp desconectado"
                         }
                         value={texto}
-                        onChange={(e) => setTexto(e.target.value)}
+                        onChange={handleTextoChange}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePasteImage}
                         disabled={isBusy || !!pendingAudio}

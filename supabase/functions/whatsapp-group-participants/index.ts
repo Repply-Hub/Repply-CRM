@@ -141,10 +141,40 @@ serve(async (req) => {
     const grupo = grupos.find((g) => g?.JID === groupJid);
     const rawParticipants: any[] = grupo?.Participants ?? [];
 
-    const participantes = rawParticipants.map((p) => ({
-      nome: p?.DisplayName || null,
-      telefone: normalizeWhatsappPhone(String(p?.PhoneNumber ?? p?.JID ?? "").replace(/@.*$/, "")),
-    })).filter((p) => p.telefone);
+    // `DisplayName` do /group/list é "nome exibido no grupo (para usuários anônimos)" —
+    // ou seja, só vem preenchido quando a WhatsApp NÃO consegue identificar o contato,
+    // exatamente o oposto do que queremos. O nome salvo de verdade (o mesmo que aparece
+    // no app do celular conectado à instância) só existe em GET /contacts
+    // (contactScope=address_book -> contact_name), por isso buscamos essa lista à parte
+    // e casamos por telefone normalizado para sobrescrever o DisplayName quando possível.
+    let contatosPorTelefone = new Map<string, string>();
+    try {
+      const contatosRes = await fetch(`${baseUrl}/contacts?contactScope=address_book`, {
+        method: "GET",
+        headers: { token: config.api_key },
+      });
+      if (contatosRes.ok) {
+        const contatos: any[] = await contatosRes.json().catch(() => []);
+        for (const c of Array.isArray(contatos) ? contatos : []) {
+          const tel = normalizeWhatsappPhone(String(c?.jid ?? "").replace(/@.*$/, ""));
+          if (tel && c?.contact_name) contatosPorTelefone.set(tel, c.contact_name);
+        }
+      } else {
+        console.error(`[whatsapp-group-participants] GET /contacts falhou: status=${contatosRes.status}`);
+      }
+    } catch (e) {
+      // Sem agenda disponível, segue só com DisplayName/fallback de telefone — mas loga pra
+      // não repetir a investigação manual por curl caso volte a acontecer.
+      console.error(`[whatsapp-group-participants] erro ao buscar /contacts:`, e);
+    }
+
+    const participantes = rawParticipants.map((p) => {
+      const telefone = normalizeWhatsappPhone(String(p?.PhoneNumber ?? p?.JID ?? "").replace(/@.*$/, ""));
+      return {
+        nome: (telefone && contatosPorTelefone.get(telefone)) || p?.DisplayName || null,
+        telefone,
+      };
+    }).filter((p) => p.telefone);
 
     if (participantes.length > 0) {
       await supabase

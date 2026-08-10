@@ -176,7 +176,7 @@ serve(async (req) => {
 
     const {
       telefone, mensagem, conversa_id, tipo = 'texto', media_url, media_mime, nome_arquivo, ptt = false,
-      quoted_wamid, quoted_conteudo, quoted_tipo, quoted_remetente_nome,
+      mentions, quoted_wamid, quoted_conteudo, quoted_tipo, quoted_remetente_nome,
     } = body;
 
     if (!telefone) {
@@ -284,6 +284,9 @@ serve(async (req) => {
         instanceName: uazapiInstance,
         text: assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem,
         ...(quoted_wamid ? { replyid: rawMessageId(quoted_wamid) } : {}),
+        // Só faz sentido em grupo — a uazapi documenta "mentions" como exclusivo
+        // desse caso ("números separados por vírgula", ou "all" para todos).
+        ...(isGroup && mentions ? { mentions } : {}),
       };
     } else {
       // --- Mídia: POST /send/media ---
@@ -302,6 +305,7 @@ serve(async (req) => {
       if (tipo === 'documento' && nome_arquivo) wapiBody.docName = nome_arquivo;
       if (media_mime) wapiBody.mimetype = media_mime;
       if (quoted_wamid) wapiBody.replyid = rawMessageId(quoted_wamid);
+      if (isGroup && mentions) wapiBody.mentions = mentions;
 
       wapiOptions = wapiBody;
     }

@@ -6,6 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// URLs do CDN da Meta (pps.whatsapp.net) trazem a expiração no parâmetro `oe`,
+// timestamp unix em hex. Sem esse parâmetro (formato inesperado), assume-se sem
+// expiração conhecida — melhor manter a foto do que descartá-la.
+function extractExpiresAt(url: string): string | null {
+  try {
+    const oe = new URL(url).searchParams.get("oe");
+    if (!oe || !/^[0-9a-fA-F]+$/.test(oe)) return null;
+    return new Date(parseInt(oe, 16) * 1000).toISOString();
+  } catch {
+    return null;
+  }
+}
+
 // Procura recursivamente uma URL de imagem em chaves como image/photo/foto/avatar/picture
 function findImageUrl(obj: unknown, depth = 0): string | null {
   if (!obj || depth > 4) return null;
@@ -77,11 +90,17 @@ serve(async (req) => {
 
     const { data: cached } = await supabase
       .from("whatsapp_contatos_fotos")
-      .select("foto_perfil_url")
+      .select("foto_perfil_url, foto_perfil_expires_at")
       .eq("empresa_id", empresaId)
       .eq("telefone", digits)
       .maybeSingle();
-    if (cached?.foto_perfil_url) {
+    // `foto_perfil_expires_at` nulo cobre tanto fotos salvas antes desta coluna existir
+    // quanto respostas sem o parâmetro `oe` — em ambos os casos não sabemos se ainda é
+    // válida, então força revalidação em vez de confiar num link já vencido pra sempre
+    // (era isso que prendia a mesma foto morta no cache por semanas).
+    const aindaValida = !!cached?.foto_perfil_expires_at
+      && new Date(cached.foto_perfil_expires_at).getTime() > Date.now();
+    if (cached?.foto_perfil_url && aindaValida) {
       return new Response(JSON.stringify({ foto_perfil_url: cached.foto_perfil_url }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -130,16 +149,31 @@ serve(async (req) => {
     try { wapiResult = JSON.parse(responseText); } catch { /* ok */ }
     const fotoUrl = findImageUrl(wapiResult);
 
-    if (fotoUrl) {
-      await supabase
-        .from("whatsapp_contatos_fotos")
-        .upsert(
-          { empresa_id: empresaId, telefone: digits, foto_perfil_url: fotoUrl, updated_at: new Date().toISOString() },
-          { onConflict: "empresa_id,telefone" },
-        );
-    }
+    // "Este contato não tem foto" também é uma resposta e precisa ser lembrada com prazo
+    // (mesmo raciocínio do whatsapp-contact-photo) — do contrário volta a reperguntar pra
+    // sempre a cada abertura do painel de participantes.
+    const SEM_FOTO_REPERGUNTAR_EM_DIAS = 7;
+    const expiresAt = fotoUrl
+      ? extractExpiresAt(fotoUrl)
+      : new Date(Date.now() + SEM_FOTO_REPERGUNTAR_EM_DIAS * 86_400_000).toISOString();
 
-    return new Response(JSON.stringify({ foto_perfil_url: fotoUrl }), {
+    await supabase
+      .from("whatsapp_contatos_fotos")
+      .upsert(
+        {
+          empresa_id: empresaId,
+          telefone: digits,
+          // Só sobrescreve a URL quando encontrou uma; do contrário mantém a que já
+          // estava lá (ainda que vencida, é melhor que apagar) e apenas adia a próxima
+          // pergunta.
+          ...(fotoUrl ? { foto_perfil_url: fotoUrl } : {}),
+          foto_perfil_expires_at: expiresAt,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "empresa_id,telefone" },
+      );
+
+    return new Response(JSON.stringify({ foto_perfil_url: fotoUrl ?? cached?.foto_perfil_url ?? null }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

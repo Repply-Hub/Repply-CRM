@@ -631,6 +631,7 @@ export function useWaSendMessage() {
       media_mime?: string | null;
       nome_arquivo?: string;
       ptt?: boolean;
+      mentions?: string;
       quoted_wamid?: string | null;
       quoted_conteudo?: string | null;
       quoted_tipo?: string | null;
@@ -658,6 +659,7 @@ export function useWaSendMessage() {
             media_mime: params.media_mime ?? null,
             nome_arquivo: params.nome_arquivo ?? null,
             ptt: params.ptt ?? false,
+            mentions: params.mentions ?? null,
             quoted_wamid: params.quoted_wamid ?? null,
             quoted_conteudo: params.quoted_conteudo ?? null,
             quoted_tipo: params.quoted_tipo ?? null,
