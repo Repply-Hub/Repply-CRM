@@ -100,6 +100,19 @@ const parseDateParam = (value: string | null): Date | undefined => {
   return isValid(parsed) ? parsed : undefined;
 };
 
+// Lê um array de ids salvo no sessionStorage (seleção de itens pra ação em massa) — nunca
+// deixa um sessionStorage corrompido/de outra versão derrubar o mount da página.
+const readIdsSessionStorage = (key: string): Set<string> => {
+  try {
+    const saved = sessionStorage.getItem(key);
+    if (!saved) return new Set();
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? new Set(parsed) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
 const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone, whatsapp: MessageSquare, visita: Eye };
 
 type PageMode = 'pipeline' | 'negocios';
@@ -470,15 +483,34 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     searchParams.has('data_ate') ? parseDateParam(searchParams.get('data_ate')) : endOfMonth(new Date())
   ));
 
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Sobrevive a editar um negócio e voltar (navigate(-1) desmonta esta página) — sem isso, a
+  // seleção pra ação em massa sempre sumia depois de abrir/editar um item específico. sessionStorage
+  // (não localStorage) de propósito: é estado de trabalho da aba atual, não deveria sobreviver
+  // a fechar o navegador e reabrir dias depois com esses ids possivelmente já obsoletos.
+  const [selected, setSelected] = useState<Set<string>>(() => readIdsSessionStorage('negocios_selected'));
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   // Move de kanban bloqueado por campo obrigatório na etapa de destino ainda não preenchido.
   const [blockedMove, setBlockedMove] = useState<{ pedidoId: string; targetLabel: string; missingLabels: string[] } | null>(null);
-  const [deleteAllFilteredMode, setDeleteAllFilteredMode] = useState(false);
+  const [deleteAllFilteredMode, setDeleteAllFilteredMode] = useState(
+    () => sessionStorage.getItem('negocios_delete_all_filtered') === '1',
+  );
   // Ids excluídos manualmente enquanto deleteAllFilteredMode está ativo — sem isso, desmarcar
   // um único item (numa página que não carrega os N ids filtrados no cliente) derrubava o modo
   // "todos" inteiro e caía pra seleção da página atual, mostrando "excluir 9" em vez de "excluir 99".
-  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(() => readIdsSessionStorage('negocios_excluded_ids'));
+
+  useEffect(() => {
+    if (selected.size > 0) sessionStorage.setItem('negocios_selected', JSON.stringify(Array.from(selected)));
+    else sessionStorage.removeItem('negocios_selected');
+  }, [selected]);
+  useEffect(() => {
+    if (excludedIds.size > 0) sessionStorage.setItem('negocios_excluded_ids', JSON.stringify(Array.from(excludedIds)));
+    else sessionStorage.removeItem('negocios_excluded_ids');
+  }, [excludedIds]);
+  useEffect(() => {
+    if (deleteAllFilteredMode) sessionStorage.setItem('negocios_delete_all_filtered', '1');
+    else sessionStorage.removeItem('negocios_delete_all_filtered');
+  }, [deleteAllFilteredMode]);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
   const bulkDeleteMutation = useBulkDeletePedidos();
@@ -772,8 +804,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       setOrDelete('marcadores', selectedMarcadores.length ? selectedMarcadores.join(',') : undefined);
       setOrDelete('atencao', showOnlyAttention ? '1' : undefined);
       setOrDelete('ocultar_importados', hideImportados ? '1' : undefined);
-      setOrDelete('data_de', dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined);
-      setOrDelete('data_ate', dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined);
+      // Período usa `set('', '')` em vez de `setOrDelete` quando limpo: precisa do
+      // parâmetro presente-mas-vazio na URL pra `searchParams.has('data_de')` (nos
+      // useState de dateFrom/dateTo acima) distinguir "usuário limpou de propósito"
+      // de "nunca mexeu" — deletar o parâmetro fazia as duas situações parecerem
+      // idênticas, e ao voltar de editar um negócio o período limpo virava mês atual
+      // de novo (searchParams.has retornava false).
+      next.set('data_de', dateFrom ? format(dateFrom, 'yyyy-MM-dd') : '');
+      next.set('data_ate', dateTo ? format(dateTo, 'yyyy-MM-dd') : '');
       return next;
     }, { replace: true });
   }, [selectedStages, selectedVendedores, selectedFabricantes, selectedMarcadores, showOnlyAttention, hideImportados, dateFrom, dateTo, setSearchParams]);
