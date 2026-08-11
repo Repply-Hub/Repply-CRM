@@ -1,8 +1,9 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo, useRef, lazy, Suspense } from 'react';
 import { startOfMonth, endOfMonth, isWithinInterval, parseISO, startOfDay, endOfDay, format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
-import { TrendingUp, DollarSign, Target, Clock, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, DollarSign, Target, Clock, Loader2, FileDown, X } from 'lucide-react';
 import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante, useDashboardStats } from '@/hooks/use-dashboard';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,15 +36,20 @@ function ChartsSkeleton() {
 const formatCurrency = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+const getDefaultDateRange = (): DateRange => ({
+  from: startOfMonth(new Date()),
+  to: endOfMonth(new Date()),
+});
+
 const Dashboard = () => {
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
+  const [dateRange, setDateRange] = useState<DateRange>(getDefaultDateRange);
   // Array vazio = "Todos" (sem filtro) — os dois filtros aceitam mais de uma
   // seleção, então não dá mais pra usar um sentinela tipo 'todos' como valor.
   const [vendedorIds, setVendedorIds] = useState<string[]>([]);
   const [fabricanteIds, setFabricanteIds] = useState<string[]>([]);
+
+  const dashboardContentRef = useRef<HTMLDivElement>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const { profile } = useAuth();
   const isGestor = profile?.role === 'admin' || profile?.role === 'gestor' || profile?.role === 'empresa';
@@ -179,6 +185,43 @@ const Dashboard = () => {
     { name: 'Baixo (<30k)', value: stats?.segmentacao_baixo ?? 0, color: 'hsl(152, 60%, 38%)' },
   ];
 
+  const hasActiveFilters = useMemo(() => {
+    const defaultRange = getDefaultDateRange();
+    return (
+      fabricanteIds.length > 0 ||
+      vendedorIds.length > 0 ||
+      format(dateRange.from, 'yyyy-MM-dd') !== format(defaultRange.from, 'yyyy-MM-dd') ||
+      format(dateRange.to, 'yyyy-MM-dd') !== format(defaultRange.to, 'yyyy-MM-dd')
+    );
+  }, [fabricanteIds, vendedorIds, dateRange]);
+
+  const handleClearFilters = () => {
+    setFabricanteIds([]);
+    setVendedorIds([]);
+    setDateRange(getDefaultDateRange());
+  };
+
+  const handleExportPdf = async () => {
+    if (!dashboardContentRef.current) return;
+    setExportingPdf(true);
+    try {
+      const { generateDashboardPdf } = await import('@/lib/generate-dashboard-pdf');
+      const periodoLabel = `${format(dateRange.from, 'dd/MM/yyyy')} a ${format(dateRange.to, 'dd/MM/yyyy')}`;
+      const fabricanteLabel = fabricanteIds.length > 0
+        ? fabricantes.filter(f => fabricanteIds.includes(f.id)).map(f => f.nome).join(', ')
+        : 'Todos';
+      const responsavelLabel = vendedorIds.length > 0
+        ? (vendedores ?? []).filter(v => vendedorIds.includes(v.usuario_id ?? '')).map(v => v.usuario_nome).join(', ')
+        : 'Todos';
+      await generateDashboardPdf(
+        dashboardContentRef.current,
+        `Período: ${periodoLabel}  ·  Fabricante: ${fabricanteLabel}  ·  Responsável: ${responsavelLabel}`
+      );
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -192,9 +235,9 @@ const Dashboard = () => {
   return (
     <AppLayout title="Dashboard" subtitle="Visão analítica do desempenho comercial">
       <ErrorBoundary>
-      <div className={`p-6 w-full transition-opacity duration-200 ${fetchingStats && !isLoading ? 'opacity-60' : 'opacity-100'}`}>
-        {/* Filtros */}
-        <div className="mb-8 flex flex-col sm:flex-row flex-wrap gap-4 justify-end items-end">
+      <div className={`px-6 pb-6 w-full transition-opacity duration-200 ${fetchingStats && !isLoading ? 'opacity-60' : 'opacity-100'}`}>
+        {/* Filtros — fixos ao rolar a página, como o header */}
+        <div className="sticky top-0 z-20 -mx-6 px-6 py-4 mb-8 border-b border-border/60 bg-background/95 backdrop-blur-sm flex flex-col sm:flex-row flex-wrap gap-4 justify-start items-end">
           <div className="w-full sm:w-56">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Fabricante</p>
             <MultiSelectSearch
@@ -225,8 +268,31 @@ const Dashboard = () => {
               Atualizando...
             </div>
           )}
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              className="h-10 gap-2 text-muted-foreground hover:text-foreground"
+              onClick={handleClearFilters}
+            >
+              <X className="h-4 w-4" />
+              Limpar filtros
+            </Button>
+          )}
+          <Button
+            className="h-10 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm sm:ml-auto"
+            onClick={handleExportPdf}
+            disabled={exportingPdf}
+          >
+            {exportingPdf ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            Exportar PDF
+          </Button>
         </div>
 
+        <div ref={dashboardContentRef}>
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {kpis.map((kpi) => (
@@ -280,6 +346,7 @@ const Dashboard = () => {
             rendimentoVendedor={rendimentoVendedor}
           />
         </Suspense>
+        </div>
       </div>
       </ErrorBoundary>
     </AppLayout>
