@@ -59,7 +59,7 @@ export function SearchableSelect({
           aria-expanded={open}
           className={cn("w-full justify-between font-normal", className)}
         >
-          {selectedOption ? selectedOption.label : placeholder}
+          <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
