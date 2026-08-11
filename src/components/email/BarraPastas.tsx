@@ -19,8 +19,8 @@ interface Props {
   /** Contagem LOCAL por pasta: quantas o CRM tem e quantas estão por ler. */
   contagens: Map<string, { total: number; naoLidas: number }>;
 }
-
 /** Uma linha da barra — usada tanto pelas pastas de sistema quanto pelos marcadores. */
+
 function Item({
   icone,
   rotulo,
