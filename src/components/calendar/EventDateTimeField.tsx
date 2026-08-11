@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarIcon } from 'lucide-react';
 import { format, parse, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -6,15 +6,9 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 interface EventDateTimeFieldProps {
   label: string;
@@ -33,8 +27,9 @@ function parseValue(value: string, type: 'date' | 'datetime-local'): Date | null
   return isValid(parsed) ? parsed : null;
 }
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
-const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
+function clamp(n: number, min: number, max: number) {
+  return Math.min(Math.max(n, min), max);
+}
 
 export function EventDateTimeField({
   label,
@@ -43,11 +38,21 @@ export function EventDateTimeField({
   onChange,
 }: EventDateTimeFieldProps) {
   const [open, setOpen] = useState(false);
+  const [hourText, setHourText] = useState('09');
+  const [minuteText, setMinuteText] = useState('00');
   const date = useMemo(() => parseValue(value, type), [value, type]);
   const isDateTime = type === 'datetime-local';
 
-  const hour = date ? format(date, 'HH') : '09';
-  const minute = date ? format(date, 'mm') : '00';
+  // Ao abrir, sincroniza os campos digitáveis de hora/minuto com o valor atual — permite
+  // corrigir o horário direto no teclado, campo a campo, além de escolher a data pelo
+  // calendário; ambos convergem pro mesmo `onChange`.
+  useEffect(() => {
+    if (open) {
+      setHourText(date ? format(date, 'HH') : '09');
+      setMinuteText(date ? format(date, 'mm') : '00');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const emit = (next: Date) => {
     onChange(format(next, isDateTime ? DATETIME_FMT : DATE_FMT));
@@ -66,18 +71,32 @@ export function EventDateTimeField({
     if (!isDateTime) setOpen(false);
   };
 
-  const handleHourChange = (h: string) => {
+  const commitHour = () => {
+    const n = parseInt(hourText, 10);
+    if (Number.isNaN(n)) {
+      setHourText(date ? format(date, 'HH') : '09');
+      return;
+    }
+    const clamped = clamp(n, 0, 23);
     const base = date ?? new Date();
     const next = new Date(base);
-    next.setHours(parseInt(h, 10), parseInt(minute, 10), 0, 0);
+    next.setHours(clamped, parseInt(minuteText, 10) || 0, 0, 0);
     emit(next);
+    setHourText(clamped.toString().padStart(2, '0'));
   };
 
-  const handleMinuteChange = (m: string) => {
+  const commitMinute = () => {
+    const n = parseInt(minuteText, 10);
+    if (Number.isNaN(n)) {
+      setMinuteText(date ? format(date, 'mm') : '00');
+      return;
+    }
+    const clamped = clamp(n, 0, 59);
     const base = date ?? new Date();
     const next = new Date(base);
-    next.setHours(parseInt(hour, 10), parseInt(m, 10), 0, 0);
+    next.setHours(parseInt(hourText, 10) || 0, clamped, 0, 0);
     emit(next);
+    setMinuteText(clamped.toString().padStart(2, '0'));
   };
 
   const display = date
@@ -104,50 +123,58 @@ export function EventDateTimeField({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={date ?? undefined}
-            onSelect={handleDateSelect}
-            locale={ptBR}
-            initialFocus
-            captionLayout="dropdown-buttons"
-            fromYear={2000}
-            toYear={new Date().getFullYear() + 10}
-            className={cn('p-3 pointer-events-auto')}
-          />
-          {isDateTime && (
-            <div className="flex items-center gap-2 border-t p-3">
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Horário</span>
-              <div className="ml-auto flex items-center gap-1">
-                <Select value={hour} onValueChange={handleHourChange}>
-                  <SelectTrigger className="h-8 w-[68px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {HOURS.map((h) => (
-                      <SelectItem key={h} value={h}>
-                        {h}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <div className="flex">
+            {isDateTime && (
+              <div className="flex flex-col items-center gap-2 border-r p-3 min-w-[140px]">
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <CalendarIcon className="h-4 w-4" />
+                  <span className="text-sm">Horário</span>
+                </div>
+                <Input
+                  value={hourText}
+                  onChange={e => setHourText(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  onBlur={commitHour}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commitHour();
+                    }
+                  }}
+                  placeholder="HH"
+                  inputMode="numeric"
+                  maxLength={2}
+                  className="h-8 w-[52px] text-center"
+                />
                 <span className="text-sm text-muted-foreground">:</span>
-                <Select value={minute} onValueChange={handleMinuteChange}>
-                  <SelectTrigger className="h-8 w-[68px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {MINUTES.map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={minuteText}
+                  onChange={e => setMinuteText(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  onBlur={commitMinute}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commitMinute();
+                    }
+                  }}
+                  placeholder="MM"
+                  inputMode="numeric"
+                  maxLength={2}
+                  className="h-8 w-[52px] text-center"
+                />
               </div>
-            </div>
-          )}
+            )}
+            <Calendar
+              mode="single"
+              selected={date ?? undefined}
+              onSelect={handleDateSelect}
+              locale={ptBR}
+              initialFocus
+              captionLayout="dropdown-buttons"
+              fromYear={2000}
+              toYear={new Date().getFullYear() + 10}
+              className={cn('p-3 pointer-events-auto')}
+            />
+          </div>
         </PopoverContent>
       </Popover>
     </div>
