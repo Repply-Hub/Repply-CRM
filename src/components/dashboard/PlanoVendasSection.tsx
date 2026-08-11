@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import {
   Dialog,
   DialogContent,
@@ -204,7 +205,7 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
             <span className="h-8 flex items-center px-2.5 rounded-md border border-border/60 bg-muted/40 text-xs font-medium text-muted-foreground">
               {MESES[mes - 1]} de {ano}
             </span>
-            {isGestor && vendedorUnico && (
+            {isGestor && (
               <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setEditOpen(true)}>
                 <Pencil className="h-3.5 w-3.5" /> Editar metas
               </Button>
@@ -256,17 +257,25 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
             {mostrarDetalhado && (
               <div className="space-y-4">
                 {progresso.map(p => {
-                  const pct = p.meta_valor > 0 ? (p.vendido_valor / p.meta_valor) * 100 : 0;
+                  const temMeta = p.meta_valor > 0;
+                  const pct = temMeta ? (p.vendido_valor / p.meta_valor) * 100 : 0;
                   return (
                     <div key={p.fabricante_id} className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold text-card-foreground">{p.fabricante_nome}</span>
                         <span className="text-muted-foreground">
-                          {formatCurrency(p.vendido_valor)} / {formatCurrency(p.meta_valor)}{' '}
-                          <span className={`font-bold ${progressoCor(pct)}`}>({pct.toFixed(0)}%)</span>
+                          {formatCurrency(p.vendido_valor)}
+                          {temMeta ? (
+                            <>
+                              {' '}/ {formatCurrency(p.meta_valor)}{' '}
+                              <span className={`font-bold ${progressoCor(pct)}`}>({pct.toFixed(0)}%)</span>
+                            </>
+                          ) : (
+                            <span className="italic"> — meta não definida</span>
+                          )}
                         </span>
                       </div>
-                      <Progress value={Math.min(pct, 100)} className="h-2.5" />
+                      {temMeta && <Progress value={Math.min(pct, 100)} className="h-2.5" />}
                     </div>
                   );
                 })}
@@ -279,17 +288,25 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
                   Por vendedor
                 </p>
                 {porVendedor.map(v => {
-                  const pct = v.meta_valor > 0 ? (v.vendido_valor / v.meta_valor) * 100 : 0;
+                  const temMeta = v.meta_valor > 0;
+                  const pct = temMeta ? (v.vendido_valor / v.meta_valor) * 100 : 0;
                   return (
                     <div key={v.usuario_id} className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold text-card-foreground">{v.usuario_nome}</span>
                         <span className="text-muted-foreground">
-                          {formatCurrency(v.vendido_valor)} / {formatCurrency(v.meta_valor)}{' '}
-                          <span className={`font-bold ${progressoCor(pct)}`}>({pct.toFixed(0)}%)</span>
+                          {formatCurrency(v.vendido_valor)}
+                          {temMeta ? (
+                            <>
+                              {' '}/ {formatCurrency(v.meta_valor)}{' '}
+                              <span className={`font-bold ${progressoCor(pct)}`}>({pct.toFixed(0)}%)</span>
+                            </>
+                          ) : (
+                            <span className="italic"> — meta não definida</span>
+                          )}
                         </span>
                       </div>
-                      <Progress value={Math.min(pct, 100)} className="h-2.5" />
+                      {temMeta && <Progress value={Math.min(pct, 100)} className="h-2.5" />}
                     </div>
                   );
                 })}
@@ -299,13 +316,13 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
         )}
       </CardContent>
 
-      {isGestor && vendedorUnico && (
+      {isGestor && (
         <EditarMetasDialog
           open={editOpen}
           onOpenChange={setEditOpen}
           empresaId={empresaId}
-          usuarioId={vendedorUnico}
-          vendedorNome={vendedorNome}
+          vendedores={vendedores}
+          initialUsuarioId={vendedorUnico ?? currentUsuarioId}
           ano={ano}
           mes={mes}
           fabricantes={fabricantes}
@@ -319,29 +336,67 @@ interface EditarMetasDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   empresaId: string;
-  usuarioId: string;
-  vendedorNome: string;
+  vendedores: Vendedor[];
+  // Pré-seleciona o vendedor com base no filtro "Responsável" do topo da
+  // página quando ele apontar pra exatamente 1 pessoa (ou o próprio usuário,
+  // se não-gestor) — o seletor abaixo permite trocar livremente depois, já
+  // que "Editar metas" agora fica visível pra qualquer gestor independente
+  // do filtro.
+  initialUsuarioId?: string;
   ano: number;
   mes: number;
   fabricantes: Fabricante[];
 }
 
-function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorNome, ano, mes, fabricantes }: EditarMetasDialogProps) {
-  // "Individual" edita a meta do vendedor aberto; "Equipe" edita uma meta que
-  // não é de ninguém em particular (usuario_id NULL), somada à visão agregada
-  // da empresa no Dashboard sem entrar na conta de nenhum vendedor específico.
+function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialUsuarioId, ano, mes, fabricantes }: EditarMetasDialogProps) {
+  // "Individual" edita a meta do vendedor selecionado; "Equipe" edita uma meta
+  // que não é de ninguém em particular (usuario_id NULL), somada à visão
+  // agregada da empresa no Dashboard sem entrar na conta de nenhum vendedor
+  // específico.
   const [escopo, setEscopo] = useState<'individual' | 'equipe'>('individual');
-  const scopedUsuarioId = escopo === 'individual' ? usuarioId : null;
+  const [selectedUsuarioId, setSelectedUsuarioId] = useState<string | undefined>(
+    initialUsuarioId ?? vendedores[0]?.usuario_id,
+  );
+  const scopedUsuarioId = escopo === 'individual' ? selectedUsuarioId ?? null : null;
+  const vendedorNome = vendedores.find(v => v.usuario_id === selectedUsuarioId)?.usuario_nome ?? '';
 
-  // Reabrir o dialog (ou trocar de vendedor) sempre volta pro escopo individual
-  // — evita reabrir "preso" no modo Equipe de uma edição anterior.
+  // Período navegável dentro do próprio dialog — antes ficava preso ao mês/ano
+  // do filtro "Período" do topo do Dashboard, obrigando trocar o filtro da
+  // página inteira só pra cadastrar meta de um mês passado ou futuro.
+  const [periodo, setPeriodo] = useState({ ano, mes });
+  const { ano: selectedAno, mes: selectedMes } = periodo;
+  const hoje = new Date();
+  const ehMesAtual = selectedAno === hoje.getFullYear() && selectedMes === hoje.getMonth() + 1;
+
+  const irParaMesAtual = () => setPeriodo({ ano: hoje.getFullYear(), mes: hoje.getMonth() + 1 });
+
+  // Janela de anos do seletor — sempre inclui o ano atual +/- 5 e, se o
+  // período selecionado (ex: vindo de um filtro antigo) cair fora dessa
+  // janela, estica pra incluí-lo também.
+  const anosDisponiveis = useMemo(() => {
+    const base = hoje.getFullYear();
+    const min = Math.min(base - 5, selectedAno);
+    const max = Math.max(base + 5, selectedAno);
+    return Array.from({ length: max - min + 1 }, (_, i) => min + i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAno]);
+
+  // Reabrir o dialog sempre volta pro escopo individual, reaplica a
+  // pré-seleção de vendedor e reinicia a navegação no mês/ano do filtro do
+  // topo — evita reabrir "preso" no modo Equipe, num vendedor ou num mês de
+  // uma edição anterior.
   useEffect(() => {
-    if (open) setEscopo('individual');
-  }, [open, usuarioId]);
+    if (open) {
+      setEscopo('individual');
+      setSelectedUsuarioId(initialUsuarioId ?? vendedores[0]?.usuario_id);
+      setPeriodo({ ano, mes });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialUsuarioId]);
 
-  const { data: metas } = useMetasVendas(open ? scopedUsuarioId : undefined, ano, mes);
-  const anoAnterior = mes === 1 ? ano - 1 : ano;
-  const mesAnterior = mes === 1 ? 12 : mes - 1;
+  const { data: metas } = useMetasVendas(open ? scopedUsuarioId : undefined, selectedAno, selectedMes);
+  const anoAnterior = selectedMes === 1 ? selectedAno - 1 : selectedAno;
+  const mesAnterior = selectedMes === 1 ? 12 : selectedMes - 1;
   const { data: metasMesAnterior } = useMetasVendas(open ? scopedUsuarioId : undefined, anoAnterior, mesAnterior);
   const upsertMeta = useUpsertMetaVenda();
   const deleteMeta = useDeleteMetaVenda();
@@ -370,7 +425,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorN
   useEffect(() => {
     setValores({});
     setFabricantesCopiados(new Set());
-  }, [scopedUsuarioId, ano, mes]);
+  }, [scopedUsuarioId, selectedAno, selectedMes]);
 
   const linhas = useMemo(() => {
     const existentes = (metas ?? []).map(m => ({ id: m.id as string | undefined, fabricanteId: m.fabricante_id }));
@@ -394,7 +449,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorN
       return;
     }
     upsertMeta.mutate(
-      { empresaId, usuarioId: scopedUsuarioId, fabricanteId, ano, mes, metaValor: valor },
+      { empresaId, usuarioId: scopedUsuarioId, fabricanteId, ano: selectedAno, mes: selectedMes, metaValor: valor },
       { onError: () => toast.error('Erro ao salvar meta') },
     );
   };
@@ -442,7 +497,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorN
       return;
     }
     upsertMeta.mutate(
-      { empresaId, usuarioId: scopedUsuarioId, fabricanteId: novoFabricanteId, ano, mes, metaValor: valor },
+      { empresaId, usuarioId: scopedUsuarioId, fabricanteId: novoFabricanteId, ano: selectedAno, mes: selectedMes, metaValor: valor },
       {
         onSuccess: () => {
           setNovoFabricanteId('');
@@ -460,10 +515,48 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorN
           <DialogTitle>
             Editar metas — {escopo === 'individual' ? vendedorNome : 'Toda a equipe'}
           </DialogTitle>
-          <DialogDescription>
-            {MESES[mes - 1]} de {ano} — meta de vendas por fabricante
-          </DialogDescription>
+          <DialogDescription>Meta de vendas por fabricante</DialogDescription>
         </DialogHeader>
+
+        <div className="flex items-center justify-center gap-2">
+          <Select
+            value={String(selectedMes)}
+            onValueChange={(v) => setPeriodo(prev => ({ ...prev, mes: Number(v) }))}
+          >
+            <SelectTrigger className="h-8 w-fit min-w-[120px] rounded-lg border border-border/60 bg-muted/30 px-2.5 text-sm font-semibold capitalize focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[280px]">
+              {MESES.map((nome, i) => (
+                <SelectItem key={nome} value={String(i + 1)} className="capitalize">{nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={String(selectedAno)}
+            onValueChange={(v) => setPeriodo(prev => ({ ...prev, ano: Number(v) }))}
+          >
+            <SelectTrigger className="h-8 w-fit min-w-[80px] rounded-lg border border-border/60 bg-muted/30 px-2.5 text-sm font-semibold focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[280px]">
+              {anosDisponiveis.map((a) => (
+                <SelectItem key={a} value={String(a)}>{a}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {!ehMesAtual && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 shrink-0 px-2 text-[11px] text-primary hover:text-primary"
+              onClick={irParaMesAtual}
+            >
+              Hoje
+            </Button>
+          )}
+        </div>
 
         <ToggleGroup
           type="single"
@@ -478,6 +571,17 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, usuarioId, vendedorN
             <Users className="h-3.5 w-3.5" /> Toda a equipe
           </ToggleGroupItem>
         </ToggleGroup>
+
+        {escopo === 'individual' && (
+          <SearchableSelect
+            className="h-9 text-sm"
+            options={vendedores.map(v => ({ value: v.usuario_id, label: v.usuario_nome }))}
+            value={selectedUsuarioId ?? ''}
+            onValueChange={setSelectedUsuarioId}
+            placeholder="Selecione o vendedor"
+            emptyMessage="Nenhum vendedor encontrado."
+          />
+        )}
 
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
