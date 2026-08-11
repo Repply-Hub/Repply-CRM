@@ -328,6 +328,29 @@ export async function chamarNylas<T>(
   return { ok: res.ok, status: res.status, body, texto };
 }
 
+/**
+ * Baixa o BINÁRIO de um anexo (`/attachments/{id}/download`), que não devolve
+ * JSON como o resto da API — daí não reusar `chamarNylas`, que sempre tenta
+ * `JSON.parse` no corpo da resposta.
+ */
+export async function baixarAnexoNylas(
+  caminho: string,
+  timeoutMs = 30_000,
+): Promise<{ ok: boolean; status: number; bytes: Uint8Array | null; contentType: string | null }> {
+  try {
+    const res = await fetch(`${nylasBase()}${caminho}`, {
+      headers: { Authorization: `Bearer ${nylasApiKey()}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return { ok: false, status: res.status, bytes: null, contentType: null };
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return { ok: true, status: res.status, bytes, contentType: res.headers.get("content-type") };
+  } catch (e) {
+    console.warn("[nylas] falha ao baixar anexo:", e);
+    return { ok: false, status: 0, bytes: null, contentType: null };
+  }
+}
+
 /** Extrai uma mensagem legível de um erro do Nylas, sem vazar o payload inteiro. */
 export function erroDoNylas(body: RespostaNylas<unknown>, texto: string): string {
   const e = body?.error as { message?: string; type?: string } | string | undefined;
@@ -364,6 +387,8 @@ export interface MensagemNylas {
     content_type?: string;
     size?: number;
     is_inline?: boolean;
+    /** Referenciado por `<img src="cid:...">` no corpo, só presente em anexos inline. */
+    content_id?: string;
   }>;
 }
 

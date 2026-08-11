@@ -193,8 +193,18 @@ export function useEmailEmpresa() {
   const carregarCorpo = async (mensagemId: string): Promise<string | null> => {
     const chave = ['email_corpo', mensagemId];
 
+    // `cid:` pendente = corpo cacheado ANTES de `resolverImagensInline` existir
+    // na Edge Function (imagem embutida ainda referenciando o esquema que o
+    // navegador não sabe interpretar). Repetido nos dois degraus de cache
+    // abaixo (React Query em memória E a linha da tabela) — os dois guardam o
+    // MESMO corpo já resolvido uma vez pela Edge Function, e um só deles
+    // aceitando a versão quebrada bastaria pra reproduzir o ícone quebrado
+    // direto do cache, sem nunca chegar na Edge Function de novo.
+    const jaResolvido = (html: string | null | undefined): html is string =>
+      !!html && !html.includes('cid:');
+
     const emCache = queryClient.getQueryData<string>(chave);
-    if (emCache) return emCache;
+    if (jaResolvido(emCache)) return emCache;
 
     const { data: linha } = await supabase
       .from('email_mensagens')
@@ -202,7 +212,7 @@ export function useEmailEmpresa() {
       .eq('id', mensagemId)
       .maybeSingle();
 
-    if (linha?.corpo_html) {
+    if (jaResolvido(linha?.corpo_html)) {
       queryClient.setQueryData(chave, linha.corpo_html);
       return linha.corpo_html;
     }

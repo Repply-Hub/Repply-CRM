@@ -1,12 +1,91 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  baixarAnexoNylas,
   chamarNylas,
   corsHeaders,
   erroDoNylas,
   json,
   type MensagemNylas,
 } from "../_shared/nylas.ts";
+
+function extensaoPorMime(mime: string | null | undefined, filename?: string): string {
+  const doNome = /\.([a-zA-Z0-9]{1,8})$/.exec((filename ?? "").trim());
+  if (doNome) return doNome[1].toLowerCase();
+  const m = (mime ?? "").toLowerCase();
+  if (m.includes("jpeg") || m.includes("jpg")) return "jpg";
+  if (m.includes("png")) return "png";
+  if (m.includes("gif")) return "gif";
+  if (m.includes("webp")) return "webp";
+  if (m.includes("svg")) return "svg";
+  if (m.includes("bmp")) return "bmp";
+  return "bin";
+}
+
+/**
+ * Substitui `src="cid:..."` das imagens embutidas no corpo (logos, assinaturas
+ * com foto, etc.) por uma URL pública de verdade.
+ *
+ * O Nylas expõe essas imagens como anexos comuns marcados `is_inline: true`,
+ * com um `content_id` que é exatamente o que aparece depois de `cid:` no HTML.
+ * O navegador não tem handler nenhum para o esquema `cid:` — só clientes de
+ * e-mail nativos (Outlook, Thunderbird) sabem resolver isso contra os anexos
+ * da própria mensagem — então, sem esta troca, toda imagem embutida aparece
+ * como ícone quebrado.
+ *
+ * Baixa cada uma do Nylas e sobe para o bucket público `email-assets` (já
+ * existente, usado hoje só para o logo da assinatura de saída). Roda uma vez,
+ * no mesmo momento em que `corpo_html` é cacheado — não a cada leitura.
+ */
+async function resolverImagensInline(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  grantId: string,
+  nylasMessageId: string,
+  empresaId: string,
+  mensagemId: string,
+  attachments: NonNullable<MensagemNylas["attachments"]>,
+  corpo: string,
+): Promise<string> {
+  const inline = attachments.filter((a) => a.is_inline && a.id && a.content_id);
+  if (!inline.length) return corpo;
+
+  let resultado = corpo;
+  // Teto de segurança: uma assinatura com muitas imagens não deve travar a
+  // abertura da mensagem numa cascata de downloads.
+  for (const anexo of inline.slice(0, 25)) {
+    const cid = (anexo.content_id ?? "").replace(/^<|>$/g, "").trim();
+    if (!cid || !resultado.includes(`cid:${cid}`)) continue;
+
+    const resp = await baixarAnexoNylas(
+      `/v3/grants/${grantId}/attachments/${encodeURIComponent(anexo.id!)}/download` +
+        `?message_id=${encodeURIComponent(nylasMessageId)}`,
+    );
+    if (!resp.ok || !resp.bytes) {
+      console.warn(`[email-mensagem] falha ao baixar imagem inline ${anexo.id}: status ${resp.status}`);
+      continue;
+    }
+
+    const ext = extensaoPorMime(resp.contentType ?? anexo.content_type, anexo.filename);
+    const caminho = `inline/${empresaId}/${mensagemId}/${anexo.id}.${ext}`;
+    const { error: erroUpload } = await supabase.storage
+      .from("email-assets")
+      .upload(caminho, resp.bytes, {
+        contentType: resp.contentType ?? anexo.content_type ?? "application/octet-stream",
+        upsert: true,
+      });
+    if (erroUpload) {
+      console.warn(`[email-mensagem] falha ao subir imagem inline ${anexo.id}:`, erroUpload);
+      continue;
+    }
+
+    const { data: pub } = supabase.storage.from("email-assets").getPublicUrl(caminho);
+    if (!pub?.publicUrl) continue;
+
+    resultado = resultado.split(`cid:${cid}`).join(pub.publicUrl);
+  }
+  return resultado;
+}
 
 /**
  * Busca o corpo completo de uma mensagem, sob demanda.
@@ -107,8 +186,12 @@ serve(async (req) => {
       return json({ error: "Mensagem não encontrada." }, 404);
     }
 
-    // Cache: uma vez buscado, o corpo não muda.
-    if (mensagem.corpo_html) {
+    // Cache: uma vez buscado, o corpo não muda — EXCETO para mensagens
+    // cacheadas antes de `resolverImagensInline` existir, cujo `corpo_html`
+    // ainda carrega `cid:` não resolvido (imagem quebrada). Essas caem no
+    // busca-de-novo abaixo, uma única vez; depois disso o `cid:` já não
+    // aparece mais e o cache volta a valer normalmente.
+    if (mensagem.corpo_html && !mensagem.corpo_html.includes("cid:")) {
       return json({ corpo_html: mensagem.corpo_html, anexos: mensagem.anexos ?? [], cache: true });
     }
 
@@ -155,7 +238,15 @@ serve(async (req) => {
 
     // Corpo vazio é resposta legítima (e-mail só com anexo). Grava assim mesmo,
     // senão toda abertura dessa mensagem gastaria uma chamada nova.
-    const corpo = completa.body ?? "";
+    const corpo = await resolverImagensInline(
+      supabase,
+      grantRow.grant_id,
+      mensagem.nylas_message_id,
+      caller.empresa_id,
+      mensagem.id,
+      completa.attachments ?? [],
+      completa.body ?? "",
+    );
 
     const { error: erroUpdate } = await supabase
       .from("email_mensagens")
