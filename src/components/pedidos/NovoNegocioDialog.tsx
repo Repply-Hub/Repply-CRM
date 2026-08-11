@@ -475,6 +475,26 @@ function NovoNegocioFormContent({
                   />
                 </div>
 
+                {/* Fabricante */}
+                <div className="space-y-2">
+                  <Label>Fabricante{obrigatorio('fabricante_id', true) && ' *'}</Label>
+                  <FabricanteSelector
+                    value={fabricanteId}
+                    onValueChange={setFabricanteId}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Nome do Negócio */}
+                <NomeNegocioField
+                  nome={nome}
+                  onNomeChange={setNome}
+                  automatico={nomeAutomatico}
+                  onAutomaticoChange={setNomeAutomatico}
+                  nomeAutomaticoPreview={nomeAutomaticoPreview}
+                />
+
                 {/* Fase do Pedido */}
                 <div className="space-y-2">
                   <Label>Fase do Negócio{obrigatorio('status', false) && ' *'}</Label>
@@ -501,15 +521,6 @@ function NovoNegocioFormContent({
                 </div>
               </div>
 
-              {/* Nome do Negócio */}
-              <NomeNegocioField
-                nome={nome}
-                onNomeChange={setNome}
-                automatico={nomeAutomatico}
-                onAutomaticoChange={setNomeAutomatico}
-                nomeAutomaticoPreview={nomeAutomaticoPreview}
-              />
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Marcador */}
                 <div className="space-y-2">
@@ -527,17 +538,6 @@ function NovoNegocioFormContent({
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Fabricante */}
-                <div className="space-y-2">
-                  <Label>Fabricante{obrigatorio('fabricante_id', true) && ' *'}</Label>
-                  <FabricanteSelector
-                    value={fabricanteId}
-                    onValueChange={setFabricanteId}
-                  />
                 </div>
 
                 {/* Obra */}
@@ -672,6 +672,9 @@ function NovoNegocioFormContent({
                         }}
                         locale={ptBR}
                         initialFocus
+                        captionLayout="dropdown-buttons"
+                        fromYear={1950}
+                        toYear={new Date().getFullYear() + 1}
                         className={cn("p-3 pointer-events-auto")}
                       />
                     </PopoverContent>
@@ -703,6 +706,9 @@ function NovoNegocioFormContent({
                         }}
                         locale={ptBR}
                         initialFocus
+                        captionLayout="dropdown-buttons"
+                        fromYear={1950}
+                        toYear={new Date().getFullYear() + 1}
                         className={cn("p-3 pointer-events-auto")}
                       />
                       {prazoResposta && (
