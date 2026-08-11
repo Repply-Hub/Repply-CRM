@@ -687,115 +687,117 @@ export default function Tarefas() {
           const si = getStatusInfo(selectedTarefa.status);
           const isOverdue = selectedTarefa.prazo_final && new Date(selectedTarefa.prazo_final) < new Date() && selectedTarefa.status !== 'concluida';
           return (
-            <SheetContent className="sm:max-w-xl overflow-y-auto">
-              <SheetHeader className="pb-6 border-b">
-                <div className="space-y-1">
-                  <SheetTitle className="flex items-center gap-2">
-                    <ClipboardList className="h-5 w-5 text-primary" />
-                    <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{selectedTarefa.titulo}</span>
-                  </SheetTitle>
-                  <SheetDescription>Detalhes da tarefa.</SheetDescription>
-                </div>
-              </SheetHeader>
+            <SheetContent className="sm:max-w-xl p-0 flex flex-col">
+              <div className="flex-1 overflow-y-auto p-6">
+                <SheetHeader className="pb-6 border-b">
+                  <div className="space-y-1">
+                    <SheetTitle className="flex items-center gap-2">
+                      <ClipboardList className="h-5 w-5 text-primary" />
+                      <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{selectedTarefa.titulo}</span>
+                    </SheetTitle>
+                    <SheetDescription>Detalhes da tarefa.</SheetDescription>
+                  </div>
+                </SheetHeader>
 
-              <div className="py-6 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</Label>
-                    <div className="pt-1">
-                      <Select
-                        value={selectedTarefa.status}
-                        onValueChange={(value) => {
-                          updateTarefa.mutate(
-                            { id: selectedTarefa.id, status: value },
-                            {
-                              onSuccess: () => {
-                                setSelectedTarefa({ ...selectedTarefa, status: value });
-                                toast.success('Etapa atualizada.');
-                              },
-                              onError: () => toast.error('Erro ao atualizar etapa.'),
-                            }
-                          );
-                        }}
-                      >
-                        <SelectTrigger className="!flex !w-fit !justify-start !gap-1.5 h-8 border-0 bg-transparent p-0 hover:opacity-80 transition-opacity focus:ring-0 focus:ring-offset-0 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 [&>svg]:opacity-60">
-                          <Badge className={`border pointer-events-none ${si.className}`}>{si.label}</Badge>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {KANBAN_STAGES.map(stage => (
-                            <SelectItem key={stage.key} value={stage.key}>
-                              {stage.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                <div className="py-6 space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</Label>
+                      <div className="pt-1">
+                        <Select
+                          value={selectedTarefa.status}
+                          onValueChange={(value) => {
+                            updateTarefa.mutate(
+                              { id: selectedTarefa.id, status: value },
+                              {
+                                onSuccess: () => {
+                                  setSelectedTarefa({ ...selectedTarefa, status: value });
+                                  toast.success('Etapa atualizada.');
+                                },
+                                onError: () => toast.error('Erro ao atualizar etapa.'),
+                              }
+                            );
+                          }}
+                        >
+                          <SelectTrigger className="!flex !w-fit !justify-start !gap-1.5 h-8 border-0 bg-transparent p-0 hover:opacity-80 transition-opacity focus:ring-0 focus:ring-offset-0 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 [&>svg]:opacity-60">
+                            <Badge className={`border pointer-events-none ${si.className}`}>{si.label}</Badge>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {KANBAN_STAGES.map(stage => (
+                              <SelectItem key={stage.key} value={stage.key}>
+                                {stage.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Calendar className="h-3 w-3" /> Prazo Final
-                    </Label>
-                    <p className={`text-sm font-medium ${isOverdue ? 'text-destructive' : ''}`}>
-                      {selectedTarefa.prazo_final ? format(new Date(selectedTarefa.prazo_final), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <User className="h-3 w-3" /> Responsável
-                    </Label>
-                    <p className="text-sm font-medium">
-                      {selectedTarefa.responsavel ? <UserProfilePopover name={selectedTarefa.responsavel} /> : '—'}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <FolderKanban className="h-3 w-3" /> Projeto / Obra
-                    </Label>
-                    <p className="text-sm font-medium">{selectedTarefa.projeto || '—'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Empresa</Label>
-                    <p className="text-sm font-medium">
-                      {selectedTarefa.cliente_id
-                        ? clientes.find(c => c.id === selectedTarefa.cliente_id)?.empresa || '—'
-                        : '—'}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Negócio</Label>
-                    <p className="text-sm font-medium">
-                      {selectedTarefa.pedido_id
-                        ? (() => {
-                            const p = pedidosOptions.find(o => o.id === selectedTarefa.pedido_id);
-                            return p ? getNomeNegocio(p) : '—';
-                          })()
-                        : '—'}
-                    </p>
-                  </div>
-                  {selectedTarefa.participantes && (
-                    <div className="space-y-1 md:col-span-2">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Participantes</Label>
-                      <p className="text-sm font-medium">{selectedTarefa.participantes}</p>
-                    </div>
-                  )}
-                  {selectedTarefa.marcadores && (
-                    <div className="space-y-1 md:col-span-2">
+                    <div className="space-y-1">
                       <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Tag className="h-3 w-3" /> Marcadores
+                        <Calendar className="h-3 w-3" /> Prazo Final
                       </Label>
-                      <p className="text-sm font-medium">{selectedTarefa.marcadores}</p>
+                      <p className={`text-sm font-medium ${isOverdue ? 'text-destructive' : ''}`}>
+                        {selectedTarefa.prazo_final ? format(new Date(selectedTarefa.prazo_final), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
+                      </p>
                     </div>
-                  )}
-                  {selectedTarefa.descricao && (
-                    <div className="space-y-1 md:col-span-2">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Descrição</Label>
-                      <p className="text-sm whitespace-pre-wrap">{selectedTarefa.descricao}</p>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <User className="h-3 w-3" /> Responsável
+                      </Label>
+                      <p className="text-sm font-medium">
+                        {selectedTarefa.responsavel ? <UserProfilePopover name={selectedTarefa.responsavel} /> : '—'}
+                      </p>
                     </div>
-                  )}
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <FolderKanban className="h-3 w-3" /> Projeto / Obra
+                      </Label>
+                      <p className="text-sm font-medium">{selectedTarefa.projeto || '—'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Empresa</Label>
+                      <p className="text-sm font-medium">
+                        {selectedTarefa.cliente_id
+                          ? clientes.find(c => c.id === selectedTarefa.cliente_id)?.empresa || '—'
+                          : '—'}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Negócio</Label>
+                      <p className="text-sm font-medium">
+                        {selectedTarefa.pedido_id
+                          ? (() => {
+                              const p = pedidosOptions.find(o => o.id === selectedTarefa.pedido_id);
+                              return p ? getNomeNegocio(p) : '—';
+                            })()
+                          : '—'}
+                      </p>
+                    </div>
+                    {selectedTarefa.participantes && (
+                      <div className="space-y-1 md:col-span-2">
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Participantes</Label>
+                        <p className="text-sm font-medium">{selectedTarefa.participantes}</p>
+                      </div>
+                    )}
+                    {selectedTarefa.marcadores && (
+                      <div className="space-y-1 md:col-span-2">
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <Tag className="h-3 w-3" /> Marcadores
+                        </Label>
+                        <p className="text-sm font-medium">{selectedTarefa.marcadores}</p>
+                      </div>
+                    )}
+                    {selectedTarefa.descricao && (
+                      <div className="space-y-1 md:col-span-2">
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Descrição</Label>
+                        <p className="text-sm whitespace-pre-wrap">{selectedTarefa.descricao}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
+              <SheetFooter className="border-t p-6 gap-3 sm:gap-0">
                 <div className="flex w-full justify-between items-center">
                   <Button
                     variant="ghost"
