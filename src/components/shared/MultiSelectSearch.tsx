@@ -93,6 +93,18 @@ export function MultiSelectSearch({
               {emptyMessage}
             </CommandEmpty>
             <CommandGroup>
+              <CommandItem
+                value="__todos__"
+                onSelect={() => onValueChange([])}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    value.length === 0 ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                Todos
+              </CommandItem>
               {options.map((option) => {
                 const isSelected = value.includes(option.value);
                 return (

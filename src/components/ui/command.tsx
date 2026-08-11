@@ -57,10 +57,18 @@ CommandInput.displayName = CommandPrimitive.Input.displayName;
 const CommandList = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.List>
->(({ className, ...props }, ref) => (
+>(({ className, onWheel, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
     className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
+    // Quando este dropdown abre dentro de um Dialog modal, o react-remove-scroll
+    // do Radix trava o scroll nativo de tudo que não faz parte da árvore do
+    // Dialog — incluindo o Popover deste Command, que é portalizado à parte.
+    // Aplicar o delta manualmente no scrollTop contorna esse bloqueio.
+    onWheel={(e) => {
+      e.currentTarget.scrollTop += e.deltaY;
+      onWheel?.(e);
+    }}
     {...props}
   />
 ));
