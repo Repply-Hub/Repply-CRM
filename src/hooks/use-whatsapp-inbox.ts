@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, createElement } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
@@ -970,6 +971,7 @@ export function useWaProvision() {
 export function useUnreadWaMessages() {
   const qc = useQueryClient();
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const empresaId = profile?.empresa_id ?? null;
   // Guarda o último nao_lidas conhecido por conversa para detectar incrementos
   // (chegada de mensagem nova) mesmo com a tela de WhatsApp fechada.
@@ -1055,6 +1057,13 @@ export function useUnreadWaMessages() {
               description: descricao,
               style: { background: '#f97316', color: '#fff', border: 'none' },
               descriptionClassName: '!text-white/90',
+              // Leva direto para a conversa que gerou o toast — `row.id` já veio no
+              // payload do realtime, sem precisar de consulta extra.
+              action: {
+                label: 'Abrir conversa',
+                onClick: () => navigate(`/whatsapp?conversaId=${row.id}`),
+              },
+              actionButtonStyle: { background: 'rgba(255,255,255,0.2)', color: '#fff' },
             });
           }
 
@@ -1074,7 +1083,7 @@ export function useUnreadWaMessages() {
       }
       supabase.removeChannel(channel);
     };
-  }, [qc, empresaId, agendarInvalidacao]);
+  }, [qc, empresaId, agendarInvalidacao, navigate]);
 
   return query;
 }

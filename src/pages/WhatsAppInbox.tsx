@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
@@ -2335,14 +2335,14 @@ function LeadSheet({
       {items.map((n) => (
         <li
           key={n.id}
-          className="flex items-start gap-2.5 p-2 rounded-lg border bg-muted/30"
+          className="flex items-start gap-2.5 p-2 rounded-lg border border-amber-200/70 dark:border-amber-900/50 bg-amber-100 dark:bg-amber-950/50"
         >
-          <div className="p-1.5 rounded-md bg-background text-primary shrink-0">
+          <div className="p-1.5 rounded-md bg-background text-amber-600 dark:text-amber-400 shrink-0">
             <StickyNote className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs break-words">{linkifyText(n.conteudo)}</p>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-xs break-words text-foreground">{linkifyText(n.conteudo)}</p>
+            <p className="text-[10px] text-amber-700/70 dark:text-amber-300/60">
               {format(new Date(n.created_at), "dd/MM/yyyy HH:mm", {
                 locale: ptBR,
               })}
@@ -3333,6 +3333,28 @@ export default function WhatsAppInbox() {
   const conversaAtiva = conversas.find((c) => c.id === conversaAtivaId) ?? null;
   const [atribuicaoModalOpen, setAtribuicaoModalOpen] = useState(false);
 
+  // Deep-link vindo do toast/ação de "nova mensagem" (ver useUnreadWaMessages em
+  // use-whatsapp-inbox.ts): navega para /whatsapp?conversaId=X. Só dá pra selecionar
+  // depois que `conversas` carregou, por isso o efeito espera a lista chegar. O param
+  // é removido da URL logo em seguida para não reabrir a mesma conversa numa
+  // atualização de página ou navegação manual dentro do inbox.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const conversaIdParam = searchParams.get("conversaId");
+    if (!conversaIdParam || conversas.length === 0) return;
+    if (conversas.some((c) => c.id === conversaIdParam)) {
+      setConversaAtivaId(conversaIdParam);
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("conversaId");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [conversas, searchParams, setSearchParams]);
+
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
 
   /**
@@ -3841,70 +3863,74 @@ export default function WhatsAppInbox() {
     return;
   }, [filtroPeriodo, periodoCustom]);
   const periodoPopoverBody = (
-    <div className="flex flex-col gap-2 p-2 w-[280px]">
-      <div className="flex flex-col gap-0.5">
-        {(
-          [
-            ["semana", "Última semana"],
-            ["mes", "Último mês"],
-            ["ano", "Último ano"],
-          ] as const
-        ).map(([val, label]) => (
-          <button
-            key={val}
-            type="button"
-            onClick={() =>
-              setFiltroPeriodo(filtroPeriodo === val ? "todos" : val)
-            }
-            className={cn(
-              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-              filtroPeriodo === val && "bg-primary/10 text-primary",
-            )}
-          >
-            {label}
-            {filtroPeriodo === val && <Check className="h-3.5 w-3.5" />}
-          </button>
-        ))}
-      </div>
-      <div className="border-t border-border/50 pt-2">
-        <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-          Personalizado
-        </p>
-        <Calendar
-          mode="range"
-          selected={{
-            from: periodoCustom.from,
-            to: periodoCustom.to,
-          }}
-          onSelect={(range) => {
-            setPeriodoCustom({
-              from: range?.from,
-              to: range?.to,
-            });
-            setFiltroPeriodo("personalizado");
-          }}
-          numberOfMonths={1}
-          locale={ptBR}
-          captionLayout="dropdown-buttons"
-          fromYear={1950}
-          toYear={new Date().getFullYear()}
-          className="pointer-events-auto"
-        />
+    <div className="flex flex-col">
+      <div className="flex">
+        <div className="border-r border-border p-3 space-y-1 min-w-[160px]">
+          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+            Atalhos
+          </p>
+          {(
+            [
+              ["semana", "Última semana"],
+              ["mes", "Último mês"],
+              ["ano", "Último ano"],
+            ] as const
+          ).map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() =>
+                setFiltroPeriodo(filtroPeriodo === val ? "todos" : val)
+              }
+              className={cn(
+                "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium transition-colors hover:bg-accent",
+                filtroPeriodo === val && "bg-primary/10 text-primary",
+              )}
+            >
+              {label}
+              {filtroPeriodo === val && <Check className="h-3.5 w-3.5" />}
+            </button>
+          ))}
+        </div>
+        <div className="p-3 min-w-[280px]">
+          <Calendar
+            mode="range"
+            selected={{
+              from: periodoCustom.from,
+              to: periodoCustom.to,
+            }}
+            onSelect={(range) => {
+              setPeriodoCustom({
+                from: range?.from,
+                to: range?.to,
+              });
+              setFiltroPeriodo("personalizado");
+            }}
+            numberOfMonths={1}
+            locale={ptBR}
+            captionLayout="dropdown-buttons"
+            fromYear={1950}
+            toYear={new Date().getFullYear()}
+            className="pointer-events-auto"
+          />
+        </div>
       </div>
       {filtroPeriodo !== "todos" && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="w-full gap-1.5 text-muted-foreground hover:text-destructive"
-          onClick={() => {
-            setFiltroPeriodo("todos");
-            setPeriodoCustom({});
-          }}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Limpar período
-        </Button>
+        <div className="border-t border-border p-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full gap-1.5 text-muted-foreground hover:text-destructive"
+            onClick={() => {
+              setFiltroPeriodo("todos");
+              setPeriodoCustom({});
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Limpar período
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -6828,9 +6854,12 @@ export default function WhatsAppInbox() {
 
                             // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca foi
                             // enviada ao WhatsApp. Renderiza centralizada (como um chip de
-                            // sistema), mas com bg cinza próprio, pra diferenciar das bolhas
-                            // normais (que usam bg-muted).
+                            // sistema). Notas digitadas manualmente usam bg âmbar; notas de
+                            // sistema usam um cinza neutro, pra diferenciar as duas na conversa.
                             if (msg.is_nota_interna) {
+                              const isNotaManual =
+                                msg.usuario?.nome &&
+                                !msg.conteudo?.startsWith(msg.usuario.nome);
                               return (
                                 <div
                                   key={msg.id}
@@ -6848,25 +6877,38 @@ export default function WhatsAppInbox() {
                                     <div className="max-w-[75%] items-center">
                                       <div
                                         className={cn(
-                                          "px-3 py-2 break-words rounded-2xl bg-amber-100 dark:bg-amber-950/50 border border-amber-200/70 dark:border-amber-900/50 text-foreground",
+                                          "px-3 py-2 break-words rounded-2xl border text-foreground",
+                                          isNotaManual
+                                            ? "bg-amber-100 dark:bg-amber-950/50 border-amber-200/70 dark:border-amber-900/50"
+                                            : "bg-slate-200 dark:bg-slate-800/70 border-slate-300 dark:border-slate-700",
                                           msg.id === destacadaMsgId &&
                                             "ring-2 ring-primary ring-offset-2 ring-offset-background",
                                         )}
                                       >
                                         <p className="text-xs text-center whitespace-pre-wrap text-foreground">
-                                          <StickyNote className="inline-block h-3 w-3 mr-1 -mt-0.5 text-amber-600 dark:text-amber-400" />
-                                          <span className="font-semibold text-amber-800 dark:text-amber-300">
+                                          <StickyNote
+                                            className={cn(
+                                              "inline-block h-3 w-3 mr-1 -mt-0.5",
+                                              isNotaManual
+                                                ? "text-amber-600 dark:text-amber-400"
+                                                : "text-slate-600 dark:text-slate-400",
+                                            )}
+                                          />
+                                          <span
+                                            className={cn(
+                                              "font-semibold",
+                                              isNotaManual
+                                                ? "text-amber-800 dark:text-amber-300"
+                                                : "text-slate-700 dark:text-slate-300",
+                                            )}
+                                          >
                                             Nota interna
                                             {/* Notas de sistema (assumir/direcionar/fechar conversa,
                                                 adicionar/remover responsável) já embutem o nome do
                                                 autor no início do texto — repetir aqui seria
                                                 redundante. Só mostra o nome quando ele não aparece
                                                 no início do conteúdo (nota digitada manualmente). */}
-                                            {msg.usuario?.nome &&
-                                            !msg.conteudo?.startsWith(msg.usuario.nome)
-                                              ? ` (${msg.usuario.nome})`
-                                              : ""}
-                                            :
+                                            {isNotaManual ? ` (${msg.usuario.nome})` : ""}:
                                           </span>{" "}
                                           {linkifyText(msg.conteudo)}
                                         </p>
