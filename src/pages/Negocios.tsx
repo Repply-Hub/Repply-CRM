@@ -80,6 +80,11 @@ const PEDIDOS_COLUMNS: ColumnDefinition[] = [
   { id: 'acoes', label: 'Ações', locked: false },
 ];
 
+// Itens visíveis por padrão (card do Kanban e colunas da lista, mesma configuração pras duas
+// visões) — o restante de PEDIDOS_COLUMNS continua disponível pra ativar manualmente em "Itens do
+// card"/"Colunas".
+const PEDIDOS_DEFAULT_VISIBLE_COLUMNS = ['negocio', 'cliente', 'contato', 'fabricante', 'valor', 'data_pedido', 'prazo_resposta', 'vendedor'];
+
 const PAGE_SIZE = 10;
 // Constante LEGACY_CARD_FIELDS removida pois as colunas agora são independentes.
 
@@ -379,6 +384,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   } = useTableSettings({
     key: 'pedidos',
     defaultColumns: PEDIDOS_COLUMNS,
+    defaultVisibleColumns: PEDIDOS_DEFAULT_VISIBLE_COLUMNS,
   });
 
   // Corrige o rótulo legado da coluna de anexo ("Pdf da cotação" e variações), criada por
@@ -1429,16 +1435,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <div className="py-6 space-y-8">
             {/* Grid de Dados */}
             <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-              {selectedViewOrder.campos_extras?.['Negócio'] && selectedViewOrder.campos_extras['Negócio'] !== selectedViewOrder.cliente?.empresa && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <User className="h-3 w-3" /> Negócio
-                  </p>
-                  <p className="text-sm font-medium">
-                    {selectedViewOrder.campos_extras['Negócio']}
-                  </p>
-                </div>
-              )}
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Building2 className="h-3 w-3" /> Cliente
@@ -1497,23 +1493,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   {(selectedViewOrder.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </p>
               </div>
-              {selectedViewOrder.pdf_url && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="h-3 w-3" /> Anexo
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = repairCorruptedBitrixUrl(selectedViewOrder.pdf_url);
-                      setPdfPreview({ url, nome: filenameFromUrl(url, 'anexo.pdf') });
-                    }}
-                    className="inline-flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 text-sm font-medium text-primary hover:underline w-fit"
-                  >
-                    <FileText className="h-4 w-4" /> Ver PDF anexado
-                  </button>
-                </div>
-              )}
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <User className="h-3 w-3" /> Vendedor Responsável
@@ -1552,6 +1531,23 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
                     })()}
                   </p>
+                </div>
+              )}
+              {selectedViewOrder.pdf_url && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="h-3 w-3" /> Anexo
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = repairCorruptedBitrixUrl(selectedViewOrder.pdf_url);
+                      setPdfPreview({ url, nome: filenameFromUrl(url, 'anexo.pdf') });
+                    }}
+                    className="inline-flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 text-sm font-medium text-primary hover:underline w-fit"
+                  >
+                    <FileText className="h-4 w-4" /> Ver PDF anexado
+                  </button>
                 </div>
               )}
               {/* Renderização de Campos Extras dinâmicos */}

@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Building2, Factory, DollarSign, GripVertical, User, CalendarIcon, FileText, StickyNote } from 'lucide-react';
+import { AlertTriangle, Building2, Factory, DollarSign, GripVertical, User, CalendarIcon, FileText, StickyNote, MapPin } from 'lucide-react';
 import { Order } from '@/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -74,7 +74,7 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                   </div>
                 )}
 
-                {(!visibleColumns || visibleColumns.includes('negocio') || visibleColumns.includes('cliente')) && (
+                {(!visibleColumns || visibleColumns.includes('negocio')) && (
                   <h4 className="font-semibold text-xs sm:text-sm text-card-foreground leading-snug pr-5">{order.nomeNegocio}</h4>
                 )}
 
@@ -94,22 +94,28 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                 )}
 
                 <div className="mt-2 space-y-1">
-                  {(!visibleColumns || visibleColumns.includes('endereco_entrega')) && (
+                  {(!visibleColumns || visibleColumns.includes('cliente')) && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <Building2 className="h-3 w-3 shrink-0 text-muted-foreground/70" />
-                      <span className="truncate">{order.obra}</span>
+                      <span className="truncate">{order.clientName}</span>
                     </div>
                   )}
-                  {(!visibleColumns || visibleColumns.includes('fabricante')) && (
+                  {(!visibleColumns || visibleColumns.includes('endereco_entrega')) && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <Factory className="h-3 w-3 shrink-0 text-muted-foreground/70" />
-                      <span className="truncate">{order.fabricante}</span>
+                      <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+                      <span className="truncate">{order.obra}</span>
                     </div>
                   )}
                   {order.contato && (!visibleColumns || visibleColumns.includes('contato')) && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <User className="h-3 w-3 shrink-0 text-muted-foreground/70" />
                       <span className="truncate">{order.contato}</span>
+                    </div>
+                  )}
+                  {(!visibleColumns || visibleColumns.includes('fabricante')) && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Factory className="h-3 w-3 shrink-0 text-muted-foreground/70" />
+                      <span className="truncate">{order.fabricante}</span>
                     </div>
                   )}
                   {(!visibleColumns || visibleColumns.includes('valor')) && (

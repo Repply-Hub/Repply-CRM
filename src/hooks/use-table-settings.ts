@@ -54,6 +54,10 @@ function mergeMissingDefaultColumns(
 interface TableSettingsOptions {
   key: string;
   defaultColumns: ColumnDefinition[];
+  /** Colunas ativas no estado "nunca customizado" (localStorage/DB vazios) — o restante de
+   * `defaultColumns` continua disponível pra ativar manualmente. Sem isso, cai no comportamento
+   * antigo de começar com todas as colunas visíveis. */
+  defaultVisibleColumns?: string[];
   defaultPageSize?: number;
 }
 
@@ -61,7 +65,8 @@ const MAX_PAGE_SIZE = 100;
 
 const clampPageSize = (value: number) => Math.min(value, MAX_PAGE_SIZE);
 
-export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: TableSettingsOptions) {
+export function useTableSettings({ key, defaultColumns, defaultVisibleColumns, defaultPageSize = 10 }: TableSettingsOptions) {
+  const initialVisibleColumns = defaultVisibleColumns ?? defaultColumns.map(c => c.id);
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id;
   const isInitialMount = useRef(true);
@@ -91,7 +96,7 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const savedVisibleRaw = localStorage.getItem(`${key}_visible_columns`);
     const savedColumnsRaw = localStorage.getItem(`${key}_all_columns`);
-    if (!savedVisibleRaw) return defaultColumns.map(c => c.id);
+    if (!savedVisibleRaw) return initialVisibleColumns;
     const savedVisible = JSON.parse(savedVisibleRaw) as string[];
     if (!savedColumnsRaw) return Array.from(new Set(savedVisible));
     try {
@@ -388,11 +393,11 @@ export function useTableSettings({ key, defaultColumns, defaultPageSize = 10 }: 
 
   const resetToDefaults = useCallback(() => {
     setColumns(defaultColumns);
-    setVisibleColumns(defaultColumns.map(c => c.id));
+    setVisibleColumns(initialVisibleColumns);
     setCustomLabels({});
     setColumnWidths({});
     toast.success('Configurações restauradas para o padrão');
-  }, [defaultColumns]);
+  }, [defaultColumns, initialVisibleColumns]);
 
   return {
     columns: currentColumns.map(c => ({ ...c, locked: false })), // Forçar desbloqueio de todas as colunas no retorno
