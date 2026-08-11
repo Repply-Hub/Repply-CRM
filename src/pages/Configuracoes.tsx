@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks } from 'lucide-react';
 import { SidebarHistoricoDialog } from '@/components/configuracoes/SidebarHistoricoDialog';
@@ -26,6 +25,13 @@ import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
 import { DominioTab } from '@/components/configuracoes/DominioTab';
 import { WhatsAppInstanciasTab } from '@/components/configuracoes/WhatsAppInstanciasTab';
 import { EmpresasTab } from '@/components/configuracoes/EmpresasTab';
+import { AssinaturaEmailEditor } from '@/components/configuracoes/AssinaturaEmailEditor';
+import {
+  LOGO_EMAIL_URL,
+  montarRodapeEmailHtml,
+  normalizarAssinaturaAntiga,
+  sanitizarAssinaturaEmail,
+} from '@/lib/assinatura-email';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -121,6 +127,7 @@ function ProfileTab() {
   const [isUploading, setIsUploading] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [assinaturaHtml, setAssinaturaHtml] = useState('');
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['meu_perfil', user?.id],
@@ -135,6 +142,17 @@ function ProfileTab() {
     },
     enabled: !!user,
   });
+
+  // Seed uma vez por usuário (chave `perfil.id`, não `assinatura_email`): os
+  // outros campos deste form (Nome, Telefone) também são não-controlados via
+  // `defaultValue` e por isso também não voltam a sincronizar depois do
+  // primeiro carregamento — isto mantém o editor de assinatura consistente
+  // com esse mesmo comportamento, em vez de "piscar" pro valor recém-salvo a
+  // cada `invalidateQueries` de `updatePerfil`.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (perfil) setAssinaturaHtml(normalizarAssinaturaAntiga(perfil.assinatura_email));
+  }, [perfil?.id]);
 
   const updatePerfil = useMutation({
     mutationFn: async (dados: { nome?: string; telefone?: string; avatar_url?: string | null; assinatura_email?: string }) => {
@@ -234,10 +252,14 @@ function ProfileTab() {
   const handleSalvarPerfil = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    updatePerfil.mutate({ 
-      nome: form.get('nome') as string, 
+    updatePerfil.mutate({
+      nome: form.get('nome') as string,
       telefone: form.get('telefone') as string,
-      assinatura_email: form.get('assinatura_email') as string
+      // Sanitiza antes de gravar, não só antes de enviar: mantém o que fica
+      // salvo em `usuarios.assinatura_email` já limpo, em vez de confiar que
+      // todo consumidor futuro desse campo (só o envio de e-mail sanitiza de
+      // novo hoje) vá lembrar de tratar como HTML não confiável.
+      assinatura_email: sanitizarAssinaturaEmail(form.get('assinatura_email') as string),
     });
   };
 
@@ -365,7 +387,35 @@ function ProfileTab() {
             <form onSubmit={handleSalvarPerfil} className="space-y-3">
               <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" defaultValue={perfil.nome} placeholder="Seu nome completo" className="h-10" /></div>
               <div className="space-y-1.5"><Label>Telefone</Label><Input name="telefone" defaultValue={perfil.telefone ?? ''} placeholder="(00) 00000-0000" className="h-10" /></div>
-              <div className="space-y-1.5"><Label>Assinatura de E-mail</Label><Textarea name="assinatura_email" defaultValue={perfil.assinatura_email ?? ''} placeholder="Ex: Atenciosamente, Equipe MD" className="min-h-[100px]" /></div>
+              <div className="space-y-1.5">
+                <Label>Assinatura de E-mail</Label>
+                <AssinaturaEmailEditor
+                  name="assinatura_email"
+                  value={assinaturaHtml}
+                  onChange={setAssinaturaHtml}
+                />
+              </div>
+              {(assinaturaHtml || perfil.nome) && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-normal text-muted-foreground">
+                    Como fica no rodapé do e-mail
+                  </Label>
+                  {/* Papel branco fixo, como no leitor de e-mail: é exatamente o
+                      fundo sobre o qual o rodapé é composto no envio real, e
+                      teria contraste ruim sobre o tema escuro do app. */}
+                  <div
+                    className="overflow-hidden rounded-md border bg-white p-3"
+                    style={{ colorScheme: 'light' }}
+                    dangerouslySetInnerHTML={{
+                      __html: montarRodapeEmailHtml({
+                        nome: perfil.nome ?? '',
+                        assinaturaHtml,
+                        logoUrl: LOGO_EMAIL_URL,
+                      }),
+                    }}
+                  />
+                </div>
+              )}
               <div className="flex justify-end pt-2">
                 <Button type="submit" size="sm" disabled={updatePerfil.isPending}>
                   {updatePerfil.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

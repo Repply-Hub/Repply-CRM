@@ -51,6 +51,8 @@ import { erroLegivelDaFunction } from "@/lib/erro-edge-function";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
 import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
+import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
+import { montarRodapeEmailHtml, normalizarAssinaturaAntiga } from "@/lib/assinatura-email";
 import { GerenciarCaixaDialog } from "@/components/email/GerenciarCaixaDialog";
 import {
   BarraPastas,
@@ -91,6 +93,7 @@ const Emails = () => {
   const [selectedEmail, setSelectedEmail] = useState<EmailAberto | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [respondendo, setRespondendo] = useState(false);
+  const [emailParaConfirmar, setEmailParaConfirmar] = useState<string | null>(null);
   const [gerenciarCaixaAberto, setGerenciarCaixaAberto] = useState(false);
   // Marcador escolhido na barra lateral. null = a aba manda sozinha.
   const [pastaSelecionada, setPastaSelecionada] = useState<PastaSelecionada>(null);
@@ -494,14 +497,16 @@ const Emails = () => {
         <div style="font-family: sans-serif; font-size: 16px; color: #333; line-height: 1.5;">
           ${data.corpo.replace(/\n/g, '<br>')}
         </div>
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-          <img src="${COMPANY_LOGO_URL}?t=${Date.now()}" alt="MD Representações" style="max-height: 50px; display: block; margin-bottom: 10px;" />
-          <div style="color: #333; font-weight: bold; font-size: 16px;">${perfil?.nome || "Equipe MD"}</div>
-          ${perfil?.assinatura_email ? `<div style="color: #666; font-size: 14px; margin-top: 4px;">${perfil.assinatura_email.replace(/\n/g, '<br>')}</div>` : ''}
-          <div style="color: #94a3b8; font-size: 12px; margin-top: 15px;">
-            MD Representações
-          </div>
-        </div>
+        ${montarRodapeEmailHtml({
+          nome: perfil?.nome ?? "",
+          // `assinatura_email` já sanitizada em Configurações antes de ser
+          // salva — normaliza aqui é só pra converter formato ANTIGO (texto
+          // puro com `\n`, de antes do editor de formatação existir).
+          // `montarRodapeEmailHtml` sanitiza de novo por conta própria, então
+          // dado antigo/legado também não passa cru.
+          assinaturaHtml: normalizarAssinaturaAntiga(perfil?.assinatura_email),
+          logoUrl: `${COMPANY_LOGO_URL}?t=${Date.now()}`,
+        })}
       `;
 
       // O registro em email_mensagens é feito pela Edge Function, que é quem
@@ -673,6 +678,20 @@ const Emails = () => {
     setIsComposeOpen(true);
   };
 
+  /**
+   * Abre o compositor em branco já com "Para" preenchido — usada ao clicar
+   * num endereço dentro do e-mail aberto (cabeçalho ou corpo), depois de
+   * confirmado no `ConfirmarEnviarEmailDialog`. Ao contrário de
+   * `responderMensagem`, não cita nada nem amarra a uma conversa: é uma
+   * mensagem nova para aquele endereço, não uma resposta.
+   */
+  const enviarPara = (endereco: string) => {
+    setFormData({ destinatario: endereco, assunto: "", corpo: "" });
+    setRespondendoA(null);
+    setRespondendo(false);
+    setIsComposeOpen(true);
+  };
+
   /** Marca como lida sem segurar a abertura da mensagem. */
   const marcarLido = (id: string) => {
     // Escreve direto na lista que já está na tela, em vez de invalidar a
@@ -806,9 +825,19 @@ const Emails = () => {
             })
           }
           onResponder={responderMensagem}
+          onClicarEndereco={setEmailParaConfirmar}
         />
 
         {compositor}
+
+        <ConfirmarEnviarEmailDialog
+          endereco={emailParaConfirmar}
+          onCancelar={() => setEmailParaConfirmar(null)}
+          onConfirmar={(endereco) => {
+            setEmailParaConfirmar(null);
+            enviarPara(endereco);
+          }}
+        />
 
         <AlertDialog
           open={!!emailToDelete}

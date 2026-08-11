@@ -36,6 +36,7 @@ import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cn
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/shared/ListPagination';
+import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 import { cn, slugify, hasTextSelection } from '@/lib/utils';
 import { ExportClientesButton } from '@/components/clientes/ExportClientesButton';
 import { FilterButton } from '@/components/shared/FilterButton';
@@ -331,6 +332,7 @@ const Clientes = () => {
   const [importOpen, setImportOpen] = useState(false);
   const [panelEmpresa, setPanelEmpresa] = useState<any | null>(null);
   const [panelContato, setPanelContato] = useState<any | null>(null);
+  const [emailParaConfirmar, setEmailParaConfirmar] = useState<string | null>(null);
 
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
@@ -1780,7 +1782,13 @@ const Clientes = () => {
                       <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                         <Mail className="h-3 w-3" /> E-mail
                       </Label>
-                      <p className="text-sm font-medium">{panelEmpresa.email}</p>
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-left hover:underline hover:text-primary"
+                        onClick={() => setEmailParaConfirmar(panelEmpresa.email)}
+                      >
+                        {panelEmpresa.email}
+                      </button>
                     </div>
                   )}
                   {panelEmpresa.telefone && (
@@ -1876,7 +1884,13 @@ const Clientes = () => {
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <Mail className="h-3 w-3" /> E-mail
                     </Label>
-                    <p className="text-sm font-medium">{panelContato.email}</p>
+                    <button
+                      type="button"
+                      className="text-sm font-medium text-left hover:underline hover:text-primary"
+                      onClick={() => setEmailParaConfirmar(panelContato.email)}
+                    >
+                      {panelContato.email}
+                    </button>
                   </div>
                 )}
                 {panelContato.telefone && (
@@ -1933,6 +1947,12 @@ const Clientes = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ConfirmarEnviarEmailDialog
+        endereco={emailParaConfirmar}
+        onCancelar={() => setEmailParaConfirmar(null)}
+        onConfirmar={(endereco) => navigate(`/emails?to=${encodeURIComponent(endereco)}`)}
+      />
     </AppLayout>
   );
 };

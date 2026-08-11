@@ -28,6 +28,7 @@ import { EnderecoForm } from '@/components/clientes/EnderecoForm';
 import { emptyEndereco, enderecoToString, stringToEndereco, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { CargoSelect } from '@/components/shared/CargoSelect';
+import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 import { slugify } from '@/lib/utils';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
@@ -64,6 +65,7 @@ const ClienteDetalhe = () => {
   }, [slug]);
 
   const navigate = useNavigate();
+  const [emailParaConfirmar, setEmailParaConfirmar] = useState<string | null>(null);
   const { data: clientes, isLoading: loadingClientes } = useClientes();
   const { data: pedidos = [], isLoading: loadingPedidos } = usePedidosPorCliente(id);
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
@@ -526,14 +528,12 @@ const ClienteDetalhe = () => {
             tabIndex={cliente.email ? 0 : undefined}
             className={`border-border/40 ${cliente.email ? 'cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : ''}`}
             onClick={() => {
-              if (cliente.email) {
-                navigate(`/emails?to=${encodeURIComponent(cliente.email)}`);
-              }
+              if (cliente.email) setEmailParaConfirmar(cliente.email);
             }}
             onKeyDown={e => {
               if (cliente.email && (e.key === 'Enter' || e.key === ' ')) {
                 e.preventDefault();
-                navigate(`/emails?to=${encodeURIComponent(cliente.email)}`);
+                setEmailParaConfirmar(cliente.email);
               }
             }}
           >
@@ -1247,6 +1247,12 @@ const ClienteDetalhe = () => {
           </AlertDialog>
         </div>
       </div>
+
+      <ConfirmarEnviarEmailDialog
+        endereco={emailParaConfirmar}
+        onCancelar={() => setEmailParaConfirmar(null)}
+        onConfirmar={(endereco) => navigate(`/emails?to=${encodeURIComponent(endereco)}`)}
+      />
     </AppLayout>
   );
 };

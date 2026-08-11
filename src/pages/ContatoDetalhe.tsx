@@ -26,6 +26,7 @@ import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { CargoSelect } from '@/components/shared/CargoSelect';
+import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 
 const TAREFAS_PAGE_SIZE = 5;
 
@@ -42,6 +43,7 @@ const ContatoDetalhe = () => {
   }, [slug]);
 
   const navigate = useNavigate();
+  const [emailParaConfirmar, setEmailParaConfirmar] = useState<string | null>(null);
   const { data: contatos, isLoading } = useContatos();
 
   // Debug log
@@ -285,10 +287,10 @@ const ContatoDetalhe = () => {
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-tight">E-mail Corporativo</p>
                     <p className="text-sm font-semibold text-foreground truncate">{contato.email || 'Não informado'}</p>
                     {contato.email && (
-                      <Button 
-                        variant="link" 
-                        className="p-0 h-auto text-[11px] mt-1" 
-                        onClick={() => navigate(`/emails?to=${encodeURIComponent(contato.email)}`)}
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto text-[11px] mt-1"
+                        onClick={() => setEmailParaConfirmar(contato.email)}
                       >
                         Enviar e-mail
                       </Button>
@@ -550,6 +552,12 @@ const ContatoDetalhe = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      <ConfirmarEnviarEmailDialog
+        endereco={emailParaConfirmar}
+        onCancelar={() => setEmailParaConfirmar(null)}
+        onConfirmar={(endereco) => navigate(`/emails?to=${encodeURIComponent(endereco)}`)}
+      />
     </AppLayout>
   );
 };
