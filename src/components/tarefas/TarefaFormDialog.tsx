@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogPortal } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,14 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
   // aparecer pra seleção manual.
   const negocioTravado = extraFields?.pedido_id !== undefined;
   const clienteTravado = extraFields?.cliente_id !== undefined;
+
+  // Um negócio só pode estar vinculado à sua própria empresa: selecionar o negócio primeiro
+  // puxa a empresa automaticamente, e selecionar a empresa primeiro restringe a lista de
+  // negócios aos que pertencem a ela.
+  const pedidosOptionsFiltradas = useMemo(() => {
+    if (!form.cliente_id) return pedidosOptions;
+    return pedidosOptions.filter(p => p.cliente?.id === form.cliente_id);
+  }, [pedidosOptions, form.cliente_id]);
 
   useEffect(() => {
     if (!open) return;
@@ -122,7 +130,7 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
           <div><Label>Título *</Label><Input placeholder="Ex: Ligar para o cliente" value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} /></div>
           <div><Label>Descrição</Label><Textarea placeholder="Detalhes da tarefa (opcional)" value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} rows={3} /></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
+            <div className="space-y-1.5">
               <Label>Status</Label>
               <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -157,7 +165,12 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
                   <SearchableSelect
                     options={clientes.map(c => ({ value: c.id, label: c.empresa }))}
                     value={form.cliente_id}
-                    onValueChange={v => setForm(f => ({ ...f, cliente_id: v }))}
+                    onValueChange={v => setForm(f => {
+                      // Troca de empresa: se o negócio selecionado não pertence a ela, desvincula.
+                      const pedidoAtual = pedidosOptions.find(p => p.id === f.pedido_id);
+                      const pedidoAindaValido = pedidoAtual && pedidoAtual.cliente?.id === v;
+                      return { ...f, cliente_id: v, pedido_id: pedidoAindaValido ? f.pedido_id : '' };
+                    })}
                     placeholder="Vincular a uma empresa"
                     contentClassName="w-[min(28rem,90vw)]"
                   />
@@ -167,12 +180,15 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
                 <div className="space-y-1.5">
                   <Label>Negócio</Label>
                   <SearchableSelect
-                    options={pedidosOptions.map(p => ({
+                    options={pedidosOptionsFiltradas.map(p => ({
                       value: p.id,
                       label: getNomeNegocio(p),
                     }))}
                     value={form.pedido_id}
-                    onValueChange={v => setForm(f => ({ ...f, pedido_id: v }))}
+                    onValueChange={v => setForm(f => {
+                      const pedido = pedidosOptions.find(p => p.id === v);
+                      return { ...f, pedido_id: v, cliente_id: pedido?.cliente?.id ?? f.cliente_id };
+                    })}
                     placeholder="Vincular a um negócio"
                     contentClassName="w-[min(28rem,90vw)]"
                   />
