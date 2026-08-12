@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
 import DOMPurify from 'dompurify';
-import { ArrowLeft, Trash2, Reply, Loader2, Paperclip } from 'lucide-react';
+import { ArrowLeft, Trash2, Reply, Loader2, Paperclip, MailOpen, CornerUpLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 export interface EmailAberto {
   id: string;
@@ -21,11 +22,32 @@ export interface EmailAberto {
   gmail_message_id?: string | null;
   /** Endereço da caixa de origem, quando ela já foi desconectada. */
   caixaOrigem?: string | null;
+  /** Só existe em mensagem recebida; enviada não tem estado de leitura. */
+  lido?: boolean;
+  /** Só existe em mensagem recebida: já saiu alguma resposta nesta conversa? */
+  respondida?: boolean;
   criado_em?: string | null;
   created_at?: string | null;
   carregandoCorpo?: boolean;
   anexos?: Array<{ filename?: string; size?: number }>;
   type?: 'sent' | 'received';
+  /** Id da conversa no provedor — liga esta mensagem às demais do mesmo thread. */
+  threadId?: string | null;
+}
+
+/** Uma outra mensagem da mesma conversa, exibida já aberta em "Nesta conversa". */
+export interface MensagemDaConversa {
+  id: string;
+  tipo: 'sent' | 'received';
+  /** Mesmo formato de `EmailAberto.remetente`: "Nome <email>" ou só o endereço. */
+  remetente: string;
+  data: string | null;
+  /** Corpo completo já carregado — usado no lugar da prévia, para o card vir aberto. */
+  html: string;
+  /** Prévia; fallback só quando `html` vier vazio (corpo não pôde ser buscado). */
+  snippet: string;
+  /** Sem sentido em mensagem enviada — ignorado nesse caso. */
+  lido?: boolean;
 }
 
 interface Props {
@@ -36,6 +58,13 @@ interface Props {
   onResponder: () => void;
   /** Clique num endereço de e-mail — no cabeçalho ou dentro do corpo da mensagem. */
   onClicarEndereco?: (endereco: string) => void;
+  /** Ausente em mensagem enviada, que não tem "não lido" para marcar. */
+  onMarcarNaoLido?: () => void;
+  /** Demais mensagens da mesma conversa (mesmo `nylas_thread_id`), já sem a que está aberta. */
+  mensagensDaConversa?: MensagemDaConversa[];
+  carregandoConversa?: boolean;
+  /** Clique num card de "Nesta conversa" — troca a mensagem aberta no leitor. */
+  onAbrirMensagemDaConversa?: (id: string) => void;
 }
 
 /** Separa "Fulano <fulano@x.com>" em nome e endereço. */
@@ -325,26 +354,22 @@ function tornarEnderecosClicaveis(raiz: HTMLElement, onClicar: (endereco: string
 }
 
 /**
- * Leitura de uma mensagem, ocupando a tela inteira — como o Gmail.
- *
- * Substitui o modal que existia antes: e-mail não é confirmação de ação, é
- * conteúdo para ler. Modal empilha um contexto sobre o outro, prende a rolagem
- * e obriga a fechar para voltar à lista; a leitura em página deixa o "voltar"
- * ser o gesto natural, e o corpo respira na largura toda.
+ * Corpo de UMA mensagem — papel branco, sanitizado, com endereços clicáveis.
+ * Usado tanto pela mensagem principal quanto por cada card de "Nesta
+ * conversa": extraído à parte porque cada mensagem tem seu PRÓPRIO HTML (e
+ * portanto seu próprio container/efeito de pós-processamento) — não dá para
+ * reaproveitar uma única ref quando várias mensagens ficam abertas ao mesmo
+ * tempo na tela.
  */
-export function LeitorEmail({
-  email,
-  emailDaConta,
-  onVoltar,
-  onExcluir,
-  onResponder,
+function CorpoEmail({
+  html,
+  textoSimples,
   onClicarEndereco,
-}: Props) {
-  const { nome, endereco } = separarRemetente(email.remetente);
-  const data = email.created_at ?? email.criado_em;
-  const inicial = (nome || '?').trim()[0]?.toUpperCase() ?? '?';
-  const anexos = email.anexos ?? [];
-
+}: {
+  html?: string | null;
+  textoSimples?: string | null;
+  onClicarEndereco?: (endereco: string) => void;
+}) {
   /**
    * O corpo do e-mail é HTML escrito por QUALQUER PESSOA DO MUNDO — basta
    * escrever para o endereço da empresa. Injetá-lo cru era um XSS armazenado:
@@ -361,19 +386,16 @@ export function LeitorEmail({
    *
    * `ADD_ATTR: ['target']` não entra: os links abrem na própria aba, e é
    * melhor assim do que abrir uma aba nova com opener exposto.
-   *
-   * `useMemo` porque sanitizar um e-mail com tabela de 600px não é de graça e
-   * o componente rerenderiza a cada troca de estado do leitor.
    */
   const corpoSeguro = useMemo(
     () =>
-      email.html
-        ? DOMPurify.sanitize(email.html, {
+      html
+        ? DOMPurify.sanitize(html, {
             FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'form', 'base', 'link'],
             FORBID_ATTR: ['target', 'formaction', 'ping', 'srcset'],
           })
         : '',
-    [email.html],
+    [html],
   );
 
   const corpoHtmlRef = useRef<HTMLDivElement>(null);
@@ -417,6 +439,73 @@ export function LeitorEmail({
     return () => container.removeEventListener('click', aoClicar);
   }, [corpoSeguro]);
 
+  /* Papel branco por padrão, como Gmail e Outlook: o HTML de e-mail é escrito
+     assumindo fundo claro, e renderizar sobre o tema escuro produziria preto
+     no preto na maioria das mensagens.
+
+     O que NÃO fazemos aqui é impor cor ao conteúdo por TAG. A versão anterior
+     aplicava `prose`, que estiliza cada elemento (`p`, `a`, `h1`...)
+     individualmente e por isso sobrescrevia até cor herdada de um `style` no
+     ancestral — num e-mail de fundo escuro com texto claro, o título e os
+     links viravam escuro sobre escuro e sumiam.
+
+     `text-slate-900` aqui é só o valor herdado pelo CONTAINER: ele preenche o
+     texto que não define cor própria. Qualquer elemento do e-mail que já
+     define sua própria cor continua intacto, porque isto não cria regra por
+     tag.
+
+     `color-scheme: light` impede o navegador de reinterpretar cores em modo
+     escuro dentro deste bloco. */
+  return (
+    <div
+      className="overflow-hidden rounded-lg border bg-white text-slate-900"
+      style={{ colorScheme: 'light' }}
+    >
+      {html ? (
+        <div
+          ref={corpoHtmlRef}
+          // Espaçamento sim, cor não: um e-mail de texto simples sem wrapper
+          // próprio ficaria colado na borda. A rolagem horizontal é o preço de
+          // aceitar HTML alheio: muitos e-mails são tabelas de largura fixa
+          // (600px é o padrão do mercado) e sem isto empurrariam a página
+          // inteira.
+          className="overflow-x-auto p-4 [&_img]:h-auto [&_img]:max-w-full [&_table]:max-w-full"
+          dangerouslySetInnerHTML={{ __html: corpoSeguro }}
+        />
+      ) : (
+        <div className="whitespace-pre-wrap px-5 py-4 text-[0.9375rem] leading-relaxed text-slate-800">
+          {textoSimples || ''}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Leitura de uma mensagem, ocupando a tela inteira — como o Gmail.
+ *
+ * Substitui o modal que existia antes: e-mail não é confirmação de ação, é
+ * conteúdo para ler. Modal empilha um contexto sobre o outro, prende a rolagem
+ * e obriga a fechar para voltar à lista; a leitura em página deixa o "voltar"
+ * ser o gesto natural, e o corpo respira na largura toda.
+ */
+export function LeitorEmail({
+  email,
+  emailDaConta,
+  onVoltar,
+  onExcluir,
+  onResponder,
+  onClicarEndereco,
+  onMarcarNaoLido,
+  mensagensDaConversa,
+  carregandoConversa,
+  onAbrirMensagemDaConversa,
+}: Props) {
+  const { nome, endereco } = separarRemetente(email.remetente);
+  const data = email.created_at ?? email.criado_em;
+  const inicial = (nome || '?').trim()[0]?.toUpperCase() ?? '?';
+  const anexos = email.anexos ?? [];
+
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Barra de ações. Fixa no topo para que "voltar" e "excluir" continuem
@@ -434,6 +523,18 @@ export function LeitorEmail({
             <Reply className="h-4 w-4" />
             Responder
           </Button>
+          {onMarcarNaoLido && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onMarcarNaoLido}
+              className="text-muted-foreground hover:text-foreground"
+              title="Marcar como não lido"
+              aria-label="Marcar como não lido"
+            >
+              <MailOpen className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -453,12 +554,12 @@ export function LeitorEmail({
             mensagem chegava cortada à direita e só aparecia inteira rolando na
             horizontal — dentro de uma tela que já rola na vertical. */}
         <div className="mx-auto w-full max-w-5xl px-6 py-6">
-          <h1 className="mb-6 font-normal text-[1.375rem] leading-snug text-foreground">
+          <h1 className="mb-4 font-semibold text-[1.5rem] leading-snug text-foreground">
             {email.assunto || '(sem assunto)'}
           </h1>
 
-          <div className="mb-6 flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold uppercase text-primary">
+          <div className="mb-6 flex items-start gap-3 border-b border-border/60 pb-5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold uppercase text-primary ring-1 ring-primary/15">
               {inicial}
             </div>
 
@@ -499,7 +600,7 @@ export function LeitorEmail({
                       }
                     }}
                   >
-                    &lt;{endereco}&gt;
+                    {endereco}
                   </span>
                 )}
               </div>
@@ -531,11 +632,19 @@ export function LeitorEmail({
               </div>
             </div>
 
-            {data && (
-              <div className="shrink-0 text-xs text-muted-foreground">
-                {format(new Date(data), "dd 'de' MMM 'de' yyyy, HH:mm", { locale: ptBR })}
-              </div>
-            )}
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {data && (
+                <div className="text-xs text-muted-foreground">
+                  {format(new Date(data), "dd 'de' MMM 'de' yyyy, HH:mm", { locale: ptBR })}
+                </div>
+              )}
+              {email.respondida && (
+                <div className="flex items-center gap-1 text-[11px] font-medium text-primary">
+                  <CornerUpLeft className="h-3 w-3" />
+                  Você respondeu
+                </div>
+              )}
+            </div>
           </div>
 
           {email.carregandoCorpo && (
@@ -557,52 +666,7 @@ export function LeitorEmail({
             </div>
           )}
 
-          {/* Papel branco por padrão, como Gmail e Outlook: o HTML de e-mail é
-              escrito assumindo fundo claro, e renderizar sobre o tema escuro
-              produziria preto no preto na maioria das mensagens.
-
-              O que NÃO fazemos aqui é impor cor ao conteúdo por TAG. A versão
-              anterior aplicava `prose`, que estiliza cada elemento (`p`, `a`,
-              `h1`...) individualmente e por isso sobrescrevia até cor herdada
-              de um `style` no ancestral — num e-mail de fundo escuro com texto
-              claro (o da Make é exatamente isso), o título e os links viravam
-              escuro sobre escuro e sumiam.
-
-              `text-slate-900` aqui é só o valor herdado pelo CONTAINER: ele
-              preenche o texto que não define cor própria (que, sem isto,
-              herdava `text-foreground` da página — quase branco no tema
-              escuro, sumindo sobre o fundo branco do e-mail). Qualquer
-              elemento do e-mail que já define sua própria cor continua
-              intacto, porque isto não cria regra por tag. Cor, fonte e
-              espaçamento continuam do remetente; nós só damos a tela, o
-              contorno e contemos o transbordo.
-
-              `color-scheme: light` impede o navegador de reinterpretar cores
-              em modo escuro dentro deste bloco. */}
-          <div
-            className="overflow-hidden rounded-lg border bg-white text-slate-900"
-            style={{ colorScheme: 'light' }}
-          >
-            {email.html ? (
-              <div
-                ref={corpoHtmlRef}
-                // Espaçamento sim, cor não: um e-mail de texto simples sem
-                // wrapper próprio ficaria colado na borda. Em mensagens que
-                // trazem fundo próprio isso vira uma moldura branca fina, que é
-                // como o Gmail também as mostra.
-                //
-                // A rolagem horizontal é o preço de aceitar HTML alheio: muitos
-                // e-mails são tabelas de largura fixa (600px é o padrão do
-                // mercado) e sem isto empurrariam a página inteira.
-                className="overflow-x-auto p-4 [&_img]:h-auto [&_img]:max-w-full [&_table]:max-w-full"
-                dangerouslySetInnerHTML={{ __html: corpoSeguro }}
-              />
-            ) : (
-              <div className="whitespace-pre-wrap px-5 py-4 text-[0.9375rem] leading-relaxed text-slate-800">
-                {email.corpo || ''}
-              </div>
-            )}
-          </div>
+          <CorpoEmail html={email.html} textoSimples={email.corpo} onClicarEndereco={onClicarEndereco} />
 
           {anexos.length > 0 && (
             <div className="mt-4">
@@ -625,6 +689,86 @@ export function LeitorEmail({
                     ) : null}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {carregandoConversa && (
+            <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Carregando o resto da conversa...
+            </div>
+          )}
+
+          {/* Cada mensagem da conversa vira seu próprio card, já ABERTO (corpo
+              completo, não só a prévia) — só o cabeçalho (quem/quando) fica
+              num botão à parte, fora do corpo em si: o corpo é HTML de
+              terceiros injetado via `dangerouslySetInnerHTML` dentro de
+              `CorpoEmail`, e aninhar isso dentro de um `<button>` quebraria os
+              próprios links/endereços clicáveis do conteúdo (elemento
+              interativo dentro de elemento interativo). O botão do cabeçalho
+              serve para focar aquela mensagem como a "atual" do leitor — para
+              responder ou excluir especificamente ela, por exemplo — o corpo
+              já visível não depende do clique. `gap-5` entre os cards: mais
+              respiro que os `gap-2` de quando eram só prévia, porque agora
+              cada um carrega o corpo inteiro. Só aparece quando existe MAIS de
+              uma mensagem no mesmo `nylas_thread_id`; conversa de mensagem
+              única não ganha a seção. */}
+          {!!mensagensDaConversa?.length && (
+            <div className="mt-6">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Nesta conversa ({mensagensDaConversa.length + 1})
+              </p>
+              <div className="flex flex-col gap-5">
+                {mensagensDaConversa.map((m) => {
+                  const { nome } = separarRemetente(m.remetente);
+                  const naoLida = m.tipo === 'received' && m.lido === false;
+                  return (
+                    <div key={m.id} className="overflow-hidden rounded-lg border border-border/60">
+                      <button
+                        type="button"
+                        onClick={() => onAbrirMensagemDaConversa?.(m.id)}
+                        title="Focar esta mensagem (responder ou excluir só ela)"
+                        className="flex w-full items-center gap-3 bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                      >
+                        <div
+                          className={cn(
+                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                            m.tipo === 'sent'
+                              ? 'bg-primary/10 text-primary'
+                              : naoLida
+                                ? 'bg-primary/10 text-primary'
+                                : 'bg-muted text-muted-foreground',
+                          )}
+                        >
+                          {m.tipo === 'sent' ? (
+                            <CornerUpLeft className="h-3.5 w-3.5" />
+                          ) : (
+                            (nome || '?').trim()[0]?.toUpperCase() ?? '?'
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span
+                            className={cn(
+                              'block truncate text-sm',
+                              naoLida ? 'font-bold text-foreground' : 'font-medium text-foreground',
+                            )}
+                          >
+                            {m.tipo === 'sent' ? 'Você' : nome}
+                          </span>
+                        </div>
+                        {m.data && (
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {format(new Date(m.data), "dd 'de' MMM, HH:mm", { locale: ptBR })}
+                          </span>
+                        )}
+                      </button>
+                      <div className="border-t border-border/60 p-3">
+                        <CorpoEmail html={m.html} textoSimples={m.snippet} onClicarEndereco={onClicarEndereco} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

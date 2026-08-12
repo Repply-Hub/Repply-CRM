@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Mail,
+  MailOpen,
   Send,
   Inbox,
   Search,
@@ -16,9 +17,17 @@ import {
   CheckSquare,
   ChevronLeft,
   ChevronRight,
-  Tag
+  ChevronsLeft,
+  ChevronsRight,
+  Tag,
+  CornerUpLeft,
 } from "lucide-react";
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -52,7 +61,10 @@ import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
 import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
-import { montarRodapeEmailHtml, normalizarAssinaturaAntiga } from "@/lib/assinatura-email";
+import {
+  montarRodapeEmailHtml,
+  normalizarAssinaturaAntiga,
+} from "@/lib/assinatura-email";
 import { GerenciarCaixaDialog } from "@/components/email/GerenciarCaixaDialog";
 import {
   BarraPastas,
@@ -72,6 +84,8 @@ interface MensagemRecebida {
   /** Endereço da caixa que recebeu, quando ela já foi desconectada. */
   caixaOrigem: string | null;
   gmail_message_id: string | null;
+  /** Id da conversa no provedor — liga esta mensagem às respostas enviadas na mesma conversa. */
+  threadId: string | null;
   remetente: string;
   destinatarios: string[];
   assunto: string | null;
@@ -81,6 +95,72 @@ interface PaginaRecebidos {
   emails: MensagemRecebida[];
   count: number;
 }
+
+/** Largura das colunas de data e ações — mesma nos 3 cabeçalhos e nas 3 linhas, para alinhar. */
+const LARGURA_COL_DATA = "w-24 shrink-0 whitespace-nowrap";
+const LARGURA_COL_ACOES = "w-20 shrink-0";
+
+/**
+ * Cabeçalho de colunas acima de cada listagem — repete a MESMA grade da
+ * linha (largura do checkbox, do avatar, do bloco de conteúdo em duas linhas,
+ * da coluna de data e da coluna de ações) trocando o dado por um rótulo, para
+ * remetente/assunto/data/ações pararem de parecer um bloco só de texto.
+ * `sticky` dentro do próprio contêiner com rolagem da lista.
+ */
+const CabecalhoLista = ({
+  rotuloPrincipal,
+  rotuloData,
+  rotuloAssunto,
+  checkbox,
+}: {
+  rotuloPrincipal: string;
+  rotuloData: string;
+  rotuloAssunto: string;
+  /** Omitido nas telas sem seleção em massa (ex.: Rascunhos). */
+  checkbox?: { checked: boolean; onChange: () => void };
+}) => (
+  <div className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background px-4 py-2">
+    {/* bg SÓLIDO — de propósito. Um fundo translúcido aqui (bg-muted/5, como o
+        rodapé usa) deixa as linhas que rolam por baixo aparecendo através do
+        cabeçalho fixo, já que ele fica sobreposto ao conteúdo. O rodapé não
+        tem esse problema por não ficar em cima de nada. bg-background é a cor
+        de fundo de toda a lista, então o resultado visual é o mesmo tom do
+        rodapé — só que sem deixar nada vazar. */}
+    {checkbox && (
+      <Checkbox
+        className="shrink-0"
+        checked={checkbox.checked}
+        onCheckedChange={checkbox.onChange}
+        aria-label="Selecionar todos"
+      />
+    )}
+    <div className="h-9 w-9 shrink-0" />
+    <div className="min-w-0 flex-1">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {rotuloPrincipal}
+      </p>
+      <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {rotuloAssunto}
+      </p>
+    </div>
+    <div
+      className={cn(
+        LARGURA_COL_DATA,
+        "text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground",
+      )}
+    >
+      {rotuloData}
+    </div>
+    <div
+      className={cn(
+        LARGURA_COL_ACOES,
+        "text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground",
+      )}
+    >
+      Ações
+    </div>
+  </div>
+);
 
 const Emails = () => {
   const [searchParams] = useSearchParams();
@@ -93,12 +173,18 @@ const Emails = () => {
   const [selectedEmail, setSelectedEmail] = useState<EmailAberto | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [respondendo, setRespondendo] = useState(false);
-  const [emailParaConfirmar, setEmailParaConfirmar] = useState<string | null>(null);
+  const [emailParaConfirmar, setEmailParaConfirmar] = useState<string | null>(
+    null,
+  );
   const [gerenciarCaixaAberto, setGerenciarCaixaAberto] = useState(false);
   // Marcador escolhido na barra lateral. null = a aba manda sozinha.
-  const [pastaSelecionada, setPastaSelecionada] = useState<PastaSelecionada>(null);
+  const [pastaSelecionada, setPastaSelecionada] =
+    useState<PastaSelecionada>(null);
   const [somenteNaoLidas, setSomenteNaoLidas] = useState(false);
-  const [emailToDelete, setEmailToDelete] = useState<{ id: string; type: "sent" | "received" } | null>(null);
+  const [emailToDelete, setEmailToDelete] = useState<{
+    id: string;
+    type: "sent" | "received";
+  } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>("received");
   /** `nylas_message_id` da mensagem sendo respondida; nulo num e-mail novo. */
@@ -106,14 +192,25 @@ const Emails = () => {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [pageSent, setPageSent] = useState(0);
   const [pageReceived, setPageReceived] = useState(0);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 50;
   // Nylas no lugar do Gmail direto: o contrato do hook é o mesmo
   // (isConnected/connectedEmail/sendEmail), então a troca é de import. A
   // diferença de modelo é que a caixa agora é da EMPRESA, compartilhada pelo
   // time, e não uma conta por usuário.
-  const { isConnected, connectedEmail, enviarEmail: sendEmail, sincronizar, sincronizarAsync,
-    isSyncing, carregarCorpo, podeGerenciarCaixa, conta } = useEmailEmpresa();
-  const { data: pastas = [], isLoading: pastasCarregando } = useEmailPastas(conta?.id);
+  const {
+    isConnected,
+    connectedEmail,
+    enviarEmail: sendEmail,
+    sincronizar,
+    sincronizarAsync,
+    isSyncing,
+    carregarCorpo,
+    podeGerenciarCaixa,
+    conta,
+  } = useEmailEmpresa();
+  const { data: pastas = [], isLoading: pastasCarregando } = useEmailPastas(
+    conta?.id,
+  );
   const { data: contagens = new Map() } = useContagemPorPasta(conta?.id);
 
   /**
@@ -152,28 +249,159 @@ const Emails = () => {
       const t = p.atualizadoEm ? new Date(p.atualizadoEm).getTime() : 0;
       return t > maior ? t : maior;
     }, 0);
-    const precisaEspelhar = pastas.length === 0 || Date.now() - maisRecente > UM_DIA;
+    const precisaEspelhar =
+      pastas.length === 0 || Date.now() - maisRecente > UM_DIA;
     if (!precisaEspelhar) return;
 
     espelhouPastasRef.current = true;
-    void sincronizar({ limit: 20, silencioso: true });
+    void sincronizar({ limit: 50, silencioso: true });
   }, [isConnected, conta?.id, pastasCarregando, pastas, sincronizar]);
 
   const [formData, setFormData] = useState({
     destinatario: "",
     assunto: "",
-    corpo: ""
+    corpo: "",
+  });
+  /** Id do rascunho em `email_rascunhos` sendo editado; nulo enquanto o autosave ainda não gravou a primeira vez. */
+  const [rascunhoId, setRascunhoId] = useState<string | null>(null);
+
+  const COMPANY_LOGO_URL =
+    "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png";
+
+  const { data: perfil } = useQuery({
+    queryKey: ["meu_perfil"],
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from("usuarios")
+        .select("id, nome, assinatura_email, empresa_id")
+        .eq("user_id", user.id)
+        .single();
+      return data;
+    },
   });
 
-  const COMPANY_LOGO_URL = "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png";
+  /**
+   * Rascunhos do usuário logado, mais recente primeiro. Alimenta a aba
+   * "Rascunhos" (item 3.5) e a recuperação automática ao clicar em
+   * "Escrever" num compositor em branco (item 3.4) — os dois usam a MESMA
+   * lista para não haver dois lugares de verdade sobre o que existe salvo.
+   */
+  const { data: rascunhos } = useQuery({
+    queryKey: ["email_rascunhos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("email_rascunhos")
+        .select("id, destinatario, assunto, corpo, atualizado_em")
+        .order("atualizado_em", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!perfil?.id,
+  });
 
   useEffect(() => {
     const to = searchParams.get("to");
     if (to) {
-      setFormData(prev => ({ ...prev, destinatario: to }));
+      setFormData((prev) => ({ ...prev, destinatario: to }));
+      // Contexto novo (endereço veio de fora, não de um rascunho salvo): não
+      // continuar amarrado a um rascunho de uma composição anterior.
+      setRascunhoId(null);
       setIsComposeOpen(true);
     }
   }, [searchParams]);
+
+  const salvarRascunhoMutation = useMutation({
+    mutationFn: async (dados: {
+      id: string | null;
+      destinatario: string;
+      assunto: string;
+      corpo: string;
+    }) => {
+      if (!perfil?.id || !perfil?.empresa_id) return null;
+      if (dados.id) {
+        const { error } = await supabase
+          .from("email_rascunhos")
+          .update({
+            destinatario: dados.destinatario,
+            assunto: dados.assunto,
+            corpo: dados.corpo,
+            atualizado_em: new Date().toISOString(),
+          })
+          .eq("id", dados.id);
+        if (error) throw error;
+        return dados.id;
+      }
+      const { data, error } = await supabase
+        .from("email_rascunhos")
+        .insert({
+          destinatario: dados.destinatario,
+          assunto: dados.assunto,
+          corpo: dados.corpo,
+          empresa_id: perfil.empresa_id,
+          usuario_id: perfil.id,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return (data?.id as string) ?? null;
+    },
+    onSuccess: (id) => {
+      if (id) setRascunhoId(id);
+      queryClient.invalidateQueries({ queryKey: ["email_rascunhos"] });
+    },
+    onError: (error: any) => {
+      // Autosave é melhor-esforço: falhar aqui não pode interromper a
+      // digitação nem exigir que a pessoa perceba e tente de novo.
+      console.warn("[email] não consegui salvar o rascunho:", error?.message);
+    },
+  });
+
+  const descartarRascunhoMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("email_rascunhos")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["email_rascunhos"] });
+    },
+  });
+
+  /**
+   * Autosave da composição: 2s depois da última tecla, grava (insere na
+   * primeira vez, atualiza depois) em `email_rascunhos`. Roda para QUALQUER
+   * composição aberta — nova mensagem ou resposta — porque um rascunho de
+   * resposta perdido dói tanto quanto um de mensagem nova.
+   *
+   * `rascunhoId` de propósito FORA das deps: ele muda quando o autosave
+   * anterior termina (via `onSuccess`), sem o conteúdo do formulário ter
+   * mudado — reagir a essa mudança reagendaria um autosave vazio a cada
+   * gravação bem-sucedida. A próxima tecla já dispara o efeito de novo e lê o
+   * `rascunhoId` atual do escopo, então não fica desatualizado.
+   */
+  useEffect(() => {
+    if (!isComposeOpen) return;
+    if (!perfil?.id || !perfil?.empresa_id) return;
+    const { destinatario, assunto, corpo } = formData;
+    if (!destinatario && !assunto && !corpo) return;
+
+    const timer = setTimeout(() => {
+      salvarRascunhoMutation.mutate({
+        id: rascunhoId,
+        destinatario,
+        assunto,
+        corpo,
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, isComposeOpen, perfil?.id, perfil?.empresa_id]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -206,14 +434,18 @@ const Emails = () => {
       toast.info("Conexão cancelada.");
     } else {
       const MOTIVOS: Record<string, string> = {
-        state_invalido: "O link de conexão não é mais válido. Tente conectar de novo.",
+        state_invalido:
+          "O link de conexão não é mais válido. Tente conectar de novo.",
         state_expirado: "A conexão demorou demais. Tente de novo.",
         troca_falhou: "O provedor recusou a autorização. Tente de novo.",
         caixa_em_uso: "Esta caixa já está conectada a outra empresa.",
         gravacao_falhou: "Não foi possível salvar a conexão. Tente de novo.",
         retorno_incompleto: "O provedor devolveu uma resposta incompleta.",
       };
-      toast.error(MOTIVOS[searchParams.get("motivo") ?? ""] ?? "Não foi possível conectar a caixa.");
+      toast.error(
+        MOTIVOS[searchParams.get("motivo") ?? ""] ??
+          "Não foi possível conectar a caixa.",
+      );
     }
 
     // Limpa a query para o aviso não reaparecer a cada re-render ou refresh.
@@ -222,20 +454,6 @@ const Emails = () => {
     limpa.searchParams.delete("motivo");
     window.history.replaceState({}, "", limpa.toString());
   }, [searchParams, queryClient]);
-
-  const { data: perfil } = useQuery({
-    queryKey: ["meu_perfil"],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data } = await supabase
-        .from("usuarios")
-        .select("nome, assinatura_email")
-        .eq("user_id", user.id)
-        .single();
-      return data;
-    },
-  });
 
   const { data: sentData, isLoading: isSentLoading } = useQuery({
     queryKey: ["emails", buscaAplicada, pageSent],
@@ -253,7 +471,7 @@ const Emails = () => {
       let query = supabase
         .from("email_mensagens")
         .select(
-          "id, assunto, snippet, destinatarios, remetente_email, envio_status, data_mensagem, caixa_origem",
+          "id, assunto, snippet, destinatarios, remetente_email, envio_status, data_mensagem, caixa_origem, nylas_thread_id, nylas_message_id",
           { count: "exact" },
         )
         .eq("direcao", "enviado")
@@ -262,7 +480,9 @@ const Emails = () => {
         .range(pageSent * PAGE_SIZE, (pageSent + 1) * PAGE_SIZE - 1);
 
       if (buscaAplicada) {
-        query = query.or(`assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%`);
+        query = query.or(
+          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%`,
+        );
       }
 
       const { data, error, count } = await query;
@@ -274,7 +494,10 @@ const Emails = () => {
         const dest = Array.isArray(m.destinatarios) ? m.destinatarios : [];
         return {
           id: m.id,
-          destinatario: dest.map((d: { email?: string }) => d?.email).filter(Boolean).join(", "),
+          destinatario: dest
+            .map((d: { email?: string }) => d?.email)
+            .filter(Boolean)
+            .join(", "),
           remetente: m.remetente_email,
           assunto: m.assunto,
           corpo: m.snippet ?? "",
@@ -283,6 +506,8 @@ const Emails = () => {
           caixaOrigem: m.caixa_origem ?? null,
           created_at: m.data_mensagem,
           updated_at: m.data_mensagem,
+          threadId: m.nylas_thread_id ?? null,
+          gmail_message_id: m.nylas_message_id,
         };
       });
 
@@ -307,7 +532,7 @@ const Emails = () => {
       let consulta = supabase
         .from("email_mensagens")
         .select(
-          "id, lido, data_mensagem, snippet, nylas_message_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem",
+          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem",
           { count: "exact" },
         )
         .eq("direcao", "recebido")
@@ -370,11 +595,14 @@ const Emails = () => {
         // email_contas.
         caixaOrigem: m.caixa_origem ?? null,
         gmail_message_id: m.nylas_message_id,
+        threadId: m.nylas_thread_id ?? null,
         remetente: m.remetente_nome
           ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
           : (m.remetente_email ?? ""),
         destinatarios: Array.isArray(m.destinatarios)
-          ? m.destinatarios.map((d: { email?: string }) => d?.email).filter(Boolean)
+          ? m.destinatarios
+              .map((d: { email?: string }) => d?.email)
+              .filter(Boolean)
           : [],
         assunto: m.assunto,
       }));
@@ -386,6 +614,34 @@ const Emails = () => {
 
   const receivedEmails = receivedData?.emails || [];
   const totalReceived = receivedData?.count || 0;
+
+  /**
+   * Ids de conversa (`nylas_thread_id`) que já têm alguma mensagem ENVIADA —
+   * usado só para desenhar o indicador "você respondeu" na lista de
+   * Recebidos. Não existe coluna pronta pra isso (ver `enviarEmail` em
+   * use-email-empresa.ts: a resposta grava o mesmo `thread_id` da conversa
+   * original, mas nada marca a mensagem original como respondida), então a
+   * lista de threads respondidas é montada aqui.
+   *
+   * Consulta enxuta de propósito — só a coluna do id, só linhas enviadas — e
+   * não paginada: hoje a caixa tem ~180 mensagens enviadas, então o Set cabe
+   * inteiro na memória sem drama. Se o volume crescer muito, isso pede uma
+   * função no banco em vez de trazer os ids todos pro cliente.
+   */
+  const { data: threadsRespondidos } = useQuery({
+    queryKey: ["threads_respondidos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("email_mensagens")
+        .select("nylas_thread_id")
+        .eq("direcao", "enviado")
+        .eq("excluido", false)
+        .not("nylas_thread_id", "is", null);
+      if (error) throw error;
+      return new Set((data ?? []).map((r) => r.nylas_thread_id as string));
+    },
+    enabled: isConnected,
+  });
 
   /**
    * Quantas mensagens a aba Recebidos tem IGNORANDO o marcador — o número que
@@ -452,7 +708,8 @@ const Emails = () => {
       ? "Spam"
       : pastaSelecionada === PASTA_LIXEIRA
         ? "Lixeira"
-        : (pastas.find((p) => p.pastaId === pastaSelecionada)?.nome ?? "este marcador");
+        : (pastas.find((p) => p.pastaId === pastaSelecionada)?.nome ??
+          "este marcador");
 
   useEffect(() => {
     if (!isConnected || !pastaSelecionada) return;
@@ -475,7 +732,9 @@ const Emails = () => {
         // a primeira não chegou a responder se o marcador tem ou não mensagem.
         marcadoresBuscadosRef.current.delete(alvo);
       })
-      .finally(() => setMarcadorEmBusca((atual) => (atual === alvo ? null : atual)));
+      .finally(() =>
+        setMarcadorEmBusca((atual) => (atual === alvo ? null : atual)),
+      );
   }, [
     isConnected,
     pastaSelecionada,
@@ -488,14 +747,20 @@ const Emails = () => {
   ]);
 
   const sendEmailMutation = useMutation({
-    mutationFn: async (data: { destinatario: string; assunto: string; corpo: string }) => {
+    mutationFn: async (data: {
+      destinatario: string;
+      assunto: string;
+      corpo: string;
+    }) => {
       if (!isConnected) {
-        throw new Error("Conecte a caixa de e-mail da empresa para enviar mensagens.");
+        throw new Error(
+          "Conecte a caixa de e-mail da empresa para enviar mensagens.",
+        );
       }
 
       const htmlBody = `
         <div style="font-family: sans-serif; font-size: 16px; color: #333; line-height: 1.5;">
-          ${data.corpo.replace(/\n/g, '<br>')}
+          ${data.corpo.replace(/\n/g, "<br>")}
         </div>
         ${montarRodapeEmailHtml({
           nome: perfil?.nome ?? "",
@@ -512,7 +777,12 @@ const Emails = () => {
       // O registro em email_mensagens é feito pela Edge Function, que é quem
       // conhece o id devolvido pelo Nylas. Gravar também daqui criaria duas
       // linhas para o mesmo envio — e o cliente nem tem INSERT nessa tabela.
-      return await sendEmail(data.destinatario, data.assunto, htmlBody, respondendoA);
+      return await sendEmail(
+        data.destinatario,
+        data.assunto,
+        htmlBody,
+        respondendoA,
+      );
     },
     onSuccess: () => {
       toast.success("E-mail enviado.");
@@ -522,12 +792,25 @@ const Emails = () => {
       setFormData({
         destinatario: "",
         assunto: "",
-        corpo: ""
+        corpo: "",
       });
+      // Enviado com sucesso: o rascunho que o alimentava não serve mais.
+      if (rascunhoId) {
+        descartarRascunhoMutation.mutate(rascunhoId);
+        setRascunhoId(null);
+      }
       queryClient.invalidateQueries({ queryKey: ["emails"] });
+      // Se foi resposta a uma conversa recebida, o indicador "você respondeu"
+      // daquela linha em Recebidos precisa acompanhar sem esperar um refresh.
+      if (respondendoA) {
+        queryClient.invalidateQueries({ queryKey: ["threads_respondidos"] });
+      }
     },
     onError: (error: any) => {
-      toast.error("Erro ao enviar e-mail: " + (error.message || "Verifique sua conexão com o Gmail"));
+      toast.error(
+        "Erro ao enviar e-mail: " +
+          (error.message || "Verifique sua conexão com o Gmail"),
+      );
     },
   });
 
@@ -544,7 +827,9 @@ const Emails = () => {
     },
     onSuccess: (_, variables) => {
       toast.success("E-mail excluído com sucesso");
-      queryClient.invalidateQueries({ queryKey: [variables.type === "sent" ? "emails" : "received_emails"] });
+      queryClient.invalidateQueries({
+        queryKey: [variables.type === "sent" ? "emails" : "received_emails"],
+      });
       // Chave própria, e o react-query casa por PREFIXO EXATO de elemento:
       // invalidar ["received_emails"] não atinge ["received_emails_total"].
       // Sem esta linha o número ao lado de "Todas" continuaria contando as
@@ -555,12 +840,19 @@ const Emails = () => {
       }
     },
     onError: (error: any) => {
-      toast.error("Erro ao excluir e-mail: " + (error.message || "Erro desconhecido"));
+      toast.error(
+        "Erro ao excluir e-mail: " + (error.message || "Erro desconhecido"),
+      );
     },
   });
 
   const bulkDeleteMutation = useMutation({
-    mutationFn: async ({ ids }: { ids: string[]; type: "sent" | "received" }) => {
+    mutationFn: async ({
+      ids,
+    }: {
+      ids: string[];
+      type: "sent" | "received";
+    }) => {
       const { error } = await supabase
         .from("email_mensagens")
         .update({ excluido: true })
@@ -568,8 +860,12 @@ const Emails = () => {
       if (error) throw error;
     },
     onSuccess: (_, variables) => {
-      toast.success(`${variables.ids.length} e-mail(s) excluído(s) com sucesso`);
-      queryClient.invalidateQueries({ queryKey: [variables.type === "sent" ? "emails" : "received_emails"] });
+      toast.success(
+        `${variables.ids.length} e-mail(s) excluído(s) com sucesso`,
+      );
+      queryClient.invalidateQueries({
+        queryKey: [variables.type === "sent" ? "emails" : "received_emails"],
+      });
       // Chave própria, e o react-query casa por PREFIXO EXATO de elemento:
       // invalidar ["received_emails"] não atinge ["received_emails_total"].
       // Sem esta linha o número ao lado de "Todas" continuaria contando as
@@ -579,7 +875,9 @@ const Emails = () => {
       setIsBulkDeleting(false);
     },
     onError: (error: any) => {
-      toast.error("Erro ao excluir e-mails: " + (error.message || "Erro desconhecido"));
+      toast.error(
+        "Erro ao excluir e-mails: " + (error.message || "Erro desconhecido"),
+      );
       setIsBulkDeleting(false);
     },
   });
@@ -592,10 +890,14 @@ const Emails = () => {
     // como novas. Metade da funcionalidade é pior do que nenhuma, porque parece
     // que funcionou.
     mutationFn: async ({ ids, lido }: { ids: string[]; lido: boolean }) => {
-      const { data, error } = await supabase.functions.invoke("email-marcar-lido", {
-        body: { mensagem_ids: ids, lido },
-      });
-      if (error) throw await erroLegivelDaFunction(error, "Não foi possível atualizar");
+      const { data, error } = await supabase.functions.invoke(
+        "email-marcar-lido",
+        {
+          body: { mensagem_ids: ids, lido },
+        },
+      );
+      if (error)
+        throw await erroLegivelDaFunction(error, "Não foi possível atualizar");
       return data as { alteradas: number; falhas: number };
     },
     onSuccess: (r) => {
@@ -613,7 +915,9 @@ const Emails = () => {
       setSelectedIds([]);
     },
     onError: (error: any) => {
-      toast.error("Erro ao atualizar e-mails: " + (error.message || "Erro desconhecido"));
+      toast.error(
+        "Erro ao atualizar e-mails: " + (error.message || "Erro desconhecido"),
+      );
     },
   });
 
@@ -629,8 +933,8 @@ const Emails = () => {
   };
 
   const toggleSelectId = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
 
@@ -650,11 +954,45 @@ const Emails = () => {
     return (m ? m[1] : bruto).trim();
   };
 
+  /** Iniciais para o avatar circular da linha: "Fulano de Tal <f@x.com>" -> "FT". */
+  const iniciaisDe = (valor?: string | null) => {
+    const semEmail = (valor ?? "").replace(/<[^>]*>/g, "").trim();
+    if (!semEmail) return "?";
+    const partes = semEmail.split(/\s+/).filter(Boolean);
+    const iniciais = partes
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("");
+    return iniciais || semEmail[0]?.toUpperCase() || "?";
+  };
+
+  /**
+   * Só para EXIBIÇÃO na lista: "Fulano de Tal <fulano@x.com>" -> "Fulano de Tal".
+   * O endereço entre "<...>" não ajuda a reconhecer o remetente numa linha já
+   * compacta — quem precisa dele abre a mensagem. Não usar em `soEndereco`,
+   * que depende do "<...>" para responder à pessoa certa.
+   */
+  const soNome = (valor?: string | null) => {
+    const bruto = (valor ?? "").trim();
+    const semEmail = bruto.replace(/\s*<[^>]*>\s*/, "").trim();
+    return semEmail || bruto;
+  };
+
+  /** Corta em `max` caracteres e acrescenta " ..." — dá previsibilidade à largura da coluna. */
+  const truncarTexto = (texto: string | null | undefined, max: number) => {
+    const valor = (texto ?? "").trim();
+    return valor.length > max ? `${valor.slice(0, max).trimEnd()} ...` : valor;
+  };
+  const LIMITE_ASSUNTO = 40;
+  const LIMITE_PREVIA = 130;
+
   /** Monta a resposta a partir da mensagem aberta e abre o compositor. */
   const responderMensagem = () => {
     if (!selectedEmail) return;
     const assunto = selectedEmail.assunto ?? "";
-    const replySubject = assunto.toLowerCase().startsWith("re:") ? assunto : `Re: ${assunto}`;
+    const replySubject = assunto.toLowerCase().startsWith("re:")
+      ? assunto
+      : `Re: ${assunto}`;
     const quando = selectedEmail.created_at || selectedEmail.criado_em;
     const citado = selectedEmail.snippet || selectedEmail.corpo || "";
 
@@ -662,7 +1000,9 @@ const Emails = () => {
       ...formData,
       // Só o endereço: o campo trazia "Nome <e-mail>" inteiro, que é o que o
       // leitor exibe, não o que o provedor aceita como destinatário.
-      destinatario: soEndereco(selectedEmail.remetente || selectedEmail.destinatario),
+      destinatario: soEndereco(
+        selectedEmail.remetente || selectedEmail.destinatario,
+      ),
       assunto: replySubject,
       corpo: `\n\n--- Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:\n\n${citado}`,
     });
@@ -672,6 +1012,9 @@ const Emails = () => {
     // tem acesso por marcador não enxerga a própria resposta, porque a regra a
     // reconhece justamente por pertencer à conversa de origem.
     setRespondendoA(selectedEmail.gmail_message_id ?? null);
+    // Contexto novo: uma resposta não continua o rascunho de outra
+    // composição — o autosave (abaixo) cria uma linha própria para ela.
+    setRascunhoId(null);
     // O e-mail aberto CONTINUA aberto atrás do compositor. Fechá-lo aqui era o
     // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
     setRespondendo(true);
@@ -689,7 +1032,62 @@ const Emails = () => {
     setFormData({ destinatario: endereco, assunto: "", corpo: "" });
     setRespondendoA(null);
     setRespondendo(false);
+    setRascunhoId(null);
     setIsComposeOpen(true);
+  };
+
+  /**
+   * Abre o compositor em branco a partir do botão "Escrever". Se houver um
+   * rascunho recente do usuário, recupera-o em vez de começar do zero (item
+   * 3.4) — só aqui, e não em `responderMensagem`/`enviarPara`, porque nesses
+   * dois o preenchimento automático (citação, destinatário) já é a intenção
+   * da pessoa, e sobrepor com um rascunho antigo apagaria isso sem aviso.
+   */
+  const escreverNovo = () => {
+    const maisRecente = rascunhos?.[0];
+    const temConteudo =
+      maisRecente &&
+      (maisRecente.destinatario || maisRecente.assunto || maisRecente.corpo);
+
+    if (temConteudo) {
+      setFormData({
+        destinatario: maisRecente.destinatario ?? "",
+        assunto: maisRecente.assunto ?? "",
+        corpo: maisRecente.corpo ?? "",
+      });
+      setRascunhoId(maisRecente.id);
+      toast.info("Rascunho recuperado.");
+    } else {
+      setFormData({ destinatario: "", assunto: "", corpo: "" });
+      setRascunhoId(null);
+    }
+    setRespondendoA(null);
+    setRespondendo(false);
+    setIsComposeOpen(true);
+  };
+
+  /** Abre um rascunho específico da aba "Rascunhos" para continuar editando. */
+  const continuarRascunho = (r: {
+    id: string;
+    destinatario: string | null;
+    assunto: string | null;
+    corpo: string | null;
+  }) => {
+    setFormData({
+      destinatario: r.destinatario ?? "",
+      assunto: r.assunto ?? "",
+      corpo: r.corpo ?? "",
+    });
+    setRascunhoId(r.id);
+    setRespondendoA(null);
+    setRespondendo(false);
+    setIsComposeOpen(true);
+  };
+
+  /** Descarta um rascunho a partir da lista, sem precisar abrir o compositor. */
+  const descartarRascunhoDaLista = (id: string) => {
+    descartarRascunhoMutation.mutate(id);
+    if (rascunhoId === id) setRascunhoId(null);
   };
 
   /** Marca como lida sem segurar a abertura da mensagem. */
@@ -700,12 +1098,20 @@ const Emails = () => {
     // item: `setQueryData` com uma chave a menos escreve num cache que ninguém
     // lê, e o selo de não-lida ficava na tela até a próxima busca.
     queryClient.setQueryData<PaginaRecebidos>(
-      ["received_emails", pageReceived, pastaSelecionada, buscaAplicada, somenteNaoLidas],
+      [
+        "received_emails",
+        pageReceived,
+        pastaSelecionada,
+        buscaAplicada,
+        somenteNaoLidas,
+      ],
       (antigo) =>
         antigo
           ? {
               ...antigo,
-              emails: antigo.emails.map((m) => (m.id === id ? { ...m, lido: true } : m)),
+              emails: antigo.emails.map((m) =>
+                m.id === id ? { ...m, lido: true } : m,
+              ),
             }
           : antigo,
     );
@@ -723,9 +1129,49 @@ const Emails = () => {
       .invoke("email-marcar-lido", { body: { mensagem_id: id, lido: true } })
       .then(({ error }) => {
         // Falhar aqui é cosmético — a próxima leitura da lista corrige o selo.
-        if (error) console.warn("[email] não consegui marcar como lida:", error.message);
+        if (error)
+          console.warn("[email] não consegui marcar como lida:", error.message);
         // O badge de não lidas da barra lateral mudou de valor.
-        else queryClient.invalidateQueries({ queryKey: ["email_contagem_por_pasta"] });
+        else
+          queryClient.invalidateQueries({
+            queryKey: ["email_contagem_por_pasta"],
+          });
+      });
+  };
+
+  /** Inverso de `marcarLido`: mesma escrita otimista, mesmo espelho no provedor. */
+  const marcarNaoLido = (id: string) => {
+    queryClient.setQueryData<PaginaRecebidos>(
+      [
+        "received_emails",
+        pageReceived,
+        pastaSelecionada,
+        buscaAplicada,
+        somenteNaoLidas,
+      ],
+      (antigo) =>
+        antigo
+          ? {
+              ...antigo,
+              emails: antigo.emails.map((m) =>
+                m.id === id ? { ...m, lido: false } : m,
+              ),
+            }
+          : antigo,
+    );
+
+    void supabase.functions
+      .invoke("email-marcar-lido", { body: { mensagem_id: id, lido: false } })
+      .then(({ error }) => {
+        if (error)
+          console.warn(
+            "[email] não consegui marcar como não lida:",
+            error.message,
+          );
+        else
+          queryClient.invalidateQueries({
+            queryKey: ["email_contagem_por_pasta"],
+          });
       });
   };
 
@@ -740,7 +1186,9 @@ const Emails = () => {
     setSelectedEmail((atual) =>
       // Só escreve se a pessoa ainda estiver nesta mensagem — ela pode ter
       // clicado em outra enquanto a busca voava.
-      atual?.id === base.id ? { ...atual, html: corpo ?? atual.html, carregandoCorpo: false } : atual,
+      atual?.id === base.id
+        ? { ...atual, html: corpo ?? atual.html, carregandoCorpo: false }
+        : atual,
     );
   };
 
@@ -760,6 +1208,93 @@ const Emails = () => {
       corpo: email.snippet ?? "",
       created_at: email.criado_em,
       type: "received",
+      respondida: !!(email.threadId && threadsRespondidos?.has(email.threadId)),
+    });
+  };
+
+  /**
+   * As DEMAIS mensagens da mesma conversa (`nylas_thread_id`) da mensagem
+   * aberta no leitor — alimenta os cards de "Nesta conversa" em
+   * `LeitorEmail`, já abertos (corpo completo, não só a prévia). Refaz ao
+   * trocar de mensagem (a chave leva o id) porque abrir outro card da MESMA
+   * conversa muda quem é "a atual" e quem entra na lista de "as outras".
+   */
+  const { data: mensagensDaConversa, isLoading: carregandoConversa } = useQuery({
+    queryKey: ["conversa", selectedEmail?.threadId, selectedEmail?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("email_mensagens")
+        .select(
+          "id, direcao, data_mensagem, remetente_nome, remetente_email, snippet, lido",
+        )
+        .eq("nylas_thread_id", selectedEmail!.threadId as string)
+        .eq("excluido", false)
+        .order("data_mensagem", { ascending: true });
+      if (error) throw error;
+
+      const outras = (data ?? []).filter((m) => m.id !== selectedEmail!.id);
+
+      // Corpo completo de cada uma, para os cards virem já abertos — não só a
+      // prévia. `carregarCorpo` cacheia por mensagem (`use-email-empresa.ts`),
+      // então reabrir a mesma conversa depois não repete a busca nem a Edge
+      // Function.
+      const corpos = await Promise.all(outras.map((m) => carregarCorpo(m.id)));
+
+      return outras.map((m, i) => ({
+        id: m.id,
+        tipo: (m.direcao === "enviado" ? "sent" : "received") as "sent" | "received",
+        remetente: m.remetente_nome
+          ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
+          : (m.remetente_email ?? ""),
+        data: m.data_mensagem,
+        snippet: m.snippet ?? "",
+        html: corpos[i] ?? "",
+        lido: m.lido,
+      }));
+    },
+    enabled: !!selectedEmail?.threadId,
+  });
+
+  /** Clique num card de "Nesta conversa": busca a linha inteira e troca a mensagem aberta. */
+  const abrirMensagemDaConversa = async (id: string) => {
+    const { data: m, error } = await supabase
+      .from("email_mensagens")
+      .select(
+        "id, direcao, data_mensagem, remetente_nome, remetente_email, destinatarios, assunto, snippet, lido, nylas_message_id, nylas_thread_id, caixa_origem",
+      )
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !m) {
+      toast.error("Não foi possível abrir esta mensagem.");
+      return;
+    }
+
+    const enviado = m.direcao === "enviado";
+    const destEmails = Array.isArray(m.destinatarios)
+      ? m.destinatarios
+          .map((d: { email?: string }) => d?.email)
+          .filter(Boolean)
+      : [];
+    if (!enviado && !m.lido) marcarLido(m.id);
+
+    void abrirComCorpo({
+      id: m.id,
+      remetente: enviado
+        ? (connectedEmail ?? m.remetente_email ?? "")
+        : m.remetente_nome
+          ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
+          : (m.remetente_email ?? ""),
+      destinatario: enviado ? destEmails.join(", ") : (destEmails[0] ?? ""),
+      assunto: m.assunto,
+      corpo: m.snippet ?? "",
+      created_at: m.data_mensagem,
+      criado_em: m.data_mensagem,
+      type: enviado ? "sent" : "received",
+      threadId: m.nylas_thread_id ?? null,
+      gmail_message_id: m.nylas_message_id,
+      lido: m.lido,
+      caixaOrigem: m.caixa_origem ?? null,
+      respondida: !enviado && !!(m.nylas_thread_id && threadsRespondidos?.has(m.nylas_thread_id)),
     });
   };
 
@@ -795,6 +1330,11 @@ const Emails = () => {
       onChange={setFormData}
       onEnviar={handleSubmit}
       onDescartar={() => {
+        // Diferente de fechar o compositor (que preserva o rascunho para
+        // retomar depois), este botão é a exclusão explícita — some da aba
+        // Rascunhos também.
+        if (rascunhoId) descartarRascunhoMutation.mutate(rascunhoId);
+        setRascunhoId(null);
         setFormData({ destinatario: "", assunto: "", corpo: "" });
         fecharCompositor(false);
       }}
@@ -821,11 +1361,24 @@ const Emails = () => {
           onExcluir={() =>
             setEmailToDelete({
               id: selectedEmail.id,
-              type: selectedEmail.type || (selectedEmail.criado_em ? "received" : "sent"),
+              type:
+                selectedEmail.type ||
+                (selectedEmail.criado_em ? "received" : "sent"),
             })
           }
           onResponder={responderMensagem}
           onClicarEndereco={setEmailParaConfirmar}
+          onMarcarNaoLido={
+            selectedEmail.type === "received"
+              ? () => {
+                  marcarNaoLido(selectedEmail.id);
+                  setSelectedEmail(null);
+                }
+              : undefined
+          }
+          mensagensDaConversa={mensagensDaConversa}
+          carregandoConversa={carregandoConversa}
+          onAbrirMensagemDaConversa={abrirMensagemDaConversa}
         />
 
         {compositor}
@@ -847,8 +1400,8 @@ const Emails = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir este e-mail?</AlertDialogTitle>
               <AlertDialogDescription>
-                Ele sai da sua caixa no CRM. A mensagem original continua na conta de
-                e-mail — nada é apagado no provedor.
+                Ele sai da sua caixa no CRM. A mensagem original continua na
+                conta de e-mail — nada é apagado no provedor.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -870,7 +1423,11 @@ const Emails = () => {
   }
 
   return (
-    <AppLayout title="E-mail" subtitle={connectedEmail ?? "Caixa da empresa"} mainClassName="flex-1 overflow-hidden p-0">
+    <AppLayout
+      title="E-mail"
+      subtitle={connectedEmail ?? "Caixa da empresa"}
+      mainClassName="flex-1 overflow-hidden p-0"
+    >
       {/* CONTROLADO (`value`, não `defaultValue`). Com `defaultValue` o Radix
           guarda a aba internamente e ignora o estado do React: `activeTab`
           existia só como espelho, e chamar `setActiveTab` de fora — como faz o
@@ -893,11 +1450,14 @@ const Emails = () => {
             {selectedIds.length > 0 ? (
               <div className="flex items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
                 <div className="flex items-center gap-2">
-                  <Checkbox 
+                  <Checkbox
                     id="select-all-bulk"
                     checked={
-                      selectedIds.length > 0 && 
-                      selectedIds.length === (activeTab === "received" ? receivedEmails?.length : emails?.length)
+                      selectedIds.length > 0 &&
+                      selectedIds.length ===
+                        (activeTab === "received"
+                          ? receivedEmails?.length
+                          : emails?.length)
                     }
                     onCheckedChange={toggleSelectAll}
                   />
@@ -906,9 +1466,9 @@ const Emails = () => {
                   </span>
                 </div>
                 <div className="h-4 w-[1px] bg-primary/20 mx-2" />
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
                   onClick={() => setIsBulkDeleting(true)}
                 >
@@ -916,19 +1476,24 @@ const Emails = () => {
                   Excluir
                 </Button>
                 {activeTab === "received" && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-8 text-primary hover:bg-primary/10 gap-2"
-                    onClick={() => bulkUpdateReadStatusMutation.mutate({ ids: selectedIds, lido: true })}
+                    onClick={() =>
+                      bulkUpdateReadStatusMutation.mutate({
+                        ids: selectedIds,
+                        lido: true,
+                      })
+                    }
                   >
                     <CheckSquare className="h-4 w-4" />
                     Lido
                   </Button>
                 )}
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="h-8 text-muted-foreground"
                   onClick={() => setSelectedIds([])}
                 >
@@ -937,24 +1502,25 @@ const Emails = () => {
               </div>
             ) : (
               <TabsList className={TOGGLE_LIST_CLASS}>
-                <TabsTrigger
-                  value="received"
-                  className={TOGGLE_TRIGGER_CLASS}
-                >
+                <TabsTrigger value="received" className={TOGGLE_TRIGGER_CLASS}>
                   <Inbox className="h-4 w-4" />
                   <span className="hidden sm:inline">Recebidos</span>
                   <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
                     {totalReceived}
                   </Badge>
                 </TabsTrigger>
-                <TabsTrigger
-                  value="sent"
-                  className={TOGGLE_TRIGGER_CLASS}
-                >
+                <TabsTrigger value="sent" className={TOGGLE_TRIGGER_CLASS}>
                   <Send className="h-4 w-4" />
                   <span className="hidden sm:inline">Enviados</span>
                   <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
                     {totalSent}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger value="drafts" className={TOGGLE_TRIGGER_CLASS}>
+                  <PenBox className="h-4 w-4" />
+                  <span className="hidden sm:inline">Rascunhos</span>
+                  <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
+                    {rascunhos?.length ?? 0}
                   </Badge>
                 </TabsTrigger>
               </TabsList>
@@ -1009,7 +1575,7 @@ const Emails = () => {
                   variant="ghost"
                   size="icon"
                   className="rounded-full hover:bg-muted shrink-0"
-                  onClick={() => sincronizar({ limit: 20 })}
+                  onClick={() => sincronizar({ limit: 50 })}
                   disabled={isSyncing}
                   title="Buscar as mensagens mais recentes"
                 >
@@ -1040,7 +1606,7 @@ const Emails = () => {
           </div>
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => setIsComposeOpen(true)}
+              onClick={escreverNovo}
               className="h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm gap-2 text-sm font-bold px-4 transition-all"
             >
               <PenBox className="h-4 w-4" />
@@ -1074,270 +1640,568 @@ const Emails = () => {
           )}
 
           <div className="relative min-w-0 flex-1 overflow-hidden">
-          <TabsContent value="sent" className="m-0 h-full overflow-hidden">
-            <div className="h-full overflow-hidden flex flex-col bg-background">
-              <div className="flex-1 overflow-y-auto">
-                {isSentLoading ? (
-                  <div className="flex justify-center py-20">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : !emails || emails.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                    <Mail className="h-16 w-16 mb-4 opacity-10" />
-                    <p className="text-lg">Nenhum e-mail enviado</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border/50">
-                    {emails.map((email) => (
-                      <div 
-                        key={email.id} 
-                        className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''}`}
-                        onClick={() => void abrirComCorpo({ ...email, type: "sent" })}
-                      >
-                        <div className="flex items-center gap-3 shrink-0">
-                          <Checkbox 
-                            checked={selectedIds.includes(email.id)}
-                            onCheckedChange={() => toggleSelectId(email.id)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                          <Mail className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
-                        </div>
-                        <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
-                          <span className="text-sm text-foreground/80 font-medium">Para: {email.destinatario}</span>
-                        </div>
-                        <div className="flex-1 truncate overflow-hidden">
-                          <span className="text-sm font-semibold text-foreground mr-2 shrink-0">{email.assunto}</span>
-                          <span className="text-sm text-muted-foreground">- {email.corpo}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="shrink-0 text-xs font-medium text-muted-foreground">
-                            {format(new Date(email.created_at), "dd 'de' MMM", { locale: ptBR })}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEmailToDelete({ id: email.id, type: "sent" });
-                            }}
+            <TabsContent value="sent" className="m-0 h-full overflow-hidden">
+              <div className="h-full overflow-hidden flex flex-col bg-background">
+                <div className="flex-1 overflow-y-auto">
+                  {isSentLoading ? (
+                    <div className="flex justify-center py-20">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : !emails || emails.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                      <Mail className="h-16 w-16 mb-4 opacity-10" />
+                      <p className="text-lg">Nenhum e-mail enviado</p>
+                    </div>
+                  ) : (
+                    <>
+                      <CabecalhoLista
+                        rotuloPrincipal="Destinatário"
+                        rotuloData="Enviado em"
+                        rotuloAssunto="Assunto e prévia"
+                        checkbox={{
+                          checked:
+                            emails.length > 0 &&
+                            selectedIds.length === emails.length,
+                          onChange: toggleSelectAll,
+                        }}
+                      />
+                      <div className="divide-y divide-border/50">
+                        {emails.map((email) => (
+                          <div
+                            key={email.id}
+                            className={cn(
+                              "group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
+                              selectedIds.includes(email.id) && "bg-primary/5",
+                            )}
+                            onClick={() =>
+                              void abrirComCorpo({ ...email, type: "sent" })
+                            }
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                            <Checkbox
+                              className="shrink-0"
+                              checked={selectedIds.includes(email.id)}
+                              onCheckedChange={() => toggleSelectId(email.id)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                              {iniciaisDe(email.destinatario)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-foreground/70">
+                                Para: {email.destinatario}
+                              </span>
+                              <div className="mt-0.5 flex items-baseline gap-1.5 overflow-hidden">
+                                <span className="shrink-0 overflow-hidden whitespace-nowrap text-sm font-semibold text-foreground">
+                                  {truncarTexto(email.assunto, LIMITE_ASSUNTO)}
+                                </span>
+                                {email.corpo && (
+                                  <span className="overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
+                                    {truncarTexto(email.corpo, LIMITE_PREVIA)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div
+                              className={cn(
+                                LARGURA_COL_DATA,
+                                "text-right text-xs font-medium text-muted-foreground",
+                              )}
+                            >
+                              {format(
+                                new Date(email.created_at),
+                                "dd 'de' MMM",
+                                { locale: ptBR },
+                              )}
+                            </div>
+                            <div
+                              className={cn(
+                                LARGURA_COL_ACOES,
+                                "flex items-center justify-end",
+                              )}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEmailToDelete({
+                                    id: email.id,
+                                    type: "sent",
+                                  });
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </>
+                  )}
+                </div>
+                {totalSent > PAGE_SIZE && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/5 shrink-0">
+                    <div className="text-sm text-muted-foreground">
+                      Mostrando {pageSent * PAGE_SIZE + 1} -{" "}
+                      {Math.min((pageSent + 1) * PAGE_SIZE, totalSent)} de{" "}
+                      {totalSent}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPageSent(0)}
+                        disabled={pageSent === 0}
+                        className="h-8 w-8 p-0"
+                        title="Primeira página"
+                        aria-label="Primeira página"
+                      >
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPageSent((p) => Math.max(0, p - 1))}
+                        disabled={pageSent === 0}
+                        className="h-8"
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPageSent((p) => p + 1)}
+                        disabled={(pageSent + 1) * PAGE_SIZE >= totalSent}
+                        className="h-8"
+                      >
+                        Próximo <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setPageSent(
+                            Math.max(0, Math.ceil(totalSent / PAGE_SIZE) - 1),
+                          )
+                        }
+                        disabled={(pageSent + 1) * PAGE_SIZE >= totalSent}
+                        className="h-8 w-8 p-0"
+                        title="Última página"
+                        aria-label="Última página"
+                      >
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
-              {totalSent > PAGE_SIZE && (
-                <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/5 shrink-0">
-                  <div className="text-sm text-muted-foreground">
-                    Mostrando {pageSent * PAGE_SIZE + 1} - {Math.min((pageSent + 1) * PAGE_SIZE, totalSent)} de {totalSent}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPageSent(p => Math.max(0, p - 1))}
-                      disabled={pageSent === 0}
-                      className="h-8"
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPageSent(p => p + 1)}
-                      disabled={(pageSent + 1) * PAGE_SIZE >= totalSent}
-                      className="h-8"
-                    >
-                      Próximo <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </TabsContent>
+            </TabsContent>
 
-          <TabsContent value="received" className="m-0 h-full overflow-hidden">
-            <div className="h-full overflow-hidden flex flex-col bg-background">
-              <div className="flex-1 overflow-y-auto">
-                {isReceivedLoading ? (
-                  <div className="flex justify-center py-20">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : !isConnected && receivedEmails.length === 0 ? (
-                  // Antes do "caixa vazia": sem conta conectada a lista está
-                  // vazia por falta de conexão, não por falta de e-mail, e
-                  // mostrar "sua caixa está limpa" esconderia a ação necessária.
-                  <div className="mx-auto w-full max-w-2xl px-4 py-10">
-                    <ConectarEmailCard />
-                  </div>
-                ) : !receivedEmails || receivedEmails.length === 0 ? (
-                  /* Lista vazia tem CAUSAS diferentes, e "sua caixa está limpa"
+            <TabsContent
+              value="received"
+              className="m-0 h-full overflow-hidden"
+            >
+              <div className="h-full overflow-hidden flex flex-col bg-background">
+                <div className="flex-1 overflow-y-auto">
+                  {isReceivedLoading ? (
+                    <div className="flex justify-center py-20">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : !isConnected && receivedEmails.length === 0 ? (
+                    // Antes do "caixa vazia": sem conta conectada a lista está
+                    // vazia por falta de conexão, não por falta de e-mail, e
+                    // mostrar "sua caixa está limpa" esconderia a ação necessária.
+                    <div className="mx-auto w-full max-w-2xl px-4 py-10">
+                      <ConectarEmailCard />
+                    </div>
+                  ) : !receivedEmails || receivedEmails.length === 0 ? (
+                    /* Lista vazia tem CAUSAS diferentes, e "sua caixa está limpa"
                      só é verdade numa delas. Um marcador que ainda não foi
                      sincronizado com essa frase fazia a funcionalidade parecer
                      quebrada — o Gmail mostrava mensagens e o CRM dizia que não
                      havia nenhuma. */
-                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-center px-4">
-                    {marcadorEmBusca && marcadorEmBusca === pastaSelecionada ? (
-                      <>
-                        <Loader2 className="mb-4 h-10 w-10 animate-spin opacity-30" />
-                        <h3 className="mb-1 text-lg font-medium">
-                          Buscando as mensagens de {nomeDaPastaSelecionada}…
-                        </h3>
-                        <p className="max-w-xs text-sm opacity-60">
-                          É a primeira vez que este marcador é aberto aqui. Da próxima
-                          vez já estará pronto.
-                        </p>
-                      </>
-                    ) : pastaSelecionada ? (
-                      <>
-                        <Tag className="mb-4 h-16 w-16 opacity-10" />
-                        <h3 className="mb-1 text-lg font-medium">
-                          Nenhuma mensagem em {nomeDaPastaSelecionada}
-                        </h3>
-                        <p className="max-w-xs text-sm opacity-60">
-                          {somenteNaoLidas
-                            ? "Não há mensagens por ler neste marcador."
-                            : buscaAplicada
-                              ? `Nada encontrado para “${buscaAplicada}” neste marcador.`
-                              : "Este marcador não tem mensagens sincronizadas. Use o botão de atualizar para buscar de novo."}
-                        </p>
-                      </>
-                    ) : somenteNaoLidas || buscaAplicada ? (
-                      <>
-                        <Inbox className="mb-4 h-16 w-16 opacity-10" />
-                        <h3 className="mb-1 text-lg font-medium">Nada por aqui</h3>
-                        <p className="max-w-xs text-sm opacity-60">
-                          {somenteNaoLidas
-                            ? "Tudo lido — nenhuma mensagem por ler."
-                            : `Nada encontrado para “${buscaAplicada}”.`}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <Inbox className="mb-4 h-16 w-16 opacity-10" />
-                        <h3 className="mb-1 text-lg font-medium">Sua caixa de entrada está limpa</h3>
-                        <p className="max-w-xs text-sm opacity-60">
-                          Os e-mails recebidos em {connectedEmail} aparecem aqui automaticamente.
-                        </p>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border/50">
-                    {/* Sem caixa conectada mas COM histórico: quem desconectou
+                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-center px-4">
+                      {marcadorEmBusca &&
+                      marcadorEmBusca === pastaSelecionada ? (
+                        <>
+                          <Loader2 className="mb-4 h-10 w-10 animate-spin opacity-30" />
+                          <h3 className="mb-1 text-lg font-medium">
+                            Buscando as mensagens de {nomeDaPastaSelecionada}…
+                          </h3>
+                          <p className="max-w-xs text-sm opacity-60">
+                            É a primeira vez que este marcador é aberto aqui. Da
+                            próxima vez já estará pronto.
+                          </p>
+                        </>
+                      ) : pastaSelecionada ? (
+                        <>
+                          <Tag className="mb-4 h-16 w-16 opacity-10" />
+                          <h3 className="mb-1 text-lg font-medium">
+                            Nenhuma mensagem em {nomeDaPastaSelecionada}
+                          </h3>
+                          <p className="max-w-xs text-sm opacity-60">
+                            {somenteNaoLidas
+                              ? "Não há mensagens por ler neste marcador."
+                              : buscaAplicada
+                                ? `Nada encontrado para “${buscaAplicada}” neste marcador.`
+                                : "Este marcador não tem mensagens sincronizadas. Use o botão de atualizar para buscar de novo."}
+                          </p>
+                        </>
+                      ) : somenteNaoLidas || buscaAplicada ? (
+                        <>
+                          <Inbox className="mb-4 h-16 w-16 opacity-10" />
+                          <h3 className="mb-1 text-lg font-medium">
+                            Nada por aqui
+                          </h3>
+                          <p className="max-w-xs text-sm opacity-60">
+                            {somenteNaoLidas
+                              ? "Tudo lido — nenhuma mensagem por ler."
+                              : `Nada encontrado para “${buscaAplicada}”.`}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <Inbox className="mb-4 h-16 w-16 opacity-10" />
+                          <h3 className="mb-1 text-lg font-medium">
+                            Sua caixa de entrada está limpa
+                          </h3>
+                          <p className="max-w-xs text-sm opacity-60">
+                            Os e-mails recebidos em {connectedEmail} aparecem
+                            aqui automaticamente.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/50">
+                      {/* Sem caixa conectada mas COM histórico: quem desconectou
                         escolheu preservar, e a promessa foi que as mensagens
                         continuariam aqui. Antes esta aba trocava a lista inteira
                         pelo card de conexão, então o histórico preservado ficava
                         invisível — a opção não entregava nada. Agora o convite a
                         reconectar aparece acima do histórico, sem escondê-lo. */}
-                    {!isConnected && (
-                      <div className="border-b bg-muted/30 px-4 py-4">
-                        <div className="mx-auto w-full max-w-2xl">
-                          <ConectarEmailCard />
-                          <p className="mt-3 text-center text-xs text-muted-foreground">
-                            Abaixo está o histórico das caixas anteriores. Ele continua
-                            disponível para consulta, mas não recebe mensagens novas.
-                          </p>
+                      {!isConnected && (
+                        <div className="border-b bg-muted/30 px-4 py-4">
+                          <div className="mx-auto w-full max-w-2xl">
+                            <ConectarEmailCard />
+                            <p className="mt-3 text-center text-xs text-muted-foreground">
+                              Abaixo está o histórico das caixas anteriores. Ele
+                              continua disponível para consulta, mas não recebe
+                              mensagens novas.
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {receivedEmails.map((email) => (
-                      <div 
-                        key={email.id} 
-                        className={`px-4 py-2.5 hover:bg-muted/50 transition-colors group cursor-pointer flex items-center gap-4 ${selectedIds.includes(email.id) ? 'bg-primary/5' : ''} ${!email.lido ? 'bg-muted/20' : ''}`}
-                        // Marca lido aqui E no provedor (ver `marcarLido`).
-                        onClick={() => abrirRecebido(email)}
-                      >
-                        <div className="flex items-center gap-3 shrink-0">
-                          <Checkbox 
+                      )}
+                      <CabecalhoLista
+                        rotuloPrincipal="Remetente"
+                        rotuloData="Recebido em"
+                        rotuloAssunto="Assunto e prévia"
+                        checkbox={{
+                          checked:
+                            receivedEmails.length > 0 &&
+                            selectedIds.length === receivedEmails.length,
+                          onChange: toggleSelectAll,
+                        }}
+                      />
+                      {receivedEmails.map((email) => (
+                        <div
+                          key={email.id}
+                          className={cn(
+                            "group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
+                            selectedIds.includes(email.id) && "bg-primary/5",
+                          )}
+                          // Marca lido aqui E no provedor (ver `marcarLido`).
+                          onClick={() => abrirRecebido(email)}
+                        >
+                          <Checkbox
+                            className="shrink-0"
                             checked={selectedIds.includes(email.id)}
                             onCheckedChange={() => toggleSelectId(email.id)}
                             onClick={(e) => e.stopPropagation()}
                           />
-                          <Inbox className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
-                        </div>
-                        <div className="min-w-[150px] max-w-[200px] truncate shrink-0">
-                          <span className={`text-sm ${!email.lido ? 'font-bold text-foreground' : 'font-normal text-muted-foreground'}`}>{email.remetente}</span>
-                        </div>
-                        <div className="flex-1 truncate overflow-hidden">
-                          <span className={`text-sm ${!email.lido ? 'font-bold text-foreground' : 'font-normal text-foreground'} mr-2 shrink-0`}>{email.assunto}</span>
-                          {/* Prévia de verdade. Antes dizia literalmente
-                              "Conteúdo HTML", que não conta nada sobre a
-                              mensagem — e o snippet já vinha do Nylas. */}
-                          {email.snippet && (
-                            <span className="text-sm text-muted-foreground opacity-60">- {email.snippet}</span>
-                          )}
-                          {/* Só aparece em mensagem de caixa já desconectada.
-                              Sem isto, depois de trocar de endereço a lista
-                              misturaria mensagens de duas caixas sem nenhuma
-                              forma de saber qual é qual — que era justamente o
-                              motivo de existir a coluna caixa_origem. */}
-                          {email.caixaOrigem && (
-                            <Badge
-                              variant="secondary"
-                              className="ml-2 h-5 shrink-0 gap-1 border-none bg-muted px-1.5 text-[11px] font-normal text-muted-foreground"
-                              title={`Recebido na caixa ${email.caixaOrigem}, que não está mais conectada`}
-                            >
-                              <Archive className="h-3 w-3" />
-                              {email.caixaOrigem}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className={`shrink-0 text-xs ${!email.lido ? 'font-bold text-foreground' : 'font-normal text-muted-foreground'}`}>
-                            {email.criado_em && format(new Date(email.criado_em), "HH:mm", { locale: ptBR })}
-                          </div>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEmailToDelete({ id: email.id, type: "received" });
-                            }}
+                          {/* Avatar-âncora da linha: tonal (bg-primary/10) quando não
+                            lida, para o olho encontrar rápido o que falta ler —
+                            mesmo recurso visual usado em Clientes.tsx. */}
+                          <div
+                            className={cn(
+                              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                              !email.lido
+                                ? "bg-primary/10 text-primary"
+                                : "bg-muted text-muted-foreground",
+                            )}
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                            {iniciaisDe(email.remetente)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            {/* Linha 1: remetente. Linha 2: assunto + prévia. Antes as
+                              quatro informações disputavam a mesma linha, todas em
+                              text-sm — nada se destacava. */}
+                            <div className="flex items-center gap-1.5">
+                              {!email.lido && (
+                                <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
+                              )}
+                              <span
+                                className={cn(
+                                  "truncate text-sm",
+                                  !email.lido
+                                    ? "font-bold text-foreground"
+                                    : "font-medium text-foreground/70",
+                                )}
+                              >
+                                {soNome(email.remetente)}
+                              </span>
+                              {/* "Você respondeu" — só existe hoje via `nylas_thread_id`
+                                  compartilhado (ver comentário em `threadsRespondidos`
+                                  acima); não há flag "respondido" na mensagem. */}
+                              {email.threadId && threadsRespondidos?.has(email.threadId) && (
+                                <CornerUpLeft
+                                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                                  title="Você respondeu esta conversa"
+                                />
+                              )}
+                            </div>
+                            <div className="mt-0.5 flex items-baseline gap-1.5 overflow-hidden">
+                              <span
+                                className={cn(
+                                  "shrink-0 overflow-hidden whitespace-nowrap text-sm",
+                                  !email.lido
+                                    ? "font-semibold text-foreground"
+                                    : "text-foreground/70",
+                                )}
+                              >
+                                {truncarTexto(email.assunto, LIMITE_ASSUNTO)}
+                              </span>
+                              {/* Prévia de verdade. Antes dizia literalmente
+                                "Conteúdo HTML", que não conta nada sobre a
+                                mensagem — e o snippet já vinha do Nylas. */}
+                              {email.snippet && (
+                                <span className="overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
+                                  {truncarTexto(email.snippet, LIMITE_PREVIA)}
+                                </span>
+                              )}
+                              {/* Só aparece em mensagem de caixa já desconectada.
+                                Sem isto, depois de trocar de endereço a lista
+                                misturaria mensagens de duas caixas sem nenhuma
+                                forma de saber qual é qual — que era justamente o
+                                motivo de existir a coluna caixa_origem. */}
+                              {email.caixaOrigem && (
+                                <Badge
+                                  variant="secondary"
+                                  className="ml-1 h-5 shrink-0 gap-1 border-none bg-muted px-1.5 text-[11px] font-normal text-muted-foreground"
+                                  title={`Recebido na caixa ${email.caixaOrigem}, que não está mais conectada`}
+                                >
+                                  <Archive className="h-3 w-3" />
+                                  {email.caixaOrigem}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div
+                            className={cn(
+                              LARGURA_COL_DATA,
+                              "text-right text-xs",
+                              !email.lido
+                                ? "font-semibold text-foreground"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {email.criado_em &&
+                              format(new Date(email.criado_em), "HH:mm", {
+                                locale: ptBR,
+                              })}
+                          </div>
+                          <div
+                            className={cn(
+                              LARGURA_COL_ACOES,
+                              "flex items-center justify-end gap-1",
+                            )}
+                          >
+                            {email.lido && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  marcarNaoLido(email.id);
+                                }}
+                                title="Marcar como não lida"
+                                aria-label="Marcar como não lida"
+                              >
+                                <MailOpen className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEmailToDelete({
+                                  id: email.id,
+                                  type: "received",
+                                });
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {totalReceived > PAGE_SIZE && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/5 shrink-0">
+                    <div className="text-sm text-muted-foreground">
+                      Mostrando {pageReceived * PAGE_SIZE + 1} -{" "}
+                      {Math.min((pageReceived + 1) * PAGE_SIZE, totalReceived)}{" "}
+                      de {totalReceived}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPageReceived(0)}
+                        disabled={pageReceived === 0}
+                        className="h-8 w-8 p-0"
+                        title="Primeira página"
+                        aria-label="Primeira página"
+                      >
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setPageReceived((p) => Math.max(0, p - 1))
+                        }
+                        disabled={pageReceived === 0}
+                        className="h-8"
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPageReceived((p) => p + 1)}
+                        disabled={
+                          (pageReceived + 1) * PAGE_SIZE >= totalReceived
+                        }
+                        className="h-8"
+                      >
+                        Próximo <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setPageReceived(
+                            Math.max(
+                              0,
+                              Math.ceil(totalReceived / PAGE_SIZE) - 1,
+                            ),
+                          )
+                        }
+                        disabled={
+                          (pageReceived + 1) * PAGE_SIZE >= totalReceived
+                        }
+                        className="h-8 w-8 p-0"
+                        title="Última página"
+                        aria-label="Última página"
+                      >
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
-              {totalReceived > PAGE_SIZE && (
-                <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/5 shrink-0">
-                  <div className="text-sm text-muted-foreground">
-                    Mostrando {pageReceived * PAGE_SIZE + 1} - {Math.min((pageReceived + 1) * PAGE_SIZE, totalReceived)} de {totalReceived}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPageReceived(p => Math.max(0, p - 1))}
-                      disabled={pageReceived === 0}
-                      className="h-8"
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPageReceived(p => p + 1)}
-                      disabled={(pageReceived + 1) * PAGE_SIZE >= totalReceived}
-                      className="h-8"
-                    >
-                      Próximo <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
+            </TabsContent>
+
+            <TabsContent value="drafts" className="m-0 h-full overflow-hidden">
+              <div className="h-full overflow-hidden flex flex-col bg-background">
+                <div className="flex-1 overflow-y-auto">
+                  {!rascunhos || rascunhos.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                      <PenBox className="h-16 w-16 mb-4 opacity-10" />
+                      <p className="text-lg">Nenhum rascunho salvo</p>
+                    </div>
+                  ) : (
+                    <>
+                      <CabecalhoLista
+                        rotuloPrincipal="Destinatário"
+                        rotuloData="Editado em"
+                        rotuloAssunto="Assunto e prévia"
+                      />
+                      <div className="divide-y divide-border/50">
+                        {rascunhos.map((r) => (
+                          <div
+                            key={r.id}
+                            className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+                            onClick={() => continuarRascunho(r)}
+                          >
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                              <PenBox className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-foreground/70">
+                                Para: {r.destinatario || "(sem destinatário)"}
+                              </span>
+                              <div className="mt-0.5 flex items-baseline gap-1.5 overflow-hidden">
+                                <span className="shrink-0 overflow-hidden whitespace-nowrap text-sm font-semibold text-foreground">
+                                  {truncarTexto(
+                                    r.assunto || "(sem assunto)",
+                                    LIMITE_ASSUNTO,
+                                  )}
+                                </span>
+                                {r.corpo && (
+                                  <span className="overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
+                                    {truncarTexto(r.corpo, LIMITE_PREVIA)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div
+                              className={cn(
+                                LARGURA_COL_DATA,
+                                "text-right text-xs font-medium text-muted-foreground",
+                              )}
+                            >
+                              {format(
+                                new Date(r.atualizado_em),
+                                "dd 'de' MMM",
+                                { locale: ptBR },
+                              )}
+                            </div>
+                            <div
+                              className={cn(
+                                LARGURA_COL_ACOES,
+                                "flex items-center justify-end",
+                              )}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  descartarRascunhoDaLista(r.id);
+                                }}
+                                title="Descartar rascunho"
+                                aria-label="Descartar rascunho"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
-              )}
-            </div>
-          </TabsContent>
+              </div>
+            </TabsContent>
           </div>
         </div>
       </Tabs>
@@ -1349,13 +2213,16 @@ const Emails = () => {
         onOpenChange={setGerenciarCaixaAberto}
       />
 
-      <AlertDialog open={!!emailToDelete} onOpenChange={(open) => !open && setEmailToDelete(null)}>
+      <AlertDialog
+        open={!!emailToDelete}
+        onOpenChange={(open) => !open && setEmailToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Isso excluirá permanentemente o e-mail
-              do nosso banco de dados.
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente o
+              e-mail do nosso banco de dados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1379,17 +2246,19 @@ const Emails = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir e-mails em massa?</AlertDialogTitle>
             <AlertDialogDescription>
-              Você está prestes a excluir {selectedIds.length} e-mail(s). 
-              Esta ação não pode ser desfeita.
+              Você está prestes a excluir {selectedIds.length} e-mail(s). Esta
+              ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsBulkDeleting(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setIsBulkDeleting(false)}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                bulkDeleteMutation.mutate({ 
-                  ids: selectedIds, 
-                  type: activeTab as "sent" | "received" 
+                bulkDeleteMutation.mutate({
+                  ids: selectedIds,
+                  type: activeTab as "sent" | "received",
                 });
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

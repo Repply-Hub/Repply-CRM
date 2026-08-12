@@ -1,5 +1,7 @@
-import { Inbox, Tag, Loader2, ShieldAlert, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Inbox, Tag, Loader2, ShieldAlert, Trash2, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 import type { PastaEmail } from '@/hooks/use-email-pastas';
 
 /** `null` = sem filtro de pasta (a aba Recebidos/Enviados manda). */
@@ -8,6 +10,9 @@ export type PastaSelecionada = string | null;
 /** Ids das pastas de sistema que a barra oferece como filtro próprio. */
 export const PASTA_SPAM = 'SPAM';
 export const PASTA_LIXEIRA = 'TRASH';
+
+/** Marcadores visíveis antes do "ver todos" — uma caixa com 900+ mensagens pode ter dezenas. */
+const LIMITE_MARCADORES_VISIVEIS = 10;
 
 interface Props {
   pastas: PastaEmail[];
@@ -41,7 +46,7 @@ function Item({
       onClick={onClick}
       title={rotulo}
       className={cn(
-        'flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+        'flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm transition-colors',
         ativo
           ? 'bg-primary/10 font-medium text-foreground'
           : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
@@ -90,8 +95,22 @@ export function BarraPastas({
   totalSemFiltro,
   contagens,
 }: Props) {
+  const [buscaMarcador, setBuscaMarcador] = useState('');
+  const [mostrarTodosMarcadores, setMostrarTodosMarcadores] = useState(false);
+
   const marcadores = pastas.filter((p) => !p.ehSistema);
   const contagem = (id: string) => contagens.get(id) ?? { total: 0, naoLidas: 0 };
+
+  const marcadoresFiltrados = useMemo(() => {
+    const termo = buscaMarcador.trim().toLowerCase();
+    if (!termo) return marcadores;
+    return marcadores.filter((p) => p.nome.toLowerCase().includes(termo));
+  }, [marcadores, buscaMarcador]);
+
+  const marcadoresVisiveis = mostrarTodosMarcadores
+    ? marcadoresFiltrados
+    : marcadoresFiltrados.slice(0, LIMITE_MARCADORES_VISIVEIS);
+  const restantes = marcadoresFiltrados.length - marcadoresVisiveis.length;
 
   // Spam e Lixeira só aparecem se a caixa realmente as tem espelhadas —
   // provedor sem lixeira não ganha um item morto na barra.
@@ -104,57 +123,105 @@ export function BarraPastas({
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col overflow-y-auto border-r bg-muted/20 md:flex">
-      <Item
-        icone={<Inbox className="h-4 w-4" />}
-        rotulo="Todas"
-        ativo={selecionada === null}
-        onClick={() => onSelecionar(null)}
-        total={totalSemFiltro}
-        naoLidas={0}
-      />
-
-      {temSpam && (
+      <div className="flex flex-col gap-0.5 p-2">
         <Item
-          icone={<ShieldAlert className="h-4 w-4" />}
-          rotulo="Spam"
-          ativo={selecionada === PASTA_SPAM}
-          onClick={() => onSelecionar(PASTA_SPAM)}
-          {...contagem(PASTA_SPAM)}
+          icone={<Inbox className="h-4 w-4" />}
+          rotulo="Todas"
+          ativo={selecionada === null}
+          onClick={() => onSelecionar(null)}
+          total={totalSemFiltro}
+          naoLidas={0}
         />
-      )}
-      {temLixeira && (
-        <Item
-          icone={<Trash2 className="h-4 w-4" />}
-          rotulo="Lixeira"
-          ativo={selecionada === PASTA_LIXEIRA}
-          onClick={() => onSelecionar(PASTA_LIXEIRA)}
-          {...contagem(PASTA_LIXEIRA)}
-        />
-      )}
 
-      {marcadores.length > 0 && (
-        <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Marcadores
-        </p>
-      )}
+        {temSpam && (
+          <Item
+            icone={<ShieldAlert className="h-4 w-4" />}
+            rotulo="Spam"
+            ativo={selecionada === PASTA_SPAM}
+            onClick={() => onSelecionar(PASTA_SPAM)}
+            {...contagem(PASTA_SPAM)}
+          />
+        )}
+        {temLixeira && (
+          <Item
+            icone={<Trash2 className="h-4 w-4" />}
+            rotulo="Lixeira"
+            ativo={selecionada === PASTA_LIXEIRA}
+            onClick={() => onSelecionar(PASTA_LIXEIRA)}
+            {...contagem(PASTA_LIXEIRA)}
+          />
+        )}
+      </div>
 
-      {carregando && (
-        <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          Carregando…
+      {(marcadores.length > 0 || carregando) && (
+        <div className="flex flex-col gap-0.5 border-t p-2">
+          <p className="px-1 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Marcadores
+          </p>
+
+          {/* Só compensa numa caixa com muitos marcadores — abaixo disso a
+              lista inteira já cabe na tela e um campo de busca só ocuparia
+              espaço para filtrar 3 itens. */}
+          {marcadores.length > 8 && (
+            <div className="relative px-1 pb-1">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={buscaMarcador}
+                onChange={(e) => setBuscaMarcador(e.target.value)}
+                placeholder="Buscar marcador..."
+                className="h-8 border-transparent bg-muted/50 pl-8 text-xs focus-visible:bg-background focus-visible:ring-1"
+              />
+            </div>
+          )}
+
+          {carregando && (
+            <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Carregando…
+            </div>
+          )}
+
+          {!carregando && buscaMarcador && marcadoresFiltrados.length === 0 && (
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              Nenhum marcador encontrado para "{buscaMarcador}".
+            </p>
+          )}
+
+          {marcadoresVisiveis.map((p) => (
+            <Item
+              key={p.id}
+              icone={<Tag className="h-4 w-4" />}
+              rotulo={p.nome}
+              ativo={selecionada === p.pastaId}
+              onClick={() => onSelecionar(p.pastaId)}
+              {...contagem(p.pastaId)}
+            />
+          ))}
+
+          {restantes > 0 && (
+            <button
+              onClick={() => setMostrarTodosMarcadores(true)}
+              className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+            >
+              <ChevronDown className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">Ver todos os marcadores</span>
+              <span className="shrink-0 tabular-nums opacity-70">+{restantes}</span>
+            </button>
+          )}
+
+          {/* Só some se a lista TODA continuar cabendo depois de recolher —
+              senão sumiria o próprio caminho de volta ao estado compacto. */}
+          {mostrarTodosMarcadores && marcadoresFiltrados.length > LIMITE_MARCADORES_VISIVEIS && (
+            <button
+              onClick={() => setMostrarTodosMarcadores(false)}
+              className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              <ChevronUp className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">Ver menos</span>
+            </button>
+          )}
         </div>
       )}
-
-      {marcadores.map((p) => (
-        <Item
-          key={p.id}
-          icone={<Tag className="h-4 w-4" />}
-          rotulo={p.nome}
-          ativo={selecionada === p.pastaId}
-          onClick={() => onSelecionar(p.pastaId)}
-          {...contagem(p.pastaId)}
-        />
-      ))}
     </aside>
   );
 }
