@@ -9,7 +9,7 @@ interface NomeNegocioFieldProps {
   onNomeChange: (nome: string) => void;
   automatico: boolean;
   onAutomaticoChange: (automatico: boolean) => void;
-  /** Prévia do nome automático ("empresa + fabricante") para exibir como placeholder/dica. */
+  /** Prévia do nome automático ("empresa | fabricante") para exibir como placeholder/dica. */
   nomeAutomaticoPreview: string;
 }
 
@@ -36,7 +36,7 @@ export function NomeNegocioField({
           onCheckedChange={(checked) => onAutomaticoChange(checked === true)}
         />
         <Label htmlFor="nome-negocio-automatico" className="text-xs font-normal text-muted-foreground cursor-pointer">
-          Usar nome automático (Empresa + Fabricante)
+          Usar nome automático (Empresa | Fabricante)
         </Label>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -49,7 +49,7 @@ export function NomeNegocioField({
           </TooltipTrigger>
           <TooltipContent side="right" className="max-w-[260px]">
             <p className="text-xs">
-              Quando marcado, o nome do negócio é preenchido automaticamente no formato "Empresa + Fabricante" e
+              Quando marcado, o nome do negócio é preenchido automaticamente no formato "Empresa | Fabricante" e
               acompanha qualquer troca de cliente ou fabricante. Desmarque para definir um nome próprio.
             </p>
           </TooltipContent>

@@ -1,9 +1,9 @@
-/** Formato automático padrão do nome de um negócio: "empresa + fabricante". */
+/** Formato automático padrão do nome de um negócio: "empresa | fabricante". */
 export function getNomeNegocioAutomatico(
   cliente?: { empresa?: string | null } | null,
   fabricante?: { nome?: string | null } | null,
 ): string {
-  return [cliente?.empresa, fabricante?.nome].filter(Boolean).join(' + ') || '—';
+  return [cliente?.empresa, fabricante?.nome].filter(Boolean).join(' | ') || '—';
 }
 
 /** Nome exibido do negócio: usa `nome` customizado quando presente, senão cai no formato automático. */

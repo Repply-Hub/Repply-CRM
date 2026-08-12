@@ -32,7 +32,7 @@ export interface UpdatePedidoPayload {
   usuario_id: string;
   obra_id?: string;
   status?: string;
-  /** Nome customizado do negócio. Ausente/null = usar nome automático ("empresa + fabricante"). */
+  /** Nome customizado do negócio. Ausente/null = usar nome automático ("empresa | fabricante"). */
   nome?: string | null;
   marcador_id?: string | null;
   data_pedido: string;

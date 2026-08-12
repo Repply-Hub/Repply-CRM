@@ -3,7 +3,7 @@ export type KanbanStage = 'novo_lead' | 'elaboracao' | 'enviado' | 'negociacao' 
 export interface Order {
   id: string;
   clientName: string;
-  /** Nome do negócio a exibir: `pedido.nome` customizado, ou "empresa + fabricante" automático. */
+  /** Nome do negócio a exibir: `pedido.nome` customizado, ou "empresa | fabricante" automático. */
   nomeNegocio: string;
   obra: string;
   fabricante: string;
