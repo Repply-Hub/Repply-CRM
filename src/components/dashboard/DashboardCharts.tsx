@@ -211,42 +211,6 @@ export function DashboardCharts({
         </Card>
       </div>
 
-      {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 gap-5">
-        {/* Conversão por Vendedor */}
-        <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-sm font-bold">Conversão por Vendedor</CardTitle>
-            <CardDescription className="text-xs">Taxa de fechamento individual</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={conversaoVendedor} layout="vertical" barCategoryGap="20%">
-                <defs>
-                  <linearGradient id="gradientConversao" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor={chartColors.success} stopOpacity={0.7} />
-                    <stop offset="100%" stopColor={chartColors.success} stopOpacity={1} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid {...commonGridProps} vertical horizontal={false} />
-                <XAxis type="number" domain={[0, 100]} {...commonAxisProps} tickFormatter={v => `${v}%`} />
-                <YAxis dataKey="nome" type="category" {...commonAxisProps} width={vendedorAxisWidth} tick={renderVendedorTick} />
-                <Tooltip content={<ChartTooltip formatValue={(v) => `${v}%`} />} />
-                <Bar
-                  dataKey="conversao"
-                  name="Conversão"
-                  fill="url(#gradientConversao)"
-                  radius={[0, 8, 8, 0]}
-                  animationDuration={1000}
-                  animationEasing="ease-out"
-                  background={{ fill: chartColors.primaryLight, radius: 8 }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Rendimento Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
         {/* Faturamento por Fábrica - Donut Chart */}
@@ -340,6 +304,39 @@ export function DashboardCharts({
                   radius={[0, 8, 8, 0]}
                   animationDuration={1000}
                   animationEasing="ease-out"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Conversão por Vendedor */}
+        <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm font-bold">Conversão por Vendedor</CardTitle>
+            <CardDescription className="text-xs">Taxa de fechamento individual</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-2">
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={conversaoVendedor} layout="vertical" barCategoryGap="20%">
+                <defs>
+                  <linearGradient id="gradientConversao" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor={chartColors.success} stopOpacity={0.7} />
+                    <stop offset="100%" stopColor={chartColors.success} stopOpacity={1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid {...commonGridProps} vertical horizontal={false} />
+                <XAxis type="number" domain={[0, 100]} {...commonAxisProps} tickFormatter={v => `${v}%`} />
+                <YAxis dataKey="nome" type="category" {...commonAxisProps} width={vendedorAxisWidth} tick={renderVendedorTick} />
+                <Tooltip content={<ChartTooltip formatValue={(v) => `${v}%`} />} />
+                <Bar
+                  dataKey="conversao"
+                  name="Conversão"
+                  fill="url(#gradientConversao)"
+                  radius={[0, 8, 8, 0]}
+                  animationDuration={1000}
+                  animationEasing="ease-out"
+                  background={{ fill: chartColors.primaryLight, radius: 8 }}
                 />
               </BarChart>
             </ResponsiveContainer>
