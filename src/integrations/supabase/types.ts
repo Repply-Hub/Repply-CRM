@@ -3930,6 +3930,8 @@ export type Database = {
         Returns: {
           fabricante_id: string
           fabricante_nome: string
+          meta_equipe_valor: number
+          meta_individual_valor: number
           meta_valor: number
           vendido_valor: number
         }[]

@@ -327,6 +327,14 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
                 {progresso.map(p => {
                   const temMeta = p.meta_valor > 0;
                   const pct = temMeta ? (p.vendido_valor / p.meta_valor) * 100 : 0;
+                  // Só faz sentido distinguir "meta da equipe" de "minha fatia" numa
+                  // visão de 1 pessoa só — o card do usuário comum (travado nele mesmo)
+                  // ou um gestor filtrando "Responsável" pra um único vendedor. Sem
+                  // isso, quem não é gestor não tinha como ver essa quebra em lugar
+                  // nenhum (o diálogo "Editar metas" que já mostra é gestor-only).
+                  const mostrarQuebraMeta = !!vendedorUnico && p.meta_equipe_valor > 0;
+                  const temMetaIndividual = mostrarQuebraMeta && p.meta_individual_valor > 0;
+                  const pctIndividual = temMetaIndividual ? (p.vendido_valor / p.meta_individual_valor) * 100 : 0;
                   return (
                     <div key={p.fabricante_id} className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
@@ -343,7 +351,26 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
                           )}
                         </span>
                       </div>
+                      {mostrarQuebraMeta && (
+                        <p className="text-[10px] text-muted-foreground">Meta geral da equipe: {formatCurrency(p.meta_equipe_valor)}</p>
+                      )}
                       {temMeta && <Progress value={Math.min(pct, 100)} className="h-2.5" />}
+
+                      {/* Barra própria pra "sua meta": comparar vendas pessoais contra o
+                          alvo do TIME (acima) já é útil, mas não mostra o progresso dele
+                          em relação à fatia que É dele dentro dessa meta geral. */}
+                      {temMetaIndividual && (
+                        <div className="space-y-1 pt-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-muted-foreground">Sua meta</span>
+                            <span className="text-muted-foreground">
+                              {formatCurrency(p.vendido_valor)} / {formatCurrency(p.meta_individual_valor)}{' '}
+                              <span className={`font-bold ${progressoCor(pctIndividual)}`}>({pctIndividual.toFixed(0)}%)</span>
+                            </span>
+                          </div>
+                          <Progress value={Math.min(pctIndividual, 100)} className="h-2" />
+                        </div>
+                      )}
                     </div>
                   );
                 })}

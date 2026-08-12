@@ -6,6 +6,11 @@ export interface PlanoVendasProgresso {
   fabricante_nome: string;
   meta_valor: number;
   vendido_valor: number;
+  // Só preenchidos (>0) quando filtrado por exatamente 1 vendedor — permite distinguir
+  // "meta da equipe toda" de "minha fatia dela" no card do usuário comum, que não tem
+  // acesso ao diálogo "Editar metas" (gestor-only) pra ver essa mesma quebra.
+  meta_equipe_valor: number;
+  meta_individual_valor: number;
 }
 
 // Progresso (meta x vendido) por fabricante, agregado no servidor pela RPC
