@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { TOGGLE_LIST_CLASS, TOGGLE_ITEM_CLASS } from '@/lib/toggle-group-styles';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import { Goal, Pencil, Plus, Trash2, Loader2, Copy, Users, User, GripVertical, Info } from 'lucide-react';
+import { Goal, Pencil, Plus, Trash2, Loader2, Copy, Users, User, GripVertical, Info, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   usePlanoVendasProgresso,
@@ -556,28 +556,41 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   const [fabricantesEquipeOcultas, setFabricantesEquipeOcultas] = useState<Set<string>>(new Set());
   const [novoFabricanteId, setNovoFabricanteId] = useState<string>('');
   const [novoValor, setNovoValor] = useState('');
+  const [buscaFabrica, setBuscaFabrica] = useState('');
 
-  // Mescla os valores confirmados no banco no estado local, sem apagar
-  // fabricantes copiados do mês anterior que ainda não foram salvos.
+  // Sincroniza `valores` com o banco (`metas`) e detecta troca de vendedor/escopo/
+  // período numa ÚNICA effect — precisa ser atômico: separadas (sync num `useEffect`,
+  // reset noutro), quando os dois disparam no mesmo ciclo (ex: reabrir o diálogo com
+  // dados já em cache, ou voltar pra um vendedor já visto antes nesta sessão) a ordem
+  // de declaração faz o reset rodar DEPOIS do sync e apagar o valor recém-carregado —
+  // o campo aparecia vazio mesmo com a meta já salva no banco. `contextoRef` (não
+  // state) resolve isso sem depender de ordem entre effects: dentro do MESMO
+  // contexto, mescla em cima do que já está em `valores` (preserva cópia do mês
+  // anterior ainda não salva); ao trocar de contexto, começa do zero a partir de
+  // `metas`, sem herdar nada do vendedor/escopo anterior.
+  const contextoValoresRef = useRef('');
   useEffect(() => {
-    if (!metas) return;
+    const contextoAtual = `${scopedUsuarioId ?? 'equipe'}|${selectedAno}|${selectedMes}`;
+    const mudouContexto = contextoValoresRef.current !== contextoAtual;
+    if (mudouContexto) {
+      contextoValoresRef.current = contextoAtual;
+      setFabricantesCopiados(new Set());
+      setFabricantesEquipeOcultas(new Set());
+      setBuscaFabrica('');
+    }
+    if (!metas) {
+      if (mudouContexto) setValores({});
+      return;
+    }
     setValores(prev => {
-      const novo = { ...prev };
+      const base = mudouContexto ? {} : prev;
+      const novo = { ...base };
       metas.forEach(m => {
         novo[m.fabricante_id] = numberToMetaDisplay(m.meta_valor);
       });
       return novo;
     });
-  }, [metas]);
-
-  // Troca de vendedor/escopo/período: descarta valores e cópia pendente do mês
-  // anterior — senão um valor da meta individual ficava "vazando" visualmente
-  // ao trocar pra Equipe (ou vice-versa) até a query nova responder.
-  useEffect(() => {
-    setValores({});
-    setFabricantesCopiados(new Set());
-    setFabricantesEquipeOcultas(new Set());
-  }, [scopedUsuarioId, selectedAno, selectedMes]);
+  }, [metas, scopedUsuarioId, selectedAno, selectedMes]);
 
   const linhas = useMemo(() => {
     const existentes = (metas ?? []).map(m => ({ id: m.id as string | undefined, fabricanteId: m.fabricante_id, origem: 'existente' as const }));
@@ -598,6 +611,15 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
       (a, b) => (posicaoFabricante.get(a.fabricanteId) ?? 0) - (posicaoFabricante.get(b.fabricanteId) ?? 0),
     );
   }, [metas, fabricantesCopiados, escopo, metaEquipePorFabricante, fabricantesEquipeOcultas, posicaoFabricante]);
+
+  // Só filtra o que é MOSTRADO/arrastável — `linhas` (sem filtro) continua sendo a base
+  // de `fabricantesComMeta`/`fabricantesDisponiveis` abaixo, senão buscar escondia
+  // fabricantes da lista e eles reapareceriam à toa no dropdown "Novo fabricante".
+  const linhasFiltradas = useMemo(() => {
+    const termo = buscaFabrica.trim().toLowerCase();
+    if (!termo) return linhas;
+    return linhas.filter(l => (fabricantes.find(f => f.id === l.fabricanteId)?.nome ?? '').toLowerCase().includes(termo));
+  }, [linhas, buscaFabrica, fabricantes]);
 
   const fabricantesComMeta = useMemo(() => new Set(linhas.map(l => l.fabricanteId)), [linhas]);
   const fabricantesDisponiveis = useMemo(
@@ -710,7 +732,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     const { source, destination } = result;
     if (source.index === destination.index) return;
 
-    const visibleIds = linhas.map(l => l.fabricanteId);
+    const visibleIds = linhasFiltradas.map(l => l.fabricanteId);
     const reorderedVisible = [...visibleIds];
     const [moved] = reorderedVisible.splice(source.index, 1);
     reorderedVisible.splice(destination.index, 0, moved);
@@ -828,6 +850,38 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
           </Button>
         </div>
 
+        {fabricantesDisponiveis.length > 0 && (
+          <div className="flex items-center gap-2">
+            <SearchableSelect
+              className="h-9 flex-1 text-sm"
+              options={fabricantesDisponiveis.map(f => ({ value: f.id, label: f.nome }))}
+              value={novoFabricanteId}
+              onValueChange={setNovoFabricanteId}
+              placeholder="Novo fabricante"
+              emptyMessage="Nenhum fabricante encontrado."
+            />
+            <MetaValorInput
+              placeholder="Meta R$"
+              className="h-9 w-32 text-sm"
+              value={novoValor}
+              onChangeValue={setNovoValor}
+            />
+            <Button size="sm" className="h-9" onClick={adicionarMeta}>Adicionar</Button>
+          </div>
+        )}
+
+        {linhas.length > 0 && (
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={buscaFabrica}
+              onChange={e => setBuscaFabrica(e.target.value)}
+              placeholder="Buscar fábrica já adicionada..."
+              className="h-9 pl-8 text-sm"
+            />
+          </div>
+        )}
+
         <div className="flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           <span className="w-4 shrink-0" />
           <span className="flex-1">Fábrica</span>
@@ -863,7 +917,10 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
                 ref={provided.innerRef}
                 {...provided.droppableProps}
               >
-                {linhas.map(({ id, fabricanteId, origem }, idx) => {
+                {linhasFiltradas.length === 0 && buscaFabrica.trim() && (
+                  <p className="py-4 text-center text-xs text-muted-foreground">Nenhuma fábrica encontrada para "{buscaFabrica}".</p>
+                )}
+                {linhasFiltradas.map(({ id, fabricanteId, origem }, idx) => {
                   const fabricante = fabricantes.find(f => f.id === fabricanteId);
                   // No escopo individual, mostra a meta de equipe como referência fixa ao
                   // lado do campo — pro gestor ver, ao preencher a meta de UM vendedor,
@@ -955,26 +1012,6 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
             )}
           </Droppable>
         </DragDropContext>
-
-        {fabricantesDisponiveis.length > 0 && (
-          <div className="flex items-center gap-2">
-            <SearchableSelect
-              className="h-9 flex-1 text-sm"
-              options={fabricantesDisponiveis.map(f => ({ value: f.id, label: f.nome }))}
-              value={novoFabricanteId}
-              onValueChange={setNovoFabricanteId}
-              placeholder="Novo fabricante"
-              emptyMessage="Nenhum fabricante encontrado."
-            />
-            <MetaValorInput
-              placeholder="Meta R$"
-              className="h-9 w-32 text-sm"
-              value={novoValor}
-              onChangeValue={setNovoValor}
-            />
-            <Button size="sm" className="h-9" onClick={adicionarMeta}>Adicionar</Button>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );
