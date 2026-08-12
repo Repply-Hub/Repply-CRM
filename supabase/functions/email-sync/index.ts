@@ -26,7 +26,7 @@ import {
  * diferentes; a distinção é feita aqui dentro.
  */
 
-const LIMITE_PADRAO = 20;
+const LIMITE_PADRAO = 50;
 const LIMITE_MAXIMO = 200; // teto da API do Nylas
 
 /**
