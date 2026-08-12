@@ -1498,6 +1498,54 @@ export type Database = {
           },
         ]
       }
+      email_rascunhos: {
+        Row: {
+          assunto: string | null
+          atualizado_em: string
+          corpo: string | null
+          criado_em: string
+          destinatario: string | null
+          empresa_id: string
+          id: string
+          usuario_id: string
+        }
+        Insert: {
+          assunto?: string | null
+          atualizado_em?: string
+          corpo?: string | null
+          criado_em?: string
+          destinatario?: string | null
+          empresa_id: string
+          id?: string
+          usuario_id: string
+        }
+        Update: {
+          assunto?: string | null
+          atualizado_em?: string
+          corpo?: string | null
+          criado_em?: string
+          destinatario?: string | null
+          empresa_id?: string
+          id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_rascunhos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_rascunhos_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresa_assinaturas: {
         Row: {
           ativado_em: string | null
@@ -2522,6 +2570,7 @@ export type Database = {
           data_pedido: string
           endereco_entrega: string | null
           fabricante_id: string
+          fechado_em: string | null
           funil_id: string
           id: string
           import_hash: string | null
@@ -2544,6 +2593,7 @@ export type Database = {
           data_pedido?: string
           endereco_entrega?: string | null
           fabricante_id: string
+          fechado_em?: string | null
           funil_id: string
           id?: string
           import_hash?: string | null
@@ -2566,6 +2616,7 @@ export type Database = {
           data_pedido?: string
           endereco_entrega?: string | null
           fabricante_id?: string
+          fechado_em?: string | null
           funil_id?: string
           id?: string
           import_hash?: string | null
@@ -2848,6 +2899,39 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_indicadores_vendedor"
             referencedColumns: ["usuario_id"]
+          },
+        ]
+      }
+      plano_vendas_fabricante_ordem: {
+        Row: {
+          empresa_id: string
+          fabricante_id: string
+          ordem: number
+        }
+        Insert: {
+          empresa_id: string
+          fabricante_id: string
+          ordem: number
+        }
+        Update: {
+          empresa_id?: string
+          fabricante_id?: string
+          ordem?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plano_vendas_fabricante_ordem_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plano_vendas_fabricante_ordem_fabricante_id_fkey"
+            columns: ["fabricante_id"]
+            isOneToOne: false
+            referencedRelation: "fabricantes"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3801,20 +3885,6 @@ export type Database = {
           total_pedidos: number
         }[]
       }
-      dashboard_velocidade_fabricante: {
-        Args: {
-          p_date_from?: string
-          p_date_to?: string
-          p_fabricante_ids?: string[]
-          p_usuario_ids?: string[]
-        }
-        Returns: {
-          dias_medio_resposta: number | null
-          fabricante_id: string
-          fabricante_nome: string
-          total_pedidos: number
-        }[]
-      }
       delete_current_user: { Args: never; Returns: undefined }
       delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
       empresa_plano_ativo: { Args: never; Returns: boolean }
@@ -3854,6 +3924,7 @@ export type Database = {
           p_ano: number
           p_fabricante_ids?: string[]
           p_mes: number
+          p_somente_com_meta?: boolean
           p_usuario_ids?: string[]
         }
         Returns: {
@@ -3879,73 +3950,25 @@ export type Database = {
           vendido_valor: number
         }[]
       }
-      pedidos_stats:
-        | {
-            Args: {
-              p_date_from?: string
-              p_date_to?: string
-              p_fabricante_ids?: string[]
-              p_only_attention?: boolean
-              p_search?: string
-              p_stages?: string[]
-              p_usuario_ids?: string[]
-            }
-            Returns: {
-              total_count: number
-              total_valor: number
-            }[]
-          }
-        | {
-            Args: {
-              p_date_from?: string
-              p_date_to?: string
-              p_fabricante_ids?: string[]
-              p_funil_id?: string
-              p_only_attention?: boolean
-              p_search?: string
-              p_stages?: string[]
-              p_usuario_ids?: string[]
-            }
-            Returns: {
-              total_count: number
-              total_valor: number
-            }[]
-          }
-        | {
-            Args: {
-              p_date_from?: string
-              p_date_to?: string
-              p_fabricante_ids?: string[]
-              p_funil_id?: string
-              p_marcador_ids?: string[]
-              p_only_attention?: boolean
-              p_search?: string
-              p_stages?: string[]
-              p_usuario_ids?: string[]
-            }
-            Returns: {
-              total_count: number
-              total_valor: number
-            }[]
-          }
-        | {
-            Args: {
-              p_date_from?: string
-              p_date_to?: string
-              p_fabricante_ids?: string[]
-              p_funil_id?: string
-              p_hide_importados?: boolean
-              p_marcador_ids?: string[]
-              p_only_attention?: boolean
-              p_search?: string
-              p_stages?: string[]
-              p_usuario_ids?: string[]
-            }
-            Returns: {
-              total_count: number
-              total_valor: number
-            }[]
-          }
+      pedidos_stats: {
+        Args: {
+          p_date_field?: string
+          p_date_from?: string
+          p_date_to?: string
+          p_fabricante_ids?: string[]
+          p_funil_id?: string
+          p_hide_importados?: boolean
+          p_marcador_ids?: string[]
+          p_only_attention?: boolean
+          p_search?: string
+          p_stages?: string[]
+          p_usuario_ids?: string[]
+        }
+        Returns: {
+          total_count: number
+          total_valor: number
+        }[]
+      }
       restaurar_usuario_por_email: {
         Args: {
           p_email: string
