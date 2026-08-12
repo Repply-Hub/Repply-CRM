@@ -19,15 +19,21 @@ export function usePlanoVendasProgresso(
   mes: number,
   usuarioIds?: string[],
   fabricanteIds?: string[],
+  // true só na visão de 1 vendedor específico: fábrica sem meta INDIVIDUAL (só de
+  // equipe, ou nenhuma) some da lista e do total, mesmo que tenha venda registrada.
+  // Sem efeito na visão agregada "Todos" (default false), que continua somando as
+  // metas de equipe normalmente.
+  somenteComMeta?: boolean,
 ) {
   return useQuery({
-    queryKey: ['plano_vendas_progresso', ano, mes, usuarioIds, fabricanteIds],
+    queryKey: ['plano_vendas_progresso', ano, mes, usuarioIds, fabricanteIds, somenteComMeta],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('plano_vendas_progresso', {
         p_ano: ano,
         p_mes: mes,
         p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
         p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
+        p_somente_com_meta: !!somenteComMeta,
       });
       if (error) throw error;
       return (data ?? []) as PlanoVendasProgresso[];
@@ -54,6 +60,10 @@ export interface PlanoVendasProgressoVendedor {
 // metas_vendas/pedidos já restringe o retorno pra quem não é gestor (só a
 // própria linha volta), então `enabled` aqui é só otimização — não é a
 // barreira de segurança.
+//
+// Só traz (vendedor, fabricante) onde existe meta INDIVIDUAL > 0 — venda numa
+// fábrica sem meta individual (só de equipe, ou nenhuma) não entra aqui nem no
+// total do vendedor, mesmo que a empresa tenha meta de equipe pra essa fábrica.
 export function usePlanoVendasProgressoPorVendedor(
   ano: number,
   mes: number,
@@ -157,6 +167,48 @@ export function useDeleteMetaVenda() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['metas_vendas'] });
+      queryClient.invalidateQueries({ queryKey: ['plano_vendas_progresso'] });
+      queryClient.invalidateQueries({ queryKey: ['plano_vendas_progresso_por_vendedor'] });
+    },
+  });
+}
+
+// Ordem customizada (por empresa) em que os fabricantes aparecem no Plano de
+// Vendas — fabricante sem linha aqui cai no critério padrão (maior meta
+// primeiro), aplicado nas RPCs plano_vendas_progresso/_por_vendedor. Mapa
+// fabricante_id -> posição, pra ordenar listas no cliente (ex: fábricas dentro
+// de cada vendedor em "Por vendedor", que a RPC não ordena globalmente).
+export function useFabricantesOrdemPlanoVendas(empresaId?: string) {
+  return useQuery({
+    queryKey: ['plano_vendas_fabricante_ordem', empresaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plano_vendas_fabricante_ordem')
+        .select('fabricante_id, ordem')
+        .eq('empresa_id', empresaId as string);
+      if (error) throw error;
+      return new Map((data ?? []).map(r => [r.fabricante_id, r.ordem]));
+    },
+    enabled: !!empresaId,
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+// Persiste a nova ordem — recebe a lista COMPLETA de fabricantes da empresa
+// (não só os visíveis no diálogo que disparou o drag), pra que fabricantes sem
+// meta neste mês/vendedor não percam a posição relativa que já tinham.
+export function useReorderFabricantesPlanoVendas() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ empresaId, orderedFabricanteIds }: { empresaId: string; orderedFabricanteIds: string[] }) => {
+      const rows = orderedFabricanteIds.map((fabricante_id, ordem) => ({ empresa_id: empresaId, fabricante_id, ordem }));
+      const { error } = await supabase
+        .from('plano_vendas_fabricante_ordem')
+        .upsert(rows, { onConflict: 'empresa_id,fabricante_id' });
+      if (error) throw error;
+    },
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['plano_vendas_fabricante_ordem', variables.empresaId] });
       queryClient.invalidateQueries({ queryKey: ['plano_vendas_progresso'] });
       queryClient.invalidateQueries({ queryKey: ['plano_vendas_progresso_por_vendedor'] });
     },

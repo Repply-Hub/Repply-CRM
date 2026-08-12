@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,8 @@ import {
 } from '@/components/ui/dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { TOGGLE_LIST_CLASS, TOGGLE_ITEM_CLASS } from '@/lib/toggle-group-styles';
-import { Goal, Pencil, Trash2, Loader2, Copy, Users, User } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
+import { Goal, Pencil, Trash2, Loader2, Copy, Users, User, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   usePlanoVendasProgresso,
@@ -24,6 +26,8 @@ import {
   useMetasVendas,
   useUpsertMetaVenda,
   useDeleteMetaVenda,
+  useFabricantesOrdemPlanoVendas,
+  useReorderFabricantesPlanoVendas,
 } from '@/hooks/use-plano-vendas';
 
 const MESES = [
@@ -150,6 +154,10 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
     mes,
     vendedorIds.length > 0 ? vendedorIds : undefined,
     fabricanteIds.length > 0 ? fabricanteIds : undefined,
+    // Só na visão de 1 vendedor: fábrica sem meta individual some da lista/total
+    // (mesma regra da seção "Por vendedor" abaixo). Na visão "Todos" (agregada)
+    // continua somando as metas de equipe normalmente.
+    !!vendedorUnico,
   );
 
   const totalMeta = useMemo(() => (progresso ?? []).reduce((acc, p) => acc + p.meta_valor, 0), [progresso]);
@@ -158,6 +166,11 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
 
   const vendedorNome = vendedores.find(v => v.usuario_id === vendedorUnico)?.usuario_nome
     ?? (vendedorUnico === currentUsuarioId ? 'Você' : '');
+
+  // Ordem customizada dos fabricantes (definida em "Editar metas") — a RPC
+  // principal já ordena por ela, mas o agrupamento "Por vendedor" abaixo é
+  // montado no cliente, então precisa reaplicar aqui.
+  const { data: fabricantesOrdemMap } = useFabricantesOrdemPlanoVendas(empresaId);
 
   // Detalhamento por vendedor — busca/mostra sempre que não há exatamente um
   // vendedor selecionado (0 = Todos, 2+ = um subconjunto) pro gestor: antes só
@@ -171,21 +184,44 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
     vendedorIds.length > 0 ? vendedorIds : undefined,
     fabricanteIds.length > 0 ? fabricanteIds : undefined,
   );
+  // A RPC já só traz (vendedor, fabricante) com meta INDIVIDUAL > 0 (ver
+  // plano_vendas_progresso_por_vendedor) — o agrupamento abaixo mantém essas linhas
+  // por fábrica dentro de cada vendedor (não só a soma), pra listar embaixo do nome
+  // dele só as fábricas em que o gestor de fato definiu uma meta individual.
   const porVendedor = useMemo(() => {
-    const porId = new Map<string, { usuario_id: string; usuario_nome: string; meta_valor: number; vendido_valor: number }>();
+    const porId = new Map<string, {
+      usuario_id: string;
+      usuario_nome: string;
+      meta_valor: number;
+      vendido_valor: number;
+      fabricas: { fabricante_id: string; fabricante_nome: string; meta_valor: number; vendido_valor: number }[];
+    }>();
     for (const linha of progressoPorVendedorRaw ?? []) {
       const atual = porId.get(linha.usuario_id) ?? {
         usuario_id: linha.usuario_id,
         usuario_nome: linha.usuario_nome,
         meta_valor: 0,
         vendido_valor: 0,
+        fabricas: [],
       };
       atual.meta_valor += linha.meta_valor;
       atual.vendido_valor += linha.vendido_valor;
+      atual.fabricas.push({
+        fabricante_id: linha.fabricante_id,
+        fabricante_nome: linha.fabricante_nome,
+        meta_valor: linha.meta_valor,
+        vendido_valor: linha.vendido_valor,
+      });
       porId.set(linha.usuario_id, atual);
     }
-    return Array.from(porId.values()).sort((a, b) => b.vendido_valor - a.vendido_valor);
-  }, [progressoPorVendedorRaw]);
+    const resultado = Array.from(porId.values());
+    resultado.forEach(v => v.fabricas.sort((a, b) => {
+      const oa = fabricantesOrdemMap?.get(a.fabricante_id) ?? Number.MAX_SAFE_INTEGER;
+      const ob = fabricantesOrdemMap?.get(b.fabricante_id) ?? Number.MAX_SAFE_INTEGER;
+      return oa !== ob ? oa - ob : b.meta_valor - a.meta_valor;
+    }));
+    return resultado.sort((a, b) => b.vendido_valor - a.vendido_valor);
+  }, [progressoPorVendedorRaw, fabricantesOrdemMap]);
 
   return (
     <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300 mb-8">
@@ -282,7 +318,7 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
               </div>
             )}
 
-            {mostrarPorVendedor && porVendedor.length > 0 && (
+            {mostrarDetalhado && mostrarPorVendedor && porVendedor.length > 0 && (
               <div className="space-y-3 pt-1 border-t border-border/60">
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider pt-3">
                   Por vendedor
@@ -291,22 +327,46 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
                   const temMeta = v.meta_valor > 0;
                   const pct = temMeta ? (v.vendido_valor / v.meta_valor) * 100 : 0;
                   return (
-                    <div key={v.usuario_id} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-card-foreground">{v.usuario_nome}</span>
-                        <span className="text-muted-foreground">
-                          {formatCurrency(v.vendido_valor)}
-                          {temMeta ? (
-                            <>
-                              {' '}/ {formatCurrency(v.meta_valor)}{' '}
-                              <span className={`font-bold ${progressoCor(pct)}`}>({pct.toFixed(0)}%)</span>
-                            </>
-                          ) : (
-                            <span className="italic"> — meta não definida</span>
-                          )}
-                        </span>
+                    <div key={v.usuario_id} className="space-y-2">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-card-foreground">{v.usuario_nome}</span>
+                          <span className="text-muted-foreground">
+                            {formatCurrency(v.vendido_valor)}
+                            {temMeta ? (
+                              <>
+                                {' '}/ {formatCurrency(v.meta_valor)}{' '}
+                                <span className={`font-bold ${progressoCor(pct)}`}>({pct.toFixed(0)}%)</span>
+                              </>
+                            ) : (
+                              <span className="italic"> — meta não definida</span>
+                            )}
+                          </span>
+                        </div>
+                        {temMeta && <Progress value={Math.min(pct, 100)} className="h-2.5" />}
                       </div>
-                      {temMeta && <Progress value={Math.min(pct, 100)} className="h-2.5" />}
+
+                      {/* Só as fábricas com meta INDIVIDUAL definida por este vendedor —
+                          nunca uma fábrica onde ele só é coberto pela meta de equipe. */}
+                      {v.fabricas.length > 0 && (
+                        <div className="pl-3 border-l-2 border-border/50 space-y-2">
+                          {v.fabricas.map(f => {
+                            const fPct = f.meta_valor > 0 ? (f.vendido_valor / f.meta_valor) * 100 : 0;
+                            return (
+                              <div key={f.fabricante_id} className="space-y-1">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-muted-foreground">{f.fabricante_nome}</span>
+                                  <span className="text-muted-foreground">
+                                    {formatCurrency(f.vendido_valor)} / {formatCurrency(f.meta_valor)}{' '}
+                                    <span className={`font-semibold ${progressoCor(fPct)}`}>({fPct.toFixed(0)}%)</span>
+                                  </span>
+                                </div>
+                                <Progress value={Math.min(fPct, 100)} className="h-1.5" />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -352,8 +412,10 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   // "Individual" edita a meta do vendedor selecionado; "Equipe" edita uma meta
   // que não é de ninguém em particular (usuario_id NULL), somada à visão
   // agregada da empresa no Dashboard sem entrar na conta de nenhum vendedor
-  // específico.
-  const [escopo, setEscopo] = useState<'individual' | 'equipe'>('individual');
+  // específico. Equipe é o escopo principal — a meta individual é uma extensão
+  // dela (ver metaEquipePorFabricante abaixo) — por isso é o padrão ao abrir o
+  // dialog e vem primeiro (à esquerda) no toggle.
+  const [escopo, setEscopo] = useState<'individual' | 'equipe'>('equipe');
   const [selectedUsuarioId, setSelectedUsuarioId] = useState<string | undefined>(
     initialUsuarioId ?? vendedores[0]?.usuario_id,
   );
@@ -381,13 +443,13 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAno]);
 
-  // Reabrir o dialog sempre volta pro escopo individual, reaplica a
+  // Reabrir o dialog sempre volta pro escopo equipe (o principal), reaplica a
   // pré-seleção de vendedor e reinicia a navegação no mês/ano do filtro do
-  // topo — evita reabrir "preso" no modo Equipe, num vendedor ou num mês de
-  // uma edição anterior.
+  // topo — evita reabrir "preso" no modo Individual, num vendedor ou num mês
+  // de uma edição anterior.
   useEffect(() => {
     if (open) {
-      setEscopo('individual');
+      setEscopo('equipe');
       setSelectedUsuarioId(initialUsuarioId ?? vendedores[0]?.usuario_id);
       setPeriodo({ ano, mes });
     }
@@ -398,11 +460,44 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   const anoAnterior = selectedMes === 1 ? selectedAno - 1 : selectedAno;
   const mesAnterior = selectedMes === 1 ? 12 : selectedMes - 1;
   const { data: metasMesAnterior } = useMetasVendas(open ? scopedUsuarioId : undefined, anoAnterior, mesAnterior);
+  // Meta individual é uma extensão da meta de equipe: buscada sempre que o dialog está
+  // aberto (independente do escopo atual — react-query dedupa com a busca de `metas`
+  // quando o escopo já é "equipe", mesma queryKey) pra servir de referência no escopo
+  // individual (ver `metaEquipePorFabricante`/placeholder abaixo).
+  const { data: metasEquipe } = useMetasVendas(open ? null : undefined, selectedAno, selectedMes);
+  const metaEquipePorFabricante = useMemo(
+    () => new Map((metasEquipe ?? []).map(m => [m.fabricante_id, m.meta_valor])),
+    [metasEquipe],
+  );
   const upsertMeta = useUpsertMetaVenda();
   const deleteMeta = useDeleteMetaVenda();
 
+  // Ordem customizada dos fabricantes no Plano de Vendas (arrastar pra reordenar
+  // abaixo). Guardada por empresa, não por vendedor/mês — reordenar aqui muda a
+  // ordem em qualquer escopo/período.
+  const { data: fabricantesOrdemMap } = useFabricantesOrdemPlanoVendas(empresaId);
+  const reorderFabricantes = useReorderFabricantesPlanoVendas();
+  // Lista completa de fabricantes da empresa na ordem atual — base pra mesclar o
+  // resultado do drag (ver handleDragEnd): fabricantes fora da lista visível do
+  // diálogo (sem meta neste escopo/período) mantêm a posição relativa.
+  const fabricantesOrdenados = useMemo(() => {
+    return [...fabricantes].sort((a, b) => {
+      const oa = fabricantesOrdemMap?.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const ob = fabricantesOrdemMap?.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      return oa !== ob ? oa - ob : a.nome.localeCompare(b.nome);
+    });
+  }, [fabricantes, fabricantesOrdemMap]);
+  const posicaoFabricante = useMemo(
+    () => new Map(fabricantesOrdenados.map((f, idx) => [f.id, idx])),
+    [fabricantesOrdenados],
+  );
+
   const [valores, setValores] = useState<Record<string, string>>({});
   const [fabricantesCopiados, setFabricantesCopiados] = useState<Set<string>>(new Set());
+  // Fábricas trazidas só como referência da meta de equipe (sem meta individual
+  // ainda) que o usuário dispensou da lista sem preencher nada — não existe nada pra
+  // apagar no banco, é só um "esconder" local (reaparece se reabrir o dialog).
+  const [fabricantesEquipeOcultas, setFabricantesEquipeOcultas] = useState<Set<string>>(new Set());
   const [novoFabricanteId, setNovoFabricanteId] = useState<string>('');
   const [novoValor, setNovoValor] = useState('');
 
@@ -425,16 +520,28 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   useEffect(() => {
     setValores({});
     setFabricantesCopiados(new Set());
+    setFabricantesEquipeOcultas(new Set());
   }, [scopedUsuarioId, selectedAno, selectedMes]);
 
   const linhas = useMemo(() => {
-    const existentes = (metas ?? []).map(m => ({ id: m.id as string | undefined, fabricanteId: m.fabricante_id }));
+    const existentes = (metas ?? []).map(m => ({ id: m.id as string | undefined, fabricanteId: m.fabricante_id, origem: 'existente' as const }));
     const idsExistentes = new Set(existentes.map(l => l.fabricanteId));
     const extras = Array.from(fabricantesCopiados)
       .filter(id => !idsExistentes.has(id))
-      .map(fabricanteId => ({ id: undefined as string | undefined, fabricanteId }));
-    return [...existentes, ...extras];
-  }, [metas, fabricantesCopiados]);
+      .map(fabricanteId => ({ id: undefined as string | undefined, fabricanteId, origem: 'copiado' as const }));
+    const cobertas = new Set([...idsExistentes, ...extras.map(l => l.fabricanteId)]);
+    // No escopo individual, toda fábrica com meta de equipe já entra na lista (mesmo
+    // sem valor individual ainda) — é a extensão da meta de equipe que o gestor pode
+    // preencher em cima, com o valor da equipe como referência (placeholder abaixo).
+    const daEquipe = escopo === 'individual'
+      ? Array.from(metaEquipePorFabricante.keys())
+          .filter(fabricanteId => !cobertas.has(fabricanteId) && !fabricantesEquipeOcultas.has(fabricanteId))
+          .map(fabricanteId => ({ id: undefined as string | undefined, fabricanteId, origem: 'equipe' as const }))
+      : [];
+    return [...existentes, ...extras, ...daEquipe].sort(
+      (a, b) => (posicaoFabricante.get(a.fabricanteId) ?? 0) - (posicaoFabricante.get(b.fabricanteId) ?? 0),
+    );
+  }, [metas, fabricantesCopiados, escopo, metaEquipePorFabricante, fabricantesEquipeOcultas, posicaoFabricante]);
 
   const fabricantesComMeta = useMemo(() => new Set(linhas.map(l => l.fabricanteId)), [linhas]);
   const fabricantesDisponiveis = useMemo(
@@ -443,7 +550,12 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   );
 
   const salvarMeta = (fabricanteId: string) => {
-    const valor = parseMetaInputValue(valores[fabricanteId] ?? '');
+    const display = valores[fabricanteId] ?? '';
+    // Linha vazia — nada digitado. Cobre principalmente as linhas trazidas só como
+    // referência da meta de equipe (ver `daEquipe` em `linhas`): passar o mouse/focar
+    // e sair sem digitar nada não pode criar uma meta individual "zero" do nada.
+    if (!display.trim()) return;
+    const valor = parseMetaInputValue(display);
     if (valor < 0) {
       toast.error('Informe um valor válido');
       return;
@@ -464,6 +576,16 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
       novo.delete(fabricanteId);
       return novo;
     });
+    setValores(prev => {
+      const { [fabricanteId]: _removido, ...resto } = prev;
+      return resto;
+    });
+  };
+
+  // Dispensa uma linha trazida só como referência da meta de equipe (sem meta
+  // individual salva) — não há nada pra apagar no banco, só sai da lista local.
+  const ocultarReferenciaEquipe = (fabricanteId: string) => {
+    setFabricantesEquipeOcultas(prev => new Set(prev).add(fabricanteId));
     setValores(prev => {
       const { [fabricanteId]: _removido, ...resto } = prev;
       return resto;
@@ -508,9 +630,37 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     );
   };
 
+  // Reordena arrastando: reordena a lista visível localmente e mescla de volta
+  // na lista completa de fabricantes da empresa, preservando a posição de quem
+  // não aparece neste escopo/período (ver fabricantesOrdenados acima).
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const { source, destination } = result;
+    if (source.index === destination.index) return;
+
+    const visibleIds = linhas.map(l => l.fabricanteId);
+    const reorderedVisible = [...visibleIds];
+    const [moved] = reorderedVisible.splice(source.index, 1);
+    reorderedVisible.splice(destination.index, 0, moved);
+
+    const fullOrder = fabricantesOrdenados.map(f => f.id);
+    const visibleSet = new Set(visibleIds);
+    const slots = fullOrder.reduce<number[]>((acc, id, idx) => {
+      if (visibleSet.has(id)) acc.push(idx);
+      return acc;
+    }, []);
+    const novoFullOrder = [...fullOrder];
+    slots.forEach((slotIdx, i) => { novoFullOrder[slotIdx] = reorderedVisible[i]; });
+
+    reorderFabricantes.mutate(
+      { empresaId, orderedFabricanteIds: novoFullOrder },
+      { onError: () => toast.error('Erro ao reordenar fabricantes') },
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>
             Editar metas — {escopo === 'individual' ? vendedorNome : 'Toda a equipe'}
@@ -564,11 +714,11 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
           onValueChange={(v) => v && setEscopo(v as 'individual' | 'equipe')}
           className={TOGGLE_LIST_CLASS}
         >
-          <ToggleGroupItem value="individual" className={`${TOGGLE_ITEM_CLASS} flex-1 gap-1.5`}>
-            <User className="h-3.5 w-3.5" /> Individual
-          </ToggleGroupItem>
           <ToggleGroupItem value="equipe" className={`${TOGGLE_ITEM_CLASS} flex-1 gap-1.5`}>
             <Users className="h-3.5 w-3.5" /> Toda a equipe
+          </ToggleGroupItem>
+          <ToggleGroupItem value="individual" className={`${TOGGLE_ITEM_CLASS} flex-1 gap-1.5`}>
+            <User className="h-3.5 w-3.5" /> Individual
           </ToggleGroupItem>
         </ToggleGroup>
 
@@ -600,30 +750,68 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
           </Button>
         </div>
 
-        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-          {linhas.map(({ id, fabricanteId }) => {
-            const fabricante = fabricantes.find(f => f.id === fabricanteId);
-            return (
-              <div key={fabricanteId} className="flex items-center gap-2">
-                <span className="flex-1 text-sm truncate">{fabricante?.nome ?? '—'}</span>
-                <MetaValorInput
-                  className="h-9 w-32 text-sm"
-                  value={valores[fabricanteId] ?? ''}
-                  onChangeValue={display => setValores(prev => ({ ...prev, [fabricanteId]: display }))}
-                  onBlur={() => salvarMeta(fabricanteId)}
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-9 w-9 text-destructive/70 hover:text-destructive"
-                  onClick={() => (id ? removerMeta(id) : removerPendente(fabricanteId))}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="plano-vendas-fabricantes">
+            {(provided) => (
+              <div
+                className="space-y-3 max-h-[50vh] overflow-y-auto pr-1"
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+              >
+                {linhas.map(({ id, fabricanteId, origem }, idx) => {
+                  const fabricante = fabricantes.find(f => f.id === fabricanteId);
+                  // Só pra linhas trazidas como extensão da meta de equipe (ainda sem valor
+                  // individual): mostra a meta geral como referência dentro do próprio campo.
+                  const metaEquipe = origem === 'equipe' ? metaEquipePorFabricante.get(fabricanteId) : undefined;
+                  const handleRemover = () => {
+                    if (id) removerMeta(id);
+                    else if (origem === 'equipe') ocultarReferenciaEquipe(fabricanteId);
+                    else removerPendente(fabricanteId);
+                  };
+                  return (
+                    <Draggable key={fabricanteId} draggableId={fabricanteId} index={idx}>
+                      {(dragProvided, dragSnapshot) => {
+                        const row = (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            className={`flex items-center gap-2 ${dragSnapshot.isDragging ? 'bg-background rounded-md shadow-lg' : ''}`}
+                          >
+                            <div
+                              {...dragProvided.dragHandleProps}
+                              className="text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0"
+                              aria-label="Arrastar para reordenar"
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </div>
+                            <span className="flex-1 text-sm truncate">{fabricante?.nome ?? '—'}</span>
+                            <MetaValorInput
+                              className="h-9 w-32 text-sm"
+                              value={valores[fabricanteId] ?? ''}
+                              onChangeValue={display => setValores(prev => ({ ...prev, [fabricanteId]: display }))}
+                              onBlur={() => salvarMeta(fabricanteId)}
+                              placeholder={metaEquipe ? `Meta geral: ${formatCurrency(metaEquipe)}` : 'Meta R$'}
+                            />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-9 w-9 text-destructive/70 hover:text-destructive"
+                              onClick={handleRemover}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                        return dragSnapshot.isDragging ? createPortal(row, document.body) : row;
+                      }}
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
               </div>
-            );
-          })}
-        </div>
+            )}
+          </Droppable>
+        </DragDropContext>
 
         {fabricantesDisponiveis.length > 0 && (
           <div className="flex items-center gap-2 pt-3 border-t border-border/60">
