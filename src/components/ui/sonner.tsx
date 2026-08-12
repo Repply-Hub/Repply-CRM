@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useTheme } from "next-themes";
 import { Toaster as Sonner, toast } from "sonner";
 
@@ -11,17 +12,20 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={theme as ToasterProps["theme"]}
       position="top-right"
       offset={{ top: "calc(5.5rem + 1rem)", right: "1rem" }}
+      style={{ "--width": "26rem" } as CSSProperties}
       className="toaster group"
       closeButton
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-primary group-[.toaster]:text-primary-foreground group-[.toaster]:border-primary group-[.toaster]:shadow-lg",
+            "group toast group-[.toaster]:bg-primary group-[.toaster]:text-primary-foreground group-[.toaster]:border-primary group-[.toaster]:shadow-lg group-[.toaster]:!flex-col group-[.toaster]:!items-start group-[.toaster]:!gap-1.5 group-[.toaster]:!py-3 group-[.toaster]:!pr-8",
+          content: "group-[.toast]:!w-full",
           description: "group-[.toast]:text-primary-foreground/80",
-          actionButton: "group-[.toast]:bg-primary-foreground group-[.toast]:text-primary",
+          actionButton:
+            "group-[.toast]:bg-primary-foreground group-[.toast]:text-primary group-[.toast]:!ml-auto group-[.toast]:!mt-0 group-[.toast]:!h-6",
           cancelButton: "group-[.toast]:bg-primary-foreground/20 group-[.toast]:text-primary-foreground",
           closeButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:border-primary-foreground/30 group-[.toast]:!left-auto group-[.toast]:!right-2 group-[.toast]:!top-2",
+            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:border-primary-foreground/30 group-[.toast]:!left-auto group-[.toast]:!right-3 group-[.toast]:!top-3 group-[.toast]:!transform-none",
           error:
             "group-[.toaster]:!bg-destructive group-[.toaster]:!text-destructive-foreground group-[.toaster]:!border-destructive [&_[data-description]]:!text-destructive-foreground/90 [&_[data-close-button]]:!bg-destructive [&_[data-close-button]]:!text-destructive-foreground [&_[data-close-button]]:!border-destructive-foreground/30",
         },
