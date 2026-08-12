@@ -2,6 +2,7 @@ import * as React from "react";
 import { Check, ChevronDown, Search, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Command,
   CommandEmpty,
@@ -19,6 +20,9 @@ import {
 interface Option {
   value: string;
   label: string;
+  /** Texto do badge mostrado à direita da opção (ex: "Meta adicionada") — omitido não
+   * renderiza nada. Não afeta seleção/filtro, é só um indicador visual na lista. */
+  badge?: string;
 }
 
 interface SearchableSelectProps {
@@ -37,6 +41,10 @@ interface SearchableSelectProps {
    * começar do topo — ex: o ano corrente num seletor de ano com centenas de opções. Não
    * muda a seleção, só a posição inicial do scroll. */
   scrollToLabel?: string;
+  /** Sobrescreve o placeholder do campo de busca dentro do dropdown — por padrão é
+   * derivado de `placeholder` ("Buscar <placeholder em minúsculas>..."), o que fica
+   * estranho quando `placeholder` já é uma frase (ex: "Selecione o vendedor"). */
+  searchPlaceholder?: string;
 }
 
 export function SearchableSelect({
@@ -50,6 +58,7 @@ export function SearchableSelect({
   onActionClick,
   actionLabel,
   scrollToLabel,
+  searchPlaceholder,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
   const listRef = React.useRef<HTMLDivElement>(null);
@@ -93,7 +102,7 @@ export function SearchableSelect({
               return 0;
             }}
           >
-            <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
+            <CommandInput placeholder={searchPlaceholder ?? `Buscar ${placeholder.toLowerCase()}...`} />
             <CommandList ref={listRef} className="max-h-[200px] overflow-y-auto overflow-x-hidden">
               <CommandEmpty className="py-6 text-center text-sm">
                 {emptyMessage}
@@ -110,11 +119,16 @@ export function SearchableSelect({
                   >
                     <Check
                       className={cn(
-                        "mr-2 h-4 w-4",
+                        "mr-2 h-4 w-4 shrink-0",
                         value === option.value ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    {option.label}
+                    <span className="truncate">{option.label}</span>
+                    {option.badge && (
+                      <Badge variant="secondary" className="ml-auto shrink-0 text-[10px] font-medium">
+                        {option.badge}
+                      </Badge>
+                    )}
                   </CommandItem>
                 ))}
               </CommandGroup>

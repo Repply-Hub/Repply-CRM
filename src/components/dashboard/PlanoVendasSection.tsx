@@ -512,6 +512,19 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     });
     return mapa;
   }, [metasIndividuaisAlocadas]);
+  // Quantidade de fabricantes com meta individual já preenchida, por vendedor — só pro
+  // badge "x/x" no seletor de vendedor abaixo (x = quantos ele já preencheu, sobre o
+  // total de fabricantes com meta de equipe nesse período — é o universo do que dá
+  // pra distribuir).
+  const qtdMetasPorVendedor = useMemo(() => {
+    const porVendedor = new Map<string, Set<string>>();
+    (metasIndividuaisAlocadas ?? []).forEach(m => {
+      if (!porVendedor.has(m.usuario_id)) porVendedor.set(m.usuario_id, new Set());
+      porVendedor.get(m.usuario_id)!.add(m.fabricante_id);
+    });
+    return new Map(Array.from(porVendedor, ([usuarioId, fabricanteIds]) => [usuarioId, fabricanteIds.size]));
+  }, [metasIndividuaisAlocadas]);
+  const totalFabricantesComMetaGeral = metaEquipePorFabricante.size;
   const upsertMeta = useUpsertMetaVenda();
   const deleteMeta = useDeleteMetaVenda();
 
@@ -783,10 +796,17 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
         {escopo === 'individual' && (
           <SearchableSelect
             className="h-9 text-sm"
-            options={vendedores.map(v => ({ value: v.usuario_id, label: v.usuario_nome }))}
+            options={vendedores.map(v => ({
+              value: v.usuario_id,
+              label: v.usuario_nome,
+              badge: totalFabricantesComMetaGeral > 0
+                ? `${qtdMetasPorVendedor.get(v.usuario_id) ?? 0}/${totalFabricantesComMetaGeral}`
+                : undefined,
+            }))}
             value={selectedUsuarioId ?? ''}
             onValueChange={setSelectedUsuarioId}
             placeholder="Selecione o vendedor"
+            searchPlaceholder="busque por um usuário..."
             emptyMessage="Nenhum vendedor encontrado."
           />
         )}

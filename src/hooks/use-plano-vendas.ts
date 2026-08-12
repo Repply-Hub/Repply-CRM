@@ -120,13 +120,15 @@ export function useMetasVendas(usuarioId: string | null | undefined, ano: number
 }
 
 export interface MetaIndividualAlocada {
+  usuario_id: string;
   fabricante_id: string;
   meta_valor: number;
 }
 
-// Soma das metas INDIVIDUAIS (todo mundo, não só o vendedor sendo editado) por
-// fabricante, num mês — usada só pro diálogo de edição calcular "quanto da meta
-// geral ainda falta distribuir entre os vendedores" (meta de equipe − esta soma).
+// Metas INDIVIDUAIS (todo mundo, não só o vendedor sendo editado) por vendedor e
+// fabricante, num mês — usada pro diálogo de edição calcular "quanto da meta geral
+// ainda falta distribuir entre os vendedores" (meta de equipe − soma por fabricante) e
+// pra marcar, no seletor de vendedor, quem já tem alguma meta lançada no período.
 // Poucas linhas por empresa/mês, então soma no cliente em vez de RPC dedicada.
 export function useMetasIndividuaisAlocadas(empresaId: string | undefined, ano: number, mes: number, enabled: boolean) {
   return useQuery({
@@ -134,7 +136,7 @@ export function useMetasIndividuaisAlocadas(empresaId: string | undefined, ano: 
     queryFn: async () => {
       const { data, error } = await supabase
         .from('metas_vendas')
-        .select('fabricante_id, meta_valor')
+        .select('usuario_id, fabricante_id, meta_valor')
         .eq('empresa_id', empresaId as string)
         .eq('ano', ano)
         .eq('mes', mes)
