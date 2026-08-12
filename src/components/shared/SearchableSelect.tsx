@@ -33,6 +33,10 @@ interface SearchableSelectProps {
   contentClassName?: string;
   onActionClick?: () => void;
   actionLabel?: string;
+  /** Rótulo (`option.label`) que a lista deve trazer visível assim que abrir, em vez de
+   * começar do topo — ex: o ano corrente num seletor de ano com centenas de opções. Não
+   * muda a seleção, só a posição inicial do scroll. */
+  scrollToLabel?: string;
 }
 
 export function SearchableSelect({
@@ -45,8 +49,22 @@ export function SearchableSelect({
   contentClassName,
   onActionClick,
   actionLabel,
+  scrollToLabel,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
+  const listRef = React.useRef<HTMLDivElement>(null);
+
+  // O Popover só monta o conteúdo quando abre, então o item alvo só existe no DOM
+  // no próximo frame — por isso o requestAnimationFrame em vez de rodar no mesmo tick.
+  React.useEffect(() => {
+    if (!open || !scrollToLabel) return;
+    const frame = requestAnimationFrame(() => {
+      listRef.current
+        ?.querySelector<HTMLElement>(`[data-value="${scrollToLabel}"]`)
+        ?.scrollIntoView({ block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, scrollToLabel]);
 
   const selectedOption = options.find((option) => option.value === value);
 
@@ -76,7 +94,7 @@ export function SearchableSelect({
             }}
           >
             <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
-            <CommandList className="max-h-[200px] overflow-y-auto overflow-x-hidden">
+            <CommandList ref={listRef} className="max-h-[200px] overflow-y-auto overflow-x-hidden">
               <CommandEmpty className="py-6 text-center text-sm">
                 {emptyMessage}
               </CommandEmpty>

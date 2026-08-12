@@ -119,6 +119,33 @@ export function useMetasVendas(usuarioId: string | null | undefined, ano: number
   });
 }
 
+export interface MetaIndividualAlocada {
+  fabricante_id: string;
+  meta_valor: number;
+}
+
+// Soma das metas INDIVIDUAIS (todo mundo, não só o vendedor sendo editado) por
+// fabricante, num mês — usada só pro diálogo de edição calcular "quanto da meta
+// geral ainda falta distribuir entre os vendedores" (meta de equipe − esta soma).
+// Poucas linhas por empresa/mês, então soma no cliente em vez de RPC dedicada.
+export function useMetasIndividuaisAlocadas(empresaId: string | undefined, ano: number, mes: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ['metas_vendas_individuais_alocadas', empresaId, ano, mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('metas_vendas')
+        .select('fabricante_id, meta_valor')
+        .eq('empresa_id', empresaId as string)
+        .eq('ano', ano)
+        .eq('mes', mes)
+        .not('usuario_id', 'is', null);
+      if (error) throw error;
+      return (data ?? []) as MetaIndividualAlocada[];
+    },
+    enabled: enabled && !!empresaId,
+  });
+}
+
 interface UpsertMetaVendaInput {
   empresaId: string;
   usuarioId: string | null;
@@ -154,6 +181,7 @@ export function useUpsertMetaVenda() {
       // por elemento de array, não por prefixo de string, então precisa da
       // chave própria (senão a lista "Por vendedor" fica com dado velho).
       queryClient.invalidateQueries({ queryKey: ['plano_vendas_progresso_por_vendedor'] });
+      queryClient.invalidateQueries({ queryKey: ['metas_vendas_individuais_alocadas'] });
     },
   });
 }
@@ -169,6 +197,7 @@ export function useDeleteMetaVenda() {
       queryClient.invalidateQueries({ queryKey: ['metas_vendas'] });
       queryClient.invalidateQueries({ queryKey: ['plano_vendas_progresso'] });
       queryClient.invalidateQueries({ queryKey: ['plano_vendas_progresso_por_vendedor'] });
+      queryClient.invalidateQueries({ queryKey: ['metas_vendas_individuais_alocadas'] });
     },
   });
 }
