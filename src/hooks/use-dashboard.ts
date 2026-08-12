@@ -17,7 +17,9 @@ export function useFaturamentoMensal(empresaId?: string) {
         .from('vw_faturamento_mensal')
         .select('*')
         .eq('empresa_id', empresaId as string)
-        .order('mes', { ascending: true });
+        // 'mes_ano' é 'YYYY-MM' (ordena certo como string). A coluna 'mes' é o rótulo
+        // formatado 'Mon/YY' — ordenar por ela alfabeticamente embaralhava os meses no gráfico.
+        .order('mes_ano', { ascending: true });
       if (error) throw error;
       return data || [];
     },
@@ -40,7 +42,7 @@ export interface IndicadorVendedor {
 // INTEIRO de `pedidos` de cada usuário a cada carga do Dashboard, ignorando os
 // filtros de Período/Fabricante do topo da tela (números que não batiam com o
 // resto da tela) e ficando mais caro conforme a base cresce. RPC aceita os
-// mesmos filtros de dashboard_stats/dashboard_velocidade_fabricante — ver
+// mesmos filtros de dashboard_stats — ver
 // supabase/migrations/20260810140000_dashboard_filtros_multiplos.sql.
 // Não recebe usuarioIds: essa lista alimenta o próprio seletor "Responsável"
 // (e o Plano de Vendas), então precisa continuar trazendo todo mundo da
@@ -61,46 +63,6 @@ export function useIndicadoresVendedor(
       });
       if (error) throw error;
       return (data ?? []) as IndicadorVendedor[];
-    },
-    enabled: !!empresaId,
-    placeholderData: keepPreviousData,
-    ...DASHBOARD_QUERY_OPTS,
-  });
-}
-
-export interface VelocidadeFabricante {
-  fabricante_id: string;
-  fabricante_nome: string;
-  total_pedidos: number;
-  /** Dias médios entre a criação do negócio e o primeiro orçamento enviado.
-   *  null quando nenhum pedido do fabricante tem essa transição registrada
-   *  (não é "0 dias" — é "sem dado"). */
-  dias_medio_resposta: number | null;
-}
-
-// Antes lia vw_velocidade_por_fabricante, que perdeu a coluna de tempo médio
-// numa recriação anterior (o frontend hardcodava `dias: 0` pra todo mundo — ver
-// git blame de src/pages/Dashboard.tsx). RPC calcula de verdade a partir de
-// pedidos_historico_status e aceita os mesmos filtros de Período/Responsável/
-// Fabricante que dashboard_stats — ver
-// supabase/migrations/20260806100000_velocidade_fabricante_rpc.sql.
-export function useVelocidadeFabricante(
-  empresaId?: string,
-  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; dateFrom?: string; dateTo?: string },
-) {
-  const { usuarioIds, fabricanteIds, dateFrom, dateTo } = filters ?? {};
-
-  return useQuery({
-    queryKey: ['dashboard_velocidade_fabricante', empresaId, usuarioIds, fabricanteIds, dateFrom, dateTo],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('dashboard_velocidade_fabricante', {
-        p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
-        p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
-        p_date_from: dateFrom ?? null,
-        p_date_to: dateTo ?? null,
-      });
-      if (error) throw error;
-      return (data ?? []) as VelocidadeFabricante[];
     },
     enabled: !!empresaId,
     placeholderData: keepPreviousData,

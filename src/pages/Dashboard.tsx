@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, DollarSign, Target, Clock, Loader2, FileDown, X } from 'lucide-react';
-import { useFaturamentoMensal, useIndicadoresVendedor, useVelocidadeFabricante, useDashboardStats } from '@/hooks/use-dashboard';
+import { useFaturamentoMensal, useIndicadoresVendedor, useDashboardStats } from '@/hooks/use-dashboard';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -95,15 +95,6 @@ const Dashboard = () => {
     dateTo: format(dateRange.to, 'yyyy-MM-dd'),
   });
 
-  // Mesmos filtros de Período/Responsável/Fabricante do topo — antes esse card
-  // vinha só por empresaId e ignorava completamente esses filtros.
-  const { data: velocidade } = useVelocidadeFabricante(empresaId, {
-    usuarioIds: vendedorIds,
-    fabricanteIds,
-    dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
-    dateTo: format(dateRange.to, 'yyyy-MM-dd'),
-  });
-
   // loadStats só fica true na primeira carga (sem dado nenhum ainda pra mostrar) —
   // trocas de filtro reaproveitam os dados anteriores (placeholderData: keepPreviousData
   // em use-dashboard.ts) e só acendem fetchingStats, sem derrubar a tela pro spinner full-page.
@@ -154,20 +145,18 @@ const Dashboard = () => {
       id: v.usuario_id
     }));
 
+    // Não-gestor só vê a própria conversão nesse gráfico, nunca a dos colegas —
+    // a RPC por trás (dashboard_indicadores_vendedor) traz a empresa toda sem
+    // filtro de usuário, então a restrição precisa ser aplicada aqui, ignorando
+    // o filtro "Responsável" do topo (que continua livre pro gestor).
+    if (!isGestor) {
+      return data.filter(v => v.id === profile?.id);
+    }
     if (vendedorIds.length > 0) {
       return data.filter(v => vendedorIds.includes(v.id));
     }
     return data;
-  }, [vendedores, vendedorIds]);
-
-  // dias_medio_resposta vem null quando nenhum pedido do fabricante tem envio de
-  // orçamento registrado ainda (não é "0 dias" — é "sem dado"); plota 0 pra não
-  // quebrar a área do gráfico, mas o tooltip (VelocidadeTooltip) diferencia os dois casos.
-  const velocidadeData = (velocidade ?? []).map(v => ({
-    fabrica: v.fabricante_nome ?? '',
-    dias: v.dias_medio_resposta ?? 0,
-    semDados: v.dias_medio_resposta === null,
-  }));
+  }, [vendedores, vendedorIds, isGestor, profile?.id]);
 
   // Já vem agregado e ordenado (desc) da RPC — a ordenação por maior/menor e o
   // agrupamento "Outros" da pizza são só de exibição, calculados dentro de
@@ -177,7 +166,16 @@ const Dashboard = () => {
     [stats],
   );
 
-  const rendimentoVendedor = stats?.rendimento_vendedor ?? [];
+  // rendimento_vendedor vem da mesma RPC dashboard_stats agregada pra empresa
+  // toda (KPIs, segmentação, etc.) — não dá pra restringir a query sem também
+  // reduzir os KPIs gerais a "só meu", que não foi pedido. Filtra aqui, pelo
+  // nome (é como a RPC já agrupa esse array), pra não-gestor não ver o
+  // faturamento nominal dos colegas nesse gráfico específico.
+  const rendimentoVendedor = useMemo(() => {
+    const raw = stats?.rendimento_vendedor ?? [];
+    if (isGestor) return raw;
+    return raw.filter(v => v.vendedor === profile?.nome);
+  }, [stats, isGestor, profile?.nome]);
 
   const segmentacao = [
     { name: 'Alto (>100k)', value: stats?.segmentacao_alto ?? 0, color: 'hsl(24, 100%, 47%)' },
@@ -341,7 +339,6 @@ const Dashboard = () => {
             faturamentoData={faturamentoData}
             segmentacao={segmentacao}
             conversaoVendedor={conversaoVendedor}
-            velocidadeData={velocidadeData}
             rendimentoFabrica={rendimentoFabrica}
             rendimentoVendedor={rendimentoVendedor}
           />

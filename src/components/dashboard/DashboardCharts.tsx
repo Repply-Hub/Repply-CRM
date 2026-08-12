@@ -58,27 +58,6 @@ function FabricaPizzaTooltip({ active, payload }: TooltipProps<number, string>) 
   );
 }
 
-interface VelocidadePonto {
-  fabrica: string;
-  dias: number;
-  semDados?: boolean;
-}
-
-function VelocidadeTooltip({ active, payload }: TooltipProps<number, string>) {
-  if (!active || !payload?.length) return null;
-  const data = payload[0]?.payload as VelocidadePonto | undefined;
-  if (!data) return null;
-
-  return (
-    <div className="bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-popover-foreground">{data.fabrica}</p>
-      <p className="text-muted-foreground">
-        {data.semDados ? 'Sem orçamento enviado registrado ainda' : `${data.dias} dia(s) até o orçamento, em média`}
-      </p>
-    </div>
-  );
-}
-
 const RADIAN = Math.PI / 180;
 const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
   const radius = innerRadius + (outerRadius - innerRadius) * 1.35;
@@ -92,11 +71,32 @@ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent
   );
 };
 
+// Recharts quebra o texto do tick em várias linhas quando ele não cabe na
+// largura reservada pro eixo — usamos um tick em SVG puro (sem a prop
+// `width`, que é o que dispara esse word-wrap) e calculamos a largura do
+// eixo a partir do nome mais longo (getVendedorNameWidth/vendedorAxisWidth
+// abaixo), então o nome completo sempre cabe numa linha só.
+const renderVendedorTick = ({ x, y, payload }: { x: number; y: number; payload: { value: string } }) => (
+  <text x={x} y={y} dy={4} textAnchor="end" fontSize={11} fill="hsl(var(--muted-foreground))">
+    {payload?.value ?? ''}
+  </text>
+);
+
+const VENDEDOR_TICK_FONT = '11px Inter, system-ui, sans-serif';
+let vendedorMeasureCtx: CanvasRenderingContext2D | null | undefined;
+function getVendedorNameWidth(nome: string) {
+  if (vendedorMeasureCtx === undefined) {
+    vendedorMeasureCtx = document.createElement('canvas').getContext('2d');
+  }
+  if (!vendedorMeasureCtx) return nome.length * 6.5; // fallback caso o canvas não esteja disponível
+  vendedorMeasureCtx.font = VENDEDOR_TICK_FONT;
+  return vendedorMeasureCtx.measureText(nome).width;
+}
+
 interface DashboardChartsProps {
   faturamentoData: { mes: string; valor: number }[];
   segmentacao: { name: string; value: number; color: string }[];
   conversaoVendedor: { nome: string; conversao: number; id: string | null }[];
-  velocidadeData: VelocidadePonto[];
   rendimentoFabrica: { fabrica: string; valor: number }[];
   rendimentoVendedor: { vendedor: string; valor: number }[];
 }
@@ -105,7 +105,6 @@ export function DashboardCharts({
   faturamentoData,
   segmentacao,
   conversaoVendedor,
-  velocidadeData,
   rendimentoFabrica,
   rendimentoVendedor,
 }: DashboardChartsProps) {
@@ -114,6 +113,16 @@ export function DashboardCharts({
   const rendimentoFabricaSorted = useMemo(() => {
     return [...rendimentoFabrica].sort((a, b) => fabricaSort === 'maior' ? b.valor - a.valor : a.valor - b.valor);
   }, [rendimentoFabrica, fabricaSort]);
+
+  // Largura do eixo calculada a partir do nome mais longo, para o YAxis
+  // sempre reservar espaço suficiente e o nome do vendedor nunca quebrar linha.
+  const vendedorAxisWidth = useMemo(() => {
+    const maxWidth = conversaoVendedor.reduce(
+      (max, v) => Math.max(max, getVendedorNameWidth(v.nome ?? '')),
+      0,
+    );
+    return Math.max(80, Math.ceil(maxWidth) + 12);
+  }, [conversaoVendedor]);
 
   // Mostra todas as fábricas na pizza — sem cortar as menores, só agrupa o
   // excedente em "Outros" (com o detalhe de cada uma disponível no hover via
@@ -203,7 +212,7 @@ export function DashboardCharts({
       </div>
 
       {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 gap-5">
         {/* Conversão por Vendedor */}
         <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
           <CardHeader className="pb-1">
@@ -221,7 +230,7 @@ export function DashboardCharts({
                 </defs>
                 <CartesianGrid {...commonGridProps} vertical horizontal={false} />
                 <XAxis type="number" domain={[0, 100]} {...commonAxisProps} tickFormatter={v => `${v}%`} />
-                <YAxis dataKey="nome" type="category" {...commonAxisProps} width={80} />
+                <YAxis dataKey="nome" type="category" {...commonAxisProps} width={vendedorAxisWidth} tick={renderVendedorTick} />
                 <Tooltip content={<ChartTooltip formatValue={(v) => `${v}%`} />} />
                 <Bar
                   dataKey="conversao"
@@ -233,42 +242,6 @@ export function DashboardCharts({
                   background={{ fill: chartColors.primaryLight, radius: 8 }}
                 />
               </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Velocidade por Fábrica */}
-        <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-sm font-bold">Velocidade de Resposta por Fábrica</CardTitle>
-            <CardDescription className="text-xs">Dias até o primeiro orçamento enviado, em média</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={velocidadeData}>
-                <defs>
-                  <linearGradient id="gradientVelocidade" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={chartColors.warning} stopOpacity={0.2} />
-                    <stop offset="95%" stopColor={chartColors.warning} stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid {...commonGridProps} />
-                <XAxis dataKey="fabrica" {...commonAxisProps} />
-                <YAxis {...commonAxisProps} tickFormatter={v => `${v}d`} />
-                <Tooltip content={<VelocidadeTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="dias"
-                  name="Dias"
-                  stroke={chartColors.warning}
-                  strokeWidth={2.5}
-                  fill="url(#gradientVelocidade)"
-                  dot={{ fill: chartColors.warning, r: 5, strokeWidth: 2.5, stroke: chartColors.card }}
-                  activeDot={{ r: 7, strokeWidth: 2, stroke: chartColors.card, fill: chartColors.warning }}
-                  animationDuration={1200}
-                  animationEasing="ease-out"
-                />
-              </AreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
