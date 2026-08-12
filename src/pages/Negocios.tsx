@@ -13,7 +13,7 @@ import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { useFunis } from '@/hooks/use-funis';
 import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
-import { usePedidos, usePedidosStats, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
+import { usePedidos, usePedidosStats, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
@@ -31,7 +31,8 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, Rows3, History, Tag, ArrowRightLeft
+  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, Rows3, History, Tag, ArrowRightLeft,
+  ListChecks
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -45,6 +46,8 @@ import { useTableSettings } from '@/hooks/use-table-settings';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { TOGGLE_LIST_CLASS, TOGGLE_ITEM_CLASS } from '@/lib/toggle-group-styles';
 import { ImportDialog } from '@/components/ImportDialog';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { ResizableTh } from '@/components/shared/ResizableTh';
@@ -395,6 +398,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   }, [columns, getLabel, handleRename]);
 
+  // Remove duas colunas-fantasma que ficam "presas" na configuração salva de qualquer empresa
+  // que já tinha personalizado a tabela antes dessas mudanças (mergeMissingDefaultColumns só
+  // ADICIONA colunas padrão novas, nunca remove as antigas que saíram da lista):
+  // - "obra" (id literal, sem isCustom): era o id/rótulo padrão da coluna de endereço ANTES de
+  //   virar "endereco_entrega"/"Obra/Endereço". Confirmado no banco (2026-08-11): nas 228 linhas
+  //   onde campos_extras.obra tem valor, é sempre idêntico a endereco_entrega — 0 diferença, ou
+  //   seja, é 100% redundante, nunca mostra informação que "Obra/Endereço" já não mostre.
+  // - "Pdf da cotação" (isCustom: true): coluna extra criada pelo assistente de importação
+  //   quando esse cabeçalho de planilha não batia com o campo canônico pdf_url/"Anexo" — as
+  //   regras de reconhecimento atuais já cobrem esse cabeçalho (não deve mais acontecer em
+  //   importações novas). Confirmado no banco: nenhum pedido tem valor real nela.
+  useEffect(() => {
+    if (columns.some(c => c.id === 'obra')) handleRemoveColumn('obra');
+    if (columns.some(c => c.id === 'Pdf da cotação')) handleRemoveColumn('Pdf da cotação');
+  }, [columns, handleRemoveColumn]);
+
   // Reage a mudanças no localStorage (ex.: importação adicionou novas colunas extras)
   useEffect(() => {
     const handler = () => {
@@ -488,6 +507,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [dateTo, setDateTo] = useState<Date | undefined>(() => (
     searchParams.has('data_ate') ? parseDateParam(searchParams.get('data_ate')) : endOfMonth(new Date())
   ));
+  // Qual data o período acima filtra: criação do negócio (default) ou fechamento
+  // (ganho/perdido) — ver PeriodoDateField em use-pedidos.ts.
+  const [dateField, setDateField] = useState<PeriodoDateField>(
+    () => (searchParams.get('data_campo') === 'fechado_em' ? 'fechado_em' : 'data_pedido'),
+  );
 
   // Sobrevive a editar um negócio e voltar (navigate(-1) desmonta esta página) — sem isso, a
   // seleção pra ação em massa sempre sumia depois de abrir/editar um item específico. sessionStorage
@@ -574,6 +598,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     marcadorIds: selectedMarcadores.length > 0 ? selectedMarcadores : undefined,
     dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
     dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
+    dateField,
     onlyAttention: showOnlyAttention || undefined,
     // Usada tanto pela query de stats (header) quanto pelo fetch paginado da lista/kanban —
     // ambos aplicam o mesmo filtro no servidor, então total/páginas e linhas exibidas ficam consistentes.
@@ -583,7 +608,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     // com a tabela vazia quando todos os resultados eram importados.
     hideImportados: hideImportados || undefined,
     funilId,
-  }), [selectedVendedores, selectedFabricantes, selectedMarcadores, dateFrom, dateTo, showOnlyAttention, deferredSearch, hideImportados, funilId]);
+  }), [selectedVendedores, selectedFabricantes, selectedMarcadores, dateFrom, dateTo, dateField, showOnlyAttention, deferredSearch, hideImportados, funilId]);
 
   // Essa query só serve a view Lista agora — desabilitada no Kanban, já que cada coluna
   // busca seus próprios dados de forma independente.
@@ -741,7 +766,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // lote de cada coluna sozinho, dentro do KanbanColumn, ao ver os filtros mudarem).
   useEffect(() => {
     setPage(1);
-  }, [empresaId, deferredSearch, selectedStages, selectedVendedores, selectedFabricantes, selectedMarcadores, showOnlyAttention, hideImportados, dateFrom, dateTo]);
+  }, [empresaId, deferredSearch, selectedStages, selectedVendedores, selectedFabricantes, selectedMarcadores, showOnlyAttention, hideImportados, dateFrom, dateTo, dateField]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -779,6 +804,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setHideImportados(false);
     setDateFrom(undefined);
     setDateTo(undefined);
+    setDateField('data_pedido');
     setSelectedStages([]);
   };
 
@@ -818,9 +844,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       // de novo (searchParams.has retornava false).
       next.set('data_de', dateFrom ? format(dateFrom, 'yyyy-MM-dd') : '');
       next.set('data_ate', dateTo ? format(dateTo, 'yyyy-MM-dd') : '');
+      setOrDelete('data_campo', dateField !== 'data_pedido' ? dateField : undefined);
       return next;
     }, { replace: true });
-  }, [selectedStages, selectedVendedores, selectedFabricantes, selectedMarcadores, showOnlyAttention, hideImportados, dateFrom, dateTo, setSearchParams]);
+  }, [selectedStages, selectedVendedores, selectedFabricantes, selectedMarcadores, showOnlyAttention, hideImportados, dateFrom, dateTo, dateField, setSearchParams]);
 
   const handleDragEnd = useCallback(async (result: DropResult) => {
     if (!result.destination) return;
@@ -1318,6 +1345,25 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <div className="space-y-4 p-2">
             <div className="space-y-2">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                Filtrar por
+              </p>
+              <ToggleGroup
+                type="single"
+                value={dateField}
+                onValueChange={(v) => v && setDateField(v as PeriodoDateField)}
+                className={cn(TOGGLE_LIST_CLASS, "w-full")}
+              >
+                <ToggleGroupItem value="data_pedido" className={cn(TOGGLE_ITEM_CLASS, "flex-1")}>
+                  Criação
+                </ToggleGroupItem>
+                <ToggleGroupItem value="fechado_em" className={cn(TOGGLE_ITEM_CLASS, "flex-1")}>
+                  Fechamento
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                 Data Início
               </p>
               <Popover>
@@ -1404,7 +1450,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </div>
       </div>
     </FilterButton>
-  ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, marcadores, selectedMarcadores, dateFrom, handleDateFromSelect, dateTo, handleDateToSelect, showOnlyAttention, setShowOnlyAttention, hideImportados, setHideImportados]);
+  ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, marcadores, selectedMarcadores, dateFrom, handleDateFromSelect, dateTo, handleDateToSelect, dateField, showOnlyAttention, setShowOnlyAttention, hideImportados, setHideImportados]);
   const selectedViewOrder = useMemo(
     () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === viewOrderId),
     [showKanban, kanbanPedidosFlat, pedidos, viewOrderId]
@@ -2047,12 +2093,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                Aplicar em ({totalCount} filtrado(s))
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                <ListChecks className="h-3.5 w-3.5" />
+                Aplicar em
+                <Badge variant="secondary" className="font-normal normal-case">{totalCount} filtrado(s)</Badge>
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkExcludedIds(new Set())}>
                   Selecionar todos
                 </Button>
@@ -2068,31 +2116,45 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             </div>
 
-            <div className="rounded-md border max-h-52 overflow-y-auto divide-y">
-              {isBulkPickerLoading ? (
-                <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando negócios...
-                </div>
-              ) : (bulkPickerData?.data ?? []).length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">Nenhum negócio corresponde aos filtros atuais.</p>
-              ) : (
-                (bulkPickerData?.data ?? []).map(p => (
-                  <label key={p.id} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50">
-                    <Checkbox
-                      checked={!bulkExcludedIds.has(p.id)}
-                      onCheckedChange={(checked) => {
-                        setBulkExcludedIds(prev => {
-                          const next = new Set(prev);
-                          if (checked) next.delete(p.id); else next.add(p.id);
-                          return next;
-                        });
-                      }}
-                    />
-                    <span className="flex-1 truncate">{getNomeNegocio(p)}</span>
-                    <span className="text-xs text-muted-foreground shrink-0">{stageLabel(p.status)}</span>
-                  </label>
-                ))
-              )}
+            <div className="rounded-lg border overflow-hidden">
+              <div className="max-h-52 overflow-y-auto divide-y">
+                {isBulkPickerLoading ? (
+                  <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando negócios...
+                  </div>
+                ) : (bulkPickerData?.data ?? []).length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">Nenhum negócio corresponde aos filtros atuais.</p>
+                ) : (
+                  (bulkPickerData?.data ?? []).map(p => {
+                    const checked = !bulkExcludedIds.has(p.id);
+                    const stage = KANBAN_STAGES.find(s => s.key === p.status);
+                    return (
+                      <label
+                        key={p.id}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer transition-colors',
+                          checked ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-muted/50'
+                        )}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            setBulkExcludedIds(prev => {
+                              const next = new Set(prev);
+                              if (v) next.delete(p.id); else next.add(p.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        <span className={cn('flex-1 truncate', !checked && 'text-muted-foreground')}>{getNomeNegocio(p)}</span>
+                        <Badge className={cn('shrink-0 font-normal', getStageBadgeClass(stage?.color ?? 'muted-foreground'))}>
+                          {stageLabel(p.status)}
+                        </Badge>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
             </div>
             {totalCount > BULK_PICKER_LIMIT && (
               <p className="text-xs text-muted-foreground">
@@ -2100,21 +2162,25 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </p>
             )}
 
-            <div className="rounded-md bg-muted/50 px-3 py-2 text-sm font-medium">
+            <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium">
+              <ListChecks className="h-4 w-4 text-primary shrink-0" />
               {bulkApplyCount} negócio(s) será(ão) atualizado(s)
             </div>
           </div>
 
-          <div className="h-px bg-border/50" />
+          <div className="h-px bg-border" />
 
-          <div className="space-y-3">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Alterar para</p>
+          <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              <ArrowRightLeft className="h-3.5 w-3.5" />
+              Alterar para
+            </p>
 
             <div className="flex items-center gap-3">
               <Checkbox checked={bulkApplyStatus} onCheckedChange={(v) => setBulkApplyStatus(!!v)} id="bulk-apply-status" />
               <Label htmlFor="bulk-apply-status" className="w-28 shrink-0 cursor-pointer font-normal">Nova etapa</Label>
               <Select value={bulkNewStatus} onValueChange={setBulkNewStatus} disabled={!bulkApplyStatus}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="flex-1 bg-background">
                   <SelectValue placeholder="Selecionar etapa" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2129,7 +2195,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <Checkbox checked={bulkApplyMarcador} onCheckedChange={(v) => setBulkApplyMarcador(!!v)} id="bulk-apply-marcador" />
               <Label htmlFor="bulk-apply-marcador" className="w-28 shrink-0 cursor-pointer font-normal">Novo marcador</Label>
               <Select value={bulkNewMarcadorId} onValueChange={setBulkNewMarcadorId} disabled={!bulkApplyMarcador}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="flex-1 bg-background">
                   <SelectValue placeholder="Selecionar marcador" />
                 </SelectTrigger>
                 <SelectContent>

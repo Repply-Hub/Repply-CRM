@@ -27,6 +27,11 @@ export interface PedidoWithRelations {
   marcador: { id: string; nome: string; cor: string } | null;
 }
 
+// Qual coluna de data o filtro de período (dateFrom/dateTo) usa: a criação do negócio
+// (default, comportamento histórico) ou o momento em que ele foi fechado (ganho ou
+// perdido) — ver supabase/migrations/20260811110000_pedidos_fechado_em.sql.
+export type PeriodoDateField = 'data_pedido' | 'fechado_em';
+
 export interface PedidosFilters {
   stages?: string[];
   vendedorIds?: string[];
@@ -36,6 +41,8 @@ export interface PedidosFilters {
   funilId?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** Qual data dateFrom/dateTo filtra — 'data_pedido' (criação, default) ou 'fechado_em'. */
+  dateField?: PeriodoDateField;
   onlyAttention?: boolean;
   /** Busca por cliente/fabricante — aplicada tanto na query de stats (RPC) quanto no fetch paginado da lista/kanban. */
   search?: string;
@@ -81,6 +88,27 @@ async function assertIdsBelongToEmpresa(ids: string[], empresaId: string): Promi
 // fetch paginado quanto nas mutações em massa "por filtro", que precisam do mesmo recorte.
 const ETAPAS_FINAIS_ATENCAO = '(fechamento,perdido)';
 
+// Aplica dateFrom/dateTo na coluna certa conforme dateField. fechado_em é timestamptz
+// (data_pedido é um DATE puro) — em vez de depender de cast de coluna em filtro do
+// PostgREST (não confiável via supabase-js), usa limites explícitos de início/fim do
+// dia. Compartilhado por usePedidos e pelas mutações em massa "por filtro", que
+// precisam do mesmo recorte de data que a lista mostra.
+function applyDateRangeFilter<T extends { gte(column: string, value: string): T; lte(column: string, value: string): T }>(
+  query: T,
+  dateFrom: string | undefined,
+  dateTo: string | undefined,
+  dateField: PeriodoDateField | undefined,
+): T {
+  if (dateField === 'fechado_em') {
+    if (dateFrom) query = query.gte('fechado_em', `${dateFrom}T00:00:00`);
+    if (dateTo) query = query.lte('fechado_em', `${dateTo}T23:59:59.999`);
+  } else {
+    if (dateFrom) query = query.gte('data_pedido', dateFrom);
+    if (dateTo) query = query.lte('data_pedido', dateTo);
+  }
+  return query;
+}
+
 interface SearchMatches {
   clienteIds: string[];
   fabricanteIds: string[];
@@ -124,10 +152,10 @@ export function usePedidos(
   filters?: PedidosFilters,
   enabled = true,
 ) {
-  const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId, search } = filters ?? {};
+  const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId, search } = filters ?? {};
 
   return useQuery({
-    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, hideImportados, funilId, search],
+    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId, search],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
@@ -182,8 +210,7 @@ export function usePedidos(
         query = query.in('marcador_id', marcadorIds);
       }
 
-      if (dateFrom) query = query.gte('data_pedido', dateFrom);
-      if (dateTo) query = query.lte('data_pedido', dateTo);
+      query = applyDateRangeFilter(query, dateFrom, dateTo, dateField);
 
       if (onlyAttention) {
         const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
@@ -273,12 +300,12 @@ export function usePedidosOptions(empresaId?: string) {
 }
 
 export function usePedidosStats(empresaId?: string, stages?: string[], filters?: PedidosFilters) {
-  const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, search, funilId, hideImportados } = filters ?? {};
+  const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, search, funilId, hideImportados } = filters ?? {};
 
   return useQuery({
     // Reage a filtros e busca — NUNCA a page/pageSize/"Exibir"/"Ver mais", que não fazem
     // parte da queryKey aqui de propósito (o header precisa do total real, não do carregado).
-    queryKey: ['pedidos_stats', empresaId, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, onlyAttention, search, funilId, hideImportados],
+    queryKey: ['pedidos_stats', empresaId, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, search, funilId, hideImportados],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
@@ -298,6 +325,7 @@ export function usePedidosStats(empresaId?: string, stages?: string[], filters?:
         p_funil_id: funilId ?? null,
         p_marcador_ids: marcadorIds && marcadorIds.length > 0 ? marcadorIds : null,
         p_hide_importados: !!hideImportados,
+        p_date_field: dateField ?? 'data_pedido',
       });
       if (error) throw error;
       const row = data?.[0];
@@ -383,7 +411,6 @@ export function useUpdatePedidoStatus() {
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
       qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_velocidade_fabricante'] });
     },
   });
 }
@@ -443,8 +470,7 @@ export function useBulkDeletePedidos() {
       if (filters?.funilId) query = query.eq('funil_id', filters.funilId);
       if (filters?.fabricanteIds && filters.fabricanteIds.length > 0) query = query.in('fabricante_id', filters.fabricanteIds);
       if (filters?.marcadorIds && filters.marcadorIds.length > 0) query = query.in('marcador_id', filters.marcadorIds);
-      if (filters?.dateFrom) query = query.gte('data_pedido', filters.dateFrom);
-      if (filters?.dateTo) query = query.lte('data_pedido', filters.dateTo);
+      query = applyDateRangeFilter(query, filters?.dateFrom, filters?.dateTo, filters?.dateField);
       if (filters?.onlyAttention) {
         const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
         query = query.lte('created_at', cutoff).not('status', 'in', ETAPAS_FINAIS_ATENCAO);
@@ -479,7 +505,6 @@ export function useBulkDeletePedidos() {
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
       qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_velocidade_fabricante'] });
     },
   });
 }
@@ -548,8 +573,7 @@ export function useBulkUpdatePedidos() {
       if (filters?.funilId) query = query.eq('funil_id', filters.funilId);
       if (filters?.fabricanteIds && filters.fabricanteIds.length > 0) query = query.in('fabricante_id', filters.fabricanteIds);
       if (filters?.marcadorIds && filters.marcadorIds.length > 0) query = query.in('marcador_id', filters.marcadorIds);
-      if (filters?.dateFrom) query = query.gte('data_pedido', filters.dateFrom);
-      if (filters?.dateTo) query = query.lte('data_pedido', filters.dateTo);
+      query = applyDateRangeFilter(query, filters?.dateFrom, filters?.dateTo, filters?.dateField);
       if (filters?.onlyAttention) {
         const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
         query = query.lte('created_at', cutoff).not('status', 'in', ETAPAS_FINAIS_ATENCAO);
@@ -586,7 +610,6 @@ export function useBulkUpdatePedidos() {
       qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
       qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
       qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_velocidade_fabricante'] });
     },
   });
 }
