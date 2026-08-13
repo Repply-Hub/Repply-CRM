@@ -2512,6 +2512,53 @@ export type Database = {
           },
         ]
       }
+      notificacoes_leituras: {
+        Row: {
+          lida_em: string
+          notificacao_id: string
+          usuario_id: string
+        }
+        Insert: {
+          lida_em?: string
+          notificacao_id: string
+          usuario_id: string
+        }
+        Update: {
+          lida_em?: string
+          notificacao_id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacoes_leituras_notificacao_id_fkey"
+            columns: ["notificacao_id"]
+            isOneToOne: false
+            referencedRelation: "notificacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_leituras_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_leituras_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_usuario"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "notificacoes_leituras_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["usuario_id"]
+          },
+        ]
+      }
       obras: {
         Row: {
           campos_extras: Json

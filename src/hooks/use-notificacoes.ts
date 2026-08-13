@@ -32,7 +32,20 @@ export function useNotificacoes() {
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw error;
-      return data as Notificacao[];
+      if (!data || data.length === 0) return [];
+
+      // `notificacoes.lida` é compartilhado entre o dono e qualquer gestor da
+      // mesma empresa (a RLS libera SELECT/UPDATE pra ambos na mesma linha), então
+      // não dá pra usar como "lida para mim". A leitura real de cada usuário vem de
+      // notificacoes_leituras, que só expõe (via RLS) as próprias marcações.
+      const { data: leituras, error: leiturasError } = await supabase
+        .from('notificacoes_leituras')
+        .select('notificacao_id')
+        .in('notificacao_id', data.map((n) => n.id));
+      if (leiturasError) throw leiturasError;
+
+      const lidasParaMim = new Set((leituras ?? []).map((l) => l.notificacao_id));
+      return data.map((n) => ({ ...n, lida: lidasParaMim.has(n.id) })) as Notificacao[];
     },
     enabled: !!user,
   });
@@ -45,6 +58,13 @@ export function useNotificacoes() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notificacoes' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['notificacoes'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notificacoes_leituras' },
         () => {
           qc.invalidateQueries({ queryKey: ['notificacoes'] });
         }
@@ -221,12 +241,17 @@ export { useUnreadWaMessages } from '@/hooks/use-whatsapp-inbox';
 
 export function useMarkAsRead() {
   const qc = useQueryClient();
+  const { profile } = useAuth();
+
   return useMutation({
     mutationFn: async (id: string) => {
+      if (!profile?.id) return;
       const { error } = await supabase
-        .from('notificacoes')
-        .update({ lida: true })
-        .eq('id', id);
+        .from('notificacoes_leituras')
+        .upsert(
+          { notificacao_id: id, usuario_id: profile.id },
+          { onConflict: 'notificacao_id,usuario_id', ignoreDuplicates: true }
+        );
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notificacoes'] }),
@@ -241,13 +266,17 @@ export function useMarkAllAsRead() {
     mutationFn: async () => {
       if (!user) return;
 
-      // Mark notifications as read (notificacoes.usuario_id referencia usuarios.id, não o uid do auth)
+      // Marca como lida (pra mim) cada notificação que eu enxergo hoje — inclusive
+      // as de outros usuários que gestores veem por estarem na mesma empresa.
+      // notificacoes.usuario_id referencia usuarios.id, não o uid do auth.
       if (profile?.id) {
-        await supabase
-          .from('notificacoes')
-          .update({ lida: true })
-          .eq('usuario_id', profile.id)
-          .eq('lida', false);
+        const { data: visiveis } = await supabase.from('notificacoes').select('id');
+        if (visiveis && visiveis.length > 0) {
+          await supabase.from('notificacoes_leituras').upsert(
+            visiveis.map((n) => ({ notificacao_id: n.id, usuario_id: profile.id })),
+            { onConflict: 'notificacao_id,usuario_id', ignoreDuplicates: true }
+          );
+        }
       }
 
       // Mark emails as read
