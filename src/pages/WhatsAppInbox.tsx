@@ -185,6 +185,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Sticker,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -918,7 +919,7 @@ function MeusChatsList({
                               "text-foreground font-medium",
                           )}
                         >
-                          {conv.ultima_mensagem ?? "Nenhuma mensagem"}
+                          <UltimaMensagemPreview mensagem={conv.ultima_mensagem} />
                         </span>
                       </TableCell>
                       <TableCell className="px-4 py-4">
@@ -1206,6 +1207,32 @@ const PLACEHOLDERS = [
   "[Documento]",
   "[Sticker]",
 ];
+
+const MENSAGEM_PREVIEW_ICONS: Record<string, { icon: LucideIcon; label: string }> = {
+  "[Imagem]": { icon: ImageIcon, label: "Foto" },
+  "[Áudio]": { icon: Mic, label: "Áudio" },
+  "[Vídeo]": { icon: Video, label: "Vídeo" },
+  "[Documento]": { icon: FileText, label: "Documento" },
+  "[Sticker]": { icon: Sticker, label: "Figurinha" },
+};
+
+// Preview compacto da última mensagem nos cards de conversa: troca o texto cru
+// "[Tipo]" salvo pelo webhook por um ícone + rótulo legível.
+function UltimaMensagemPreview({
+  mensagem,
+}: {
+  mensagem: string | null | undefined;
+}) {
+  const info = mensagem ? MENSAGEM_PREVIEW_ICONS[mensagem] : undefined;
+  if (!info) return <>{mensagem ?? "Nenhuma mensagem"}</>;
+  const Icon = info.icon;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{info.label}</span>
+    </span>
+  );
+}
 
 // Preview compacto da mensagem citada, tanto dentro da bolha (mensagem já enviada
 // com reply) quanto acima do textarea (enquanto o usuário está respondendo).
@@ -5143,7 +5170,7 @@ export default function WhatsAppInbox() {
             {conv.nome_contato ?? formatPhone(conv.telefone)}
           </p>
           <p className="text-xs text-muted-foreground truncate mt-0.5">
-            {conv.ultima_mensagem ?? "Nenhuma mensagem"}
+            <UltimaMensagemPreview mensagem={conv.ultima_mensagem} />
           </p>
         </div>
         {!modoSelecao &&
