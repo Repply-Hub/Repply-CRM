@@ -327,7 +327,7 @@ export function DashboardCharts({
                 </defs>
                 <CartesianGrid {...commonGridProps} vertical horizontal={false} />
                 <XAxis type="number" domain={[0, 100]} {...commonAxisProps} tickFormatter={v => `${v}%`} />
-                <YAxis dataKey="nome" type="category" {...commonAxisProps} width={vendedorAxisWidth} tick={renderVendedorTick} />
+                <YAxis dataKey="nome" type="category" {...commonAxisProps} width={vendedorAxisWidth} tick={renderVendedorTick} interval={0} />
                 <Tooltip content={<ChartTooltip formatValue={(v) => `${v}%`} />} />
                 <Bar
                   dataKey="conversao"
@@ -362,7 +362,7 @@ export function DashboardCharts({
                 </defs>
                 <CartesianGrid {...commonGridProps} vertical horizontal={false} />
                 <XAxis type="number" {...commonAxisProps} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
-                <YAxis dataKey="vendedor" type="category" {...commonAxisProps} width={100} />
+                <YAxis dataKey="vendedor" type="category" {...commonAxisProps} width={100} interval={0} />
                 <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
                 <Bar
                   dataKey="valor"
