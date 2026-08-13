@@ -14,7 +14,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { TOGGLE_LIST_CLASS, TOGGLE_ITEM_CLASS } from '@/lib/toggle-group-styles';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -510,6 +520,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
       setEscopo('equipe');
       setSelectedUsuarioId(initialUsuarioId ?? vendedores[0]?.usuario_id);
       setPeriodo({ ano, mes });
+      setPendingDeletionIds(new Set());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialUsuarioId]);
@@ -584,6 +595,15 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   const [novoFabricanteId, setNovoFabricanteId] = useState<string>('');
   const [novoValor, setNovoValor] = useState('');
   const [buscaFabrica, setBuscaFabrica] = useState('');
+  // Linhas existentes marcadas pra excluir na Lixeira: some da lista na hora
+  // (não faz sentido continuar mostrando o que a pessoa acabou de mandar
+  // remover), mas o DELETE só roda no banco quando "Salvar alterações" for
+  // clicado — reaparece inteira se a pessoa escolher "Descartar" depois.
+  const [pendingDeletionIds, setPendingDeletionIds] = useState<Set<string>>(new Set());
+  // Nada aqui persiste sozinho: todo campo é rascunho local até "Salvar
+  // alterações" (ou até o aviso de fechar com pendências escolher salvar).
+  const [salvandoTudo, setSalvandoTudo] = useState(false);
+  const [pedindoConfirmacaoFechar, setPedindoConfirmacaoFechar] = useState(false);
 
   // Sincroniza `valores` com o banco (`metas`) e detecta troca de vendedor/escopo/
   // período numa ÚNICA effect — precisa ser atômico: separadas (sync num `useEffect`,
@@ -620,7 +640,9 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   }, [metas, scopedUsuarioId, selectedAno, selectedMes]);
 
   const linhas = useMemo(() => {
-    const existentes = (metas ?? []).map(m => ({ id: m.id as string | undefined, fabricanteId: m.fabricante_id, origem: 'existente' as const }));
+    const existentes = (metas ?? [])
+      .filter(m => !pendingDeletionIds.has(m.id))
+      .map(m => ({ id: m.id as string | undefined, fabricanteId: m.fabricante_id, origem: 'existente' as const }));
     const idsExistentes = new Set(existentes.map(l => l.fabricanteId));
     const extras = Array.from(fabricantesCopiados)
       .filter(id => !idsExistentes.has(id))
@@ -637,7 +659,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     return [...existentes, ...extras, ...daEquipe].sort(
       (a, b) => (posicaoFabricante.get(a.fabricanteId) ?? 0) - (posicaoFabricante.get(b.fabricanteId) ?? 0),
     );
-  }, [metas, fabricantesCopiados, escopo, metaEquipePorFabricante, fabricantesEquipeOcultas, posicaoFabricante]);
+  }, [metas, pendingDeletionIds, fabricantesCopiados, escopo, metaEquipePorFabricante, fabricantesEquipeOcultas, posicaoFabricante]);
 
   // Só filtra o que é MOSTRADO/arrastável — `linhas` (sem filtro) continua sendo a base
   // de `fabricantesComMeta`/`fabricantesDisponiveis` abaixo, senão buscar escondia
@@ -654,34 +676,61 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     [fabricantes, fabricantesComMeta],
   );
 
-  const salvarMeta = (fabricanteId: string) => {
-    const display = valores[fabricanteId] ?? '';
-    // Linha vazia — nada digitado. Cobre principalmente as linhas trazidas só como
-    // referência da meta de equipe (ver `daEquipe` em `linhas`): passar o mouse/focar
-    // e sair sem digitar nada não pode criar uma meta individual "zero" do nada.
-    if (!display.trim()) return;
-    const valor = parseMetaInputValue(display);
-    if (valor < 0) {
-      toast.error('Informe um valor válido');
-      return;
-    }
-    // Meta individual não pode ultrapassar a meta de equipe daquela fábrica — ela é
-    // uma fatia da meta geral, não um valor à parte.
+  // Última versão confirmada pelo banco — base de comparação pra saber o que
+  // é rascunho ainda não salvo, tanto pro botão "Salvar alterações" quanto
+  // pro aviso ao tentar fechar o dialog.
+  const valoresSalvos = useMemo(() => {
+    const mapa: Record<string, string> = {};
+    (metas ?? []).forEach(m => { mapa[m.fabricante_id] = numberToMetaDisplay(m.meta_valor); });
+    return mapa;
+  }, [metas]);
+
+  // Diferente do "vazio não conta" de antes (quando o blur salvava sozinho):
+  // aqui nada persiste sem clicar em "Salvar", então limpar um campo que
+  // TINHA valor salvo também é uma alteração pendente — só ignora quando o
+  // campo já nasceu vazio (linha de referência da meta de equipe nunca
+  // preenchida) e continua vazio.
+  const isDirty = useMemo(() => {
+    const camposAlterados = linhas.some(l => {
+      const atual = (valores[l.fabricanteId] ?? '').trim();
+      const salvo = valoresSalvos[l.fabricanteId] ?? '';
+      return atual !== salvo;
+    });
+    const novoPendente = !!novoFabricanteId && novoValor.trim() !== '';
+    return camposAlterados || novoPendente || pendingDeletionIds.size > 0;
+  }, [linhas, valores, valoresSalvos, novoFabricanteId, novoValor, pendingDeletionIds]);
+
+  // Validação compartilhada entre a linha existente e o mini-form "Novo
+  // fabricante" — a mesma regra (meta individual não pode passar da meta de
+  // equipe) vale nos dois casos.
+  const validarValorMeta = (fabricanteId: string, valor: number): string | null => {
+    if (valor < 0) return 'Informe um valor válido';
     if (escopo === 'individual') {
       const metaEquipe = metaEquipePorFabricante.get(fabricanteId);
       if (metaEquipe !== undefined && valor > metaEquipe) {
-        toast.error(`A meta do usuário não pode ser maior que a meta geral (${formatCurrency(metaEquipe)}).`);
-        return;
+        return `A meta do usuário não pode ser maior que a meta geral (${formatCurrency(metaEquipe)}).`;
       }
     }
-    upsertMeta.mutate(
-      { empresaId, usuarioId: scopedUsuarioId, fabricanteId, ano: selectedAno, mes: selectedMes, metaValor: valor },
-      { onError: () => toast.error('Erro ao salvar meta') },
-    );
+    return null;
   };
 
-  const removerMeta = (id: string) => {
-    deleteMeta.mutate(id, { onError: () => toast.error('Erro ao remover meta') });
+  // Grava no banco. Só é chamado de dentro de `salvarAlteracoesPendentes` —
+  // nenhum campo persiste sozinho mais (nem onBlur, nem "Adicionar"), tudo
+  // fica em `valores`/`fabricantesCopiados` até a pessoa clicar em salvar.
+  const persistirMeta = async (fabricanteId: string, display: string): Promise<boolean> => {
+    const valor = parseMetaInputValue(display);
+    const erro = validarValorMeta(fabricanteId, valor);
+    if (erro) {
+      toast.error(erro);
+      return false;
+    }
+    try {
+      await upsertMeta.mutateAsync({ empresaId, usuarioId: scopedUsuarioId, fabricanteId, ano: selectedAno, mes: selectedMes, metaValor: valor });
+      return true;
+    } catch {
+      toast.error('Erro ao salvar meta');
+      return false;
+    }
   };
 
   const removerPendente = (fabricanteId: string) => {
@@ -722,33 +771,129 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     toast.success('Valores preenchidos a partir do mês anterior — revise e salve.');
   };
 
-  const adicionarMeta = () => {
+  // Persiste o mini-form "Novo fabricante" — só usado dentro de
+  // `salvarAlteracoesPendentes`, pro caso da pessoa deixar esses dois campos
+  // preenchidos sem clicar em "Adicionar" e ir direto pra "Salvar alterações".
+  const persistirNovoFabricante = async (): Promise<boolean> => {
+    if (!novoFabricanteId) {
+      toast.error('Selecione um fabricante');
+      return false;
+    }
     const valor = parseMetaInputValue(novoValor);
+    const erro = validarValorMeta(novoFabricanteId, valor);
+    if (erro) {
+      toast.error(erro);
+      return false;
+    }
+    try {
+      await upsertMeta.mutateAsync({ empresaId, usuarioId: scopedUsuarioId, fabricanteId: novoFabricanteId, ano: selectedAno, mes: selectedMes, metaValor: valor });
+      setNovoFabricanteId('');
+      setNovoValor('');
+      return true;
+    } catch {
+      toast.error('Erro ao adicionar meta');
+      return false;
+    }
+  };
+
+  // "Adicionar" NÃO grava no banco — só move o fabricante pro rascunho da
+  // tabela principal (mesmo mecanismo de "Copiar meta do mês anterior"),
+  // pra ficar sujeito ao mesmo "Salvar alterações"/aviso de fechar que as
+  // demais linhas, em vez de persistir na hora.
+  const adicionarMeta = () => {
     if (!novoFabricanteId) {
       toast.error('Selecione um fabricante');
       return;
     }
-    if (valor < 0) {
-      toast.error('Informe um valor válido');
+    const valor = parseMetaInputValue(novoValor);
+    const erro = validarValorMeta(novoFabricanteId, valor);
+    if (erro) {
+      toast.error(erro);
       return;
     }
-    if (escopo === 'individual') {
-      const metaEquipe = metaEquipePorFabricante.get(novoFabricanteId);
-      if (metaEquipe !== undefined && valor > metaEquipe) {
-        toast.error(`A meta do usuário não pode ser maior que a meta geral (${formatCurrency(metaEquipe)}).`);
-        return;
+    setFabricantesCopiados(prev => new Set(prev).add(novoFabricanteId));
+    setValores(prev => ({ ...prev, [novoFabricanteId]: novoValor }));
+    setNovoFabricanteId('');
+    setNovoValor('');
+  };
+
+  // Persiste TUDO que está só em rascunho local: linhas marcadas pra excluir
+  // (Lixeira), campos com valor digitado diferente do salvo — inclusive
+  // limpos de propósito, tratado como remover a meta — e o mini-form "Novo
+  // fabricante" se ainda estiver preenchido. É o único lugar do dialog que
+  // efetivamente grava no banco. Usado pelo botão "Salvar alterações" e pelo
+  // "Salvar" do aviso de fechar com pendências. Para no primeiro erro (o
+  // toast já foi disparado por `persistirMeta`/`persistirNovoFabricante`/
+  // `deleteMeta`) pra não mascarar qual campo falhou.
+  const salvarAlteracoesPendentes = async (): Promise<boolean> => {
+    setSalvandoTudo(true);
+    try {
+      for (const id of pendingDeletionIds) {
+        try {
+          await deleteMeta.mutateAsync(id);
+        } catch {
+          toast.error('Erro ao remover meta');
+          return false;
+        }
       }
+
+      for (const l of linhas) {
+        const atual = (valores[l.fabricanteId] ?? '').trim();
+        const salvo = valoresSalvos[l.fabricanteId] ?? '';
+        if (atual === salvo) continue;
+        if (!atual) {
+          // Campo existente foi limpo de propósito — equivale a remover a meta.
+          if (l.id) {
+            try {
+              await deleteMeta.mutateAsync(l.id);
+            } catch {
+              toast.error('Erro ao remover meta');
+              return false;
+            }
+          }
+          continue;
+        }
+        const ok = await persistirMeta(l.fabricanteId, atual);
+        if (!ok) return false;
+      }
+
+      if (novoFabricanteId && novoValor.trim()) {
+        const ok = await persistirNovoFabricante();
+        if (!ok) return false;
+      }
+
+      setPendingDeletionIds(new Set());
+      toast.success('Metas salvas.');
+      return true;
+    } finally {
+      setSalvandoTudo(false);
     }
-    upsertMeta.mutate(
-      { empresaId, usuarioId: scopedUsuarioId, fabricanteId: novoFabricanteId, ano: selectedAno, mes: selectedMes, metaValor: valor },
-      {
-        onSuccess: () => {
-          setNovoFabricanteId('');
-          setNovoValor('');
-        },
-        onError: () => toast.error('Erro ao adicionar meta'),
-      },
-    );
+  };
+
+  // Volta `valores` pro que já está no banco, limpa o mini-form e desfaz as
+  // marcações de exclusão pendente — usado só pela opção "Descartar
+  // alterações" do aviso de fechar. Também esvazia `fabricantesCopiados`: sem
+  // isto, uma linha trazida por "Copiar meta do mês anterior"/"Adicionar" e
+  // nunca salva continuaria aparecendo na lista, só que vazia, em vez de
+  // sumir junto com o valor descartado.
+  const descartarAlteracoesPendentes = () => {
+    setValores(() => {
+      const novo: Record<string, string> = {};
+      (metas ?? []).forEach(m => { novo[m.fabricante_id] = numberToMetaDisplay(m.meta_valor); });
+      return novo;
+    });
+    setFabricantesCopiados(new Set());
+    setPendingDeletionIds(new Set());
+    setNovoFabricanteId('');
+    setNovoValor('');
+  };
+
+  const requestClose = (proximoEstado: boolean) => {
+    if (!proximoEstado && isDirty && !salvandoTudo) {
+      setPedindoConfirmacaoFechar(true);
+      return;
+    }
+    onOpenChange(proximoEstado);
   };
 
   // Reordena arrastando: reordena a lista visível localmente e mescla de volta
@@ -780,7 +925,8 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={requestClose}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
@@ -967,7 +1113,9 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
                       - parseMetaInputValue(valores[fabricanteId] ?? '')
                     : undefined;
                   const handleRemover = () => {
-                    if (id) removerMeta(id);
+                    // Linha existente: só marca pra excluir (some da lista agora,
+                    // mas o DELETE no banco só roda em "Salvar alterações").
+                    if (id) setPendingDeletionIds(prev => new Set(prev).add(id));
                     else if (origem === 'equipe') ocultarReferenciaEquipe(fabricanteId);
                     else removerPendente(fabricanteId);
                   };
@@ -1016,7 +1164,6 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
                               className="h-9 w-32 text-sm border-border/60 focus-visible:ring-1 focus-visible:ring-offset-0"
                               value={valores[fabricanteId] ?? ''}
                               onChangeValue={display => setValores(prev => ({ ...prev, [fabricanteId]: display }))}
-                              onBlur={() => salvarMeta(fabricanteId)}
                               placeholder={metaEquipe !== undefined ? 'Meta do usuário' : 'Meta R$'}
                             />
                             <Button
@@ -1039,7 +1186,65 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
             )}
           </Droppable>
         </DragDropContext>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => requestClose(false)} disabled={salvandoTudo}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={async () => { if (await salvarAlteracoesPendentes()) onOpenChange(false); }}
+            disabled={!isDirty || salvandoTudo}
+          >
+            {salvandoTudo && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Salvar alterações
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Cada campo já autosalva no onBlur — este aviso só existe pro texto que
+        ainda está sendo digitado (ou o mini-form "Novo fabricante" preenchido)
+        no momento em que a pessoa tenta fechar o dialog. */}
+    <AlertDialog open={pedindoConfirmacaoFechar} onOpenChange={setPedindoConfirmacaoFechar}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Alterações não salvas</AlertDialogTitle>
+          <AlertDialogDescription>
+            Há valores digitados que ainda não foram salvos. Deseja salvá-los antes de sair, ou descartar?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={salvandoTudo}>Continuar editando</AlertDialogCancel>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={salvandoTudo}
+            onClick={() => {
+              descartarAlteracoesPendentes();
+              setPedindoConfirmacaoFechar(false);
+              onOpenChange(false);
+            }}
+          >
+            Descartar alterações
+          </Button>
+          <Button
+            type="button"
+            disabled={salvandoTudo}
+            onClick={async () => {
+              const ok = await salvarAlteracoesPendentes();
+              if (ok) {
+                setPedindoConfirmacaoFechar(false);
+                onOpenChange(false);
+              }
+            }}
+          >
+            {salvandoTudo && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Salvar alterações
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
