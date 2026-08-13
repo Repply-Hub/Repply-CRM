@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Archive, ChevronDown, Loader2, Mail, Tag, Trash2 } from 'lucide-react';
+import { AlertTriangle, Archive, ChevronDown, Loader2, Mail, PenLine, Tag, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -49,6 +50,7 @@ function resumoDoAcesso(p: UsuarioDaCaixa): string {
 }
 
 export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
+  const navigate = useNavigate();
   const { conta, connectedEmail, desconectar, isDisconnecting } = useEmailEmpresa();
   const [confirmando, setConfirmando] = useState<'preservar' | 'apagar' | null>(null);
   const [expandido, setExpandido] = useState<string | null>(null);
@@ -136,6 +138,23 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
 
         {!confirmando ? (
           <>
+            {/* Atalho pra assinatura: quem abre "gerenciar caixa" pensando em
+                como o e-mail sai formatado não tinha nenhum caminho daqui até
+                lá — precisava saber de cor que isso mora em Configurações. */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full justify-start gap-2"
+              onClick={() => {
+                onOpenChange(false);
+                navigate('/configuracoes?tab=perfil');
+              }}
+            >
+              <PenLine className="h-4 w-4" />
+              Configurar assinatura de e-mail
+            </Button>
+
             {/* Quem enxerga a caixa. Vem antes de desconectar de propósito: é a
                 ação do dia a dia, e desconectar é irreversível. */}
             <div className="min-w-0 space-y-2">

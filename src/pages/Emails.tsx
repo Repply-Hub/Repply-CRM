@@ -62,6 +62,7 @@ import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
 import {
+  LOGO_EMAIL_URL,
   montarRodapeEmailHtml,
   normalizarAssinaturaAntiga,
 } from "@/lib/assinatura-email";
@@ -264,9 +265,6 @@ const Emails = () => {
   });
   /** Id do rascunho em `email_rascunhos` sendo editado; nulo enquanto o autosave ainda não gravou a primeira vez. */
   const [rascunhoId, setRascunhoId] = useState<string | null>(null);
-
-  const COMPANY_LOGO_URL =
-    "https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png";
 
   const { data: perfil } = useQuery({
     queryKey: ["meu_perfil"],
@@ -770,7 +768,7 @@ const Emails = () => {
           // `montarRodapeEmailHtml` sanitiza de novo por conta própria, então
           // dado antigo/legado também não passa cru.
           assinaturaHtml: normalizarAssinaturaAntiga(perfil?.assinatura_email),
-          logoUrl: `${COMPANY_LOGO_URL}?t=${Date.now()}`,
+          logoUrl: `${LOGO_EMAIL_URL}?t=${Date.now()}`,
         })}
       `;
 

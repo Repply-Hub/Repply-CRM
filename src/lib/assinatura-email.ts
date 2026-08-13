@@ -1,7 +1,15 @@
 import DOMPurify from 'dompurify';
+import { supabase } from '@/integrations/supabase/client';
 
+/**
+ * Calculada a partir do client Supabase configurado, não hardcoded: o
+ * projeto Supabase deste CRM já foi trocado antes, e a URL antiga (de um
+ * projeto que não existe mais) ficou presa aqui e duplicada em Emails.tsx —
+ * por isso a logo aparecia sempre quebrada, tanto no preview quanto no
+ * e-mail enviado. `getPublicUrl` só monta a string, não faz request.
+ */
 export const LOGO_EMAIL_URL =
-  'https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png';
+  supabase.storage.from('email-assets').getPublicUrl('logo-email.png').data.publicUrl;
 
 /**
  * Assinatura pessoal roda como HTML digitado pelo próprio usuário (editor de

@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, Upload } from 'lucide-react';
 import { SidebarHistoricoDialog } from '@/components/configuracoes/SidebarHistoricoDialog';
 import { AvatarCropDialog } from '@/components/configuracoes/AvatarCropDialog';
 import { CamposTab } from '@/components/configuracoes/CamposTab';
@@ -32,6 +32,7 @@ import {
   normalizarAssinaturaAntiga,
   sanitizarAssinaturaEmail,
 } from '@/lib/assinatura-email';
+import { validateFile } from '@/lib/file-validation';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -128,6 +129,8 @@ function ProfileTab() {
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [assinaturaHtml, setAssinaturaHtml] = useState('');
+  const [logoVersion, setLogoVersion] = useState(0);
+  const [logoDragAtivo, setLogoDragAtivo] = useState(false);
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['meu_perfil', user?.id],
@@ -263,29 +266,53 @@ function ProfileTab() {
     });
   };
 
-  const uploadEmailLogo = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadEmailLogo = async (file: File) => {
+    if (!validateFile(file, {
+      allowedMimePrefixes: ['image/'],
+      allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp'],
+      maxBytes: 5 * 1024 * 1024, // 5 MB
+    })) return;
+
     try {
       setIsUploading(true);
-      if (!event.target.files || event.target.files.length === 0) return;
-      
-      const file = event.target.files[0];
       const filePath = `logo-email.png`;
 
-      // Upload with upsert: true to replace existing logo
+      // upsert: true para substituir a logo existente — o path é fixo de
+      // propósito (uma logo por empresa hoje), então o mesmo arquivo é
+      // sobrescrito a cada troca.
       const { error: uploadError } = await supabase.storage
         .from('email-assets')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, file, { upsert: true, contentType: file.type || 'image/png' });
 
       if (uploadError) throw uploadError;
-      
+
+      // O path no Storage não muda, então o browser (e um eventual CDN)
+      // continuariam servindo a imagem antiga do cache sem isto.
+      setLogoVersion(Date.now());
       toast.success('Logo da empresa atualizada com sucesso!');
-      // Force refresh by invalidating any relevant queries if needed, 
-      // though the URL remains the same, browser cache might need clearing
     } catch (error: any) {
       toast.error('Erro ao carregar logo: ' + error.message);
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const selecionarLogoPorInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) uploadEmailLogo(file);
+  };
+
+  const arrastarLogo = (ativo: boolean) => (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setLogoDragAtivo(ativo);
+  };
+
+  const soltarLogo = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setLogoDragAtivo(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) uploadEmailLogo(file);
   };
 
   const handleSalvarEmail = (e: React.FormEvent<HTMLFormElement>) => {
@@ -410,7 +437,7 @@ function ProfileTab() {
                       __html: montarRodapeEmailHtml({
                         nome: perfil.nome ?? '',
                         assinaturaHtml,
-                        logoUrl: LOGO_EMAIL_URL,
+                        logoUrl: `${LOGO_EMAIL_URL}?v=${logoVersion}`,
                       }),
                     }}
                   />
@@ -435,23 +462,34 @@ function ProfileTab() {
               <CardDescription>Esta logo aparecerá no rodapé dos seus e-mails enviados (exclusivo para administradores)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg bg-muted/30">
-                <img 
-                  src="https://ukwwhwytyovrzefkdeyj.supabase.co/storage/v1/object/public/email-assets/logo-email.png" 
-                  alt="Logo da Empresa" 
+              <div
+                className={cn(
+                  'flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg bg-muted/30 transition-colors',
+                  logoDragAtivo && 'border-primary bg-primary/5',
+                )}
+                onDragOver={arrastarLogo(true)}
+                onDragEnter={arrastarLogo(true)}
+                onDragLeave={arrastarLogo(false)}
+                onDrop={soltarLogo}
+              >
+                <img
+                  key={logoVersion}
+                  src={`${LOGO_EMAIL_URL}?v=${logoVersion}`}
+                  alt="Logo da Empresa"
                   className="max-h-20 mb-4 object-contain"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200x50?text=MD+Representações';
                   }}
                 />
+                <p className="text-xs text-muted-foreground mb-2">Arraste uma imagem aqui ou</p>
                 <Button variant="outline" size="sm" asChild disabled={isUploading}>
                   <label className="cursor-pointer gap-2">
-                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                    Alterar Logotipo da Empresa
-                    <input type="file" accept="image/*" onChange={uploadEmailLogo} disabled={isUploading} className="hidden" />
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    {isUploading ? 'Enviando...' : 'Escolher arquivo'}
+                    <input type="file" accept="image/*" onChange={selecionarLogoPorInput} disabled={isUploading} className="hidden" />
                   </label>
                 </Button>
-                <p className="text-[10px] text-muted-foreground mt-2">Recomendado: fundo transparente (PNG), max 50px de altura</p>
+                <p className="text-[10px] text-muted-foreground mt-2">Recomendado: fundo transparente (PNG), máx. 50px de altura · até 5MB</p>
               </div>
             </CardContent>
           </Card>
