@@ -51,11 +51,13 @@ export const KanbanColumn = memo(function KanbanColumn({
 
   const limit = pageSize * loadedBatches;
   const stageFilter = useMemo(() => [stageKey], [stageKey]);
-  const { data: pedidosData, isLoading, isFetching } = usePedidos(empresaId, 0, limit, stageFilter, filters, stageEnabled);
+  const { data: pedidosData, isLoading, isFetching } = usePedidos(empresaId, 0, limit, stageFilter, filters, stageEnabled, true);
 
   const rawRows = pedidosData?.data ?? EMPTY_ROWS;
   // Total real desta etapa (count exato do Postgres, ignora o limit) — permite saber com
-  // certeza se ainda há mais para buscar, sem depender de heurística.
+  // certeza se ainda há mais para buscar, sem depender de heurística. Precisa de `withCount:
+  // true` explícito porque usePedidos não computa o count por padrão (custa caro em tabelas
+  // grandes e a maioria dos chamadores não usa esse valor).
   const stageTotal = pedidosData?.count ?? 0;
 
   const q = (filters?.search ?? '').trim().toLowerCase();

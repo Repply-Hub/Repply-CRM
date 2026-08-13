@@ -151,11 +151,18 @@ export function usePedidos(
   stages?: string[],
   filters?: PedidosFilters,
   enabled = true,
+  // `count: 'exact'` faz o Postgres computar a contagem total junto com a página pedida — em
+  // tabelas grandes isso deixa CADA página bem mais lenta pra buscar. A maioria dos chamadores
+  // (ex.: picker do modal de Ação em Massa) já tem o total vindo de usePedidosStats (RPC dedicada)
+  // e nunca lê o `count` devolvido aqui, então por padrão ele fica desligado — só quem
+  // efetivamente usa `data.count` (ex.: KanbanColumn, pro "carregar mais" por coluna) precisa
+  // passar `withCount: true` explicitamente.
+  withCount = false,
 ) {
   const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId, search } = filters ?? {};
 
   return useQuery({
-    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId, search],
+    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId, search, withCount],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
@@ -180,7 +187,7 @@ export function usePedidos(
           vendedor:usuarios(id, nome, empresa_id),
           obra:obras(id, nome_obra),
           marcador:marcadores(id, nome, cor)
-        `, { count: 'exact' })
+        `, withCount ? { count: 'exact' } : undefined)
         // `created_at` tem MUITOS valores duplicados (imports em massa gravam o mesmo
         // timestamp em centenas de linhas) — sem um desempate único e estável, o Postgres
         // pode reordenar as linhas empatadas entre execuções, fazendo o range crescer
@@ -299,7 +306,7 @@ export function usePedidosOptions(empresaId?: string) {
   });
 }
 
-export function usePedidosStats(empresaId?: string, stages?: string[], filters?: PedidosFilters) {
+export function usePedidosStats(empresaId?: string, stages?: string[], filters?: PedidosFilters, enabled = true) {
   const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, search, funilId, hideImportados } = filters ?? {};
 
   return useQuery({
@@ -331,7 +338,7 @@ export function usePedidosStats(empresaId?: string, stages?: string[], filters?:
       const row = data?.[0];
       return { count: Number(row?.total_count ?? 0), valor: Number(row?.total_valor ?? 0) };
     },
-    enabled: !!empresaId,
+    enabled: !!empresaId && enabled,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,

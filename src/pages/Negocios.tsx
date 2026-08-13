@@ -91,10 +91,6 @@ const PEDIDOS_DEFAULT_VISIBLE_COLUMNS = ['negocio', 'cliente', 'contato', 'fabri
 const PAGE_SIZE = 10;
 // Constante LEGACY_CARD_FIELDS removida pois as colunas agora são independentes.
 
-// Teto de itens exibidos individualmente no checklist do modal de Ação em Massa — acima disso, a
-// exclusão manual item a item deixa de ser prática de qualquer forma.
-const BULK_PICKER_LIMIT = 300;
-
 const getStageBadgeClass = (corToken: string) => `bg-${corToken} text-white`;
 
 // Filtros do pipeline (etapa, vendedor, fabricante, marcador, período, atenção, importados) são
@@ -546,11 +542,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const bulkDeleteMutation = useBulkDeletePedidos();
   const isDeleting = bulkDeleteMutation.isPending;
 
-  // Ação em massa (etapa + marcador num só bloco): o alvo é sempre "todos os negócios que batem
-  // nos filtros ativos da tela" — a seleção acontece dentro do próprio modal (checklist), via
-  // `bulkExcludedIds`, sem depender de checkboxes marcados na lista antes de abrir o modal.
+  // Ação em massa (etapa + marcador num só bloco): o alvo é somente o que o usuário marcar no
+  // checklist do próprio modal (`bulkSelected`) — os filtros da tela só definem quais negócios
+  // aparecem disponíveis para escolha, não quais recebem a alteração. Guarda nome/etapa junto do id
+  // (não só o id) para o painel "Selecionados" continuar mostrando o item mesmo depois de o usuário
+  // trocar de página no picker (a página anterior não fica mais carregada em memória).
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
-  const [bulkExcludedIds, setBulkExcludedIds] = useState<Set<string>>(new Set());
+  const [bulkSelected, setBulkSelected] = useState<Map<string, { nome: string; status: string }>>(new Map());
+  const [bulkPickerPage, setBulkPickerPage] = useState(1);
+  const [bulkPickerPageSize, setBulkPickerPageSize] = useState(10);
+  // Busca própria do picker do modal — independente dos filtros ativos na tela (etapa, vendedor,
+  // fabricante, marcador, período etc.): o modal parte do funil atual com TODOS os negócios dele,
+  // e só a busca digitada aqui restringe a lista.
+  const [bulkPickerSearch, setBulkPickerSearch] = useState('');
+  const deferredBulkPickerSearch = useDeferredValue(bulkPickerSearch);
   const [bulkApplyStatus, setBulkApplyStatus] = useState(false);
   const [bulkApplyMarcador, setBulkApplyMarcador] = useState(false);
   const [bulkNewStatus, setBulkNewStatus] = useState('');
@@ -622,18 +627,29 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   );
   const { data: pedidosStats, isFetching: isStatsFetching } = usePedidosStats(empresaId, activeStages, pedidosFilters);
 
-  // Lista própria do modal de Ação em Massa: os mesmos filtros ativos na tela, mas independente
-  // da paginação da tabela/kanban — só busca quando o modal está aberto, e só até BULK_PICKER_LIMIT
-  // itens (checklist individual não escala para milhares; acima do limite, a exclusão manual fica
-  // restrita aos itens carregados, mas o restante continua incluído no alvo "todos os filtrados").
-  const { data: bulkPickerData, isFetching: isBulkPickerLoading } = usePedidos(
+  // Picker do modal de Ação em Massa: ignora os filtros ativos na tela (etapa, vendedor,
+  // fabricante, marcador, período, atenção, importados, busca da página) de propósito — o modal
+  // precisa alcançar qualquer negócio do funil atual, não só o recorte filtrado que está sendo
+  // visualizado no momento. Mantém o funil porque "Nova etapa" usa as colunas desse funil
+  // específico (`KANBAN_STAGES`), então misturar negócios de outro funil não faria sentido ali.
+  const bulkPickerFilters: PedidosFilters = useMemo(() => ({
+    funilId,
+    search: deferredBulkPickerSearch.trim() || undefined,
+  }), [funilId, deferredBulkPickerSearch]);
+  // `isLoading` (não `isFetching`) pro spinner de bloqueio: com `placeholderData: keepPreviousData`
+  // (ver usePedidos), trocar de página/busca já mantém a página anterior visível instantaneamente
+  // enquanto busca a próxima — usar isFetching aqui apagava a tabela inteira a cada clique de
+  // paginação, mesmo com os dados já em cache, dando a impressão de estar lento.
+  const { data: bulkPickerData, isLoading: isBulkPickerLoading, isFetching: isBulkPickerFetching } = usePedidos(
     empresaId,
-    0,
-    BULK_PICKER_LIMIT,
-    activeStages,
-    pedidosFilters,
+    bulkPickerPage - 1,
+    bulkPickerPageSize,
+    undefined,
+    bulkPickerFilters,
     bulkEditOpen,
   );
+  const { data: bulkPickerStats } = usePedidosStats(empresaId, undefined, bulkPickerFilters, bulkEditOpen);
+  const bulkPickerTotalCount = bulkPickerStats?.count ?? 0;
   const isLoading = isUserLoading || (!showKanban && isPedidosLoading);
   // Com `placeholderData: keepPreviousData`, trocar de página/filtro/busca mantém o conteúdo
   // anterior visível sem acionar `isLoading` de novo — sem isso o usuário não tinha nenhum
@@ -642,6 +658,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const pedidos = useMemo(() => pedidosData?.data ?? [], [pedidosData]);
   const totalCount = pedidosStats?.count ?? 0;
   const totalValor = pedidosStats?.valor ?? 0;
+  const bulkPickerTotalPages = Math.max(1, Math.ceil(bulkPickerTotalCount / bulkPickerPageSize));
 
   useEffect(() => {
     if (!kanbanColunas || !funilId) return;
@@ -1008,9 +1025,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
-  // Alvo é sempre "todos os filtrados" resolvido no servidor, descontando o que foi desmarcado
-  // no checklist do próprio modal (`bulkExcludedIds`) — mesmo padrão do handleBulkDelete.
-  const bulkApplyCount = Math.max(0, totalCount - bulkExcludedIds.size);
+  // Alvo é exatamente o que foi marcado no checklist do próprio modal — envia os ids
+  // explicitamente, igual ao fluxo de "Excluir Selecionados" com seleção manual.
+  const bulkApplyCount = bulkSelected.size;
   const handleBulkApply = async () => {
     if (!empresaId || bulkApplyCount === 0) return;
     const updates: { status?: string; marcador_id?: string | null } = {};
@@ -1020,12 +1037,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
     try {
       const updated = await bulkUpdateMutation.mutateAsync({
-        target: {
-          empresaId,
-          stages: activeStages,
-          filters: pedidosFilters,
-          excludeIds: bulkExcludedIds.size > 0 ? Array.from(bulkExcludedIds) : undefined,
-        },
+        target: { ids: Array.from(bulkSelected.keys()) },
         updates,
       });
       if (updated > 0) {
@@ -1036,7 +1048,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       setBulkApplyMarcador(false);
       setBulkNewStatus('');
       setBulkNewMarcadorId('');
-      setBulkExcludedIds(new Set());
+      setBulkSelected(new Map());
     } catch (err: any) {
       console.error('[bulk-update pedidos]', err);
       toast.error(err?.message || 'Erro inesperado ao aplicar a alteração em massa');
@@ -1175,11 +1187,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <ColumnSettingsItem
             label="Ação em Massa"
             icon={ArrowRightLeft}
-            // Não depende de seleção prévia na lista — abre direto com "todos os filtrados"
-            // marcados; o ajuste fino (desmarcar itens) acontece dentro do próprio modal.
-            disabled={totalCount === 0}
+            // Não depende de seleção prévia nem dos filtros da lista — abre com nada marcado e
+            // mostrando todos os negócios do funil atual; a escolha acontece dentro do modal.
+            disabled={!empresaId}
             onClick={() => {
-              setBulkExcludedIds(new Set());
+              setBulkSelected(new Map());
+              setBulkPickerPage(1);
+              setBulkPickerSearch('');
               setBulkEditOpen(true);
             }}
           />
@@ -1218,7 +1232,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     totalCount,
     someSelected,
     selectedCount,
-    setBulkExcludedIds,
+    empresaId,
+    setBulkSelected,
     setImportOpen,
     setImportDialogMounted,
     setColunasDialogOpen,
@@ -1452,8 +1467,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     </FilterButton>
   ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, marcadores, selectedMarcadores, dateFrom, handleDateFromSelect, dateTo, handleDateToSelect, dateField, showOnlyAttention, setShowOnlyAttention, hideImportados, setHideImportados]);
   const selectedViewOrder = useMemo(
-    () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === viewOrderId),
-    [showKanban, kanbanPedidosFlat, pedidos, viewOrderId]
+    () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === viewOrderId)
+      ?? bulkPickerData?.data?.find(p => p.id === viewOrderId),
+    [showKanban, kanbanPedidosFlat, pedidos, viewOrderId, bulkPickerData]
   );
 
   const viewOrderSheet = (
@@ -2085,7 +2101,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </AlertDialog>
 
       <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Ação em massa</DialogTitle>
             <DialogDescription>
@@ -2093,79 +2109,158 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                <ListChecks className="h-3.5 w-3.5" />
-                Aplicar em
-                <Badge variant="secondary" className="font-normal normal-case">{totalCount} filtrado(s)</Badge>
-              </p>
-              <div className="flex gap-1">
-                <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkExcludedIds(new Set())}>
-                  Selecionar todos
-                </Button>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4">
+            {/* Picker: mesma lógica de tabela paginada da tela, dentro do modal */}
+            <div className="flex flex-col gap-2 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  <ListChecks className="h-3.5 w-3.5" />
+                  Negócios do funil
+                  <Badge variant="secondary" className="font-normal normal-case">{bulkPickerTotalCount}</Badge>
+                </p>
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
                   className="h-6 px-2 text-xs"
-                  onClick={() => setBulkExcludedIds(new Set((bulkPickerData?.data ?? []).map(p => p.id)))}
+                  onClick={() => setBulkSelected(prev => {
+                    const next = new Map(prev);
+                    (bulkPickerData?.data ?? []).forEach(p => next.set(p.id, { nome: getNomeNegocio(p), status: p.status }));
+                    return next;
+                  })}
                 >
-                  Limpar seleção
+                  Selecionar página
                 </Button>
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={bulkPickerSearch}
+                  onChange={(e) => { setBulkPickerSearch(e.target.value); setBulkPickerPage(1); }}
+                  placeholder="Buscar por cliente, obra ou fabricante..."
+                  className="h-9 pl-8"
+                />
+              </div>
+
+              {/* Card único (borda arredondada compartilhada): corpo com header fixo + linhas
+                  roláveis, e um rodapé de paginação preso dentro da mesma caixa — igual ao
+                  header, não some nem faz parte da área que borra durante o refetch. */}
+              <div className="rounded-lg border overflow-hidden">
+                <div className="relative">
+                  {isBulkPickerLoading ? (
+                    <div className="flex h-80 items-center justify-center text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando negócios...
+                    </div>
+                  ) : (bulkPickerData?.data ?? []).length === 0 ? (
+                    <p className="flex h-80 items-center justify-center text-center text-sm text-muted-foreground">Nenhum negócio encontrado.</p>
+                  ) : (
+                    // Mesmas colunas configuradas na tabela da tela (reaproveita PedidoRow) — clicar
+                    // numa linha abre os detalhes do negócio (mesmo painel da tela) pra conferir se é
+                    // o negócio certo antes de aplicar a alteração em massa.
+                    <>
+                      {isBulkPickerFetching && (
+                        // top-12 pula a faixa do header (h-12 do TableHead) — o blur cobre só as
+                        // linhas, deixando o cabeçalho sempre nítido/legível.
+                        <div className="absolute inset-x-0 bottom-0 top-12 z-20 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      )}
+                      <Table wrapperClassName="h-80">
+                        <TableHeader className="sticky top-0 z-10 bg-muted">
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="w-10 px-2.5" />
+                            {columns.filter(col => tableVisibleColumns.includes(col.id)).map(col => (
+                              <TableHead key={col.id} className="whitespace-nowrap px-2.5 text-xs font-semibold">
+                                {getLabel(col.id)}
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(bulkPickerData?.data ?? []).map(p => (
+                            <PedidoRow
+                              key={p.id}
+                              pedido={p}
+                              selected={bulkSelected.has(p.id)}
+                              onToggle={() => setBulkSelected(prev => {
+                                const next = new Map(prev);
+                                if (next.has(p.id)) next.delete(p.id);
+                                else next.set(p.id, { nome: getNomeNegocio(p), status: p.status });
+                                return next;
+                              })}
+                              onClick={() => setViewOrderId(p.id)}
+                              visibleColumns={tableVisibleColumns}
+                              columns={columns}
+                              KANBAN_STAGES={KANBAN_STAGES}
+                              getLabel={getLabel}
+                              stageLabel={stageLabel}
+                            />
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </>
+                  )}
+                </div>
+                <div className="border-t bg-muted/40 px-2.5 py-2">
+                  <ListPagination
+                    page={bulkPickerPage}
+                    totalPages={bulkPickerTotalPages}
+                    totalItems={bulkPickerTotalCount}
+                    pageSize={bulkPickerPageSize}
+                    onPageChange={setBulkPickerPage}
+                    onPageSizeChange={(nextPageSize) => { setBulkPickerPageSize(nextPageSize); setBulkPickerPage(1); }}
+                    itemLabel="negócio"
+                    itemLabelPlural="negócios"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="rounded-lg border overflow-hidden">
-              <div className="max-h-52 overflow-y-auto divide-y">
-                {isBulkPickerLoading ? (
-                  <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando negócios...
-                  </div>
-                ) : (bulkPickerData?.data ?? []).length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">Nenhum negócio corresponde aos filtros atuais.</p>
+            {/* Painel de selecionados: fica visível independente da página do picker */}
+            <div className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Selecionados
+                  <Badge className="font-normal normal-case">{bulkSelected.size}</Badge>
+                </p>
+                {bulkSelected.size > 0 && (
+                  <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkSelected(new Map())}>
+                    Limpar
+                  </Button>
+                )}
+              </div>
+              <div className="h-80 overflow-y-auto space-y-1">
+                {bulkSelected.size === 0 ? (
+                  <p className="py-10 text-center text-xs text-muted-foreground px-2">
+                    Marque negócios na lista ao lado para adicioná-los aqui.
+                  </p>
                 ) : (
-                  (bulkPickerData?.data ?? []).map(p => {
-                    const checked = !bulkExcludedIds.has(p.id);
-                    const stage = KANBAN_STAGES.find(s => s.key === p.status);
-                    return (
-                      <label
-                        key={p.id}
-                        className={cn(
-                          'flex items-center gap-3 px-3 py-2.5 text-sm cursor-pointer transition-colors',
-                          checked ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-muted/50'
-                        )}
+                  Array.from(bulkSelected.entries()).map(([id, info]) => (
+                    <div key={id} className="flex items-center gap-1.5 rounded-md border bg-background px-2 py-1.5 text-xs">
+                      <span className="flex-1 truncate" title={info.nome}>{info.nome}</span>
+                      <button
+                        type="button"
+                        aria-label="Remover da seleção"
+                        className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        onClick={() => setBulkSelected(prev => {
+                          const next = new Map(prev);
+                          next.delete(id);
+                          return next;
+                        })}
                       >
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(v) => {
-                            setBulkExcludedIds(prev => {
-                              const next = new Set(prev);
-                              if (v) next.delete(p.id); else next.add(p.id);
-                              return next;
-                            });
-                          }}
-                        />
-                        <span className={cn('flex-1 truncate', !checked && 'text-muted-foreground')}>{getNomeNegocio(p)}</span>
-                        <Badge className={cn('shrink-0 font-normal', getStageBadgeClass(stage?.color ?? 'muted-foreground'))}>
-                          {stageLabel(p.status)}
-                        </Badge>
-                      </label>
-                    );
-                  })
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
-            {totalCount > BULK_PICKER_LIMIT && (
-              <p className="text-xs text-muted-foreground">
-                Mostrando os {BULK_PICKER_LIMIT} primeiros de {totalCount}. Os demais continuam incluídos, a menos que ajuste os filtros.
-              </p>
-            )}
+          </div>
 
-            <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium">
-              <ListChecks className="h-4 w-4 text-primary shrink-0" />
-              {bulkApplyCount} negócio(s) será(ão) atualizado(s)
-            </div>
+          <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium">
+            <ListChecks className="h-4 w-4 text-primary shrink-0" />
+            {bulkApplyCount} negócio(s) será(ão) atualizado(s)
           </div>
 
           <div className="h-px bg-border" />
