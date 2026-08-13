@@ -131,6 +131,7 @@ function ProfileTab() {
   const [assinaturaHtml, setAssinaturaHtml] = useState('');
   const [logoVersion, setLogoVersion] = useState(0);
   const [logoDragAtivo, setLogoDragAtivo] = useState(false);
+  const [logoExiste, setLogoExiste] = useState(true);
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['meu_perfil', user?.id],
@@ -289,9 +290,25 @@ function ProfileTab() {
       // O path no Storage não muda, então o browser (e um eventual CDN)
       // continuariam servindo a imagem antiga do cache sem isto.
       setLogoVersion(Date.now());
+      setLogoExiste(true);
       toast.success('Logo da empresa atualizada com sucesso!');
     } catch (error: any) {
       toast.error('Erro ao carregar logo: ' + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removerLogoEmail = async () => {
+    try {
+      setIsUploading(true);
+      const { error } = await supabase.storage.from('email-assets').remove(['logo-email.png']);
+      if (error) throw error;
+      setLogoVersion(Date.now());
+      setLogoExiste(false);
+      toast.success('Logo removida.');
+    } catch (error: any) {
+      toast.error('Erro ao remover logo: ' + error.message);
     } finally {
       setIsUploading(false);
     }
@@ -453,13 +470,13 @@ function ProfileTab() {
           </CardContent>
         </Card>
 
-        {(perfil.role === 'admin' || perfil.role === 'empresa') && (
+        {(perfil.role === 'admin' || perfil.role === 'gestor' || perfil.role === 'empresa') && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-primary" /> Logotipo da Empresa
               </CardTitle>
-              <CardDescription>Esta logo aparecerá no rodapé dos seus e-mails enviados (exclusivo para administradores)</CardDescription>
+              <CardDescription>Esta logo aparecerá no rodapé dos seus e-mails enviados (exclusivo para gestores e administradores)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div
@@ -472,23 +489,42 @@ function ProfileTab() {
                 onDragLeave={arrastarLogo(false)}
                 onDrop={soltarLogo}
               >
-                <img
-                  key={logoVersion}
-                  src={`${LOGO_EMAIL_URL}?v=${logoVersion}`}
-                  alt="Logo da Empresa"
-                  className="max-h-20 mb-4 object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200x50?text=MD+Representações';
-                  }}
-                />
+                {logoExiste ? (
+                  <img
+                    key={logoVersion}
+                    src={`${LOGO_EMAIL_URL}?v=${logoVersion}`}
+                    alt="Logo da Empresa"
+                    className="max-h-20 mb-4 object-contain"
+                    onLoad={() => setLogoExiste(true)}
+                    onError={() => setLogoExiste(false)}
+                  />
+                ) : (
+                  <div className="flex h-20 items-center justify-center mb-4 text-xs text-muted-foreground">
+                    Nenhuma logo enviada
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground mb-2">Arraste uma imagem aqui ou</p>
-                <Button variant="outline" size="sm" asChild disabled={isUploading}>
-                  <label className="cursor-pointer gap-2">
-                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                    {isUploading ? 'Enviando...' : 'Escolher arquivo'}
-                    <input type="file" accept="image/*" onChange={selecionarLogoPorInput} disabled={isUploading} className="hidden" />
-                  </label>
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" asChild disabled={isUploading}>
+                    <label className="cursor-pointer gap-2">
+                      {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      {isUploading ? 'Enviando...' : logoExiste ? 'Trocar logo' : 'Escolher arquivo'}
+                      <input type="file" accept="image/*" onChange={selecionarLogoPorInput} disabled={isUploading} className="hidden" />
+                    </label>
+                  </Button>
+                  {logoExiste && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={removerLogoEmail}
+                      disabled={isUploading}
+                    >
+                      Remover
+                    </Button>
+                  )}
+                </div>
                 <p className="text-[10px] text-muted-foreground mt-2">Recomendado: fundo transparente (PNG), máx. 50px de altura · até 5MB</p>
               </div>
             </CardContent>
