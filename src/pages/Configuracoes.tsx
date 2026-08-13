@@ -129,7 +129,10 @@ function ProfileTab() {
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [assinaturaHtml, setAssinaturaHtml] = useState('');
-  const [logoVersion, setLogoVersion] = useState(0);
+  // Começa em Date.now() (não 0): o path no Storage é fixo, então um "?v=0"
+  // reaproveitado em toda visita faria o navegador servir do cache HTTP a
+  // logo de uma sessão anterior em vez de buscar a atual após um F5.
+  const [logoVersion, setLogoVersion] = useState(() => Date.now());
   const [logoDragAtivo, setLogoDragAtivo] = useState(false);
   const [logoExiste, setLogoExiste] = useState(true);
 
