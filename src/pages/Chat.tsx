@@ -878,6 +878,9 @@ const Chat = () => {
     if (target.type === 'geral') return members.filter(m => m.id !== myVendedor).map(m => m.id);
     return [];
   }, [target.type, grupoMembros, members, myVendedor]);
+  // Diretório usado pra resolver usuario_id -> {nome, avatar_url} tanto dos avatares
+  // de "visualizado por" no rodapé da mensagem quanto do painel de detalhes.
+  const readerDirectory = target.type === 'grupo' ? grupoMembros : members;
 
   useEffect(() => {
     if (!messages || messages.length === 0) return;
@@ -1791,6 +1794,12 @@ const Chat = () => {
                         const isSeen = isGroupTarget
                           ? expectedReaders.length > 0 && expectedReaders.every(uid => readReceipts[msg.id]?.some(r => r.usuario_id === uid))
                           : msg.lida;
+                        // Quem já visualizou essa mensagem (só relevante pra grupo/geral, minhas mensagens).
+                        const viewers = isGroupTarget
+                          ? (readReceipts[msg.id] ?? [])
+                              .map(r => readerDirectory.find(v => v.id === r.usuario_id))
+                              .filter((v): v is Vendedor => !!v)
+                          : [];
                         return (
                           <div
                             key={msg.id}
@@ -1845,19 +1854,13 @@ const Chat = () => {
                                     <DropdownMenuTrigger asChild>
                                       <button
                                         type="button"
-                                        className="absolute top-1/2 -translate-y-1/2 right-1 p-1 rounded-full text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 opacity-0 group-hover/msg:opacity-100 transition-opacity"
+                                        className="absolute top-1 right-1 p-1 rounded-full text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 opacity-0 group-hover/msg:opacity-100 transition-opacity"
                                         title="Mais opções"
                                       >
                                         <ChevronDown className="h-3 w-3" />
                                       </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                      {isGroupTarget && (
-                                        <DropdownMenuItem onClick={() => setReadReceiptsMsg(msg)}>
-                                          <CheckCheck className="h-3.5 w-3.5 mr-2" />
-                                          Dados da mensagem
-                                        </DropdownMenuItem>
-                                      )}
                                       <DropdownMenuItem
                                         className="bg-destructive text-white focus:bg-destructive/90 focus:text-white"
                                         onClick={() => setMsgToDelete(msg)}
@@ -1942,6 +1945,30 @@ const Chat = () => {
                                     <Check className="h-3 w-3" title="Enviado" />
                                   )
                                 )}
+                                {isMe && viewers.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setReadReceiptsMsg(msg)}
+                                    className="flex items-center -space-x-1.5 ml-1"
+                                    title="Ver quem visualizou"
+                                  >
+                                    {viewers.slice(0, 3).map(v => (
+                                      <Avatar key={v.id} className="h-4 w-4 border border-background">
+                                        {v.avatar_url && (
+                                          <img src={v.avatar_url} alt={v.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                                        )}
+                                        <AvatarFallback className={`${colorForId(v.id)} text-white text-[7px]`}>
+                                          {getInitials(v.nome)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    ))}
+                                    {viewers.length > 3 && (
+                                      <div className="h-4 w-4 rounded-full bg-muted-foreground/20 border border-background flex items-center justify-center text-[6px] font-semibold text-muted-foreground">
+                                        {viewers.length}
+                                      </div>
+                                    )}
+                                  </button>
+                                )}
                               </p>
                             </div>
                           </div>
@@ -1998,17 +2025,16 @@ const Chat = () => {
               <ScrollArea className="flex-1">
                 {(() => {
                   if (!readReceiptsMsg) return null;
-                  const directory = target.type === 'grupo' ? grupoMembros : members;
                   const receipts = readReceipts[readReceiptsMsg.id] ?? [];
                   const receiptByUser = new Map(receipts.map(r => [r.usuario_id, r.lida_em]));
                   const readList = expectedReaders
                     .filter(uid => receiptByUser.has(uid))
-                    .map(uid => ({ vendedor: directory.find(v => v.id === uid), lida_em: receiptByUser.get(uid)! }))
+                    .map(uid => ({ vendedor: readerDirectory.find(v => v.id === uid), lida_em: receiptByUser.get(uid)! }))
                     .filter((r): r is { vendedor: Vendedor; lida_em: string } => !!r.vendedor)
                     .sort((a, b) => new Date(b.lida_em).getTime() - new Date(a.lida_em).getTime());
                   const unreadList = expectedReaders
                     .filter(uid => !receiptByUser.has(uid))
-                    .map(uid => directory.find(v => v.id === uid))
+                    .map(uid => readerDirectory.find(v => v.id === uid))
                     .filter((v): v is Vendedor => !!v)
                     .sort((a, b) => a.nome.localeCompare(b.nome));
 
