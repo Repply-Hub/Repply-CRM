@@ -76,7 +76,7 @@ export const StandardPopoverMenu = ({
                 side={side} 
                 align={align} 
                 sideOffset={sideOffset} 
-                className={cn("w-64 p-0 shadow-2xl border-border/40 z-[60] bg-background overflow-hidden", popoverClassName)}
+                className={cn("w-64 p-0 shadow-2xl border-border/40 z-[1100] bg-background overflow-hidden", popoverClassName)}
             >
                 <div className="flex flex-col h-full">
                     <div className="px-4 py-3 bg-muted/20">
