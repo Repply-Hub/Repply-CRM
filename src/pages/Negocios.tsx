@@ -34,7 +34,7 @@ import {
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
   ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, Rows3, History, Tag, ArrowRightLeft,
-  ListChecks
+  ListChecks, ArrowRight
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -52,6 +52,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { TOGGLE_LIST_CLASS, TOGGLE_ITEM_CLASS } from '@/lib/toggle-group-styles';
 import { ImportDialog } from '@/components/ImportDialog';
 import { ListPagination } from '@/components/shared/ListPagination';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { ResizableTh } from '@/components/shared/ResizableTh';
 import { KanbanColumn } from '@/components/pedidos/kanban/KanbanColumn';
 import { FilterButton } from '@/components/shared/FilterButton';
@@ -561,10 +562,32 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // e só a busca digitada aqui restringe a lista.
   const [bulkPickerSearch, setBulkPickerSearch] = useState('');
   const deferredBulkPickerSearch = useDeferredValue(bulkPickerSearch);
+  // Filtros próprios do picker (etapa, marcador, responsável, período) — mesma lógica
+  // multi-seleção dos filtros da tela (toggleFilter), mas com estado isolado: restringem só a
+  // lista de negócios disponíveis para escolha dentro do modal, sem interferir nos filtros
+  // ativos da tela.
+  const [bulkPickerStages, setBulkPickerStages] = useState<string[]>([]);
+  const [bulkPickerVendedorIds, setBulkPickerVendedorIds] = useState<string[]>([]);
+  const [bulkPickerMarcadorIds, setBulkPickerMarcadorIds] = useState<string[]>([]);
+  const [bulkPickerDateFrom, setBulkPickerDateFrom] = useState<Date | undefined>(undefined);
+  const [bulkPickerDateTo, setBulkPickerDateTo] = useState<Date | undefined>(undefined);
+  const [bulkPickerDateField, setBulkPickerDateField] = useState<PeriodoDateField>('data_pedido');
+  const handleBulkPickerDateFromSelect = (date: Date | undefined) => {
+    setBulkPickerDateFrom(date);
+    if (date && bulkPickerDateTo && date > bulkPickerDateTo) setBulkPickerDateTo(date);
+    setBulkPickerPage(1);
+  };
+  const handleBulkPickerDateToSelect = (date: Date | undefined) => {
+    setBulkPickerDateTo(date);
+    if (date && bulkPickerDateFrom && date < bulkPickerDateFrom) setBulkPickerDateFrom(date);
+    setBulkPickerPage(1);
+  };
   const [bulkApplyStatus, setBulkApplyStatus] = useState(false);
   const [bulkApplyMarcador, setBulkApplyMarcador] = useState(false);
+  const [bulkApplyVendedor, setBulkApplyVendedor] = useState(false);
   const [bulkNewStatus, setBulkNewStatus] = useState('');
   const [bulkNewMarcadorId, setBulkNewMarcadorId] = useState('');
+  const [bulkNewVendedorId, setBulkNewVendedorId] = useState('');
   const bulkUpdateMutation = useBulkUpdatePedidos();
   const isBulkUpdating = bulkUpdateMutation.isPending;
 
@@ -640,15 +663,23 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   );
   const { data: pedidosStats, isFetching: isStatsFetching } = usePedidosStats(empresaId, activeStages, pedidosFilters);
 
-  // Picker do modal de Ação em Massa: ignora os filtros ativos na tela (etapa, vendedor,
-  // fabricante, marcador, período, atenção, importados, busca da página) de propósito — o modal
-  // precisa alcançar qualquer negócio do funil atual, não só o recorte filtrado que está sendo
-  // visualizado no momento. Mantém o funil porque "Nova etapa" usa as colunas desse funil
-  // específico (`KANBAN_STAGES`), então misturar negócios de outro funil não faria sentido ali.
+  // Picker do modal de Ação em Massa: ignora os filtros ativos na tela (fabricante, período,
+  // atenção, importados, busca da página) de propósito — o modal por padrão alcança qualquer
+  // negócio do funil atual, não só o recorte filtrado que está sendo visualizado no momento.
+  // Etapa/marcador/responsável/período têm filtro próprio (bulkPickerStages/VendedorIds/
+  // MarcadorIds/DateFrom/DateTo), isolado dos filtros da tela, só para facilitar achar negócios
+  // dentro do picker. Mantém o funil porque "Nova etapa" usa as colunas desse funil específico
+  // (`KANBAN_STAGES`), então misturar negócios de outro funil não faria sentido ali.
   const bulkPickerFilters: PedidosFilters = useMemo(() => ({
     funilId,
     search: deferredBulkPickerSearch.trim() || undefined,
-  }), [funilId, deferredBulkPickerSearch]);
+    stages: bulkPickerStages.length > 0 ? bulkPickerStages : undefined,
+    vendedorIds: bulkPickerVendedorIds.length > 0 ? bulkPickerVendedorIds : undefined,
+    marcadorIds: bulkPickerMarcadorIds.length > 0 ? bulkPickerMarcadorIds : undefined,
+    dateFrom: bulkPickerDateFrom ? format(bulkPickerDateFrom, 'yyyy-MM-dd') : undefined,
+    dateTo: bulkPickerDateTo ? format(bulkPickerDateTo, 'yyyy-MM-dd') : undefined,
+    dateField: bulkPickerDateField,
+  }), [funilId, deferredBulkPickerSearch, bulkPickerStages, bulkPickerVendedorIds, bulkPickerMarcadorIds, bulkPickerDateFrom, bulkPickerDateTo, bulkPickerDateField]);
   // `isLoading` (não `isFetching`) pro spinner de bloqueio: com `placeholderData: keepPreviousData`
   // (ver usePedidos), trocar de página/busca já mantém a página anterior visível instantaneamente
   // enquanto busca a próxima — usar isFetching aqui apagava a tabela inteira a cada clique de
@@ -752,6 +783,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // Função substituída pela seleção múltipla de etapas, o reset de página é gerenciado pelo useEffect ou quando clica.
 
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || (key || '');
+  const stageColorToken = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.color || 'muted-foreground';
 
   // Removido useEffect que forçava a substituição das colunas individuais pela coluna "negocio"
   // para permitir que o usuário escolha ver as colunas separadamente.
@@ -1046,11 +1078,24 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // Alvo é exatamente o que foi marcado no checklist do próprio modal — envia os ids
   // explicitamente, igual ao fluxo de "Excluir Selecionados" com seleção manual.
   const bulkApplyCount = bulkSelected.size;
+  // Agrupa os selecionados pela etapa atual (De:) — como a seleção pode misturar negócios de
+  // etapas diferentes, mostra cada etapa de origem presente (com a contagem) em vez de assumir
+  // uma origem única, para deixar claro o que vai mudar antes de aplicar o "Para:".
+  const bulkOriginStages = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const info of bulkSelected.values()) {
+      counts.set(info.status, (counts.get(info.status) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([status, count]) => ({ status, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [bulkSelected]);
   const handleBulkApply = async () => {
     if (!empresaId || bulkApplyCount === 0) return;
-    const updates: { status?: string; marcador_id?: string | null } = {};
+    const updates: { status?: string; marcador_id?: string | null; usuario_id?: string } = {};
     if (bulkApplyStatus && bulkNewStatus) updates.status = bulkNewStatus;
     if (bulkApplyMarcador && bulkNewMarcadorId) updates.marcador_id = bulkNewMarcadorId === 'nenhum' ? null : bulkNewMarcadorId;
+    if (bulkApplyVendedor && bulkNewVendedorId) updates.usuario_id = bulkNewVendedorId;
     if (Object.keys(updates).length === 0) return;
 
     try {
@@ -1064,8 +1109,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       setBulkEditOpen(false);
       setBulkApplyStatus(false);
       setBulkApplyMarcador(false);
+      setBulkApplyVendedor(false);
       setBulkNewStatus('');
       setBulkNewMarcadorId('');
+      setBulkNewVendedorId('');
       setBulkSelected(new Map());
     } catch (err: any) {
       console.error('[bulk-update pedidos]', err);
@@ -1165,7 +1212,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       onReset={resetToDefaults}
       label={showKanban ? 'Itens do card' : 'Colunas'}
     >
-      <div className="flex flex-col border-t border-border/50">
+      <div className="flex flex-col">
         {showKanban && (
           <ColumnSettingsItem
             label="Gerenciar colunas Kanban"
@@ -1212,6 +1259,18 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               setBulkSelected(new Map());
               setBulkPickerPage(1);
               setBulkPickerSearch('');
+              setBulkPickerStages([]);
+              setBulkPickerVendedorIds([]);
+              setBulkPickerMarcadorIds([]);
+              setBulkPickerDateFrom(undefined);
+              setBulkPickerDateTo(undefined);
+              setBulkPickerDateField('data_pedido');
+              setBulkApplyStatus(false);
+              setBulkApplyMarcador(false);
+              setBulkApplyVendedor(false);
+              setBulkNewStatus('');
+              setBulkNewMarcadorId('');
+              setBulkNewVendedorId('');
               setBulkEditOpen(true);
             }}
           />
@@ -2153,14 +2212,208 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </Button>
               </div>
 
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={bulkPickerSearch}
-                  onChange={(e) => { setBulkPickerSearch(e.target.value); setBulkPickerPage(1); }}
-                  placeholder="Buscar por cliente, obra ou fabricante..."
-                  className="h-9 pl-8"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={bulkPickerSearch}
+                    onChange={(e) => { setBulkPickerSearch(e.target.value); setBulkPickerPage(1); }}
+                    placeholder="Buscar por cliente, obra ou fabricante..."
+                    className="h-9 pl-8"
+                  />
+                </div>
+                <FilterButton
+                  hasFilters={bulkPickerStages.length > 0 || bulkPickerVendedorIds.length > 0 || bulkPickerMarcadorIds.length > 0 || !!bulkPickerDateFrom || !!bulkPickerDateTo}
+                  activeFilterCount={(bulkPickerStages.length > 0 ? 1 : 0) + (bulkPickerVendedorIds.length > 0 ? 1 : 0) + (bulkPickerMarcadorIds.length > 0 ? 1 : 0) + ((bulkPickerDateFrom || bulkPickerDateTo) ? 1 : 0)}
+                  onClear={() => {
+                    setBulkPickerStages([]);
+                    setBulkPickerVendedorIds([]);
+                    setBulkPickerMarcadorIds([]);
+                    setBulkPickerDateFrom(undefined);
+                    setBulkPickerDateTo(undefined);
+                    setBulkPickerDateField('data_pedido');
+                    setBulkPickerPage(1);
+                  }}
+                  align="end"
+                  popoverClassName="w-64"
+                >
+                  <div className="flex flex-col gap-1">
+                    <StandardPopoverMenu
+                      label="Etapa"
+                      icon={LayoutGrid}
+                      badge={bulkPickerStages.length > 0 ? bulkPickerStages.length : undefined}
+                      side="left"
+                      align="start"
+                      sideOffset={10}
+                      popoverClassName="w-60"
+                    >
+                      <div className="space-y-1">
+                        {KANBAN_STAGES.map(s => (
+                          <label key={s.key} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                            <Checkbox
+                              checked={bulkPickerStages.includes(s.key)}
+                              onCheckedChange={() => {
+                                toggleFilter(bulkPickerStages, setBulkPickerStages, s.key);
+                                setBulkPickerPage(1);
+                              }}
+                            />
+                            {s.label}
+                          </label>
+                        ))}
+                      </div>
+                    </StandardPopoverMenu>
+
+                    <StandardPopoverMenu
+                      label="Responsável"
+                      icon={User}
+                      badge={bulkPickerVendedorIds.length > 0 ? bulkPickerVendedorIds.length : undefined}
+                      side="left"
+                      align="start"
+                      sideOffset={10}
+                      popoverClassName="w-60"
+                    >
+                      <ScrollArea className="h-60">
+                        <div className="space-y-1 pr-3">
+                          {(vendedores ?? []).map(v => (
+                            <label key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                              <Checkbox
+                                checked={bulkPickerVendedorIds.includes(v.id)}
+                                onCheckedChange={() => {
+                                  toggleFilter(bulkPickerVendedorIds, setBulkPickerVendedorIds, v.id);
+                                  setBulkPickerPage(1);
+                                }}
+                              />
+                              {v.nome}
+                            </label>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </StandardPopoverMenu>
+
+                    <StandardPopoverMenu
+                      label="Marcador"
+                      icon={Tag}
+                      badge={bulkPickerMarcadorIds.length > 0 ? bulkPickerMarcadorIds.length : undefined}
+                      side="left"
+                      align="start"
+                      sideOffset={10}
+                      popoverClassName="w-60"
+                    >
+                      <ScrollArea className="h-60">
+                        <div className="space-y-1 pr-3">
+                          {(marcadores ?? []).map(m => (
+                            <label key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                              <Checkbox
+                                checked={bulkPickerMarcadorIds.includes(m.id)}
+                                onCheckedChange={() => {
+                                  toggleFilter(bulkPickerMarcadorIds, setBulkPickerMarcadorIds, m.id);
+                                  setBulkPickerPage(1);
+                                }}
+                              />
+                              {m.nome}
+                            </label>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </StandardPopoverMenu>
+
+                    <StandardPopoverMenu
+                      label="Período"
+                      icon={CalendarIcon}
+                      badge={(bulkPickerDateFrom || bulkPickerDateTo) ? 'Ativo' : undefined}
+                      side="left"
+                      align="start"
+                      sideOffset={10}
+                      popoverClassName="w-64"
+                    >
+                      <div className="space-y-4 p-2">
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                            Filtrar por
+                          </p>
+                          <ToggleGroup
+                            type="single"
+                            value={bulkPickerDateField}
+                            onValueChange={(v) => { if (v) { setBulkPickerDateField(v as PeriodoDateField); setBulkPickerPage(1); } }}
+                            className={cn(TOGGLE_LIST_CLASS, "w-full")}
+                          >
+                            <ToggleGroupItem value="data_pedido" className={cn(TOGGLE_ITEM_CLASS, "flex-1")}>
+                              Criação
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="fechado_em" className={cn(TOGGLE_ITEM_CLASS, "flex-1")}>
+                              Fechamento
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                            Data Início
+                          </p>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal h-9",
+                                  !bulkPickerDateFrom && "text-muted-foreground"
+                                )}
+                              >
+                                {bulkPickerDateFrom ? format(bulkPickerDateFrom, "dd/MM/yyyy") : "Selecione..."}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={bulkPickerDateFrom}
+                                onSelect={handleBulkPickerDateFromSelect}
+                                locale={ptBR}
+                                captionLayout="dropdown-buttons"
+                                fromYear={1950}
+                                toYear={new Date().getFullYear()}
+                                className="[&_.rdp-nav]:hidden [&_.rdp-caption_label]:hidden"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                            Data Fim
+                          </p>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal h-9",
+                                  !bulkPickerDateTo && "text-muted-foreground"
+                                )}
+                              >
+                                {bulkPickerDateTo ? format(bulkPickerDateTo, "dd/MM/yyyy") : "Selecione..."}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={bulkPickerDateTo}
+                                onSelect={handleBulkPickerDateToSelect}
+                                initialFocus
+                                locale={ptBR}
+                                captionLayout="dropdown-buttons"
+                                fromYear={1950}
+                                toYear={new Date().getFullYear()}
+                                className="[&_.rdp-nav]:hidden [&_.rdp-caption_label]:hidden"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </StandardPopoverMenu>
+                  </div>
+                </FilterButton>
               </div>
 
               {/* Card único (borda arredondada compartilhada): corpo com header fixo + linhas
@@ -2291,19 +2544,40 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               Alterar para
             </p>
 
-            <div className="flex items-center gap-3">
-              <Checkbox checked={bulkApplyStatus} onCheckedChange={(v) => setBulkApplyStatus(!!v)} id="bulk-apply-status" />
-              <Label htmlFor="bulk-apply-status" className="w-28 shrink-0 cursor-pointer font-normal">Nova etapa</Label>
-              <Select value={bulkNewStatus} onValueChange={setBulkNewStatus} disabled={!bulkApplyStatus}>
-                <SelectTrigger className="flex-1 bg-background">
-                  <SelectValue placeholder="Selecionar etapa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {KANBAN_STAGES.map(s => (
-                    <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <Checkbox checked={bulkApplyStatus} onCheckedChange={(v) => setBulkApplyStatus(!!v)} id="bulk-apply-status" />
+                <Label htmlFor="bulk-apply-status" className="cursor-pointer font-normal">Nova etapa</Label>
+              </div>
+
+              {/* De/Para explícito: mostra a(s) etapa(s) de origem dos negócios marcados antes da
+                  seta, e o destino escolhido depois — evita o usuário aplicar uma "nova etapa" às
+                  cegas sem saber de onde os negócios selecionados estão saindo. */}
+              <div className="flex flex-wrap items-center gap-2 pl-7">
+                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">De:</span>
+                {bulkOriginStages.length === 0 ? (
+                  <span className="text-xs text-muted-foreground italic">selecione negócios na lista</span>
+                ) : (
+                  bulkOriginStages.map(({ status, count }) => (
+                    <Badge key={status} className={cn(getStageBadgeClass(stageColorToken(status)), "font-normal normal-case gap-1")}>
+                      {stageLabel(status)}
+                      <span className="opacity-80">× {count}</span>
+                    </Badge>
+                  ))
+                )}
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">Para:</span>
+                <Select value={bulkNewStatus} onValueChange={setBulkNewStatus} disabled={!bulkApplyStatus}>
+                  <SelectTrigger className="h-8 flex-1 min-w-[160px] bg-background">
+                    <SelectValue placeholder="Selecionar etapa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {KANBAN_STAGES.map(s => (
+                      <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -2321,6 +2595,18 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="flex items-center gap-3">
+              <Checkbox checked={bulkApplyVendedor} onCheckedChange={(v) => setBulkApplyVendedor(!!v)} id="bulk-apply-vendedor" />
+              <Label htmlFor="bulk-apply-vendedor" className="w-28 shrink-0 cursor-pointer font-normal">Novo responsável</Label>
+              <SearchableSelect
+                options={(vendedores ?? []).map(v => ({ value: v.id, label: v.nome }))}
+                value={bulkNewVendedorId}
+                onValueChange={setBulkNewVendedorId}
+                placeholder="Selecionar responsável"
+                className={cn("flex-1 bg-background", !bulkApplyVendedor && "opacity-50 pointer-events-none")}
+              />
+            </div>
           </div>
 
           <DialogFooter>
@@ -2330,9 +2616,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               disabled={
                 isBulkUpdating ||
                 bulkApplyCount === 0 ||
-                (!bulkApplyStatus && !bulkApplyMarcador) ||
+                (!bulkApplyStatus && !bulkApplyMarcador && !bulkApplyVendedor) ||
                 (bulkApplyStatus && !bulkNewStatus) ||
-                (bulkApplyMarcador && !bulkNewMarcadorId)
+                (bulkApplyMarcador && !bulkNewMarcadorId) ||
+                (bulkApplyVendedor && !bulkNewVendedorId)
               }
             >
               {isBulkUpdating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Aplicando...</> : `Aplicar a ${bulkApplyCount} negócio(s)`}
