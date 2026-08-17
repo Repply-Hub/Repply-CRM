@@ -1114,7 +1114,7 @@ const Clientes = () => {
             onReset={resetToDefaults}
             label={activeTab === 'empresas' ? 'Colunas Empresas' : 'Colunas Contatos'}
           >
-            <div className="flex flex-col border-t border-border/50">
+            <div className="flex flex-col border-border/50">
               <ColumnSettingsPopover label="Ações" icon={Plus}>
                 <ExportClientesButton 
                   data={activeTab === 'empresas' ? filteredEmpresas : filteredContatos} 
