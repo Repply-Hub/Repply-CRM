@@ -6,7 +6,7 @@ import { KanbanCard } from './KanbanCard';
 import { KanbanStage } from '@/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { usePedidos, type PedidosFilters, type PedidoWithRelations } from '@/hooks/use-pedidos';
+import { usePedidos, type PedidosFilters, type PedidoWithRelations, type SearchMatches } from '@/hooks/use-pedidos';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
 
 // Referência estável (não uma array literal nova a cada render) — evita recomputar
@@ -31,16 +31,23 @@ interface KanbanColumnProps {
   /** Reporta ao pai os pedidos crus (pós-busca) desta coluna, para funções que precisam do
    *  conjunto completo do board (rolar até um card ao buscar, exportar PDF do pipeline). */
   onOrdersChange?: (stageKey: string, rows: PedidoWithRelations[]) => void;
+  /** Ids de cliente/fabricante/obra que casam com `filters.search`, já resolvidos uma única vez
+   *  pela página (ver useSearchMatches) — evita que cada coluna refaça os mesmos 3 ILIKEs. */
+  resolvedSearchMatches?: SearchMatches | null;
+  /** true enquanto a página ainda está resolvendo um termo de busca novo — a coluna espera em
+   *  vez de resolver por conta própria (mantém as linhas antigas visíveis via placeholderData). */
+  searchPending?: boolean;
 }
 
 export const KanbanColumn = memo(function KanbanColumn({
   stageKey, label, colorClass, onCardClick, visibleColumns, columns,
   pageSize, empresaId, filters, etapaFilter, onOrdersChange,
+  resolvedSearchMatches, searchPending,
 }: KanbanColumnProps) {
   const safeColor = typeof colorClass === 'string' ? colorClass : 'muted';
   const safeLabel = typeof label === 'string' ? label : String(label ?? '');
   const navigate = useNavigate();
-  const stageEnabled = !etapaFilter || etapaFilter.includes(stageKey);
+  const stageEnabled = (!etapaFilter || etapaFilter.includes(stageKey)) && !searchPending;
 
   // Cada coluna busca SÓ o seu próprio status — queryKey/cache/fetch totalmente
   // independentes entre colunas. "Ver mais" aumenta apenas o limit desta coluna.
@@ -51,7 +58,7 @@ export const KanbanColumn = memo(function KanbanColumn({
 
   const limit = pageSize * loadedBatches;
   const stageFilter = useMemo(() => [stageKey], [stageKey]);
-  const { data: pedidosData, isLoading, isFetching } = usePedidos(empresaId, 0, limit, stageFilter, filters, stageEnabled, true);
+  const { data: pedidosData, isLoading, isFetching } = usePedidos(empresaId, 0, limit, stageFilter, filters, stageEnabled, true, resolvedSearchMatches);
 
   const rawRows = pedidosData?.data ?? EMPTY_ROWS;
   // Total real desta etapa (count exato do Postgres, ignora o limit) — permite saber com

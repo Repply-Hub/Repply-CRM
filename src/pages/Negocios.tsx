@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { parse, isValid, startOfMonth, endOfMonth } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useDelayedLoading } from '@/hooks/use-delayed-loading';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +15,7 @@ import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { useFunis } from '@/hooks/use-funis';
 import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
-import { usePedidos, usePedidosStats, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField } from '@/hooks/use-pedidos';
+import { usePedidos, usePedidosStats, useSearchMatches, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
@@ -465,7 +467,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const isPipelineMode = mode === 'pipeline';
 
   const [search, setSearch] = useState(() => localStorage.getItem('negocios_search') || '');
-  const deferredSearch = useDeferredValue(search);
+  // Debounce real (não só useDeferredValue): cada mudança em `deferredSearch` dispara queries ao
+  // Supabase (resolução de busca + listagem + stats) — sem represar por um tempo sem digitar,
+  // cada tecla vira uma rodada de requisições.
+  const deferredSearch = useDebouncedValue(search, 350);
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
   const [importDialogMounted, setImportDialogMounted] = useState(false);
@@ -615,6 +620,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     funilId,
   }), [selectedVendedores, selectedFabricantes, selectedMarcadores, dateFrom, dateTo, dateField, showOnlyAttention, deferredSearch, hideImportados, funilId]);
 
+  // Resolve o termo de busca (ids de cliente/fabricante/obra que casam) UMA VEZ aqui, e repassa
+  // pronto pra cada KanbanColumn — sem isso, cada coluna do board refaria os mesmos 3 ILIKEs por
+  // conta própria (ver useSearchMatches em use-pedidos.ts). Enquanto um termo novo ainda está
+  // sendo resolvido, as colunas seguram a busca própria (mantêm as linhas antigas visíveis via
+  // placeholderData) em vez de resolver cada uma por si.
+  const searchMatchesQuery = useSearchMatches(pedidosFilters.search);
+  const kanbanSearchPending = !!pedidosFilters.search && searchMatchesQuery.isLoading;
+
   // Essa query só serve a view Lista agora — desabilitada no Kanban, já que cada coluna
   // busca seus próprios dados de forma independente.
   const { data: pedidosData, isLoading: isPedidosLoading, isFetching: isPedidosFetching } = usePedidos(
@@ -655,6 +668,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // anterior visível sem acionar `isLoading` de novo — sem isso o usuário não tinha nenhum
   // sinal de que uma nova busca já estava em andamento no servidor.
   const isRefetching = !isLoading && (isPedidosFetching || isStatsFetching);
+  // A busca ficou rápida o bastante (debounce + índices) pra a maioria das buscas terminar em
+  // poucas dezenas/centenas de ms — sem esse atraso, o ícone de carregamento da barra de busca
+  // acendia e apagava quase instantaneamente a cada pausa na digitação, parecendo "piscar". Só
+  // mostra o ícone se ainda estiver buscando depois de 200ms; assim que termina, some na hora.
+  const showSearchLoading = useDelayedLoading(isRefetching, 200);
   const pedidos = useMemo(() => pedidosData?.data ?? [], [pedidosData]);
   const totalCount = pedidosStats?.count ?? 0;
   const totalValor = pedidosStats?.valor ?? 0;
@@ -1840,7 +1858,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               onValueChange={handleSearchChange}
               storageKey="negocios_recent_searches"
               className="order-last w-full sm:order-none sm:w-auto sm:min-w-[240px] sm:shrink-0"
-              loading={isRefetching}
+              loading={showSearchLoading}
             />
 
             <div className="shrink-0">{filtrosPopover}</div>
@@ -1880,6 +1898,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   filters={pedidosFilters}
                   etapaFilter={activeStages}
                   onOrdersChange={handleKanbanColumnData}
+                  resolvedSearchMatches={searchMatchesQuery.data ?? null}
+                  searchPending={kanbanSearchPending}
                 />
               ))}
               <div className="self-start mt-[52px] shrink-0">

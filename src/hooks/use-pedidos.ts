@@ -109,7 +109,7 @@ function applyDateRangeFilter<T extends { gte(column: string, value: string): T;
   return query;
 }
 
-interface SearchMatches {
+export interface SearchMatches {
   clienteIds: string[];
   fabricanteIds: string[];
   obraIds: string[];
@@ -136,6 +136,21 @@ async function resolveSearchMatches(trimmedSearch: string): Promise<SearchMatche
 const hasNoSearchMatches = (matches: SearchMatches) =>
   matches.clienteIds.length === 0 && matches.fabricanteIds.length === 0 && matches.obraIds.length === 0;
 
+// Resolve o termo de busca uma única vez, com `queryKey` baseada só no termo (não na etapa/status)
+// — permite que o Kanban chame este hook uma vez na página e repasse o resultado já pronto para
+// cada KanbanColumn via `resolvedSearchMatches`, em vez de cada coluna resolver os mesmos 3 ILIKEs
+// de novo (antes: N colunas × 3 queries por termo digitado; agora: 3 queries no total, cacheadas).
+export function useSearchMatches(search?: string) {
+  const trimmed = search?.trim();
+  return useQuery({
+    queryKey: ['search-matches', trimmed],
+    queryFn: () => resolveSearchMatches(trimmed!),
+    enabled: !!trimmed,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+  });
+}
+
 const buildSearchOrClause = (matches: SearchMatches): string => {
   const orParts: string[] = [];
   if (matches.clienteIds.length > 0) orParts.push(`cliente_id.in.(${matches.clienteIds.join(',')})`);
@@ -158,6 +173,11 @@ export function usePedidos(
   // efetivamente usa `data.count` (ex.: KanbanColumn, pro "carregar mais" por coluna) precisa
   // passar `withCount: true` explicitamente.
   withCount = false,
+  // Matches de busca já resolvidos (ver useSearchMatches) — quando fornecido, pula a resolução
+  // interna (3 ILIKEs) e reaproveita o resultado. Usado pelo Kanban, onde várias colunas
+  // compartilham o mesmo termo e resolveriam os mesmos ids repetidamente. `undefined` mantém o
+  // comportamento antigo (resolve sozinho); `null` explícito também cai no fallback.
+  resolvedSearchMatches?: SearchMatches | null,
 ) {
   const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId, search } = filters ?? {};
 
@@ -172,7 +192,9 @@ export function usePedidos(
       }
 
       const trimmedSearch = search?.trim();
-      const searchMatches = trimmedSearch ? await resolveSearchMatches(trimmedSearch) : null;
+      const searchMatches = trimmedSearch
+        ? (resolvedSearchMatches ?? await resolveSearchMatches(trimmedSearch))
+        : null;
       if (searchMatches && hasNoSearchMatches(searchMatches)) {
         return { data: [], count: 0 };
       }
@@ -516,9 +538,9 @@ export function useBulkDeletePedidos() {
   });
 }
 
-// Ambos os campos são opcionais — o chamador decide se altera a etapa, o marcador, ou os dois
-// juntos numa mesma chamada (é responsabilidade do chamador garantir que ao menos um esteja presente).
-export type BulkPedidosUpdates = { status?: string; marcador_id?: string | null };
+// Todos os campos são opcionais — o chamador decide quais alterar numa mesma chamada
+// (é responsabilidade do chamador garantir que ao menos um esteja presente).
+export type BulkPedidosUpdates = { status?: string; marcador_id?: string | null; usuario_id?: string };
 
 // Aplica a mesma etapa (status) e/ou o mesmo marcador a vários negócios de uma vez, num único
 // UPDATE — reaproveita o mesmo par de formatos de alvo do useBulkDeletePedidos (ids explícitos
@@ -532,6 +554,7 @@ export function useBulkUpdatePedidos() {
       const updateData: Record<string, unknown> = {};
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.marcador_id !== undefined) updateData.marcador_id = updates.marcador_id;
+      if (updates.usuario_id !== undefined) updateData.usuario_id = updates.usuario_id;
       if (updates.status === 'fechamento') {
         const now = new Date();
         const offset = now.getTimezoneOffset();
@@ -602,6 +625,7 @@ export function useBulkUpdatePedidos() {
         const campos = [
           updates.status !== undefined ? 'a etapa' : null,
           updates.marcador_id !== undefined ? 'o marcador' : null,
+          updates.usuario_id !== undefined ? 'o responsável' : null,
         ].filter(Boolean).join(' e ');
         const escopo = 'ids' in target ? 'selecionado(s) manualmente' : 'em massa (por filtro)';
         registrarAtividade.mutate({
