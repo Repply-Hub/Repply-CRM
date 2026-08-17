@@ -1,3 +1,11 @@
+// DEPRECATED/ÓRFÃ: esta function não está integrada ao fluxo padrão da UI (ver
+// IMPORT_STRUCTURE.md, seção 10) e nada em src/ a invoca. O pipeline real de import
+// (usado por ImportDataDialog, ImportPedidosDialog e ImportClientesDialog) faz o
+// parsing de datas de forma 100% determinística — sem IA — em `sanitizeFieldValue`
+// (src/components/import/MappingStep.tsx), incluindo a regra de desambiguação BR-first
+// para datas tipo "05/03/2024". Essa function usa o Gemini para converter datas para
+// ISO 8601 sem essa mesma regra explícita; se algum dia for integrada, alinhar a
+// desambiguação com `sanitizeFieldValue` antes.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
