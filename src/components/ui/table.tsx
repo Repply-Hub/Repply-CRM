@@ -1,5 +1,7 @@
 import * as React from "react";
+import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 
+import { ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 const Table = React.forwardRef<
@@ -7,9 +9,19 @@ const Table = React.forwardRef<
   React.HTMLAttributes<HTMLTableElement> & { wrapperClassName?: string }
 >(
   ({ className, wrapperClassName, ...props }, ref) => (
-    <div className={cn("relative w-full overflow-auto", wrapperClassName)}>
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
-    </div>
+    // Scrollbar desenhada via Radix em vez do overflow-auto nativo: a barra do navegador
+    // sempre pinta por cima de tudo dentro do container com scroll, inclusive de um header
+    // sticky (não dá pra resolver isso com z-index, é assim que scrollbar nativa funciona) —
+    // com a barra custom virando um elemento normal na árvore, o header sticky (z-10, definido
+    // pelos usos de TableHeader) fica acima dela na pilha de camadas.
+    <ScrollAreaPrimitive.Root type="always" className={cn("relative w-full overflow-hidden", wrapperClassName)}>
+      <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
+        <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      </ScrollAreaPrimitive.Viewport>
+      <ScrollBar orientation="horizontal" />
+      <ScrollBar orientation="vertical" />
+      <ScrollAreaPrimitive.Corner />
+    </ScrollAreaPrimitive.Root>
   ),
 );
 Table.displayName = "Table";

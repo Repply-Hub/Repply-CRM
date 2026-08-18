@@ -9,6 +9,7 @@
      nada no app: o ThemeProvider já aplica a classe `light` no <html>, onde os
      dois seletores coincidem. */
   :root, .light {
+    color-scheme: light;
     /* Repply Brand System V2.0 */
     /* Repply Orange #FF5A1F · Deep Black #0A0A0A · Pure White #FFFFFF */
 
@@ -93,6 +94,11 @@
   }
 
   .dark {
+    /* Sem isso o Chrome desenha os controles nativos que ele mesmo controla
+       (scrollbar overlay, <select>, spinners de input number/date etc.) no tema
+       claro por padrão, mesmo com o app inteiro em modo escuro — a barra de
+       rolagem então aparece com um fundo cinza-claro sólido em vez de transparente. */
+    color-scheme: dark;
     /* Deep Black #0A0A0A base */
     --background: 0 0% 7%;
     --foreground: 0 0% 94%;

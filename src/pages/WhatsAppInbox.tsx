@@ -849,7 +849,7 @@ function MeusChatsList({
               </p>
             </div>
           ) : (
-            <Table wrapperClassName="flex-1 min-h-0 overflow-auto">
+            <Table wrapperClassName="flex-1 min-h-0">
               <TableHeader>
                 <TableRow className="bg-muted hover:bg-muted">
                   <TableHead className="sticky top-0 z-10 bg-muted min-w-[220px] whitespace-nowrap px-4 py-3 text-xs font-semibold">
