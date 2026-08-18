@@ -518,7 +518,11 @@ const Emails = () => {
   const emails = sentData?.emails || [];
   const totalSent = sentData?.count || 0;
 
-  const { data: receivedData, isLoading: isReceivedLoading } = useQuery({
+  const {
+    data: receivedData,
+    isLoading: isReceivedLoading,
+    isFetching: isReceivedFetching,
+  } = useQuery({
     queryKey: [
       "received_emails",
       pageReceived,
@@ -1807,7 +1811,17 @@ const Emails = () => {
               className="m-0 h-full overflow-hidden"
             >
               <div className="h-full overflow-hidden flex flex-col bg-background">
-                <div className="flex-1 overflow-y-auto">
+                <div className="relative flex-1 overflow-y-auto">
+                  {/* Com `keepPreviousData`, trocar de marcador mantém a lista
+                    antiga na tela e `isReceivedLoading` fica falso — só
+                    `isFetching` sobe. Sem esta faixa, a troca parecia não ter
+                    acontecido até os dados novos chegarem. */}
+                  {isReceivedFetching && !isReceivedLoading && (
+                    <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-center gap-2 border-b bg-background/95 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Atualizando mensagens…
+                    </div>
+                  )}
                   {isReceivedLoading ? (
                     <div className="flex justify-center py-20">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -1878,7 +1892,12 @@ const Emails = () => {
                       )}
                     </div>
                   ) : (
-                    <div className="divide-y divide-border/50">
+                    <div
+                      className={cn(
+                        "divide-y divide-border/50 transition-opacity",
+                        isReceivedFetching && "opacity-50",
+                      )}
+                    >
                       {/* Sem caixa conectada mas COM histórico: quem desconectou
                         escolheu preservar, e a promessa foi que as mensagens
                         continuariam aqui. Antes esta aba trocava a lista inteira
