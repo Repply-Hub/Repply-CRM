@@ -129,6 +129,7 @@ function ProfileTab() {
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [assinaturaHtml, setAssinaturaHtml] = useState('');
+  const [assinaturaModo, setAssinaturaModo] = useState<'texto' | 'imagem'>('texto');
   // Começa em Date.now() (não 0): o path no Storage é fixo, então um "?v=0"
   // reaproveitado em toda visita faria o navegador servir do cache HTTP a
   // logo de uma sessão anterior em vez de buscar a atual após um F5.
@@ -335,6 +336,16 @@ function ProfileTab() {
     if (file) uploadEmailLogo(file);
   };
 
+  // Área precisa de `tabIndex` (aplicado no elemento) pra ser focável: evento
+  // `paste` só chega em elementos com foco (ou em inputs/textareas).
+  const colarLogo = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const item = Array.from(event.clipboardData.items).find((i) => i.type.startsWith('image/'));
+    const file = item?.getAsFile();
+    if (!file) return;
+    event.preventDefault();
+    uploadEmailLogo(file);
+  };
+
   const handleSalvarEmail = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -382,7 +393,16 @@ function ProfileTab() {
                 </label>
               </div>
               <div>
-                <p className="font-semibold">{perfil.nome}</p>
+                {/* Badge de cargo junto do nome (é identidade, não ação) —
+                    separado da linha de baixo, que fica só com as ações
+                    sobre a foto (trocar/editar/remover), em vez de misturar
+                    os dois tipos de coisa na mesma linha. */}
+                <p className="font-semibold flex items-center gap-2">
+                  {perfil.nome}
+                  <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="text-[10px]">
+                    {{ admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' }[perfil.role] || perfil.role}
+                  </Badge>
+                </p>
                 <p className="text-sm text-muted-foreground">{perfil.email}</p>
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <Button
@@ -400,33 +420,30 @@ function ProfileTab() {
                     </label>
                   </Button>
                   {perfil.avatar_url && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1.5 text-xs"
-                      disabled={isUploading}
-                      onClick={editCurrentAvatar}
-                    >
-                      <Crop className="h-3.5 w-3.5" />
-                      Editar
-                    </Button>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="text-[10px]">
-                    {{ admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' }[perfil.role] || perfil.role}
-                  </Badge>
-                  {perfil.avatar_url && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => updatePerfil.mutate({ avatar_url: null })}
-                      className="h-auto p-0 text-[11px] text-destructive hover:text-destructive hover:bg-transparent hover:underline"
-                      disabled={updatePerfil.isPending}
-                    >
-                      Remover imagem
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1.5 text-xs"
+                        disabled={isUploading}
+                        onClick={editCurrentAvatar}
+                      >
+                        <Crop className="h-3.5 w-3.5" />
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => updatePerfil.mutate({ avatar_url: null })}
+                        disabled={updatePerfil.isPending}
+                        title="Remover imagem"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -440,6 +457,8 @@ function ProfileTab() {
                   name="assinatura_email"
                   value={assinaturaHtml}
                   onChange={setAssinaturaHtml}
+                  userId={user!.id}
+                  onModoChange={setAssinaturaModo}
                 />
               </div>
               {(assinaturaHtml || perfil.nome) && (
@@ -447,22 +466,108 @@ function ProfileTab() {
                   <Label className="text-xs font-normal text-muted-foreground">
                     Como fica no rodapé do e-mail
                   </Label>
-                  {/* Papel branco fixo, como no leitor de e-mail: é exatamente o
-                      fundo sobre o qual o rodapé é composto no envio real, e
-                      teria contraste ruim sobre o tema escuro do app. */}
-                  <div
-                    className="overflow-hidden rounded-md border bg-white p-3"
-                    style={{ colorScheme: 'light' }}
-                    dangerouslySetInnerHTML={{
-                      __html: montarRodapeEmailHtml({
-                        nome: perfil.nome ?? '',
-                        assinaturaHtml,
-                        logoUrl: `${LOGO_EMAIL_URL}?v=${logoVersion}`,
-                      }),
-                    }}
-                  />
+                  {/* Moldura própria (header + borda) em vez do branco solto de
+                      antes: o CORPO precisa continuar branco fixo — é
+                      exatamente o fundo sobre o qual o rodapé é composto no
+                      envio real — mas sem um header em volta, esse branco
+                      cru destoava muito do resto da tela no tema escuro,
+                      como se tivesse quebrado. O header (no tom do próprio
+                      tema, claro ou escuro) deixa claro que é uma
+                      pré-visualização emoldurada, não um componente solto. */}
+                  <div className="overflow-hidden rounded-md border">
+                    <div className="flex items-center gap-1.5 border-b bg-muted/40 px-3 py-1.5">
+                      <Mail className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Pré-visualização do e-mail
+                      </span>
+                    </div>
+                    <div
+                      className="bg-white p-3"
+                      style={{ colorScheme: 'light' }}
+                      dangerouslySetInnerHTML={{
+                        __html: montarRodapeEmailHtml({
+                          nome: perfil.nome ?? '',
+                          assinaturaHtml,
+                          logoUrl: `${LOGO_EMAIL_URL}?v=${logoVersion}`,
+                          mostrarLogo: assinaturaModo === 'texto',
+                          logoCarregou: logoExiste,
+                          isolado: true,
+                        }),
+                      }}
+                    />
+                  </div>
                 </div>
               )}
+              {/* Logotipo da empresa: dentro do mesmo form, mas discreto de
+                  propósito — é uma configuração da empresa (exclusiva de
+                  gestores/admin), não um dado pessoal, então não compete em
+                  destaque com os campos acima. Os botões aqui são
+                  `type="button"` com upload próprio (instantâneo, fora do
+                  submit do form) — só ficam dentro do form pra "Salvar
+                  alterações" poder vir depois deles no layout.
+                  Some quando a aba "Imagem" está selecionada — mesmo antes de
+                  um arquivo ser enviado: é exclusivo do modo texto, já que o
+                  rodapé some com a logo nesse caso (`mostrarLogo` acima) e
+                  oferecer o upload aqui seria uma configuração sem efeito
+                  nenhum. Usa `assinaturaModo` (a aba selecionada no editor),
+                  não o formato do `assinaturaHtml`: o valor só vira `<img>`
+                  depois que uma imagem é de fato enviada, e antes disso os
+                  dois modos ficam com o mesmo valor `''`. */}
+              {(perfil.role === 'admin' || perfil.role === 'gestor' || perfil.role === 'empresa') && assinaturaModo === 'texto' && (
+                <div
+                  tabIndex={0}
+                  className={cn(
+                    'flex items-center gap-3 rounded-md border border-dashed px-3 py-2 outline-none transition-colors',
+                    logoDragAtivo && 'border-primary bg-primary/5',
+                  )}
+                  onDragOver={arrastarLogo(true)}
+                  onDragEnter={arrastarLogo(true)}
+                  onDragLeave={arrastarLogo(false)}
+                  onDrop={soltarLogo}
+                  onPaste={colarLogo}
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-muted/50 overflow-hidden">
+                    {logoExiste ? (
+                      <img
+                        key={logoVersion}
+                        src={`${LOGO_EMAIL_URL}?v=${logoVersion}`}
+                        alt="Logo da Empresa"
+                        className="max-h-9 max-w-9 object-contain"
+                        onLoad={() => setLogoExiste(true)}
+                        onError={() => setLogoExiste(false)}
+                      />
+                    ) : (
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-muted-foreground">Logotipo da empresa</p>
+                    <p className="truncate text-[10px] text-muted-foreground/70">Aparece no rodapé dos e-mails enviados</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button variant="ghost" size="sm" asChild disabled={isUploading} className="h-7 gap-1.5 text-xs">
+                      <label className="cursor-pointer">
+                        {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                        {logoExiste ? 'Trocar' : 'Enviar'}
+                        <input type="file" accept="image/*" onChange={selecionarLogoPorInput} disabled={isUploading} className="hidden" />
+                      </label>
+                    </Button>
+                    {logoExiste && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-destructive hover:text-destructive"
+                        onClick={removerLogoEmail}
+                        disabled={isUploading}
+                      >
+                        Remover
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-end pt-2">
                 <Button type="submit" size="sm" disabled={updatePerfil.isPending}>
                   {updatePerfil.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -472,67 +577,6 @@ function ProfileTab() {
             </form>
           </CardContent>
         </Card>
-
-        {(perfil.role === 'admin' || perfil.role === 'gestor' || perfil.role === 'empresa') && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-primary" /> Logotipo da Empresa
-              </CardTitle>
-              <CardDescription>Esta logo aparecerá no rodapé dos seus e-mails enviados (exclusivo para gestores e administradores)</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div
-                className={cn(
-                  'flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg bg-muted/30 transition-colors',
-                  logoDragAtivo && 'border-primary bg-primary/5',
-                )}
-                onDragOver={arrastarLogo(true)}
-                onDragEnter={arrastarLogo(true)}
-                onDragLeave={arrastarLogo(false)}
-                onDrop={soltarLogo}
-              >
-                {logoExiste ? (
-                  <img
-                    key={logoVersion}
-                    src={`${LOGO_EMAIL_URL}?v=${logoVersion}`}
-                    alt="Logo da Empresa"
-                    className="max-h-20 mb-4 object-contain"
-                    onLoad={() => setLogoExiste(true)}
-                    onError={() => setLogoExiste(false)}
-                  />
-                ) : (
-                  <div className="flex h-20 items-center justify-center mb-4 text-xs text-muted-foreground">
-                    Nenhuma logo enviada
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground mb-2">Arraste uma imagem aqui ou</p>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" asChild disabled={isUploading}>
-                    <label className="cursor-pointer gap-2">
-                      {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                      {isUploading ? 'Enviando...' : logoExiste ? 'Trocar logo' : 'Escolher arquivo'}
-                      <input type="file" accept="image/*" onChange={selecionarLogoPorInput} disabled={isUploading} className="hidden" />
-                    </label>
-                  </Button>
-                  {logoExiste && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={removerLogoEmail}
-                      disabled={isUploading}
-                    >
-                      Remover
-                    </Button>
-                  )}
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-2">Recomendado: fundo transparente (PNG), máx. 50px de altura · até 5MB</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <CustomizeTab />
         {/* GmailSettings sai daqui: a conexão de e-mail passou a ser da EMPRESA,
@@ -544,14 +588,14 @@ function ProfileTab() {
       </div>
 
       <div className="space-y-6">
-        <Card className="h-full flex flex-col">
+        <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Lock className="h-4 w-4 text-primary" /> Conta e Segurança
             </CardTitle>
             <CardDescription>Gerencie seu acesso e configurações de segurança</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col justify-between p-6 pt-2">
+          <CardContent className="p-6 pt-2 space-y-6">
             <div className="space-y-4 pb-6 border-b">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-primary" />
@@ -575,7 +619,7 @@ function ProfileTab() {
               </form>
             </div>
 
-            <div className="space-y-4 py-8">
+            <div className="space-y-4 pb-6 border-b">
               <div className="flex items-center gap-2">
                 <Lock className="h-4 w-4 text-primary" />
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Alterar Senha</h3>
@@ -598,7 +642,7 @@ function ProfileTab() {
               </form>
             </div>
 
-            <div className="space-y-4 pt-6">
+            <div className="space-y-4">
               <div className="flex items-center gap-2 text-destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <h3 className="text-sm font-semibold uppercase tracking-wider">Zona de Perigo</h3>

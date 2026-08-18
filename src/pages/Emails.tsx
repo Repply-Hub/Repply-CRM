@@ -63,6 +63,7 @@ import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
 import {
   LOGO_EMAIL_URL,
+  ehAssinaturaImagem,
   montarRodapeEmailHtml,
   normalizarAssinaturaAntiga,
 } from "@/lib/assinatura-email";
@@ -756,19 +757,24 @@ const Emails = () => {
         );
       }
 
+      // `assinatura_email` já sanitizada em Configurações antes de ser salva —
+      // normaliza aqui é só pra converter formato ANTIGO (texto puro com
+      // `\n`, de antes do editor de formatação existir). `montarRodapeEmailHtml`
+      // sanitiza de novo por conta própria, então dado antigo/legado também
+      // não passa cru.
+      const assinaturaNormalizada = normalizarAssinaturaAntiga(perfil?.assinatura_email);
+
       const htmlBody = `
         <div style="font-family: sans-serif; font-size: 16px; color: #333; line-height: 1.5;">
           ${data.corpo.replace(/\n/g, "<br>")}
         </div>
         ${montarRodapeEmailHtml({
           nome: perfil?.nome ?? "",
-          // `assinatura_email` já sanitizada em Configurações antes de ser
-          // salva — normaliza aqui é só pra converter formato ANTIGO (texto
-          // puro com `\n`, de antes do editor de formatação existir).
-          // `montarRodapeEmailHtml` sanitiza de novo por conta própria, então
-          // dado antigo/legado também não passa cru.
-          assinaturaHtml: normalizarAssinaturaAntiga(perfil?.assinatura_email),
+          assinaturaHtml: assinaturaNormalizada,
           logoUrl: `${LOGO_EMAIL_URL}?t=${Date.now()}`,
+          // Assinatura em modo imagem já é autossuficiente — mostrar a logo
+          // da empresa em cima dela seria redundante/poluído.
+          mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
         })}
       `;
 
