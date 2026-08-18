@@ -138,25 +138,44 @@ const Dashboard = () => {
     valor: f.faturamento_total ?? 0,
   }));
 
+  // Opções do seletor "Responsável": só vendedores com pelo menos uma
+  // conversão (negócio fechado) no período/fabricante filtrado — vendedor sem
+  // nenhum negócio fechado ali não ajuda a filtrar nada e só engrossa a lista
+  // (empresas com muitos cadastros inativos/novatos chegam a ter dezenas).
+  // `vendedores` (lista completa, sem esse corte) continua sendo usado em
+  // todo o resto da página — Plano de Vendas precisa listar todo mundo pra
+  // permitir definir meta de quem ainda não converteu nada.
+  const vendedoresComConversao = useMemo(
+    () => (vendedores ?? []).filter(v => Number(v.qtd_fechado ?? 0) > 0),
+    [vendedores],
+  );
+
   const conversaoVendedor = useMemo(() => {
-    const data = (vendedores ?? []).map(v => ({
+    const toRow = (v: { usuario_nome?: string; total_pedidos?: number; qtd_fechado?: number; usuario_id?: string }) => ({
       nome: v.usuario_nome ?? '',
       conversao: v.total_pedidos ? (Number(v.qtd_fechado ?? 0) / Number(v.total_pedidos)) * 100 : 0,
-      id: v.usuario_id
-    }));
+      id: v.usuario_id,
+    });
 
     // Não-gestor só vê a própria conversão nesse gráfico, nunca a dos colegas —
     // a RPC por trás (dashboard_indicadores_vendedor) traz a empresa toda sem
     // filtro de usuário, então a restrição precisa ser aplicada aqui, ignorando
-    // o filtro "Responsável" do topo (que continua livre pro gestor).
+    // o filtro "Responsável" do topo (que continua livre pro gestor). Sempre a
+    // própria barra, mesmo em 0% — é o indicador individual dele, diferente da
+    // comparação entre vendedores abaixo, onde 0% é só ruído.
     if (!isGestor) {
-      return data.filter(v => v.id === profile?.id);
+      return (vendedores ?? []).filter(v => v.usuario_id === profile?.id).map(toRow);
     }
+
+    // Parte da mesma lista sem vendedor de conversão zero usada no seletor
+    // "Responsável" (vendedoresComConversao) — o mesmo ruído que não ajuda a
+    // filtrar nada ali também não ajuda a comparar taxas de fechamento aqui.
+    const data = vendedoresComConversao.map(toRow);
     if (vendedorIds.length > 0) {
       return data.filter(v => vendedorIds.includes(v.id));
     }
     return data;
-  }, [vendedores, vendedorIds, isGestor, profile?.id]);
+  }, [vendedores, vendedoresComConversao, vendedorIds, isGestor, profile?.id]);
 
   // Já vem agregado e ordenado (desc) da RPC — a ordenação por maior/menor e o
   // agrupamento "Outros" da pizza são só de exibição, calculados dentro de
@@ -249,7 +268,7 @@ const Dashboard = () => {
           <div className="w-full sm:w-56">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Responsável</p>
             <MultiSelectSearch
-              options={(vendedores ?? []).map((v) => ({ value: v.usuario_id ?? '', label: v.usuario_nome ?? '' }))}
+              options={vendedoresComConversao.map((v) => ({ value: v.usuario_id ?? '', label: v.usuario_nome ?? '' }))}
               value={vendedorIds}
               onValueChange={setVendedorIds}
               placeholder="Todos"
