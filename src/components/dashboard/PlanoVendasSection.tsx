@@ -29,7 +29,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { TOGGLE_LIST_CLASS, TOGGLE_ITEM_CLASS } from '@/lib/toggle-group-styles';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import { Goal, Pencil, Plus, Trash2, Loader2, Copy, Users, User, GripVertical, Info, Search } from 'lucide-react';
+import { Goal, Pencil, Plus, Trash2, Loader2, Copy, Users, User, GripVertical, Info, Search, Factory } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   usePlanoVendasProgresso,
@@ -48,6 +48,7 @@ const MESES = [
 ];
 
 const MOSTRAR_DETALHADO_KEY = 'md-plano-vendas-detalhado';
+const VISUALIZACAO_KEY = 'md-plano-vendas-visualizacao';
 
 const formatCurrency = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -174,6 +175,18 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
   useEffect(() => {
     localStorage.setItem(MOSTRAR_DETALHADO_KEY, mostrarDetalhado ? '1' : '0');
   }, [mostrarDetalhado]);
+
+  // Alterna a visão detalhada entre "por fabricante" (padrão) e "por vendedor"
+  // — só faz sentido quando a seção "Por vendedor" existe (ver
+  // `mostrarPorVendedor` abaixo); nos demais casos só a visão por fabricante é
+  // renderizada, independente deste estado.
+  const [visualizacao, setVisualizacao] = useState<'fabricante' | 'vendedor'>(
+    () => (localStorage.getItem(VISUALIZACAO_KEY) === 'vendedor' ? 'vendedor' : 'fabricante'),
+  );
+
+  useEffect(() => {
+    localStorage.setItem(VISUALIZACAO_KEY, visualizacao);
+  }, [visualizacao]);
 
   // "Editar metas" e o resumo "Meta x realizado — Fulano" só existem quando dá
   // pra apontar pra UMA pessoa específica — com 0 (Todos) ou 2+ selecionados,
@@ -325,14 +338,31 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <Label htmlFor="mostrar-detalhado" className="text-xs font-medium text-muted-foreground cursor-pointer">
                 Mostrar vendas detalhado
               </Label>
-              <Switch id="mostrar-detalhado" checked={mostrarDetalhado} onCheckedChange={setMostrarDetalhado} />
+              <div className="flex items-center gap-2">
+                {mostrarDetalhado && mostrarPorVendedor && (
+                  <ToggleGroup
+                    type="single"
+                    value={visualizacao}
+                    onValueChange={(v) => v && setVisualizacao(v as 'fabricante' | 'vendedor')}
+                    className={TOGGLE_LIST_CLASS}
+                  >
+                    <ToggleGroupItem value="fabricante" className={`${TOGGLE_ITEM_CLASS} gap-1.5`}>
+                      <Factory className="h-3.5 w-3.5" /> Fabricante
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="vendedor" className={`${TOGGLE_ITEM_CLASS} gap-1.5`}>
+                      <Users className="h-3.5 w-3.5" /> Vendedor
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                )}
+                <Switch id="mostrar-detalhado" checked={mostrarDetalhado} onCheckedChange={setMostrarDetalhado} />
+              </div>
             </div>
 
-            {mostrarDetalhado && (
+            {mostrarDetalhado && (!mostrarPorVendedor || visualizacao === 'fabricante') && (
               <div className="space-y-4">
                 {progresso.map(p => {
                   const temMeta = p.meta_valor > 0;
@@ -387,11 +417,14 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
               </div>
             )}
 
-            {mostrarDetalhado && mostrarPorVendedor && porVendedor.length > 0 && (
-              <div className="space-y-3 pt-1 border-t border-border/60">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider pt-3">
-                  Por vendedor
-                </p>
+            {mostrarDetalhado && mostrarPorVendedor && visualizacao === 'vendedor' && porVendedor.length === 0 && (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                Nenhuma meta individual definida para este período.
+              </p>
+            )}
+
+            {mostrarDetalhado && mostrarPorVendedor && visualizacao === 'vendedor' && porVendedor.length > 0 && (
+              <div className="space-y-3">
                 {porVendedor.map(v => {
                   const temMeta = v.meta_valor > 0;
                   const pct = temMeta ? (v.vendido_valor / v.meta_valor) * 100 : 0;
