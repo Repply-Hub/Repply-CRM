@@ -364,6 +364,14 @@ export function usePedidosStats(empresaId?: string, stages?: string[], filters?:
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
+    // Sem isso, toda troca de filtro/busca derruba `data` pra `undefined` até a nova resposta
+    // chegar, e o header cai pra "0 negócios · Total: R$ 0,00" por um instante — pior ainda,
+    // o checkbox "selecionar todos" (que decide abrir o diálogo de "selecionar todos os
+    // filtrados" comparando `totalCount > currentPageIds.length`) enxerga esse 0 e conclui que
+    // não há nada além da página carregada, marcando só as linhas visíveis em vez de oferecer
+    // a opção de selecionar todo o filtro. `usePedidos` já mantém a página anterior do mesmo
+    // jeito; aqui falta o mesmo tratamento pro total.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -493,27 +501,48 @@ export function useBulkDeletePedidos() {
       const searchMatches = trimmedSearch ? await resolveSearchMatches(trimmedSearch) : null;
       if (searchMatches && hasNoSearchMatches(searchMatches)) return 0;
 
-      let query = supabase.from('pedidos').delete({ count: 'exact' }).in('usuario_id', usuarioIds);
-      if (excludeIds && excludeIds.length > 0) query = query.not('id', 'in', `(${excludeIds.join(',')})`);
-      if (stages && stages.length > 0) query = query.in('status', stages);
-      if (filters?.funilId) query = query.eq('funil_id', filters.funilId);
-      if (filters?.fabricanteIds && filters.fabricanteIds.length > 0) query = query.in('fabricante_id', filters.fabricanteIds);
-      if (filters?.marcadorIds && filters.marcadorIds.length > 0) query = query.in('marcador_id', filters.marcadorIds);
-      query = applyDateRangeFilter(query, filters?.dateFrom, filters?.dateTo, filters?.dateField);
-      if (filters?.onlyAttention) {
-        const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
-        query = query.lte('created_at', cutoff).not('status', 'in', ETAPAS_FINAIS_ATENCAO);
-      }
-      if (filters?.hideImportados) {
-        query = query.is('import_hash', null);
-      }
-      if (searchMatches) {
-        query = query.or(buildSearchOrClause(searchMatches));
-      }
+      const buildMatchingQuery = () => {
+        let query = supabase.from('pedidos').select('id').in('usuario_id', usuarioIds);
+        if (excludeIds && excludeIds.length > 0) query = query.not('id', 'in', `(${excludeIds.join(',')})`);
+        if (stages && stages.length > 0) query = query.in('status', stages);
+        if (filters?.funilId) query = query.eq('funil_id', filters.funilId);
+        if (filters?.fabricanteIds && filters.fabricanteIds.length > 0) query = query.in('fabricante_id', filters.fabricanteIds);
+        if (filters?.marcadorIds && filters.marcadorIds.length > 0) query = query.in('marcador_id', filters.marcadorIds);
+        query = applyDateRangeFilter(query, filters?.dateFrom, filters?.dateTo, filters?.dateField);
+        if (filters?.onlyAttention) {
+          const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
+          query = query.lte('created_at', cutoff).not('status', 'in', ETAPAS_FINAIS_ATENCAO);
+        }
+        if (filters?.hideImportados) {
+          query = query.is('import_hash', null);
+        }
+        if (searchMatches) {
+          query = query.or(buildSearchOrClause(searchMatches));
+        }
+        return query;
+      };
 
-      const { error, count } = await query;
-      if (error) throw error;
-      return count ?? 0;
+      // Um único DELETE cobrindo todos os filtrados de uma vez estourava o statement_timeout do
+      // Postgres em empresas com muitos negócios (código 57014) — cada exclusão em cascata/trigger
+      // por linha soma, e milhares de linhas num único statement passam do limite. Em vez disso,
+      // busca até BULK_BATCH_SIZE ids que ainda casam com o filtro e apaga só esses; como as linhas
+      // apagadas saem do resultado do filtro, repetir a busca sempre traz o próximo lote — sem
+      // precisar de cursor/offset — até não sobrar nenhuma.
+      let deleted = 0;
+      while (true) {
+        const { data, error: selectError } = await buildMatchingQuery().limit(BULK_BATCH_SIZE);
+        if (selectError) throw selectError;
+        const batchIds = (data ?? []).map(row => row.id);
+        if (batchIds.length === 0) break;
+
+        const { error: deleteError, count } = await supabase.from('pedidos').delete({ count: 'exact' }).in('id', batchIds);
+        if (deleteError) throw deleteError;
+        deleted += count ?? batchIds.length;
+
+        if (batchIds.length < BULK_BATCH_SIZE) break;
+        await new Promise(resolve => setTimeout(resolve, BULK_BATCH_DELAY_MS));
+      }
+      return deleted;
     },
     onSuccess: (count, variables) => {
       const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
