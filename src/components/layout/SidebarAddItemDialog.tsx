@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { Globe } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarItem } from '@/hooks/use-sidebar-preferences';
-import { getIconComponent, AVAILABLE_ICONS, isExternalUrl, getFaviconUrl, getFaviconFallbackUrl } from '@/lib/sidebar-icons';
+import { getIconComponent, AVAILABLE_ICONS, isExternalUrl } from '@/lib/sidebar-icons';
+import { SidebarFavicon } from '@/components/layout/SidebarFavicon';
 import { toast } from 'sonner';
 
 interface Props {
@@ -30,8 +32,6 @@ export function SidebarAddItemDialog({ open, onOpenChange, onSave, initialItem }
 
   const trimmedPath = path.trim();
   const isExternal = isExternalUrl(trimmedPath);
-  const faviconUrl = isExternal ? getFaviconUrl(trimmedPath) : undefined;
-  const faviconFallbackUrl = isExternal ? getFaviconFallbackUrl(trimmedPath) : undefined;
 
   const handleSave = () => {
     if (!label.trim() || !trimmedPath) {
@@ -61,22 +61,7 @@ export function SidebarAddItemDialog({ open, onOpenChange, onSave, initialItem }
           <div className="flex items-center gap-2">
             {isExternal && (
               <div className="h-9 w-9 shrink-0 rounded-md border flex items-center justify-center overflow-hidden bg-muted">
-                {faviconUrl && (
-                  <img
-                    src={faviconUrl}
-                    alt=""
-                    className="h-4 w-4"
-                    onError={e => {
-                      const img = e.currentTarget;
-                      if (img.dataset.fallback !== '1' && faviconFallbackUrl) {
-                        img.dataset.fallback = '1';
-                        img.src = faviconFallbackUrl;
-                      } else {
-                        img.style.visibility = 'hidden';
-                      }
-                    }}
-                  />
-                )}
+                <SidebarFavicon url={trimmedPath} icon={Globe} className="h-4 w-4 text-muted-foreground" />
               </div>
             )}
             <Input

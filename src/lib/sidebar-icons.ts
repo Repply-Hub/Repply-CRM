@@ -52,11 +52,30 @@ export function isExternalUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
 }
 
-// Usa domain_url (URL completa, não só o domínio) para que o serviço de
-// favicons olhe a página específica — importante para casos como
-// docs.google.com, onde /favicon.ico ou o favicon "genérico" do domínio
-// não batem com o ícone real exibido na aba (ex: o ícone azul do Docs).
-export function getFaviconUrl(url: string, size = 64): string | undefined {
+// DuckDuckGo como fonte PRINCIPAL, não o Google: testado contra sites reais
+// que usuários cadastraram (Vercel, portais de sefaz/receita estadual) e o
+// Google (`s2/favicons?domain_url=`) devolveu 404 pra 2 de 3 — inclusive pra
+// domain_url apontando pra uma página específica que ELE MESMO diz ter
+// indexado. DuckDuckGo acertou 2 de 3 nos mesmos testes. Nenhum serviço
+// público de favicon é 100%: sites de baixo tráfego (intranet, portal
+// estadual pouco visitado) muitas vezes não estão indexados em NENHUM dos
+// dois — daí a cadeia de fallback em `SidebarFavicon` (DuckDuckGo → Google →
+// favicon.ico do próprio site → ícone genérico).
+export function getFaviconUrl(url: string): string | undefined {
+  try {
+    const { hostname } = new URL(url);
+    return `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
+  } catch {
+    return undefined;
+  }
+}
+
+// Usa domain_url (URL completa, não só o domínio) para que o serviço olhe a
+// página específica — importante para casos como docs.google.com, onde
+// /favicon.ico ou o favicon "genérico" do domínio não batem com o ícone real
+// exibido na aba (ex: o ícone azul do Docs). Segunda tentativa, depois do
+// DuckDuckGo falhar.
+export function getFaviconGoogleUrl(url: string, size = 64): string | undefined {
   try {
     new URL(url);
     return `https://www.google.com/s2/favicons?sz=${size}&domain_url=${encodeURIComponent(url)}`;
@@ -65,7 +84,11 @@ export function getFaviconUrl(url: string, size = 64): string | undefined {
   }
 }
 
-// Fallback caso o serviço de favicons não retorne nada útil.
+// Última tentativa antes do ícone genérico: o favicon.ico do próprio site.
+// Só acerta quando o site serve o arquivo exatamente nesse path na raiz — a
+// declaração real (`<link rel="icon">`) pode apontar pra outro lugar (ex:
+// `/img/favicon.ico`), mas ler o HTML da página pra descobrir isso exigiria
+// um fetch cross-origin que a maioria dos sites bloqueia via CORS.
 export function getFaviconFallbackUrl(url: string): string | undefined {
   try {
     const { origin } = new URL(url);

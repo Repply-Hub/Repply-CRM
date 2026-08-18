@@ -9,8 +9,9 @@ import { NavLink } from '@/components/layout/NavLink';
 import { useSidebarPreferences, SidebarItem, ROTA_APP } from '@/hooks/use-sidebar-preferences';
 import { useSaveSidebarEmpresaPadrao } from '@/hooks/use-sidebar-empresa-padrao';
 import { usePermissoes } from '@/hooks/use-permissoes';
-import { getIconComponent, getFaviconUrl, getFaviconFallbackUrl } from '@/lib/sidebar-icons';
+import { getIconComponent } from '@/lib/sidebar-icons';
 import { SidebarAddItemDialog } from '@/components/layout/SidebarAddItemDialog';
+import { SidebarFavicon } from '@/components/layout/SidebarFavicon';
 import { useUnreadEmails, useUnreadChatMessages, useUnreadWaMessages } from '@/hooks/use-notificacoes';
 import logoSidebar from '@/assets/logo-sidebar.svg';
 import { toast } from 'sonner';
@@ -305,7 +306,6 @@ export function AppSidebar() {
                       <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-0.5 px-1">
                         {editItems.map((item, index) => {
                           const Icon = getIconComponent(item.icon);
-                          const faviconUrl = item.isExternal ? getFaviconUrl(item.path) : undefined;
                           return (
                             <Draggable key={item.id} draggableId={item.id} index={index}>
                               {(provided, snapshot) => (
@@ -321,22 +321,8 @@ export function AppSidebar() {
                                   <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing text-sidebar-foreground/40 hover:text-sidebar-foreground/70">
                                     <GripVertical className="h-3.5 w-3.5" />
                                   </div>
-                                  {faviconUrl ? (
-                                    <img
-                                      src={faviconUrl}
-                                      alt=""
-                                      className="h-4 w-4 shrink-0 rounded-sm"
-                                      onError={e => {
-                                        const img = e.currentTarget;
-                                        const fallback = getFaviconFallbackUrl(item.path);
-                                        if (img.dataset.fallback !== '1' && fallback) {
-                                          img.dataset.fallback = '1';
-                                          img.src = fallback;
-                                        } else {
-                                          img.style.visibility = 'hidden';
-                                        }
-                                      }}
-                                    />
+                                  {item.isExternal ? (
+                                    <SidebarFavicon url={item.path} icon={Icon} className="h-4 w-4 shrink-0 text-sidebar-foreground/60" />
                                   ) : (
                                     Icon && <Icon className="h-4 w-4 shrink-0 text-sidebar-foreground/60" />
                                   )}
@@ -385,28 +371,13 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {displayItems.map((item) => {
                     const Icon = getIconComponent(item.icon);
-                    const faviconUrl = item.isExternal ? getFaviconUrl(item.path) : undefined;
                     const showBadge = (item.id === 'emails' && unreadEmails > 0) || (item.id === 'chat' && unreadChat > 0) || (item.id === 'whatsapp' && unreadWa > 0);
                     const badgeCount = item.id === 'emails' ? unreadEmails : item.id === 'whatsapp' ? unreadWa : unreadChat;
 
                     const iconEl = (
                       <div className="relative">
-                        {faviconUrl ? (
-                          <img
-                            src={faviconUrl}
-                            alt=""
-                            className="h-4 w-4 shrink-0 rounded-sm"
-                            onError={e => {
-                              const img = e.currentTarget;
-                              const fallback = getFaviconFallbackUrl(item.path);
-                              if (img.dataset.fallback !== '1' && fallback) {
-                                img.dataset.fallback = '1';
-                                img.src = fallback;
-                              } else {
-                                img.style.visibility = 'hidden';
-                              }
-                            }}
-                          />
+                        {item.isExternal ? (
+                          <SidebarFavicon url={item.path} icon={Icon} className="h-4 w-4 shrink-0" />
                         ) : (
                           Icon && <Icon className="h-4 w-4 shrink-0" />
                         )}
