@@ -19,6 +19,15 @@ import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/c
 const formatCurrency = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// Eixo mostra só o tick redondo que o recharts já calcula (0/25/50/75/100) —
+// sem casas decimais, pra não competir por espaço com os outros ticks. O
+// tooltip mostra o valor real por trás da barra (ex.: 70,588235...%), que sem
+// arredondar vira uma dízima ilegível — 1 casa decimal com vírgula pt-BR é
+// precisão suficiente pra comparar vendedores sem virar ruído visual.
+const formatPercentTick = (v: number) => `${Math.round(v)}%`;
+const formatPercentTooltip = (v: number) =>
+  `${v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+
 // Fábricas além desse número entram agrupadas na fatia "Outros" da pizza de
 // faturamento — nenhuma fica de fora do gráfico, só sai da lista principal.
 const TOP_N_FABRICAS_PIZZA = 5;
@@ -326,9 +335,9 @@ export function DashboardCharts({
                   </linearGradient>
                 </defs>
                 <CartesianGrid {...commonGridProps} vertical horizontal={false} />
-                <XAxis type="number" domain={[0, 100]} {...commonAxisProps} tickFormatter={v => `${v}%`} />
+                <XAxis type="number" domain={[0, 100]} {...commonAxisProps} tickFormatter={formatPercentTick} />
                 <YAxis dataKey="nome" type="category" {...commonAxisProps} width={vendedorAxisWidth} tick={renderVendedorTick} interval={0} />
-                <Tooltip content={<ChartTooltip formatValue={(v) => `${v}%`} />} />
+                <Tooltip content={<ChartTooltip formatValue={formatPercentTooltip} />} />
                 <Bar
                   dataKey="conversao"
                   name="Conversão"
