@@ -38,8 +38,9 @@ Três fatos que mudam como se trabalha neste repositório:
    linhas; o TypeScript está configurado de forma frouxa de propósito; e o `npm run lint`
    **não passa** — são 498 problemas herdados no `main`. O critério prático é *o número
    não subir*, não *o lint passar*.
-3. Somando 1 e 2: **toda alteração vai por branch e Pull Request.** Nunca
-   `git push origin main`.
+3. Somando 1 e 2: **nada é commitado sem autorização explícita do dono do produto.** O
+   trabalho vai direto no `main`, como o time já faz — a barreira é humana, pedida antes de
+   cada commit, e não um Pull Request. Ver [Git e publicação](#git-e-publicação).
 
 ---
 
@@ -249,19 +250,28 @@ limpeza). São de uso manual, não fazem parte do build.
 
 ## Git e publicação
 
-**Fluxo obrigatório**, sem exceção:
+O trabalho vai **direto no `main`**, como o time já faz. A barreira entre o código e o
+cliente é a **autorização do dono do produto, pedida antes de cada commit** — não um Pull
+Request.
 
-```sh
-git checkout -b tipo/descricao-curta
-git push -u origin tipo/descricao-curta
-gh pr create
-```
+**Os quatro passos, sem exceção:**
 
-Prefixos: `feat/` · `fix/` · `refactor/` · `docs/` · `chore/`.
-Mensagem de commit no padrão convencional, em português.
+1. **Avisar** o que vai subir e esperar o "pode". A autorização é por commit; a anterior
+   não vale para a próxima.
+2. **Conferir se entrou commit de outra pessoa** — outros colaboradores continuam subindo
+   no `main`:
+   ```sh
+   git fetch origin
+   git log --oneline HEAD..origin/main   # vazio = nada novo
+   git status --short                     # vazio = área limpa
+   ```
+3. **Avaliar conflito.** Se apareceu commit novo tocando os mesmos arquivos, **parar e
+   avisar** antes de juntar.
+4. **Commitar e enviar** para o `main`, com mensagem no padrão convencional, em português:
+   `fix(negocios): corrige lentidão na busca do pipeline`
 
 **Publicação:** a Vercel publica automaticamente o que entra em `main`. Não há passo
-manual — por isso o Pull Request é a única barreira que existe entre o código e o cliente.
+manual — por isso a autorização prévia é a única barreira que existe.
 
 O `vercel.json` tem duas regras que **parecem** decoração e não são (reescrita de rota com
 exclusão de `/assets`, e tempos de cache distintos). A explicação de cada uma está em

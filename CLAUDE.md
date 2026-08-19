@@ -304,7 +304,8 @@ Além disso, conforme o que mudou:
 - ❌ Painel que atribua culpa — ver o princípio "registra, não interpreta" (`SPEC.md` §3.5)
 - ❌ Transformar prática da MD em regra do sistema (`SPEC.md` §4)
 - ❌ Chamar este produto de "Imob"
-- ❌ `git push origin main`
+- ❌ Commitar ou enviar qualquer coisa **sem autorização do Lucas** (ver §13)
+- ❌ Commitar sem antes rodar `git fetch` e conferir se entrou commit de outra pessoa
 
 ---
 
@@ -340,22 +341,49 @@ npx vitest run src/hooks/whatsapp-phone.test.ts
 
 ## 13. Git e GitHub — fluxo obrigatório
 
-> **Nunca envie nada direto para `main`.** O `main` não tem proteção e a Vercel publica em
-> produção a cada envio. Somado à cobertura de teste quase inexistente, qualquer erro
-> chega em minutos ao cliente pagante.
+O trabalho vai **direto no `main`**, como o time já faz. A barreira não é o Pull Request:
+é a **autorização do Lucas, pedida antes de cada commit.**
 
-Fluxo, sem exceção:
+> 🔴 **Nunca commite nem envie nada sem avisar e receber o "pode".**
+> A autorização é **por commit**. Ter recebido antes não vale para o próximo.
+>
+> Isso existe porque o `main` não tem proteção, a Vercel publica em produção a cada envio,
+> e a rede de proteção automática é fraca (7 arquivos de teste para 78 mil linhas, lint com
+> 498 problemas herdados, TypeScript frouxo). Sem etapa humana, o erro chega ao cliente
+> pagante em minutos.
+
+### Os quatro passos, nesta ordem
+
+**1. Avisar e esperar.** Diga o que vai subir e por quê. Espere a resposta.
+
+**2. Conferir se entrou commit de outra pessoa.** Outros colaboradores continuam subindo
+código no `main`. Antes de commitar:
 
 ```sh
-git checkout -b tipo/descricao-curta
-# trabalho + commits em português
-git push -u origin tipo/descricao-curta
-gh pr create
+git fetch origin
+git log --oneline HEAD..origin/main    # vazio = nada novo
+git status --short                      # vazio = área limpa
 ```
 
-E então **espere a aprovação do Lucas**. Ele aprova, ele publica.
+**3. Avaliar conflito.** Se apareceu commit novo, veja se ele toca os mesmos arquivos que
+você. Se tocar, **pare e avise o Lucas antes de tentar juntar** — não resolva conflito em
+produção por conta própria.
 
-Prefixos: `feat/`, `fix/`, `refactor/`, `docs/`, `chore/`.
+**4. Commitar e enviar.**
+
+```sh
+git add -A
+git commit -m "tipo(escopo): descrição em português"
+git push origin main
+```
+
+Mensagem no padrão convencional, em português. Prefixos: `feat`, `fix`, `refactor`,
+`docs`, `chore`, `style`.
+
+> **Histórico da regra:** o projeto experimentou branch + Pull Request em 19/08/2026
+> (PR #1, o único do repositório). A decisão foi revertida no mesmo dia, para não conviver
+> com dois padrões enquanto os colaboradores atuais commitam direto. A proteção migrou do
+> Pull Request para a autorização prévia.
 
 ---
 
