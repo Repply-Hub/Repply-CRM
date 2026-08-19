@@ -212,7 +212,16 @@ function FabricanteForm({
       reset();
       onOpenChange(false);
     } catch (err: any) {
-      toast.error(err.message);
+      // O texto cru da RLS ("new row violates row-level security policy...")
+      // chegou à tela de um usuário real em inglês. A regra que barrava
+      // vendedor foi derrubada, então este caminho ficou raro — mas qualquer
+      // política futura deve falhar em português, não em erro de banco.
+      const msg = err.message || "";
+      toast.error(
+        msg.includes("row-level security")
+          ? "Você não tem permissão para isso."
+          : msg || "Erro ao salvar fabricante.",
+      );
     }
   };
 
