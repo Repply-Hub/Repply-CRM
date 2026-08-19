@@ -1,6 +1,14 @@
-# Auditoria de Integrações Externas
+# Integrações externas
 
-**Data:** 2026-06-18  
+Inventário de tudo que o Repply CRM depende de fora, e o que trocar ao montar um ambiente
+novo.
+
+> **Revisado em 19/08/2026.** O documento original é de 18/06/2026 e tinha três pontos
+> vencidos, corrigidos aqui: o provedor de e-mail (era Gmail, hoje é **Nylas**), a
+> descrição do `APP_URL`, e a classificação da exposição do token do WhatsApp — que
+> **não** era risco aceito pelo dono do produto. Correções assinaladas ao longo do texto.
+
+**Data do levantamento original:** 2026-06-18  
 **Projeto:** mdrepresentacoes  
 **Objetivo:** Mapear todas as integrações externas que precisam ser substituídas ou reconfiguradas ao fazer deploy para um novo cliente.
 
@@ -12,7 +20,9 @@
 |---|---|---|---|
 | **Supabase** | `src/integrations/supabase/client.ts`, `.env` | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`, `SUPABASE_SERVICE_ROLE_KEY` (Edge Functions) | Por deploy |
 | **Google Maps** | `src/hooks/use-geocode-obras.ts`, `src/components/obras/MapaObras.tsx`, `.env` | `VITE_GOOGLE_MAPS_API_KEY` | Por deploy |
-| **Gmail OAuth** | `supabase/functions/gmail-auth-url/index.ts`, `supabase/functions/gmail-callback/index.ts`, `supabase/functions/gmail-send/index.ts`, `supabase/functions/gmail-sync-inbox/index.ts` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `APP_URL` (redirect URI), credenciais na tabela `gmail_tokens` | Por usuário (multi-tenant) |
+| **Nylas (e-mail)** | `supabase/functions/email-*`, `supabase/functions/_shared/nylas.ts` | `NYLAS_API_KEY`, `NYLAS_CLIENT_ID`, `NYLAS_API_BASE` (região, **imutável**), `NYLAS_WEBHOOK_SECRET`, `APP_URL` | Credencial por deploy; caixa por empresa |
+| **Gmail OAuth** *(legado)* | `supabase/functions/gmail-*`, tabela `gmail_tokens` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | **Substituído pelo Nylas em ago/2026.** Código ainda no repositório |
+| **Stripe** | `supabase/functions/stripe-checkout`, `stripe-portal`, `stripe-webhook` | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Por deploy |
 | **uazapi (WhatsApp)** | `supabase/functions/whatsapp-provision/index.ts`, `supabase/functions/whatsapp-send/index.ts`, `supabase/functions/whatsapp-webhook/index.ts`, tabela `configuracoes_wapi` | `UAZAPI_BASE_URL`, `UAZAPI_ADMIN_TOKEN`, URL do webhook (`SUPABASE_URL/functions/v1/whatsapp-webhook`), `api_key` por instância na tabela `configuracoes_wapi` | `UAZAPI_BASE_URL`/`ADMIN_TOKEN` por deploy; `api_key` por instância de cliente |
 | **Lovable AI (PDF)** | `supabase/functions/extract-natal-pdf/index.ts` | `LOVABLE_API_KEY` | Por deploy |
 | **IDEMA / Portais Gov.** | `supabase/functions/scrape-licencas-idema/index.ts`, `supabase/functions/portal-scraper/index.ts` | URLs hardcoded (`siga.idema.rn.gov.br`, `natal.rn.gov.br`, `extremoz.rn.gov.br`) — substituir se cliente for de outro estado/município | Por deploy / geográfico |
@@ -64,9 +74,19 @@
 
 ---
 
-### 3. Gmail OAuth 2.0
+### 3. Gmail OAuth 2.0 — LEGADO
 
-**Tipo:** Autenticação OAuth + envio/leitura de e-mails via Gmail API  
+> 🔴 **Vencido.** O e-mail migrou para o **Nylas** em agosto de 2026. Esta seção descreve
+> **código legado** que ainda está no repositório e não é mais o caminho ativo. O provedor
+> atual está em [`docs/modulos/email.md`](../modulos/email.md), e o que ainda sobrou do
+> Gmail está listado em [`docs/divida-tecnica.md` §9](../divida-tecnica.md).
+>
+> Correção adicional: o texto abaixo diz que o `APP_URL` é o *redirect URI* do OAuth. **Não
+> é.** O endereço de retorno enviado ao Google deriva de `SUPABASE_URL`; o `APP_URL` só é
+> usado no redirecionamento final de volta ao app. E não há valor fixo no código — a função
+> lança erro se o `APP_URL` estiver ausente.
+
+**Tipo:** Autenticação OAuth + envio/leitura de e-mails via Gmail API
 **Escopo:** Credenciais OAuth por deploy; tokens por usuário (multi-tenant)
 
 **Credenciais:**
@@ -128,10 +148,15 @@
 3. Webhook URL se atualiza automaticamente via `SUPABASE_URL` — ok se Supabase for novo
 4. Instâncias individuais (`api_key` em `configuracoes_wapi`) são criadas pelo fluxo de provisionamento — não precisam ser migradas manualmente
 
-#### Risco aceito: o token da instância está legível em `webhook_debug`
+#### 🔴 Falha em aberto: o token da instância está legível em `webhook_debug`
 
-Medido em 05/08/2026, e **mantido por decisão do dono do produto** — registrado aqui para
-que ninguém o descubra de novo achando que é novidade.
+> **Correção de 19/08/2026.** A versão original desta seção classificava isso como risco
+> "mantido por decisão do dono do produto". **O dono do produto confirmou que a decisão não
+> foi dele.** Não é risco aceito: é dívida a pagar, e está na fase 1 do roadmap. O item
+> completo, com a ordem obrigatória de conserto, está em
+> [`docs/divida-tecnica.md` §1](../divida-tecnica.md).
+
+Medido em 05/08/2026.
 
 - `public.webhook_debug` está com **RLS desabilitada** e tem ~61 mil linhas.
 - **~1.621 dessas linhas contêm o `api_key` da instância conectada em texto plano** — o valor
@@ -249,6 +274,10 @@ não entrega nada. Foi um bug real, silencioso por meses (corrigido em 05/08/202
 ---
 
 ## Cron (`pg_cron` + `pg_net`) — quebrado no projeto atual
+
+> O diagnóstico completo, com as três causas empilhadas e os comandos de verificação, vive
+> em [`docs/divida-tecnica.md` §4](../divida-tecnica.md). O que segue abaixo é o mesmo
+> conteúdo, mantido aqui porque é onde a checklist de novo ambiente precisa dele.
 
 Dois jobs estão agendados: `eventos-lembrete` (5 min) e `email-sync` (15 min).
 **Nenhum dos dois jamais executou com sucesso.** Em 05/08/2026 havia 3656

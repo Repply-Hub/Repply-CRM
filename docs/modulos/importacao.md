@@ -1,6 +1,14 @@
-# Estrutura de Importação CSV / XLSX
+# Importação de planilha (CSV / XLSX)
 
-Documentação técnica do sistema de importação de arquivos CSV e Excel para as páginas de **Clientes** e **Negócios**.
+Documentação técnica do sistema de importação de arquivos CSV e Excel.
+
+> **Este documento absorveu quatro anteriores** — `docs/IMPORT_STRUCTURE.md` (cópia
+> antiga), `docs/IMPORTACAO_ESTRUTURA_ATUAL.md`, `importacoes_resumo.md` e
+> `LinhasIgnoradas.md`. As seções 12 a 14 vieram deles.
+
+> 🔴 **A importação é a prioridade zero do projeto.** Um problema de formatação de datas
+> trava a migração da base da MD Representações do Bitrix24 para o Repply. Ver
+> [`docs/divida-tecnica.md` §3](../divida-tecnica.md).
 
 ---
 
@@ -432,3 +440,106 @@ Arquivo (CSV/XLSX)
                          linhas_ignoradas
                          _importacao
 ```
+
+---
+
+## 12. Catálogo e tabela de preços — o import que todo mundo confunde
+
+O botão **"Importar fabricantes"** na tela de Fabricantes **não importa fabricantes.**
+Ele importa linhas de `tabela_precos` — produto, preço, referência, categoria, estoque.
+
+| Componente | Escopo |
+|---|---|
+| `src/components/catalogo/GlobalImportCatalogoDialog.tsx` | Vários fabricantes de uma vez |
+| `src/components/catalogo/ImportCatalogoDialog.tsx` | Um fabricante já selecionado na tela |
+
+Cada linha é casada com um fabricante **já existente**, por nome, ou com um fabricante
+escolhido no seletor. **Se o fabricante não é encontrado, a linha é ignorada** — não há
+criação automática nesse fluxo. A gravação é por `useBulkCreatePrecos`
+(`src/hooks/use-fabricantes.ts`).
+
+### Não existe importação da entidade Fabricante
+
+Busca exaustiva não encontrou nenhum fluxo dedicado a cadastrar fabricantes em massa a
+partir de planilha. O cadastro é **manual**, pelo formulário em `src/pages/Fabricantes.tsx`.
+
+A única criação automática de fabricante acontece **como efeito colateral** da importação
+de Negócios: `resolveFabricanteId` (`src/lib/import/resolve-entities.ts`) cria o registro
+quando o nome citado numa linha não bate com nenhum existente.
+
+> É uma assimetria: Clientes e Negócios têm assistente completo, Fabricante não tem
+> nenhum. Se o volume de cadastro manual crescer, vira pedido de funcionalidade.
+
+---
+
+## 13. Achados de arquitetura
+
+Levantados na auditoria da agência. **O estado de cada um foi reconferido em 19/08/2026.**
+
+### ✅ Resolvido — `fabricantes` sem escopo de empresa
+
+O achado original: `public.fabricantes` não tinha `empresa_id` e a leitura era
+`USING (true)` para qualquer usuário autenticado — ou seja, **catálogo compartilhado entre
+todas as empresas do sistema.**
+
+**Corrigido em 19/08/2026** pelas migrations
+`20260819124247_fabricantes_e_precos_por_empresa.sql` e
+`20260819125643_fabricantes_escrita_para_todo_membro_da_empresa.sql`: catálogo e preços
+passaram a ser por empresa, e a escrita deixou de exigir papel de gestor.
+
+### ⚠️ Em aberto — duas gerações de política em `clientes`
+
+Coexistem duas políticas de acesso multi-empresa na tabela `clientes`: uma baseada em
+`vendedor_in_my_empresa(vendedor_id)` (migration `20260413223933`) e outra baseada em
+`empresa_id` direto (migration `20260504172116`). **Não há evidência de que a antiga tenha
+sido desativada.**
+
+Se as duas estiverem ativas como `PERMISSIVE`, o resultado efetivo é a **união** delas —
+mais permissivo do que qualquer uma isolada, o que provavelmente não é a intenção.
+Registrado em [`docs/divida-tecnica.md`](../divida-tecnica.md).
+
+### ⚠️ Em aberto — coluna `import_hash` sem migration
+
+`use-bulk-import.ts` lê e escreve `pedidos.import_hash` para evitar linha duplicada, mas
+**nenhuma migration cria essa coluna** e ela não aparece nos tipos gerados. Ou o banco real
+divergiu das migrations (coluna criada fora do fluxo), ou o tipo está desatualizado.
+
+> **Confirme contra o banco real antes de assumir que a deduplicação funciona em
+> produção.**
+
+### ⚠️ Em aberto — código morto em `Negocios.tsx`
+
+`ImportDialog` / `ImportDataDialog` continuam importados e renderizados em `Negocios.tsx`
+sem nenhum botão que os acione. O equivalente já foi removido de `Clientes.tsx` (commit
+`c899bdb`), mas não aqui.
+
+### ⚠️ Em aberto — contatos duplicam sem aviso
+
+`contatos` não tem nenhuma estratégia de deduplicação, diferente de empresas (junção por
+CNPJ) e negócios (hash de linha). Importar o mesmo arquivo duas vezes gera contatos
+repetidos, silenciosamente.
+
+---
+
+## 14. Pontos a considerar se a importação for refeita
+
+Registrados pela auditoria anterior e ainda válidos:
+
+1. **Três lógicas diferentes de detecção automática de coluna**, nenhuma reaproveitada
+   pelas outras: expressão regular fixa em `ImportClientesDialog`, pontuação por expressão
+   + amostra em `importPedidosUtils`, e `detectFuzzyMapping` genérico em `MappingStep`,
+   usado só como último recurso. **Unificar isso é o ganho mais direto.**
+2. **Cada entidade deduplica de um jeito**: junção por CNPJ (empresas), hash SHA-256 da
+   linha (negócios), nome de fabricante existente (catálogo), nenhuma (contatos).
+3. **A importação roda inteira no navegador**, sem função de servidor. Arquivos de até
+   15 MB são lidos e processados no cliente.
+4. **Dois assistentes que não compartilham lógica de negócio** — só a interface de
+   mapeamento. Um modelo unificado precisaria abstrair a parte específica de cada entidade
+   (campos, validação, resolução de vínculo, deduplicação) por trás de uma interface comum.
+5. **Um diálogo genérico órfão** (`ImportDialog` / `ImportDataDialog`,
+   `useBulkImport.importClientes`) já existe e não é usado. Avalie se serve de base ou se
+   deve ser removido.
+6. **A função de borda `import-data` está desconectada** e é a única peça pensada para
+   arquivos muito irregulares. Ela também converte data **com IA**, sem a regra brasileira
+   de desambiguação que o caminho real aplica — ver
+   [`docs/divida-tecnica.md` §6](../divida-tecnica.md).

@@ -1,99 +1,405 @@
-# CLAUDE.md
+# CLAUDE.md — Repply CRM
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Este arquivo orienta o Claude Code quando trabalha neste repositório.
+**Leitura obrigatória antes de escrever qualquer código.**
 
-## What this is
+---
 
-A CRM/ERP for a construction-materials sales rep business ("MD Representações"): sales pipeline (Kanban),
-client/contact management, obras (construction site) tracking with maps, manufacturer catalog, and
-email/WhatsApp communication — built with React + TypeScript + Vite, Tailwind + shadcn-ui, TanStack Query,
-and Supabase (Postgres + Auth + Edge Functions) as the backend. Originally scaffolded via Lovable.
+## 1. O que é este projeto
 
-## Commands
+**Repply CRM** — SaaS multi-empresa para **representantes comerciais**. Cada empresa de
+representação tem seu espaço isolado, com sua equipe, suas marcas representadas, sua
+carteira e seu funil.
+
+Cliente-âncora: **MD Representações** (Natal/RN, materiais de construção). Já existem
+empresas de fora usando — **este sistema está em produção com cliente pagante.**
+
+> ⚠️ **Este NÃO é o Repply Imob.** Imob é outro produto, outro público (incorporadora e
+> imobiliária), outro repositório, outra base de código. Documentos herdados da agência
+> chamam este sistema de "Imob" — está errado. Ver `SPEC.md` §1.2.
+
+### Documentos de referência
+
+| Arquivo | Quando consultar |
+|---|---|
+| `SPEC.md` | **Sempre antes de construir algo novo.** Domínio, estado real de cada módulo, escopo por fase, decisões e porquês |
+| `README.md` | Setup, stack, estrutura, scripts, deploy |
+| `docs/README.md` | Índice dos documentos técnicos por assunto |
+| `docs/divida-tecnica.md` | O que está quebrado, com custo e ordem de conserto |
+| `../../../2-MD REPRESENTAÇÕES/1-Brandbooks e Wiki/Cérebro MD/` | Wiki da MD — a fonte mais rica de domínio da representação. **Leia como caso de uso, não como especificação** (ver `SPEC.md` §4) |
+| `../../Playbooks e Identidade visual/repply_playbook_v4.md` | Contexto de negócio e marca da Repply |
+
+---
+
+## 2. Stack
+
+- **Framework:** React 18 + TypeScript + **Vite** (não é Next.js)
+- **Roteamento:** React Router 6, com carregamento sob demanda por página
+- **UI:** shadcn-ui sobre Radix + Tailwind CSS 3
+- **Dados:** TanStack Query (React Query) — um hook por domínio em `src/hooks/`
+- **Formulários:** React Hook Form + Zod
+- **Gráficos:** Recharts · **Mapas:** Google Maps + Leaflet
+- **Backend:** Supabase (Postgres + Auth + Storage + Edge Functions em Deno)
+- **Testes:** Vitest + Testing Library, ambiente jsdom
+- **Deploy:** Vercel — **publica sozinha a cada envio para `main`**
+
+**TypeScript está frouxo de propósito** (`strictNullChecks: false`, `noImplicitAny: false`).
+Não conte com garantia de tipo ao ler nem ao escrever: o compilador não vai te avisar.
+
+Atalho de caminho: `@/*` → `./src/*`.
+
+---
+
+## 3. Como o Lucas pede coisas
+
+O Lucas é o dono do produto e **não codifica**. Toda mensagem visível para ele em
+**PT-BR coloquial**. Jargão técnico só dentro do código e de comentário técnico.
+
+**Explique a consequência prática antes do mecanismo.** Use analogia concreta quando o
+conceito for estrutural. Nomeie arquivos e serviços, mas sempre dizendo para que servem.
+
+| Em vez de | Use |
+|---|---|
+| "schema" / "migration" | "estrutura do banco" / "mudança no banco" |
+| "RLS bloqueou" | "a regra de segurança do banco recusou essa consulta" |
+| "edge function" | "função que roda no servidor" |
+| "enum" | "lista fixa de opções gravada no código" |
+| "chunk load error" | "o navegador está pedindo um arquivo de uma versão antiga do site" |
+| "TypeError" | "o código tentou usar uma variável que estava vazia" |
+| "índice trigram" | "atalho de busca no banco" |
+| "cache envenenado" | "o navegador guardou o arquivo errado e não pede de novo" |
+
+### Skills conforme o pedido
+
+| Ele pede… | Use |
+|---|---|
+| Pensar antes de fazer, discutir uma ideia | `superpowers:brainstorming` |
+| Construir algo novo com plano | `superpowers:writing-plans` → `executing-plans` |
+| "isso não funciona", bug, comportamento estranho | `superpowers:systematic-debugging` |
+| Revisar o que foi feito | `superpowers:requesting-code-review` |
+| Confirmar que está pronto | `superpowers:verification-before-completion` |
+
+**Sempre responda em PT-BR**, independentemente do idioma da skill ou do código.
+
+---
+
+## 4. Vocabulário do produto
+
+Interface em português do ramo. Código e banco em português também (herdado) — **não
+traduza para inglês**, a consistência vale mais que a preferência.
+
+| Na tela | No banco | O que é de verdade |
+|---|---|---|
+| **Negócio** | `pedidos` | Um **orçamento**. É o objeto central do sistema |
+| **Cliente** | `clientes` | A empresa que compra (construtora, loja, PJ) |
+| **Contato** | `contatos` | A pessoa dentro do cliente |
+| **Fabricante** | `fabricantes` | A **representada** — a marca que o representante vende |
+| **Obra** | `obras` | O canteiro. Pode ter CNPJ próprio (SPE) |
+| **Etapa** | `kanban_colunas` | Coluna do funil, configurável por empresa |
+| **Usuário** | `usuarios` | Membro da equipe. Antigamente `vendedores` |
+| **Empresa** | `empresas` | O **assinante do SaaS**, não o cliente dele |
+
+### Três ambiguidades que já causaram bug
+
+1. **"empresa" significa duas coisas.** `empresas` é o assinante do SaaS. Mas `clientes`
+   tem um campo `empresa` de texto, que é o nome da empresa **cliente**. Inquilino é
+   sempre `empresa_id`.
+2. **"vendedor" virou "usuário", mas não em todo lugar.** Sobrou em
+   `historico_contatos.vendedor_id`, nas funções `is_gestor()`, `get_my_vendedor_id()`,
+   `vendedor_in_my_empresa()` e na visão `vw_indicadores_vendedor`. Código novo usa
+   `usuarios` / `usuario_id` / `get_my_usuario_id()`. **Não remova os antigos** sem varrer
+   as políticas de segurança que ainda os usam.
+3. **"Negócio" na tela é `pedidos` no banco.** Não renomeie nenhum dos dois.
+
+### Termos do ramo
+
+| Termo | Significado |
+|---|---|
+| **Representada** | A fábrica que o representante representa |
+| **SPE** | Sociedade de Propósito Específico — CNPJ criado só para uma obra |
+| **Alçada de desconto** | Até quanto o vendedor pode dar desconto sem pedir autorização |
+| **Tabela de preços** | A lista de preços vigente de uma fábrica |
+| **Orçamento parado** | Enviado e sem resposta há X dias. É a maior fonte de perda |
+
+---
+
+## 5. Convenções
+
+1. **PT-BR** em interface, documentação, mensagem de erro, comentário e commit.
+2. **Arquivos:** kebab-case para hooks e utilitários (`use-pedidos.ts`), PascalCase para
+   componentes (`ImportPedidosDialog.tsx`).
+3. **Um hook por domínio** em `src/hooks/`, envolvendo TanStack Query.
+4. **`src/components/ui/`** é shadcn gerado — trate como camada-base. Estenda por
+   propriedade e classe, não editando a primitiva.
+5. **Componentes de domínio** ficam em `src/components/<dominio>/`.
+6. **Teste ao lado do código** (`*.test.ts`) ou em `src/test/`.
+7. **Commit no padrão convencional, em português:**
+   `fix(negocios): corrige lentidão na busca do pipeline`
+
+---
+
+## 6. Regras absolutas (violar = bug crítico)
+
+### Banco e segurança
+
+1. **A autorização real é a RLS do Postgres.** Esconder botão não protege nada. Nunca
+   tente replicar autorização só no frontend.
+2. **Toda tabela nova nasce por migration**, com RLS habilitada e política escrita, no
+   mesmo arquivo. **Nunca crie tabela pelo painel do Supabase.**
+   > Foi exatamente assim que a `webhook_debug` ficou sem proteção e vazou a chave do
+   > WhatsApp: nasceu à mão, nunca passou por revisão de código. Ver `SPEC.md` §11.1.
+3. **Nunca edite migration existente.** Só acrescente arquivo novo.
+4. **Some no banco, não no navegador.** Total, contagem e agregação saem de função de
+   banco ou de contagem exata do servidor. `pedidos` já tem milhares de linhas.
+5. **Nunca commite credencial.** Nem em documento, nem em comentário, nem em exemplo.
+
+### Dados no frontend
+
+6. **Mutação invalida a lista inteira de chaves relacionadas.** Ao mexer em `pedidos`,
+   olhe a lista de invalidação em `use-pedidos.ts` antes — inclui painéis que não parecem
+   ligados, como `vw_faturamento_mensal`.
+7. **`ProtectedRoute` tem mais de dois estados.** Além de logado e deslogado, trata:
+   perfil ainda carregando, usuário excluído de forma reversível (`deleted_at`), sessão
+   órfã (existe sessão, mas a linha de perfil sumiu — dispara saída automática) e usuário
+   sem empresa. **Nunca assuma que ter sessão significa que o app está usável** — confira
+   `profileLoaded` / `profileAttempted`.
+
+### Tipos
+
+8. **`src/integrations/supabase/types.ts` é gerado**, mas não há banco local neste
+   ambiente. Ao criar RPC ou mudar tabela, **atualize o arquivo à mão** para bater.
+
+---
+
+## 7. Armadilhas medidas neste código
+
+Cada uma custou horas ou dinheiro de alguém. Estão aqui para não custarem de novo.
+
+### 7.1 Número de WhatsApp: o nono dígito
+
+Enfiar o 9 em qualquer número de 10 dígitos **quebra os telefones fixos que têm WhatsApp**.
+Um cliente real, com fixo `(84) 2030-0387`, virava um número inexistente — e isso
+respondia por 100% das falhas de envio.
+
+A regra correta está em `normalizeWhatsappPhone`, com testes que fixam o contrato
+(`src/hooks/whatsapp-phone.test.ts`). **A mesma regra existe duplicada** nas funções de
+borda (`supabase/functions/_shared/whatsapp.ts`). Se as duas divergirem, a mesma pessoa
+vira duas conversas.
+
+### 7.2 Identificador de grupo do WhatsApp é literal
+
+`whatsapp_conversas.telefone` guarda o identificador do grupo em dois formatos, e o
+formato antigo **tem hífen**. Qualquer `replace(/\D/g, "")` apaga o hífen e monta um
+destino inexistente — a uazapi responde sucesso e não entrega nada. Foi bug silencioso
+por meses.
+
+### 7.3 `.eq(coluna, null)` nunca casa
+
+No PostgREST isso vira `coluna=eq.null`, e em SQL `NULL = NULL` não é verdadeiro. Use
+`.is(coluna, null)`. Sintoma típico: o clique parece funcionar e o estado volta sozinho
+ao recarregar.
+
+### 7.4 Busca por texto sob RLS não usa índice
+
+Consulta direta com `.ilike()` **não consegue** usar o índice de busca quando há RLS,
+porque o Postgres não pode avaliar o texto antes da política. Medido de verdade: buscar
+um termo raro levava 12 segundos e estourava o tempo limite — quanto mais raro o termo,
+pior.
+
+A saída é RPC `SECURITY DEFINER` que repete as mesmas cláusulas da política
+explicitamente, deixando o índice cortar primeiro. Exemplo pronto: `wa_buscar_mensagens`
+(12.013 ms → 22 ms). **Ao criar busca textual nova, siga esse padrão.**
+
+### 7.5 Página que quebra depois de um deploy
+
+Todas as páginas carregam sob demanda, e o Vite nomeia cada arquivo pelo conteúdo. Quando
+sai um deploy, quem estava com a aba aberta aponta para arquivos que não existem mais — e
+o React **guarda a promessa rejeitada**, então nem trocar de tela recria o módulo. Só
+recarregar resolve.
+
+Por isso existe `lazyComRetry`, que traduz isso na tela de "saiu versão nova". **Use
+`lazyComRetry` em vez de `React.lazy` direto.**
+
+### 7.6 `vercel.json` não aceita comentário
+
+JSON não tem comentário e a Vercel **recusa** propriedade desconhecida dentro das regras —
+o deploy falha na validação. Já aconteceu. A explicação de cada regra vive em
+`docs/arquitetura/integracoes-externas.md`, não no arquivo.
+
+E a exclusão de `/assets` da regra de reescrita **não é decoração**: sem ela, arquivo
+inexistente devolve a página inteira com status de sucesso, e o navegador guarda página
+no lugar de código — com cura só por limpeza manual de cache.
+
+### 7.7 Ordenar mês por rótulo embaralha o gráfico
+
+Ordene por `mes_ano` (`AAAA-MM`, que ordena certo como texto), nunca pelo rótulo
+formatado.
+
+### 7.8 Array vazio em filtro de RPC filtra tudo fora
+
+`= ANY('{}')` não casa com nada. Converta array vazio em `null` antes de mandar para o
+servidor — `null` é quem significa "sem filtro".
+
+---
+
+## 8. Identidade visual
+
+Sistema de marca já implementado em `src/index.css` ("Repply Brand System V2.0"). **Use os
+tokens, não valores soltos.**
+
+| | |
+|---|---|
+| **Repply Orange** | `#FF5A1F` → token `--primary` |
+| **Deep Black** | `#0A0A0A` → base da barra lateral e do tema escuro |
+| **Pure White** | `#FFFFFF` |
+| **Display / títulos** | General Sans |
+| **Corpo** | Satoshi |
+| **Dados e números** | JetBrains Mono |
+
+Fontes vêm do Fontshare e do Google Fonts, declaradas em `index.html`.
+
+**Tom visual:** sóbrio e técnico. Sem superlativo, sem linguagem de varejo. O
+interlocutor é um profissional que respeita precisão e detesta ser vendido.
+
+---
+
+## 9. Verificação obrigatória antes de dizer "feito"
+
+Nunca afirme que algo funciona sem ter rodado. Evidência antes de afirmação.
 
 ```sh
-npm run dev          # Vite dev server on port 8080
-npm run build         # production build
-npm run build:dev     # dev-mode build (unminified, for debugging build issues)
-npm run lint          # eslint .
-npm run test          # vitest run (single pass)
-npm run test:watch    # vitest watch mode
+npm run test      # 116 testes. Tem que passar limpo
+npm run build     # tem que compilar
+npm run lint      # ver a ressalva abaixo
 ```
 
-Run a single test file: `npx vitest run src/components/import-pedidos/importPedidosUtils.test.ts`
-Tests live next to the code they cover (`*.test.ts`) or in `src/test/`; environment is jsdom, globals are
-enabled (no need to import `describe`/`it`/`expect`), setup file is `src/test/setup.ts`.
+> ⚠️ **`npm run lint` NÃO passa limpo neste projeto.** Medido em 19/08/2026 no `main`:
+> **498 problemas (458 erros, 40 avisos)**. É estado herdado, não regressão.
+>
+> Por isso, o critério aqui **não é** "o lint passou". É: **o número não subiu**. Rode
+> antes de mexer, guarde o total, rode depois e compare. Se subiu, o que você acrescentou
+> tem erro novo — conserte.
+>
+> Ver [`docs/divida-tecnica.md` §18](docs/divida-tecnica.md).
 
-TypeScript is configured loosely (`strictNullChecks: false`, `noImplicitAny: false`, unused vars/params not
-flagged) — don't assume strict-mode guarantees when reading or writing code.
+Além disso, conforme o que mudou:
 
-Path alias: `@/*` → `./src/*` (configured in tsconfig and vite.config.ts).
+- **Mexeu em permissão ou RLS?** Teste logado como vendedor comum, não só como gestor.
+- **Mexeu em consulta pesada?** Meça antes e depois. Diga o número.
+- **Mexeu em algo do banco?** Confirme se a migration foi de fato aplicada — este ambiente
+  não tem banco local, e escrever a migration **não é** aplicá-la.
+- **Mexeu em rota ou no `vercel.json`?** Teste link direto (`/clientes`,
+  `/pedidos/:id/editar`), não só a navegação pelo menu.
 
-## Database / Supabase
+---
 
-This project's Supabase backend is managed as code in `supabase/`:
+## 10. Anti-padrões (proibidos)
 
-- `supabase/migrations/*.sql` — schema, RLS policies, and SQL functions. Add new migrations rather than
-  editing old ones; this repo has no local Supabase stack wired up in this environment, so migrations are
-  applied by whoever owns the linked project (`supabase db push`), not verified locally.
-- `supabase/functions/*` — Deno Edge Functions for things that can't run client-side (external API secrets,
-  scraping, scheduled jobs). Each is its own directory with an `index.ts`.
-- `src/integrations/supabase/client.ts` and `src/integrations/supabase/types.ts` are marked
-  "automatically generated" (normally via `supabase gen types`) — when adding a new RPC or changing a table
-  shape, update `types.ts` by hand to match if you can't regenerate it (no live DB access in this sandbox).
+- ❌ Criar tabela pelo painel do Supabase
+- ❌ Editar migration já existente
+- ❌ Puxar coleção inteira para o navegador só para contar ou somar
+- ❌ Confiar em verificação de permissão feita só no frontend
+- ❌ `React.lazy` direto em página (use `lazyComRetry`)
+- ❌ Limpar não-dígitos de identificador de WhatsApp
+- ❌ Painel que atribua culpa — ver o princípio "registra, não interpreta" (`SPEC.md` §3.5)
+- ❌ Transformar prática da MD em regra do sistema (`SPEC.md` §4)
+- ❌ Chamar este produto de "Imob"
+- ❌ `git push origin main`
 
-**RLS is the real authorization boundary.** Table policies key off helper SQL functions like `is_gestor()`,
-`is_admin()`, `get_my_usuario_id()`, `usuario_in_my_empresa()` — assume every query from the client is
-filtered server-side by these, and don't try to replicate authorization logic purely in the frontend.
+---
 
-Prefer aggregate queries (`count: 'exact', head: true`, or a `SECURITY INVOKER` SQL RPC for sums/aggregates)
-over pulling full result sets to the client to compute counts/totals — PostgREST/supabase-js don't do
-client-side aggregation well, and tables here (e.g. `pedidos`) can hold thousands of rows.
+## 11. Quando parar e perguntar ao Lucas
 
-## Data model essentials
+- A mudança altera o que o cliente **vê ou paga**
+- A mudança precisa ser aplicada no banco de produção
+- Apareceu decisão de produto que não está no `SPEC.md`
+- O pedido esbarra numa das decisões registradas em `SPEC.md` §10
+- Descobriu risco de segurança novo
+- O conserto exige mexer em algo que hoje está funcionando para cliente pagante
 
-- **Multi-tenancy is per-company, not per-deploy-only**: `empresas` (companies) each have many `usuarios`
-  (their staff). A user's `profile` (from `use-auth.tsx`) is a row in `usuarios` joined with `empresas`,
-  and carries `role` (`admin` vs. company users) and `empresa_id`. `role === 'admin'` is a separate global
-  super-admin tier with its own routes/dashboard (see `AdminRoute`, `AdminDashboard`) and no access to the
-  sales pipeline.
-- **Legacy table overlap**: there is an older `vendedores` table that predates `usuarios`/`empresas` and is
-  still referenced in a few places (e.g. `historico_contatos.vendedor_id` joins to `vendedores`, while
-  `pedidos.usuario_id` joins to `usuarios`). `docs/auth-structure.md` describes the old `vendedores`-only
-  model and is out of date — trust the actual migrations/RLS policies and code over that doc.
-  `is_gestor()`/`get_my_vendedor_id()` are legacy helpers still used by some RLS policies.
-- **Core sales entities**: `pedidos` (a "negócio"/deal) belongs to a `cliente`, a `fabricante`
-  (manufacturer), optionally an `obra` (construction site), and a `vendedor` (via `usuario_id`). It has a
-  `status` representing its Kanban stage. Kanban stages themselves are configurable per company via
-  `kanban_colunas` / `useKanbanColunas`, not a fixed enum.
-- Full deployment/integration inventory (Supabase, Google Maps, Gmail OAuth, uazapi/WhatsApp, Resend, etc.,
-  and what to swap when redeploying for a new client) is documented in `INTEGRATION_AUDIT.md`.
+---
 
-## Frontend architecture
+## 12. Comandos
 
-- **Routing/auth** (`src/App.tsx`): all authenticated routes are wrapped in `ProtectedRoute`, which reads
-  `useAuth()` (`src/hooks/use-auth.tsx`) and handles several non-obvious states beyond plain
-  logged-in/logged-out: profile still loading, soft-deleted user (`profile.deleted_at`), orphaned session
-  (session exists but profile row was deleted — triggers auto sign-out), and user with no `empresa_id` yet.
-  Don't assume `session` alone means the app is usable — check `profileLoaded`/`profileAttempted` too.
-- **Data fetching**: one hook per domain in `src/hooks/` (`use-pedidos.ts`, `use-clientes.ts`, `use-obras.ts`,
-  etc.), each wrapping `@tanstack/react-query`. Mutations invalidate related query keys on `onSettled`
-  (including cross-cutting dashboard views like `vw_faturamento_mensal`) — when adding a mutation that
-  changes `pedidos`, check `use-pedidos.ts` for the full invalidation list rather than only invalidating the
-  one key you touched.
-- **Negócios/pipeline page** (`src/pages/Negocios.tsx`) is the most complex screen: it renders either a
-  Kanban board or a flat list from the same `usePedidos`/`usePedidosStats` data, applies company/stage
-  filters server-side, and does bulk operations (status drag-and-drop, bulk delete) — read this file before
-  changing pipeline behavior, since board and list share a lot of derived state (filters, selection).
-- **Import pipeline** (CSV/XLSX for Clientes and Negócios) is a three-step wizard (upload → column mapping →
-  preview/confirm) with fuzzy header-matching; fully documented in `IMPORT_STRUCTURE.md` — read that before
-  touching `src/lib/import/`, `ImportPedidosDialog.tsx`, or the `import-data` edge function.
-- **UI components**: `src/components/ui/` is shadcn-ui (generated, treat as a base layer — extend via props/
-  className rather than editing generated primitives where possible). Feature components are organized by
-  domain under `src/components/` (`layout/` for app shell/sidebar, `shared/` for generic multi-domain
-  components, `pedidos/kanban/` for the pipeline board, plus `clientes/`, `obras/`, `catalogo/`, `chat/`,
-  `tarefas/`, `whatsapp/`, `email/`, `import/`, `configuracoes/`, etc.).
+```sh
+npm run dev          # servidor de desenvolvimento, porta 8080
+npm run build        # build de produção
+npm run build:dev    # build sem minificar, para investigar erro de build
+npm run lint         # eslint
+npm run test         # vitest, uma passada
+npm run test:watch   # vitest em modo contínuo
+```
+
+Rodar um teste só:
+
+```sh
+npx vitest run src/hooks/whatsapp-phone.test.ts
+```
+
+---
+
+## 13. Git e GitHub — fluxo obrigatório
+
+> **Nunca envie nada direto para `main`.** O `main` não tem proteção e a Vercel publica em
+> produção a cada envio. Somado à cobertura de teste quase inexistente, qualquer erro
+> chega em minutos ao cliente pagante.
+
+Fluxo, sem exceção:
+
+```sh
+git checkout -b tipo/descricao-curta
+# trabalho + commits em português
+git push -u origin tipo/descricao-curta
+gh pr create
+```
+
+E então **espere a aprovação do Lucas**. Ele aprova, ele publica.
+
+Prefixos: `feat/`, `fix/`, `refactor/`, `docs/`, `chore/`.
+
+---
+
+## 14. Estrutura
+
+```
+mdrepresentacoes/
+├── SPEC.md · CLAUDE.md · README.md      ← os três da raiz
+├── docs/                                 ← detalhe técnico por assunto
+├── src/
+│   ├── pages/          29 telas (uma por rota)
+│   ├── components/
+│   │   ├── ui/         shadcn gerado — camada-base
+│   │   ├── layout/     casca do app, barra lateral, notificações
+│   │   ├── shared/     usados por mais de um domínio
+│   │   └── <dominio>/  pedidos, clientes, obras, catalogo, chat, tarefas, email…
+│   ├── hooks/          um por domínio, envolvendo TanStack Query
+│   ├── lib/            funções puras e utilitários
+│   ├── integrations/   cliente e tipos do Supabase (gerados)
+│   └── test/           configuração de teste
+└── supabase/
+    ├── migrations/     252 arquivos — só acrescente
+    └── functions/      37 funções de borda em Deno
+```
+
+**Sinal de alerta:** `src/pages/WhatsAppInbox.tsx` tem 7.838 linhas e
+`src/pages/Negocios.tsx` tem 2.698. Arquivo desse tamanho é difícil de mexer com
+segurança. Ao encostar neles, prefira extrair a parte tocada para um componente próprio a
+engordar mais o arquivo.
+
+---
+
+## 15. Quando estiver perdido
+
+1. `SPEC.md` §5 diz o estado real do módulo que você está mexendo
+2. `docs/divida-tecnica.md` diz se o que parece bug já é conhecido
+3. Os comentários deste código são **bons** — quem escreveu explicou o porquê das
+   decisões estranhas. Leia antes de "corrigir"
+4. Migration recente costuma explicar comportamento novo melhor que o código
+5. Se ainda assim não fechar, **pergunte ao Lucas** em vez de adivinhar
+
+---
 
 ## Idioma
 
-a parttr de agora SEMPRE responda em português do Brasil, mesmo que o código, comentários ou nomes de variáveis estejam em inglês.
+**Sempre responda em português do Brasil**, mesmo que código, comentários ou nomes de
+variáveis estejam em inglês.
