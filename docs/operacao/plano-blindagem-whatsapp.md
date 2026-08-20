@@ -10,6 +10,10 @@ executadas**.
 **Cobre as dívidas** [§1](../divida-tecnica.md#1-a-chave-do-whatsapp-está-legível) e
 [§16](../divida-tecnica.md#16-o-webhook-do-whatsapp-aceita-qualquer-um).
 
+**O passo a passo para executar** está em
+[`plano-blindagem-whatsapp-execucao.md`](plano-blindagem-whatsapp-execucao.md) — 10
+tarefas, com o código de cada uma. Este documento aqui é o *o quê* e o *porquê*.
+
 > ⚠️ **A Fase 3 pode derrubar o WhatsApp da MD se for feita fora de ordem.** Ver §6.
 
 ---

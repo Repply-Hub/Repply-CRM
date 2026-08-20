@@ -53,7 +53,8 @@ repositório**, não aqui:
 | [`operacao/cobranca-stripe.md`](operacao/cobranca-stripe.md) | O que falta fazer fora do repositório para a cobrança funcionar |
 | [`operacao/guia-de-paginas.md`](operacao/guia-de-paginas.md) | Para que serve cada tela, em linguagem de negócio. Serve de material de uso |
 | [`operacao/plano-reparo-datas.md`](operacao/plano-reparo-datas.md) | **Proposto, não executado.** Como reparar as datas trocadas dos 11.903 negócios já importados |
-| [`operacao/plano-blindagem-whatsapp.md`](operacao/plano-blindagem-whatsapp.md) | **Fase 0 executada, fases 1–4 propostas.** As duas falhas de segurança do WhatsApp: senha exposta e webhook sem autenticação |
+| [`operacao/plano-blindagem-whatsapp.md`](operacao/plano-blindagem-whatsapp.md) | **Fase 0 executada, fases 1–4 propostas.** As duas falhas de segurança do WhatsApp: senha exposta e webhook sem autenticação — **o quê e o porquê** |
+| [`operacao/plano-blindagem-whatsapp-execucao.md`](operacao/plano-blindagem-whatsapp-execucao.md) | O **passo a passo** das fases 1 a 4 do documento acima: 10 tarefas, com código, comandos e critério de aprovação de cada uma |
 
 ## Dívida
 
