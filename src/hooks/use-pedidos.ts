@@ -27,10 +27,30 @@ export interface PedidoWithRelations {
   marcador: { id: string; nome: string; cor: string } | null;
 }
 
-// Qual coluna de data o filtro de período (dateFrom/dateTo) usa: a criação do negócio
-// (default, comportamento histórico) ou o momento em que ele foi fechado (ganho ou
-// perdido) — ver supabase/migrations/20260811110000_pedidos_fechado_em.sql.
-export type PeriodoDateField = 'data_pedido' | 'fechado_em';
+/**
+ * Qual coluna de data o filtro de período (dateFrom/dateTo) usa.
+ *
+ * - `data_pedido`     — a criação do negócio. Default e comportamento histórico.
+ * - `prazo_resposta`  — a data de fechamento.
+ *
+ * POR QUE `prazo_resposta` E NÃO `fechado_em`: havia dois campos diferentes chamados
+ * "Data de Fechamento" na interface. `fechado_em` é mantida por trigger e registra
+ * quando o negócio entrou numa etapa final DENTRO do Repply; `prazo_resposta` é o que
+ * a ficha e o formulário mostram como "Data de Fechamento", recebe a data vinda do
+ * Bitrix na importação e é sobrescrita com a data de hoje quando o negócio é fechado
+ * pela tela.
+ *
+ * Para negócio cadastrado à mão os dois coincidem. Para negócio importado, não: o
+ * gatilho carimbou o momento da importação. Medido em 20/08/2026 na MD: dos 11.714
+ * negócios importados com `fechado_em`, 11.653 estavam em 18/08 e 61 em 19/08 — a base
+ * histórica inteira aparecia como fechada no dia da importação. Perguntar "quanto
+ * vendemos em agosto" separava a venda importada da cadastrada à mão, e são a mesma
+ * venda.
+ *
+ * `fechado_em` continua existindo como registro interno de transição de etapa
+ * (20260811110000_pedidos_fechado_em.sql), mas não sustenta mais o filtro.
+ */
+export type PeriodoDateField = 'data_pedido' | 'prazo_resposta';
 
 export interface PedidosFilters {
   stages?: string[];
@@ -41,7 +61,7 @@ export interface PedidosFilters {
   funilId?: string;
   dateFrom?: string;
   dateTo?: string;
-  /** Qual data dateFrom/dateTo filtra — 'data_pedido' (criação, default) ou 'fechado_em'. */
+  /** Qual data dateFrom/dateTo filtra — 'data_pedido' (criação, default) ou 'prazo_resposta' (fechamento). */
   dateField?: PeriodoDateField;
   onlyAttention?: boolean;
   /** Busca por cliente/fabricante — aplicada tanto na query de stats (RPC) quanto no fetch paginado da lista/kanban. */
@@ -88,24 +108,20 @@ async function assertIdsBelongToEmpresa(ids: string[], empresaId: string): Promi
 // fetch paginado quanto nas mutações em massa "por filtro", que precisam do mesmo recorte.
 const ETAPAS_FINAIS_ATENCAO = '(fechamento,perdido)';
 
-// Aplica dateFrom/dateTo na coluna certa conforme dateField. fechado_em é timestamptz
-// (data_pedido é um DATE puro) — em vez de depender de cast de coluna em filtro do
-// PostgREST (não confiável via supabase-js), usa limites explícitos de início/fim do
-// dia. Compartilhado por usePedidos e pelas mutações em massa "por filtro", que
-// precisam do mesmo recorte de data que a lista mostra.
-function applyDateRangeFilter<T extends { gte(column: string, value: string): T; lte(column: string, value: string): T }>(
+// Aplica dateFrom/dateTo na coluna certa conforme dateField. As duas colunas são DATE
+// puro, então a comparação é direta — não precisa dos limites de início/fim de dia que
+// o antigo fechado_em (timestamptz) exigia, nem de cast de coluna em filtro do
+// PostgREST, que não é confiável via supabase-js. Compartilhado por usePedidos e pelas
+// mutações em massa "por filtro", que precisam do mesmo recorte que a lista mostra.
+export function applyDateRangeFilter<T extends { gte(column: string, value: string): T; lte(column: string, value: string): T }>(
   query: T,
   dateFrom: string | undefined,
   dateTo: string | undefined,
   dateField: PeriodoDateField | undefined,
 ): T {
-  if (dateField === 'fechado_em') {
-    if (dateFrom) query = query.gte('fechado_em', `${dateFrom}T00:00:00`);
-    if (dateTo) query = query.lte('fechado_em', `${dateTo}T23:59:59.999`);
-  } else {
-    if (dateFrom) query = query.gte('data_pedido', dateFrom);
-    if (dateTo) query = query.lte('data_pedido', dateTo);
-  }
+  const coluna = dateField === 'prazo_resposta' ? 'prazo_resposta' : 'data_pedido';
+  if (dateFrom) query = query.gte(coluna, dateFrom);
+  if (dateTo) query = query.lte(coluna, dateTo);
   return query;
 }
 

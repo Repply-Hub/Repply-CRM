@@ -509,11 +509,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [dateTo, setDateTo] = useState<Date | undefined>(() => (
     searchParams.has('data_ate') ? parseDateParam(searchParams.get('data_ate')) : endOfMonth(new Date())
   ));
-  // Qual data o período acima filtra: criação do negócio (default) ou fechamento
-  // (ganho/perdido) — ver PeriodoDateField em use-pedidos.ts.
-  const [dateField, setDateField] = useState<PeriodoDateField>(
-    () => (searchParams.get('data_campo') === 'fechado_em' ? 'fechado_em' : 'data_pedido'),
-  );
+  // Qual data o período acima filtra: criação do negócio (default) ou fechamento —
+  // ver PeriodoDateField em use-pedidos.ts.
+  //
+  // 'fechado_em' é aceito por compatibilidade: era o valor antigo deste parâmetro, e
+  // links salvos ou abas abertas antes da mudança ainda o carregam. Cai no mesmo lugar.
+  const [dateField, setDateField] = useState<PeriodoDateField>(() => {
+    const doUrl = searchParams.get('data_campo');
+    return doUrl === 'prazo_resposta' || doUrl === 'fechado_em' ? 'prazo_resposta' : 'data_pedido';
+  });
 
   // Sobrevive a editar um negócio e voltar (navigate(-1) desmonta esta página) — sem isso, a
   // seleção pra ação em massa sempre sumia depois de abrir/editar um item específico. sessionStorage
@@ -1448,7 +1452,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <ToggleGroupItem value="data_pedido" className={cn(TOGGLE_ITEM_CLASS, "flex-1")}>
                   Criação
                 </ToggleGroupItem>
-                <ToggleGroupItem value="fechado_em" className={cn(TOGGLE_ITEM_CLASS, "flex-1")}>
+                <ToggleGroupItem value="prazo_resposta" className={cn(TOGGLE_ITEM_CLASS, "flex-1")}>
                   Fechamento
                 </ToggleGroupItem>
               </ToggleGroup>
@@ -2340,7 +2344,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                             <ToggleGroupItem value="data_pedido" className={cn(TOGGLE_ITEM_CLASS, "flex-1")}>
                               Criação
                             </ToggleGroupItem>
-                            <ToggleGroupItem value="fechado_em" className={cn(TOGGLE_ITEM_CLASS, "flex-1")}>
+                            <ToggleGroupItem value="prazo_resposta" className={cn(TOGGLE_ITEM_CLASS, "flex-1")}>
                               Fechamento
                             </ToggleGroupItem>
                           </ToggleGroup>
