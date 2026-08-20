@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { PresenceProvider } from "@/hooks/use-presence";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { TelaBloqueio } from "@/components/shared/TelaBloqueio";
 import { Button } from "@/components/ui/button";
@@ -608,36 +609,38 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <UrlCleaner />
-            {/* Boundary da RAIZ. O único ErrorBoundary do app ficava dentro do
-                ProtectedRoute, então as rotas públicas — `/`, `/login`,
-                `/cadastro`, `/redefinir-senha` e o 404 — não tinham nenhum. Lá
-                um erro subia até o topo e o React 18 desmontava a árvore
-                inteira: página branca, sem nem a tela de erro.
+        <PresenceProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <UrlCleaner />
+              {/* Boundary da RAIZ. O único ErrorBoundary do app ficava dentro do
+                  ProtectedRoute, então as rotas públicas — `/`, `/login`,
+                  `/cadastro`, `/redefinir-senha` e o 404 — não tinham nenhum. Lá
+                  um erro subia até o topo e o React 18 desmontava a árvore
+                  inteira: página branca, sem nem a tela de erro.
 
-                Isso importa especialmente no logout, que leva justamente para
-                `/login`: se o chunk dessa página fosse de uma versão anterior,
-                sair do sistema deixava a tela em branco. Era o "faço logout e
-                preciso atualizar a página".
+                  Isso importa especialmente no logout, que leva justamente para
+                  `/login`: se o chunk dessa página fosse de uma versão anterior,
+                  sair do sistema deixava a tela em branco. Era o "faço logout e
+                  preciso atualizar a página".
 
-                Fica DENTRO dos providers para a tela de erro poder usar tema e
-                tokens, e ACIMA do Suspense para pegar também a rejeição do
-                import de uma página. */}
-            <ErrorBoundary
-              fallback={(error, _reset, codigo) => (
-                <TelaDeErro error={error} codigo={codigo} />
-              )}
-            >
-              <Suspense fallback={<PageFallback />}>
-                <AppRoutes />
-              </Suspense>
-            </ErrorBoundary>
-          </BrowserRouter>
-        </TooltipProvider>
+                  Fica DENTRO dos providers para a tela de erro poder usar tema e
+                  tokens, e ACIMA do Suspense para pegar também a rejeição do
+                  import de uma página. */}
+              <ErrorBoundary
+                fallback={(error, _reset, codigo) => (
+                  <TelaDeErro error={error} codigo={codigo} />
+                )}
+              >
+                <Suspense fallback={<PageFallback />}>
+                  <AppRoutes />
+                </Suspense>
+              </ErrorBoundary>
+            </BrowserRouter>
+          </TooltipProvider>
+        </PresenceProvider>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>

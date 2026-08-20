@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import {
   Send, Loader2, MessageCircle, MessageSquare, Users, Circle, PanelLeftClose, PanelLeftOpen,
-  Paperclip, FileText, Image, X, Download, Users2, Calendar, Eraser, ChevronDown,
+  Paperclip, FileText, X, Download, Users2, Calendar, Eraser, ChevronDown,
   Video, Link2, ExternalLink, Play, Pause, Camera, Pencil, Check, CheckCheck, Search, Trash2, UserPlus, Mic, Square, Reply
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -621,7 +621,7 @@ const Chat = () => {
   const [teamCollapsed, setTeamCollapsed] = useState(false);
   const [text, setText] = useState('');
   const [previewFile, setPreviewFile] = useState<FilePreviewTarget | null>(null);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<{ file: File; previewUrl: string | null }[]>([]);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -951,7 +951,8 @@ const Chat = () => {
     const trimmed = text.trim();
     if (!trimmed && selectedFiles.length === 0) return;
     setText('');
-    const files = [...selectedFiles];
+    const files = selectedFiles.map(f => f.file);
+    selectedFiles.forEach(f => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
     setSelectedFiles([]);
     const quoted = buildQuotedParams(respondendoA);
     setRespondendoA(null);
@@ -991,7 +992,19 @@ const Chat = () => {
     const validFiles = files.filter(file =>
       validateFile(file, { allowedExtensions: CHAT_ALLOWED_EXT, allowedMimePrefixes: CHAT_ALLOWED_MIME })
     );
-    setSelectedFiles(prev => [...prev, ...validFiles]);
+    const withPreview = validFiles.map(file => ({
+      file,
+      previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+    }));
+    setSelectedFiles(prev => [...prev, ...withPreview]);
+  };
+
+  const removeSelectedFile = (idx: number) => {
+    setSelectedFiles(prev => {
+      const item = prev[idx];
+      if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      return prev.filter((_, i) => i !== idx);
+    });
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2183,19 +2196,26 @@ const Chat = () => {
             )}
             {selectedFiles.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-2">
-                {selectedFiles.map((file, idx) => (
-                  <div key={`${file.name}-${idx}`} className="flex items-center gap-2 px-2 py-1.5 bg-muted rounded-lg text-sm max-w-[200px]">
-                    {file.type.startsWith('image/') ? (
-                      <Image className="h-4 w-4 text-primary shrink-0" />
+                {selectedFiles.map(({ file, previewUrl }, idx) => (
+                  <div
+                    key={`${file.name}-${idx}`}
+                    className="relative flex items-center gap-2 px-2 py-1.5 bg-muted rounded-lg text-sm max-w-[200px]"
+                  >
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="preview" className="h-10 w-10 object-cover rounded-lg shrink-0" />
                     ) : (
-                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                      <div className="h-9 w-9 flex items-center justify-center bg-background rounded-lg shrink-0 border border-border">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                      </div>
                     )}
-                    <span className="truncate flex-1 text-xs text-foreground">{file.name}</span>
+                    {!previewUrl && (
+                      <span className="truncate flex-1 text-xs text-foreground">{file.name}</span>
+                    )}
                     <button
-                      onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
-                      className="p-0.5 hover:bg-background rounded"
+                      onClick={() => removeSelectedFile(idx)}
+                      className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/80"
                     >
-                      <X className="h-3.5 w-3.5 text-muted-foreground" />
+                      <X className="h-2.5 w-2.5" />
                     </button>
                   </div>
                 ))}
