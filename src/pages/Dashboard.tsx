@@ -99,7 +99,7 @@ const Dashboard = () => {
   // resposta por atendente) — só interessam ao gestor/admin acompanhando a equipe;
   // pra não-gestor nem dispara a query (RLS de whatsapp_conversas já restringiria
   // ao próprio usuário, mas o gráfico fica oculto de qualquer forma — ver DashboardCharts).
-  const { data: whatsappStats } = useDashboardWhatsappStats(isGestor ? empresaId : undefined, {
+  const { data: whatsappStats, isError: whatsappIsError } = useDashboardWhatsappStats(isGestor ? empresaId : undefined, {
     dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
     dateTo: format(dateRange.to, 'yyyy-MM-dd'),
   });
@@ -371,6 +371,7 @@ const Dashboard = () => {
             rendimentoVendedor={rendimentoVendedor}
             whatsappConversas={isGestor && whatsappStats ? { abertas: whatsappStats.conversas_abertas, fechadas: whatsappStats.conversas_fechadas } : null}
             whatsappTempoResposta={whatsappStats?.tempo_resposta_atendente ?? []}
+            whatsappError={isGestor && whatsappIsError}
           />
         </Suspense>
         </div>

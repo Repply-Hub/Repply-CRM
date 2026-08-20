@@ -7,6 +7,7 @@ import {
 import type { TooltipProps } from 'recharts';
 import { TrendingUp, Factory, MessageCircle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/DashboardChartTooltip';
 
@@ -124,6 +125,9 @@ interface DashboardChartsProps {
   // pensada pra gestor/admin acompanhar a equipe, não o desempenho individual).
   whatsappConversas: { abertas: number; fechadas: number } | null;
   whatsappTempoResposta: { atendente: string; minutos: number }[];
+  // true quando a busca dessas métricas falhou (pro gestor/admin) — mostra um aviso
+  // no lugar dos gráficos em vez de deixá-los sumir sem explicação nenhuma.
+  whatsappError?: boolean;
 }
 
 export function DashboardCharts({
@@ -134,6 +138,7 @@ export function DashboardCharts({
   rendimentoVendedor,
   whatsappConversas,
   whatsappTempoResposta,
+  whatsappError,
 }: DashboardChartsProps) {
   const [fabricaSort, setFabricaSort] = useState<'maior' | 'menor'>('maior');
 
@@ -425,7 +430,12 @@ export function DashboardCharts({
       </div>
 
       {/* Atendimento WhatsApp — só renderizado pra gestor/admin (whatsappConversas null pro resto) */}
-      {whatsappConversas && (
+      {whatsappError ? (
+        <Alert variant="destructive" className="mt-5">
+          <AlertTitle>Não foi possível carregar as métricas de atendimento no WhatsApp</AlertTitle>
+          <AlertDescription>Tente recarregar a página. Se continuar assim, avise o suporte.</AlertDescription>
+        </Alert>
+      ) : whatsappConversas && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
           {/* Conversas Abertas x Fechadas */}
           <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
