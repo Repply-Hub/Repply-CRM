@@ -497,6 +497,7 @@ Estas três já causaram bug e vão causar de novo se ninguém souber:
 | **empresa** | `empresas` = o assinante do SaaS. Mas `clientes` tem um campo `empresa` de texto, que é o nome da empresa **cliente** | Inquilino é sempre `empresa_id`. O texto em `clientes` é dado do cliente, não vínculo |
 | **vendedor** | A tabela `vendedores` virou `usuarios` em abril/2026, mas o nome antigo sobrou: `historico_contatos.vendedor_id`, as funções `is_gestor()`, `get_my_vendedor_id()`, `vendedor_in_my_empresa()`, a visão `vw_indicadores_vendedor` | Para código novo use `usuarios` / `usuario_id` / `get_my_usuario_id()`. Os antigos continuam funcionando como apelido — não remova sem varrer as políticas de segurança |
 | **negócio / pedido** | Na tela é **Negócio**. No banco é `pedidos`. No domínio é um **orçamento** | Interface fala Negócio, código fala `pedido`. Não renomeie nem um nem outro por conta própria |
+| **data de fechamento** | Existiam **dois campos com esse nome na tela**: `prazo_resposta` (ficha e formulário) e `fechado_em` (filtro de período) | A data de fechamento é `prazo_resposta`. `fechado_em` é registro interno de transição de etapa e não deve aparecer com esse rótulo — ver §10.8 |
 
 ### 6.4 Mapa das tabelas por domínio
 
@@ -742,6 +743,32 @@ promete prospecção por licença.
 ### 10.6 O CRM registra, não interpreta
 
 *Decisão de 19/08/2026.* Ver §3.5.
+
+### 10.8 A data de fechamento é uma só, igual nas duas origens
+
+*Decisão de 20/08/2026.*
+
+Venda importada do Bitrix e venda cadastrada à mão pelo vendedor são **a mesma venda**.
+Perguntar "quanto fechamos em agosto" tem que somar as duas. Por isso a data de fechamento
+é um campo só, com o mesmo significado nas duas origens: **`prazo_resposta`**.
+
+**O que estava errado.** O filtro de período usava `fechado_em`, que é carimbada por
+gatilho quando o negócio entra numa etapa final *dentro do Repply*. Para a base importada
+isso virou a data da importação: dos 11.714 negócios importados da MD, 11.653 ficaram com
+18/08/2026 e 61 com 19/08/2026 — a história inteira de 2022 a 2026 aparecendo como fechada
+no dia em que entrou no sistema.
+
+Medido antes e depois: filtrar agosto/2026 por fechamento devolvia **11.715** negócios
+(praticamente tudo). Passou a devolver **107** — 104 do Bitrix e 3 cadastrados à mão.
+
+**`fechado_em` não foi removida.** Continua registrando a transição de etapa dentro do
+sistema, que é informação legítima de auditoria. Só deixou de sustentar o filtro e de se
+chamar "Data de Fechamento" na tela.
+
+**Por que não foi o contrário** (preencher `fechado_em` com a data do Bitrix): exigiria
+reescrever 11.714 linhas e quebraria a garantia de que aquela coluna só é escrita por
+gatilho. Apontar o filtro para o campo certo é mudança de código, não de dado — mais
+barata e mais segura.
 
 ### 10.7 A soma é feita no banco, não no navegador
 

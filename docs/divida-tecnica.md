@@ -34,6 +34,7 @@ Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu.
 | 18 | [O lint não passa](#18-o-lint-não-passa) | Média | Não |
 | 19 | [11.903 negócios com data trocada](#19-11903-negócios-com-data-trocada-em-produção) | **Alta** | Distorce todo relatório por data |
 | 20 | [Empresa "MD" duplicada com 6.374 negócios órfãos](#20-empresa-md-duplicada-com-6374-negócios-órfãos) | Média | Não |
+| 21 | [Colunas de data com nome que não bate com a tela](#21-colunas-de-data-com-nome-que-não-bate-com-a-tela) | Média | Não |
 
 ---
 
@@ -663,10 +664,51 @@ data e o commit — o histórico do que já doeu é o que impede repetir.*
 
 ---
 
+## 21. Colunas de data com nome que não bate com a tela
+
+**Gravidade: média. Adiada de propósito para depois do reparo das datas.**
+
+Três colunas de `pedidos` guardam coisa diferente do que o nome diz:
+
+| Coluna | O nome sugere | O que realmente guarda |
+|---|---|---|
+| `data_pedido` | Data do pedido | **Data de criação** do negócio |
+| `prazo_resposta` | Prazo de resposta | **Data de fechamento** |
+| `created_at` | Quando a linha entrou no sistema | Para a base importada, **a data que veio da planilha** |
+
+E o mesmo campo aparece com dois rótulos diferentes conforme a tela: `prazo_resposta` é
+"Data de Fechamento" na ficha do negócio e "Prazo de resposta" na configuração de campos.
+
+### Por que importa
+
+Nome de coluna que mente é dívida silenciosa: cada pessoa que chega perde tempo
+descobrindo, e alguém acaba consultando o campo errado. Foi exatamente o que aconteceu com
+o filtro de período — ver [§10.8 do SPEC](../SPEC.md) e a entrada em Resolvidos.
+
+### Por que foi adiada
+
+Renomear coluna tem raio grande: tipos gerados, hooks, consultas, políticas de segurança,
+visões, funções de banco e funções de borda. Num projeto com lint que já falha e cobertura
+de teste baixa ([§5](#5-cobertura-de-teste-quase-zero), [§18](#18-o-lint-não-passa)), é
+onde o erro passa despercebido.
+
+**Decisão do dono do produto em 20/08/2026:** primeiro consertar os dados, que doem hoje;
+a renomeação vira tarefa própria depois, com calma.
+
+### Ordem sugerida quando for a hora
+
+1. `prazo_resposta` → `data_fechamento`
+2. `data_pedido` → `data_criacao` (nome que `clientes` já usa, e que a tela já mostra)
+3. Padronizar os rótulos: um campo, um nome, em todas as telas
+4. Só então avaliar se `created_at` e `data_criacao` continuam ambos necessários
+
+---
+
 ## Resolvidos
 
 | Item | Quando | Como |
 |---|---|---|
+| **Filtro "data de fechamento" mostrava a base inteira** — usava `fechado_em`, carimbada pelo gatilho no momento da importação, então os 11.714 negócios importados apareciam como fechados em 18–19/08/2026. Filtrar agosto devolvia 11.715 negócios em vez de 107 | 20/08/2026 | `46137a97` — filtro passa a usar `prazo_resposta`, que tem o mesmo significado para venda importada e cadastrada à mão. Índice novo e 6 testes fixando a regra |
 | **`fabricantes` e `tabela_precos` eram globais entre todas as empresas** — uma empresa via o catálogo e os preços cadastrados por outra | 19/08/2026 | `20260819124247_fabricantes_e_precos_por_empresa.sql` e `20260819125643_fabricantes_escrita_para_todo_membro_da_empresa.sql` |
 | **Precedência de operador no comando dos agendamentos**, que gerava `22P02 invalid input syntax for json` | 05/08/2026 | `20260805123341_corrige_precedencia_jsonb_nos_crons.sql`. *Não resolveu o item 4 — era só a terceira das três causas* |
 | **Tabela `wapi_instancia_usuarios` sem migration** — criada à mão, ninguém conseguia recriar o banco do zero | 01/07/2026 | `20260701000000_wapi_instancia_usuarios_retroativa.sql`, com `CREATE TABLE IF NOT EXISTS` documentando o schema real |

@@ -59,7 +59,7 @@ repositório**, não aqui:
 
 | Documento | O que contém |
 |---|---|
-| [`divida-tecnica.md`](divida-tecnica.md) | **20 itens** com gravidade, custo real e ordem de conserto. Mais o que já foi resolvido |
+| [`divida-tecnica.md`](divida-tecnica.md) | **21 itens** com gravidade, custo real e ordem de conserto. Mais o que já foi resolvido |
 
 ---
 
