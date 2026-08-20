@@ -39,7 +39,7 @@ repositório**, não aqui:
 | Documento | O que contém |
 |---|---|
 | [`modulos/negocios.md`](modulos/negocios.md) | O pipeline: filtros, estado compartilhado entre quadro e lista, desempenho |
-| [`modulos/importacao.md`](modulos/importacao.md) | O assistente de importação ponta a ponta. **É a prioridade zero do projeto** |
+| [`modulos/importacao.md`](modulos/importacao.md) | O assistente de importação ponta a ponta. Conversão de data corrigida em `446779ff` |
 | [`modulos/whatsapp.md`](modulos/whatsapp.md) | Integração uazapi: banco, funções, provisionamento de instância, bugs |
 | [`modulos/email.md`](modulos/email.md) | Integração Nylas: conexão, sincronização, quem enxerga a caixa |
 | [`modulos/anexos.md`](modulos/anexos.md) | Arquivos anexados a negócio, e o armazenamento |
@@ -52,12 +52,13 @@ repositório**, não aqui:
 | [`operacao/colocar-no-ar.md`](operacao/colocar-no-ar.md) | Passo a passo para publicar mudanças que dependem de configuração fora do código |
 | [`operacao/cobranca-stripe.md`](operacao/cobranca-stripe.md) | O que falta fazer fora do repositório para a cobrança funcionar |
 | [`operacao/guia-de-paginas.md`](operacao/guia-de-paginas.md) | Para que serve cada tela, em linguagem de negócio. Serve de material de uso |
+| [`operacao/plano-reparo-datas.md`](operacao/plano-reparo-datas.md) | **Proposto, não executado.** Como reparar as datas trocadas dos 11.903 negócios já importados |
 
 ## Dívida
 
 | Documento | O que contém |
 |---|---|
-| [`divida-tecnica.md`](divida-tecnica.md) | **18 itens** com gravidade, custo real e ordem de conserto. Mais o que já foi resolvido |
+| [`divida-tecnica.md`](divida-tecnica.md) | **20 itens** com gravidade, custo real e ordem de conserto. Mais o que já foi resolvido |
 
 ---
 

@@ -261,7 +261,7 @@ conhecida) · **Quebrado** (não faz o que promete) · **Não existe**.
 | 10 | Chat interno | `/chat` | Sólido | — |
 | 11 | WhatsApp | `/whatsapp` | Com ressalva | Falha de segurança aberta + arquivo de 7.838 linhas |
 | 12 | E-mail | `/emails` | Com ressalva | **Sincronização automática nunca rodou** |
-| 13 | Importação | dentro de cada tela | **Quebrado** | Bug de data trava a migração do Bitrix |
+| 13 | Importação | dentro de cada tela | Sólido | Conversão de data corrigida em 19/08/2026 |
 | 14 | Configurações e Permissões | `/configuracoes` | Sólido | — |
 | 15 | Admin da Repply | `/admin/*` | Com ressalva | Falta o controle de seções por empresa |
 | 16 | Landing e Assinatura | `/` e `/assinar` | Com ressalva | Código pronto; a cobrança depende de passos fora do código |
@@ -609,8 +609,10 @@ que estiver marcado como paralelo.
 importação não funciona, a MD paga e opera dois sistemas, e o painel de metas não reflete
 a operação inteira.
 
-- Corrigir o parsing de datas na importação de planilha
-- Validar com a exportação real do Bitrix24, ponta a ponta
+- ✅ **Corrigir o parsing de datas na importação de planilha** — feito em `446779ff`
+- ✅ **Validar com a exportação real do Bitrix24, ponta a ponta** — 26.181 datas, 100%
+- ⬜ **Reparar os 11.903 negócios já gravados com data trocada** — plano pronto em
+  `docs/operacao/plano-reparo-datas.md`, aguardando autorização
 - Decidir o destino da função de borda órfã `import-data`: integrar alinhando a regra de
   data, ou remover
 - Migrar a base histórica da MD e conferir contagens

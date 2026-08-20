@@ -16,7 +16,7 @@ Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu.
 |---|---|---|---|
 | 1 | [Chave do WhatsApp legível](#1-a-chave-do-whatsapp-está-legível) | **Crítica** | Não, mas não deve esperar |
 | 2 | [Titularidade dos serviços](#2-titularidade-dos-serviços) | **Crítica** | Sim — impede aplicar mudança de banco |
-| 3 | [Importação: formatação de datas](#3-importação--formatação-de-datas) | **Alta** | Sim — trava a migração da MD |
+| 3 | [Importação: formatação de datas](#3-importação--formatação-de-datas) | ✅ Resolvida | Código corrigido em `446779ff` |
 | 4 | [Agendamentos nunca funcionaram](#4-os-agendamentos-nunca-funcionaram) | Alta | Não |
 | 5 | [Cobertura de teste quase zero](#5-cobertura-de-teste-quase-zero) | Alta | Não |
 | 6 | [Função `import-data` órfã](#6-função-import-data-órfã) | Média | Não |
@@ -32,6 +32,8 @@ Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu.
 | 16 | [Webhook do WhatsApp aceita qualquer um](#16-o-webhook-do-whatsapp-aceita-qualquer-um) | **Crítica** | Não |
 | 17 | [Instância fantasma na uazapi](#17-instância-fantasma-na-uazapi) | Média | Não |
 | 18 | [O lint não passa](#18-o-lint-não-passa) | Média | Não |
+| 19 | [11.903 negócios com data trocada](#19-11903-negócios-com-data-trocada-em-produção) | **Alta** | Distorce todo relatório por data |
+| 20 | [Empresa "MD" duplicada com 6.374 negócios órfãos](#20-empresa-md-duplicada-com-6374-negócios-órfãos) | Média | Não |
 
 ---
 
@@ -131,11 +133,19 @@ comprometida.**
 
 ## 3. Importação — formatação de datas
 
-**Gravidade: alta. É a prioridade zero do projeto.**
+**Gravidade: alta. ✅ O CÓDIGO FOI CORRIGIDO em 19/08/2026 (`446779ff`).**
+**Os dados já gravados, não — ver [item 19](#19-11903-negócios-com-data-trocada-em-produção).**
 
-A migração da base da MD Representações do Bitrix24 para o Repply está travada por um
-problema de formatação de datas na importação de planilha, que a agência deixou sem
-corrigir. Enquanto isso, a MD opera os dois sistemas em paralelo.
+A migração da base da MD Representações do Bitrix24 para o Repply estava travada por um
+problema de formatação de datas na importação de planilha. **A causa era outra do que se
+supunha:** nada era rejeitado — as datas entravam com dia e mês trocados, em silêncio, em
+26,7% dos casos.
+
+A causa tinha dois elos: o parser convertia a data em texto no formato americano (porque o
+Bitrix exporta a data como número sem formato de célula), e a conversão seguinte tinha que
+adivinhar se aquele texto era brasileiro ou americano. O conserto foi parar de jogar fora a
+informação exata que existia na célula. Verificado contra 26.181 datas reais: de 73,3% para
+100% de acerto.
 
 **Onde olhar:**
 
@@ -542,6 +552,74 @@ compare.
    na configuração. Regra desligada conscientemente é honesta; regra ligada e violada 458
    vezes é ruído
 4. Só depois disso faz sentido exigir lint limpo em Pull Request
+
+---
+
+## 19. 11.903 negócios com data trocada em produção
+
+**Gravidade: alta. Mapeado, não reparado.**
+
+A importação da base do Bitrix24 gravou dia e mês invertidos em parte das datas. O código
+que causava isso **foi corrigido** em `446779ff`, mas o que já está gravado continua
+errado.
+
+### O tamanho
+
+| Medida | Valor |
+|---|---|
+| Datas conferidas nos 8 arquivos reais | 26.181 |
+| Convertidas erradas pelo código antigo | **26,7%** |
+| Negócios da MD vindos de importação | 11.903 de 11.905 |
+| Colunas de data afetadas | `data_pedido`, `prazo_resposta`, `created_at` (e possivelmente `fechado_em`) |
+
+### O sintoma que a MD via
+
+Filtro por data de fechamento devolvendo número que não batia com a realidade. Onde a
+planilha diz que existem **6 negócios** fechando de setembro a dezembro de 2026, o sistema
+mostra **~180**.
+
+### Por que não dá para consertar com uma regra
+
+**A corrupção não é uniforme.** Na amostra do arquivo de agosto, 8 negócios estão com a
+data errada e **5 estão com a data certa**. Uma regra do tipo "troca dia por mês onde o dia
+for ≤ 12" consertaria uns e estragaria os outros.
+
+O reparo tem que ser linha a linha, pela chave `import_hash` — que é única para cada uma
+das 11.903 linhas.
+
+> **Plano completo, com cópia de segurança, validação e volta atrás:**
+> [`docs/operacao/plano-reparo-datas.md`](operacao/plano-reparo-datas.md). Proposto, **não
+> executado** — depende de autorização.
+
+---
+
+## 20. Empresa "MD" duplicada com 6.374 negócios órfãos
+
+**Gravidade: média.**
+
+Existem duas empresas no banco com dados da MD:
+
+| Empresa | Criada | Usuários | Negócios | Período dos negócios |
+|---|---|---|---|---|
+| **MD** | 25/06/2026 **16:49** | 2 | **6.374** | jun/2022 a dez/2023 |
+| **MD Representações** | 25/06/2026 **17:38** | 13 | 11.905 | jan/2022 a "dez/2026" |
+
+A primeira foi criada 49 minutos antes da segunda, tem uma importação parcial e nenhum
+usuário da equipe real. Tudo indica **primeira tentativa de importação abandonada**.
+
+### Por que importa
+
+Ninguém da MD enxerga esses negócios — a segurança por linha separa por empresa. Mas eles:
+
+- ocupam espaço e entram em todo backup
+- **distorcem qualquer contagem global** (foi o que me fez reportar "18.279 negócios"
+  quando a MD tem 11.905)
+- confundem quem consultar o banco direto no futuro
+
+### Decisão pendente
+
+Apagar, manter como histórico, ou investigar antes. É decisão do dono do produto e
+**independente do reparo das datas**.
 
 ---
 
