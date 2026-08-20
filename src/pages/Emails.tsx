@@ -75,6 +75,7 @@ import {
   type PastaSelecionada,
 } from "@/components/email/BarraPastas";
 import { useEmailPastas, useContagemPorPasta } from "@/hooks/use-email-pastas";
+import { MoverParaMarcadorDialog } from "@/components/email/MoverParaMarcadorDialog";
 
 /** Uma linha da caixa de entrada, no formato que a listagem devolve. */
 interface MensagemRecebida {
@@ -188,6 +189,8 @@ const Emails = () => {
     type: "sent" | "received";
   } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  /** Ids das mensagens em processo de "mover para marcador" — vazio = fechado. */
+  const [mensagensParaMover, setMensagensParaMover] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>("received");
   /** `nylas_message_id` da mensagem sendo respondida; nulo num e-mail novo. */
   const [respondendoA, setRespondendoA] = useState<string | null>(null);
@@ -568,11 +571,14 @@ const Emails = () => {
 
       // A busca do topo é UMA só para a tela inteira, mas só a aba Enviados a
       // aplicava: procurar em Recebidos devolvia a caixa inteira, como se nada
-      // tivesse sido digitado. Mesmos campos das duas: assunto e prévia — o
-      // corpo não está na listagem para procurar.
+      // tivesse sido digitado. Em Recebidos entram também remetente_nome/
+      // remetente_email — sem eles, digitar o e-mail de quem mandou (o caso
+      // mais comum de "procurar um e-mail") não encontrava nada, porque esse
+      // texto não aparece nem no assunto nem na prévia.
       if (buscaAplicada) {
         consulta = consulta.or(
-          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%`,
+          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%,` +
+            `remetente_nome.ilike.%${buscaAplicada}%,remetente_email.ilike.%${buscaAplicada}%`,
         );
       }
 
@@ -673,9 +679,13 @@ const Emails = () => {
 
       if (somenteNaoLidas) consulta = consulta.eq("lido", false);
 
+      // Mesmos campos da listagem (ver o comentário lá): sem remetente aqui, o
+      // badge de "Todas" contaria diferente do que a lista realmente mostra
+      // para o mesmo termo.
       if (buscaAplicada) {
         consulta = consulta.or(
-          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%`,
+          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%,` +
+            `remetente_nome.ilike.%${buscaAplicada}%,remetente_email.ilike.%${buscaAplicada}%`,
         );
       }
 
@@ -1384,9 +1394,21 @@ const Emails = () => {
                 }
               : undefined
           }
+          onMover={
+            selectedEmail.type === "received"
+              ? () => setMensagensParaMover([selectedEmail.id])
+              : undefined
+          }
           mensagensDaConversa={mensagensDaConversa}
           carregandoConversa={carregandoConversa}
           onAbrirMensagemDaConversa={abrirMensagemDaConversa}
+        />
+
+        <MoverParaMarcadorDialog
+          open={mensagensParaMover.length > 0}
+          onOpenChange={(o) => !o && setMensagensParaMover([])}
+          contaId={conta?.id}
+          mensagemIds={mensagensParaMover}
         />
 
         {compositor}
@@ -1497,6 +1519,19 @@ const Emails = () => {
                   >
                     <CheckSquare className="h-4 w-4" />
                     Lido
+                  </Button>
+                )}
+                {/* Marcador é conceito de caixa de entrada — em Enviados a
+                    mensagem nem tem `pastas` do jeito que a Edge Function espera. */}
+                {activeTab === "received" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-primary hover:bg-primary/10 gap-2"
+                    onClick={() => setMensagensParaMover(selectedIds)}
+                  >
+                    <Tag className="h-4 w-4" />
+                    Mover
                   </Button>
                 )}
                 <Button
@@ -1644,6 +1679,8 @@ const Emails = () => {
                     : totalReceived
               }
               contagens={contagens}
+              contaId={conta?.id}
+              podeCriarMarcador={podeGerenciarCaixa}
             />
           )}
 
@@ -2234,6 +2271,14 @@ const Emails = () => {
       <GerenciarCaixaDialog
         open={gerenciarCaixaAberto}
         onOpenChange={setGerenciarCaixaAberto}
+      />
+
+      <MoverParaMarcadorDialog
+        open={mensagensParaMover.length > 0}
+        onOpenChange={(o) => !o && setMensagensParaMover([])}
+        contaId={conta?.id}
+        mensagemIds={mensagensParaMover}
+        onMoved={() => setSelectedIds([])}
       />
 
       <AlertDialog

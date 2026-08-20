@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Inbox, Tag, Loader2, ShieldAlert, Trash2, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Inbox, Tag, Loader2, ShieldAlert, Trash2, Search, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import type { PastaEmail } from '@/hooks/use-email-pastas';
+import { CriarMarcadorDialog } from '@/components/email/CriarMarcadorDialog';
 
 /** `null` = sem filtro de pasta (a aba Recebidos/Enviados manda). */
 export type PastaSelecionada = string | null;
@@ -23,6 +25,10 @@ interface Props {
   totalSemFiltro: number;
   /** Contagem LOCAL por pasta: quantas o CRM tem e quantas estão por ler. */
   contagens: Map<string, { total: number; naoLidas: number }>;
+  /** Conta cujo marcador está sendo criado — sem ela o botão "Novo marcador" some. */
+  contaId?: string | null;
+  /** Só quem administra a caixa pode escrever nela; ver `podeGerenciarCaixa`. */
+  podeCriarMarcador?: boolean;
 }
 /** Uma linha da barra — usada tanto pelas pastas de sistema quanto pelos marcadores. */
 
@@ -94,9 +100,12 @@ export function BarraPastas({
   onSelecionar,
   totalSemFiltro,
   contagens,
+  contaId,
+  podeCriarMarcador,
 }: Props) {
   const [buscaMarcador, setBuscaMarcador] = useState('');
   const [mostrarTodosMarcadores, setMostrarTodosMarcadores] = useState(false);
+  const [criarMarcadorAberto, setCriarMarcadorAberto] = useState(false);
 
   const marcadores = pastas.filter((p) => !p.ehSistema);
   const contagem = (id: string) => contagens.get(id) ?? { total: 0, naoLidas: 0 };
@@ -118,11 +127,15 @@ export function BarraPastas({
   const temLixeira = pastas.some((p) => p.pastaId === PASTA_LIXEIRA);
 
   // Some inteira quando não há nada além de "Todas": uma coluna com um item só
-  // rouba largura da lista de mensagens sem dar nada em troca.
-  if (!carregando && marcadores.length === 0 && !temSpam && !temLixeira) return null;
+  // rouba largura da lista de mensagens sem dar nada em troca. Mas não quando
+  // dá para criar marcador — aí a coluna vazia é o próprio caminho para deixar
+  // de estar vazia, e escondê-la tornaria a ação inalcançável.
+  if (!carregando && marcadores.length === 0 && !temSpam && !temLixeira && !podeCriarMarcador) {
+    return null;
+  }
 
   return (
-    <aside className="hidden w-56 shrink-0 flex-col overflow-y-auto border-r bg-muted/20 md:flex">
+    <aside className="hidden w-72 shrink-0 flex-col overflow-y-auto border-r bg-muted/20 md:flex">
       <div className="flex flex-col gap-0.5 p-2">
         <Item
           icone={<Inbox className="h-4 w-4" />}
@@ -153,7 +166,7 @@ export function BarraPastas({
         )}
       </div>
 
-      {(marcadores.length > 0 || carregando) && (
+      {(marcadores.length > 0 || carregando || podeCriarMarcador) && (
         <div className="flex flex-col gap-0.5 border-t p-2">
           <p className="px-1 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Marcadores
@@ -172,6 +185,21 @@ export function BarraPastas({
                 className="h-8 border-transparent bg-muted/50 pl-8 text-xs focus-visible:bg-background focus-visible:ring-1"
               />
             </div>
+          )}
+
+          {/* Logo abaixo da barra de busca — é o mesmo lugar mesmo quando ela
+              não aparece (caixa com poucos marcadores), já que ambas vivem
+              neste bloco condicional. */}
+          {podeCriarMarcador && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCriarMarcadorAberto(true)}
+              className="justify-start gap-2 px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Novo marcador
+            </Button>
           )}
 
           {carregando && (
@@ -221,6 +249,14 @@ export function BarraPastas({
             </button>
           )}
         </div>
+      )}
+
+      {podeCriarMarcador && (
+        <CriarMarcadorDialog
+          open={criarMarcadorAberto}
+          onOpenChange={setCriarMarcadorAberto}
+          contaId={contaId}
+        />
       )}
     </aside>
   );

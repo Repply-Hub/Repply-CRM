@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import DOMPurify from 'dompurify';
-import { ArrowLeft, Trash2, Reply, Loader2, Paperclip, MailOpen, CornerUpLeft } from 'lucide-react';
+import { ArrowLeft, Trash2, Reply, Loader2, Paperclip, MailOpen, CornerUpLeft, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -60,6 +60,8 @@ interface Props {
   onClicarEndereco?: (endereco: string) => void;
   /** Ausente em mensagem enviada, que não tem "não lido" para marcar. */
   onMarcarNaoLido?: () => void;
+  /** Ausente em mensagem enviada — marcador é conceito da caixa de entrada. */
+  onMover?: () => void;
   /** Demais mensagens da mesma conversa (mesmo `nylas_thread_id`), já sem a que está aberta. */
   mensagensDaConversa?: MensagemDaConversa[];
   carregandoConversa?: boolean;
@@ -497,6 +499,7 @@ export function LeitorEmail({
   onResponder,
   onClicarEndereco,
   onMarcarNaoLido,
+  onMover,
   mensagensDaConversa,
   carregandoConversa,
   onAbrirMensagemDaConversa,
@@ -533,6 +536,18 @@ export function LeitorEmail({
               aria-label="Marcar como não lido"
             >
               <MailOpen className="h-4 w-4" />
+            </Button>
+          )}
+          {onMover && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onMover}
+              className="text-muted-foreground hover:text-foreground"
+              title="Mover para marcador"
+              aria-label="Mover para marcador"
+            >
+              <Tag className="h-4 w-4" />
             </Button>
           )}
           <Button

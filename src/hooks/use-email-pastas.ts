@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
 
 /** Uma pasta/marcador da caixa, como o provedor a entrega. */
 export interface PastaEmail {
@@ -137,6 +138,72 @@ export function useContagemPorPasta(contaId?: string | null) {
     },
     enabled: !!contaId,
     staleTime: 30_000,
+  });
+}
+
+/**
+ * Cria um marcador NA CAIXA REAL (Gmail), via `email-criar-marcador`.
+ *
+ * Não é uma preferência do CRM: a Edge Function fala com o Nylas e o
+ * marcador passa a existir no provedor, exatamente como um criado à mão no
+ * Gmail — inclusive reaparece lá se alguém excluir só daqui. O espelho local
+ * (`email_pastas`) é gravado pela própria function, então a invalidação
+ * abaixo já lê a linha nova em vez de disparar uma sincronização inteira.
+ */
+export function useCriarMarcador(contaId?: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (nome: string) => {
+      const { data, error } = await supabase.functions.invoke('email-criar-marcador', {
+        body: { nome },
+      });
+      if (error) throw await erroLegivelDaFunction(error, 'Não foi possível criar o marcador.');
+      return data.pasta as { id: string; nome: string };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email_pastas', contaId] });
+      toast.success('Marcador criado');
+    },
+    onError: (e: Error) => {
+      toast.error(e.message || 'Não foi possível criar o marcador.');
+    },
+  });
+}
+
+/**
+ * Move uma ou mais mensagens para um marcador — via `email-mover-marcador`.
+ *
+ * "Mover" aqui é o mesmo verbo do Gmail: a mensagem some da Entrada real (no
+ * provedor) e passa a existir só no marcador de destino, não ganha um rótulo
+ * a mais. As listas de mensagens e as contagens da barra lateral dependem da
+ * coluna `pastas`, que a function já reescreve — por isso a invalidação cobre
+ * as duas.
+ */
+export function useMoverParaMarcador() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ mensagemIds, pastaId }: { mensagemIds: string[]; pastaId: string }) => {
+      const { data, error } = await supabase.functions.invoke('email-mover-marcador', {
+        body: { mensagem_ids: mensagemIds, pasta_id: pastaId },
+      });
+      if (error) throw await erroLegivelDaFunction(error, 'Não foi possível mover.');
+      return data as { pasta: { id: string; nome: string }; alteradas: number; falhas: number };
+    },
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ['received_emails'] });
+      queryClient.invalidateQueries({ queryKey: ['received_emails_total'] });
+      queryClient.invalidateQueries({ queryKey: ['email_contagem_por_pasta'] });
+      if (r.falhas) {
+        toast.warning(`Movido aqui, mas o provedor não confirmou todas. A próxima sincronização acerta.`);
+      } else {
+        toast.success(`Movido para "${r.pasta.nome}"`);
+      }
+    },
+    onError: (e: Error) => {
+      toast.error(e.message || 'Não foi possível mover o e-mail.');
+    },
   });
 }
 
