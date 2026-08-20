@@ -957,7 +957,7 @@ export function UsuariosTab() {
                 {searchQuery && <p className="text-xs text-muted-foreground/60 mt-1">Tente outro termo de busca</p>}
               </div>
             ) : (
-              <ScrollArea className="flex-1 min-h-0">
+              <ScrollArea className="flex-1 min-h-0" scrollBarClassName="z-20">
                 {(() => {
                   const roleOrder = ['admin', 'empresa', 'gestor', 'vendedor'];
                   const groupedByRole = roleOrder.reduce<Record<string, typeof filteredVendedores>>((acc, role) => {
@@ -978,7 +978,10 @@ export function UsuariosTab() {
                     const RoleIcon = cfg.icon;
                     return (
                       <div key={role}>
-                        <div className="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border sticky top-0 z-10">
+                        <div className={cn(
+                          'flex items-center gap-2 px-4 py-2 bg-muted border-b border-border sticky top-0',
+                          role === 'gestor' ? 'z-30' : 'z-10',
+                        )}>
                           <RoleIcon className={cn('h-3.5 w-3.5', cfg.color)} />
                           <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{cfg.label}</span>
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 ml-auto">{items.length}</Badge>
