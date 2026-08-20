@@ -121,3 +121,43 @@ export function useDashboardStats(
     ...DASHBOARD_QUERY_OPTS,
   });
 }
+
+export interface DashboardWhatsappStats {
+  conversas_abertas: number;
+  conversas_fechadas: number;
+  tempo_resposta_atendente: { atendente: string; minutos: number }[];
+}
+
+// Métricas de atendimento via WhatsApp pro gestor/admin acompanhar a equipe —
+// conversas_abertas/fechadas conta whatsapp_conversas.arquivada, e
+// tempo_resposta_atendente pareia cada mensagem de entrada com a próxima saída na
+// mesma conversa (ver supabase/migrations/20260819120000_dashboard_whatsapp_stats_rpc.sql).
+// Sem p_usuario_ids/p_fabricante_ids: a RLS de whatsapp_conversas já restringe um
+// não-gestor às conversas em que ele é responsável, então a própria RPC devolve
+// só os dados que o usuário logado pode ver — nada a filtrar aqui.
+export function useDashboardWhatsappStats(
+  empresaId?: string,
+  filters?: { dateFrom?: string; dateTo?: string },
+) {
+  const { dateFrom, dateTo } = filters ?? {};
+
+  return useQuery({
+    queryKey: ['dashboard_whatsapp_stats', empresaId, dateFrom, dateTo],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('dashboard_whatsapp_stats', {
+        p_date_from: dateFrom ?? null,
+        p_date_to: dateTo ?? null,
+      });
+      if (error) throw error;
+      const row = (data as DashboardWhatsappStats[] | null)?.[0];
+      return (row ?? {
+        conversas_abertas: 0,
+        conversas_fechadas: 0,
+        tempo_resposta_atendente: [],
+      }) as DashboardWhatsappStats;
+    },
+    enabled: !!empresaId,
+    placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTS,
+  });
+}

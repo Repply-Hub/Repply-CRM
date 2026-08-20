@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, DollarSign, Target, Clock, Loader2, FileDown, X } from 'lucide-react';
-import { useFaturamentoMensal, useIndicadoresVendedor, useDashboardStats } from '@/hooks/use-dashboard';
+import { useFaturamentoMensal, useIndicadoresVendedor, useDashboardStats, useDashboardWhatsappStats } from '@/hooks/use-dashboard';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -91,6 +91,15 @@ const Dashboard = () => {
   const { data: stats, isLoading: loadStats, isFetching: fetchingStats } = useDashboardStats(empresaId, {
     usuarioIds: vendedorIds,
     fabricanteIds,
+    dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
+    dateTo: format(dateRange.to, 'yyyy-MM-dd'),
+  });
+
+  // Métricas de atendimento WhatsApp (conversas abertas/fechadas, tempo médio de
+  // resposta por atendente) — só interessam ao gestor/admin acompanhando a equipe;
+  // pra não-gestor nem dispara a query (RLS de whatsapp_conversas já restringiria
+  // ao próprio usuário, mas o gráfico fica oculto de qualquer forma — ver DashboardCharts).
+  const { data: whatsappStats } = useDashboardWhatsappStats(isGestor ? empresaId : undefined, {
     dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
     dateTo: format(dateRange.to, 'yyyy-MM-dd'),
   });
@@ -360,6 +369,8 @@ const Dashboard = () => {
             conversaoVendedor={conversaoVendedor}
             rendimentoFabrica={rendimentoFabrica}
             rendimentoVendedor={rendimentoVendedor}
+            whatsappConversas={isGestor && whatsappStats ? { abertas: whatsappStats.conversas_abertas, fechadas: whatsappStats.conversas_fechadas } : null}
+            whatsappTempoResposta={whatsappStats?.tempo_resposta_atendente ?? []}
           />
         </Suspense>
         </div>

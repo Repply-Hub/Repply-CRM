@@ -5,7 +5,7 @@ import {
   Tooltip, Area, AreaChart,
 } from 'recharts';
 import type { TooltipProps } from 'recharts';
-import { TrendingUp, Factory } from 'lucide-react';
+import { TrendingUp, Factory, MessageCircle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/DashboardChartTooltip';
@@ -27,6 +27,18 @@ const formatCurrency = (v: number) =>
 const formatPercentTick = (v: number) => `${Math.round(v)}%`;
 const formatPercentTooltip = (v: number) =>
   `${v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+
+// Tempo médio de resposta vem em minutos (fracionários) da RPC — acima de 1h vira
+// "Xh Ymin" pra não mostrar "87 min" num painel pensado pra leitura rápida pelo gestor.
+const formatMinutos = (v: number) => {
+  if (v >= 60) {
+    const h = Math.floor(v / 60);
+    const m = Math.round(v % 60);
+    return m > 0 ? `${h}h ${m}min` : `${h}h`;
+  }
+  return `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} min`;
+};
+const formatMinutosTick = (v: number) => (v >= 60 ? `${Math.round(v / 60)}h` : `${Math.round(v)}min`);
 
 // Fábricas além desse número entram agrupadas na fatia "Outros" da pizza de
 // faturamento — nenhuma fica de fora do gráfico, só sai da lista principal.
@@ -108,6 +120,10 @@ interface DashboardChartsProps {
   conversaoVendedor: { nome: string; conversao: number; id: string | null }[];
   rendimentoFabrica: { fabrica: string; valor: number }[];
   rendimentoVendedor: { vendedor: string; valor: number }[];
+  // null = não-gestor: seção de atendimento WhatsApp inteira fica oculta (métrica
+  // pensada pra gestor/admin acompanhar a equipe, não o desempenho individual).
+  whatsappConversas: { abertas: number; fechadas: number } | null;
+  whatsappTempoResposta: { atendente: string; minutos: number }[];
 }
 
 export function DashboardCharts({
@@ -116,6 +132,8 @@ export function DashboardCharts({
   conversaoVendedor,
   rendimentoFabrica,
   rendimentoVendedor,
+  whatsappConversas,
+  whatsappTempoResposta,
 }: DashboardChartsProps) {
   const [fabricaSort, setFabricaSort] = useState<'maior' | 'menor'>('maior');
 
@@ -132,6 +150,25 @@ export function DashboardCharts({
     );
     return Math.max(80, Math.ceil(maxWidth) + 12);
   }, [conversaoVendedor]);
+
+  const conversasStatusData = useMemo(
+    () => whatsappConversas
+      ? [
+          { status: 'Abertas', quantidade: whatsappConversas.abertas },
+          { status: 'Fechadas', quantidade: whatsappConversas.fechadas },
+        ]
+      : [],
+    [whatsappConversas],
+  );
+
+  // Mesma técnica de vendedorAxisWidth acima, reaplicada aos nomes dos atendentes.
+  const atendenteAxisWidth = useMemo(() => {
+    const maxWidth = whatsappTempoResposta.reduce(
+      (max, v) => Math.max(max, getVendedorNameWidth(v.atendente ?? '')),
+      0,
+    );
+    return Math.max(80, Math.ceil(maxWidth) + 12);
+  }, [whatsappTempoResposta]);
 
   // Mostra todas as fábricas na pizza — sem cortar as menores, só agrupa o
   // excedente em "Outros" (com o detalhe de cada uma disponível no hover via
@@ -386,6 +423,76 @@ export function DashboardCharts({
           </CardContent>
         </Card>
       </div>
+
+      {/* Atendimento WhatsApp — só renderizado pra gestor/admin (whatsappConversas null pro resto) */}
+      {whatsappConversas && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+          {/* Conversas Abertas x Fechadas */}
+          <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <MessageCircle className="h-4 w-4 text-primary" /> Conversas Abertas x Fechadas
+              </CardTitle>
+              <CardDescription className="text-xs">Volume de atendimento no WhatsApp por status</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={conversasStatusData} barCategoryGap="35%">
+                  <CartesianGrid {...commonGridProps} />
+                  <XAxis dataKey="status" {...commonAxisProps} />
+                  <YAxis {...commonAxisProps} allowDecimals={false} />
+                  <Tooltip content={<ChartTooltip formatValue={(v) => `${v} conversa(s)`} />} />
+                  <Bar
+                    dataKey="quantidade"
+                    name="Conversas"
+                    radius={[8, 8, 0, 0]}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
+                  >
+                    {conversasStatusData.map((entry, idx) => (
+                      <Cell key={idx} fill={entry.status === 'Abertas' ? chartColors.primary : chartColors.success} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Tempo Médio de Resposta por Atendente */}
+          <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <Clock className="h-4 w-4 text-primary" /> Tempo Médio de Resposta
+              </CardTitle>
+              <CardDescription className="text-xs">Tempo até a primeira resposta no WhatsApp, por atendente</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={whatsappTempoResposta} layout="vertical" barCategoryGap="20%">
+                  <defs>
+                    <linearGradient id="gradientTempoResposta" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={chartColors.warning} stopOpacity={0.7} />
+                      <stop offset="100%" stopColor={chartColors.warning} stopOpacity={1} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid {...commonGridProps} vertical horizontal={false} />
+                  <XAxis type="number" {...commonAxisProps} tickFormatter={formatMinutosTick} />
+                  <YAxis dataKey="atendente" type="category" {...commonAxisProps} width={atendenteAxisWidth} tick={renderVendedorTick} interval={0} />
+                  <Tooltip content={<ChartTooltip formatValue={formatMinutos} />} />
+                  <Bar
+                    dataKey="minutos"
+                    name="Tempo médio"
+                    fill="url(#gradientTempoResposta)"
+                    radius={[0, 8, 8, 0]}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </>
   );
 }

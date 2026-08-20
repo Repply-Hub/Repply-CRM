@@ -3932,6 +3932,17 @@ export type Database = {
           total_pedidos: number
         }[]
       }
+      dashboard_whatsapp_stats: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+        }
+        Returns: {
+          conversas_abertas: number
+          conversas_fechadas: number
+          tempo_resposta_atendente: Json
+        }[]
+      }
       delete_current_user: { Args: never; Returns: undefined }
       delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
       empresa_plano_ativo: { Args: never; Returns: boolean }
