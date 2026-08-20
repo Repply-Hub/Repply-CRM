@@ -123,7 +123,17 @@ const EditarPedido = () => {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [pdfPreview, setPdfPreview] = useState<FilePreviewTarget | null>(null);
+  // Confirmação de remoção do anexo já salvo. Remover aqui apenas DESVINCULA: grava
+  // pdf_url = null no negócio. O arquivo continua no bucket "pedido-anexos" e o link
+  // antigo fica registrado no Histórico de Alterações, então um clique errado é
+  // reversível.
+  const [removerAnexoOpen, setRemoverAnexoOpen] = useState(false);
   const [camposExtras, setCamposExtras] = useState<Record<string, string>>({});
+  // Valor de negociação: por padrão espelha a soma dos itens; quando o usuário digita,
+  // passa a valer o número digitado. Mesmo par de estados do cadastro novo
+  // (NovoNegocioDialog.tsx).
+  const [valorManual, setValorManual] = useState<number | null>(null);
+  const [isManualMode, setIsManualMode] = useState(false);
   const { profile } = useAuth();
   const { data: camposConfig } = useConfiguracoesCampos('pedidos', profile?.empresa_id);
   const { data: marcadores } = useMarcadores(profile?.empresa_id);
@@ -155,6 +165,16 @@ const EditarPedido = () => {
         unidade: i.unidade || '',
         preco_unitario: Number(i.preco_unitario),
       })));
+      // O banco guarda so um numero, sem dizer se veio da soma dos itens ou se foi
+      // digitado. Deduzimos: valor salvo diferente da soma dos itens = alguem digitou,
+      // entao o campo abre em modo manual. E isso que faz o valor dos negocios
+      // importados (que tem valor e nenhum item) reaparecer em vez de zerar.
+      const somaItens = pedidoData.itens.reduce((sum, i) => sum + Number(i.quantidade) * Number(i.preco_unitario), 0);
+      const valorSalvo = Number(p.valor_total ?? 0);
+      if (Math.abs(valorSalvo - somaItens) >= 0.01) {
+        setValorManual(valorSalvo);
+        setIsManualMode(true);
+      }
       setInitialized(true);
     }
   }, [pedidoData, initialized]);
@@ -171,6 +191,9 @@ const EditarPedido = () => {
   );
 
   const valorTotal = useMemo(() => itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0), [itens]);
+  // Valor que vale para exibição e para gravação: o digitado, quando houver;
+  // senão, a soma dos itens.
+  const valorFinal = isManualMode ? (valorManual || 0) : valorTotal;
 
   const pedidoStatus = pedidoData?.pedido?.status || '';
   const isClosedStatus = ['fechamento', 'perdido'].includes(pedidoStatus);
@@ -246,6 +269,10 @@ const EditarPedido = () => {
       prazo_resposta: prazoResposta ? 'ok' : undefined,
       observacoes: observacoes,
       itens: itens.length > 0 ? 'ok' : undefined,
+      // "Valor de Negociacao" e campo padrao configuravel (campo_key `valor_manual`).
+      // Sem esta linha, a empresa que o marcasse como obrigatorio nunca conseguia salvar
+      // a edicao: a chave nao existia no mapa e a validacao reprovava sempre.
+      valor_manual: valorFinal > 0 ? 'ok' : undefined,
     };
     for (const campo of camposConfig ?? []) {
       if (!isCampoObrigatorioNaEtapa(campo, currentKanbanColunaId)) continue;
@@ -299,6 +326,10 @@ const EditarPedido = () => {
         observacoes: observacoes || undefined,
         pdf_url: newPdfUrl,
         campos_extras: camposExtras,
+        // So manda o valor quando o usuario digitou. Fora disso o campo nem vai no
+        // payload, e o gatilho do banco segue calculando pela soma dos itens - que e
+        // exatamente o comportamento de hoje, sem risco de zerar valor importado.
+        valor_total: isManualMode ? valorFinal : undefined,
         itens: itens.map(i => ({
           id: i.id,
           descricao_material: i.descricao_material,
@@ -679,6 +710,16 @@ const EditarPedido = () => {
                           >
                             Ver PDF
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="relative z-10 h-8 w-8 text-destructive"
+                            title="Remover anexo"
+                            aria-label="Remover anexo"
+                            onClick={(e) => { e.stopPropagation(); setRemoverAnexoOpen(true); }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </>
                       ) : (
                         <>
@@ -747,11 +788,31 @@ const EditarPedido = () => {
                   </div>
 
                   {itens.length === 0 ? (
-                    <div className="border border-dashed border-border rounded-lg p-8 text-center">
-                      <p className="text-sm text-muted-foreground mb-3">Nenhum item adicionado</p>
-                      <Button size="sm" variant="outline" onClick={addItem}>
-                        <Plus className="h-4 w-4 mr-1" /> Adicionar primeiro item
-                      </Button>
+                    <div className="space-y-6">
+                      <div className="border border-dashed border-border rounded-lg p-8 text-center">
+                        <p className="text-sm text-muted-foreground mb-3">Nenhum item adicionado</p>
+                        <Button size="sm" variant="outline" onClick={addItem}>
+                          <Plus className="h-4 w-4 mr-1" /> Adicionar primeiro item
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2 p-4 border rounded-xl bg-muted/10 max-w-sm">
+                        <Label className="text-sm font-semibold">Valor de Negociacao</Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">R$</span>
+                          <Input
+                            type="number"
+                            className="h-10 pl-9 text-base font-bold"
+                            value={valorManual ?? ''}
+                            onChange={(e) => {
+                              setValorManual(parseFloat(e.target.value) || 0);
+                              setIsManualMode(true);
+                            }}
+                            placeholder="0,00"
+                          />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">Defina o valor manualmente caso nao queira listar itens individuais.</p>
+                      </div>
                     </div>
                   ) : (
                     <div className="rounded-xl border border-border overflow-hidden">
@@ -813,11 +874,40 @@ const EditarPedido = () => {
                           ))}
                         </TableBody>
                       </Table>
-                      <div className="flex justify-end px-4 py-3 bg-muted/30 border-t border-border">
+                      <div className="flex justify-between items-center px-4 py-3 bg-muted/30 border-t border-border">
+                        <div className="flex-1 max-w-[200px] space-y-1">
+                          <Label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Valor de Negociacao</Label>
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">R$</span>
+                            <Input
+                              type="number"
+                              className={cn("h-9 pl-8 text-sm font-bold transition-all", isManualMode ? "border-primary ring-1 ring-primary bg-background" : "bg-muted/30 border-transparent")}
+                              value={isManualMode ? (valorManual ?? 0) : valorTotal}
+                              onChange={(e) => {
+                                setValorManual(parseFloat(e.target.value) || 0);
+                                setIsManualMode(true);
+                              }}
+                              placeholder="0,00"
+                            />
+                            {isManualMode && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-1 top-1 h-7 px-2 text-[10px] text-primary"
+                                onClick={() => {
+                                  setIsManualMode(false);
+                                  setValorManual(null);
+                                }}
+                              >
+                                Automatico
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                         <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Valor Total</p>
+                          <p className="text-xs text-muted-foreground">{isManualMode ? 'Valor Manual' : 'Total dos Itens'}</p>
                           <p className="text-lg font-bold text-foreground">
-                            {valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {valorFinal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </p>
                         </div>
                       </div>
@@ -898,6 +988,32 @@ const EditarPedido = () => {
             <Button variant="outline" onClick={() => setOrigemDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleCreateOrigem}>
               Criar Origem
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={removerAnexoOpen} onOpenChange={setRemoverAnexoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover o anexo deste negócio?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2 text-sm text-muted-foreground">
+            <p>O negócio vai ficar sem anexo assim que você salvar as alterações.</p>
+            <p>O arquivo não é apagado do sistema — ele só deixa de ficar ligado a este negócio.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoverAnexoOpen(false)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setPdfUrl('');
+                setPdfFile(null);
+                setRemoverAnexoOpen(false);
+                toast.success('Anexo removido. Salve as alterações para confirmar.');
+              }}
+            >
+              Remover anexo
             </Button>
           </DialogFooter>
         </DialogContent>

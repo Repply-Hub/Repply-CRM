@@ -42,6 +42,10 @@ export interface UpdatePedidoPayload {
   observacoes?: string;
   pdf_url?: string;
   campos_extras?: Record<string, string>;
+  /** Valor de negociação digitado à mão. Ausente = deixa o valor por conta do gatilho
+   * do banco (soma dos itens). Ver o passo 4 da mutação: precisa ser gravado DEPOIS
+   * dos itens, senão `trg_recalcular_valor_total` sobrescreve. */
+  valor_total?: number;
   itens: {
     id?: string;
     descricao_material: string;
@@ -124,12 +128,38 @@ export function useUpdatePedidoCompleto() {
         : await deleteQuery;
       if (delErr) throw delErr;
 
+      // 4. Valor de negociação — gravado por último DE PROPÓSITO.
+      // O gatilho `trg_recalcular_valor_total` (AFTER INSERT/UPDATE/DELETE em
+      // itens_pedido) reescreve pedidos.valor_total com a soma dos itens. Se este
+      // update fosse junto com o passo 1, os passos 2 e 3 o apagariam.
+      //
+      // LIMITE CONHECIDO: isso preserva o valor digitado em toda alteração feita por
+      // esta tela e pelo cadastro novo — os únicos caminhos que hoje mexem em
+      // itens_pedido. Se um dia surgir outro caminho que altere itens sem regravar o
+      // valor, o gatilho volta a mandar. A alternativa seria uma coluna marcando
+      // "valor digitado à mão" e um gatilho que a respeitasse; foi descartada por
+      // exigir cirurgia num gatilho de que importação, kanban e painéis dependem.
+      //
+      // Sem `valor_total` no payload, nada é gravado aqui e o gatilho segue mandando.
+      if (payload.valor_total !== undefined) {
+        const { error: valorErr } = await supabase
+          .from('pedidos')
+          .update({ valor_total: payload.valor_total })
+          .eq('id', payload.pedido_id);
+        if (valorErr) throw valorErr;
+      }
+
       return { id: payload.pedido_id };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pedidos'] });
       qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
       qc.invalidateQueries({ queryKey: ['pedido_completo'] });
+      // O valor entra nos totais do funil e nos painéis; sem estas três, o número novo
+      // só aparecia lá depois de recarregar a página.
+      qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
+      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
     },
   });
 }
