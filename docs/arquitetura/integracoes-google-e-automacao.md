@@ -1,4 +1,17 @@
-# Integrações Google: Gmail OAuth2 e Google Maps
+# Integrações Google e configuração de automação
+
+Cobre três assuntos que nasceram juntos nesta investigação: o **Google Maps** (em uso), o
+**Gmail OAuth** (hoje legado) e a tabela **`configuracoes_automacao`** depois da
+consolidação multi-empresa.
+
+> ⚠️ **Atualização de 19/08/2026 — o Gmail não é mais o provedor de e-mail.** O sistema
+> migrou para o **Nylas** em agosto de 2026. Tudo que este documento diz sobre `gmail_*`
+> descreve **código legado que ainda está no repositório**, não o caminho ativo. O provedor
+> atual está em [`docs/modulos/email.md`](../modulos/email.md).
+>
+> O que continua válido: a seção de **Google Maps**, a seção de **`configuracoes_automacao`**
+> e as três divergências apontadas na seção 8 — que já foram corrigidas em
+> [`integracoes-externas.md`](integracoes-externas.md).
 
 > Documento gerado a partir de leitura direta do código em `supabase/functions/`, `supabase/migrations/` e
 > `src/` nesta data (2026-07-07). Todas as afirmações abaixo citam o arquivo e a linha de onde foram
@@ -220,3 +233,4 @@ pontos:
 
 Recomenda-se atualizar `INTEGRATION_AUDIT.md` para refletir isso e, principalmente, remover a chave real
 exposta na linha 55.
+

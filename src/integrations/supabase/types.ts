@@ -1710,6 +1710,7 @@ export type Database = {
           campos_extras: Json
           cnpj: string | null
           created_at: string
+          empresa_id: string
           id: string
           nome: string | null
           nome_contato: string | null
@@ -1720,6 +1721,9 @@ export type Database = {
           campos_extras?: Json
           cnpj?: string | null
           created_at?: string
+          // Preenchido por trigger com a empresa de quem insere; só o super-admin
+          // precisaria passar explicitamente.
+          empresa_id?: string
           id?: string
           nome?: string | null
           nome_contato?: string | null
@@ -1730,6 +1734,7 @@ export type Database = {
           campos_extras?: Json
           cnpj?: string | null
           created_at?: string
+          empresa_id?: string
           id?: string
           nome?: string | null
           nome_contato?: string | null
@@ -3173,6 +3178,7 @@ export type Database = {
           categoria: string | null
           created_at: string
           descricao_material: string
+          empresa_id: string
           estoque_disponivel: number | null
           fabricante_id: string
           id: string
@@ -3187,6 +3193,8 @@ export type Database = {
           categoria?: string | null
           created_at?: string
           descricao_material: string
+          // Preenchido por trigger com a empresa do fabricante.
+          empresa_id?: string
           estoque_disponivel?: number | null
           fabricante_id: string
           id?: string
@@ -3201,6 +3209,7 @@ export type Database = {
           categoria?: string | null
           created_at?: string
           descricao_material?: string
+          empresa_id?: string
           estoque_disponivel?: number | null
           fabricante_id?: string
           id?: string

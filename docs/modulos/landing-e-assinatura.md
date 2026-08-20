@@ -1,47 +1,41 @@
-# Hand-off — Landing Page + Cadastro com Pagamento (Repply Imob)
+# Landing page e assinatura — Repply CRM
 
-Documento pronto para entregar ao **Claude Code**. Contém a identidade visual real da marca
-(extraída do Instagram [@repply.hub](https://www.instagram.com/repply.hub/) e do site
-[repplyhub.com.br](https://www.repplyhub.com.br)), a estrutura da landing page e o resumo do fluxo de
-pagamento. Os detalhes técnicos de billing estão em **`docs/PLANO_LP_E_PAGAMENTO.md`** (referenciado ao longo).
+Registro de como a landing page pública e o fluxo de cadastro com pagamento foram
+concebidos e construídos. Nasceu como documento de entrega para o Claude Code; virou a
+única memória escrita do porquê a landing é do jeito que é.
 
----
+> **Correção de produto (19/08/2026).** A versão original deste documento chamava este
+> sistema de **Repply Imob**. Está errado. Este repositório é o **Repply CRM**, para
+> representantes comerciais; o Repply Imob é outro produto, outro público e outra base de
+> código. Ver [`SPEC.md` §1.2](../../SPEC.md). As referências foram corrigidas — se
+> sobrou alguma, corrija.
 
-## 🟠 Cole isto no Claude Code (prompt inicial)
-
-> Leia `docs/HANDOFF_REPPLY_IMOB_LP.md` e `docs/PLANO_LP_E_PAGAMENTO.md`. Implemente, na ordem da seção
-> "Tarefas para o Claude Code", uma **landing page pública** para o produto **Repply Imob** (o CRM comercial),
-> seguindo a identidade visual da marca descrita aqui, e o **fluxo de cadastro com paywall** (paga para ativar,
-> planos fixos mensais). Comece pela **Fase 1 (LP visual)** e pare para eu revisar antes de mexer em rotas/backend.
-> Não invente preços — use placeholders e me pergunte. Mantenha tudo em pt-BR e reutilize os tokens de marca
-> que já existem em `src/index.css` ("Repply Brand System V2.0").
+**Onde ficou o resto:** os detalhes de cobrança estão em
+[`docs/operacao/cobranca-stripe.md`](../operacao/cobranca-stripe.md).
 
 ---
 
 ## 1. Contexto do produto
 
-**Repply Hub** é um ecossistema digital para o mercado da **construção e imobiliário** (Grupo MD · Natal/RN),
-com **quatro frentes**:
+**Repply** é a casa de tecnologia e marketing do Grupo MD (Natal/RN), com duas marcas de
+mercado:
 
-| Frente | O que é |
+| Marca | Público |
 |---|---|
-| **Repply Ads** | Tráfego pago |
-| **Repply Studio** | Audiovisual |
-| **Repply Imob** | **CRM comercial ← este é o produto desta LP** |
-| **Repply Labs** | Tecnologia sob medida |
+| **Repply Hub** | Construtoras, incorporadoras, imobiliárias e arquitetos. Dentro dela: Ads, Studio, **Imob** e Labs |
+| **Repply CRM** | **Representantes comerciais** — é este repositório |
 
-Este repositório (o CRM) é o **Repply Imob**: "Organização do funil e previsibilidade de vendas, do primeiro
-contato ao fechamento." A LP deve se posicionar como o **CRM comercial do ecossistema Repply**.
+O Repply CRM tem marca, discurso e presença próprios, separados da Hub, porque fala com
+outro público. Não aparece no site da Hub de propósito.
 
-**Público-alvo (do site oficial):** incorporadoras, construtoras, imobiliárias e arquitetos — "quem lança e
-precisa vender".
+**Público-alvo da landing:** representante comercial — hoje com recorte em materiais de
+construção, tanto quem vende B2B para engenharia quanto quem vende para o varejo.
 
-> ⚠️ **Nuance a decidir (ver seção 7):** o código atual nasceu para representação de **materiais de construção**
-> (fabricantes, pedidos, obras). A marca Repply aponta para o mercado **imobiliário/incorporação**. As copies
-> abaixo usam a voz imobiliária da marca; os módulos reais do sistema (pipeline, clientes, WhatsApp, e-mail,
-> dashboard) são genéricos o suficiente. Confirmar o vocabulário final com o Vinicius.
+**Posicionamento:** *o CRM que fala a sua língua.* O nome herda a história
+"Rep + ply" (Representante + Reply).
 
 ---
+
 
 ## 2. Identidade visual (fonte da verdade: site + Instagram)
 
@@ -68,7 +62,7 @@ sempre com o laranja como constante.
 - **Símbolo "r."**: um "r" minúsculo branco com um **quadrado laranja arredondado** no lugar do ponto, dentro de
   um badge quadrado quase-preto. Já existe em `src/assets/` e `src/components/layout/Logo.tsx` — **reutilizar**.
 - **Lockup horizontal**: badge "r." + wordmark **"repply hub."** — `repply` branco bold, `hub.` laranja bold.
-  Para o produto, pode usar **"repply imob."** (imob laranja) no header da LP, mantendo o mesmo estilo.
+  Para o produto, pode usar **"repply crm."** (crm laranja) no header da LP, mantendo o mesmo estilo.
 
 ### 2.3 Tipografia
 
@@ -103,19 +97,19 @@ Editorial, confiante, provocativo e "de dentro do mercado". Exemplos reais da ma
 
 ---
 
-## 3. Estrutura da Landing Page (Repply Imob)
+## 3. Estrutura da Landing Page
 
 Nova `src/pages/Landing.tsx` + seções em `src/components/landing/*`. Layout base inspirado no site oficial e na
 LP da QuantIA. Seções, em ordem (copy = **sugestão** na voz da marca, ajustável):
 
-1. **Nav** (sticky, translúcida sobre o escuro): logo "repply imob." · âncoras (Problema · Recursos · Preços) ·
+1. **Nav** (sticky, translúcida sobre o escuro): logo "repply crm." · âncoras (Problema · Recursos · Preços) ·
    "Entrar" · **CTA "Criar conta"**. Barra de progresso laranja no topo.
 2. **Hero:** eyebrow `CRM COMERCIAL · IMOBILIÁRIO` + headline grande com keyword laranja
    (ex: "O CRM de quem **lança e vende** empreendimento.") + subhead
    ("Funil, WhatsApp, e-mail e previsibilidade de vendas — do primeiro contato ao fechamento, num só lugar.") +
    **2 CTAs** ("Criar conta" gradiente / "Ver planos" outline) + demo animada do produto (ver §3.1).
 3. **O Cenário / Problema — "Antes / Agora":** planilha + WhatsApp solto + leads perdidos → pipeline
-   organizado no Repply Imob. Bloco comparativo (herda o padrão do site e da QuantIA).
+   organizado no Repply CRM. Bloco comparativo (herda o padrão do site e da QuantIA).
 4. **Como funciona (3 passos):** Cadastre sua empresa → Convide seu time (código) → Venda com o funil + automações.
 5. **Recursos (grid dos módulos reais):** Pipeline/Funil (Kanban), Clientes & Contatos, Negócios/Propostas,
    **WhatsApp Inbox**, **E-mail (Gmail)**, Dashboard/KPIs, Calendário, Tarefas, Obras/Empreendimentos,
@@ -182,16 +176,34 @@ recebendo mensagens e virando card no funil. Escuro, com acentos laranja.
 
 ---
 
-## 7. Decisões pendentes (perguntar ao Vinicius antes das Fases 3+)
+## 7. As decisões que estavam pendentes — e como ficaram
 
-1. **Preços e limites** dos 3 planos (Starter/Pro/Business) — valores e nº de usuários por plano.
-2. **Vocabulário do produto:** manter termos atuais (fabricantes/pedidos/representação) ou migrar para o
-   imobiliário (empreendimentos/lançamentos/incorporadoras)?
-3. **Nome na LP:** "Repply Imob" (frente do Hub) vs só "Repply"?
-4. **Boleto/PIX** no recorrente ou **cartão apenas**?
-5. **Confirmação de e-mail** no lançamento: manter ou desligar (para o fluxo "paga para ativar")?
-6. **Conta Stripe** do Repply/Grupo MD já existe? **Domínio** público para success/cancel/webhook.
-7. **`max_seats`**: o que acontece ao estourar o limite de usuários do plano?
+Esta seção era uma lista de perguntas em aberto. Fechada em 19/08/2026.
+
+| Pergunta original | Como ficou |
+|---|---|
+| Preços e limites dos 3 planos (Starter/Pro/Business) | **Não são três.** É um só: **Plano de Lançamento, R$ 2.997/ano, usuários ilimitados, todos os módulos.** Catálogo exibido em `src/lib/planos.ts`; fonte de verdade na tabela `planos` |
+| Vocabulário: manter representação ou migrar para o imobiliário | **Mantém representação.** Fabricante, pedido, obra. O vocabulário imobiliário pertence ao Repply Imob, que é outro produto |
+| Nome na landing: "Repply Imob" ou só "Repply" | **Repply CRM.** Marca de mercado própria, separada da Hub |
+| Boleto/PIX ou cartão apenas | Stripe no cartão. Meio alternativo não entrou no escopo |
+| Confirmação de e-mail: manter ou desligar | Mantida |
+| Conta Stripe e domínio público | Resolvidos. Domínio e Stripe já são da Repply |
+| `max_seats` ao estourar o limite | **Não se aplica** — o Plano de Lançamento é de usuários ilimitados |
+
+### Tipografia — o que este documento recomendava e o que foi implementado
+
+O documento original sugeria **Sora ou Space Grotesk** para títulos e **Inter** para
+corpo, como aproximação até confirmar a fonte da marca. **A fonte real é outra** e já está
+no código:
+
+| Uso | Fonte real | Onde |
+|---|---|---|
+| Títulos | **General Sans** | Fontshare, declarada em `index.html` |
+| Corpo | **Satoshi** | Fontshare |
+| Dados e números | **JetBrains Mono** | Google Fonts |
+
+Use as fontes acima. As recomendações de Sora/Inter no corpo deste documento estão
+superadas.
 
 ---
 
