@@ -3597,6 +3597,56 @@ export type Database = {
           },
         ]
       }
+      whatsapp_conversa_visualizacoes: {
+        Row: {
+          conversa_id: string
+          id: string
+          usuario_id: string
+          visualizado_em: string
+        }
+        Insert: {
+          conversa_id: string
+          id?: string
+          usuario_id: string
+          visualizado_em?: string
+        }
+        Update: {
+          conversa_id?: string
+          id?: string
+          usuario_id?: string
+          visualizado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversa_visualizacoes_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversa_visualizacoes_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversa_visualizacoes_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_usuario"
+            referencedColumns: ["usuario_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversa_visualizacoes_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "vw_indicadores_vendedor"
+            referencedColumns: ["usuario_id"]
+          },
+        ]
+      }
       whatsapp_conversas: {
         Row: {
           arquivada: boolean
@@ -3617,6 +3667,7 @@ export type Database = {
           telefone: string
           ultima_mensagem: string | null
           ultima_mensagem_at: string | null
+          ultima_mensagem_direcao: string | null
           updated_at: string
         }
         Insert: {
@@ -3638,6 +3689,7 @@ export type Database = {
           telefone: string
           ultima_mensagem?: string | null
           ultima_mensagem_at?: string | null
+          ultima_mensagem_direcao?: string | null
           updated_at?: string
         }
         Update: {
@@ -3659,6 +3711,7 @@ export type Database = {
           telefone?: string
           ultima_mensagem?: string | null
           ultima_mensagem_at?: string | null
+          ultima_mensagem_direcao?: string | null
           updated_at?: string
         }
         Relationships: [

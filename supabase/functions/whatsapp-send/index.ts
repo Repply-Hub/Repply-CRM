@@ -507,7 +507,7 @@ serve(async (req) => {
       // destino, a conversa nasce já com o número que o WhatsApp confirmou.
       const { data: conv } = await supabase.from("whatsapp_conversas")
         .upsert(
-          { empresa_id: userData.empresa_id, telefone: numeroUsado, ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, instancia_id: config.id },
+          { empresa_id: userData.empresa_id, telefone: numeroUsado, ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, ultima_mensagem_direcao: "saida", instancia_id: config.id },
           { onConflict: "empresa_id,telefone" }
         ).select("id").single();
       conversaId = conv?.id;
@@ -530,7 +530,7 @@ serve(async (req) => {
       // pela conversa (aparece em "Meus chats"), tanto em grupo quanto em chat individual.
       const [, gravacao] = await Promise.all([
         supabase.from("whatsapp_conversas")
-          .update({ ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, arquivada: false, instancia_id: config.id })
+          .update({ ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, ultima_mensagem_direcao: "saida", arquivada: false, instancia_id: config.id })
           .eq("id", conversaId),
         supabase.from("whatsapp_mensagens").insert(insertData),
         ensureResponsavel(supabase, conversaId, userData.id),

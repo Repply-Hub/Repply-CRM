@@ -644,7 +644,22 @@ async function handleIncomingMessage(
     }
   }
 
-  if (!conteudo) conteudo = `[${tipo}]`;
+  // Resposta a menu interativo (lista/botão): a uazapi não manda `text` nesse
+  // caso, só o id do item escolhido em `buttonOrListid` (campo documentado no
+  // schema oficial da Message, https://docs.uazapi.com/ — não tem endpoint que
+  // devolva o rótulo, só o id mesmo). Sem isso, toda escolha de menu virava o
+  // fallback genérico abaixo.
+  if (!conteudo && msg.buttonOrListid) conteudo = String(msg.buttonOrListid);
+
+  if (!conteudo) {
+    // Chegou aqui sem nenhum texto reconhecível — grava o payload cru pra dar
+    // pra investigar da próxima vez (mesmo padrão do debug de reação/ligação
+    // logo acima), em vez de só perder silenciosamente o conteúdo real.
+    await supabase.from("webhook_debug").insert({
+      payload: { _texto_vazio_debug: true, msg, content, msgType },
+    });
+    conteudo = `[${tipo}]`;
+  }
 
   // Mensagem citada (reply) — `msg.quoted` é uma STRING PURA com o id da mensagem
   // citada (confirmado contra payloads reais em webhook_debug/_reaction_debug), não um
@@ -725,14 +740,16 @@ async function handleIncomingMessage(
   // incrementado a cada reentrega, mesmo quando só 1 mensagem de fato chegava —
   // daí o badge mostrar um número bem maior que a quantidade real de mensagens.
   let jaProcessada = false;
+  let msgExistenteConteudo: string | null = null;
   if (wamid) {
     const { data: msgExistente } = await supabase
       .from("whatsapp_mensagens")
-      .select("id")
+      .select("id, conteudo")
       .eq("empresa_id", empresaId)
       .eq("wamid", wamid)
       .maybeSingle();
     jaProcessada = !!msgExistente;
+    msgExistenteConteudo = msgExistente?.conteudo ?? null;
   }
 
   let { data: existente } = await supabase
@@ -795,6 +812,7 @@ async function handleIncomingMessage(
         nome_contato: nomeContatoResolvido,
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
+        ultima_mensagem_direcao: sentByOtherChannel ? "saida" : "entrada",
         nao_lidas:
           sentByOtherChannel || jaProcessada
             ? (existente.nao_lidas ?? 0)
@@ -821,6 +839,7 @@ async function handleIncomingMessage(
         nome_contato: nomeContatoResolvido,
         ultima_mensagem: conteudo.slice(0, 200),
         ultima_mensagem_at: new Date().toISOString(),
+        ultima_mensagem_direcao: sentByOtherChannel ? "saida" : "entrada",
         nao_lidas: sentByOtherChannel || jaProcessada ? 0 : 1,
         arquivada: false,
         is_group: isGroup,
@@ -864,6 +883,23 @@ async function handleIncomingMessage(
   if (quotedTipo) insertData.quoted_tipo = quotedTipo;
   if (quotedRemetenteNome)
     insertData.quoted_remetente_nome = quotedRemetenteNome;
+
+  // A uazapi às vezes reentrega o mesmo wamid com o conteúdo já resolvido depois de
+  // uma primeira entrega que caiu no fallback genérico "[texto]" (webhook incompleto
+  // chegando antes do texto ser processado do lado deles). O upsert normal ignora
+  // duplicado por wamid — sem este caso especial, essa segunda entrega com o texto
+  // certo era descartada e a mensagem ficava travada como "[texto]" pra sempre.
+  if (jaProcessada && wamid && msgExistenteConteudo === "[texto]" && conteudo && conteudo !== "[texto]") {
+    const { error: fixError } = await supabase
+      .from("whatsapp_mensagens")
+      .update({ conteudo, tipo })
+      .eq("empresa_id", empresaId)
+      .eq("wamid", wamid);
+    if (fixError) {
+      console.error("[webhook] falha ao corrigir mensagem [texto]:", fixError);
+    }
+    return;
+  }
 
   const { error: msgError } = await supabase
     .from("whatsapp_mensagens")
@@ -969,6 +1005,7 @@ async function handleCallEvent(supabase: any, empresaId: string, payload: any) {
       .update({
         ultima_mensagem: conteudo,
         ultima_mensagem_at: new Date().toISOString(),
+        ultima_mensagem_direcao: "entrada",
         nao_lidas: (existente.nao_lidas ?? 0) + 1,
         arquivada: false,
       })
@@ -982,6 +1019,7 @@ async function handleCallEvent(supabase: any, empresaId: string, payload: any) {
         telefone,
         ultima_mensagem: conteudo,
         ultima_mensagem_at: new Date().toISOString(),
+        ultima_mensagem_direcao: "entrada",
         nao_lidas: 1,
         arquivada: false,
         is_group: isGroupCall,

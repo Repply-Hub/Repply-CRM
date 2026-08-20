@@ -53,6 +53,10 @@ export interface WaConversa {
   foto_perfil_expires_at: string | null;
   ultima_mensagem: string | null;
   ultima_mensagem_at: string | null;
+  // Direção ('entrada'/'saida') da última mensagem — usado só pra saber se
+  // uma conversa sem responsável já foi respondida por alguém fora do CRM
+  // (celular/WhatsApp Web), ver `precisaAssumir` em WhatsAppInbox.tsx.
+  ultima_mensagem_direcao: string | null;
   nao_lidas: number;
   // Marcação manual de "não lida" via menu "..." — sobrepõe a supressão automática
   // do estado "não lida" em conversas já atribuídas (ver `conversaNaoLida` em
@@ -65,6 +69,11 @@ export interface WaConversa {
   updated_at: string;
   instancia_id: string | null;
   responsaveis?: WaResponsavel[];
+  // Quem do time já abriu esta conversa enquanto ela estava sem responsável —
+  // só populado/exibido pra conversas "Não atribuídas" (ver
+  // whatsapp_conversa_visualizacoes). Não tem relação com o estado de
+  // lida/não lida.
+  visualizadores?: WaResponsavel[];
 }
 
 function compareConversas(a: WaConversa, b: WaConversa): number {
@@ -170,13 +179,14 @@ export function useWaConversas() {
       if (!empresaId) return [];
       const { data, error } = await supabase
         .from('whatsapp_conversas')
-        .select('*, responsaveis:whatsapp_conversa_responsaveis(usuario:usuarios(id, nome, avatar_url))')
+        .select('*, responsaveis:whatsapp_conversa_responsaveis(usuario:usuarios(id, nome, avatar_url)), visualizadores:whatsapp_conversa_visualizacoes(usuario:usuarios(id, nome, avatar_url))')
         .eq('empresa_id', empresaId);
       if (error) throw error;
       return ((data ?? []) as any[])
         .map(c => ({
           ...c,
           responsaveis: (c.responsaveis ?? []).map((r: any) => r.usuario).filter(Boolean),
+          visualizadores: (c.visualizadores ?? []).map((v: { usuario: WaResponsavel | null }) => v.usuario).filter(Boolean),
         }) as WaConversa)
         .sort(compareConversas);
     },
@@ -205,10 +215,11 @@ export function useWaConversas() {
 
         qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
           (old ?? [])
-            // O payload do realtime só traz as colunas da própria tabela — sem o
-            // join de responsaveis — então preserva o que já estava no cache para
-            // não sumir com a conversa dos filtros "Meu"/"Geral".
-            .map((c) => c.id === updated.id ? { ...updated, responsaveis: c.responsaveis } : c)
+            // O payload do realtime só traz as colunas da própria tabela — sem os
+            // joins de responsaveis/visualizadores — então preserva o que já estava
+            // no cache para não sumir com a conversa dos filtros "Meu"/"Geral" nem
+            // com a pilha de quem já visualizou.
+            .map((c) => c.id === updated.id ? { ...updated, responsaveis: c.responsaveis, visualizadores: c.visualizadores } : c)
             .sort(compareConversas)
         );
         // A invalidação de `unread_wa_count` que existia aqui era DUPLICADA:
@@ -499,6 +510,42 @@ export function useWaMensagens(conversaId: string | null) {
   return { ...query, fetchOlderMensagens, hasOlderMensagens, loadingOlderMensagens };
 }
 
+// --- Exportar histórico de uma conversa ---
+
+const WA_MENSAGENS_EXPORT_PAGE_SIZE = 1000;
+
+// Busca TODAS as mensagens de uma conversa num intervalo de datas, paginando
+// com `.range()` até esgotar — não reaproveita `useWaMensagens` porque aquele
+// hook só mantém as últimas 200 mensagens em cache (carregamento incremental
+// pra tela de chat), o que não serve pra exportar "todo o período".
+export async function fetchMensagensParaExportar(
+  conversaId: string,
+  from: Date,
+  to: Date,
+): Promise<WaMensagem[]> {
+  const fromIso = new Date(from.getFullYear(), from.getMonth(), from.getDate(), 0, 0, 0).toISOString();
+  const toIso = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999).toISOString();
+
+  const todas: WaMensagem[] = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('whatsapp_mensagens')
+      .select(MENSAGEM_SELECT)
+      .eq('conversa_id', conversaId)
+      .gte('created_at', fromIso)
+      .lte('created_at', toIso)
+      .order('created_at', { ascending: true })
+      .range(offset, offset + WA_MENSAGENS_EXPORT_PAGE_SIZE - 1);
+    if (error) throw error;
+    const pagina = ((data ?? []) as unknown) as WaMensagem[];
+    todas.push(...pagina);
+    if (pagina.length < WA_MENSAGENS_EXPORT_PAGE_SIZE) break;
+    offset += WA_MENSAGENS_EXPORT_PAGE_SIZE;
+  }
+  return todas;
+}
+
 // --- Busca de mensagens por texto + período, em todas as conversas ---
 
 export interface WaMensagemBusca {
@@ -743,7 +790,7 @@ export function useWaSendMessage() {
             const responsaveis = profile?.id && !jaResponsavel
               ? [...(c.responsaveis ?? []), { id: profile.id, nome: profile.nome, avatar_url: profile.avatar_url ?? null }]
               : c.responsaveis;
-            return { ...c, ultima_mensagem: vars.mensagem, ultima_mensagem_at: new Date().toISOString(), responsaveis };
+            return { ...c, ultima_mensagem: vars.mensagem, ultima_mensagem_at: new Date().toISOString(), ultima_mensagem_direcao: 'saida', responsaveis };
           })
           .sort(compareConversas)
       );
@@ -1226,6 +1273,46 @@ export function useWaSetResponsaveis() {
     },
     onError: (err: any) => {
       toast.error(err?.message ?? 'Erro ao atualizar responsáveis');
+    },
+  });
+}
+
+// Registra que o usuário logado abriu uma conversa "Não atribuída" — só serve
+// pro gestor enxergar quem do time está entrando na conversa e não está
+// assumindo (pilha de avatares na lista). Não mexe em lida/não lida, que já
+// tem o próprio mecanismo (useWaMarcarLida). Upsert: reabrir a mesma conversa
+// não duplica linha, só atualiza `visualizado_em`.
+export function useWaRegistrarVisualizacao() {
+  const qc = useQueryClient();
+  const { profile } = useAuth();
+
+  return useMutation({
+    mutationFn: async (conversaId: string) => {
+      if (!profile?.id) return;
+      const { error } = await supabase
+        .from('whatsapp_conversa_visualizacoes')
+        .upsert(
+          { conversa_id: conversaId, usuario_id: profile.id, visualizado_em: new Date().toISOString() },
+          { onConflict: 'conversa_id,usuario_id' },
+        );
+      if (error) throw error;
+    },
+    onSuccess: (_, conversaId) => {
+      if (!profile?.id) return;
+      qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
+        (old ?? []).map((c) => {
+          if (c.id !== conversaId) return c;
+          const jaVisualizou = c.visualizadores?.some((v) => v.id === profile.id);
+          if (jaVisualizou) return c;
+          return {
+            ...c,
+            visualizadores: [
+              ...(c.visualizadores ?? []),
+              { id: profile.id, nome: profile.nome, avatar_url: profile.avatar_url ?? null },
+            ],
+          };
+        }),
+      );
     },
   });
 }

@@ -18,6 +18,7 @@ import {
   useWaDeletarConversa,
   useWaDeletarConversasEmMassa,
   useWaSetResponsaveis,
+  useWaRegistrarVisualizacao,
   useWaAddNota,
   useWaSetNotaFixada,
   useWaExcluirMensagem,
@@ -33,6 +34,7 @@ import {
   useWaBuscarMensagens,
   uploadWaMedia,
   mimeForFile,
+  fetchMensagensParaExportar,
   type WaConversa,
   type WaMensagem,
   type WaReacao,
@@ -77,6 +79,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -186,6 +189,8 @@ import {
   ZoomOut,
   RotateCcw,
   Sticker,
+  FileDown,
+  FileSpreadsheet,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -203,6 +208,11 @@ import { cn, autoResizeTextarea } from "@/lib/utils";
 import { downloadFile } from "@/lib/download-file";
 import { linkifyText } from "@/lib/linkify";
 import {
+  DateRangePicker,
+  type DateRange,
+} from "@/components/shared/DateRangePicker";
+import type { ConversaExportRow } from "@/lib/generate-conversa-pdf";
+import {
   TOGGLE_LIST_CLASS,
   TOGGLE_BUTTON_CLASS,
   TOGGLE_BUTTON_ACTIVE,
@@ -218,6 +228,49 @@ function formatPhone(phone: string) {
   if (local.length === 10)
     return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
   return phone;
+}
+
+const TIPO_MENSAGEM_LABELS: Record<string, string> = {
+  texto: "Texto",
+  imagem: "Imagem",
+  audio: "Áudio",
+  video: "Vídeo",
+  documento: "Documento",
+  sticker: "Figurinha",
+};
+
+// Transcrição pra exportação: mensagem de mídia vira "[Tipo] — legenda" (o
+// arquivo em si não entra no PDF/Excel, só o texto), e notas internas ficam de
+// fora — a exportação é o histórico real da conversa no WhatsApp, não os
+// bastidores do atendimento.
+function buildConversaExportRows(
+  mensagens: WaMensagem[],
+  nomeContato: string,
+): ConversaExportRow[] {
+  return mensagens
+    .filter((m) => !m.is_nota_interna)
+    .map((m) => {
+      const tipoLabel = TIPO_MENSAGEM_LABELS[m.tipo] ?? m.tipo ?? "Texto";
+      let mensagem: string;
+      if (m.apagada_para_todos) {
+        mensagem = "[Mensagem apagada]";
+      } else if (!m.tipo || m.tipo === "texto") {
+        mensagem = m.conteudo || "";
+      } else {
+        mensagem = m.conteudo ? `[${tipoLabel}] — ${m.conteudo}` : `[${tipoLabel}]`;
+      }
+      return {
+        dataHora: format(new Date(m.created_at), "dd/MM/yyyy HH:mm", {
+          locale: ptBR,
+        }),
+        remetente:
+          m.direcao === "saida"
+            ? (m.usuario?.nome ?? "Equipe")
+            : (m.remetente_nome ?? nomeContato),
+        tipo: tipoLabel,
+        mensagem,
+      };
+    });
 }
 
 function colorForPhone(phone: string) {
@@ -509,6 +562,19 @@ function conversaNaoLida(
   return conv.nao_lidas_forcada || conv.nao_lidas > 0;
 }
 
+// Uma conversa sem responsável só entra na fila "Não atribuídos" quando
+// ninguém ainda respondeu — se a última mensagem já saiu (mesmo mandada
+// direto do celular/WhatsApp Web, fora do CRM, onde não dá pra saber quem
+// respondeu pra atribuir automaticamente), ela não é mais um alarme de
+// "cliente esperando sem ninguém olhar". Ver ultima_mensagem_direcao em
+// use-whatsapp-inbox.ts.
+function precisaAssumir(conv: WaConversa): boolean {
+  return (
+    (conv.responsaveis ?? []).length === 0 &&
+    conv.ultima_mensagem_direcao !== "saida"
+  );
+}
+
 // Badge de não lidas. Quando a conversa está aberta (`ativa`) o contador não
 // zera mais sozinho — só some quando o usuário envia uma resposta — então aqui
 // trocamos o badge sólido por um contorno com ícone de olho, sinalizando que a
@@ -613,6 +679,54 @@ function ConversaParticipantesStack({
               textClass,
             )}
           >
+            +{restantes}
+          </AvatarFallback>
+        </Avatar>
+      )}
+    </div>
+  );
+}
+
+// Pilha de avatares em miniatura de quem do time já abriu uma conversa "Não
+// atribuída" sem assumi-la — é o que dá pro gestor ver, de relance, quem está
+// entrando na conversa do cliente e não está respondendo. Fica ao lado do
+// aviso "Conversa sem responsável!" no painel da conversa (não na sidebar):
+// só existe uma vez que a conversa está aberta, então faz mais sentido perto
+// do "Assumir"/"Direcionar" do que competindo por espaço na linha da lista.
+// Anel laranja pontilhado ecoa o badge "Não atribuído" da sidebar.
+function ConversaVisualizadoresStack({ conv }: { conv: WaConversa }) {
+  const membros = (conv.visualizadores ?? []).map((v) => ({
+    nome: v.nome,
+    chave: v.id,
+    foto: v.avatar_url,
+  }));
+  if (membros.length === 0) return null;
+
+  const visiveis = membros.slice(0, 3);
+  const restantes = membros.length - visiveis.length;
+  const nomesTitle = membros.map((m) => m.nome).join(", ");
+
+  return (
+    <div
+      className="flex -space-x-2 overflow-hidden shrink-0"
+      title={`Visualizaram sem assumir: ${nomesTitle}`}
+    >
+      {visiveis.map((m, i) => (
+        <Avatar
+          key={`${m.chave}-${i}`}
+          className="inline-block h-5 w-5 rounded-full ring-2 ring-background border border-dashed border-orange-400 dark:border-orange-500/60"
+        >
+          {m.foto && <AvatarImage src={m.foto} alt="" />}
+          <AvatarFallback
+            className={cn(colorForPhone(m.chave), "text-white font-semibold text-[7px]")}
+          >
+            {initials(m.nome, m.chave)}
+          </AvatarFallback>
+        </Avatar>
+      ))}
+      {restantes > 0 && (
+        <Avatar className="inline-block h-5 w-5 rounded-full ring-2 ring-background">
+          <AvatarFallback className="bg-muted text-muted-foreground font-semibold text-[7px]">
             +{restantes}
           </AvatarFallback>
         </Avatar>
@@ -2289,6 +2403,42 @@ function LeadSheet({
     setEditarNomeOpen(false);
   }
   const { data: mensagens = [] } = useWaMensagens(conversa.id);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportRange, setExportRange] = useState<DateRange>(() => ({
+    from: new Date(2000, 0, 1),
+    to: new Date(),
+  }));
+  const [exportando, setExportando] = useState<"pdf" | "xlsx" | null>(null);
+  async function handleExportarConversa(formato: "pdf" | "xlsx") {
+    setExportando(formato);
+    try {
+      const nomeContato = conversa.nome_contato ?? formatPhone(conversa.telefone);
+      const mensagensPeriodo = await fetchMensagensParaExportar(
+        conversa.id,
+        exportRange.from,
+        exportRange.to,
+      );
+      if (mensagensPeriodo.length === 0) {
+        toast.info("Nenhuma mensagem encontrada no período selecionado.");
+        return;
+      }
+      const linhas = buildConversaExportRows(mensagensPeriodo, nomeContato);
+      const periodoLabel = `${format(exportRange.from, "dd/MM/yyyy", { locale: ptBR })} a ${format(exportRange.to, "dd/MM/yyyy", { locale: ptBR })}`;
+      if (formato === "pdf") {
+        const { generateConversaPdf } = await import("@/lib/generate-conversa-pdf");
+        await generateConversaPdf(linhas, nomeContato, periodoLabel);
+      } else {
+        const { generateConversaExcel } = await import("@/lib/generate-conversa-excel");
+        generateConversaExcel(linhas, nomeContato);
+      }
+      setExportDialogOpen(false);
+    } catch (err) {
+      console.error("[wa] erro ao exportar conversa:", err);
+      toast.error("Não foi possível exportar a conversa.");
+    } finally {
+      setExportando(null);
+    }
+  }
   const { data: tarefasConversa = [] } = useTarefasPorConversa(conversa.id);
   // Notas internas (mensagens is_nota_interna) criadas a partir desta conversa,
   // mais recente primeiro — tarefasConversa já vem ordenada desc pelo hook.
@@ -2804,22 +2954,39 @@ function LeadSheet({
             </div>
           )}
 
-          {/* Data de início da conversa */}
-          <div className="space-y-3">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-              Conversa
-            </p>
-            <div className="space-y-1">
-              <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <CalendarDays className="h-3 w-3" /> Início
-              </Label>
-              <p className="text-sm font-medium">
-                {format(
-                  new Date(conversa.created_at),
-                  "dd/MM/yyyy 'às' HH:mm",
-                  { locale: ptBR },
-                )}
+          {/* Data de início e exportação da conversa */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+            <div className="space-y-3">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                Conversa
               </p>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <CalendarDays className="h-3 w-3" /> Início
+                </Label>
+                <p className="text-sm font-medium">
+                  {format(
+                    new Date(conversa.created_at),
+                    "dd/MM/yyyy 'às' HH:mm",
+                    { locale: ptBR },
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <FileDown className="h-3 w-3" /> Exportar conversa
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full justify-center gap-2"
+                onClick={() => setExportDialogOpen(true)}
+              >
+                <FileDown className="h-3.5 w-3.5" /> Exportar mensagens
+              </Button>
             </div>
           </div>
 
@@ -3248,6 +3415,53 @@ function LeadSheet({
               </button>
             )}
           </div>
+
+          <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Exportar conversa</DialogTitle>
+                <DialogDescription>
+                  Escolha o período e o formato do arquivo.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 pt-1">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Período
+                  </Label>
+                  <DateRangePicker value={exportRange} onChange={setExportRange} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={!!exportando}
+                    onClick={() => handleExportarConversa("pdf")}
+                    className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium hover:bg-muted/80 hover:border-primary/50 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {exportando === "pdf" ? (
+                      <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+                    ) : (
+                      <FileDown className="h-6 w-6 text-muted-foreground" />
+                    )}
+                    PDF
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!exportando}
+                    onClick={() => handleExportarConversa("xlsx")}
+                    className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium hover:bg-muted/80 hover:border-primary/50 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {exportando === "xlsx" ? (
+                      <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+                    ) : (
+                      <FileSpreadsheet className="h-6 w-6 text-muted-foreground" />
+                    )}
+                    Excel
+                  </button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </SheetContent>
     </Sheet>
@@ -3646,6 +3860,22 @@ export default function WhatsAppInbox() {
     const souResponsavel = (conv.responsaveis ?? []).some((r) => r.id === profile.id);
     if (souResponsavel && (conv.nao_lidas > 0 || conv.nao_lidas_forcada)) {
       marcarLida.mutate(conversaAtivaId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversaAtivaId, profile?.id]);
+  const registrarVisualizacao = useWaRegistrarVisualizacao();
+  // Conversa sem responsável: registra quem do time abriu, pra lista "Não
+  // atribuídas" mostrar a pilha de quem já entrou e não assumiu (ver
+  // ConversaVisualizadoresStack) — não tem relação com lida/não lida, é só
+  // pro gestor enxergar quem está olhando e não está puxando pra si.
+  useEffect(() => {
+    if (!conversaAtivaId || !profile?.id) return;
+    const conv = conversas.find((c) => c.id === conversaAtivaId);
+    if (!conv) return;
+    const naoAtribuida = (conv.responsaveis ?? []).length === 0;
+    const jaVisualizou = (conv.visualizadores ?? []).some((v) => v.id === profile.id);
+    if (naoAtribuida && !jaVisualizou) {
+      registrarVisualizacao.mutate(conversaAtivaId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversaAtivaId, profile?.id]);
@@ -4518,7 +4748,7 @@ export default function WhatsAppInbox() {
   }
 
   const conversasPorTipoEBusca = conversas.filter((c) => {
-    if (filtroConversa === "geral" && (c.responsaveis?.length ?? 0) > 0)
+    if (filtroConversa === "geral" && !precisaAssumir(c))
       return false;
     // "Meus chats" tem o mesmo significado pra vendedor e admin/gestor:
     // só o que está atribuído ao usuário logado.
@@ -4703,8 +4933,12 @@ export default function WhatsAppInbox() {
     const outros: WaConversa[] = [];
     for (const c of conversasFiltradas) {
       const responsaveis = c.responsaveis ?? [];
-      if (responsaveis.length === 0) naoAtribuidos.push(c);
-      else if (responsaveis.some((r) => r.id === profile.id)) meus.push(c);
+      if (responsaveis.length === 0) {
+        // Já respondida por fora do CRM: não tem responsável pra cair em
+        // "meus"/"outros", mas também não é mais um "Não atribuídos" que
+        // precisa de alguém assumindo — ver `precisaAssumir`.
+        if (precisaAssumir(c)) naoAtribuidos.push(c);
+      } else if (responsaveis.some((r) => r.id === profile.id)) meus.push(c);
       else outros.push(c);
     }
 
@@ -6367,6 +6601,7 @@ export default function WhatsAppInbox() {
                           </PopoverContent>
                         </Popover>
                       </div>
+                      <ConversaVisualizadoresStack conv={conversaAtiva} />
                     </div>
                   </div>
                 )}
@@ -6821,15 +7056,30 @@ export default function WhatsAppInbox() {
                             const msgParaExibir = prefixoExterno
                               ? { ...msg, conteudo: prefixoExterno.resto }
                               : msg;
+                            // Chave de quem mandou uma mensagem de saída: id do usuário do CRM,
+                            // senão o nome extraído do prefixo manual "*Nome:*" — sem isso, duas
+                            // pessoas diferentes respondendo por fora do CRM em sequência caíam no
+                            // mesmo "null === null" e a segunda ficava sem nome, empilhada como se
+                            // fosse a primeira.
+                            const remetenteSaidaChave = (m: WaMensagem): string | null =>
+                              m.usuario?.id ??
+                              extrairPrefixoRemetenteExterno(m.conteudo)?.nome ??
+                              null;
                             // Empilha mensagens consecutivas do mesmo remetente sem repetir o
                             // nome/número acima de cada bolha — só mostra na primeira da leva.
+                            // Quando a mensagem de saída atual não tem como se identificar (sem
+                            // usuario_id nem prefixo "*Nome:*"), assume que é continuação de quem
+                            // já estava mandando — não tem como saber se é uma pessoa nova, e tratar
+                            // como "nova" faria o badge genérico "Fora do CRM" repetir a cada
+                            // mensagem de uma sequência da mesma pessoa.
                             const isFirstDoRemetente =
                               !prevMsg ||
                               showDate ||
                               prevMsg.direcao !== msg.direcao ||
                               (isSaida
-                                ? (prevMsg.usuario?.id ?? null) !==
-                                  (msg.usuario?.id ?? null)
+                                ? remetenteSaidaChave(msg) !== null &&
+                                  remetenteSaidaChave(prevMsg) !==
+                                    remetenteSaidaChave(msg)
                                 : (prevMsg.remetente_telefone ?? null) !==
                                   (msg.remetente_telefone ?? null));
   
@@ -7010,7 +7260,6 @@ export default function WhatsAppInbox() {
                                           )}
                                         {isSaida &&
                                           !msg.usuario &&
-                                          prefixoExterno &&
                                           isFirstDoRemetente && (
                                             <div
                                               className={cn(
@@ -7026,11 +7275,15 @@ export default function WhatsAppInbox() {
                                                 />
                                               ) : (
                                                 <span className="w-fit max-w-full truncate text-sm font-semibold leading-tight text-white">
-                                                  {prefixoExterno.nome}
+                                                  {/* Sem "*Nome*" no início do texto pra identificar
+                                                      quem mandou (convenção manual) — não dá pra saber
+                                                      quem foi, mas ainda assim sinaliza que não veio do
+                                                      CRM, em vez de deixar a bolha sem nenhuma pista. */}
+                                                  {prefixoExterno?.nome ?? "Fora do CRM"}
                                                 </span>
                                               )}
                                               <span
-                                                title="Enviado fora do CRM (WhatsApp Web/celular)"
+                                                title="Enviado fora do CRM (WhatsApp Web/celular) — sem como identificar quem enviou"
                                                 className="inline-flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded text-[9px] font-medium bg-white/20 text-white"
                                               >
                                                 <Smartphone className="h-2.5 w-2.5" />
