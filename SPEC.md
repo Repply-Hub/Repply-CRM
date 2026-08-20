@@ -755,12 +755,18 @@ e para de funcionar sem aviso conforme a empresa cresce.
 
 Inventário completo em `docs/divida-tecnica.md`. Os três que mais importam:
 
-### 11.1 A chave do WhatsApp está legível — grave, e em aberto
+### 11.1 A chave do WhatsApp está legível — exposição fechada, resto em aberto
 
 **O que é:** as funções do WhatsApp gravam o pacote inteiro recebido da uazapi numa tabela
 de diagnóstico (`webhook_debug`). A uazapi manda o próprio token dentro do pacote. A tabela
-está sem política de segurança, então quem tiver a **chave pública do app** — que vai
-dentro do JavaScript do site e é pública por natureza — consegue ler.
+estava sem política de segurança, então quem tivesse a **chave pública do app** — que vai
+dentro do JavaScript do site e é pública por natureza — conseguia ler. Uma requisição real
+sem sessão, em 20/08/2026, devolveu `HTTP 200` e **71.009 linhas**, das quais **4.725** com
+o token e **4.774** com o nome da instância.
+
+**Exposição fechada em 20/08/2026.** Ver
+[`docs/operacao/plano-blindagem-whatsapp.md`](docs/operacao/plano-blindagem-whatsapp.md)
+para o estado de cada fase.
 
 **O que isso permite:** falar direto com a uazapi, sem passar pelo Repply. Ler todas as
 conversas da empresa, enviar mensagem se passando por ela e desconectar o número.
@@ -773,14 +779,26 @@ revisão de código. É o motivo pelo qual isso escapou de todo mundo.
 > por decisão do dono do produto". O dono do produto confirmou em 19/08/2026 que **a
 > decisão não foi dele**. Isso não é risco aceito; é dívida a pagar.
 
-**A ordem do conserto importa — errar a ordem tranca todo mundo:**
+**A ordem do conserto — corrigida em 20/08/2026.**
 
-1. Apagar o token das linhas já existentes
-2. Parar de gravá-lo
-3. Criar a política de acesso
-4. **Só então** ligar a segurança por linha
+> ⚠️ **Este documento prescrevia a ordem inversa, e a justificativa estava errada.** Dizia
+> para ligar a segurança por linha **por último**, porque "ligar antes de existir política
+> bloqueia inclusive o diagnóstico". **Não bloqueia.** O diagnóstico é feito pelo painel do
+> Supabase e pelas funções de borda, e ambos usam credencial de serviço, que passa por cima
+> da segurança por linha por definição. Verificado na prática: depois de ligada, a consulta
+> de diagnóstico continua funcionando e as funções continuam gravando.
+>
+> A premissa errada custava caro: mandava **esperar** a limpeza e o conserto do código para
+> só então fechar um vazamento que estava ativo e crescendo ~1.200 linhas por dia.
 
-Ligar a segurança antes de existir política bloqueia inclusive o diagnóstico.
+A ordem correta, e a que foi seguida:
+
+1. **Ligar a segurança por linha, sem política** — estanca a exposição em minutos e não
+   quebra nada. ✅ feito em 20/08/2026
+2. Parar de gravar o token
+3. Apagar o acumulado e instalar prazo de guarda
+4. Autenticar o webhook (ver §16 da dívida técnica) — **em modo observação primeiro**
+5. Tirar o token do navegador
 
 **Não termina aí:** o próprio site entrega o token ao navegador no fluxo de conectar o QR
 Code (`use-whatsapp-inbox.ts` fala direto com a uazapi). Limpar a tabela fecha metade do
@@ -839,9 +857,10 @@ segurança, do que qualquer correção técnica.
 
 ### Fase 1 — Segurança
 
-- [ ] Nenhuma linha de `webhook_debug` contém token
+- [x] `webhook_debug` fechada para leitura pública — 20/08/2026, sem quebrar diagnóstico
 - [ ] As funções pararam de gravar o token
-- [ ] `webhook_debug` tem segurança por linha ligada, com política, sem quebrar diagnóstico
+- [ ] Nenhuma linha de `webhook_debug` contém token
+- [ ] O webhook do WhatsApp confere quem está chamando
 - [ ] O navegador não recebe mais o token da instância
 - [ ] Projeto Supabase e repositório GitHub em conta da Repply
 

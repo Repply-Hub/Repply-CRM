@@ -14,7 +14,7 @@ Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu.
 
 | # | Item | Gravidade | Bloqueia? |
 |---|---|---|---|
-| 1 | [Chave do WhatsApp legível](#1-a-chave-do-whatsapp-está-legível) | **Crítica** | Não, mas não deve esperar |
+| 1 | [Chave do WhatsApp legível](#1-a-chave-do-whatsapp-está-legível) | **Crítica** | ⏳ Exposição fechada em 20/08. Restam 3 fases — [plano](operacao/plano-blindagem-whatsapp.md) |
 | 2 | [Titularidade dos serviços](#2-titularidade-dos-serviços) | **Crítica** | Sim — impede aplicar mudança de banco |
 | 3 | [Importação: formatação de datas](#3-importação--formatação-de-datas) | ✅ Resolvida | Código corrigido em `446779ff` |
 | 4 | [Agendamentos nunca funcionaram](#4-os-agendamentos-nunca-funcionaram) | Alta | Não |
@@ -39,7 +39,10 @@ Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu.
 
 ## 1. A chave do WhatsApp está legível
 
-**Gravidade: crítica. Em aberto.**
+**Gravidade: crítica. Exposição pública fechada em 20/08/2026; o resto em aberto.**
+
+> **Leia primeiro:** [`operacao/plano-blindagem-whatsapp.md`](operacao/plano-blindagem-whatsapp.md)
+> — as 5 fases, o que já foi feito e o que falta.
 
 ### O que é
 
@@ -47,11 +50,35 @@ As funções do WhatsApp gravam o pacote inteiro recebido da uazapi, cru, numa t
 diagnóstico chamada `webhook_debug`. A uazapi manda o **próprio token da instância dentro
 do pacote**. Ninguém decidiu salvar a chave: decidiram salvar tudo, e a chave veio junto.
 
-Medido em 05/08/2026:
+Medido em 05/08/2026, e **remedido em 20/08/2026**. O número real era quase o triplo do que
+a auditoria da agência registrava:
 
-- `public.webhook_debug` está com **RLS desabilitada** e tem cerca de **61 mil linhas**
-- Cerca de **1.621 dessas linhas contêm o `api_key` da instância em texto puro** — o valor
-  bate exatamente com `configuracoes_wapi.api_key`
+| | Auditoria (05/08) | Medido (20/08) |
+|---|---|---|
+| Linhas na tabela | ~61.000 | **71.008** · 74 MB |
+| Linhas com o `api_key` em texto puro | ~1.621 | **4.725** |
+| Linhas com telefone de cliente | não medido | **53.847** (piso) |
+| Linhas expondo o `instance_name` | não medido | **4.774** |
+| Crescimento | não medido | ~1.200 linhas/dia |
+
+A exposição não era teórica: uma requisição real ao PostgREST com a chave publicável do
+site, **sem sessão**, devolveu `HTTP 200` e `Content-Range: 0-0/71009`. Era também o único
+achado de nível **ERROR** entre os 197 avisos de segurança do projeto
+(`rls_disabled_in_public`).
+
+**A consequência que só apareceu na remedição:** a tabela publicava *as duas metades do
+ataque* — a senha **e** o nome da instância. Por isso o
+[item 16](#16-o-webhook-do-whatsapp-aceita-qualquer-um) nunca dependeu de alguém adivinhar
+o nome da instância.
+
+**Exposição fechada em 20/08/2026** (`20260820121510_webhook_debug_fecha_acesso_publico.sql`):
+RLS ligada, zero políticas, sem concessão para `anon`/`authenticated` — o padrão que
+`email_webhook_eventos`, `stripe_eventos`, `email_conta_grants` e `email_conexao_estados`
+já usavam. A leitura anônima passou a devolver `HTTP 401`, e as Edge Functions continuam
+gravando via `service_role` (conferido: a tabela seguiu recebendo linhas depois da mudança).
+
+**O que continua em aberto:** a senha segue sendo gravada a cada evento, as 4.725 linhas
+antigas continuam guardadas, e o webhook segue sem autenticação.
 
 ### O que isso permite
 
@@ -499,6 +526,14 @@ que `email-webhook` faz. Configure o segredo na uazapi ao provisionar a instânc
 
 > Junto com o [item 1](#1-a-chave-do-whatsapp-está-legível), forma o par de falhas abertas
 > no módulo de WhatsApp. **Os dois são fase 1 do roadmap.**
+>
+> **Não é preciso adivinhar o nome da instância:** ele estava publicado em 4.774 linhas da
+> `webhook_debug`, legível sem sessão até 20/08/2026 (ver item 1).
+>
+> Conserto planejado na Fase 3 de
+> [`operacao/plano-blindagem-whatsapp.md`](operacao/plano-blindagem-whatsapp.md), em modo
+> observação antes de passar a recusar — ligar a conferência de uma vez faria 100% das
+> mensagens pararem de chegar em silêncio, acidente que já aconteceu aqui (`0715119`).
 
 ---
 
