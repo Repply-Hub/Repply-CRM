@@ -26,8 +26,24 @@ export function useSecoesDaEmpresa() {
     // Sem empresa não há o que perguntar. O admin global cai aqui e não usa telas de CRM
     // (o ProtectedRoute o manda para /admin/empresas).
     enabled: profileLoaded && !!empresaId,
-    // Muda raramente — só quando o admin mexe — e é consultada em dezenas de pontos.
-    staleTime: 5 * 60 * 1000,
+
+    // 30 segundos, e recarrega ao voltar para a aba.
+    //
+    // A primeira versão usava 5 minutos, com o argumento de que "a cascata pergunta em
+    // dezenas de pontos". O argumento estava ERRADO: o TanStack Query agrupa por
+    // queryKey, então os dezenas de consumidores compartilham UMA busca. O custo real de
+    // um prazo curto é uma consulta pequena por navegação — barato.
+    //
+    // E o prazo longo tinha um custo alto, relatado em 21/08/2026: o admin desligou o
+    // Portal da MD e o item continuou na tela de quem estava logado lá. A invalidação
+    // feita em use-admin-secoes.ts só alcança o navegador DO ADMIN — o da outra pessoa é
+    // outra sessão e não fica sabendo. Somado ao `refetchOnWindowFocus: false` global
+    // (App.tsx), o navegador dela podia ficar indefinidamente com a resposta velha.
+    //
+    // O override de refetchOnWindowFocus é deliberado e vale só para esta consulta: voltar
+    // para a aba é o momento natural de descobrir que o acesso mudou.
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('minhas_secoes');
       if (error) throw error;

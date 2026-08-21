@@ -40,10 +40,14 @@ export function useAdminSecoes() {
 /**
  * Cria, altera ou remove a exceção de uma empresa.
  *
- * `habilitada: null` REMOVE a exceção, e a empresa volta a seguir o preset. Esse terceiro
- * estado não é luxo: sem ele, "voltar ao padrão" viraria uma exceção gravada com o mesmo
- * valor do preset — e no dia em que o preset mudasse, aquela empresa ficaria para trás sem
- * ninguém entender por quê.
+ * `habilitada: null` REMOVE a exceção explicitamente — é o que o botão "Voltar a seguir o
+ * preset" usa.
+ *
+ * E, desde 21/08/2026, **pedir um valor IGUAL ao do preset também remove**: a regra vive
+ * dentro de `admin_definir_excecao_secao`, no banco. Exceção passou a significar sempre
+ * DIVERGÊNCIA. Antes disso, desligar e religar uma seção deixava para trás uma exceção
+ * inofensiva no valor mas mentirosa no selo — e que faria a empresa ficar parada no dia em
+ * que o preset mudasse.
  */
 export function useDefinirExcecao() {
   const qc = useQueryClient();
