@@ -355,6 +355,22 @@ export const PEDIDOS_OPTIONS_LIMITE_LISTA = 500;
 export const PEDIDOS_OPTIONS_LIMITE_BUSCA = 50;
 /** A partir de quantas letras a busca vai ao servidor (1 letra traria meia base). */
 export const PEDIDOS_OPTIONS_MIN_BUSCA = 2;
+/**
+ * Teto de ids de cliente/fabricante que entram no filtro `.or()` da busca.
+ *
+ * NÃO é enfeite. O PostgREST recebe o filtro pela URL, e cada id ocupa ~37 bytes
+ * ali dentro. Medido nesta base em 21/08/2026: o termo "co" — o começo de
+ * Construtora, Comércio e Condomínio — casa com 1.066 clientes, o que geraria um
+ * endereço de ~39 KB. O servidor recusa antes de a consulta chegar ao banco, e a
+ * busca falha justamente nos termos mais usados do ramo ("ar" casa 783).
+ *
+ * Com o teto a busca sempre responde. Em troca ela fica INCOMPLETA quando o termo
+ * é muito comum — por isso quem consome precisa avisar na tela (ver o aviso em
+ * TarefaFormDialog). O conserto definitivo é uma RPC `SECURITY DEFINER` que faça
+ * o casamento dentro do banco, sem trafegar id nenhum: é o padrão que o
+ * CLAUDE.md §7.4 já manda usar para busca textual, e está registrado na dívida.
+ */
+export const PEDIDOS_OPTIONS_TETO_IDS = 60;
 
 // Resolve os ids que casam com o termo, do mesmo jeito que resolveSearchMatches faz para a
 // tela de Negócios: por ids, nunca colando o texto digitado dentro do filtro `.or()`. Um
@@ -369,8 +385,13 @@ async function resolvePedidoOptionMatches(termo: string, usuarioIds: string[]) {
       .in('usuario_id', usuarioIds)
       .ilike('nome', `%${termo}%`)
       .limit(PEDIDOS_OPTIONS_LIMITE_BUSCA),
-    supabase.from('clientes').select('id').ilike('empresa', `%${termo}%`),
-    supabase.from('fabricantes').select('id').ilike('nome', `%${termo}%`),
+    // `order` + `limit`: o teto precisa de ordem definida, senão o Postgres pode
+    // devolver 60 clientes diferentes a cada chamada e o resultado da MESMA busca
+    // muda sozinho entre uma digitada e outra.
+    supabase.from('clientes').select('id').ilike('empresa', `%${termo}%`)
+      .order('empresa').limit(PEDIDOS_OPTIONS_TETO_IDS),
+    supabase.from('fabricantes').select('id').ilike('nome', `%${termo}%`)
+      .order('nome').limit(PEDIDOS_OPTIONS_TETO_IDS),
   ]);
   return {
     pedidoIds: (pedidoMatches ?? []).map(p => p.id),

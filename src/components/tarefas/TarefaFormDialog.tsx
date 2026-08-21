@@ -101,7 +101,11 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
   const avisoNegocios = buscandoNoServidor
     ? (pedidosEncontrados.length >= PEDIDOS_OPTIONS_LIMITE_BUSCA
         ? `Mostrando os ${PEDIDOS_OPTIONS_LIMITE_BUSCA} primeiros resultados — escreva mais para afinar a busca.`
-        : undefined)
+        // Aviso mesmo com poucos resultados: a busca casa o termo contra o nome do
+        // cliente e do fabricante por lista de ids, e essa lista tem teto
+        // (PEDIDOS_OPTIONS_TETO_IDS). Com termo comum — "co" casa 1.066 clientes — a
+        // busca responde sem ter visto todos. Dizer "nada encontrado" seria mentira.
+        : 'A busca cobre a base inteira, mas pode não ver tudo quando o termo é muito curto. Se faltar algum, escreva mais letras.')
     : (pedidosEncontrados.length >= PEDIDOS_OPTIONS_LIMITE_LISTA
         ? `Mostrando os ${PEDIDOS_OPTIONS_LIMITE_LISTA} negócios mais recentes. Digite ao menos ${PEDIDOS_OPTIONS_MIN_BUSCA} letras para procurar em todos.`
         : undefined);
