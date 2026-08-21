@@ -155,7 +155,9 @@ export function ImportCatalogoDialog({ open, onOpenChange, fabricanteId, fabrica
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+      {/* `dvh` e não `vh`: no celular `100vh` mede a tela COM a barra de endereço
+          escondida, então o rodapé do diálogo fica atrás da barra do navegador. */}
+      <DialogContent className="max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
         <DialogHeader className="px-6 py-4 bg-muted/30 shrink-0 border-b flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2.5 text-foreground font-bold text-lg">

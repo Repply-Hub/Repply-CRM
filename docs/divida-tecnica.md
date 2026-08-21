@@ -3,7 +3,8 @@
 O que está quebrado, mal resolvido ou pendente neste sistema, com **o custo real** e **a
 ordem de conserto**. Escrito para que ninguém precise redescobrir cada item.
 
-Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu.
+Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 27
+acrescentados em 21/08/2026.
 
 > **Este documento não é lista de desejos.** Cada item aqui já tem consequência medida ou
 > observada. Melhoria que ainda é opinião não entra.
@@ -35,6 +36,12 @@ Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu.
 | 19 | [11.903 negócios com data trocada](#19-11903-negócios-com-data-trocada-em-produção) | **Alta** | Distorce todo relatório por data |
 | 20 | [Empresa "MD" duplicada com 6.374 negócios órfãos](#20-empresa-md-duplicada-com-6374-negócios-órfãos) | Média | Não |
 | 21 | [Colunas de data com nome que não bate com a tela](#21-colunas-de-data-com-nome-que-não-bate-com-a-tela) | Média | Não |
+| 22 | [Automação diária filtra por um slug que não existe](#22-a-automação-diária-filtra-por-um-slug-que-não-existe) | **Alta** | Não — mas manda alerta errado todo dia |
+| 23 | [Etapa final é reconhecida por texto fixo](#23-etapa-final-é-reconhecida-por-texto-fixo-não-por-marca-na-tabela) | **Alta** | Sim — impede funil realmente configurável |
+| 24 | [`SearchableSelect` identifica opção pelo rótulo](#24-searchableselect-identifica-a-opção-pelo-rótulo) | Média | Não |
+| 25 | [522 tamanhos de fonte travados em pixel](#25-522-tamanhos-de-fonte-travados-em-pixel) | Média | Não |
+| 26 | [Cabeçalho de página sem slot de ação](#26-o-cabeçalho-de-página-não-tem-slot-de-ação-e-7-páginas-o-remontam-à-mão) | Baixa | Não |
+| 27 | [`src/data/mockData.ts` órfão](#27-srcdatamockdatats-é-arquivo-órfão) | Baixa | Não |
 
 ---
 
@@ -255,16 +262,20 @@ select id, status_code, left(content, 200) from net._http_response order by id d
 
 **Gravidade: alta.**
 
-**7 arquivos de teste para 78 mil linhas de código.**
+**10 arquivos de teste, 152 casos, para 78 mil linhas de código.** Eram 7 arquivos em
+19/08/2026.
 
 ```
-src/components/import-pedidos/importPedidosUtils.test.ts
-src/hooks/whatsapp-phone.test.ts
-src/lib/erro-edge-function.test.ts
-src/lib/lazy-com-retry.test.ts
-src/lib/plano-gate.test.ts
-src/lib/situacao-empresa.test.ts
-src/test/example.test.ts
+src/components/import-pedidos/importPedidosUtils.test.ts    7 casos
+src/hooks/use-pedidos-filtro-data.test.ts                    6   (20/08 — filtro por fechamento)
+src/hooks/whatsapp-phone.test.ts                            12
+src/lib/erro-edge-function.test.ts                          12
+src/lib/import/file-parser.test.ts                           4
+src/lib/lazy-com-retry.test.ts                               4   (+10 por it.each)
+src/lib/moeda.test.ts                                       26   (21/08 — dinheiro em PT-BR)
+src/lib/plano-gate.test.ts                                  44
+src/lib/situacao-empresa.test.ts                            20
+src/test/example.test.ts                                     1
 ```
 
 Agrava dois outros fatos:
@@ -273,8 +284,9 @@ Agrava dois outros fatos:
   commit e o cliente
 - **O TypeScript está frouxo** (item 12) — o compilador também não segura o erro
 
-É por isso que este projeto tem regra fixa de **branch + Pull Request, nunca envio direto
-para `main`**.
+É por isso que este projeto exige **autorização do Lucas antes de cada commit**
+(`CLAUDE.md` §13). O projeto chegou a experimentar branch + Pull Request em 19/08/2026 e
+reverteu no mesmo dia: a barreira é humana, não é o PR.
 
 ### Por onde começar
 
@@ -627,6 +639,28 @@ das 11.903 linhas.
 > [`docs/operacao/plano-reparo-datas.md`](operacao/plano-reparo-datas.md). Proposto, **não
 > executado** — depende de autorização.
 
+### Dois achados novos, medidos em 21/08/2026
+
+Vieram à tona quando o Dashboard passou a contar dinheiro por data de fechamento
+(`prazo_resposta`) — antes disso ninguém somava por essa coluna, então o estrago não
+aparecia.
+
+| Achado | Tamanho | Consequência |
+|---|---|---|
+| Negócios em etapa final com data de **fechamento anterior à de criação** | **445**, somando R$ **6.879.618,26**. Defasagem de 1 a 73 dias; **411** caem num mês diferente do de criação | Esse dinheiro está hoje empurrado para um mês em que não aconteceu, no Faturamento Mensal e no Plano de Vendas |
+| Negócios em etapa final **sem nenhuma** data de fechamento | **2** | Invisíveis em qualquer relatório por fechamento |
+
+A causa do primeiro: na planilha do Bitrix aquela coluna era data **prevista** de
+fechamento, e nunca foi corrigida depois que a venda saiu.
+
+**Diagnóstico e comandos de reparo estão prontos e comentados no fim de
+`supabase/migrations/20260821120100_data_fechamento_em_todos_os_caminhos.sql`. Nada foi
+executado.** Se for rodado, R$ 6,88 milhões trocam de mês na tela — quem já olhou meta
+batida ou comissão com os números atuais precisa ser avisado **antes**.
+
+Negócio novo não consegue mais entrar em etapa final sem data: o gatilho
+`fn_set_pedido_fechado_em` passou a garantir isso (ver Resolvidos, 21/08/2026).
+
 ---
 
 ## 20. Empresa "MD" duplicada com 6.374 negócios órfãos
@@ -704,7 +738,277 @@ a renomeação vira tarefa própria depois, com calma.
 
 ---
 
+## 22. A automação diária filtra por um slug que não existe
+
+**Gravidade: alta. Confirmado no código em 21/08/2026.**
+
+`supabase/functions/automacao-diaria/index.ts:44` exclui do follow-up os negócios já
+encerrados assim:
+
+```ts
+.not("status", "in", '("fechado","perdido")')
+```
+
+**`'fechado'` não existe.** Os slugs reais, semeados em
+`20260418175245_...sql:44-48` e no gatilho de empresa nova, são:
+
+```
+novo_lead · elaboracao · enviado · negociacao · fechamento · perdido
+```
+
+`'fechado'` era o nome antigo, abandonado quando as visões foram reescritas para
+`'fechamento'` em `20260426171830_...sql`. A função de borda ficou para trás.
+
+### O que acontece na prática
+
+`'perdido'` casa e é excluído certo. `'fechamento'` **não casa com nada**, então negócio
+já **ganho** continua no filtro, e a linha 52 (`if (!pedido) continue; // already closed`)
+nunca o descarta. Resultado: o vendedor recebe **"⚠️ Follow-up atrasado"** para venda que
+já fechou. É o inverso do que o comentário do código promete — não deixa de disparar,
+dispara demais.
+
+### Está no banco também
+
+A definição vigente de `vw_pedidos_inativos` — que a mesma função consome na segunda parte
+(linha 101) — repete o slug morto:
+
+`20260504172116_d58aba56-...sql:79` → `WHERE p.status NOT IN ('fechado', 'perdido');`
+
+Ou seja, negócio ganho e parado também gera **"🔴 Pedido parado há N dias"**.
+
+Terceira ocorrência: `supabase/functions/import-data/index.ts:38`, no prompt que descreve
+os status válidos — mas essa função é órfã (item 6).
+
+**Conserto:** trocar `'fechado'` por `'fechamento'` nos três pontos. O da visão exige
+migration nova (nunca editar a existente). É barato e para de gastar a confiança do
+vendedor nas notificações do sistema.
+
+---
+
+## 23. Etapa final é reconhecida por texto fixo, não por marca na tabela
+
+**Gravidade: alta. Bloqueia a promessa de funil configurável.**
+
+`kanban_colunas` é anunciada como configurável por empresa e por funil (`SPEC.md` §10.1).
+Mas **não existe nenhuma coluna que diga "esta etapa encerra o negócio"**. Conferido: as
+colunas são `id, empresa_id, slug, nome, cor, ordem, is_sistema, created_at, updated_at`
+(`20260418175245_...sql:2-13`) mais `funil_id` (`20260722140000_funis.sql:46`). Busca por
+`is_final`, `etapa_final`, `is_ganho`, `tipo_etapa` nas 260 migrations: **zero**.
+
+`is_sistema` **não serve**: marca "coluna padrão, não pode apagar" — e inclui `novo_lead`,
+`elaboracao`, `enviado` e `negociacao`.
+
+No lugar disso, o sistema compara texto. **8 pontos de decisão no frontend:**
+
+| Arquivo | Como decide |
+|---|---|
+| `src/hooks/use-pedidos.ts:110` | `ETAPAS_FINAIS_ATENCAO = '(fechamento,perdido)'` — usado em 3 consultas |
+| `src/hooks/use-edit-pedido.ts:8` | `ETAPAS_FINAIS = ['fechamento', 'perdido']` |
+| `src/pages/Negocios.tsx:214` | `status === 'fechamento' \|\| status === 'perdido'` |
+| `src/components/pedidos/kanban/KanbanCard.tsx:27` | idêntico, duplicado |
+| `src/pages/EditarPedido.tsx:201` | `['fechamento', 'perdido'].includes(...)` |
+| `src/components/pedidos/ImportPedidosDialog.tsx:63` | `new Set(['fechamento', 'perdido'])` |
+| `src/components/pedidos/kanban/KanbanColunasDialog.tsx:169` | `slug === 'perdido' \|\| slug === 'fechamento'` |
+| `src/components/import-pedidos/importPedidosUtils.ts:182` | **regex sobre o nome**: `/fech/`, `/ganho/`, `/won/`… |
+
+E no banco, **71 linhas de migration** comparam `status` com `'fechamento'` ou `'fechado'`
+literal — inclusive o gatilho da data de fechamento e todo o faturamento do Dashboard.
+
+Ainda: `src/types/index.ts:1` fixa as etapas no compilador **sem `'perdido'`**:
+
+```ts
+export type KanbanStage = 'novo_lead' | 'elaboracao' | 'enviado' | 'negociacao' | 'fechamento';
+```
+
+### A contradição que fecha o argumento
+
+Nada impede uma empresa criar a etapa **"Contrato Assinado"** como final. Se criar, aquele
+negócio **não conta no faturamento**, não recebe data de fechamento, e continua gerando
+alerta de negócio parado — porque o sistema inteiro só reconhece a palavra `'fechamento'`.
+
+**Conserto:** uma coluna em `kanban_colunas` (`tipo_final`: `ganho` / `perdido` / `null`),
+migration de backfill a partir dos slugs atuais, e trocar as comparações por consulta a
+essa marca. É trabalho de raio grande — mas enquanto não for feito, "funil configurável"
+só vale enquanto ninguém configurar de verdade.
+
+---
+
+## 24. `SearchableSelect` identifica a opção pelo rótulo
+
+**Gravidade: média. Medido em 21/08/2026.**
+
+`src/components/shared/SearchableSelect.tsx` é usado em **20 lugares, em 15 arquivos** —
+cliente, obra, fabricante, vendedor, marcador. As opções são montadas com **id no `value`
+e nome livre no `label`**.
+
+O valor que ele **salva** é o id, e isso está certo: `onValueChange(option.value)` na
+linha 116. **Renomear um item não quebra a seleção gravada** — essa parte, que parecia ser
+o problema, não é.
+
+O defeito real está uma camada abaixo. Na linha 114 o componente entrega o **rótulo** ao
+cmdk como valor interno do item:
+
+```tsx
+key={option.value}
+value={option.label}      // <- o cmdk passa a identificar o item por aqui
+```
+
+E a rolagem inicial procura pelo rótulo no DOM (linha 72,
+`querySelector('[data-value="${scrollToLabel}"]')`).
+
+### O que isso quebra
+
+No cmdk 1.1.1, o item calcula `aria-selected` comparando o valor registrado (= o rótulo)
+com o valor atual do Command, e a navegação por teclado pega **o primeiro do DOM**.
+Com **duas opções de mesmo nome** — duas obras "Ed. Solar", dois clientes com a mesma
+razão social:
+
+- as duas ficam com `aria-selected="true"` ao mesmo tempo;
+- **Enter sempre escolhe a primeira**. Não existe jeito de alcançar a segunda pelo
+  teclado (o clique de mouse ainda acerta, porque usa closure);
+- `scrollToLabel` também sempre cai na primeira, e **quebra o seletor CSS** se o rótulo
+  contiver aspas.
+
+Nome repetido não é caso raro neste domínio: obra com o mesmo nome em cidades diferentes e
+cliente com filiais são o normal.
+
+**Conserto:** passar `value={option.value}` ao `CommandItem` e mover o texto pesquisável
+para `keywords`, que é o que o cmdk oferece exatamente para isso.
+
+---
+
+## 25. 522 tamanhos de fonte travados em pixel
+
+**Gravidade: média. Contado em 21/08/2026.**
+
+| Padrão | Ocorrências em `src/` |
+|---|---|
+| `text-[NNpx]` | **522** |
+| `font-size: NNpx` em CSS cru | 5 — **legítimas**, são HTML de e-mail (`src/lib/assinatura-email.ts`, `src/pages/Emails.tsx:782`), onde cliente de e-mail exige px inline |
+
+Três valores respondem por 92% do total: `text-[10px]` (315), `text-[11px]` (129),
+`text-[9px]` (42). Há até `text-[6px]`.
+
+Concentração: `WhatsAppInbox.tsx` (84), `Chat.tsx` (52), `MappingStep.tsx` (29),
+`Negocios.tsx` (26), `Clientes.tsx` (21).
+
+### Por que importa
+
+Tamanho em pixel **ignora a preferência de letra grande** do navegador e do sistema. Quem
+aumenta a fonte porque não enxerga bem não vê diferença nenhuma nessas 522 ocorrências —
+elas continuam em 10px. O sistema é usado por representantes que passam o dia nele.
+
+E some-se à causa estrutural da responsividade (ver Resolvidos, 21/08/2026): o app tira a
+rolagem do documento, então o que não cabe fica **invisível**, sem barra de rolagem. Fonte
+maior aqui não é só conforto — é o que decide se o texto existe na tela.
+
+**Conserto:** trocar por `text-xs` / `text-sm` (que são `rem` e respeitam a preferência),
+ou por tokens próprios se 12px for grande demais para o caso. Não vale uma varredura em
+massa — troque quando estiver mexendo no arquivo por outro motivo, começando pelos cinco
+arquivos da concentração.
+
+---
+
+## 26. O cabeçalho de página não tem slot de ação, e 7 páginas o remontam à mão
+
+**Gravidade: baixa. Confirmado em 21/08/2026.**
+
+> Correção de uma suposição: **o cabeçalho compartilhado existe.** É o próprio
+> `AppLayout` (`src/components/layout/AppLayout.tsx:12-18`), com `title` e `subtitle`, e
+> **17 páginas o usam certo**.
+
+O problema é a porta de fuga da linha 54, `{headerContent ?? (...)}`. Como o `AppLayout`
+**não oferece um slot para o botão de ação à direita**, quem precisa de um botão no
+cabeçalho abandona `title`/`subtitle` e remonta o bloco inteiro:
+
+`NovoPedido.tsx:13-20` · `ContatoDetalhe.tsx:165-180` · `EditarPedido.tsx:417-432` ·
+`Chat.tsx:1241` · `ClienteDetalhe.tsx:389` · `WhatsAppInbox.tsx:5572`
+
+O caso mais gritante é **`src/pages/Obras.tsx:325-333`**, que passa `title` **e**
+`subtitle` **e também** `headerContent` reproduzindo o mesmo markup — os dois primeiros
+ficam mortos.
+
+A string de classe do título aparece **12 vezes em 10 arquivos**. Custo: mudar o
+cabeçalho exige achar as 12 cópias, e quem esquece uma deixa uma página fora do padrão
+sem ninguém notar.
+
+**Conserto:** acrescentar `acoes?: ReactNode` ao `AppLayout`, renderizado à direita do
+título, e devolver essas 7 páginas para `title`/`subtitle`. `headerContent` fica só para
+cabeçalho de verdade diferente (Chat e WhatsApp, que têm o contato no lugar do título).
+
+---
+
+## 27. `src/data/mockData.ts` é arquivo órfão
+
+**Gravidade: baixa. Conferido em 21/08/2026.**
+
+> Correção de uma suposição: **não é dado falso rodando em produção.** A varredura por
+> `mockOrders`, `mockClients`, `mockFabricantes`, `mockVendedores`, `mockContacts` e
+> `KANBAN_STAGES` em `src/` devolve **zero imports**, e "Construtora Alpha" não aparece no
+> pacote publicado. Nenhuma tela usa.
+
+50 linhas, único arquivo de `src/data/`. Contém 8 negócios fictícios, 3 clientes com CNPJ
+falso, 5 fabricantes, 4 vendedores com e-mail `@md.com.br`, 3 contatos e um
+`KANBAN_STAGES` de 5 etapas fixas — **sem "Perdido"**.
+
+Aquela lista fixa **já causou bug**, e o comentário que registra isso continua no código:
+
+`src/pages/ClienteDetalhe.tsx:75` — as etapas vinham de `@/data/mockData` com 5 valores,
+sem "Perdido", e quem abria a ficha do cliente não conseguia filtrar os negócios perdidos
+dele. Hoje `ClienteDetalhe.tsx:82` e `Negocios.tsx:401` montam as etapas a partir de
+`useKanbanColunasEmpresa`.
+
+**O custo hoje é de leitura, não de execução:** quem procurar "quais são as etapas do
+funil" acha primeiro a lista morta de 5 valores e conclui que "Perdido" não existe.
+
+**Conserto:** apagar o arquivo. Confirme antes que nada em `supabase/functions/` o
+referencia.
+
+---
+
 ## Resolvidos
+
+### 21/08/2026 — leva de dashboard, data de fechamento, dinheiro e responsividade
+
+> ⚠️ **Código escrito, ainda não commitado; as duas migrations ainda NÃO foram aplicadas
+> no banco.** Escrever migration não é aplicá-la. Enquanto elas não subirem, o Dashboard
+> em produção continua contando dinheiro por data de criação. Confira antes de tratar
+> qualquer linha desta seção como fato na tela do cliente.
+>
+> As migrations são `20260821120000_dashboard_datas_por_fechamento.sql` e
+> `20260821120100_data_fechamento_em_todos_os_caminhos.sql`.
+
+| O que estava errado | Como foi resolvido |
+|---|---|
+| **O Dashboard contava dinheiro pela data de criação.** Todas as funções recortavam por `data_pedido`, inclusive as de dinheiro. Um negócio criado em 28/junho e fechado em 3/julho entrava no faturamento de **junho** e sumia da meta de julho | Faturamento Total, Negócios Fechados, Ticket Médio, Faturamento por Fábrica, Rendimento por Responsável, Faturamento Mensal e Plano de Vendas passam a contar por `prazo_resposta`. Taxa de Conversão, Conversão por Vendedor e Segmentação por Ticket continuam por criação, de propósito (conta de safra). Detalhe métrica a métrica em [`modulos/dashboard.md`](modulos/dashboard.md) |
+| **"Negócios Fechados" e o Ticket Médio saíam do contador errado** — usavam o numerador da taxa de conversão ("criados no período que já ganharam"), não "fecharam no período". Em ago/2026 são **62 contra 45** | `dashboard_stats` ganhou duas CTEs (`base_criados`, `base_fechados`) e o campo novo `pedidos_fechados_periodo`. Cada tela lê o seu |
+| **Plano de Vendas mostrava só um mês e não avisava.** A função só sabia olhar `p_ano`/`p_mes`, e a tela mandava o mês da data inicial — filtrar "01/jan a 31/dez" devolvia **janeiro e mais nada** | `plano_vendas_progresso` e `..._por_vendedor` passam a receber intervalo e somam as metas de todos os meses tocados. As assinaturas antigas viraram atalho de compatibilidade |
+| **O selo "+X% últ. mês" ficava travado em "+0%" verde para sempre** — comparava com o penúltimo item da lista **já filtrada**, e no período padrão só existe um mês | O mês anterior passa a sair da lista completa. Sem mês anterior no histórico, o selo não é desenhado, em vez de mentir zero |
+| **Mês inteiro sumia do gráfico de Faturamento Mensal** quando o dia 1 caía fora do filtro: "15/jan a 20/ago" apagava janeiro, sem aviso | O mês entra quando **se sobrepõe** ao período, não quando o dia 1 cai dentro |
+| **Dois cartões para o mesmo número:** "Rendimento por Fábrica" (barras) mostrava exatamente o mesmo array da rosca "Faturamento por Fábrica" | Cartão de barras removido. Ver `SPEC.md` §10.11 |
+| **A data de fechamento só era carimbada em 2 dos 6 caminhos** que mudam o status de um negócio. Perder um negócio não registrava o dia da perda; salvar a ficha de um negócio ganho com o campo em branco **apagava** a data (`use-edit-pedido.ts:75`); excluir uma etapa do kanban podia marcar centenas de negócios como ganhos, todos sem data | A regra saiu da tela e foi para o gatilho `fn_set_pedido_fechado_em`, que agora manda em `prazo_resposta` além de `fechado_em`, cobre `'fechamento'` **e** `'perdido'`, respeita a data que o usuário digitou no mesmo salvamento, mantém a data ao reabrir (`SPEC.md` §10.10) e tem rede de segurança contra etapa final sem data |
+| **Data carimbada no dia errado depois das 21h.** O banco roda em UTC: `current_date` já é o dia seguinte, e uma venda fechada às 21h30 de 31/agosto cairia na meta de setembro | O dia sai convertido para `America/Sao_Paulo` |
+| **A importação deixava linha perdida sem data** chegar vazia ao gatilho, saindo carimbada com o dia da importação — o mesmo mecanismo que envenenou `fechado_em` | `ImportPedidosDialog.tsx` passou a usar a data de criação como substituta para `'fechamento'` **e** `'perdido'` |
+| **Campo de dinheiro era `<Input type="number">` cru, em 10 lugares.** Três negócios foram gravados **mil vezes maiores** que o certo — o pior `106.387.320,00` no lugar de `106.387,32` — sem nada na tela indicar erro. Causa: `type="number"` devolve string vazia para `"99.888,47"`, a roda do mouse altera o valor sozinha, e `parseFloat("99.888,47")` devolve `99.888` | Novos `src/lib/moeda.ts` (26 testes) e `src/components/shared/CampoMoeda.tsx`, com máscara brasileira, `type="text"` e cursor ancorado na contagem de dígitos. Armadilha registrada em `CLAUDE.md` §7.10 |
+| **Modal mais alto que a janela prendia o usuário na tela.** O `DialogContent` do shadcn não tem teto de altura nem rolagem, e o projeto desligou Esc e clique-fora — Salvar sumia por baixo e o "X" por cima **ao mesmo tempo**. Já acontecia em notebook 1366x768 sem zoom | Novo `src/components/shared/DialogoResponsivo.tsx` (teto em `dvh`, miolo com rolagem própria), adotado em 16 telas. Armadilha registrada em `CLAUDE.md` §7.11 |
+| **A tira de abas era cortada em tela estreita.** Em Configurações, as últimas abas (Campos e Empresa) simplesmente sumiam no celular, sem barra de rolagem em lugar nenhum — funcionalidade inteira inacessível, sem nada indicando que existia | `src/lib/toggle-group-styles.ts` ganhou `max-w-full overflow-x-auto`, `[&>*]:shrink-0` e `justify-start` |
+| **Em Fabricantes o botão "Novo" era literalmente recortado**, e `xl:col-span-3` fazia a coluna **encolher ~100px** ao cruzar 1280px — era por isso que reduzir o zoom um passo piorava antes de melhorar, e o cliente precisava reduzir várias vezes | `flex-wrap` no cabeçalho do card, `min-w-0` no título, `shrink-0` nos botões; `2xl:col-span-3` no lugar de `xl:`; altura `h-full` no lugar de `h-[795px]` fixos |
+| **Faltava busca em 10 pontos** onde a lista já não cabe no olho: contatos, negócio na tarefa, linhas ignoradas, filtros de fabricante e marcador em Negócios, marcador nos formulários, fabricante padrão do catálogo, marcadores de e-mail e referência do produto | Barras de busca acrescentadas. A de negócio na tarefa vai ao **servidor** a partir de 2 letras (com 300ms de represa) — dropdown com teto de 50 resultados, não relatório |
+
+**A causa estrutural da responsividade continua de pé e precisa estar registrada:** o app
+tira a rolagem do documento (`src/index.css:165` — `html, body, #root { overflow: hidden }`)
+e **14 páginas** repassam `overflow-hidden` ao conteúdo via `mainClassName`. A consequência
+é que **o que não cabe fica invisível, sem barra de rolagem em lugar nenhum** — não fica
+pequeno, não fica cortado com aviso: some. Foi assim com as abas de Configurações e com o
+botão "Novo" de Fabricantes.
+
+Os consertos acima são centrais (teto de altura no diálogo, `flex-wrap` na tira de abas,
+margem `p-3 sm:p-4 md:p-6`), mas **não removem a causa**. Enquanto a rolagem do documento
+estiver desligada, todo componente novo precisa se conter sozinho — e quem esquecer não
+recebe nenhum sinal. Também é o que torna o [item 25](#25-522-tamanhos-de-fonte-travados-em-pixel)
+mais grave do que parece: aumentar a fonte pode fazer conteúdo desaparecer.
+
+### Anteriores
 
 | Item | Quando | Como |
 |---|---|---|

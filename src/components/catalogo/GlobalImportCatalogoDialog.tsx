@@ -14,7 +14,7 @@ import { validateFile } from '@/lib/file-validation';
 import { MappingStep, sanitizeImportedRows, type ExtraMappingValue, type FieldDef, detectFuzzyMapping } from '@/components/import/MappingStep';
 import { ImportInstructionsStep, type TemplateField } from '@/components/import/ImportInstructionsStep';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { cn } from '@/lib/utils';
 
 const VISIBLE_FIELDS: FieldDef[] = [
@@ -254,7 +254,9 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+      {/* `dvh` e não `vh`: no celular `100vh` mede a tela COM a barra de endereço
+          escondida, então o rodapé do diálogo fica atrás da barra do navegador. */}
+      <DialogContent className="max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
         <DialogHeader className="px-6 py-4 bg-muted/30 shrink-0 border-b flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2.5 text-foreground font-bold text-lg">
@@ -339,16 +341,16 @@ export function GlobalImportCatalogoDialog({ open, onOpenChange, onFabricanteCha
                 <p className="text-xs text-muted-foreground">
                   Usado para linhas onde o fabricante não for identificado na planilha.
                 </p>
-                <Select value={selectedFabricanteId} onValueChange={setSelectedFabricanteId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um fabricante..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {fabricantes?.map(f => (
-                      <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Lista com busca: são 31 fabricantes na MD, e num `Select` cru
+                    a única forma de achar um é rolando a lista inteira. */}
+                <SearchableSelect
+                  options={(fabricantes ?? []).map(f => ({ value: f.id, label: f.nome }))}
+                  value={selectedFabricanteId}
+                  onValueChange={setSelectedFabricanteId}
+                  placeholder="Selecione um fabricante..."
+                  searchPlaceholder="Buscar fabricante..."
+                  emptyMessage="Nenhum fabricante encontrado."
+                />
               </div>
 
               <div className="bg-muted/30 rounded-xl border border-border/50 shadow-sm overflow-hidden">

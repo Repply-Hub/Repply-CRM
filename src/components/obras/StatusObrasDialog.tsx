@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Loader2, GripVertical } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -118,15 +119,15 @@ export function StatusObrasDialog({ open, onOpenChange }: Props) {
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
+                <ConteudoDialogo className="max-w-2xl">
+                    <CabecalhoDialogo>
                         <DialogTitle>Gerenciar Status de Obras</DialogTitle>
                         <DialogDescription>
                             Personalize as etapas das suas obras. Defina a ordem e as cores de cada status.
                         </DialogDescription>
-                    </DialogHeader>
+                    </CabecalhoDialogo>
 
-                    <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+                    <div className="shrink-0 rounded-lg border bg-muted/30 p-3 space-y-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Adicionar novo status</p>
                         <div className="flex flex-col sm:flex-row gap-2">
                             <Input
@@ -157,7 +158,11 @@ export function StatusObrasDialog({ open, onOpenChange }: Props) {
                         </div>
                     </div>
 
-                    <ScrollArea className="max-h-[400px] -mx-1 px-1">
+                    {/* A lista é `flex-1 min-h-0` em vez de `max-h-[400px]`: com altura
+                        fixa o diálogo nunca ficava menor que ~700px, e num notebook de
+                        1366x768 (ou com zoom em 150%) o botão "Fechar" e o "X" saíam da
+                        tela ao mesmo tempo — sem Esc nem clique-fora, só recarregando. */}
+                    <ScrollArea className="min-h-0 flex-1 -mx-1 px-1">
                         {isLoading ? (
                             <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -222,10 +227,10 @@ export function StatusObrasDialog({ open, onOpenChange }: Props) {
                         )}
                     </ScrollArea>
 
-                    <DialogFooter>
+                    <RodapeDialogo>
                         <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-                    </DialogFooter>
-                </DialogContent>
+                    </RodapeDialogo>
+                </ConteudoDialogo>
             </Dialog>
 
             <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>

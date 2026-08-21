@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Loader2, GripVertical, Lock } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
   useMarcadores,
@@ -108,14 +108,18 @@ export function MarcadoresDialog({ open, onOpenChange, empresaId }: Props) {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        {/* ConteudoDialogo em vez de DialogContent: com 16 marcadores a janela passava de 670px
+            de altura e, num notebook 1366x768, transbordava para os dois lados ao mesmo tempo —
+            o "Fechar" sumia por baixo e o "X" por cima, sem Esc nem clique-fora para escapar. */}
+        <ConteudoDialogo className="max-w-2xl">
+          <CabecalhoDialogo>
             <DialogTitle>Gerenciar Marcadores</DialogTitle>
             <DialogDescription>
               Personalize os marcadores dos seus negócios. Defina a ordem e as cores de cada um.
             </DialogDescription>
-          </DialogHeader>
+          </CabecalhoDialogo>
 
+          <CorpoDialogo className="space-y-4">
           <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Adicionar novo marcador</p>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -148,7 +152,9 @@ export function MarcadoresDialog({ open, onOpenChange, empresaId }: Props) {
             </div>
           </div>
 
-          <ScrollArea className="max-h-[400px] -mx-1 px-1">
+          {/* Sem altura fixa: quem rola agora é o corpo do modal inteiro, então a lista usa a
+              altura que sobrar na janela em vez de reservar 400px que a tela pode não ter. */}
+          <div className="-mx-1 px-1">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -219,12 +225,13 @@ export function MarcadoresDialog({ open, onOpenChange, empresaId }: Props) {
                 </Droppable>
               </DragDropContext>
             )}
-          </ScrollArea>
+          </div>
+          </CorpoDialogo>
 
-          <DialogFooter>
+          <RodapeDialogo>
             <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          </DialogFooter>
-        </DialogContent>
+          </RodapeDialogo>
+        </ConteudoDialogo>
       </Dialog>
 
       <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>

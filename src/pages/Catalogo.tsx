@@ -160,23 +160,33 @@ const Catalogo = () => {
           </CardContent>
         </Card>
 
-        <div className="flex justify-between items-center gap-4 shrink-0">
+        {/* `flex-wrap` nesta barra: o "Voltar para todas as categorias" ocupa
+            ~250px e não encolhe (botão do shadcn é `whitespace-nowrap`), então
+            sem quebra de linha ele empurrava o "Novo Produto" para fora do
+            `<main>`, que é `overflow-hidden` — o botão sumia sem deixar rolagem
+            para alcançá-lo. No modo de seleção isso começava já a 951px. */}
+        <div className="flex flex-wrap justify-between items-center gap-4 shrink-0">
           {!showFolders ? (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setCategoria('todas');
                 setBusca('');
               }}
-              className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+              className="flex min-w-0 items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+              title="Voltar para todas as categorias"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar para todas as categorias
+              <ArrowLeft className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Voltar para todas as categorias</span>
+              <span className="sm:hidden">Voltar</span>
             </Button>
           ) : <div />}
 
-          <div className="flex items-center gap-2">
+          {/* `ml-auto` para o bloco continuar à direita mesmo quando desce para a
+              segunda linha — sozinho na linha, o `justify-between` do pai o
+              jogaria para a esquerda. */}
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
             {!showFolders && (
               <>
                 {isSelectionMode ? (

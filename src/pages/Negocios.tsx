@@ -120,6 +120,62 @@ const readIdsSessionStorage = (key: string): Set<string> => {
   }
 };
 
+// Lista de marcar com busca local, usada nos submenus de filtro que crescem: Fabricante (31
+// representadas) e Marcador (16 hoje, e sobe a cada campanha nova). É o mesmo padrão que
+// Clientes.tsx já usa nos cinco filtros dele — a caixa de rolagem mostra ~7 linhas por vez, então
+// sem busca quem procura uma marca do fim do alfabeto rolava a lista inteira toda vez.
+// Estado de busca interno e isolado por instância: o mesmo filtro aparece na tela e no modal de
+// Ação em Massa, e digitar num não pode mexer no outro.
+function FilterCheckboxList({
+  options,
+  selected,
+  onToggle,
+  emptyMessage = 'Nenhuma opção disponível.',
+  searchPlaceholder = 'Buscar...',
+}: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  emptyMessage?: string;
+  searchPlaceholder?: string;
+}) {
+  const [search, setSearch] = useState('');
+  const term = search.trim().toLowerCase();
+  const filteredOptions = term ? options.filter(o => o.label.toLowerCase().includes(term)) : options;
+
+  return (
+    <div className="flex flex-col">
+      <div className="px-2 pt-2 pb-1">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
+      </div>
+      {options.length === 0 ? (
+        <p className="text-xs text-muted-foreground px-3 py-4 text-center">{emptyMessage}</p>
+      ) : filteredOptions.length === 0 ? (
+        <p className="text-xs text-muted-foreground px-3 py-4 text-center">Nenhum resultado para "{search.trim()}".</p>
+      ) : (
+        <ScrollArea className="h-56">
+          <div className="space-y-1 p-2 pt-0 pr-3">
+            {filteredOptions.map(opt => (
+              <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
+                <Checkbox checked={selected.includes(opt.value)} onCheckedChange={() => onToggle(opt.value)} />
+                <span className="truncate">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  );
+}
+
 const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone, whatsapp: MessageSquare, visita: Eye };
 
 type PageMode = 'pipeline' | 'negocios';
@@ -214,7 +270,11 @@ const PedidoRow = memo(({
                       {daysInStage} dias nesta etapa
                     </div>
                   )}
-                  <p className="whitespace-nowrap">{pedido.cliente?.empresa ?? '-'}</p>
+                  {/* `truncate` + `title`: a coluna é fixada em 150px pelo colgroup (o min-w do
+                      TableCell é ignorado em table-fixed), e a mediana dos nomes de cliente tem 33
+                      caracteres. Antes o nome era cortado a seco, sem "…" e sem nenhuma forma de
+                      ler o resto — dois clientes parecidos ficavam indistinguíveis. */}
+                  <p className="truncate" title={pedido.cliente?.empresa ?? ''}>{pedido.cliente?.empresa ?? '-'}</p>
                 </div>
               </TableCell>
             );
@@ -1394,16 +1454,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           sideOffset={10}
           popoverClassName="w-60"
         >
-          <ScrollArea className="h-60">
-            <div className="space-y-1 pr-3">
-              {(fabricantes ?? []).map(f => (
-                <label key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                  <Checkbox checked={selectedFabricantes.includes(f.id)} onCheckedChange={() => toggleFilter(selectedFabricantes, setSelectedFabricantes, f.id)} />
-                  {f.nome}
-                </label>
-              ))}
-            </div>
-          </ScrollArea>
+          <FilterCheckboxList
+            options={(fabricantes ?? []).map(f => ({ value: f.id, label: f.nome }))}
+            selected={selectedFabricantes}
+            onToggle={(id) => toggleFilter(selectedFabricantes, setSelectedFabricantes, id)}
+            searchPlaceholder="Buscar fabricante..."
+            emptyMessage="Nenhum fabricante cadastrado."
+          />
         </StandardPopoverMenu>
 
         {/* Submenu Marcador */}
@@ -1416,16 +1473,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           sideOffset={10}
           popoverClassName="w-60"
         >
-          <ScrollArea className="h-60">
-            <div className="space-y-1 pr-3">
-              {(marcadores ?? []).map(m => (
-                <label key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                  <Checkbox checked={selectedMarcadores.includes(m.id)} onCheckedChange={() => toggleFilter(selectedMarcadores, setSelectedMarcadores, m.id)} />
-                  {m.nome}
-                </label>
-              ))}
-            </div>
-          </ScrollArea>
+          <FilterCheckboxList
+            options={(marcadores ?? []).map(m => ({ value: m.id, label: m.nome }))}
+            selected={selectedMarcadores}
+            onToggle={(id) => toggleFilter(selectedMarcadores, setSelectedMarcadores, id)}
+            searchPlaceholder="Buscar marcador..."
+            emptyMessage="Nenhum marcador cadastrado."
+          />
         </StandardPopoverMenu>
 
         {/* Submenu Período */}
@@ -2303,22 +2357,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       sideOffset={10}
                       popoverClassName="w-60"
                     >
-                      <ScrollArea className="h-60">
-                        <div className="space-y-1 pr-3">
-                          {(marcadores ?? []).map(m => (
-                            <label key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
-                              <Checkbox
-                                checked={bulkPickerMarcadorIds.includes(m.id)}
-                                onCheckedChange={() => {
-                                  toggleFilter(bulkPickerMarcadorIds, setBulkPickerMarcadorIds, m.id);
-                                  setBulkPickerPage(1);
-                                }}
-                              />
-                              {m.nome}
-                            </label>
-                          ))}
-                        </div>
-                      </ScrollArea>
+                      <FilterCheckboxList
+                        options={(marcadores ?? []).map(m => ({ value: m.id, label: m.nome }))}
+                        selected={bulkPickerMarcadorIds}
+                        onToggle={(id) => {
+                          toggleFilter(bulkPickerMarcadorIds, setBulkPickerMarcadorIds, id);
+                          setBulkPickerPage(1);
+                        }}
+                        searchPlaceholder="Buscar marcador..."
+                        emptyMessage="Nenhum marcador cadastrado."
+                      />
                     </StandardPopoverMenu>
 
                     <StandardPopoverMenu
@@ -2587,17 +2635,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <div className="flex items-center gap-3">
               <Checkbox checked={bulkApplyMarcador} onCheckedChange={(v) => setBulkApplyMarcador(!!v)} id="bulk-apply-marcador" />
               <Label htmlFor="bulk-apply-marcador" className="w-28 shrink-0 cursor-pointer font-normal">Novo marcador</Label>
-              <Select value={bulkNewMarcadorId} onValueChange={setBulkNewMarcadorId} disabled={!bulkApplyMarcador}>
-                <SelectTrigger className="flex-1 bg-background">
-                  <SelectValue placeholder="Selecionar marcador" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nenhum">Nenhum</SelectItem>
-                  {(marcadores ?? []).map(m => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* SearchableSelect igual ao "Novo responsável" logo abaixo: são 17 opções e este é
+                  o campo que grava a mudança em TODOS os negócios marcados — errar aqui por não
+                  achar o marcador na rolagem custa caro. O desabilitado é feito por classe porque
+                  o componente não tem propriedade `disabled`, mesmo padrão já usado ao lado. */}
+              <SearchableSelect
+                options={[{ value: 'nenhum', label: 'Nenhum' }, ...(marcadores ?? []).map(m => ({ value: m.id, label: m.nome }))]}
+                value={bulkNewMarcadorId}
+                onValueChange={setBulkNewMarcadorId}
+                placeholder="Selecionar marcador"
+                className={cn("flex-1 bg-background", !bulkApplyMarcador && "opacity-50 pointer-events-none")}
+              />
             </div>
 
             <div className="flex items-center gap-3">

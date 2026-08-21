@@ -1476,9 +1476,14 @@ const Emails = () => {
       >
         {/* Header with Search and Tab Actions */}
         <div className="px-4 py-3 flex items-center justify-between gap-4 border-b bg-background/95 sticky top-0 z-10">
-          <div className="flex items-center gap-4 flex-1">
+          {/* `min-w-0` + rolagem própria nesta fileira: sem os dois, as abas e a
+              busca não cediam espaço, a linha estourava para a direita e o
+              "Escrever" — que é o ÚNICO caminho para um e-mail novo — sumia por
+              inteiro entre ~768 e ~917px de janela, sem barra de rolagem em lugar
+              nenhum para alcançá-lo. Mesmo padrão de Negocios.tsx:1862. */}
+          <div className="flex items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
             {selectedIds.length > 0 ? (
-              <div className="flex items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
+              <div className="flex shrink-0 items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
                 <div className="flex items-center gap-2">
                   <Checkbox
                     id="select-all-bulk"
@@ -1544,7 +1549,7 @@ const Emails = () => {
                 </Button>
               </div>
             ) : (
-              <TabsList className={TOGGLE_LIST_CLASS}>
+              <TabsList className={cn(TOGGLE_LIST_CLASS, "shrink-0")}>
                 <TabsTrigger value="received" className={TOGGLE_TRIGGER_CLASS}>
                   <Inbox className="h-4 w-4" />
                   <span className="hidden sm:inline">Recebidos</span>
@@ -1603,8 +1608,8 @@ const Emails = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 flex-1 max-w-md hidden md:flex">
-              <div className="relative flex-1">
+            <div className="flex items-center gap-2 flex-1 min-w-[14rem] max-w-md hidden md:flex">
+              <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
                 <Input
                   placeholder="Pesquisar e-mails..."
@@ -1647,13 +1652,18 @@ const Emails = () => {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          {/* `shrink-0`: a ação principal da tela nunca cede espaço para os
+              filtros. Quem tem de encolher é a fileira da esquerda, que agora
+              rola sozinha. */}
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               onClick={escreverNovo}
               className="h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm gap-2 text-sm font-bold px-4 transition-all"
+              title="Escrever um e-mail novo"
+              aria-label="Escrever um e-mail novo"
             >
               <PenBox className="h-4 w-4" />
-              Escrever
+              <span className="hidden sm:inline">Escrever</span>
             </Button>
           </div>
         </div>

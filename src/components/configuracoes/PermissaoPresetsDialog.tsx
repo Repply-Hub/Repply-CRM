@@ -3,7 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogTitle,
+  DialogTrigger,
+  ConteudoDialogo,
+  CabecalhoDialogo,
+} from '@/components/shared/DialogoResponsivo';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Settings, Plus, Pencil, Trash2, Loader2, ChevronLeft, Shield, Check } from 'lucide-react';
@@ -70,8 +77,8 @@ function PresetEditor({ preset, onBack }: { preset: PermissaoPreset; onBack: () 
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
+    <div className="flex min-h-0 flex-1 flex-col space-y-4">
+      <div className="flex shrink-0 items-center gap-2">
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onBack}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -82,11 +89,15 @@ function PresetEditor({ preset, onBack }: { preset: PermissaoPreset; onBack: () 
         {preset.origem === 'padrao' && <Badge variant="outline" className="text-[10px] ml-auto">Padrão</Badge>}
       </div>
 
-      <ScrollArea className="h-[65vh] pr-3">
+      {/* A lista encolhe junto com a janela em vez de reservar 65% dela.
+          Com `h-[65vh]` o diálogo pedia sempre 190px fixos + 65% da altura, o que
+          só cabia acima de ~543px úteis: em zoom de 175% o "Salvar preset" e o "X"
+          sumiam ao mesmo tempo e o gestor não conseguia gravar as permissões. */}
+      <ScrollArea className="min-h-0 flex-1 pr-3">
         <PermissaoMatrixEditor getValue={key => permissoes[key]} onChange={handleChange} />
       </ScrollArea>
 
-      <DialogFooter>
+      <DialogFooter className="shrink-0">
         <Button onClick={handleSalvar} disabled={update.isPending}>
           {update.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...</> : 'Salvar preset'}
         </Button>
@@ -119,8 +130,8 @@ function NovoPresetForm({ onCreated, onBack }: { onCreated: (preset: PermissaoPr
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
+    <div className="flex min-h-0 flex-1 flex-col space-y-4">
+      <div className="flex shrink-0 items-center gap-3">
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => etapa === 'info' ? onBack() : setEtapa('info')}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -144,11 +155,11 @@ function NovoPresetForm({ onCreated, onBack }: { onCreated: (preset: PermissaoPr
           </DialogFooter>
         </div>
       ) : (
-        <div className="space-y-4">
-          <ScrollArea className="h-[55vh] pr-3">
+        <div className="flex min-h-0 flex-1 flex-col space-y-4">
+          <ScrollArea className="min-h-0 flex-1 pr-3">
             <PermissaoMatrixEditor getValue={key => permissoes[key]} onChange={handleChange} />
           </ScrollArea>
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button onClick={handleCriar} disabled={create.isPending}>
               {create.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Criando...</> : 'Criar preset'}
             </Button>
@@ -239,10 +250,10 @@ export function PermissaoPresetsDialog({ empresaId, meuUsuarioId }: { empresaId:
           <Settings className="h-4 w-4" /> Gerenciar presets
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
+      <ConteudoDialogo className="sm:max-w-2xl">
+        <CabecalhoDialogo>
           <DialogTitle>{editingAtual ? 'Editar preset' : criando ? 'Novo preset' : 'Presets de permissões'}</DialogTitle>
-        </DialogHeader>
+        </CabecalhoDialogo>
         {editingAtual ? (
           <PresetEditor preset={editingAtual} onBack={() => setEditing(null)} />
         ) : criando ? (
@@ -250,7 +261,7 @@ export function PermissaoPresetsDialog({ empresaId, meuUsuarioId }: { empresaId:
         ) : (
           <PresetsList empresaId={empresaId} meuUsuarioId={meuUsuarioId} onEdit={setEditing} onNovo={() => setCriando(true)} />
         )}
-      </DialogContent>
+      </ConteudoDialogo>
     </Dialog>
   );
 }

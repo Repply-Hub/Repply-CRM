@@ -352,6 +352,11 @@ Os dois somam no **servidor**, por função de banco (`dashboard_stats`,
 `plano_vendas_progresso`), e não puxando os pedidos para o navegador. Mantenha assim: a
 tabela `pedidos` já tem milhares de linhas.
 
+> 🔴 **Nem toda métrica usa a mesma coluna de data.** Dinheiro conta por fechamento,
+> conversão conta por criação (§10.9). Antes de construir gráfico novo aqui, leia
+> [`docs/modulos/dashboard.md`](docs/modulos/dashboard.md) — métrica a métrica, com o
+> porquê de cada escolha.
+
 ### 5.7 Calendário, Tarefas e Chat
 
 **Calendário** — eventos com participantes, criação em lote, visão por mês/semana/dia.
@@ -770,6 +775,67 @@ reescrever 11.714 linhas e quebraria a garantia de que aquela coluna só é escr
 gatilho. Apontar o filtro para o campo certo é mudança de código, não de dado — mais
 barata e mais segura.
 
+### 10.9 Dinheiro conta por fechamento; conversão é conta de safra
+
+*Decisão de 21/08/2026.* Complementa a §10.8: aquela definiu **qual** coluna é a data de
+fechamento; esta define **quais métricas** a usam.
+
+**A regra:** dinheiro conta pelo dia em que o negócio foi ganho (`prazo_resposta`).
+Conversão conta pelo dia em que o negócio nasceu (`data_pedido`).
+
+Um negócio criado em 28/junho e fechado em 3/julho é faturamento de **julho**. Antes ele
+entrava em junho e sumia da meta de julho, que é o mês em que a venda aconteceu. Passaram
+para fechamento: Faturamento Total, Negócios Fechados, Ticket Médio, Faturamento por
+Fábrica, Rendimento por Responsável, Faturamento Mensal e o Plano de Vendas.
+
+**A taxa de conversão é de SAFRA e continua por data de criação:** *dos negócios criados no
+período, quantos foram ganhos*. O numerador é subconjunto do denominador, então a conta
+**nunca passa de 100%**.
+
+A fórmula alternativa — fechados no período ÷ criados no período — mistura dois conjuntos
+que não se contêm. Medido nesta base: na semana de **29/12/2025** ela daria **157%**. Um
+painel que mostra "157% de conversão" não é painel, é bug com aparência de dado. Por isso
+Taxa de Conversão, Conversão por Vendedor e Segmentação por Ticket **não foram movidas** —
+já estavam certas.
+
+**Consequência de processo:** todo gráfico novo exige a pergunta "criação ou fechamento?"
+respondida pelo dono do produto **antes** de ser construído. As duas respostas produzem
+números plausíveis e ninguém percebe a troca olhando a tela. Ver `CLAUDE.md` §5 e
+[`docs/modulos/dashboard.md`](docs/modulos/dashboard.md).
+
+### 10.10 Reabrir um negócio mantém a data de fechamento anterior
+
+*Decisão de 21/08/2026.*
+
+Quando um negócio volta de uma etapa final para uma etapa aberta, `fechado_em` é limpa —
+"quando fechou" deixa de fazer sentido. Mas **`prazo_resposta` é mantida**: ela vira o
+registro de quando aquele negócio tinha sido fechado da última vez.
+
+**Por que é seguro:** todo cálculo de faturamento exige `status = 'fechamento'` além da
+data. Negócio reaberto não conta como venda de jeito nenhum — só a data sobra registrada.
+
+**A alternativa era pior:** limpar a data ao reabrir apagaria a única informação histórica
+que existe sobre aquele fechamento, e ninguém teria como reconstruí-la.
+
+Junto com essa decisão, a regra da data de fechamento saiu da tela e foi para o banco
+(gatilho `fn_set_pedido_fechado_em`). Existem **seis** caminhos que mudam o status de um
+negócio e só dois carimbavam data — inclusive um, a exclusão de etapa do kanban, que pode
+marcar centenas de negócios como ganhos de uma vez. Manter a mesma regra escrita em seis
+lugares e sincronizada para sempre não funciona, e o sétimo caminho que alguém criar
+amanhã nasceria errado em silêncio, como o sexto nasceu.
+
+### 10.11 Um número, um gráfico
+
+*Decisão de 21/08/2026.*
+
+O cartão "Rendimento por Fábrica" (barras) foi **removido**. Ele mostrava exatamente o
+mesmo array que a rosca "Faturamento por Fábrica" — mesmo campo, mesma RPC — mudando só o
+desenho e ganhando um seletor Maior/Menor.
+
+Dois cartões para o mesmo número fazem a tela parecer maior do que a informação que ela
+tem, e obrigam quem olha a conferir se são a mesma coisa. Ficou a rosca, que já agrupa as
+fábricas pequenas em "Outros" com o detalhe ao passar o mouse.
+
 ### 10.7 A soma é feita no banco, não no navegador
 
 Total, contagem e progresso de meta saem de função de banco ou de contagem exata do
@@ -846,7 +912,8 @@ verificação, está em `docs/divida-tecnica.md`.
 
 ### 11.3 Praticamente não há teste automatizado
 
-7 arquivos de teste para 78 mil linhas de código. E o `npm run lint` **também não passa** —
+10 arquivos de teste (152 casos) para 78 mil linhas de código. E o `npm run lint` **também
+não passa** —
 498 problemas herdados no `main` (medido em 19/08/2026), o que faz a ferramenta deixar de
 servir como sinal: ninguém percebe quando 458 erros viram 459.
 

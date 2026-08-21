@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Archive, ChevronDown, Loader2, Mail, PenLine, Tag, Trash2 } from 'lucide-react';
+import { AlertTriangle, Archive, ChevronDown, Loader2, Mail, PenLine, Search, Tag, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import {
   useCompartilhamentoCaixa,
   useEmailPastas,
@@ -12,13 +13,11 @@ import {
 } from '@/hooks/use-email-pastas';
 import { useEmailEmpresa, ROTULO_PROVEDOR } from '@/hooks/use-email-empresa';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+// Teto de altura e rolagem: com muita gente na empresa este diálogo passa da
+// altura da tela, e o modal do shadcn corta o excedente EM CIMA e EMBAIXO ao
+// mesmo tempo — some o rodapé e some o "X" de fechar, sem saída pelo teclado.
+import { ConteudoDialogo } from '@/components/shared/DialogoResponsivo';
 
 interface Props {
   open: boolean;
@@ -40,6 +39,84 @@ interface Props {
  * das vezes, então a decisão é explícita — e "manter" vem primeiro por ser o
  * caminho reversível.
  */
+/** A partir de quantos marcadores a lista deixa de caber no olho e ganha busca. */
+const MARCADORES_ATE_ROLAR = 8;
+
+/**
+ * Os marcadores de UMA pessoa, com busca própria.
+ *
+ * A MD tem 31 marcadores e a lista se repete inteira a cada pessoa que se abre:
+ * sem busca, liberar um marcador para cinco vendedores é rolar trinta linhas
+ * cinco vezes. A busca é local (nada vai ao servidor) e o estado mora aqui
+ * dentro — trocar de pessoa recomeça com a lista inteira, que é o esperado.
+ */
+function MarcadoresDaPessoa({
+  marcadores,
+  caixaInteira,
+  liberados,
+  isSalvando,
+  onAlternar,
+}: {
+  marcadores: { pastaId: string; nome: string }[];
+  caixaInteira: boolean;
+  liberados: string[];
+  isSalvando: boolean;
+  onAlternar: (pastaId: string, ligado: boolean) => void;
+}) {
+  const [busca, setBusca] = useState('');
+  const termo = busca.trim().toLowerCase();
+  const visiveis = termo
+    ? marcadores.filter((m) => m.nome.toLowerCase().includes(termo))
+    : marcadores;
+
+  return (
+    <>
+      {marcadores.length > MARCADORES_ATE_ROLAR && (
+        <div className="relative py-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar marcador..."
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
+      )}
+
+      {visiveis.length === 0 ? (
+        <p className="py-2 text-xs text-muted-foreground">
+          Nenhum marcador com "{busca.trim()}".
+        </p>
+      ) : (
+        // Teto de altura só quando a lista é longa: com poucos marcadores uma
+        // caixa de rolagem meio vazia parece defeito.
+        <div className={cn(marcadores.length > MARCADORES_ATE_ROLAR && 'max-h-48 overflow-y-auto pr-1')}>
+          {visiveis.map((m) => (
+            <label
+              key={m.pastaId}
+              className={cn(
+                'flex items-center gap-3 py-1',
+                caixaInteira ? 'opacity-50' : 'cursor-pointer',
+              )}
+            >
+              {/* Com a caixa inteira liberada o marcador já está incluído.
+                  Travado e marcado diz isso sem apagar a escolha anterior:
+                  desmarcar "caixa inteira" devolve o que a pessoa tinha. */}
+              <Checkbox
+                checked={caixaInteira || liberados.includes(m.pastaId)}
+                disabled={caixaInteira || isSalvando}
+                onCheckedChange={(v) => onAlternar(m.pastaId, v === true)}
+              />
+              <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate text-sm text-foreground">{m.nome}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Resume, numa linha, o que a pessoa enxerga hoje. */
 function resumoDoAcesso(p: UsuarioDaCaixa): string {
   if (p.porPapel) return `${p.role} · acesso pelo cargo`;
@@ -110,7 +187,7 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={fechar}>
-      <DialogContent className="sm:max-w-[520px]">
+      <ConteudoDialogo className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Caixa de e-mail da empresa</DialogTitle>
           <DialogDescription>
@@ -118,11 +195,11 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        {/* `min-w-0` em todo filho que possa crescer: o DialogContent é um GRID,
-            e item de grid tem `min-width: auto`, ou seja, se recusa a encolher
-            abaixo do próprio conteúdo. Sem isto, um endereço de e-mail comprido
-            empurra a caixa inteira para além do `max-w` e o diálogo vaza da
-            tela — foi exatamente o que aconteceu aqui. */}
+        {/* `min-w-0` em todo filho que possa crescer: item de grid — e de flex,
+            que é o que o ConteudoDialogo usa — tem `min-width: auto`, ou seja,
+            se recusa a encolher abaixo do próprio conteúdo. Sem isto, um
+            endereço de e-mail comprido empurra a caixa inteira para além do
+            `max-w` e o diálogo vaza da tela — foi o que aconteceu aqui. */}
         <div className="flex min-w-0 items-start gap-3 rounded-lg border bg-muted/40 px-4 py-3">
           <Mail className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
           <div className="min-w-0 flex-1">
@@ -230,32 +307,15 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
                                 da próxima sincronização.
                               </p>
                             ) : (
-                              marcadores.map((m) => (
-                                <label
-                                  key={m.pastaId}
-                                  className={cn(
-                                    'flex items-center gap-3 py-1',
-                                    p.caixaInteira ? 'opacity-50' : 'cursor-pointer',
-                                  )}
-                                >
-                                  {/* Com a caixa inteira liberada o marcador já
-                                      está incluído. Travado e marcado diz isso
-                                      sem apagar a escolha anterior: desmarcar
-                                      "caixa inteira" devolve o que a pessoa
-                                      tinha. */}
-                                  <Checkbox
-                                    checked={p.caixaInteira || p.marcadores.includes(m.pastaId)}
-                                    disabled={p.caixaInteira || isSalvando}
-                                    onCheckedChange={(v) =>
-                                      alternar(p.usuarioId, m.pastaId, v === true)
-                                    }
-                                  />
-                                  <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                                    {m.nome}
-                                  </span>
-                                </label>
-                              ))
+                              <MarcadoresDaPessoa
+                                marcadores={marcadores}
+                                caixaInteira={p.caixaInteira}
+                                liberados={p.marcadores}
+                                isSalvando={isSalvando}
+                                onAlternar={(pastaId, ligado) =>
+                                  alternar(p.usuarioId, pastaId, ligado)
+                                }
+                              />
                             )}
                           </div>
                         )}
@@ -353,7 +413,7 @@ export function GerenciarCaixaDialog({ open, onOpenChange }: Props) {
             </div>
           </>
         )}
-      </DialogContent>
+      </ConteudoDialogo>
     </Dialog>
   );
 }

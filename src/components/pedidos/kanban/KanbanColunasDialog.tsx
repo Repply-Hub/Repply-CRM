@@ -4,12 +4,12 @@ import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, GripVertical, Loader2, Lock, Eye, EyeOff, FolderKanban, FolderPlus, X } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
     useKanbanColunas,
@@ -242,8 +242,13 @@ export function KanbanColunasDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={requestClose}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
+                {/* ConteudoDialogo em vez de DialogContent: com as 6 etapas de hoje esta janela já
+                    mede ~670px e, num notebook 1366x768, transbordava para cima e para baixo ao
+                    mesmo tempo — "Salvar alterações" sumia por baixo e o "X" por cima. Como Esc e
+                    clique-fora estão desligados (ui/dialog.tsx:42), a única saída era recarregar a
+                    página e perder tudo que tinha sido reordenado. */}
+                <ConteudoDialogo className="max-w-2xl">
+                    <CabecalhoDialogo>
                         <DialogTitle className="flex items-center gap-2 flex-wrap">
                             Gerenciar Colunas do Kanban
                             {funilNome && selectedFunilId === funilId && (
@@ -256,8 +261,9 @@ export function KanbanColunasDialog({
                             Crie, edite, reordene e remova as colunas (etapas) do funil selecionado. Apenas gestores e administradores podem fazer alterações.
                             As alterações só têm efeito depois de clicar em "Salvar alterações".
                         </DialogDescription>
-                    </DialogHeader>
+                    </CabecalhoDialogo>
 
+                    <CorpoDialogo className="space-y-4">
                     {funis && (
                         <div className="space-y-1.5">
                             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -308,7 +314,10 @@ export function KanbanColunasDialog({
                             )}
                         </div>
                     )}
-                    <ScrollArea className="max-h-[400px] -mx-1 px-1">
+                    {/* Sem altura fixa: quem rola é o corpo do modal inteiro, então a lista de
+                        etapas usa a altura que sobra na janela em vez de reservar 400px que a tela
+                        pode não ter. */}
+                    <div className="-mx-1 px-1">
                         {isLoading ? (
                             <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -463,9 +472,10 @@ export function KanbanColunasDialog({
                             )}
                             </div>
                         )}
-                    </ScrollArea>
+                    </div>
+                    </CorpoDialogo>
 
-                    <DialogFooter className="sm:justify-between">
+                    <RodapeDialogo className="sm:justify-between">
                         {selectedFunil && !selectedFunil.is_padrao ? (
                             <Button
                                 variant="outline"
@@ -484,8 +494,8 @@ export function KanbanColunasDialog({
                                 Salvar alterações
                             </Button>
                         </div>
-                    </DialogFooter>
-                </DialogContent>
+                    </RodapeDialogo>
+                </ConteudoDialogo>
             </Dialog>
 
             {/* Editar coluna (rascunho, aplicado só ao salvar) */}

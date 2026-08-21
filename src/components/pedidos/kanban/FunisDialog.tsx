@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, Loader2, Lock } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
     useFunis,
     useCreateFunil,
@@ -62,16 +62,20 @@ export function FunisDialog({ open, onOpenChange, empresaId, onFunilCreated }: P
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
+                {/* ConteudoDialogo em vez de DialogContent: a altura desta janela cresce a cada
+                    funil criado e, sem teto, ela transborda para cima e para baixo ao mesmo tempo —
+                    o "Fechar" e o "X" somem juntos e só recarregar a página resolve. */}
+                <ConteudoDialogo className="max-w-lg">
+                    <CabecalhoDialogo>
                         <DialogTitle>Gerenciar Funis</DialogTitle>
                         <DialogDescription>
                             Crie, renomeie ou exclua funis (pipelines) de vendas. Cada funil nasce com as
                             mesmas etapas padrão e pode ser customizado depois. Apenas gestores e
                             administradores podem fazer alterações.
                         </DialogDescription>
-                    </DialogHeader>
+                    </CabecalhoDialogo>
 
+                    <CorpoDialogo className="space-y-4">
                     {/* Adicionar novo */}
                     <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Criar novo funil</p>
@@ -91,7 +95,9 @@ export function FunisDialog({ open, onOpenChange, empresaId, onFunilCreated }: P
                     </div>
 
                     {/* Lista */}
-                    <ScrollArea className="max-h-[350px] -mx-1 px-1">
+                    {/* Sem altura fixa: quem rola é o corpo do modal, então a lista aproveita a
+                        altura que a janela tiver em vez de reservar 350px. */}
+                    <div className="-mx-1 px-1">
                         {isLoading ? (
                             <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -134,12 +140,13 @@ export function FunisDialog({ open, onOpenChange, empresaId, onFunilCreated }: P
                                 ))}
                             </div>
                         )}
-                    </ScrollArea>
+                    </div>
+                    </CorpoDialogo>
 
-                    <DialogFooter>
+                    <RodapeDialogo>
                         <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-                    </DialogFooter>
-                </DialogContent>
+                    </RodapeDialogo>
+                </ConteudoDialogo>
             </Dialog>
 
             {/* Renomear funil */}

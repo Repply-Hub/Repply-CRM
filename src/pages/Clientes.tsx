@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ConteudoDialogo } from '@/components/shared/DialogoResponsivo';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
@@ -34,6 +35,7 @@ import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettin
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
+import { ContatoSelector } from '@/components/clientes/ContatoSelector';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
@@ -73,6 +75,13 @@ const CONTATO_FIELDS: ColumnDefinition[] = [
   { id: 'data_criacao', label: 'Data de Criação' },
   { id: 'criado_por', label: 'Criado por' },
 ];
+
+// Colunas ligadas de saída para quem NUNCA mexeu na configuração da tabela. As 17 de
+// CLIENTE_FIELDS somavam 2.590px de largura — mais de sete telas de celular só para achar
+// o nome. Quem já tem configuração salva (como a MD) continua exatamente com a dela, e
+// qualquer um pode religar as demais pelo botão "Colunas".
+const CLIENTE_COLUNAS_PADRAO = ['empresa', 'tipo', 'cnpj', 'telefone', 'email', 'cidade'];
+const CONTATO_COLUNAS_PADRAO = ['nome_contato', 'empresa', 'telefone', 'email', 'cargo'];
 
 const EMPRESA_STEPS = [
   { id: 1, label: 'Dados' },
@@ -429,11 +438,13 @@ const Clientes = () => {
   const empresasSettings = useTableSettings({
     key: 'clientes_empresas',
     defaultColumns: CLIENTE_FIELDS,
+    defaultVisibleColumns: CLIENTE_COLUNAS_PADRAO,
   });
 
   const contatosSettings = useTableSettings({
     key: 'clientes_contatos',
     defaultColumns: CONTATO_FIELDS,
+    defaultVisibleColumns: CONTATO_COLUNAS_PADRAO,
   });
 
   const {
@@ -952,7 +963,7 @@ const Clientes = () => {
 
   return (
     <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`} mainClassName="flex-1 overflow-hidden flex flex-col">
-      <div className="p-6 w-full flex-1 flex flex-col min-h-0">
+      <div className="p-3 sm:p-4 md:p-6 w-full flex-1 flex flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <TabsList className={cn(TOGGLE_LIST_CLASS, 'shrink-0')}>
@@ -1158,7 +1169,7 @@ const Clientes = () => {
 
           {/* Novo tipo dialog — criação + gerenciamento */}
           <Dialog open={newTipoOpen} onOpenChange={(o) => { setNewTipoOpen(o); if (!o) setNewTipoName(''); }}>
-            <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+            <ConteudoDialogo className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Gerenciar tipos</DialogTitle>
               </DialogHeader>
@@ -1222,13 +1233,13 @@ const Clientes = () => {
               <div className="flex justify-end pt-3">
                 <Button variant="outline" size="sm" onClick={() => setNewTipoOpen(false)}>Fechar</Button>
               </div>
-            </DialogContent>
+            </ConteudoDialogo>
           </Dialog>
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> {activeTab === 'empresas' ? 'Nova Empresa' : 'Novo Contato'}</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <ConteudoDialogo className="max-w-lg">
               <DialogHeader><DialogTitle>{activeTab === 'empresas' ? 'Cadastrar Empresa' : 'Cadastrar Contato'}</DialogTitle></DialogHeader>
 
               {activeTab === 'empresas' && (
@@ -1306,7 +1317,7 @@ const Clientes = () => {
                     )}
 
                     {step === 2 && (
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><Label>Email{empresaObrigatorio('email', true) && ' *'}</Label><Input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="email@exemplo.com" required={empresaObrigatorio('email', true)} /></div>
                         <div><Label>Telefone{empresaObrigatorio('telefone', true) && ' *'}</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required={empresaObrigatorio('telefone', true)} /></div>
                       </div>
@@ -1337,21 +1348,20 @@ const Clientes = () => {
                           <Button type="button" size="sm" variant={contatoMode === 'novo' ? 'default' : 'outline'} onClick={() => setContatoMode('novo')}>Novo contato</Button>
                         </div>
                         {contatoMode === 'existente' && (
-                          <Select value={selectedContatoId} onValueChange={setSelectedContatoId}>
-                            <SelectTrigger><SelectValue placeholder={loadingContatos ? 'Carregando contatos...' : 'Selecione um contato...'} /></SelectTrigger>
-                            <SelectContent>
-                              {contatosList?.map(c => (
-                                <SelectItem key={c.id} value={c.id}>
-                                  {c.nome_contato}{c.empresa ? ` (${c.empresa})` : ''}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          /* Eram mais de mil contatos numa lista sem busca, e no pior momento
+                             possível: o cadastro já está preenchido e o usuário trava no
+                             último passo. Agora dá para digitar nome, e-mail ou telefone. */
+                          <ContatoSelector
+                            contatos={contatosList ?? []}
+                            value={selectedContatoId}
+                            onValueChange={setSelectedContatoId}
+                            placeholder={loadingContatos ? 'Carregando contatos...' : 'Selecione um contato...'}
+                          />
                         )}
                         {contatoMode === 'novo' && (
                           <div className="space-y-3">
                             <Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder={`Nome do contato${contatoObrigatorio('nome_contato', true) ? ' *' : ''}`} required={contatoObrigatorio('nome_contato', true)} />
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <CargoSelect value={cargo} onValueChange={setCargo} />
                               <Input value={contatoTelefone} onChange={e => setContatoTelefone(e.target.value)} placeholder={`Telefone do contato${contatoObrigatorio('telefone', true) ? ' *' : ''}`} required={contatoObrigatorio('telefone', true)} />
                             </div>
@@ -1393,7 +1403,7 @@ const Clientes = () => {
                     <div><Label>Nome do contato{contatoObrigatorio('nome_contato', true) && ' *'}</Label><Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder="Nome completo" required={contatoObrigatorio('nome_contato', true)} /></div>
                     <div><Label>Empresa{contatoObrigatorio('empresa_vinculo', false) && ' *'}</Label><EmpresaSelector value={empresa} onValueChange={setEmpresa} placeholder="Vincular empresa..." /></div>
                     <div><Label>Cargo{contatoObrigatorio('cargo', false) && ' *'}</Label><CargoSelect value={cargo} onValueChange={setCargo} /></div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div><Label>Email{contatoObrigatorio('email', true) && ' *'}</Label><Input name="email" type="email" placeholder="email@exemplo.com" required={contatoObrigatorio('email', true)} /></div>
                       <div><Label>Telefone{contatoObrigatorio('telefone', true) && ' *'}</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required={contatoObrigatorio('telefone', true)} /></div>
                     </div>
@@ -1413,7 +1423,7 @@ const Clientes = () => {
                   </>
                 )}
               </form>
-            </DialogContent>
+            </ConteudoDialogo>
           </Dialog>
         </div>
         </Tabs>
@@ -1449,7 +1459,7 @@ const Clientes = () => {
 
         {/* Dialog: confirmação por escrito */}
         <Dialog open={typedConfirmOpen} onOpenChange={(o) => { setTypedConfirmOpen(o); if (!o) setTypedConfirmText(''); }}>
-          <DialogContent className="sm:max-w-md">
+          <ConteudoDialogo className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="text-destructive">Confirmar exclusão</DialogTitle>
             </DialogHeader>
@@ -1481,13 +1491,71 @@ const Clientes = () => {
                 {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir permanentemente'}
               </Button>
             </div>
-          </DialogContent>
+          </ConteudoDialogo>
         </Dialog>
         {isLoading ? (
           <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : activeTab === 'empresas' ? (
           <>
-            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-auto flex-1 min-h-0">
+            {/* Tela estreita: a tabela tem largura em pixel somada coluna a coluna e não cabe
+                no celular de jeito nenhum. Mesma solução que Tarefas.tsx já usa — os mesmos
+                dados em cartão, com os campos que identificam a empresa. Tocar abre o painel
+                lateral, igual ao clique na linha no computador. */}
+            <div className="block md:hidden space-y-3 flex-1 min-h-0 overflow-y-auto">
+              {paginatedEmpresas.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Building2 className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm font-medium">Nenhuma empresa encontrada</p>
+                  <p className="text-xs mt-1">Tente ajustar os filtros ou cadastre uma nova</p>
+                </div>
+              ) : paginatedEmpresas.map(client => {
+                const Icon = getTipoIcon(client.tipo);
+                const local = [client.cidade, client.uf].filter(Boolean).join(' / ');
+                return (
+                  <div
+                    key={client.id}
+                    onClick={() => { if (!hasTextSelection()) setPanelEmpresa(client); }}
+                    className={cn(
+                      'rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] cursor-pointer transition-all',
+                      selected.has(client.id) && 'ring-1 ring-primary/30 bg-primary/5'
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={selected.has(client.id)}
+                        onCheckedChange={() => toggleOne(client.id)}
+                        onClick={e => e.stopPropagation()}
+                        className="mt-1 shrink-0"
+                        aria-label={`Selecionar ${client.empresa}`}
+                      />
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <Icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm text-card-foreground line-clamp-2">{client.empresa || 'Sem nome'}</p>
+                        {visibleColumns.includes('tipo') && (
+                          <Badge variant="secondary" className="mt-1 text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
+                        )}
+                      </div>
+                    </div>
+                    {/* Os mesmos campos que a pessoa escolheu ver na tabela — desligar uma
+                        coluna no botão "Colunas" também tira ela do cartão. */}
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      {visibleColumns.includes('telefone') && client.telefone && (
+                        <p className="flex items-center gap-1.5 truncate"><Phone className="h-3 w-3 shrink-0" />{client.telefone}</p>
+                      )}
+                      {visibleColumns.includes('email') && client.email && (
+                        <p className="flex items-center gap-1.5 truncate"><Mail className="h-3 w-3 shrink-0" />{client.email}</p>
+                      )}
+                      {(visibleColumns.includes('cidade') || visibleColumns.includes('uf')) && local && (
+                        <p className="flex items-center gap-1.5 truncate"><MapPin className="h-3 w-3 shrink-0" />{local}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="hidden md:block rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-auto flex-1 min-h-0">
               <table className="w-full text-sm table-fixed" style={{ width: clientesTableTotalWidth }}>
                 <colgroup>
                   <col style={{ width: CLIENTES_CHECKBOX_COL_WIDTH }} />
@@ -1623,7 +1691,56 @@ const Clientes = () => {
           </>
         ) : (
           <>
-            <div className="rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-auto flex-1 min-h-0">
+            {/* Mesma lista em cartões da aba Empresas, para a aba Contatos. */}
+            <div className="block md:hidden space-y-3 flex-1 min-h-0 overflow-y-auto">
+              {paginatedContatos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Users className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm font-medium">Nenhum contato encontrado</p>
+                  <p className="text-xs mt-1">Tente ajustar os filtros ou cadastre um novo</p>
+                </div>
+              ) : paginatedContatos.map(contato => (
+                <div
+                  key={contato.id}
+                  onClick={() => { if (!hasTextSelection()) setPanelContato(contato); }}
+                  className={cn(
+                    'rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] cursor-pointer transition-all',
+                    selected.has(contato.id) && 'ring-1 ring-primary/30 bg-primary/5'
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={selected.has(contato.id)}
+                      onCheckedChange={() => toggleOne(contato.id)}
+                      onClick={e => e.stopPropagation()}
+                      className="mt-1 shrink-0"
+                      aria-label={`Selecionar ${contato.nome_contato}`}
+                    />
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm text-card-foreground line-clamp-2">{contato.nome_contato || 'Sem nome'}</p>
+                      {visibleColumns.includes('empresa') && contato.empresa && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{contato.empresa}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    {visibleColumns.includes('cargo') && contato.cargo && (
+                      <p className="flex items-center gap-1.5 truncate"><Briefcase className="h-3 w-3 shrink-0" />{contato.cargo}</p>
+                    )}
+                    {visibleColumns.includes('telefone') && contato.telefone && (
+                      <p className="flex items-center gap-1.5 truncate"><Phone className="h-3 w-3 shrink-0" />{contato.telefone}</p>
+                    )}
+                    {visibleColumns.includes('email') && contato.email && (
+                      <p className="flex items-center gap-1.5 truncate"><Mail className="h-3 w-3 shrink-0" />{contato.email}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden md:block rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-auto flex-1 min-h-0">
               <table className="w-full text-sm table-fixed" style={{ width: clientesTableTotalWidth }}>
                 <colgroup>
                   <col style={{ width: CLIENTES_CHECKBOX_COL_WIDTH }} />
@@ -1750,7 +1867,7 @@ const Clientes = () => {
         {panelEmpresa && (() => {
           const Icon = getTipoIcon(panelEmpresa.tipo);
           return (
-            <SheetContent className="sm:max-w-xl overflow-y-auto">
+            <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
               <SheetHeader className="pb-6 border-b">
                 <SheetTitle className="flex items-center gap-2">
                   <Icon className="h-5 w-5 text-primary shrink-0" />
@@ -1844,7 +1961,7 @@ const Clientes = () => {
       {/* Painel lateral de detalhe rápido de Contato (clique na linha fora do texto) */}
       <Sheet open={!!panelContato} onOpenChange={(open) => !open && setPanelContato(null)}>
         {panelContato && (
-          <SheetContent className="sm:max-w-xl overflow-y-auto">
+          <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
             <SheetHeader className="pb-6 border-b">
               <SheetTitle className="flex items-center gap-2">
                 <User className="h-5 w-5 text-primary shrink-0" />

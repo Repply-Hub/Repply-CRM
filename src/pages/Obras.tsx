@@ -15,7 +15,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { StandardPopoverMenu, StandardMenuItem } from '@/components/ui/standard-popover-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogTitle,
+  ConteudoDialogo,
+  CabecalhoDialogo,
+  CorpoDialogo,
+  RodapeDialogo,
+} from '@/components/shared/DialogoResponsivo';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import {
   Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon,
@@ -717,10 +724,14 @@ export default function Obras() {
 
         {/* Edit Obra Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
+          {/* ConteudoDialogo/CorpoDialogo: o formulário tem ~600px e antes crescia
+              para fora da janela nas duas pontas, levando junto o "Salvar alterações"
+              e o "X" de fechar — e como Esc e clique-fora estão desligados, a única
+              saída era recarregar a página e perder o que estava preenchido. */}
+          <ConteudoDialogo>
+            <CabecalhoDialogo>
               <DialogTitle>Editar Obra</DialogTitle>
-            </DialogHeader>
+            </CabecalhoDialogo>
             <form onSubmit={(e) => {
               e.preventDefault();
               const result = cnpjSchema.safeParse(editObra.spe_cnpj);
@@ -739,81 +750,85 @@ export default function Obras() {
                   setEditObraCnpjError('');
                 }
               });
-            }} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nome da Obra</Label>
-                <Input 
-                  required
-                  placeholder="Ex: Edifício Horizonte"
-                  value={editObra.nome_obra}
-                  onChange={(e) => setEditObra(prev => ({ ...prev, nome_obra: e.target.value }))}
-                />
-              </div>
+            }} className="flex min-h-0 flex-1 flex-col gap-4">
+              <CorpoDialogo className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome da Obra</Label>
+                  <Input 
+                    required
+                    placeholder="Ex: Edifício Horizonte"
+                    value={editObra.nome_obra}
+                    onChange={(e) => setEditObra(prev => ({ ...prev, nome_obra: e.target.value }))}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label>Cliente Responsável</Label>
-                <EmpresaSelector
-                  value={editObra.cliente_id}
-                  onValueChange={(v) => setEditObra(prev => ({ ...prev, cliente_id: v }))}
-                  placeholder="Selecione o cliente"
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label>Cliente Responsável</Label>
+                  <EmpresaSelector
+                    value={editObra.cliente_id}
+                    onValueChange={(v) => setEditObra(prev => ({ ...prev, cliente_id: v }))}
+                    placeholder="Selecione o cliente"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select 
-                  value={editObra.status} 
-                  onValueChange={(v) => setEditObra(prev => ({ ...prev, status: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusObras?.map(s => (
-                      <SelectItem key={s.slug} value={s.slug}>{s.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select 
+                    value={editObra.status} 
+                    onValueChange={(v) => setEditObra(prev => ({ ...prev, status: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusObras?.map(s => (
+                        <SelectItem key={s.slug} value={s.slug}>{s.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label>Endereço de Entrega</Label>
-                <EnderecoAutocomplete
-                  value={editObra.endereco_entrega}
-                  onChange={(v) => setEditObra(prev => ({ ...prev, endereco_entrega: v }))}
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label>Endereço de Entrega</Label>
+                  <EnderecoAutocomplete
+                    value={editObra.endereco_entrega}
+                    onChange={(v) => setEditObra(prev => ({ ...prev, endereco_entrega: v }))}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label>SPE / CNPJ</Label>
-                <Input 
-                  placeholder="00.000.000/0000-00"
-                  maxLength={18}
-                  value={editObra.spe_cnpj}
-                  onChange={(e) => {
-                    setEditObra(prev => ({ ...prev, spe_cnpj: formatCnpj(e.target.value) }));
-                    setEditObraCnpjError('');
-                  }}
-                />
-                {editObraCnpjError && <p className="text-[0.8rem] font-medium text-destructive">{editObraCnpjError}</p>}
-              </div>
+                <div className="space-y-2">
+                  <Label>SPE / CNPJ</Label>
+                  <Input 
+                    placeholder="00.000.000/0000-00"
+                    maxLength={18}
+                    value={editObra.spe_cnpj}
+                    onChange={(e) => {
+                      setEditObra(prev => ({ ...prev, spe_cnpj: formatCnpj(e.target.value) }));
+                      setEditObraCnpjError('');
+                    }}
+                  />
+                  {editObraCnpjError && <p className="text-[0.8rem] font-medium text-destructive">{editObraCnpjError}</p>}
+                </div>
+              </CorpoDialogo>
 
-              <DialogFooter>
+              <RodapeDialogo>
                 <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
                 <Button type="submit" disabled={updateObra.isPending}>
                   {updateObra.isPending ? "Salvando..." : "Salvar Alterações"}
                 </Button>
-              </DialogFooter>
+              </RodapeDialogo>
             </form>
-          </DialogContent>
+          </ConteudoDialogo>
         </Dialog>
 
         {/* Create Obra Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
+          {/* Mesmo conserto do "Editar Obra" — e aqui a altura ainda cresce com os
+              campos personalizados que a empresa cadastrar, então o teto não é opcional. */}
+          <ConteudoDialogo>
+            <CabecalhoDialogo>
               <DialogTitle>Nova Obra</DialogTitle>
-            </DialogHeader>
+            </CabecalhoDialogo>
             <form onSubmit={(e) => {
               e.preventDefault();
               const nomeObraObrigatorio = obraObrigatorio('nome_obra', true);
@@ -849,84 +864,86 @@ export default function Obras() {
                   setNewObraCnpjError('');
                 }
               });
-            }} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nome da Obra{obraObrigatorio('nome_obra', true) && ' *'}</Label>
-                <Input
-                  required={obraObrigatorio('nome_obra', true)}
-                  placeholder="Ex: Edifício Central"
-                  value={newObra.nome_obra}
-                  onChange={(e) => setNewObra(prev => ({ ...prev, nome_obra: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Cliente Responsável{obraObrigatorio('cliente_id', true) && ' *'}</Label>
-                <EmpresaSelector
-                  value={newObra.cliente_id}
-                  onValueChange={(v) => setNewObra(prev => ({ ...prev, cliente_id: v }))}
-                  placeholder="Selecione um cliente"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Status Inicial{obraObrigatorio('status', false) && ' *'}</Label>
-                <Select
-                  value={newObra.status}
-                  onValueChange={(v) => setNewObra(prev => ({ ...prev, status: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusObras?.map(s => (
-                      <SelectItem key={s.slug} value={s.slug}>{s.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Endereço de Entrega{obraObrigatorio('endereco_entrega', false) && ' *'}</Label>
-                <EnderecoAutocomplete
-                  value={newObra.endereco_entrega}
-                  onChange={(v) => setNewObra(prev => ({ ...prev, endereco_entrega: v }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>SPE / CNPJ{obraObrigatorio('spe_cnpj', false) && ' *'}</Label>
-                <Input
-                  placeholder="00.000.000/0000-00"
-                  maxLength={18}
-                  value={newObra.spe_cnpj}
-                  onChange={(e) => {
-                    setNewObra(prev => ({ ...prev, spe_cnpj: formatCnpj(e.target.value) }));
-                    setNewObraCnpjError('');
-                  }}
-                />
-                {newObraCnpjError && <p className="text-[0.8rem] font-medium text-destructive">{newObraCnpjError}</p>}
-              </div>
-
-              {(camposConfigObras ?? []).filter(c => c.origem === 'customizado').map(campo => (
-                <div key={campo.id} className="space-y-2">
-                  <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+            }} className="flex min-h-0 flex-1 flex-col gap-4">
+              <CorpoDialogo className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome da Obra{obraObrigatorio('nome_obra', true) && ' *'}</Label>
                   <Input
-                    value={camposExtrasObra[campo.campo_key] ?? ''}
-                    onChange={(e) => setCamposExtrasObra(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}
-                    placeholder={campo.label ?? ''}
+                    required={obraObrigatorio('nome_obra', true)}
+                    placeholder="Ex: Edifício Central"
+                    value={newObra.nome_obra}
+                    onChange={(e) => setNewObra(prev => ({ ...prev, nome_obra: e.target.value }))}
                   />
                 </div>
-              ))}
 
-              <DialogFooter>
+                <div className="space-y-2">
+                  <Label>Cliente Responsável{obraObrigatorio('cliente_id', true) && ' *'}</Label>
+                  <EmpresaSelector
+                    value={newObra.cliente_id}
+                    onValueChange={(v) => setNewObra(prev => ({ ...prev, cliente_id: v }))}
+                    placeholder="Selecione um cliente"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status Inicial{obraObrigatorio('status', false) && ' *'}</Label>
+                  <Select
+                    value={newObra.status}
+                    onValueChange={(v) => setNewObra(prev => ({ ...prev, status: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusObras?.map(s => (
+                        <SelectItem key={s.slug} value={s.slug}>{s.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Endereço de Entrega{obraObrigatorio('endereco_entrega', false) && ' *'}</Label>
+                  <EnderecoAutocomplete
+                    value={newObra.endereco_entrega}
+                    onChange={(v) => setNewObra(prev => ({ ...prev, endereco_entrega: v }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>SPE / CNPJ{obraObrigatorio('spe_cnpj', false) && ' *'}</Label>
+                  <Input
+                    placeholder="00.000.000/0000-00"
+                    maxLength={18}
+                    value={newObra.spe_cnpj}
+                    onChange={(e) => {
+                      setNewObra(prev => ({ ...prev, spe_cnpj: formatCnpj(e.target.value) }));
+                      setNewObraCnpjError('');
+                    }}
+                  />
+                  {newObraCnpjError && <p className="text-[0.8rem] font-medium text-destructive">{newObraCnpjError}</p>}
+                </div>
+
+                {(camposConfigObras ?? []).filter(c => c.origem === 'customizado').map(campo => (
+                  <div key={campo.id} className="space-y-2">
+                    <Label>{campo.label}{campo.obrigatorio && ' *'}</Label>
+                    <Input
+                      value={camposExtrasObra[campo.campo_key] ?? ''}
+                      onChange={(e) => setCamposExtrasObra(prev => ({ ...prev, [campo.campo_key]: e.target.value }))}
+                      placeholder={campo.label ?? ''}
+                    />
+                  </div>
+                ))}
+              </CorpoDialogo>
+
+              <RodapeDialogo>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
                 <Button type="submit" disabled={createObra.isPending}>
                   {createObra.isPending ? "Salvando..." : "Criar Obra"}
                 </Button>
-              </DialogFooter>
+              </RodapeDialogo>
             </form>
-          </DialogContent>
+          </ConteudoDialogo>
         </Dialog>
 
         <AlertDialog open={confirmDeleteBulk} onOpenChange={setConfirmDeleteBulk}>

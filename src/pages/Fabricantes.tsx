@@ -19,12 +19,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+// Casca de modal com teto de altura: sem ela, formulário mais alto que a janela
+// esconde o "Salvar" por baixo e o "X" por cima ao mesmo tempo — e como este
+// projeto desliga Esc e clique-fora, a única saída seria recarregar a página.
+import { ConteudoDialogo } from "@/components/shared/DialogoResponsivo";
 import {
   Select,
   SelectContent,
@@ -235,7 +234,7 @@ function FabricanteForm({
         if (!o) reset();
       }}
     >
-      <DialogContent className="sm:max-w-[425px]">
+      <ConteudoDialogo className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
             {editData ? "Editar" : "Cadastrar"} Fabricante
@@ -297,7 +296,7 @@ function FabricanteForm({
             {isPending ? "Salvando..." : "Salvar"}
           </Button>
         </form>
-      </DialogContent>
+      </ConteudoDialogo>
     </Dialog>
   );
 }
@@ -574,24 +573,44 @@ const Fabricantes = () => {
       mainClassName="flex-1 overflow-hidden flex flex-col"
     >
       <div className="p-4 md:p-6 w-full flex-1 flex flex-col min-h-0 h-full">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0 h-full lg:grid-rows-1">
+        {/* `grid-rows-1` em TODA largura (era só a partir de `lg`): é ele que dá
+            altura DEFINIDA à linha. Sem isso, o card da esquerda — que agora usa
+            `h-full` no lugar dos 795px fixos — cresceria com a lista inteira e
+            estouraria a tela, em vez de rolar por dentro. */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0 h-full grid-rows-1">
           {/* ── Left Panel: Fabricantes List ─────────────────────── */}
+          {/* `2xl:col-span-3` e não `xl:`: 3 de 12 colunas numa grade só um pouco
+              maior dá MENOS pixels que 4 de 12, então cruzar 1280px ENCOLHIA esta
+              coluna em ~100px. Era por isso que diminuir o zoom um passo piorava
+              antes de melhorar, e o cliente precisava reduzir várias vezes.
+              A barra lateral (64px recolhida, 256px aberta) come largura que os
+              pontos de quebra do Tailwind não enxergam — eles medem a JANELA. */}
           <div
-            className={`lg:col-span-4 xl:col-span-3 flex flex-col min-h-0 self-start ${showingDetail ? "hidden lg:block" : ""}`}
+            className={`lg:col-span-4 2xl:col-span-3 flex flex-col min-h-0 ${showingDetail ? "hidden lg:block" : ""}`}
           >
-            <Card className="rounded-xl border-border/60 flex flex-col overflow-hidden h-[795px] w-full">
+            {/* Altura pelo espaço que existe, não por número mágico: `h-[795px]`
+                exigia janela de ~931px de altura e o pé do card ficava fora da
+                tela em qualquer notebook, sem rolagem para alcançar. */}
+            <Card className="rounded-xl border-border/60 flex flex-col overflow-hidden h-full max-h-full w-full">
               <CardHeader className="pb-3 flex-none">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-base font-bold flex items-center gap-2">
-                      <Factory className="h-4 w-4 text-primary" /> Fabricantes
+                {/* O botão "Novo" era LITERALMENTE recortado: sem `flex-wrap`, sem
+                    `min-w-0` no título e sem `shrink-0` nos botões, a linha
+                    estourava para a direita e o `overflow-hidden` do Card cortava
+                    o excedente — e o app não tem rolagem horizontal em lugar
+                    nenhum. Agora o título vira reticências primeiro; se ainda
+                    faltar espaço, os botões descem para a linha de baixo. */}
+                <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-base font-bold flex items-center gap-2 min-w-0">
+                      <Factory className="h-4 w-4 shrink-0 text-primary" />
+                      <span className="truncate">Fabricantes</span>
                     </CardTitle>
-                    <CardDescription className="text-xs">
+                    <CardDescription className="text-xs truncate">
                       {fabricantesList.length} cadastrado
                       {fabricantesList.length !== 1 ? "s" : ""}
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Button
                       size="icon"
                       variant="outline"
@@ -608,6 +627,8 @@ const Fabricantes = () => {
                         setFabDialog(true);
                       }}
                       className="gap-1.5 h-9 bg-primary hover:bg-primary/90"
+                      title="Cadastrar novo fabricante"
+                      aria-label="Cadastrar novo fabricante"
                     >
                       <Plus className="h-4 w-4" /> Novo
                     </Button>
@@ -634,8 +655,11 @@ const Fabricantes = () => {
                     <p className="text-sm text-muted-foreground font-medium">
                       Nenhum fabricante cadastrado
                     </p>
+                    {/* O botão se chama "Novo", não "Novo Fabricante". Mandar
+                        procurar um rótulo que não existe faz a pessoa concluir
+                        que o botão sumiu. */}
                     <p className="text-xs text-muted-foreground/70 mt-1">
-                      Clique em "Novo Fabricante" para adicionar.
+                      Clique em "Novo", no topo desta lista, para adicionar.
                     </p>
                   </div>
                 ) : (
@@ -657,7 +681,7 @@ const Fabricantes = () => {
 
           {/* ── Right Panel: Details + Price Table ───────────────── */}
           <div
-            className={`lg:col-span-8 xl:col-span-9 flex flex-col gap-4 min-h-0 h-full ${!showingDetail ? "hidden lg:block" : ""}`}
+            className={`lg:col-span-8 2xl:col-span-9 flex flex-col gap-4 min-h-0 h-full ${!showingDetail ? "hidden lg:block" : ""}`}
           >
             {selectedFab ? (
               <>
@@ -687,19 +711,25 @@ const Fabricantes = () => {
                 {/* Price Table */}
                 <Card className="rounded-xl border-border/60 flex-1 flex flex-col min-h-0 overflow-hidden">
                   <CardHeader className="pb-3 flex-none">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <CardTitle className="text-base font-bold flex items-center gap-2">
-                          <Package className="h-4 w-4 text-primary" /> Catálogo
-                          de Produtos
+                    {/* Mesmo conserto do cabeçalho da lista: o título cede espaço
+                        (vira reticências) e a fileira de botões quebra de linha
+                        em vez de estourar para fora do Card, que é recortado. */}
+                    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <CardTitle className="text-base font-bold flex items-center gap-2 min-w-0">
+                          <Package className="h-4 w-4 shrink-0 text-primary" />
+                          <span className="truncate">Catálogo de Produtos</span>
                         </CardTitle>
-                        <CardDescription className="text-xs mt-0.5">
+                        <CardDescription className="text-xs mt-0.5 truncate">
                           {precos?.length ?? 0} produto
                           {(precos?.length ?? 0) !== 1 ? "s" : ""} cadastrado
                           {(precos?.length ?? 0) !== 1 ? "s" : ""}
                         </CardDescription>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
+                      {/* `min-w-0` e NÃO `shrink-0` aqui: este bloco já quebra
+                          linha por dentro, então o certo é deixá-lo encolher para
+                          que o `flex-wrap` de dentro funcione. */}
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <FilterButton
                           hasFilters={hasFilters}
                           activeFilterCount={activeFilterCount}
@@ -1108,7 +1138,7 @@ const Fabricantes = () => {
       />
 
       <Dialog open={newCategoryOpen} onOpenChange={setNewCategoryOpen}>
-        <DialogContent className="w-[95vw] max-w-md sm:max-w-[425px]">
+        <ConteudoDialogo className="w-[95vw] max-w-md sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Nova Categoria</DialogTitle>
           </DialogHeader>
@@ -1147,7 +1177,7 @@ const Fabricantes = () => {
               </Button>
             </div>
           </div>
-        </DialogContent>
+        </ConteudoDialogo>
       </Dialog>
 
       <AlertDialog

@@ -18,13 +18,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ConteudoDialogo } from '@/components/shared/DialogoResponsivo';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Building2, Store, User, MapPin, Mail, Phone, Plus, Loader2, Pencil, Trash2, Users, X, HardHat, ListChecks, FileText, Contact, Tag, CalendarDays, UserCheck, Search } from 'lucide-react';
-import { KANBAN_STAGES } from '@/data/mockData';
+import { useKanbanColunasEmpresa } from '@/hooks/use-kanban-colunas';
 import { toast } from 'sonner';
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
+import { ContatoSelector } from '@/components/clientes/ContatoSelector';
 import { emptyEndereco, enderecoToString, stringToEndereco, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { CargoSelect } from '@/components/shared/CargoSelect';
@@ -44,13 +46,6 @@ const formatDateBR = (value?: string | null) => {
   return `${dia}/${mes}/${ano}`;
 };
 
-const stageColors: Record<string, string> = {
-  novo_lead: 'bg-kanban-new text-white',
-  elaboracao: 'bg-kanban-budget text-white',
-  enviado: 'bg-kanban-sent text-white',
-  negociacao: 'bg-kanban-negotiation text-white',
-  fechamento: 'bg-kanban-closed text-white',
-};
 
 const ClienteDetalhe = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -76,6 +71,21 @@ const ClienteDetalhe = () => {
     () => tarefasKanbanColunas.map(c => ({ key: c.slug, label: c.nome })),
     [tarefasKanbanColunas]
   );
+
+  // As etapas vinham de uma lista fixa no código (`@/data/mockData`) com 5 valores, sem
+  // "Perdido" — quem abria a ficha do cliente não conseguia filtrar os negócios perdidos
+  // dele, e outra empresa assinante veria etapas que não são as dela. Aqui lemos as colunas
+  // reais. Pegamos as de TODOS os funis porque a ficha lista os negócios do cliente inteiro,
+  // que podem estar em funis diferentes; o `status` do negócio é o slug, então basta um por
+  // slug (funis distintos podem repetir "fechamento", e seriam a mesma opção na tela).
+  const { data: kanbanColunasEmpresa = [] } = useKanbanColunasEmpresa(empresaId);
+  const KANBAN_STAGES = useMemo(() => {
+    const porSlug = new Map<string, { key: string; label: string; color: string }>();
+    kanbanColunasEmpresa.forEach(c => {
+      if (!porSlug.has(c.slug)) porSlug.set(c.slug, { key: c.slug, label: c.nome, color: c.cor });
+    });
+    return Array.from(porSlug.values());
+  }, [kanbanColunasEmpresa]);
 
   // Debug log
   console.log('ClienteDetalhe - slug:', slug, 'extracted id:', id);
@@ -125,7 +135,7 @@ const ClienteDetalhe = () => {
   const fabricantesDoCliente = useMemo(() => {
     const mapa = new Map<string, string>();
     pedidosCliente.forEach(p => {
-      const fab = (p as any).fabricante;
+      const fab = (p as { fabricante?: { id?: string; nome?: string } }).fabricante;
       if (fab?.id) mapa.set(fab.id, fab.nome);
     });
     return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
@@ -153,6 +163,11 @@ const ClienteDetalhe = () => {
     [pedidosFiltrados, pedidosPage, pedidosPageSize]
   );
   const contatosExtras = (contatos ?? []).filter((c: any) => cliente && c.empresa === cliente.empresa);
+  // Candidatos a vincular: todo mundo que ainda não está neste cliente.
+  const contatosParaVincular = useMemo(
+    () => (contatos ?? []).filter((c: any) => c.empresa !== cliente?.empresa),
+    [contatos, cliente?.empresa]
+  );
   const tarefasCliente = useMemo(() => (tarefas ?? []).filter(t => t.cliente_id === id), [tarefas, id]);
   const totalTarefasPages = Math.max(1, Math.ceil(tarefasCliente.length / tarefasPageSize));
   const paginatedTarefas = useMemo(() =>
@@ -288,7 +303,7 @@ const ClienteDetalhe = () => {
   if (!cliente) {
     return (
       <AppLayout>
-        <div className="p-6">
+        <div className="p-3 sm:p-4 md:p-6">
           <Button variant="ghost" size="sm" onClick={() => navigate('/clientes')}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
           </Button>
@@ -300,10 +315,13 @@ const ClienteDetalhe = () => {
 
   const Icon = tipoIcons[cliente.tipo] ?? Building2;
   const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
+  // Mesma construção de classe que Negocios.tsx:97 usa para a etiqueta de etapa.
+  const stageBadgeClass = (key: string) =>
+    `bg-${KANBAN_STAGES.find(s => s.key === key)?.color || 'muted-foreground'} text-white`;
 
   const viewOrderSheet = (
     <Dialog open={!!viewOrderId} onOpenChange={(open) => !open && setViewOrderId(null)}>
-      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+      <ConteudoDialogo className="sm:max-w-xl">
         <DialogHeader className="pb-6 border-b">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-1">
@@ -319,7 +337,7 @@ const ClienteDetalhe = () => {
 
         {selectedViewOrder ? (
           <div className="py-6 space-y-8">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Fabricante</p>
                 <p className="text-sm font-medium">{(selectedViewOrder as any).fabricante?.nome ?? '-'}</p>
@@ -338,7 +356,7 @@ const ClienteDetalhe = () => {
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</p>
-                <Badge className={stageColors[selectedViewOrder.status] ?? ''}>
+                <Badge className={stageBadgeClass(selectedViewOrder.status)}>
                   {stageLabel(selectedViewOrder.status)}
                 </Badge>
               </div>
@@ -362,7 +380,7 @@ const ClienteDetalhe = () => {
           </Button>
           <Button variant="secondary" onClick={() => setViewOrderId(null)}>Fechar</Button>
         </div>
-      </DialogContent>
+      </ConteudoDialogo>
     </Dialog>
   );
 
@@ -393,11 +411,11 @@ const ClienteDetalhe = () => {
       }
     >
       {viewOrderSheet}
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-4 md:p-6 space-y-6">
 
         {/* Edit Dialog */}
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <ConteudoDialogo className="max-w-lg">
             <DialogHeader><DialogTitle>Editar Cliente</DialogTitle></DialogHeader>
             <form onSubmit={handleEditSubmit} className="space-y-4 mt-2">
               <div>
@@ -427,7 +445,7 @@ const ClienteDetalhe = () => {
                 <Label>Nome do Contato</Label>
                 <Input value={editData.nome_contato} onChange={e => setEditData(d => ({ ...d, nome_contato: e.target.value }))} placeholder="Nome da pessoa de contato" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Email</Label>
                   <Input type="email" value={editData.email} onChange={e => setEditData(d => ({ ...d, email: e.target.value }))} />
@@ -452,7 +470,7 @@ const ClienteDetalhe = () => {
                 {updateCliente.isPending ? 'Salvando...' : 'Salvar Alterações'}
               </Button>
             </form>
-          </DialogContent>
+          </ConteudoDialogo>
         </Dialog>
 
         {/* Info Cards */}
@@ -723,7 +741,7 @@ const ClienteDetalhe = () => {
             </div>
 
               <Dialog open={addObraOpen} onOpenChange={setAddObraOpen}>
-                <DialogContent>
+                <ConteudoDialogo>
                   <DialogHeader>
                     <DialogTitle>Adicionar Nova Obra</DialogTitle>
                   </DialogHeader>
@@ -807,7 +825,7 @@ const ClienteDetalhe = () => {
                       </Button>
                     </div>
                   </form>
-                </DialogContent>
+                </ConteudoDialogo>
               </Dialog>
             </CardContent>
           </Card>
@@ -891,7 +909,7 @@ const ClienteDetalhe = () => {
                 </div>
 
               <Dialog open={addContatoOpen} onOpenChange={setAddContatoOpen}>
-                <DialogContent>
+                <ConteudoDialogo>
                   <DialogHeader>
                     <DialogTitle>Adicionar Novo Contato</DialogTitle>
                   </DialogHeader>
@@ -950,29 +968,24 @@ const ClienteDetalhe = () => {
                       </Button>
                     </div>
                   </form>
-                </DialogContent>
+                </ConteudoDialogo>
               </Dialog>
 
               <Dialog open={vincularContatoOpen} onOpenChange={setVincularContatoOpen}>
-                <DialogContent>
+                <ConteudoDialogo>
                   <DialogHeader>
                     <DialogTitle>Vincular Contato Existente</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-4">
                     <div className="space-y-2">
                       <Label>Selecione o Contato</Label>
-                      <Select value={selectedContatoId} onValueChange={setSelectedContatoId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Escolha um contato..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {contatos?.filter(c => c.empresa !== cliente.empresa).map(c => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.nome_contato} {c.empresa ? `(${c.empresa})` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {/* Eram mais de mil contatos num Select sem busca: rolar era a única
+                          saída e o usuário acabava recadastrando o contato, duplicando a base. */}
+                      <ContatoSelector
+                        contatos={contatosParaVincular}
+                        value={selectedContatoId}
+                        onValueChange={setSelectedContatoId}
+                      />
                     </div>
                   </div>
                   <DialogFooter>
@@ -999,7 +1012,7 @@ const ClienteDetalhe = () => {
                       {updateContato.isPending ? 'Vinculando...' : 'Vincular ao Cliente'}
                     </Button>
                   </DialogFooter>
-                </DialogContent>
+                </ConteudoDialogo>
               </Dialog>
             </CardContent>
           </Card>
@@ -1100,7 +1113,7 @@ const ClienteDetalhe = () => {
                             <TableCell className="font-medium">{(p as any).fabricante?.nome ?? '-'}</TableCell>
                             <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                             <TableCell>
-                              <Badge className={stageColors[p.status] ?? ''}>{stageLabel(p.status)}</Badge>
+                              <Badge className={stageBadgeClass(p.status)}>{stageLabel(p.status)}</Badge>
                             </TableCell>
                             <TableCell className="text-muted-foreground">{new Date(p.data_pedido).toLocaleDateString('pt-BR')}</TableCell>
                           </TableRow>

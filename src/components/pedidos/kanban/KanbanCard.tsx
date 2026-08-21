@@ -94,28 +94,32 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                 )}
 
                 <div className="mt-2 space-y-1">
+                  {/* `title` nos quatro campos cortados: a coluna do board tem 208-288px e um terço
+                      dos nomes de cliente não cabe. O Tooltip do Radix envolve o cartão inteiro e
+                      só diz "Arraste para mover", então sem o title nativo não havia NENHUMA forma
+                      de ler o valor completo sem abrir o negócio. */}
                   {(!visibleColumns || visibleColumns.includes('cliente')) && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <Building2 className="h-3 w-3 shrink-0 text-muted-foreground/70" />
-                      <span className="truncate">{order.clientName}</span>
+                      <span className="truncate" title={order.clientName}>{order.clientName}</span>
                     </div>
                   )}
                   {(!visibleColumns || visibleColumns.includes('endereco_entrega')) && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/70" />
-                      <span className="truncate">{order.obra}</span>
+                      <span className="truncate" title={order.obra}>{order.obra}</span>
                     </div>
                   )}
                   {order.contato && (!visibleColumns || visibleColumns.includes('contato')) && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <User className="h-3 w-3 shrink-0 text-muted-foreground/70" />
-                      <span className="truncate">{order.contato}</span>
+                      <span className="truncate" title={order.contato}>{order.contato}</span>
                     </div>
                   )}
                   {(!visibleColumns || visibleColumns.includes('fabricante')) && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <Factory className="h-3 w-3 shrink-0 text-muted-foreground/70" />
-                      <span className="truncate">{order.fabricante}</span>
+                      <span className="truncate" title={order.fabricante}>{order.fabricante}</span>
                     </div>
                   )}
                   {(!visibleColumns || visibleColumns.includes('valor')) && (

@@ -128,7 +128,9 @@ export default function HistoricoAlteracoes() {
 
   return (
     <AppLayout title="Histórico de Alterações" subtitle="Registro de toda ação realizada no sistema" mainClassName="flex-1 overflow-hidden flex flex-col">
-      <div className="p-6 flex flex-col flex-1 min-h-0 gap-4">
+      {/* Padding que encolhe com a tela: com `p-6` fixo, num celular ou em zoom alto
+          48px de cada lado saem da largura útil da tabela. */}
+      <div className="flex flex-1 min-h-0 flex-col gap-4 p-3 sm:p-4 md:p-6">
         <div className="flex flex-wrap gap-3 shrink-0">
           <Select
             value={tabelaFiltro ?? 'todas'}

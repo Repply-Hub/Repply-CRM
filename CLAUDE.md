@@ -135,6 +135,29 @@ traduza para inglês**, a consistência vale mais que a preferência.
 6. **Teste ao lado do código** (`*.test.ts`) ou em `src/test/`.
 7. **Commit no padrão convencional, em português:**
    `fix(negocios): corrige lentidão na busca do pipeline`
+8. **Dinheiro:** campo de entrada é `<CampoMoeda>`; exibir e ler valor é
+   `formatarMoedaBRL` / `parseMoedaBRL` (`src/lib/moeda.ts`). Ver §7.10.
+9. **Modal:** `<ConteudoDialogo>` em vez de `<DialogContent>`. Ver §7.11.
+
+### 🔴 Gráfico novo: pergunte o período ao Lucas ANTES de construir
+
+**Todo painel, cartão ou gráfico novo precisa de uma resposta explícita: ele conta por
+data de criação (`data_pedido`) ou por data de fechamento (`prazo_resposta`)?**
+
+Não dá para deduzir do nome da métrica. As duas respostas produzem números plausíveis,
+ninguém percebe a troca olhando a tela, e o erro só aparece quando alguém compara com a
+planilha — semanas depois. Foi assim que o Dashboard inteiro passou meses respondendo
+"criados no período" **inclusive nas métricas de dinheiro**.
+
+O par de perguntas que resolve:
+
+1. **É dinheiro ou é conversão?** Dinheiro conta por fechamento. Conversão é conta de
+   safra: dos criados no período, quantos ganharam — e conta por criação.
+2. **O numerador é subconjunto do denominador?** Se não for, a razão pode passar de 100%.
+   Medido: a fórmula alternativa da taxa de conversão daria **157%** na semana de
+   29/12/2025.
+
+Detalhe métrica a métrica em [`docs/modulos/dashboard.md`](docs/modulos/dashboard.md).
 
 ---
 
@@ -240,6 +263,60 @@ formatado.
 `= ANY('{}')` não casa com nada. Converta array vazio em `null` antes de mandar para o
 servidor — `null` é quem significa "sem filtro".
 
+### 7.9 Predicado que cita duas colunas de data derruba o índice (e a RLS cobra por linha)
+
+Parece natural dar à RPC um parâmetro tipo `p_date_field` para escolher entre
+`data_pedido` e `prazo_resposta`. **Não faça.** Medido nesta base:
+
+| Forma | Resultado |
+|---|---|
+| `CASE WHEN p_date_field = ... THEN a ELSE b END >= p_date_from` | `pedidos_stats` de **~4ms para 16–31 SEGUNDOS**, com os índices existindo |
+| "OU de blocos" (cada bloco cita uma coluna só) | **~30–200ms** — melhor, mas ainda 10 a 50× o original |
+| Coluna **cravada no texto** de cada recorte | Volta ao Index Scan |
+
+Duas coisas se somam. O PostgREST **sempre** chama RPC por argumento nomeado
+(`func(p_a := ...)`), que é o caso do plano genérico, e aí um predicado citando duas
+colunas faz o Postgres largar o Index Scan. E a política de RLS de `pedidos` chama
+`usuario_in_my_empresa` **uma vez por linha varrida** — sair de ~100 linhas para 11,9 mil é
+o que transforma 4ms em segundos.
+
+Por isso `dashboard_stats` tem duas CTEs separadas em vez de um parâmetro. História
+completa em [`docs/modulos/dashboard.md`](docs/modulos/dashboard.md) §6.
+
+### 7.10 `type="number"` não aceita máscara, e `parseFloat` come dinheiro brasileiro
+
+Duas armadilhas que andam juntas, e as duas são silenciosas:
+
+1. **`<Input type="number">` recusa texto formatado.** O navegador devolve **string
+   vazia** para `"99.888,47"` — sem erro nenhum. O campo se apaga sozinho a cada tecla e
+   grava zero. Em `type="number"` a **roda do mouse** também altera o valor quando o
+   cursor está por cima.
+2. **`parseFloat("99.888,47")` devolve `99.888`** — mil vezes menos, sem erro. `parseFloat`
+   é função de padrão americano: ela para na vírgula.
+
+O estrago real: três negócios gravados mil vezes maiores que o certo, o pior deles
+`106.387.320,00` no lugar de `106.387,32`, e nada na tela indicava erro.
+
+**Use `<CampoMoeda>`** (`src/components/shared/CampoMoeda.tsx`) em campo de dinheiro, e
+`parseMoedaBRL` / `formatarMoedaBRL` (`src/lib/moeda.ts`) para ler e mostrar valor. Nunca
+`parseFloat` em dinheiro, nunca `type="number"` em campo com máscara.
+
+### 7.11 Modal sem teto de altura prende o usuário na tela
+
+O `DialogContent` do shadcn **não tem teto de altura nem rolagem**, e é centralizado por
+deslocamento de 50%. Conteúdo mais alto que a janela transborda para os **dois** lados: o
+botão Salvar some por baixo e o "X" some por cima ao mesmo tempo. Como este projeto
+desligou Esc e clique-fora (`src/components/ui/dialog.tsx:42`), a pessoa preenche o
+formulário inteiro e **só sai recarregando a página**.
+
+Já acontece hoje, em notebook 1366x768 sem zoom.
+
+**Use `<ConteudoDialogo>`** de `src/components/shared/DialogoResponsivo.tsx` no lugar de
+`<DialogContent>`. Só trocar a tag já tira a tela do beco sem saída; envolver o miolo em
+`<CorpoDialogo>` é o que deixa título e botões parados enquanto só o meio rola. Altura em
+`dvh`, não `vh` — no celular `100vh` mede a tela com a barra de endereço escondida, e o
+rodapé do modal fica atrás dela.
+
 ---
 
 ## 8. Identidade visual
@@ -268,7 +345,7 @@ interlocutor é um profissional que respeita precisão e detesta ser vendido.
 Nunca afirme que algo funciona sem ter rodado. Evidência antes de afirmação.
 
 ```sh
-npm run test      # 116 testes. Tem que passar limpo
+npm run test      # 152 testes em 10 arquivos. Tem que passar limpo
 npm run build     # tem que compilar
 npm run lint      # ver a ressalva abaixo
 ```
@@ -300,6 +377,10 @@ Além disso, conforme o que mudou:
 - ❌ Puxar coleção inteira para o navegador só para contar ou somar
 - ❌ Confiar em verificação de permissão feita só no frontend
 - ❌ `React.lazy` direto em página (use `lazyComRetry`)
+- ❌ `type="number"` ou `parseFloat` em campo de dinheiro (use `CampoMoeda` / `parseMoedaBRL`)
+- ❌ `<DialogContent>` cru em modal com formulário (use `ConteudoDialogo`)
+- ❌ Parâmetro que escolhe entre duas colunas de data dentro de uma RPC (§7.9)
+- ❌ Construir gráfico novo sem perguntar ao Lucas se ele conta por criação ou por fechamento
 - ❌ Limpar não-dígitos de identificador de WhatsApp
 - ❌ Painel que atribua culpa — ver o princípio "registra, não interpreta" (`SPEC.md` §3.5)
 - ❌ Transformar prática da MD em regra do sistema (`SPEC.md` §4)
@@ -312,6 +393,8 @@ Além disso, conforme o que mudou:
 ## 11. Quando parar e perguntar ao Lucas
 
 - A mudança altera o que o cliente **vê ou paga**
+- **Vai construir gráfico, cartão ou painel novo** — pergunte se conta por data de criação
+  ou de fechamento antes de escrever a primeira linha (§5)
 - A mudança precisa ser aplicada no banco de produção
 - Apareceu decisão de produto que não está no `SPEC.md`
 - O pedido esbarra numa das decisões registradas em `SPEC.md` §10
@@ -348,7 +431,7 @@ O trabalho vai **direto no `main`**, como o time já faz. A barreira não é o P
 > A autorização é **por commit**. Ter recebido antes não vale para o próximo.
 >
 > Isso existe porque o `main` não tem proteção, a Vercel publica em produção a cada envio,
-> e a rede de proteção automática é fraca (7 arquivos de teste para 78 mil linhas, lint com
+> e a rede de proteção automática é fraca (10 arquivos de teste para 78 mil linhas, lint com
 > 498 problemas herdados, TypeScript frouxo). Sem etapa humana, o erro chega ao cliente
 > pagante em minutos.
 
@@ -405,8 +488,8 @@ mdrepresentacoes/
 │   ├── integrations/   cliente e tipos do Supabase (gerados)
 │   └── test/           configuração de teste
 └── supabase/
-    ├── migrations/     252 arquivos — só acrescente
-    └── functions/      37 funções de borda em Deno
+    ├── migrations/     260 arquivos — só acrescente
+    └── functions/      39 funções de borda em Deno
 ```
 
 **Sinal de alerta:** `src/pages/WhatsAppInbox.tsx` tem 7.838 linhas e

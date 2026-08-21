@@ -2,23 +2,34 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database, Json } from '@/integrations/supabase/types';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, Trash2, Eye, ChevronDown, ChevronUp, ChevronRight, FileSpreadsheet, RotateCcw, Loader2, CopyPlus } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Trash2, Eye, ChevronDown, ChevronUp, ChevronRight, FileSpreadsheet, RotateCcw, Loader2, CopyPlus, Check, Plus, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  ConteudoDialogo,
+  CabecalhoDialogo,
+  CorpoDialogo,
+  RodapeDialogo,
+} from '@/components/shared/DialogoResponsivo';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +41,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useBulkImport } from '@/hooks/use-bulk-import';
+import { useAuth } from '@/hooks/use-auth';
+import { useClientes, useFabricantes } from '@/hooks/use-clientes';
+import { useFunis } from '@/hooks/use-funis';
+import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
+import { useMarcadores } from '@/hooks/use-marcadores';
+import { cn } from '@/lib/utils';
 
 const FIELD_LABELS: Record<string, string> = {
   empresa: 'Empresa', razao_social: 'Razão Social', tipo: 'Tipo', cnpj: 'CNPJ',
@@ -58,6 +75,262 @@ const SKIP_FIELDS = new Set([
   'import_hash', 'campos_extras', '__dateError', '__import_hash',
   'criado_por_usuario_id', 'criado_por_nome',
 ]);
+
+// ─── Campos que apontam para um cadastro do sistema ────────────────────────────
+//
+// Estes campos NÃO são texto livre de verdade: cada um deles é casado por NOME
+// contra um cadastro existente na hora de reimportar (ver resolve-entities.ts), e
+// quando o nome não bate a importação CRIA um registro novo sem perguntar nada.
+// Em 4.913 linhas para corrigir à mão, um acento a menos ou um "LTDA" a mais é o
+// caminho mais rápido para acabar com dois cadastros do mesmo cliente.
+//
+// Por isso a caixa de texto vira um seletor com busca: escolher da lista é o
+// caminho fácil, e criar um cadastro novo continua possível — só que como uma
+// decisão visível, com o nome que vai ser criado escrito na tela.
+type TipoCadastro = 'cliente' | 'fabricante' | 'etapa' | 'marcador' | 'tipo_cliente';
+
+interface CampoDeCadastro {
+  tipo: TipoCadastro;
+  /** Se aceitar um nome fora da lista serve para alguma coisa nesta importação. */
+  permitirNovo: boolean;
+  /** O que acontece de fato quando o nome não bate com nenhum cadastro. */
+  avisoNaoCadastrado: string;
+}
+
+function tipoDeCadastroDoCampo(campo: string, tipoImportacao: string): CampoDeCadastro | null {
+  const CRIA_SOZINHO = 'Não existe cadastro com este nome — reimportar vai criar um novo.';
+
+  if (campo === 'cliente') return { tipo: 'cliente', permitirNovo: true, avisoNaoCadastrado: CRIA_SOZINHO };
+  if (campo === 'fabricante') return { tipo: 'fabricante', permitirNovo: true, avisoNaoCadastrado: CRIA_SOZINHO };
+  // No catálogo o fabricante NÃO nasce sozinho: retryCatalogo exige que já exista e
+  // recusa a linha com "Fabricante não encontrado". Oferecer "cadastrar novo" ali só
+  // levaria a pessoa direto para outra falha.
+  if (campo === 'fabricante_nome') return {
+    tipo: 'fabricante',
+    permitirNovo: false,
+    avisoNaoCadastrado: 'Não existe fabricante com este nome — a importação vai recusar a linha de novo.',
+  };
+  // `status`/`marcador` só têm cadastro correspondente na importação de negócios;
+  // `tipo` só existe na de clientes. Amarrar ao tipo da linha evita oferecer a
+  // lista errada caso uma planilha traga uma coluna com o mesmo nome.
+  if (campo === 'status' && tipoImportacao === 'negocios') return {
+    tipo: 'etapa',
+    permitirNovo: false,
+    avisoNaoCadastrado: 'Não é uma etapa deste funil — a linha vai cair calada na primeira etapa.',
+  };
+  if (campo === 'marcador' && tipoImportacao === 'negocios') return { tipo: 'marcador', permitirNovo: true, avisoNaoCadastrado: CRIA_SOZINHO };
+  if (campo === 'tipo' && tipoImportacao.startsWith('clientes')) return { tipo: 'tipo_cliente', permitirNovo: true, avisoNaoCadastrado: CRIA_SOZINHO };
+  return null;
+}
+
+interface OpcaoCadastro {
+  /** O texto que vai para `dados_originais` — é por ele que a importação casa o cadastro. */
+  valor: string;
+  rotulo: string;
+  /** Segunda linha da opção: CNPJ, razão social, aviso de nome repetido. Também entra na busca. */
+  detalhe?: string;
+}
+
+function normalizarBusca(texto: string): string {
+  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+/**
+ * Agrupa cadastros pelo nome normalizado.
+ *
+ * Existe porque a MD tem 35 nomes de cliente repetidos, cobrindo 70 cadastros — e
+ * `resolveClienteId` casa por `ilike` pegando o PRIMEIRO. Listar os dois separados
+ * daria a impressão de que dá para escolher qual, quando não dá: os dois produzem
+ * exatamente o mesmo resultado. Então some numa opção só, dizendo a verdade.
+ */
+function agruparPorNome(
+  registros: Array<{ nome?: string | null; detalhes?: Array<string | null | undefined> }>,
+): OpcaoCadastro[] {
+  const grupos = new Map<string, { rotulo: string; detalhes: string[]; qtd: number }>();
+  for (const registro of registros) {
+    const nome = (registro.nome ?? '').trim();
+    if (!nome) continue;
+    const chave = normalizarBusca(nome);
+    const atual = grupos.get(chave) ?? { rotulo: nome, detalhes: [], qtd: 0 };
+    atual.qtd += 1;
+    (registro.detalhes ?? []).forEach((d) => {
+      const texto = (d ?? '').trim();
+      if (texto && !atual.detalhes.includes(texto)) atual.detalhes.push(texto);
+    });
+    grupos.set(chave, atual);
+  }
+  return Array.from(grupos.values())
+    .map(({ rotulo, detalhes, qtd }) => ({
+      valor: rotulo,
+      rotulo,
+      detalhe: qtd > 1
+        ? `${qtd} cadastros com este nome — a importação usa o primeiro${detalhes.length ? ` · ${detalhes.join(' · ')}` : ''}`
+        : (detalhes.join(' · ') || undefined),
+    }))
+    .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
+}
+
+/**
+ * Campo de escolha com busca para os campos que apontam para cadastro.
+ *
+ * `permitirNovo` liga o botão de rodapé que aceita o texto digitado como um
+ * cadastro novo. Fica DESLIGADO onde aceitar texto fora da lista não resolve nada:
+ * na etapa do funil o nome que não bate cai calado na primeira coluna, e no
+ * catálogo o fabricante inexistente derruba a linha outra vez.
+ */
+function CampoCadastro({
+  id,
+  valor,
+  aoMudar,
+  opcoes,
+  carregando,
+  placeholder,
+  permitirNovo,
+  avisoNaoCadastrado,
+  desabilitado,
+}: {
+  id: string;
+  valor: string;
+  aoMudar: (valor: string) => void;
+  opcoes: OpcaoCadastro[];
+  carregando?: boolean;
+  placeholder: string;
+  permitirNovo: boolean;
+  avisoNaoCadastrado: string;
+  desabilitado?: boolean;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [termo, setTermo] = useState('');
+
+  const filtradas = useMemo(() => {
+    const busca = normalizarBusca(termo.trim());
+    if (!busca) return opcoes;
+    return opcoes.filter((o) => normalizarBusca(`${o.rotulo} ${o.detalhe ?? ''}`).includes(busca));
+  }, [opcoes, termo]);
+
+  const valorLimpo = valor.trim();
+  // `opcoes.length === 0` conta como "não sei dizer": enquanto a lista não chegou
+  // (ou a empresa não tem esse cadastro nenhum), acusar tudo de não cadastrado
+  // seria alarme falso.
+  const cadastrado = useMemo(
+    () => !valorLimpo || opcoes.length === 0 || opcoes.some((o) => normalizarBusca(o.valor) === normalizarBusca(valorLimpo)),
+    [opcoes, valorLimpo],
+  );
+
+  const termoLimpo = termo.trim();
+  const podeCriar =
+    permitirNovo &&
+    termoLimpo.length > 0 &&
+    !opcoes.some((o) => normalizarBusca(o.valor) === normalizarBusca(termoLimpo));
+
+  return (
+    <div className="space-y-1">
+      <Popover open={aberto} onOpenChange={(o) => { setAberto(o); if (!o) setTermo(''); }}>
+        <PopoverTrigger asChild>
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={aberto}
+            disabled={desabilitado}
+            className={cn(
+              'h-8 w-full justify-between px-2 text-sm font-normal',
+              !valorLimpo && 'text-muted-foreground',
+              !cadastrado && 'border-amber-500/60',
+            )}
+          >
+            <span className="truncate">{valorLimpo || placeholder}</span>
+            <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[min(24rem,90vw)] p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput placeholder="Buscar..." value={termo} onValueChange={setTermo} />
+            <CommandList className="max-h-[240px]">
+              {carregando ? (
+                <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando cadastros...
+                </div>
+              ) : (
+                <>
+                  <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                    Nada encontrado com esse texto.
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {filtradas.map((opcao) => (
+                      <CommandItem
+                        key={opcao.valor}
+                        value={opcao.valor}
+                        onSelect={() => { aoMudar(opcao.valor); setAberto(false); setTermo(''); }}
+                      >
+                        <Check
+                          className={cn(
+                            'mr-2 h-4 w-4 shrink-0',
+                            normalizarBusca(opcao.valor) === normalizarBusca(valorLimpo) ? 'opacity-100' : 'opacity-0',
+                          )}
+                        />
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate text-sm">{opcao.rotulo}</span>
+                          {opcao.detalhe && (
+                            <span className="truncate text-[10px] text-muted-foreground">{opcao.detalhe}</span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
+            </CommandList>
+            {(podeCriar || !!valorLimpo) && (
+              <div className="space-y-1 border-t p-1">
+                {podeCriar && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-full justify-start gap-2 text-xs font-normal"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      aoMudar(termoLimpo);
+                      setAberto(false);
+                      setTermo('');
+                    }}
+                  >
+                    <Plus className="h-3 w-3 shrink-0" />
+                    <span className="truncate">Cadastrar novo: "{termoLimpo}"</span>
+                  </Button>
+                )}
+                {!!valorLimpo && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-full justify-start gap-2 text-xs font-normal text-muted-foreground"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      aoMudar('');
+                      setAberto(false);
+                      setTermo('');
+                    }}
+                  >
+                    <X className="h-3 w-3 shrink-0" />
+                    Deixar em branco
+                  </Button>
+                )}
+              </div>
+            )}
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {!cadastrado && (
+        <p className="text-[10px] leading-tight text-amber-600 dark:text-amber-400">
+          {avisoNaoCadastrado}
+        </p>
+      )}
+    </div>
+  );
+}
 
 // Uma linha de negócio ignorada por duplicidade carrega o hash do negócio já existente
 // (ver use-bulk-import.ts) — usamos isso para localizar o registro real e montar a
@@ -267,20 +540,116 @@ async function retryCatalogo(fields: Record<string, string>, nomeArquivo?: strin
   }
 }
 
+/**
+ * Uma linha que a importação recusou. Vem do tipo GERADO pelo Supabase em vez de
+ * escrito à mão: assim, se a tabela mudar de formato, o erro aparece aqui na hora
+ * da compilação em vez de virar campo vazio na tela.
+ */
+type LinhaIgnorada = Database['public']['Tables']['linhas_ignoradas_importacao']['Row'];
+
+/**
+ * `dados_originais` é `Json` no tipo gerado, ou seja: pode ser texto, número, lista
+ * ou objeto. A importação sempre grava um OBJETO (a linha da planilha, campo a campo),
+ * mas o tipo não sabe disso. Esta função deixa a suposição explícita e devolve um
+ * objeto vazio quando a forma vier diferente — em vez de escondê-la atrás de um `as`
+ * que estouraria em tempo de execução se um dia vier outra coisa.
+ */
+function comoObjeto(valor: Json | null | undefined): Record<string, unknown> {
+  return valor && typeof valor === 'object' && !Array.isArray(valor)
+    ? (valor as Record<string, unknown>)
+    : {};
+}
+
 export default function LinhasIgnoradas() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedRow, setSelectedRow] = useState<any>(null);
+  const [selectedRow, setSelectedRow] = useState<LinhaIgnorada | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [openFiles, setOpenFiles] = useState<Set<string>>(new Set());
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  const [retryRow, setRetryRow] = useState<any>(null);
+  const [retryRow, setRetryRow] = useState<LinhaIgnorada | null>(null);
   const [retryFields, setRetryFields] = useState<Record<string, string>>({});
   const [isRetrying, setIsRetrying] = useState(false);
 
   const { importClientes, importNegocios } = useBulkImport();
+
+  // ── Cadastros que alimentam os seletores do diálogo de correção ──────────────
+  // `enabled` amarrado ao diálogo: a lista de clientes é a consulta mais cara do
+  // sistema (1.305 registros com obras e um join de usuários) e esta tela abre
+  // muitas vezes só para conferir a contagem, sem abrir correção nenhuma.
+  const { profile } = useAuth();
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
+  const retryAberto = !!retryRow;
+  const { data: clientesCadastrados, isLoading: carregandoClientes } = useClientes({ enabled: retryAberto });
+  const { data: fabricantesCadastrados, isLoading: carregandoFabricantes } = useFabricantes();
+  const { data: marcadoresCadastrados } = useMarcadores(empresaId);
+  const { data: funis } = useFunis(empresaId);
+  // O reenvio de uma linha de negócio não escolhe funil (ver handleRetrySubmit →
+  // importNegocios sem funilIdParam), então as etapas ofertadas têm que ser as do
+  // funil padrão — as mesmas contra as quais o status vai ser casado.
+  const funilPadraoId = useMemo(
+    () => (funis ?? []).find(f => f.is_padrao)?.id ?? funis?.[0]?.id,
+    [funis],
+  );
+  const { data: etapasFunil } = useKanbanColunas(empresaId, funilPadraoId);
+
+  const opcoesClientes = useMemo(
+    () => agruparPorNome((clientesCadastrados ?? []).map((c) => ({
+      nome: c.empresa,
+      detalhes: [c.razao_social, c.cnpj],
+    }))),
+    [clientesCadastrados],
+  );
+
+  const opcoesFabricantes = useMemo(
+    () => agruparPorNome((fabricantesCadastrados ?? []).map((f: any) => ({
+      nome: f.nome,
+      detalhes: [f.cnpj],
+    }))),
+    [fabricantesCadastrados],
+  );
+
+  const opcoesEtapas = useMemo(
+    () => agruparPorNome((etapasFunil ?? []).map(c => ({ nome: c.nome }))),
+    [etapasFunil],
+  );
+
+  const opcoesMarcadores = useMemo(
+    () => agruparPorNome((marcadoresCadastrados ?? []).map(m => ({ nome: m.nome }))),
+    [marcadoresCadastrados],
+  );
+
+  // "Tipo" de cliente não é lista fixa no banco: é texto livre que virou 19 valores
+  // distintos ao longo do tempo ("construtora - 3 níveis", "hotéis"...). A lista
+  // ofertada é o que a base já usa, para a correção manual parar de inventar
+  // variações novas do mesmo tipo.
+  const opcoesTiposCliente = useMemo<OpcaoCadastro[]>(() => {
+    const vistos = new Map<string, string>();
+    (clientesCadastrados ?? []).forEach((c: any) => {
+      const tipo = (c.tipo ?? '').trim();
+      if (tipo && !vistos.has(normalizarBusca(tipo))) vistos.set(normalizarBusca(tipo), tipo);
+    });
+    return Array.from(vistos.values())
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      .map(tipo => ({ valor: tipo, rotulo: tipo }));
+  }, [clientesCadastrados]);
+
+  const cadastroDoTipo = (tipo: TipoCadastro) => {
+    switch (tipo) {
+      case 'cliente':
+        return { opcoes: opcoesClientes, carregando: carregandoClientes, placeholder: 'Escolher cliente' };
+      case 'fabricante':
+        return { opcoes: opcoesFabricantes, carregando: carregandoFabricantes, placeholder: 'Escolher fabricante' };
+      case 'etapa':
+        return { opcoes: opcoesEtapas, carregando: false, placeholder: 'Escolher etapa' };
+      case 'marcador':
+        return { opcoes: opcoesMarcadores, carregando: false, placeholder: 'Escolher marcador' };
+      case 'tipo_cliente':
+        return { opcoes: opcoesTiposCliente, carregando: carregandoClientes, placeholder: 'Escolher tipo' };
+    }
+  };
 
   const { data: linhas, isLoading } = useQuery({
     queryKey: ['linhas_ignoradas_importacao'],
@@ -475,7 +844,9 @@ export default function LinhasIgnoradas() {
       subtitle="Revise e ajuste dados que não puderam ser importados automaticamente"
       mainClassName="flex-1 overflow-hidden flex flex-col"
     >
-      <div className="p-6 flex flex-col flex-1 min-h-0 gap-6">
+      {/* Padding que encolhe com a tela: com `p-6` fixo, num celular ou em zoom alto
+          48px dos dois lados saem do espaço útil de leitura da lista. */}
+      <div className="flex flex-1 min-h-0 flex-col gap-6 p-3 sm:p-4 md:p-6">
         <Button
           variant="ghost"
           size="sm"
@@ -667,8 +1038,8 @@ export default function LinhasIgnoradas() {
 
       {/* Retry dialog */}
       <Dialog open={!!retryRow} onOpenChange={(o) => !o && !isRetrying && setRetryRow(null)}>
-        <DialogContent className="max-w-xl max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <ConteudoDialogo className="max-w-xl">
+          <CabecalhoDialogo>
             <DialogTitle className="flex items-center gap-2">
               <RotateCcw className="h-4 w-4" />
               Tentar importar novamente
@@ -687,34 +1058,58 @@ export default function LinhasIgnoradas() {
                 </span>
               )}
             </DialogDescription>
-          </DialogHeader>
+          </CabecalhoDialogo>
 
-          <div className="flex-1 overflow-auto py-2">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <CorpoDialogo className="py-2">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
               {Object.entries(retryFields).map(([key, value]) => {
                 const isRequired = requiredForType(retryRow?.tipo_importacao).has(key);
+                const campoCadastro = tipoDeCadastroDoCampo(key, retryRow?.tipo_importacao ?? '');
                 return (
                   <div key={key} className="space-y-1">
                     <Label htmlFor={`retry-${key}`} className="text-xs font-semibold">
                       {FIELD_LABELS[key] ?? key}
                       {isRequired && <span className="text-destructive ml-0.5">*</span>}
                     </Label>
-                    <Input
-                      id={`retry-${key}`}
-                      value={value}
-                      onChange={(e) =>
-                        setRetryFields(prev => ({ ...prev, [key]: e.target.value }))
-                      }
-                      className="h-8 text-sm"
-                      disabled={isRetrying}
-                    />
+                    {campoCadastro ? (
+                      (() => {
+                        const cadastro = cadastroDoTipo(campoCadastro.tipo);
+                        return (
+                          <CampoCadastro
+                            id={`retry-${key}`}
+                            valor={value}
+                            aoMudar={(novo) => setRetryFields(prev => ({ ...prev, [key]: novo }))}
+                            opcoes={cadastro.opcoes}
+                            carregando={cadastro.carregando}
+                            placeholder={cadastro.placeholder}
+                            permitirNovo={campoCadastro.permitirNovo}
+                            avisoNaoCadastrado={campoCadastro.avisoNaoCadastrado}
+                            desabilitado={isRetrying}
+                          />
+                        );
+                      })()
+                    ) : (
+                      <Input
+                        id={`retry-${key}`}
+                        value={value}
+                        onChange={(e) =>
+                          setRetryFields(prev => ({ ...prev, [key]: e.target.value }))
+                        }
+                        className="h-8 text-sm"
+                        disabled={isRetrying}
+                      />
+                    )}
                   </div>
                 );
               })}
             </div>
-          </div>
+          </CorpoDialogo>
 
-          <DialogFooter className="gap-2 sm:gap-2 pt-2 border-t">
+          {/* `flex-wrap` porque uma linha duplicada mostra 4 botões que somam 679px num
+              diálogo de 528px de miolo: sem quebra, o "Cancelar" saía para fora da tela à
+              esquerda a partir de 768px. O `sm:space-x-0` anula o espaçamento herdado do
+              DialogFooter, que somava com o `gap-2` e desalinhava a segunda linha. */}
+          <RodapeDialogo className="flex-wrap justify-end gap-2 border-t pt-2 sm:gap-2 sm:space-x-0">
             <Button variant="outline" onClick={() => setRetryRow(null)} disabled={isRetrying}>
               Cancelar
             </Button>
@@ -722,7 +1117,7 @@ export default function LinhasIgnoradas() {
               variant="outline"
               onClick={() => retryRow && saveEditMutation.mutate({
                 id: retryRow.id,
-                dadosOriginais: retryRow.dados_originais ?? {},
+                dadosOriginais: comoObjeto(retryRow.dados_originais),
                 fields: retryFields,
               })}
               disabled={isRetrying || saveEditMutation.isPending}
@@ -745,8 +1140,8 @@ export default function LinhasIgnoradas() {
               {isRetrying && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {isRetrying ? 'Importando...' : 'Confirmar e Importar'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
+          </RodapeDialogo>
+        </ConteudoDialogo>
       </Dialog>
 
       <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
@@ -771,19 +1166,15 @@ export default function LinhasIgnoradas() {
       </AlertDialog>
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent
-          className={
-            selectedRow && isLinhaDuplicada(selectedRow)
-              ? 'max-w-4xl max-h-[85vh] overflow-hidden flex flex-col'
-              : 'max-w-2xl max-h-[80vh] overflow-hidden flex flex-col'
-          }
+        <ConteudoDialogo
+          className={selectedRow && isLinhaDuplicada(selectedRow) ? 'max-w-4xl' : 'max-w-2xl'}
         >
-          <DialogHeader>
+          <CabecalhoDialogo>
             <DialogTitle>Detalhes da Linha Ignorada</DialogTitle>
             <DialogDescription>
               Dados originais da planilha que não foram importados.
             </DialogDescription>
-          </DialogHeader>
+          </CabecalhoDialogo>
 
           {(() => {
             const selectedDuplicada = selectedRow ? isLinhaDuplicada(selectedRow) : false;
@@ -793,9 +1184,9 @@ export default function LinhasIgnoradas() {
             const selectedPedidoExistente = selectedDuplicadaHash ? duplicateMatches?.get(selectedDuplicadaHash) : undefined;
 
             return (
-          <div className="flex-1 overflow-auto py-4">
+          <CorpoDialogo className="py-4">
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
                   <span className="text-xs font-semibold text-muted-foreground">Tipo de Importação</span>
                   <p className="capitalize">{selectedRow?.tipo_importacao}</p>
@@ -805,7 +1196,7 @@ export default function LinhasIgnoradas() {
                   <p className="text-destructive font-medium">{selectedRow?.motivo_ignorado || 'Campo obrigatório ausente'}</p>
                 </div>
                 {selectedRow?.nome_arquivo && (
-                  <div className="space-y-1 col-span-2">
+                  <div className="space-y-1 sm:col-span-2">
                     <span className="text-xs font-semibold text-muted-foreground">Arquivo de Origem</span>
                     <p className="flex items-center gap-1.5 text-sm">
                       <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
@@ -815,7 +1206,7 @@ export default function LinhasIgnoradas() {
                 )}
               </div>
 
-              <div className={selectedDuplicada ? 'grid grid-cols-2 gap-4 items-start' : ''}>
+              <div className={selectedDuplicada ? 'grid grid-cols-1 gap-4 md:grid-cols-2 items-start' : ''}>
                 <div className="space-y-2">
                   <span className="text-xs font-semibold text-muted-foreground">
                     {selectedDuplicada ? 'O que foi tentado importar' : 'Dados da Linha'}
@@ -842,11 +1233,11 @@ export default function LinhasIgnoradas() {
                 )}
               </div>
             </div>
-          </div>
+          </CorpoDialogo>
             );
           })()}
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <RodapeDialogo className="flex-wrap justify-end">
             <Button
               variant="outline"
               onClick={() => {
@@ -860,8 +1251,8 @@ export default function LinhasIgnoradas() {
             <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
               Fechar
             </Button>
-          </DialogFooter>
-        </DialogContent>
+          </RodapeDialogo>
+        </ConteudoDialogo>
       </Dialog>
     </AppLayout>
   );

@@ -34,7 +34,7 @@ Três fatos que mudam como se trabalha neste repositório:
 
 1. **A Vercel publica sozinha a cada envio para `main`.** Não existe etapa de aprovação
    automática entre o commit e o cliente.
-2. **Quase não existe rede de proteção automática.** São 7 arquivos de teste para 78 mil
+2. **Quase não existe rede de proteção automática.** São 10 arquivos de teste para 78 mil
    linhas; o TypeScript está configurado de forma frouxa de propósito; e o `npm run lint`
    **não passa** — são 498 problemas herdados no `main`. O critério prático é *o número
    não subir*, não *o lint passar*.

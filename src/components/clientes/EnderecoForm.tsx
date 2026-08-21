@@ -153,7 +153,9 @@ export function EnderecoForm({ value, onChange, required }: EnderecoFormProps) {
   return (
     <div className="space-y-3">
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Endereço</p>
-      <div className="grid grid-cols-3 gap-3">
+      {/* Três colunas fixas dentro de um modal davam ~100px por campo no celular — logradouro
+          cabia umas 8 letras. Empilha até o `sm` e só então volta a ser lado a lado. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <Label>CEP</Label>
           <div className="relative">
@@ -170,7 +172,7 @@ export function EnderecoForm({ value, onChange, required }: EnderecoFormProps) {
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">Auto-preenche ao sair</p>
         </div>
-        <div className="col-span-2 relative" ref={containerRef}>
+        <div className="sm:col-span-2 relative" ref={containerRef}>
           <Label>Logradouro{required && ' *'}</Label>
           <div className="relative">
             <Input
@@ -208,17 +210,17 @@ export function EnderecoForm({ value, onChange, required }: EnderecoFormProps) {
           <p className="text-[10px] text-muted-foreground mt-1">Sugestões a partir de 3 caracteres</p>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <Label>Número{required && ' *'}</Label>
           <Input value={value.numero} onChange={e => set('numero', e.target.value)} placeholder="Nº" required={required} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Label>Complemento</Label>
           <Input value={value.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Sala, Bloco..." />
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <Label>Bairro</Label>
           <Input value={value.bairro} onChange={e => set('bairro', e.target.value)} placeholder="Bairro" />

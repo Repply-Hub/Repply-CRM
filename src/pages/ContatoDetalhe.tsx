@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ConteudoDialogo } from '@/components/shared/DialogoResponsivo';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ArrowLeft, User, Mail, Phone, Loader2, Pencil, Trash2, Building2, Calendar, Clock, MessageSquare, History, Factory, DollarSign, Plus, ListChecks } from 'lucide-react';
@@ -149,7 +150,7 @@ const ContatoDetalhe = () => {
   if (!contato) {
     return (
       <AppLayout>
-        <div className="p-6">
+        <div className="p-3 sm:p-4 md:p-6">
           <Button variant="ghost" size="sm" onClick={() => navigate('/clientes')}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
           </Button>
@@ -219,7 +220,7 @@ const ContatoDetalhe = () => {
         </div>
       }
     >
-      <div className="p-4 sm:p-6 space-y-6 w-full">
+      <div className="p-3 sm:p-4 md:p-6 space-y-6 w-full">
         <div className="grid gap-6 md:grid-cols-3">
           {/* Card: Perfil e Empresa */}
           <Card className="md:col-span-1">
@@ -463,7 +464,7 @@ const ContatoDetalhe = () => {
         </div>
 
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent>
+          <ConteudoDialogo>
             <DialogHeader>
               <DialogTitle>Editar Contato</DialogTitle>
             </DialogHeader>
@@ -478,7 +479,7 @@ const ContatoDetalhe = () => {
         </div>
 
         <Dialog open={vincularOpen} onOpenChange={setVincularOpen}>
-          <DialogContent className="sm:max-w-[425px]">
+          <ConteudoDialogo className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Vincular Empresa</DialogTitle>
             </DialogHeader>
@@ -514,7 +515,7 @@ const ContatoDetalhe = () => {
                 {updateContato.isPending ? 'Vinculando...' : 'Vincular'}
               </Button>
             </DialogFooter>
-          </DialogContent>
+          </ConteudoDialogo>
         </Dialog>
               <div>
                 <Label>E-mail</Label>
@@ -549,7 +550,7 @@ const ContatoDetalhe = () => {
                 {updateContato.isPending ? 'Salvando...' : 'Salvar Alterações'}
               </Button>
             </form>
-          </DialogContent>
+          </ConteudoDialogo>
         </Dialog>
       </div>
 
