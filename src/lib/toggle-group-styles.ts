@@ -3,7 +3,21 @@
 // ativo sólido na cor primária. Usado para padronizar os seletores de
 // visão/aba nas páginas principais (Clientes, Obras, Calendário, WhatsApp,
 // E-mails, Configurações).
-export const TOGGLE_LIST_CLASS = "inline-flex items-center gap-1 rounded-md border border-border bg-background p-0.5 h-auto";
+//
+// A segunda linha é o que impede a tira de abas de ser CORTADA numa tela
+// estreita. Sem ela, em Configurações as últimas abas (Campos e Empresa)
+// simplesmente somem no celular, sem barra de rolagem em lugar nenhum — o
+// usuário perde acesso à funcionalidade inteira, e nada indica que ela existe.
+// - `max-w-full overflow-x-auto`: quando não couber, rola de lado em vez de sumir.
+// - `[scrollbar-width:none]` e `[&::-webkit-scrollbar]:hidden`: rola sem barra à
+//   vista, para não roubar altura de uma tira de 32px.
+// - `[&>*]:shrink-0`: as abas precisam se recusar a encolher, senão elas se
+//   espremem para caber e a rolagem nunca chega a existir.
+// - `justify-start`: o ToggleGroup do Radix já vem com `justify-center`, e
+//   conteúdo centralizado que transborda fica inalcançável do lado esquerdo.
+export const TOGGLE_LIST_CLASS =
+  "inline-flex items-center justify-start gap-1 rounded-md border border-border bg-background p-0.5 h-auto " +
+  "max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0";
 
 // `group` existe para o contador (TOGGLE_BADGE_CLASS) conseguir reagir ao
 // estado da aba: o data-state fica no gatilho, não no badge.
