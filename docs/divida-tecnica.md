@@ -3,7 +3,7 @@
 O que está quebrado, mal resolvido ou pendente neste sistema, com **o custo real** e **a
 ordem de conserto**. Escrito para que ninguém precise redescobrir cada item.
 
-Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 28
+Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 30
 acrescentados em 21/08/2026.
 
 > **Este documento não é lista de desejos.** Cada item aqui já tem consequência medida ou
@@ -1054,7 +1054,82 @@ tarefas, e está na tela que a MD usa o dia todo.
 
 ---
 
+## 29. O filtro de período do WhatsApp abre no mês errado
+
+**Gravidade: baixa. Não bloqueia — mas é o último calendário do sistema com o defeito.**
+
+Em 21/08/2026 os 18 calendários do sistema ganharam `defaultMonth` (ver `CLAUDE.md` §7.13).
+**Um ficou de fora:** `src/pages/WhatsAppInbox.tsx:4168`, o filtro de período das conversas,
+que é `mode="range"` e não passa nem `month` nem `defaultMonth`.
+
+Não foi tocado de propósito: outro desenvolvedor estava trabalhando naquele arquivo na mesma
+janela, e mexer nele arriscava desfazer trabalho em andamento. **Isso precisa ser passado
+para ele** — é uma propriedade, no formato:
+
+```tsx
+<Calendar mode="range" defaultMonth={mesDoCalendario(range?.from, range?.to)} … />
+```
+
+O utilitário está em `src/components/shared/mes-calendario.ts`. O diálogo de exportar
+conversas do mesmo módulo **já foi consertado**, porque usa o `DateRangePicker`
+compartilhado — nenhum arquivo da área do WhatsApp foi editado para isso.
+
+---
+
+## 30. Miudezas do módulo Calendário
+
+**Gravidade: baixa. Três defeitos anteriores, encontrados ao mexer nos seletores de data.**
+
+Nenhum foi corrigido em 21/08/2026 porque os três mudam comportamento e precisam de decisão
+do Lucas, não de conserto técnico.
+
+**(a) O mini calendário fica parado ao clicar num dia de fora do mês.**
+`src/pages/Calendario.tsx:161-165` — `handleMiniCalendarSelect` faz `setCurrentDate(date)`
+sem `setMonth(date)`. Como `showOutsideDays` é `true` por padrão (`ui/calendar.tsx:12`),
+clicar num dia da borda muda a agenda para outro mês e o mini calendário continua exibindo o
+mês antigo. A navegação pelo cabeçalho está certa (`setMonth(nextDate)`, linha 155).
+
+**(b) O campo Fim do evento não acompanha o Início.**
+`src/components/calendar/EventDialog.tsx:224` — pôr o Início em 15/03/2024 deixa o Fim na
+data de hoje. O calendário do Fim abre no mês do que está gravado (hoje), então o conserto de
+21/08 está correto e o incômodo permanece. Resolver de verdade é fazer o Fim seguir o Início
+preservando a duração — comportamento novo.
+
+**(c) Ligar "Dia inteiro" no meio do preenchimento esvazia o campo.**
+`src/components/calendar/EventDateTimeField.tsx:23-28` + `EventDialog.tsx:217-230` — o `type`
+muda mas o texto guardado não é reformatado. Com date-fns 3.6,
+`parse("2024-03-15T10:00", "yyyy-MM-dd", …)` devolve data inválida e o campo passa a mostrar
+"Selecionar" até a pessoa reescolher. O campo fica visivelmente vazio, então não engana
+ninguém — mas obriga a redigitar.
+
+---
+
 ## Resolvidos
+
+### 21/08/2026 — calendário e data escolhida
+
+> ✅ **Commitado e no ar** (`99c45394` e `2c1583c4`).
+
+**O dia clicado era gravado como o dia anterior.** Os quatro campos de data dos formulários
+de negócio convertiam fuso com
+`new Date(d.getTime() - d.getTimezoneOffset() * 60 * 1000)`. Como a gravação usa
+`format(d,'yyyy-MM-dd')`, que lê o fuso LOCAL, a conversão recuava a data um dia inteiro.
+Medido com `TZ=America/Sao_Paulo`: clicar em `2024-03-15` gravava `2024-03-14`; clicar no dia
+1º de março gravava `2024-02-29`, jogando o negócio para o mês anterior. Escapou por dois
+anos porque só 4 negócios nasceram dentro do CRM. Detalhe em `CLAUDE.md` §7.12.
+
+**Os 18 calendários abriam no mês de hoje.** `react-day-picker` v8 ignora `selected` ao
+decidir o mês inicial, e o projeto não passava `defaultMonth` em lugar nenhum — filtrar
+março/2024, fechar e reabrir custava 29 cliques na setinha. Corrigidos todos, mais o
+`DateRangePicker`, que precisou da forma controlada porque as abas De/Até compartilham a
+mesma instância. Novo utilitário: `src/components/shared/mes-calendario.ts`. Detalhe em
+`CLAUDE.md` §7.13.
+
+**Quatro calendários não tinham navegação nenhuma** — sem setas e sem nome do mês, presos no
+mês atual sem saída (os dois campos de período do histórico em Configurações → Usuários e
+os dois de Próximo Contato). Ganharam `captionLayout="dropdown-buttons"`.
+
+Ficou pendente o filtro do WhatsApp (item 29) e as miudezas do Calendário (item 30).
 
 ### 21/08/2026 — leva de dashboard, data de fechamento, dinheiro e responsividade
 

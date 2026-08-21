@@ -338,6 +338,78 @@ Já acontece hoje, em notebook 1366x768 sem zoom.
 `dvh`, não `vh` — no celular `100vh` mede a tela com a barra de endereço escondida, e o
 rodapé do modal fica atrás dela.
 
+### 7.12 Campo de data não converte fuso — e `getTimezoneOffset` recua um dia
+
+O calendário entrega **meia-noite no fuso local**. Se a gravação usa
+`format(d, 'yyyy-MM-dd')` do date-fns — que também lê o fuso local —, os dois já falam a
+mesma língua e **não há nada a converter**.
+
+O que existia aqui, nos quatro campos de data dos formulários de negócio:
+
+```js
+const localDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60 * 1000));
+```
+
+`getTimezoneOffset()` devolve **+180** no Brasil, então isso recua três horas e a data cai
+no dia anterior às 21h. Medido com `TZ=America/Sao_Paulo`:
+
+| Usuário clicou | Sistema gravava |
+|---|---|
+| `2024-03-15` | `2024-03-14` |
+| `2024-03-01` | `2024-02-29` |
+
+Clicar no dia 1º jogava o negócio para o **mês anterior** — e o botão já mostrava o dia
+errado logo depois do clique.
+
+**Esse idioma não é errado por si:** ele é o jeito certo de fazer `toISOString()` (que lê
+UTC) devolver a data local. Casado com `format()`, faz o oposto do que promete. A regra
+simples: **converta o fuso no ponto onde a data vira texto, nunca no ponto onde ela é
+escolhida** — e escolha uma só das duas famílias, `format` (local) ou `toISOString` (UTC).
+
+Ler do banco sempre esteve certo e é o padrão a copiar: âncora de meio-dia,
+`new Date(p.data_pedido + 'T12:00:00')`, imune a qualquer deslocamento de fuso.
+
+Passou dois anos sem ninguém notar porque só **4 negócios** nasceram dentro do CRM — os
+outros 11.903 vieram da importação, que monta a data por outro caminho.
+
+### 7.13 Calendário abre no mês de hoje, não no mês da data escolhida
+
+`react-day-picker` v8 decide o mês de abertura por `month ?? defaultMonth ?? hoje`.
+**`selected` não entra nessa conta.** Um campo com março/2024 escolhido abre em agosto/2026
+e obriga a 29 cliques na setinha — com quatro anos de histórico importado, inviabiliza
+consultar o passado.
+
+**Todo `<Calendar>` precisa de `defaultMonth`.** A primitiva `ui/calendar.tsx` repassa
+`{...props}` ao `DayPicker`, então basta a propriedade — não se edita a primitiva (§5.4).
+Use `mesDoCalendario(...)` de `src/components/shared/mes-calendario.ts`, que escolhe a
+primeira data preenchida e cai no mês atual quando não há nenhuma:
+
+```tsx
+<Calendar defaultMonth={mesDoCalendario(prazoResposta, dataPedido)} … />
+```
+
+Ele aceita **só `Date` de verdade**: `new Date("2024-03-01")` no horário de Brasília devolve
+29/02, e o calendário abriria em fevereiro.
+
+**Quando `defaultMonth` NÃO basta:** ele só vale na montagem. Serve porque `PopoverContent`
+é Radix dentro de `Portal` sem `forceMount`, e desmonta ao fechar. Mas se o **mesmo**
+elemento `<Calendar>` servir dois campos (as abas De/Até do `DateRangePicker`), trocar de
+aba não remonta nada e o mês nunca é recalculado. Aí é `month` + `onMonthChange`, via
+`useMesVisivel(alvo, chaveDeReinicio)` do mesmo arquivo.
+
+**Cuidado com o teto de ano:** `toYear={new Date().getFullYear()}` trava o seletor no ano
+corrente e impede escolher data futura em campo de prazo ou de fim de período.
+
+**Armadilha de fábrica:** `ui/calendar.tsx` esconde o rótulo do mês (`caption_label: hidden`)
+e anula as setas (`IconLeft`/`IconRight` devolvendo `null`), e o CSS do react-day-picker não
+é importado em lugar nenhum — os botões ficam sem tamanho. **Sem `captionLayout="dropdown-buttons"`
+o calendário fica mudo, preso no mês atual, sem saída.** Quatro campos do sistema estavam
+assim. Ao acrescentar calendário novo, passe `captionLayout`, `fromYear` e `toYear`.
+
+**Não conserte a navegação da agenda.** `CalendarHeader`, `CalendarMonthView` e
+`TimeGridView` devem abrir no mês que a pessoa está olhando, não no do último evento tocado.
+Só campo de ESCOLHER data usa `defaultMonth`.
+
 ---
 
 ## 8. Identidade visual
@@ -400,6 +472,8 @@ Além disso, conforme o que mudou:
 - ❌ `React.lazy` direto em página (use `lazyComRetry`)
 - ❌ `type="number"` ou `parseFloat` em campo de dinheiro (use `CampoMoeda` / `parseMoedaBRL`)
 - ❌ `<DialogContent>` cru em modal com formulário (use `ConteudoDialogo`)
+- ❌ Converter fuso na data que veio do calendário (§7.12) — a conversão recua um dia
+- ❌ `<Calendar>` sem `defaultMonth` (§7.13) — abre no mês de hoje e ignora a data escolhida
 - ❌ Parâmetro que escolhe entre duas colunas de data dentro de uma RPC (§7.9)
 - ❌ Construir gráfico novo sem perguntar ao Lucas se ele conta por criação ou por fechamento
 - ❌ Limpar não-dígitos de identificador de WhatsApp

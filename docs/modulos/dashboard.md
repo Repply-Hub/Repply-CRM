@@ -238,6 +238,41 @@ para julgar a meta.
 > equipe e conferir comissão. É mudança do que ele vê e do que ele paga — cai direto na
 > lista do `CLAUDE.md` §11. Decisão registrada em `SPEC.md` §10.12.
 
+### As metas de 06/2022 a 07/2026 da MD foram REPLICADAS, não digitadas
+
+Em 21/08/2026, a pedido do Lucas, as 18 metas de agosto/2026 da MD Representações
+(R$ 3.500.000 no total, todas de equipe — `usuario_id IS NULL`) foram copiadas para os 50
+meses de **junho/2022 a julho/2026**: 900 linhas em `metas_vendas`. Antes disso a empresa só
+tinha meta em agosto e setembro de 2026, e o Plano de Vendas era inútil para qualquer mês do
+histórico importado do Bitrix.
+
+Quem for interpretar esses números precisa saber de três coisas:
+
+1. **A meta é a mesma em todos os 50 meses.** Não houve planejamento mês a mês; é a de
+   agosto/2026 repetida. Comparar "meta batida" entre 2022 e 2026 compara contra um alvo que
+   não existia na época.
+2. **Junho/2022 é mês parcial.** O histórico começa em 24/06/2022, então aquele mês mostra
+   R$ 21.427 contra a meta cheia de R$ 3,5 milhões.
+3. **Dez fábricas venderam sem ter meta**, em 46 dos 50 meses: R$ 2.611.365,96 em 221
+   negócios. Como o Plano de Vendas usa `FULL OUTER JOIN`, elas aparecem com meta zero e
+   valor cheio — o percentual do mês fica melhor do que a meta previa, porque o numerador as
+   inclui e o denominador não. As maiores são estruturais, não pontuais: **Ralo Linear**
+   (35 meses, R$ 455.545) e **Soprano** (23 meses, R$ 702.594) foram representadas por anos.
+   As outras: Decortiles (R$ 820.740), Owa Sonex, Eliane Floor, Ecophon, Asperbras,
+   Durafloor, Hydra e um cadastro que parece duplicado, "Elettromec | Invita".
+
+Para desfazer, o recorte é a data de criação das linhas:
+
+```sql
+DELETE FROM public.metas_vendas
+WHERE empresa_id = (SELECT id FROM public.empresas WHERE nome = 'MD Representações')
+  AND created_at::date = '2026-08-21';
+```
+
+O índice que impede duplicata é parcial —
+`metas_vendas_equipe_uniq (empresa_id, fabricante_id, ano, mes) WHERE usuario_id IS NULL` —,
+então um `ON CONFLICT` aqui precisa repetir o `WHERE usuario_id IS NULL`.
+
 ---
 
 ## 8. O selo "+X% últ. mês"
