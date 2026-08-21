@@ -28,6 +28,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { CampoMoeda } from '@/components/shared/CampoMoeda';
+import { formatarMoedaBRL } from '@/lib/moeda';
 import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 
 const DEFAULT_ORIGENS = [
@@ -525,19 +527,20 @@ function NovoNegocioFormContent({
                 {/* Marcador */}
                 <div className="space-y-2">
                   <Label>Marcador</Label>
-                  <Select value={marcadorId || 'nenhum'} onValueChange={(v) => setMarcadorId(v === 'nenhum' ? '' : v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar marcador" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="nenhum">Nenhum</SelectItem>
-                      {(marcadores ?? []).map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Era o único campo deste formulário sem busca: Cliente, Fabricante,
+                      Obra e Responsável já têm. Com a lista de marcadores passando de
+                      uma dezena, rolar até achar custa mais que digitar duas letras. */}
+                  <SearchableSelect
+                    options={[
+                      { value: 'nenhum', label: 'Nenhum' },
+                      ...(marcadores ?? []).map((m) => ({ value: m.id, label: m.nome })),
+                    ]}
+                    value={marcadorId || 'nenhum'}
+                    onValueChange={(v) => setMarcadorId(v === 'nenhum' ? '' : v)}
+                    placeholder="Selecionar marcador"
+                    searchPlaceholder="Buscar marcador..."
+                    emptyMessage="Nenhum marcador encontrado."
+                  />
                 </div>
 
                 {/* Obra */}
@@ -774,19 +777,25 @@ function NovoNegocioFormContent({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2 p-4 border rounded-xl bg-muted/10">
                         <Label className="text-sm font-semibold">Valor de Negociação</Label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">R$</span>
-                          <Input
-                            type="number"
-                            className="h-10 pl-9 text-base font-bold"
-                            value={valorManual ?? ''}
-                            onChange={(e) => {
-                              setValorManual(parseFloat(e.target.value) || 0);
-                              setIsManualMode(true);
-                            }}
-                            placeholder="0,00"
-                          />
-                        </div>
+                        {/* CampoMoeda no lugar do <input type="number"> antigo. Dois defeitos
+                            morreram aqui de uma vez:
+                            1. o campo era do padrão dos EUA e a leitura usava parseFloat —
+                               parseFloat("99.888,47") devolve 99.888, MIL VEZES MENOS, sem
+                               erro nenhum. Foi o que gravou 106.387.320,00 no lugar de
+                               106.387,32 em produção;
+                            2. em type="number" a roda do mouse altera o valor sozinha quando
+                               o cursor está por cima do campo — a pessoa rola a página para
+                               ver o resto do formulário e o valor muda sem ela ver.
+                            O CampoMoeda entrega número puro no onChange, então nada de
+                            parseFloat volta aqui. */}
+                        <CampoMoeda
+                          className="h-10 text-base font-bold"
+                          value={valorManual}
+                          onChange={(v) => {
+                            setValorManual(v);
+                            setIsManualMode(true);
+                          }}
+                        />
                         <p className="text-[10px] text-muted-foreground">Defina o valor manualmente caso não queira listar itens individuais.</p>
                       </div>
 
@@ -868,13 +877,37 @@ function NovoNegocioFormContent({
                               </Select>
                             </TableCell>
                             <TableCell>
-                              <Input className="h-8 text-xs" type="number" min="0" step="1" value={item.quantidade} onChange={e => updateItem(item.id, 'quantidade', parseFloat(e.target.value) || 0)} />
+                              {/* Quantidade NÃO é dinheiro, então continua campo numérico do
+                                  navegador. Só o step mudou: a coluna do banco é
+                                  numeric(10,3) e as unidades incluem metro quadrado e
+                                  quilograma, mas o step="1" antigo dava a entender que
+                                  quantidade quebrada não podia. O onWheel que tira o foco
+                                  existe porque em type="number" a roda do mouse altera o
+                                  valor sozinha — aqui não dá para trocar por texto, então a
+                                  defesa é soltar o campo antes de a roda mexer nele. */}
+                              <Input
+                                className="h-8 text-xs"
+                                type="number"
+                                min="0"
+                                step="0.001"
+                                value={item.quantidade}
+                                onWheel={(e) => e.currentTarget.blur()}
+                                onChange={e => updateItem(item.id, 'quantidade', parseFloat(e.target.value) || 0)}
+                              />
                             </TableCell>
                             <TableCell>
-                              <Input className="h-8 text-xs" type="number" min="0" step="0.01" value={item.preco_unitario} onChange={e => updateItem(item.id, 'preco_unitario', parseFloat(e.target.value) || 0)} />
+                              {/* Sem "R$" porque a coluna já se chama "Preço Unit." e o espaço
+                                  é curto. Erro aqui é pior que no valor total: preço unitário
+                                  errado é multiplicado pela quantidade. */}
+                              <CampoMoeda
+                                comPrefixo={false}
+                                className="h-8 text-xs"
+                                value={item.preco_unitario}
+                                onChange={(v) => updateItem(item.id, 'preco_unitario', v ?? 0)}
+                              />
                             </TableCell>
                             <TableCell className="text-right font-medium text-sm">
-                              {(item.quantidade * item.preco_unitario).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              {formatarMoedaBRL(item.quantidade * item.preco_unitario)}
                             </TableCell>
                             <TableCell>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeItem(item.id)}>
@@ -888,17 +921,20 @@ function NovoNegocioFormContent({
                     <div className="flex justify-between items-center px-4 py-3 bg-muted/30 border-t border-border">
                       <div className="flex-1 max-w-[200px] space-y-1">
                         <Label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Valor de Negociação</Label>
+                        {/* A <div relative> de fora fica: é ela que ancora o botão
+                            "Automático" por cima do campo. O CampoMoeda traz a sua própria
+                            caixa e o seu próprio "R$" — aninhar as duas não quebra nada.
+                            O valor passa cru (pode ser null): converter null para 0 aqui
+                            faria o campo se reescrever com "0" no instante em que a pessoa
+                            apagasse o conteúdo, o que parece defeito. */}
                         <div className="relative">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">R$</span>
-                          <Input
-                            type="number"
-                            className={cn("h-9 pl-8 text-sm font-bold transition-all", isManualMode ? "border-primary ring-1 ring-primary bg-background" : "bg-muted/30 border-transparent")}
-                            value={isManualMode ? (valorManual ?? 0) : valorTotalItens}
-                            onChange={(e) => {
-                              setValorManual(parseFloat(e.target.value) || 0);
+                          <CampoMoeda
+                            className={cn("h-9 text-sm font-bold transition-all", isManualMode ? "border-primary ring-1 ring-primary bg-background" : "bg-muted/30 border-transparent")}
+                            value={isManualMode ? valorManual : valorTotalItens}
+                            onChange={(v) => {
+                              setValorManual(v);
                               setIsManualMode(true);
                             }}
-                            placeholder="0,00"
                           />
                           {isManualMode && (
                             <Button
@@ -918,7 +954,7 @@ function NovoNegocioFormContent({
                       <div className="text-right">
                         <p className="text-xs text-muted-foreground">{isManualMode ? 'Valor Manual' : 'Total dos Itens'}</p>
                         <p className="text-lg font-bold text-foreground">
-                          {valorFinal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {formatarMoedaBRL(valorFinal)}
                         </p>
                       </div>
                     </div>
@@ -1051,6 +1087,11 @@ function NovoNegocioFormContent({
   );
 }
 
+// Quantas sugestões do catálogo cabem na listinha sem virar rolagem infinita.
+// O corte já existia; o que faltava era AVISAR que ele existe — sem aviso, quem
+// digita um termo genérico acha que a fábrica só tem 10 produtos.
+const MAX_SUGESTOES_CATALOGO = 10;
+
 // Autocomplete component for item description
 function ItemDescricaoField({
   value,
@@ -1065,12 +1106,20 @@ function ItemDescricaoField({
 }) {
   const [open, setOpen] = useState(false);
 
-  const filtered = useMemo(() => {
-    if (!value.trim()) return tabelaPrecos.slice(0, 10);
+  // A tela do Catálogo promete busca por referência, mas aqui só a descrição era
+  // procurada. Quem sabe o código do produto de cabeça não achava nada e acabava
+  // digitando o item na mão — perdendo o preço que veio da tabela da fábrica.
+  const encontrados = useMemo(() => {
+    const termo = value.trim().toLowerCase();
+    if (!termo) return tabelaPrecos;
     return tabelaPrecos.filter(tp =>
-      tp.descricao_material.toLowerCase().includes(value.toLowerCase())
-    ).slice(0, 10);
+      (tp.descricao_material ?? '').toLowerCase().includes(termo) ||
+      (tp.referencia ?? '').toLowerCase().includes(termo)
+    );
   }, [value, tabelaPrecos]);
+
+  const filtered = encontrados.slice(0, MAX_SUGESTOES_CATALOGO);
+  const ocultos = encontrados.length - filtered.length;
 
   return (
     <div className="relative">
@@ -1100,7 +1149,7 @@ function ItemDescricaoField({
                       <p>{tp.descricao_material}</p>
                       <p className="text-[10px] text-muted-foreground">
                         {tp.referencia && `Ref: ${tp.referencia} · `}
-                        {tp.preco_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        {formatarMoedaBRL(tp.preco_unitario)}
                         {tp.unidade && ` / ${tp.unidade}`}
                         {tp.estoque_disponivel !== undefined && ` · Estoque: ${tp.estoque_disponivel}`}
                       </p>
@@ -1110,6 +1159,11 @@ function ItemDescricaoField({
               </CommandGroup>
             </CommandList>
           </Command>
+          {ocultos > 0 && (
+            <p className="border-t px-2 py-1.5 text-[10px] text-muted-foreground">
+              Mais {ocultos} {ocultos === 1 ? 'item encontrado' : 'itens encontrados'} — escreva mais da descrição ou a referência.
+            </p>
+          )}
         </div>
       )}
     </div>
