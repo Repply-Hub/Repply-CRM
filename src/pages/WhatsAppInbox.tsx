@@ -505,8 +505,8 @@ function ParticipanteAvatar({
 }
 
 // Avatar principal da conversa na sidebar: foto/iniciais do contato, ou a foto/ícone
-// do grupo quando for uma conversa em grupo. `size="lg"` é usado na lista espaçosa
-// de "Meus chats" (mais espaço disponível que a sidebar estreita).
+// do grupo quando for uma conversa em grupo. `size="lg"` é usado na visão "Lista"
+// (mais espaço disponível que a sidebar estreita).
 function ConversaAvatar({
   conv,
   size = "sm",
@@ -762,8 +762,17 @@ function ConversaGroupHeader({
   );
 }
 
-// Aba "Meus chats": lista espaçosa (sem o painel de mensagens ao lado) só com
-// as conversas atribuídas ao usuário logado.
+// Visão "Lista" (é este o rótulo na tela, e o ícone é uma lista): as MESMAS
+// conversas da visão normal, em formato espaçoso e sem o painel de mensagens
+// ao lado.
+//
+// ⚠️ O nome interno mente e já causou confusão. Ele diz "Meus chats", mas esta
+// visão NÃO filtra por responsável: recebe `conversasFiltradas` — exatamente a
+// mesma lista da outra visão — e usa `currentUserId` só para contar não lidas.
+// Quem filtra por responsável é o agrupamento da barra lateral
+// ("Meus chats" / "Não atribuídos" / "Outros atendentes"), que é outra coisa.
+// Renomear `MeusChatsList` e o estado "meus-chats" para algo como "lista" está
+// pendente; até lá, leia o nome como decoração.
 function MeusChatsList({
   conversas,
   apelidoPorInstanciaId,
@@ -5601,6 +5610,8 @@ export default function WhatsAppInbox() {
             setAbaInbox("conversas");
           }}
           onVoltarNormal={() => setAbaInbox("conversas")}
+          busca={busca}
+          setBusca={setBusca}
           filtroStatus={filtroStatus}
           setFiltroStatus={setFiltroStatus}
           countAbertas={countAbertas}
