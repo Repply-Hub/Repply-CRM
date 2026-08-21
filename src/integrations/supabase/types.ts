@@ -4008,6 +4008,7 @@ export type Database = {
       delete_current_user: { Args: never; Returns: undefined }
       delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
       empresa_plano_ativo: { Args: never; Returns: boolean }
+      empresa_tem_secao: { Args: { p_secao: string }; Returns: boolean }
       get_my_empresa_id: { Args: never; Returns: string }
       get_my_usuario_id: { Args: never; Returns: string }
       get_my_vendedor_id: { Args: never; Returns: string }
@@ -4022,6 +4023,13 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_gestor: { Args: never; Returns: boolean }
       is_member_of_grupo: { Args: { _grupo_id: string }; Returns: boolean }
+      minhas_secoes: {
+        Args: never
+        Returns: {
+          habilitada: boolean
+          secao: string
+        }[]
+      }
       montar_permissoes_preset_padrao: {
         Args: { p_preset_key: string }
         Returns: Json
