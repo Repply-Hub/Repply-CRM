@@ -3,7 +3,7 @@
 O que está quebrado, mal resolvido ou pendente neste sistema, com **o custo real** e **a
 ordem de conserto**. Escrito para que ninguém precise redescobrir cada item.
 
-Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 30
+Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 31
 acrescentados em 21/08/2026.
 
 > **Este documento não é lista de desejos.** Cada item aqui já tem consequência medida ou
@@ -1104,7 +1104,83 @@ ninguém — mas obriga a redigitar.
 
 ---
 
+## 31. A lista de exceções da seleção em massa viaja na URL, e trava em ~800
+
+**Gravidade: média. Não apaga dado errado — trava a operação e não explica por quê.**
+
+No modo "todos os filtrados", desmarcar itens acumula ids em `excludedIds`, e a exclusão
+manda a lista inteira dentro do endereço da consulta:
+
+```ts
+// src/hooks/use-pedidos.ts:654
+if (excludeIds && excludeIds.length > 0) query = query.not('id', 'in', `(${excludeIds.join(',')})`);
+```
+
+É o **mesmo problema do item 28** (a busca de negócio filtrando por lista de ids), com os
+mesmos números medidos nesta base: ~37 bytes por id, o servidor recusa por volta de 29 KB.
+
+| exceções | endereço |
+|---|---|
+| 500 | ~18 KB |
+| **800** | **~29 KB — limite conhecido** |
+| 1.000 | ~36 KB |
+
+Com a opção "Exibir 100" da paginação, **8 cliques em "Apenas esta página" bastam** para
+chegar lá. Com busca ativa é antes, porque o mesmo endereço carrega também os ids de
+cliente, fabricante e obra que casam com o termo (`use-pedidos.ts:668`).
+
+**O que acontece:** a consulta falha na primeira iteração, cai no `catch` e mostra um
+`toast.error` genérico (`Negocios.tsx:1204-1206`). **Não apaga nada** — a direção é segura.
+Mas o usuário fica sem saída e sem explicação, e nada na tela avisa que a lista de exceções
+tem tamanho.
+
+**Conserto:** o mesmo do item 28 — uma RPC `SECURITY DEFINER` que receba o filtro e as
+exceções no corpo da requisição e resolva dentro do banco, sem trafegar id nenhum.
+**As três migram juntas** (esta, o item 28 e `resolveSearchMatches`), porque é o mesmo
+padrão herdado. Enquanto isso não acontece, um paliativo honesto seria travar o acúmulo de
+exceções num teto e dizer isso na tela.
+
+**Não confundir com o defeito irmão, que JÁ foi corrigido:** as exceções ficarem órfãs
+quando o filtro muda (o botão prometia "Excluir 1.574" e o banco apagava 1.584). Esse foi
+resolvido em 21/08/2026 — ver Resolvidos.
+
+---
+
 ## Resolvidos
+
+### 21/08/2026 — seleção em massa na lista de Negócios
+
+> ✅ **Commitado e no ar.**
+
+**Desmarcar todos desmarcava só a página.** Com os 11.906 negócios selecionados pelo atalho
+"Todos", a caixa do cabeçalho acrescentava a página atual às exceções em vez de limpar a
+seleção. Com 10 por página, "desmarcar todos" eram **1.191 cliques**. E não existia nenhum
+botão de limpar seleção na tela — a de Clientes já tinha desde sempre.
+
+A caixa ficou **simétrica**: marcar já perguntava "apenas esta página ou todos os N?", e
+desmarcar passou a fazer a mesma pergunta, num diálogo espelhado. A pergunta só aparece
+quando decide algo — sem seleção fora da página atual, ela desmarca direto.
+
+A decisão saiu da tela (2.700 linhas) e virou `src/lib/selecao-em-massa.ts`, com sete
+resultados possíveis e 11 testes.
+
+**O botão prometia menos do que o banco apagava.** Encontrado pela contraprova, e anterior a
+esta leva: o contador subtrai TODAS as exceções (`totalCount - excludedIds.size`), mas o
+servidor só desconta as que caem dentro do filtro vigente — e as exceções nunca eram limpas
+ao trocar o filtro. Repro medido: "Todos (11.909)" → desmarcar a página 1 → filtrar por
+Deca Metais → botão "Excluir 1.574", banco apaga **1.584**. A divergência era sempre para
+MAIS, nunca para menos. Numa variante, o contador chegava a zero e a barra de ações sumia
+com as linhas ainda marcadas na tela.
+
+Corrigido guardando junto da seleção a **assinatura do filtro em que ela nasceu**: trocou o
+filtro, a seleção é limpa com aviso na tela. Resolve de brinde a seleção que sobrevivia na
+sessão do navegador e reaparecia ao voltar pelo menu com os filtros zerados.
+
+**A caixa decidia com o total ainda em zero.** A lista e a contagem são consultas separadas;
+na primeira pintura as linhas já apareciam com `totalCount = 0`, e clicar ali limpava a
+seleção inteira sem perguntar. A regra passou a esperar o total chegar.
+
+Ficou pendente o teto de ~800 exceções no endereço da consulta (item 31).
 
 ### 21/08/2026 — calendário e data escolhida
 

@@ -60,6 +60,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { acaoDaCaixaDoCabecalho } from '@/lib/selecao-em-massa';
 import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
 import { filenameFromUrl } from '@/lib/download-file';
 import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
@@ -594,6 +595,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // um único item (numa página que não carrega os N ids filtrados no cliente) derrubava o modo
   // "todos" inteiro e caía pra seleção da página atual, mostrando "excluir 9" em vez de "excluir 99".
   const [excludedIds, setExcludedIds] = useState<Set<string>>(() => readIdsSessionStorage('negocios_excluded_ids'));
+  // Em QUAL filtro a seleção "todos os filtrados" nasceu. Sem isto, o número do
+  // botão e o que o servidor apaga divergiam: o botão subtrai TODAS as exceções
+  // (`totalCount - excludedIds.size`), mas o servidor só desconta as que caem
+  // dentro do filtro vigente. Medido: com 10 exceções criadas sem filtro e depois
+  // um filtro de fabricante, o botão prometia "Excluir 1.574" e o banco apagava
+  // 1.584 — sempre para MAIS, nunca para menos.
+  const [filtroDaSelecao, setFiltroDaSelecao] = useState<string | null>(
+    () => sessionStorage.getItem('negocios_selecao_filtro'),
+  );
 
   useEffect(() => {
     if (selected.size > 0) sessionStorage.setItem('negocios_selected', JSON.stringify(Array.from(selected)));
@@ -607,8 +617,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     if (deleteAllFilteredMode) sessionStorage.setItem('negocios_delete_all_filtered', '1');
     else sessionStorage.removeItem('negocios_delete_all_filtered');
   }, [deleteAllFilteredMode]);
+  useEffect(() => {
+    if (filtroDaSelecao) sessionStorage.setItem('negocios_selecao_filtro', filtroDaSelecao);
+    else sessionStorage.removeItem('negocios_selecao_filtro');
+  }, [filtroDaSelecao]);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
+  const [desmarcarDialogOpen, setDesmarcarDialogOpen] = useState(false);
   const bulkDeleteMutation = useBulkDeletePedidos();
   const isDeleting = bulkDeleteMutation.isPending;
 
@@ -706,6 +721,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     hideImportados: hideImportados || undefined,
     funilId,
   }), [selectedVendedores, selectedFabricantes, selectedMarcadores, dateFrom, dateTo, dateField, showOnlyAttention, deferredSearch, hideImportados, funilId]);
+
+  // Identidade do recorte atual. É o que a exclusão em massa manda ao servidor
+  // (`activeStages` + `pedidosFilters`), então é exatamente isto que precisa ter
+  // ficado igual para a seleção "todos os filtrados" continuar significando o que
+  // o usuário escolheu.
+  const assinaturaDoFiltro = useMemo(
+    () => JSON.stringify([empresaId ?? null, activeStages ?? null, pedidosFilters]),
+    [empresaId, activeStages, pedidosFilters],
+  );
 
   // Resolve o termo de busca (ids de cliente/fabricante/obra que casam) UMA VEZ aqui, e repassa
   // pronto pra cada KanbanColumn — sem isso, cada coluna do board refaria os mesmos 3 ILIKEs por
@@ -1039,6 +1063,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       ? currentPageIds.every(id => !excludedIds.has(id))
       : currentPageIds.every(id => selected.has(id))
   );
+  const selecionadosNaPagina = deleteAllFilteredMode
+    ? currentPageIds.filter(id => !excludedIds.has(id)).length
+    : currentPageIds.filter(id => selected.has(id)).length;
   const selectedCount = deleteAllFilteredMode ? Math.max(0, totalCount - excludedIds.size) : selected.size;
   const someSelected = selectedCount > 0;
 
@@ -1060,34 +1087,113 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     });
   };
 
+  /** Zera a seleção inteira e sai do modo "todos os filtrados". */
+  const limparSelecao = () => {
+    setSelected(new Set());
+    setExcludedIds(new Set());
+    setDeleteAllFilteredMode(false);
+    setFiltroDaSelecao(null);
+  };
+
+  // A seleção "todos os filtrados" é DEFINIDA pelo filtro: trocar o filtro faz o
+  // conjunto "todos" virar outro, que ninguém escolheu. Pior, as exceções criadas
+  // no filtro antigo continuavam sendo subtraídas do número exibido sem serem
+  // descontadas da exclusão — o botão prometia menos do que o banco apagava.
+  // Vale também ao ENTRAR na tela: a seleção sobrevive na sessão do navegador, e
+  // voltar pelo menu (que zera os filtros da URL) reencontrava "11.909 de 11.909
+  // selecionado(s)" sem o usuário ter pedido.
+  useEffect(() => {
+    if (!deleteAllFilteredMode) return;
+    if (filtroDaSelecao === assinaturaDoFiltro) return;
+    limparSelecao();
+    toast.info('A seleção foi limpa porque o filtro mudou.');
+  }, [assinaturaDoFiltro, deleteAllFilteredMode, filtroDaSelecao]);
+
+  // A decisão de SETE resultados vive em src/lib/selecao-em-massa.ts, travada por
+  // teste. Aqui ficou só o efeito de cada uma.
+  //
+  // A caixa é SIMÉTRICA: marcar já perguntava "apenas esta página ou todos os N?",
+  // e desmarcar passa a fazer a mesma pergunta. Antes, desmarcar acrescentava a
+  // página atual às exceções sem perguntar nada — com 10 por página e 11.906
+  // negócios, "desmarcar todos" eram 1.191 cliques, um por página.
   const toggleAll = () => {
+    const acao = acaoDaCaixaDoCabecalho({
+      modoTodosFiltrados: deleteAllFilteredMode,
+      paginaInteiraSelecionada: allPageSelected,
+      totalConhecido: pedidosStats !== undefined,
+      totalFiltrado: totalCount,
+      itensNaPagina: currentPageIds.length,
+      selecionadosNaPagina,
+      selecionadosNoTotal: selectedCount,
+    });
+
+    switch (acao) {
+      case 'nada':
+        return;
+
+      case 'limpar-tudo':
+        limparSelecao();
+        return;
+
+      case 'perguntar-desmarcar':
+        setDesmarcarDialogOpen(true);
+        return;
+
+      case 'reincluir-pagina':
+        // Segue em "todos os filtrados": só desfaz as exceções desta página, sem
+        // tocar nas que o usuário marcou em outras.
+        setExcludedIds(prev => {
+          const next = new Set(prev);
+          currentPageIds.forEach(id => next.delete(id));
+          return next;
+        });
+        return;
+
+      case 'desmarcar-pagina':
+        setSelected(prev => {
+          const next = new Set(prev);
+          currentPageIds.forEach(id => next.delete(id));
+          return next;
+        });
+        return;
+
+      case 'marcar-pagina':
+        setSelected(prev => {
+          const next = new Set(prev);
+          currentPageIds.forEach(id => next.add(id));
+          return next;
+        });
+        return;
+
+      case 'perguntar-marcar':
+        setSelectAllDialogOpen(true);
+        return;
+    }
+  };
+
+  /** Tira da seleção apenas as linhas visíveis, preservando as das outras páginas. */
+  const desmarcarPaginaSomente = () => {
     if (deleteAllFilteredMode) {
+      // Segue em "todos os filtrados": a página entra na lista de exceções, que é
+      // o que a exclusão em massa desconta no servidor.
       setExcludedIds(prev => {
         const next = new Set(prev);
-        if (allPageSelected) {
-          currentPageIds.forEach(id => next.add(id));
-        } else {
-          currentPageIds.forEach(id => next.delete(id));
-        }
+        currentPageIds.forEach(id => next.add(id));
         return next;
       });
-      return;
-    }
-    if (allPageSelected) {
+    } else {
       setSelected(prev => {
         const next = new Set(prev);
         currentPageIds.forEach(id => next.delete(id));
         return next;
       });
-    } else if (totalCount > currentPageIds.length) {
-      setSelectAllDialogOpen(true);
-    } else {
-      setSelected(prev => {
-        const next = new Set(prev);
-        currentPageIds.forEach(id => next.add(id));
-        return next;
-      });
     }
+    setDesmarcarDialogOpen(false);
+  };
+
+  const limparSelecaoPeloDialogo = () => {
+    limparSelecao();
+    setDesmarcarDialogOpen(false);
   };
 
   const selectPageOnly = () => {
@@ -1108,6 +1214,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setSelected(new Set());
     setExcludedIds(new Set());
     setDeleteAllFilteredMode(true);
+    setFiltroDaSelecao(assinaturaDoFiltro);
     setSelectAllDialogOpen(false);
   };
 
@@ -2053,10 +2160,21 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <div className="min-w-0 flex-1 flex flex-col min-h-0">
               <div className="mb-4 shrink-0">
                 {someSelected && (
-                  <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
-                    <Trash2 className="h-4 w-4" />
-                    Excluir {selectedCount}
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
+                      <Trash2 className="h-4 w-4" />
+                      Excluir {selectedCount}
+                    </Button>
+                    {/* Sem este botão, a única saída era a caixa do cabeçalho — e ela
+                        trabalha por página. Mesmo padrão da tela de Clientes
+                        (Clientes.tsx), para as duas listas se comportarem igual. */}
+                    <Button variant="ghost" size="sm" onClick={limparSelecao}>
+                      Limpar seleção
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      {selectedCount} de {totalCount} selecionado(s)
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -2214,6 +2332,25 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             >
               {isDeleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Removendo...</> : 'Excluir'}
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Espelho do diálogo de marcar, logo abaixo. As duas pontas fazem a mesma
+          pergunta de propósito: perguntar só ao marcar era o que fazia a caixa
+          parecer que desmarcava tudo quando desmarcava só a página. */}
+      <AlertDialog open={desmarcarDialogOpen} onOpenChange={setDesmarcarDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desmarcar negócios</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja desmarcar apenas os {selecionadosNaPagina} negócio(s) desta página ou limpar a seleção inteira, com {selectedCount} negócio(s)?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" onClick={desmarcarPaginaSomente}>Apenas esta página ({selecionadosNaPagina})</Button>
+            <Button variant="default" onClick={limparSelecaoPeloDialogo}>Limpar tudo ({selectedCount})</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
