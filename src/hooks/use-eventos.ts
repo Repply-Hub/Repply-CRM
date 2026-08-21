@@ -268,6 +268,12 @@ export function useBulkCreateEventos() {
     mutationFn: async (forms: EventoForm[]) => {
       const rows = forms.map((form) => ({
         user_id: user!.id,
+        // `eventos.criado_por` é NOT NULL sem valor padrão, e nada no banco o
+        // preenche sozinho. Sem esta linha o banco recusava o lote inteiro com
+        // 23502 (not-null violation) e a importação de calendário NUNCA gravou
+        // um evento sequer. O cadastro avulso (useCreateEvento) já fazia certo;
+        // este caminho ficou para trás quando a coluna foi criada.
+        criado_por: user!.id,
         titulo: form.titulo,
         descricao: form.descricao || null,
         inicio: form.diaInteiro
