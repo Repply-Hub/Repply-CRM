@@ -1,5 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidarPaineisDeNegocios } from './use-pedidos';
+
+// Etapas em que o negócio já está encerrado (ganho ou perdido) e `prazo_resposta` deixa de
+// ser "prazo" para virar a DATA DE FECHAMENTO — o dado que sustenta o Faturamento, o Plano
+// de Vendas e as roscas do Dashboard.
+const ETAPAS_FINAIS = ['fechamento', 'perdido'];
 
 export function usePedidoCompleto(pedidoId: string | null) {
   return useQuery({
@@ -60,6 +66,22 @@ export function useUpdatePedidoCompleto() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: UpdatePedidoPayload) => {
+      // A data de fechamento em branco NÃO vira `null` quando o negócio está numa etapa
+      // final. Escrever `null` ali apagava a data de uma venda já registrada — e, depois da
+      // migration 20260821120000, negócio ganho sem data some do Faturamento Total, do
+      // Plano de Vendas e do Faturamento Mensal em silêncio. A rede de segurança do gatilho
+      // (migration 20260821120100) impede o buraco, mas repõe a data de HOJE: uma venda de
+      // junho trocaria de mês só por alguém ter salvado a ficha. Omitir o campo mantém o que
+      // já está gravado, que é a única resposta certa.
+      // Etapa aberta continua podendo limpar o campo — lá ele é prazo, não fechamento.
+      // Sem `status` no payload não dá para saber em que etapa o negócio está; nesse caso o
+      // campo também é omitido, porque apagar dado por engano não tem volta e deixar de
+      // apagar tem.
+      const emEtapaFinal = payload.status ? ETAPAS_FINAIS.includes(payload.status) : true;
+      const prazoRespostaPatch = payload.prazo_resposta
+        ? { prazo_resposta: payload.prazo_resposta }
+        : (emEtapaFinal ? {} : { prazo_resposta: null });
+
       // 1. Update pedido metadata
       const { error: pedidoErr } = await supabase
         .from('pedidos')
@@ -72,7 +94,7 @@ export function useUpdatePedidoCompleto() {
           ...(payload.status ? { status: payload.status } : {}),
           marcador_id: payload.marcador_id || null,
           data_pedido: payload.data_pedido,
-          prazo_resposta: payload.prazo_resposta || null,
+          ...prazoRespostaPatch,
           origem_lead: payload.origem_lead || null,
           endereco_entrega: payload.endereco_entrega || null,
           observacoes: payload.observacoes || null,
@@ -152,14 +174,11 @@ export function useUpdatePedidoCompleto() {
       return { id: payload.pedido_id };
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pedidos'] });
-      qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
       qc.invalidateQueries({ queryKey: ['pedido_completo'] });
-      // O valor entra nos totais do funil e nos painéis; sem estas três, o número novo
-      // só aparecia lá depois de recarregar a página.
-      qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
-      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
+      // O valor e a etapa entram nos totais do funil e em todos os painéis; sem isso, o
+      // número novo só aparecia lá depois de recarregar a página. A lista mora em
+      // use-pedidos.ts para não existirem duas versões dela.
+      invalidarPaineisDeNegocios(qc);
     },
   });
 }

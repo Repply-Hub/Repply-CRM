@@ -39,6 +39,7 @@ repositório**, não aqui:
 | Documento | O que contém |
 |---|---|
 | [`modulos/negocios.md`](modulos/negocios.md) | O pipeline: filtros, estado compartilhado entre quadro e lista, desempenho |
+| [`modulos/dashboard.md`](modulos/dashboard.md) | Cada métrica do Dashboard e do Plano de Vendas, **de qual coluna de data ela sai e por quê**. A conversão de safra, os dois contadores de "fechados", e a armadilha de desempenho que proíbe o `p_date_field` |
 | [`modulos/importacao.md`](modulos/importacao.md) | O assistente de importação ponta a ponta. Conversão de data corrigida em `446779ff` |
 | [`modulos/whatsapp.md`](modulos/whatsapp.md) | Integração uazapi: banco, funções, provisionamento de instância, bugs |
 | [`modulos/email.md`](modulos/email.md) | Integração Nylas: conexão, sincronização, quem enxerga a caixa |
@@ -60,7 +61,7 @@ repositório**, não aqui:
 
 | Documento | O que contém |
 |---|---|
-| [`divida-tecnica.md`](divida-tecnica.md) | **21 itens** com gravidade, custo real e ordem de conserto. Mais o que já foi resolvido |
+| [`divida-tecnica.md`](divida-tecnica.md) | **27 itens** com gravidade, custo real e ordem de conserto. Mais o que já foi resolvido |
 
 ---
 

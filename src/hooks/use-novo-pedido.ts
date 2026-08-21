@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidarPaineisDeNegocios } from './use-pedidos';
 
 export function useObrasByCliente(clienteId: string | null) {
   return useQuery({
@@ -103,6 +104,11 @@ export function useCreatePedidoCompleto() {
           marcador_id: payload.marcador_id || null,
           observacoes: payload.observacoes || null,
           pdf_url: payload.pdf_url || null,
+          // Aqui o `null` é seguro (diferente do formulário de edição): o campo "Data de
+          // Fechamento" é opcional e o negócio pode nascer já em Fechamento/Perdido. Se
+          // vier vazio nessa situação, o gatilho `fn_set_pedido_fechado_em` (migration
+          // 20260821120100) carimba a data de hoje no INSERT — sem isso o negócio nasceria
+          // ganho e sem data, invisível em qualquer relatório por fechamento.
           prazo_resposta: payload.prazo_resposta || null,
           origem_lead: payload.origem_lead || null,
           endereco_entrega: payload.endereco_entrega || null,
@@ -139,10 +145,11 @@ export function useCreatePedidoCompleto() {
       return pedido;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pedidos'] });
-      qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
-      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
+      // Um negócio novo pode nascer já em Fechamento (venda registrada depois do fato), então
+      // mexe em tudo — inclusive nos painéis que esta lista não invalidava (o total do
+      // cabeçalho de Negócios, os cartões do Dashboard e o Plano de Vendas). A lista mora em
+      // use-pedidos.ts para não existirem duas versões dela.
+      invalidarPaineisDeNegocios(qc);
     },
   });
 }

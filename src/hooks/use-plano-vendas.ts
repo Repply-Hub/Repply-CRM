@@ -19,9 +19,19 @@ export interface PlanoVendasProgresso {
 // (nenhum item selecionado no filtro) viram `null` antes de mandar pro
 // servidor: `= ANY('{}')` não bate com nada, então um array vazio filtraria
 // tudo fora — `null` é quem significa "sem filtro" na RPC.
+//
+// Recebe o INTERVALO (dateFrom/dateTo em 'yyyy-MM-dd'), não mais ano/mês. Antes
+// só o mês da data inicial chegava aqui, então um filtro de "01/jan a 31/dez"
+// devolvia janeiro e nada mais — sem nenhum sinal na tela de que o resto do
+// período tinha sido descartado. A RPC (migration 20260821120000) soma as metas
+// de todos os meses que o intervalo toca e o vendido do intervalo inteiro.
+//
+// `as never` nos dois argumentos: src/integrations/supabase/types.ts é gerado a
+// partir do banco e ainda descreve a assinatura antiga (p_ano/p_mes). Enquanto
+// ele não for regerado, é o mesmo escape já usado em use-admin-cs.ts.
 export function usePlanoVendasProgresso(
-  ano: number,
-  mes: number,
+  dateFrom: string,
+  dateTo: string,
   usuarioIds?: string[],
   fabricanteIds?: string[],
   // true só na visão de 1 vendedor específico: fábrica sem meta INDIVIDUAL (só de
@@ -31,15 +41,15 @@ export function usePlanoVendasProgresso(
   somenteComMeta?: boolean,
 ) {
   return useQuery({
-    queryKey: ['plano_vendas_progresso', ano, mes, usuarioIds, fabricanteIds, somenteComMeta],
+    queryKey: ['plano_vendas_progresso', dateFrom, dateTo, usuarioIds, fabricanteIds, somenteComMeta],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('plano_vendas_progresso', {
-        p_ano: ano,
-        p_mes: mes,
+      const { data, error } = await supabase.rpc('plano_vendas_progresso' as never, {
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
         p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
         p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
         p_somente_com_meta: !!somenteComMeta,
-      });
+      } as never);
       if (error) throw error;
       return (data ?? []) as PlanoVendasProgresso[];
     },
@@ -69,22 +79,27 @@ export interface PlanoVendasProgressoVendedor {
 // Só traz (vendedor, fabricante) onde existe meta INDIVIDUAL > 0 — venda numa
 // fábrica sem meta individual (só de equipe, ou nenhuma) não entra aqui nem no
 // total do vendedor, mesmo que a empresa tenha meta de equipe pra essa fábrica.
+//
+// Mesmo intervalo (dateFrom/dateTo) da função agregada acima, e pelo mesmo
+// motivo: se só uma das duas somasse o período inteiro, o total da seção e a
+// quebra "Por vendedor" passariam a discordar na tela e ninguém saberia qual
+// das duas está certa.
 export function usePlanoVendasProgressoPorVendedor(
-  ano: number,
-  mes: number,
+  dateFrom: string,
+  dateTo: string,
   enabled: boolean,
   usuarioIds?: string[],
   fabricanteIds?: string[],
 ) {
   return useQuery({
-    queryKey: ['plano_vendas_progresso_por_vendedor', ano, mes, usuarioIds, fabricanteIds],
+    queryKey: ['plano_vendas_progresso_por_vendedor', dateFrom, dateTo, usuarioIds, fabricanteIds],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('plano_vendas_progresso_por_vendedor', {
-        p_ano: ano,
-        p_mes: mes,
+      const { data, error } = await supabase.rpc('plano_vendas_progresso_por_vendedor' as never, {
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
         p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
         p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
-      });
+      } as never);
       if (error) throw error;
       return (data ?? []) as PlanoVendasProgressoVendedor[];
     },

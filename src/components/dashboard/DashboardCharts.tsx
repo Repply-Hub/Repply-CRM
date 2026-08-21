@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -8,8 +8,8 @@ import type { TooltipProps } from 'recharts';
 import { TrendingUp, Factory, MessageCircle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/DashboardChartTooltip';
+import { formatarMoedaBRL } from '@/lib/moeda';
 
 // Componente carregado via React.lazy a partir de Dashboard.tsx — o recharts (e os
 // módulos d3-* que ele traz junto) é de longe o maior pedaço de código dessa
@@ -17,8 +17,9 @@ import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/c
 // KPI (que não usam gráfico nenhum) fiquem esperando esse bundle inteiro baixar e
 // ser interpretado antes de aparecer na tela.
 
-const formatCurrency = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+// Uma cópia a menos das 26 espalhadas pelo sistema — mesmo resultado, agora
+// vindo de src/lib/moeda.ts.
+const formatCurrency = formatarMoedaBRL;
 
 // Eixo mostra só o tick redondo que o recharts já calcula (0/25/50/75/100) —
 // sem casas decimais, pra não competir por espaço com os outros ticks. O
@@ -140,12 +141,6 @@ export function DashboardCharts({
   whatsappTempoResposta,
   whatsappError,
 }: DashboardChartsProps) {
-  const [fabricaSort, setFabricaSort] = useState<'maior' | 'menor'>('maior');
-
-  const rendimentoFabricaSorted = useMemo(() => {
-    return [...rendimentoFabrica].sort((a, b) => fabricaSort === 'maior' ? b.valor - a.valor : a.valor - b.valor);
-  }, [rendimentoFabrica, fabricaSort]);
-
   // Largura do eixo calculada a partir do nome mais longo, para o YAxis
   // sempre reservar espaço suficiente e o nome do vendedor nunca quebrar linha.
   const vendedorAxisWidth = useMemo(() => {
@@ -314,52 +309,13 @@ export function DashboardCharts({
           </CardContent>
         </Card>
 
-        {/* Rendimento por Fábrica - Bar Chart */}
-        <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
-          <CardHeader className="pb-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <Factory className="h-4 w-4 text-primary" /> Rendimento por Fábrica
-                </CardTitle>
-                <CardDescription className="text-xs">Faturamento fechado por fabricante</CardDescription>
-              </div>
-              <Select value={fabricaSort} onValueChange={(v) => setFabricaSort(v as 'maior' | 'menor')}>
-                <SelectTrigger className="h-8 w-fit max-w-full shrink-0 whitespace-nowrap text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="maior">Maior</SelectItem>
-                  <SelectItem value="menor">Menor</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={rendimentoFabricaSorted} layout="vertical" barCategoryGap="20%">
-                <defs>
-                  <linearGradient id="gradientRendimento" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor={chartColors.primary} stopOpacity={0.7} />
-                    <stop offset="100%" stopColor={chartColors.primary} stopOpacity={1} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid {...commonGridProps} vertical horizontal={false} />
-                <XAxis type="number" {...commonAxisProps} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
-                <YAxis dataKey="fabrica" type="category" {...commonAxisProps} width={100} />
-                <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
-                <Bar
-                  dataKey="valor"
-                  name="Rendimento"
-                  fill="url(#gradientRendimento)"
-                  radius={[0, 8, 8, 0]}
-                  animationDuration={1000}
-                  animationEasing="ease-out"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Havia aqui um segundo cartão, "Rendimento por Fábrica", em barras.
+            Ele mostrava EXATAMENTE o mesmo array da pizza acima (o
+            rendimento_fabricante de dashboard_stats), mudando só o desenho e
+            ganhando um seletor Maior/Menor. Dois cartões para o mesmo número
+            faziam a tela parecer maior do que a informação que ela tem. Ficou a
+            pizza, que já mostra as fábricas pequenas agrupadas em "Outros" com
+            o detalhe no hover. */}
 
         {/* Conversão por Vendedor */}
         <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
@@ -394,8 +350,11 @@ export function DashboardCharts({
           </CardContent>
         </Card>
 
-        {/* Rendimento por Responsável */}
-        <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+        {/* Rendimento por Responsável — ocupa a linha inteira porque sobraram
+            três cartões nesta grade de duas colunas; sem isso o último ficaria
+            com metade da linha vazia ao lado, o que na tela parece gráfico que
+            não carregou. */}
+        <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300 lg:col-span-2">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" /> Rendimento por Responsável

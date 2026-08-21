@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { invalidarPaineisDeNegocios } from './use-pedidos';
 
 export interface KanbanColuna {
   id: string;
@@ -145,6 +146,15 @@ export function useDeleteKanbanColuna() {
     mutationFn: async (input: { id: string; slug: string; targetSlug: string; funilId: string }) => {
       // Move pedidos da coluna excluída para a coluna alvo — escopado ao mesmo funil,
       // já que dois funis diferentes podem ter colunas com o mesmo slug.
+      //
+      // DATA DE FECHAMENTO: se a etapa de destino escolhida for Fechamento ou Perdido, este
+      // UPDATE marca dezenas ou centenas de negócios como fechados de uma vez. É o caminho
+      // de que ninguém lembra quando pensa em "fechar um negócio" — e por isso a regra da
+      // data não mora aqui: o gatilho `fn_set_pedido_fechado_em`
+      // (supabase/migrations/20260821120100_data_fechamento_em_todos_os_caminhos.sql) roda
+      // linha a linha também neste UPDATE em massa e carimba a data em cada um deles. Não
+      // acrescente carimbo de data aqui: duas donas para a mesma regra foi exatamente como
+      // o problema começou.
       const { error: pErr } = await supabase
         .from('pedidos')
         .update({ status: input.targetSlug })
@@ -156,7 +166,9 @@ export function useDeleteKanbanColuna() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kanban_colunas'] });
-      qc.invalidateQueries({ queryKey: ['pedidos'] });
+      // Remanejar negócios em massa pode passar dezenas deles para Fechamento ou Perdido —
+      // ou tirá-los de lá —, então mexe no faturamento e nas metas, não só no quadro.
+      invalidarPaineisDeNegocios(qc);
       toast.success('Coluna excluída e negócios remanejados');
     },
     onError: (err: any) => toast.error(err?.message || 'Erro ao excluir coluna'),

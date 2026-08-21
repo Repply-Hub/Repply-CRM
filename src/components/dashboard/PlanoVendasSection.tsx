@@ -8,14 +8,19 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+// Casca de modal com teto de altura e rolagem própria — sem ela este diálogo
+// fica mais alto que a janela (precisa de ~930px) e o botão "Salvar alterações"
+// some para fora da tela, sem barra de rolagem para alcançá-lo. Ver
+// src/components/shared/DialogoResponsivo.tsx.
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  ConteudoDialogo,
+  CabecalhoDialogo,
+  CorpoDialogo,
+  RodapeDialogo,
+} from '@/components/shared/DialogoResponsivo';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -29,6 +34,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { TOGGLE_LIST_CLASS, TOGGLE_ITEM_CLASS } from '@/lib/toggle-group-styles';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
+import { CampoMoeda } from '@/components/shared/CampoMoeda';
+import { formatarMoedaBRL } from '@/lib/moeda';
 import { Goal, Pencil, Plus, Trash2, Loader2, Copy, Users, User, GripVertical, Info, Search, Factory } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -50,69 +57,25 @@ const MESES = [
 const MOSTRAR_DETALHADO_KEY = 'md-plano-vendas-detalhado';
 const VISUALIZACAO_KEY = 'md-plano-vendas-visualizacao';
 
-const formatCurrency = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+// A máscara de dinheiro deste arquivo (formatMetaInputDisplay/parseMetaInputValue/
+// numberToMetaDisplay e o MetaValorInput) foi promovida a peça compartilhada em
+// src/lib/moeda.ts + src/components/shared/CampoMoeda.tsx, para o campo de meta e
+// o campo de valor do negócio serem literalmente o mesmo código. De brinde o
+// cursor parou de pular para o fim ao editar o meio de um número já digitado.
+const formatCurrency = formatarMoedaBRL;
 
-// Formata em tempo real como o usuário digita (separador de milhar pt-BR),
-// mantendo no máximo uma vírgula decimal. Não bloqueia digitação: cada
-// keystroke é uma reformatação síncrona e barata, sem debounce.
-function formatMetaInputDisplay(raw: string): string {
-  const cleaned = raw.replace(/[^\d,]/g, '');
-  const [intPart, ...decParts] = cleaned.split(',');
-  const intDigits = (intPart ?? '').replace(/^0+(?=\d)/, '');
-  const formattedInt = intDigits ? Number(intDigits).toLocaleString('pt-BR') : '';
-  if (decParts.length > 0) {
-    return `${formattedInt || '0'},${decParts.join('').slice(0, 2)}`;
-  }
-  return formattedInt;
-}
-
-// Extrai o número puro (sem máscara) do texto exibido, para persistir no banco.
-function parseMetaInputValue(raw: string): number {
-  const cleaned = raw.replace(/[^\d,]/g, '');
-  const [intPart, ...decParts] = cleaned.split(',');
-  const intDigits = (intPart ?? '').replace(/^0+(?=\d)/, '') || '0';
-  const decDigits = decParts.length > 0 ? decParts.join('').slice(0, 2) : '';
-  const value = Number(decDigits ? `${intDigits}.${decDigits}` : intDigits);
-  return Number.isNaN(value) ? 0 : value;
-}
-
-// Converte um número vindo do banco para o texto formatado do input.
-function numberToMetaDisplay(n: number): string {
-  if (!n) return '';
-  const [intPart, decPart] = n.toString().split('.');
-  const formattedInt = Number(intPart).toLocaleString('pt-BR');
-  return decPart ? `${formattedInt},${decPart.slice(0, 2)}` : formattedInt;
-}
-
-interface MetaValorInputProps {
-  value: string;
-  onChangeValue: (display: string) => void;
-  onBlur?: () => void;
-  placeholder?: string;
-  className?: string;
-}
-
-function MetaValorInput({ value, onChangeValue, onBlur, placeholder, className }: MetaValorInputProps) {
-  return (
-    <Input
-      type="text"
-      inputMode="decimal"
-      placeholder={placeholder}
-      className={className}
-      value={value}
-      onChange={e => onChangeValue(formatMetaInputDisplay(e.target.value))}
-      onBlur={onBlur}
-    />
-  );
-}
+// O rascunho da edição guarda NÚMERO puro (ou null quando o campo está vazio),
+// não mais o texto formatado. Vazio e zero passam a ser coisas distintas: zero é
+// uma meta que alguém escolheu, vazio é a ausência dela — e limpar um campo que
+// tinha meta salva agora significa remover a meta, como já era a intenção.
+type ValorMeta = number | null;
 
 // Cabeçalho de coluna com um "i" que explica o que ela significa em tooltip — as
 // colunas de meta geral/restante/individual não são autoexplicativas na primeira
 // olhada, diferente do resto da UI.
 function ColunaHeaderInfo({ label, info, className }: { label: string; info: string; className?: string }) {
   return (
-    <span className={`hidden sm:flex shrink-0 items-center justify-center gap-1 text-center ${className ?? ''}`}>
+    <span className={`flex shrink-0 items-center justify-center gap-1 text-center ${className ?? ''}`}>
       {label}
       <Tooltip>
         <TooltipTrigger asChild>
@@ -152,12 +115,12 @@ interface PlanoVendasSectionProps {
   fabricanteIds: string[];
   vendedores: Vendedor[];
   fabricantes: Fabricante[];
-  // Mês/ano derivados do filtro de Período do topo da página (dateRange.from) —
-  // antes esta seção tinha seletores de Mês/Ano próprios, soltos do resto dos
-  // cards, então dava pra mostrar aqui um mês bem diferente do que os outros
-  // cards estavam exibindo.
-  ano: number;
-  mes: number;
+  // O período INTEIRO do filtro do topo da página, em 'yyyy-MM-dd' — antes esta
+  // seção recebia só `ano` e `mes` da data INICIAL, então um filtro de "01/jan a
+  // 31/dez" fazia o Plano de Vendas mostrar janeiro e chamar aquilo de "total do
+  // período", sem nenhum aviso de que os outros onze meses tinham ficado de fora.
+  dateFrom: string;
+  dateTo: string;
 }
 
 function progressoCor(pct: number) {
@@ -166,7 +129,7 @@ function progressoCor(pct: number) {
   return 'text-muted-foreground';
 }
 
-export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vendedorIds, fabricanteIds, vendedores, fabricantes, ano, mes }: PlanoVendasSectionProps) {
+export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vendedorIds, fabricanteIds, vendedores, fabricantes, dateFrom, dateTo }: PlanoVendasSectionProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [mostrarDetalhado, setMostrarDetalhado] = useState(
     () => localStorage.getItem(MOSTRAR_DETALHADO_KEY) === '1',
@@ -193,9 +156,26 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
   // vira visão agregada/por vendedor (mostrarPorVendedor abaixo).
   const vendedorUnico = vendedorIds.length === 1 ? vendedorIds[0] : undefined;
 
+  // O diálogo "Editar metas" continua trabalhando MÊS a MÊS (meta é compromisso
+  // mensal e a tabela metas_vendas é por ano/mês), então ele abre no primeiro mês
+  // do período — mas navega livremente lá dentro.
+  const anoInicial = Number(dateFrom.slice(0, 4));
+  const mesInicial = Number(dateFrom.slice(5, 7));
+  const anoFinal = Number(dateTo.slice(0, 4));
+  const mesFinal = Number(dateTo.slice(5, 7));
+  // Rótulo do período: "Agosto de 2026" quando é um mês só, "Janeiro a Dezembro
+  // de 2026" dentro do mesmo ano, "Nov/2025 a Fev/2026" quando cruza o ano. O
+  // rótulo precisa dizer a verdade — era ele que sustentava a impressão de que o
+  // número embaixo se referia ao filtro escolhido.
+  const periodoLabel = useMemo(() => {
+    if (anoInicial === anoFinal && mesInicial === mesFinal) return `${MESES[mesInicial - 1]} de ${anoInicial}`;
+    if (anoInicial === anoFinal) return `${MESES[mesInicial - 1]} a ${MESES[mesFinal - 1]} de ${anoInicial}`;
+    return `${MESES[mesInicial - 1].slice(0, 3)}/${anoInicial} a ${MESES[mesFinal - 1].slice(0, 3)}/${anoFinal}`;
+  }, [anoInicial, mesInicial, anoFinal, mesFinal]);
+
   const { data: progresso, isLoading } = usePlanoVendasProgresso(
-    ano,
-    mes,
+    dateFrom,
+    dateTo,
     vendedorIds.length > 0 ? vendedorIds : undefined,
     fabricanteIds.length > 0 ? fabricanteIds : undefined,
     // Só na visão de 1 vendedor: fábrica sem meta individual some da lista/total
@@ -224,8 +204,8 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
   // um vendedor de cada vez pra inspecionar o plano de cada um.
   const mostrarPorVendedor = isGestor && vendedorIds.length !== 1;
   const { data: progressoPorVendedorRaw } = usePlanoVendasProgressoPorVendedor(
-    ano,
-    mes,
+    dateFrom,
+    dateTo,
     mostrarPorVendedor,
     vendedorIds.length > 0 ? vendedorIds : undefined,
     fabricanteIds.length > 0 ? fabricanteIds : undefined,
@@ -282,10 +262,10 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {/* Mês/ano seguem o filtro de Período do topo da página — ver
-                PlanoVendasSectionProps.ano/mes. */}
+            {/* O período segue o filtro do topo da página — ver
+                PlanoVendasSectionProps.dateFrom/dateTo. */}
             <span className="h-8 flex items-center px-2.5 rounded-md border border-border/60 bg-muted/40 text-xs font-medium text-muted-foreground">
-              {MESES[mes - 1]} de {ano}
+              {periodoLabel}
             </span>
             {isGestor && (
               <Button
@@ -485,8 +465,8 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
           empresaId={empresaId}
           vendedores={vendedores}
           initialUsuarioId={vendedorUnico ?? currentUsuarioId}
-          ano={ano}
-          mes={mes}
+          ano={anoInicial}
+          mes={mesInicial}
           fabricantes={fabricantes}
         />
       )}
@@ -619,14 +599,14 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     [fabricantesOrdenados],
   );
 
-  const [valores, setValores] = useState<Record<string, string>>({});
+  const [valores, setValores] = useState<Record<string, ValorMeta>>({});
   const [fabricantesCopiados, setFabricantesCopiados] = useState<Set<string>>(new Set());
   // Fábricas trazidas só como referência da meta de equipe (sem meta individual
   // ainda) que o usuário dispensou da lista sem preencher nada — não existe nada pra
   // apagar no banco, é só um "esconder" local (reaparece se reabrir o dialog).
   const [fabricantesEquipeOcultas, setFabricantesEquipeOcultas] = useState<Set<string>>(new Set());
   const [novoFabricanteId, setNovoFabricanteId] = useState<string>('');
-  const [novoValor, setNovoValor] = useState('');
+  const [novoValor, setNovoValor] = useState<ValorMeta>(null);
   const [buscaFabrica, setBuscaFabrica] = useState('');
   // Linhas existentes marcadas pra excluir na Lixeira: some da lista na hora
   // (não faz sentido continuar mostrando o que a pessoa acabou de mandar
@@ -664,9 +644,9 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     }
     setValores(prev => {
       const base = mudouContexto ? {} : prev;
-      const novo = { ...base };
+      const novo: Record<string, ValorMeta> = { ...base };
       metas.forEach(m => {
-        novo[m.fabricante_id] = numberToMetaDisplay(m.meta_valor);
+        novo[m.fabricante_id] = m.meta_valor;
       });
       return novo;
     });
@@ -713,8 +693,8 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   // é rascunho ainda não salvo, tanto pro botão "Salvar alterações" quanto
   // pro aviso ao tentar fechar o dialog.
   const valoresSalvos = useMemo(() => {
-    const mapa: Record<string, string> = {};
-    (metas ?? []).forEach(m => { mapa[m.fabricante_id] = numberToMetaDisplay(m.meta_valor); });
+    const mapa: Record<string, ValorMeta> = {};
+    (metas ?? []).forEach(m => { mapa[m.fabricante_id] = m.meta_valor; });
     return mapa;
   }, [metas]);
 
@@ -725,11 +705,11 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   // preenchida) e continua vazio.
   const isDirty = useMemo(() => {
     const camposAlterados = linhas.some(l => {
-      const atual = (valores[l.fabricanteId] ?? '').trim();
-      const salvo = valoresSalvos[l.fabricanteId] ?? '';
+      const atual = valores[l.fabricanteId] ?? null;
+      const salvo = valoresSalvos[l.fabricanteId] ?? null;
       return atual !== salvo;
     });
-    const novoPendente = !!novoFabricanteId && novoValor.trim() !== '';
+    const novoPendente = !!novoFabricanteId && novoValor !== null;
     return camposAlterados || novoPendente || pendingDeletionIds.size > 0;
   }, [linhas, valores, valoresSalvos, novoFabricanteId, novoValor, pendingDeletionIds]);
 
@@ -750,8 +730,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   // Grava no banco. Só é chamado de dentro de `salvarAlteracoesPendentes` —
   // nenhum campo persiste sozinho mais (nem onBlur, nem "Adicionar"), tudo
   // fica em `valores`/`fabricantesCopiados` até a pessoa clicar em salvar.
-  const persistirMeta = async (fabricanteId: string, display: string): Promise<boolean> => {
-    const valor = parseMetaInputValue(display);
+  const persistirMeta = async (fabricanteId: string, valor: number): Promise<boolean> => {
     const erro = validarValorMeta(fabricanteId, valor);
     if (erro) {
       toast.error(erro);
@@ -794,9 +773,9 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
       return;
     }
     setValores(prev => {
-      const novo = { ...prev };
+      const novo: Record<string, ValorMeta> = { ...prev };
       metasMesAnterior.forEach(m => {
-        novo[m.fabricante_id] = numberToMetaDisplay(m.meta_valor);
+        novo[m.fabricante_id] = m.meta_valor;
       });
       return novo;
     });
@@ -812,7 +791,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
       toast.error('Selecione um fabricante');
       return false;
     }
-    const valor = parseMetaInputValue(novoValor);
+    const valor = novoValor ?? 0;
     const erro = validarValorMeta(novoFabricanteId, valor);
     if (erro) {
       toast.error(erro);
@@ -821,7 +800,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     try {
       await upsertMeta.mutateAsync({ empresaId, usuarioId: scopedUsuarioId, fabricanteId: novoFabricanteId, ano: selectedAno, mes: selectedMes, metaValor: valor });
       setNovoFabricanteId('');
-      setNovoValor('');
+      setNovoValor(null);
       return true;
     } catch {
       toast.error('Erro ao adicionar meta');
@@ -838,7 +817,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
       toast.error('Selecione um fabricante');
       return;
     }
-    const valor = parseMetaInputValue(novoValor);
+    const valor = novoValor ?? 0;
     const erro = validarValorMeta(novoFabricanteId, valor);
     if (erro) {
       toast.error(erro);
@@ -847,7 +826,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
     setFabricantesCopiados(prev => new Set(prev).add(novoFabricanteId));
     setValores(prev => ({ ...prev, [novoFabricanteId]: novoValor }));
     setNovoFabricanteId('');
-    setNovoValor('');
+    setNovoValor(null);
   };
 
   // Persiste TUDO que está só em rascunho local: linhas marcadas pra excluir
@@ -871,10 +850,10 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
       }
 
       for (const l of linhas) {
-        const atual = (valores[l.fabricanteId] ?? '').trim();
-        const salvo = valoresSalvos[l.fabricanteId] ?? '';
+        const atual = valores[l.fabricanteId] ?? null;
+        const salvo = valoresSalvos[l.fabricanteId] ?? null;
         if (atual === salvo) continue;
-        if (!atual) {
+        if (atual === null) {
           // Campo existente foi limpo de propósito — equivale a remover a meta.
           if (l.id) {
             try {
@@ -890,7 +869,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
         if (!ok) return false;
       }
 
-      if (novoFabricanteId && novoValor.trim()) {
+      if (novoFabricanteId && novoValor !== null) {
         const ok = await persistirNovoFabricante();
         if (!ok) return false;
       }
@@ -911,14 +890,14 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   // sumir junto com o valor descartado.
   const descartarAlteracoesPendentes = () => {
     setValores(() => {
-      const novo: Record<string, string> = {};
-      (metas ?? []).forEach(m => { novo[m.fabricante_id] = numberToMetaDisplay(m.meta_valor); });
+      const novo: Record<string, ValorMeta> = {};
+      (metas ?? []).forEach(m => { novo[m.fabricante_id] = m.meta_valor; });
       return novo;
     });
     setFabricantesCopiados(new Set());
     setPendingDeletionIds(new Set());
     setNovoFabricanteId('');
-    setNovoValor('');
+    setNovoValor(null);
   };
 
   const requestClose = (proximoEstado: boolean) => {
@@ -960,14 +939,22 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   return (
     <>
     <Dialog open={open} onOpenChange={requestClose}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
+      {/* Título e botões ficam parados; TODO o miolo (escopo, período, vendedor,
+          "novo fabricante", busca e a lista) rola junto dentro do CorpoDialogo.
+          Antes o diálogo tinha ~467px de moldura fixa MAIS uma lista de 50vh, o
+          que exigia uma janela de ~930px de altura — com a escala do Windows em
+          125% sobram ~760px e o botão "Salvar alterações" ficava fora da tela,
+          sem barra de rolagem para alcançá-lo. */}
+      <ConteudoDialogo className="sm:max-w-2xl">
+        <CabecalhoDialogo>
           <DialogTitle>
             {temMetas ? 'Editar' : 'Criar'} metas — {escopo === 'individual' ? vendedorNome : 'Toda a equipe'}
           </DialogTitle>
           <DialogDescription>Meta de vendas por fabricante</DialogDescription>
-        </DialogHeader>
+        </CabecalhoDialogo>
 
+        <CorpoDialogo>
+        <div className="space-y-4 pb-4">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <ToggleGroup
             type="single"
@@ -1066,11 +1053,12 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
               placeholder="Novo fabricante"
               emptyMessage="Nenhum fabricante encontrado."
             />
-            <MetaValorInput
+            <CampoMoeda
+              comPrefixo={false}
               placeholder="Meta R$"
-              className="h-9 w-32 text-sm"
+              className="h-9 w-24 sm:w-32 text-sm"
               value={novoValor}
-              onChangeValue={setNovoValor}
+              onChange={setNovoValor}
             />
             <Button size="sm" className="h-9" onClick={adicionarMeta}>Adicionar</Button>
           </div>
@@ -1087,30 +1075,36 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
             />
           </div>
         )}
+        </div>
 
-        <div className="flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {/* Cabeçalho das colunas: fica DENTRO do mesmo container que rola (o
+            CorpoDialogo), por isso tem exatamente a mesma largura útil das
+            linhas. Antes ele ficava fora, e a barra de rolagem da lista comia
+            ~15px só das linhas — os títulos não paravam em cima das colunas.
+            `sticky` mantém os títulos à vista enquanto se rola a lista. */}
+        <div className="sticky top-0 z-10 flex items-center gap-2 bg-background pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           <span className="w-4 shrink-0" />
           <span className="flex-1">Fábrica</span>
           {escopo === 'individual' ? (
             <>
               <ColunaHeaderInfo
-                className="w-28"
+                className="w-20 sm:w-28"
                 label="Meta geral"
                 info="Alvo definido para toda a equipe nesta fábrica."
               />
               <ColunaHeaderInfo
-                className="w-28"
+                className="w-20 sm:w-28"
                 label="Restante da meta geral"
                 info="Quanto da meta geral ainda não foi distribuído a nenhum vendedor."
               />
               <ColunaHeaderInfo
-                className="w-32"
+                className="w-24 sm:w-32"
                 label="Meta individual"
                 info="A fatia deste vendedor dentro da meta geral."
               />
             </>
           ) : (
-            <span className="hidden sm:flex w-32 shrink-0 items-center justify-center text-center">Meta</span>
+            <span className="flex w-24 sm:w-32 shrink-0 items-center justify-center text-center">Meta</span>
           )}
           <span className="w-9 shrink-0" />
         </div>
@@ -1118,8 +1112,11 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="plano-vendas-fabricantes">
             {(provided) => (
+              // Sem rolagem própria: quem rola é o CorpoDialogo. Duas áreas de
+              // rolagem aninhadas era o que desalinhava o cabeçalho e ainda
+              // reservava metade da janela para uma lista que podia estar vazia.
               <div
-                className="space-y-3 max-h-[50vh] overflow-y-auto pr-1"
+                className="space-y-3"
                 ref={provided.innerRef}
                 {...provided.droppableProps}
               >
@@ -1143,8 +1140,14 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
                     ? metaEquipe
                       - (totalAlocadoPorFabricante.get(fabricanteId) ?? 0)
                       + (metas?.find(m => m.fabricante_id === fabricanteId)?.meta_valor ?? 0)
-                      - parseMetaInputValue(valores[fabricanteId] ?? '')
+                      - (valores[fabricanteId] ?? 0)
                     : undefined;
+                  // As duas colunas de referência só existem no escopo individual.
+                  // Quando uma fábrica entra na lista sem meta de equipe (copiada do
+                  // mês anterior, por exemplo), entra um espaçador do mesmo tamanho:
+                  // sem ele a linha inteira pulava ~240px para a esquerda e o campo
+                  // de digitação saía de baixo do próprio título de coluna.
+                  const mostrarColunasEquipe = escopo === 'individual';
                   const handleRemover = () => {
                     // Linha existente: só marca pra excluir (some da lista agora,
                     // mas o DELETE no banco só roda em "Salvar alterações").
@@ -1169,18 +1172,24 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
                               <GripVertical className="h-4 w-4" />
                             </div>
                             <span className="flex-1 text-sm truncate">{fabricante?.nome ?? '—'}</span>
-                            {metaEquipe !== undefined && (
+                            {/* Encolhem em tela estreita em vez de sumirem: escondidas,
+                                o gestor digitava no escuro e ainda levava a recusa
+                                "não pode ser maior que a meta geral (R$ X)" citando
+                                justamente o número que não estava na tela. */}
+                            {mostrarColunasEquipe && (metaEquipe !== undefined ? (
                               <span
-                                className="hidden sm:flex h-9 w-28 shrink-0 flex-col items-center justify-center rounded-md border border-border/60 bg-muted/30 px-1.5 text-center leading-tight"
+                                className="flex h-9 w-20 sm:w-28 shrink-0 flex-col items-center justify-center rounded-md border border-border/60 bg-muted/30 px-1.5 text-center leading-tight"
                                 title={`Meta de equipe para este fabricante: ${formatCurrency(metaEquipe)}`}
                               >
                                 <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Meta geral</span>
-                                <span className="text-xs font-semibold truncate w-full">{formatCurrency(metaEquipe)}</span>
+                                <span className="text-[11px] font-semibold tabular-nums truncate w-full">{formatCurrency(metaEquipe)}</span>
                               </span>
-                            )}
-                            {restante !== undefined && (
+                            ) : (
+                              <span className="w-20 sm:w-28 shrink-0" />
+                            ))}
+                            {mostrarColunasEquipe && (restante !== undefined ? (
                               <span
-                                className={`hidden sm:flex h-9 w-28 shrink-0 flex-col items-center justify-center rounded-md border px-1.5 text-center leading-tight ${
+                                className={`flex h-9 w-20 sm:w-28 shrink-0 flex-col items-center justify-center rounded-md border px-1.5 text-center leading-tight ${
                                   restante < 0
                                     ? 'border-destructive/40 bg-destructive/10'
                                     : 'border-border/60 bg-muted/30'
@@ -1188,15 +1197,18 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
                                 title={`Ainda não atribuído a nenhum vendedor: ${formatCurrency(restante)}`}
                               >
                                 <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Restante</span>
-                                <span className={`text-xs font-semibold truncate w-full ${restante < 0 ? 'text-destructive' : ''}`}>
+                                <span className={`text-[11px] font-semibold tabular-nums truncate w-full ${restante < 0 ? 'text-destructive' : ''}`}>
                                   {formatCurrency(restante)}
                                 </span>
                               </span>
-                            )}
-                            <MetaValorInput
-                              className="h-9 w-32 text-sm border-border/60 focus-visible:ring-1 focus-visible:ring-offset-0"
-                              value={valores[fabricanteId] ?? ''}
-                              onChangeValue={display => setValores(prev => ({ ...prev, [fabricanteId]: display }))}
+                            ) : (
+                              <span className="w-20 sm:w-28 shrink-0" />
+                            ))}
+                            <CampoMoeda
+                              comPrefixo={false}
+                              className="h-9 w-24 sm:w-32 text-sm border-border/60 focus-visible:ring-1 focus-visible:ring-offset-0"
+                              value={valores[fabricanteId] ?? null}
+                              onChange={valor => setValores(prev => ({ ...prev, [fabricanteId]: valor }))}
                               placeholder={metaEquipe !== undefined ? 'Meta do usuário' : 'Meta R$'}
                             />
                             <Button
@@ -1219,8 +1231,9 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
             )}
           </Droppable>
         </DragDropContext>
+        </CorpoDialogo>
 
-        <DialogFooter>
+        <RodapeDialogo>
           <Button type="button" variant="outline" onClick={() => requestClose(false)} disabled={salvandoTudo}>
             Cancelar
           </Button>
@@ -1232,13 +1245,13 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
             {salvandoTudo && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Salvar alterações
           </Button>
-        </DialogFooter>
-      </DialogContent>
+        </RodapeDialogo>
+      </ConteudoDialogo>
     </Dialog>
 
-    {/* Cada campo já autosalva no onBlur — este aviso só existe pro texto que
-        ainda está sendo digitado (ou o mini-form "Novo fabricante" preenchido)
-        no momento em que a pessoa tenta fechar o dialog. */}
+    {/* Nada neste diálogo persiste sozinho: tudo é rascunho local até "Salvar
+        alterações". Este aviso é o que impede a pessoa de fechar a tela e perder
+        o que digitou (inclusive o mini-form "Novo fabricante" preenchido). */}
     <AlertDialog open={pedindoConfirmacaoFechar} onOpenChange={setPedindoConfirmacaoFechar}>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -1247,7 +1260,10 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
             Há valores digitados que ainda não foram salvos. Deseja salvá-los antes de sair, ou descartar?
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
+        {/* Três botões não cabem lado a lado na largura do aviso (512px): sem o
+            flex-wrap eles se espremem e "Descartar" encosta em "Salvar" — clique
+            errado apaga o que a pessoa acabou de digitar. */}
+        <AlertDialogFooter className="flex-wrap gap-2 sm:space-x-0">
           <AlertDialogCancel disabled={salvandoTudo}>Continuar editando</AlertDialogCancel>
           <Button
             type="button"
@@ -1259,7 +1275,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
               onOpenChange(false);
             }}
           >
-            Descartar alterações
+            Descartar
           </Button>
           <Button
             type="button"
@@ -1273,7 +1289,7 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
             }}
           >
             {salvandoTudo && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Salvar alterações
+            Salvar
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -59,6 +59,9 @@ interface ImportPedidosDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/** As duas etapas que encerram um negócio. Fora daqui, "data de fechamento" não se aplica. */
+const ETAPAS_FINAIS = new Set(['fechamento', 'perdido']);
+
 export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogProps) {
   const navigate = useNavigate();
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
@@ -450,7 +453,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
           campos_extras,
           data_pedido: r.data_pedido || new Date().toLocaleDateString('en-CA'),
           created_at: r.data_pedido ? `${r.data_pedido.slice(0, 10)}T12:00:00.000Z` : new Date().toISOString(),
-          prazo_resposta: r.prazo_resposta || (r.status === 'fechamento' ? (r.data_pedido || new Date().toLocaleDateString('en-CA')) : null),
+          // Etapa final (ganho OU perda) sem data de fechamento na planilha cai na data
+          // de criação, nunca no dia da importação. O gatilho do banco
+          // (fn_set_pedido_fechado_em) carimba `current_date` quando a linha chega vazia —
+          // e foi exatamente assim que a coluna `fechado_em` foi envenenada: 11.653
+          // negócios de 2022 a 2026 gravados como se tivessem fechado em 18/08/2026.
+          // Mandar a data de criação preenchida daqui impede o carimbo de entrar.
+          prazo_resposta: r.prazo_resposta || (ETAPAS_FINAIS.has(r.status) ? (r.data_pedido || new Date().toLocaleDateString('en-CA')) : null),
           usuario_id: resolvedUserId || vid,
         };
       });

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, lazy, Suspense } from 'react';
-import { startOfMonth, endOfMonth, isWithinInterval, parseISO, startOfDay, endOfDay, format } from 'date-fns';
+import { startOfMonth, endOfMonth, parseISO, startOfDay, endOfDay, format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePi
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
 import { MultiSelectSearch } from '@/components/shared/MultiSelectSearch';
 import { PlanoVendasSection } from '@/components/dashboard/PlanoVendasSection';
+import { formatarMoedaBRL } from '@/lib/moeda';
 
 // recharts (e os módulos d3-* que ele traz) é de longe o maior pedaço de código
 // desta página — carregar via lazy() evita que os cards de KPI, que não dependem
@@ -33,8 +34,9 @@ function ChartsSkeleton() {
   );
 }
 
-const formatCurrency = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+// Uma cópia a menos das 26 espalhadas pelo sistema — mesmo resultado, agora
+// vindo de src/lib/moeda.ts.
+const formatCurrency = formatarMoedaBRL;
 
 const getDefaultDateRange = (): DateRange => ({
   from: startOfMonth(new Date()),
@@ -109,37 +111,63 @@ const Dashboard = () => {
   // em use-dashboard.ts) e só acendem fetchingStats, sem derrubar a tela pro spinner full-page.
   const isLoading = loadFat || loadStats;
 
+  // Um mês entra no gráfico quando SE SOBREPÕE ao período escolhido. Antes o
+  // teste era se o DIA 1 do mês caía dentro do intervalo, e isso apagava mês
+  // inteiro do gráfico: escolher "15/jan a 20/ago" fazia janeiro sumir, sem
+  // aviso nenhum, porque o dia 1 de janeiro estava fora do filtro.
   const filteredFaturamento = useMemo(() => {
     if (!faturamento) return [];
+    const inicio = startOfDay(dateRange.from);
+    const fim = endOfDay(dateRange.to);
     return faturamento.filter(f => {
       if (!f.mes_ano) return false;
-      const d = parseISO(`${f.mes_ano}-01`);
-      return isWithinInterval(d, { 
-        start: startOfDay(dateRange.from), 
-        end: endOfDay(dateRange.to) 
-      });
+      const primeiroDia = parseISO(`${f.mes_ano}-01`);
+      return primeiroDia <= fim && endOfMonth(primeiroDia) >= inicio;
     });
   }, [faturamento, dateRange.from, dateRange.to]);
 
+  // O selo "+X% últ. mês" compara o último mês do período com o mês anterior a
+  // ele na lista COMPLETA, não na lista filtrada. Com o período padrão (só o mês
+  // corrente) a lista filtrada tem um único item, então não existia mês anterior
+  // e o selo ficava travado num "+0%" verde para sempre — número que nunca foi
+  // verdade. Agora, sem mês anterior no histórico, o selo simplesmente não é
+  // desenhado, em vez de mentir zero.
   const lastMonth = filteredFaturamento[filteredFaturamento.length - 1];
-  const prevMonth = filteredFaturamento[filteredFaturamento.length - 2];
-  const faturamentoChange = lastMonth && prevMonth && prevMonth.faturamento_total && prevMonth.faturamento_total !== 0
+  const prevMonth = useMemo(() => {
+    if (!lastMonth || !faturamento) return undefined;
+    const idx = faturamento.findIndex(f => f.mes_ano === lastMonth.mes_ano);
+    return idx > 0 ? faturamento[idx - 1] : undefined;
+  }, [faturamento, lastMonth]);
+  const temComparativo = !!lastMonth && !!prevMonth && !!prevMonth.faturamento_total;
+  const faturamentoChange = temComparativo
     ? (((lastMonth.faturamento_total ?? 0) - prevMonth.faturamento_total) / prevMonth.faturamento_total * 100).toFixed(0)
     : '0';
 
 
   const totalPedidos = stats?.total_pedidos ?? 0;
-  const totalPedidosFechados = stats?.pedidos_fechados ?? 0;
-  const taxaConversao = totalPedidos > 0 ? ((totalPedidosFechados / totalPedidos) * 100).toFixed(0) : '0';
+  // ATENÇÃO — são DOIS números diferentes e cada cartão lê o seu (ver
+  // DashboardStats em use-dashboard.ts e a migration 20260821120000):
+  //   pedidos_fechados         = criados no período que já ganharam (safra).
+  //                              Só serve para a Taxa de Conversão.
+  //   pedidos_fechados_periodo = fecharam DENTRO do período. É o cartão
+  //                              "Negócios Fechados" e o divisor do Ticket Médio.
+  // Trocar um pelo outro é o erro mais fácil de cometer aqui: os dois nomes são
+  // parecidos, os dois números são plausíveis e ninguém percebe pela tela.
+  const fechadosDaSafra = stats?.pedidos_fechados ?? 0;
+  const negociosFechadosNoPeriodo = stats?.pedidos_fechados_periodo ?? 0;
+  const taxaConversao = totalPedidos > 0 ? ((fechadosDaSafra / totalPedidos) * 100).toFixed(0) : '0';
 
   const totalFaturamento = stats?.total_faturamento ?? 0;
-  const ticketMedioGeral = totalPedidosFechados > 0 ? totalFaturamento / totalPedidosFechados : 0;
+  // Dinheiro fechado no período dividido pelos negócios fechados no período —
+  // os dois lados da divisão precisam sair da mesma janela de tempo, senão o
+  // ticket médio vira a razão entre dois conjuntos diferentes de negócios.
+  const ticketMedioGeral = negociosFechadosNoPeriodo > 0 ? totalFaturamento / negociosFechadosNoPeriodo : 0;
 
   const kpis = [
-    { label: 'Faturamento Total', value: formatCurrency(totalFaturamento), icon: DollarSign, change: lastMonth ? `${Number(faturamentoChange) >= 0 ? '+' : ''}${faturamentoChange}% últ. mês` : '', positive: Number(faturamentoChange) >= 0, accent: true },
+    { label: 'Faturamento Total', value: formatCurrency(totalFaturamento), icon: DollarSign, change: temComparativo ? `${Number(faturamentoChange) >= 0 ? '+' : ''}${faturamentoChange}% últ. mês` : '', positive: Number(faturamentoChange) >= 0, accent: true },
     { label: 'Taxa Conversão', value: `${taxaConversao}%`, icon: Target, change: `${totalPedidos} negócios`, positive: true },
     { label: 'Ticket Médio', value: formatCurrency(ticketMedioGeral), icon: TrendingUp, change: '', positive: true },
-    { label: 'Negócios Fechados', value: String(totalPedidosFechados), icon: Clock, change: '', positive: true },
+    { label: 'Negócios Fechados', value: String(negociosFechadosNoPeriodo), icon: Clock, change: '', positive: true },
   ];
 
   const faturamentoData = filteredFaturamento.map(f => ({
@@ -262,9 +290,13 @@ const Dashboard = () => {
     <AppLayout title="Dashboard" subtitle="Visão analítica do desempenho comercial">
       <ErrorBoundary>
       <div className={`px-6 pb-6 w-full transition-opacity duration-200 ${fetchingStats && !isLoading ? 'opacity-60' : 'opacity-100'}`}>
-        {/* Filtros — fixos ao rolar a página, como o header */}
-        <div className="sticky top-0 z-20 -mx-6 px-6 py-4 mb-8 border-b border-border/60 bg-background/95 backdrop-blur-sm flex flex-col sm:flex-row flex-wrap gap-4 justify-start items-end">
-          <div className="w-full sm:w-56">
+        {/* Filtros — fixos ao rolar a página, como o header, MAS só a partir de
+            xl. Abaixo de ~1200px eles não cabem numa linha só e quebram em duas;
+            fixos, essa segunda linha soma ~150px que somem da altura útil para
+            sempre e espremem o Plano de Vendas logo abaixo (é um dos motivos de
+            precisar diminuir o zoom para usar a tela). */}
+        <div className="static xl:sticky xl:top-0 xl:z-20 -mx-6 px-6 py-4 mb-8 border-b border-border/60 bg-background/95 backdrop-blur-sm flex flex-col sm:flex-row flex-wrap gap-4 justify-start items-end">
+          <div className="w-full sm:w-44 xl:w-56">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Fabricante</p>
             <MultiSelectSearch
               options={fabricantes.map((f) => ({ value: f.id, label: f.nome }))}
@@ -274,7 +306,7 @@ const Dashboard = () => {
               className="h-10 bg-card border-border/60 shadow-sm"
             />
           </div>
-          <div className="w-full sm:w-56">
+          <div className="w-full sm:w-44 xl:w-56">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Responsável</p>
             <MultiSelectSearch
               options={vendedoresComConversao.map((v) => ({ value: v.usuario_id ?? '', label: v.usuario_nome ?? '' }))}
@@ -356,8 +388,11 @@ const Dashboard = () => {
             fabricanteIds={fabricanteIds}
             vendedores={(vendedores ?? []).map(v => ({ usuario_id: v.usuario_id ?? '', usuario_nome: v.usuario_nome ?? '' }))}
             fabricantes={fabricantes}
-            ano={dateRange.from.getFullYear()}
-            mes={dateRange.from.getMonth() + 1}
+            // O período INTEIRO, não só o mês da data inicial. Antes daqui saíam
+            // `ano` e `mes` de dateRange.from, então um filtro de "01/jan a
+            // 31/dez" mostrava só janeiro no Plano de Vendas — e não avisava.
+            dateFrom={format(dateRange.from, 'yyyy-MM-dd')}
+            dateTo={format(dateRange.to, 'yyyy-MM-dd')}
           />
         )}
 

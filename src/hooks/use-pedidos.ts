@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
 import { useRegistrarAtividade } from './use-historico-alteracoes';
@@ -37,8 +37,9 @@ export interface PedidoWithRelations {
  * "Data de Fechamento" na interface. `fechado_em` é mantida por trigger e registra
  * quando o negócio entrou numa etapa final DENTRO do Repply; `prazo_resposta` é o que
  * a ficha e o formulário mostram como "Data de Fechamento", recebe a data vinda do
- * Bitrix na importação e é sobrescrita com a data de hoje quando o negócio é fechado
- * pela tela.
+ * Bitrix na importação e é carimbada com a data de hoje quando o negócio entra numa
+ * etapa final — pelo gatilho do banco, não por este arquivo (ver
+ * supabase/migrations/20260821120100_data_fechamento_em_todos_os_caminhos.sql).
  *
  * Para negócio cadastrado à mão os dois coincidem. Para negócio importado, não: o
  * gatilho carimbou o momento da importação. Medido em 20/08/2026 na MD: dos 11.714
@@ -151,6 +152,33 @@ async function resolveSearchMatches(trimmedSearch: string): Promise<SearchMatche
 
 const hasNoSearchMatches = (matches: SearchMatches) =>
   matches.clienteIds.length === 0 && matches.fabricanteIds.length === 0 && matches.obraIds.length === 0;
+
+// Todo painel que muda de número quando um negócio muda de etapa, de valor ou de dono.
+// Vive numa lista só porque a memória deste projeto é de esquecer alguma: `dashboard_stats`
+// e o Plano de Vendas não eram invalidados em lugar NENHUM do código. Com staleTime de 5
+// minutos e sem refetch ao voltar pra aba (use-dashboard.ts:6-10), fechar um negócio e
+// voltar ao Dashboard mostrava os 4 cartões e as duas roscas congelados — e quem conferisse
+// concluiria, com razão aparente, que a correção não tinha funcionado.
+// As seis mutações que mexem em negócio (arrastar no kanban, ação em massa, exclusão em
+// massa, edição da ficha, cadastro novo e o remanejamento que a exclusão de etapa dispara)
+// chamam esta função em vez de repetir a lista, para que acrescentar um painel novo seja
+// uma linha aqui e não uma caçada por quatro arquivos.
+export function invalidarPaineisDeNegocios(qc: QueryClient) {
+  const chaves = [
+    'pedidos',
+    'pedidos_por_cliente',
+    'pedidos_stats',
+    'vw_faturamento_mensal',
+    'dashboard_indicadores_vendedor',
+    'dashboard_stats',
+    'plano_vendas_progresso',
+    // Chave própria de propósito: `invalidateQueries` casa elemento a elemento do array,
+    // não por prefixo de texto — ['plano_vendas_progresso'] NÃO alcança
+    // ['plano_vendas_progresso_por_vendedor'], e a quebra "Por vendedor" ficaria velha.
+    'plano_vendas_progresso_por_vendedor',
+  ];
+  chaves.forEach(chave => qc.invalidateQueries({ queryKey: [chave] }));
+}
 
 // Resolve o termo de busca uma única vez, com `queryKey` baseada só no termo (não na etapa/status)
 // — permite que o Kanban chame este hook uma vez na página e repasse o resultado já pronto para
@@ -321,24 +349,110 @@ export interface PedidoOption {
   fabricante: { id: string; nome: string } | null;
 }
 
+/** Quantos negócios a lista traz quando NÃO há termo de busca (os mais recentes). */
+export const PEDIDOS_OPTIONS_LIMITE_LISTA = 500;
+/** Teto de resultados de uma busca — dropdown não é relatório. */
+export const PEDIDOS_OPTIONS_LIMITE_BUSCA = 50;
+/** A partir de quantas letras a busca vai ao servidor (1 letra traria meia base). */
+export const PEDIDOS_OPTIONS_MIN_BUSCA = 2;
+
+// Resolve os ids que casam com o termo, do mesmo jeito que resolveSearchMatches faz para a
+// tela de Negócios: por ids, nunca colando o texto digitado dentro do filtro `.or()`. Um
+// termo com vírgula ou parêntese quebraria a sintaxe do PostgREST se fosse concatenado ali.
+// Cobre os três pedaços que formam o rótulo da opção (ver getNomeNegocio): o nome
+// customizado do negócio, o nome do cliente e o nome do fabricante.
+async function resolvePedidoOptionMatches(termo: string, usuarioIds: string[]) {
+  const [{ data: pedidoMatches }, { data: clienteMatches }, { data: fabricanteMatches }] = await Promise.all([
+    supabase
+      .from('pedidos')
+      .select('id')
+      .in('usuario_id', usuarioIds)
+      .ilike('nome', `%${termo}%`)
+      .limit(PEDIDOS_OPTIONS_LIMITE_BUSCA),
+    supabase.from('clientes').select('id').ilike('empresa', `%${termo}%`),
+    supabase.from('fabricantes').select('id').ilike('nome', `%${termo}%`),
+  ]);
+  return {
+    pedidoIds: (pedidoMatches ?? []).map(p => p.id),
+    clienteIds: (clienteMatches ?? []).map(c => c.id),
+    fabricanteIds: (fabricanteMatches ?? []).map(f => f.id),
+  };
+}
+
 // Lista enxuta de negócios (só os campos usados pra rotular a opção) pra popular o seletor de
-// "vincular a um negócio" no formulário de tarefas — não reaproveita usePedidos porque esse traz
-// só os N pedidos mais recentes paginados, e aqui precisamos do universo pra busca.
-export function usePedidosOptions(empresaId?: string) {
+// "vincular a um negócio" no formulário de tarefas.
+//
+// SEM `search`: os PEDIDOS_OPTIONS_LIMITE_LISTA negócios mais recentes — é a lista de partida,
+// não o universo. Eram 11.907 negócios contra um teto de 500, e o filtro do seletor acontece
+// no navegador: procurar um negócio antigo não achava nada e a tela não avisava que tinha
+// cortado. Subir o teto para o universo inteiro NÃO resolve e piora: o SearchableSelect
+// desenha um item de lista para CADA opção, sem virtualização — 11.907 itens travam o
+// diálogo. Quem consome pode comparar `data.length` com PEDIDOS_OPTIONS_LIMITE_LISTA para
+// dizer honestamente que a lista está cortada.
+//
+// COM `search` (a partir de PEDIDOS_OPTIONS_MIN_BUSCA letras): a procura vai ao SERVIDOR e
+// alcança a base inteira, devolvendo no máximo PEDIDOS_OPTIONS_LIMITE_BUSCA resultados.
+// O parâmetro é opcional de propósito — quem já chamava com um argumento só continua
+// funcionando exatamente como antes.
+export function usePedidosOptions(empresaId?: string, search?: string) {
+  const termo = search?.trim() ?? '';
+  const buscandoNoServidor = termo.length >= PEDIDOS_OPTIONS_MIN_BUSCA;
+
   return useQuery({
-    queryKey: ['pedidos_options', empresaId],
+    queryKey: ['pedidos_options', empresaId, buscandoNoServidor ? termo : null],
     enabled: !!empresaId,
     queryFn: async () => {
       const usuarioIds = await resolveUsuarioIds(empresaId!);
       if (usuarioIds.length === 0) return [];
-      const { data, error } = await supabase
+
+      let query = supabase
         .from('pedidos')
         .select('id, status, nome, cliente:clientes(id, empresa), fabricante:fabricantes(id, nome)')
         .in('usuario_id', usuarioIds)
-        .order('created_at', { ascending: false })
-        .limit(500);
+        .order('created_at', { ascending: false });
+
+      if (buscandoNoServidor) {
+        const { pedidoIds, clienteIds, fabricanteIds } = await resolvePedidoOptionMatches(termo, usuarioIds);
+        const orParts: string[] = [];
+        if (pedidoIds.length > 0) orParts.push(`id.in.(${pedidoIds.join(',')})`);
+        if (clienteIds.length > 0) orParts.push(`cliente_id.in.(${clienteIds.join(',')})`);
+        if (fabricanteIds.length > 0) orParts.push(`fabricante_id.in.(${fabricanteIds.join(',')})`);
+        // Nada casou com o termo: devolve lista vazia em vez de deixar o `.or()` vazio, que
+        // no PostgREST não filtra nada e traria os negócios mais recentes como se fossem
+        // resultado da busca.
+        if (orParts.length === 0) return [];
+        query = query.or(orParts.join(',')).limit(PEDIDOS_OPTIONS_LIMITE_BUSCA);
+      } else {
+        query = query.limit(PEDIDOS_OPTIONS_LIMITE_LISTA);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as unknown as PedidoOption[];
+    },
+    staleTime: 1000 * 60 * 5,
+    // Sem isso, cada letra digitada derruba a lista pra vazia até a resposta chegar, e o
+    // seletor pisca "Nenhuma opção encontrada" no meio da digitação.
+    placeholderData: keepPreviousData,
+  });
+}
+
+// Um negócio específico no mesmo formato da lista de opções. Existe para o caso em que a
+// tarefa já está vinculada a um negócio que NÃO está entre os mais recentes: sem isso, o
+// seletor não acha o id na lista e mostra o texto de "não selecionado", como se o vínculo
+// tivesse sumido. `enabled` fica desligado quando não há id.
+export function usePedidoOptionPorId(pedidoId?: string | null) {
+  return useQuery({
+    queryKey: ['pedido_option', pedidoId ?? null],
+    enabled: !!pedidoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('id, status, nome, cliente:clientes(id, empresa), fabricante:fabricantes(id, nome)')
+        .eq('id', pedidoId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as unknown as PedidoOption | null;
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -397,14 +511,15 @@ export function useUpdatePedidoStatus() {
   const registrarAtividade = useRegistrarAtividade();
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const updateData: Record<string, unknown> = { status };
-      if (status === 'fechamento') {
-        const now = new Date();
-        const offset = now.getTimezoneOffset();
-        const localDate = new Date(now.getTime() - (offset * 60 * 1000));
-        updateData.prazo_resposta = localDate.toISOString().split('T')[0];
-      }
-      const { error } = await supabase.from('pedidos').update(updateData).eq('id', id);
+      // Só a etapa vai no update. A DATA DE FECHAMENTO (`prazo_resposta`) é carimbada pelo
+      // gatilho `fn_set_pedido_fechado_em` (migration 20260821120100), e daqui não sai nada
+      // sobre ela de propósito: aqui só existiam DOIS dos seis caminhos que fecham um
+      // negócio, o carimbo só valia para 'fechamento' (perder um negócio não registrava o
+      // dia da perda) e a data vinha do relógio do computador do vendedor — relógio ou fuso
+      // errado carimbava o dia errado, sem ninguém perceber. O gatilho cobre os seis
+      // caminhos, cobre 'perdido' e usa o relógio do servidor, que é um só para todo mundo.
+      // Duas donas para a mesma regra é como o problema começou.
+      const { error } = await supabase.from('pedidos').update({ status }).eq('id', id);
       if (error) throw error;
     },
     onSuccess: (_data, { id, status }) => {
@@ -459,11 +574,7 @@ export function useUpdatePedidoStatus() {
       });
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['pedidos'] });
-      qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
-      qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
-      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
+      invalidarPaineisDeNegocios(qc);
     },
   });
 }
@@ -574,11 +685,7 @@ export function useBulkDeletePedidos() {
           descricao,
         });
       }
-      qc.invalidateQueries({ queryKey: ['pedidos'] });
-      qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
-      qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
-      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
+      invalidarPaineisDeNegocios(qc);
     },
   });
 }
@@ -600,12 +707,11 @@ export function useBulkUpdatePedidos() {
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.marcador_id !== undefined) updateData.marcador_id = updates.marcador_id;
       if (updates.usuario_id !== undefined) updateData.usuario_id = updates.usuario_id;
-      if (updates.status === 'fechamento') {
-        const now = new Date();
-        const offset = now.getTimezoneOffset();
-        const localDate = new Date(now.getTime() - (offset * 60 * 1000));
-        updateData.prazo_resposta = localDate.toISOString().split('T')[0];
-      }
+      // Sem carimbo de data aqui: quem preenche a DATA DE FECHAMENTO é o gatilho
+      // `fn_set_pedido_fechado_em` (migration 20260821120100), pelo mesmo motivo explicado
+      // em useUpdatePedidoStatus — ele vale para ganho E para perda, vale para os seis
+      // caminhos que fecham um negócio, e usa o relógio do servidor em vez do relógio de
+      // cada navegador.
 
       if ('ids' in target) {
         const { ids } = target;
@@ -681,11 +787,7 @@ export function useBulkUpdatePedidos() {
           descricao: `Alterou ${campos} de ${count} negócio(s) ${escopo}`,
         });
       }
-      qc.invalidateQueries({ queryKey: ['pedidos'] });
-      qc.invalidateQueries({ queryKey: ['pedidos_por_cliente'] });
-      qc.invalidateQueries({ queryKey: ['pedidos_stats'] });
-      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
+      invalidarPaineisDeNegocios(qc);
     },
   });
 }

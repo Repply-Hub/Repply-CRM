@@ -34,8 +34,17 @@ export function useFaturamentoMensal(empresaId?: string) {
 export interface IndicadorVendedor {
   usuario_id: string;
   usuario_nome: string;
+  // total_pedidos e qtd_fechado são a conta "de safra": negócios CRIADOS no
+  // período e, desses, quantos já foram ganhos. É o que alimenta "Conversão por
+  // Vendedor", que o Lucas decidiu manter por data de criação — o numerador é
+  // subconjunto do denominador, então a taxa nunca passa de 100%.
   total_pedidos: number;
   qtd_fechado: number;
+  // Já é a outra conta: quantos negócios esse vendedor FECHOU dentro do período
+  // (por prazo_resposta, a "Data de Fechamento" da tela), tendo sido criados
+  // quando fosse. Vem da migration 20260821120000. Hoje nenhum gráfico usa —
+  // está aqui para quem precisar somar fechamento por pessoa sem reabrir a RPC.
+  qtd_fechado_periodo?: number;
 }
 
 // Antes lia vw_indicadores_usuario sem filtro nenhum: reagregava o histórico
@@ -71,12 +80,20 @@ export function useIndicadoresVendedor(
 }
 
 export interface DashboardStats {
+  // ---- janela de CRIAÇÃO (data_pedido) ----
   total_pedidos: number;
+  // "Criados no período que JÁ ganharam, em qualquer data". É o numerador da
+  // Taxa de Conversão e nada mais. NÃO é o cartão "Negócios Fechados" — os dois
+  // números são diferentes (ago/2026: 62 aqui contra 45 no cartão).
   pedidos_fechados: number;
-  total_faturamento: number;
   segmentacao_alto: number;
   segmentacao_medio: number;
   segmentacao_baixo: number;
+  // ---- janela de FECHAMENTO (prazo_resposta) ----
+  // "Fecharam DENTRO do período, tendo sido criados quando fosse". É o cartão
+  // "Negócios Fechados" e o divisor do Ticket Médio.
+  pedidos_fechados_periodo: number;
+  total_faturamento: number;
   rendimento_fabricante: { fabrica: string; valor: number }[];
   rendimento_vendedor: { vendedor: string; valor: number }[];
 }
@@ -85,6 +102,10 @@ export interface DashboardStats {
 // no cliente em cima de até 500 linhas de `pedidos` com 4 joins (usePedidos), o mesmo
 // anti-padrão documentado no CLAUDE.md do projeto. A RPC roda como o usuário chamador
 // (SECURITY INVOKER), então a RLS de pedidos já escopa para a empresa dele sozinha.
+//
+// Desde a migration 20260821120000 a função tem DUAS janelas de tempo (uma por
+// data de criação, outra por data de fechamento) e devolve os dois números de
+// negócios fechados — ver os comentários da interface DashboardStats acima.
 export function useDashboardStats(
   empresaId?: string,
   filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; dateFrom?: string; dateTo?: string },
@@ -105,6 +126,7 @@ export function useDashboardStats(
       return (row ?? {
         total_pedidos: 0,
         pedidos_fechados: 0,
+        pedidos_fechados_periodo: 0,
         total_faturamento: 0,
         segmentacao_alto: 0,
         segmentacao_medio: 0,
