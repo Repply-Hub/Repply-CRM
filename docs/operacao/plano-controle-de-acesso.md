@@ -19,7 +19,7 @@ Medido no banco de produção em 21/08/2026.
 | Fato | Medida |
 |---|---|
 | Controle de seção por empresa | **Não existe.** Nem tabela, nem tela, nem regra de banco |
-| A função `has_funcionalidade` no banco | Existe e é **código morto** — zero chamadas no SQL e no frontend |
+| A função `has_funcionalidade` no banco | Existe, **não é este eixo** — é permissão por USUÁRIO (ver §4.3). Nenhuma política a usa |
 | Tabelas do Portal com leitura liberada para **qualquer** usuário logado | **4 de 4** (`licencas_idema`, `licencas_natal`, `licencas_extremoz`, `dom_licencas`) |
 | Tabelas do Portal que aceitam **escrita** de qualquer usuário logado | **3** (inserção nas três; `licencas_idema` também aceita alteração) |
 | Empresas com menu personalizado (o único "controle" existente) | **2 de 8** — as outras 6 caem no padrão, onde o Portal aparece |
@@ -54,6 +54,12 @@ Todas do dono do produto, em 21/08/2026.
 | 4 | Relação preset ↔ empresa | **A empresa segue o preset**, com exceções por cima |
 | 5 | Preset padrão | **Tudo o que existe hoje, menos o Portal** |
 | 6 | Página de vendas | **Tira o Portal** — não prometer o que o assinante não recebe |
+| 7 | A MD no preset padrão | **Entra igual a todas as outras**, sem exceção semeada. O dono liga o Portal na tela de admin depois de pronta |
+
+> ⚠️ **A decisão 7 impõe uma ordem.** Como nenhuma exceção é criada por migration, a MD só
+> volta a ter o Portal quando alguém apertar o botão na tela de admin. Logo **a tela de
+> admin tem de existir ANTES da trava do banco** — senão a MD fica sem Portal no intervalo,
+> e devolvê-lo exigiria mexer no banco à mão, que é exatamente o que a decisão 7 evita.
 
 ---
 
@@ -129,7 +135,15 @@ segue o preset padrão** — não existe estado "sem regra": empresa criada hoje
 um caminho que ninguém previu cai no padrão, que é o comportamento seguro.
 
 **Exceções por empresa** — linhas do tipo "esta empresa tem esta seção, apesar do preset".
-A exceção **sempre ganha** do preset. A MD entra com uma linha: Portal ligado.
+A exceção **sempre ganha** do preset.
+
+**Nenhuma exceção nasce por migration** (decisão 7). As 8 empresas, MD inclusive, entram
+apontando para o preset padrão. A tabela de exceções nasce **vazia**, e a primeira linha
+dela será criada pelo dono do produto, pela tela de admin, ligando o Portal para a MD.
+
+Isso é deliberado: a exceção precisa nascer pelo caminho que vai ser usado para sempre. Se
+a primeira fosse semeada por migration, o caminho da tela só seria exercitado de verdade na
+segunda — e ninguém descobriria um defeito nele até já estar valendo.
 
 Toda tabela nova nasce por migration, com RLS habilitada e política escrita — só admin
 global escreve; qualquer usuário logado lê o que vale para a própria empresa (precisa, para
@@ -146,8 +160,26 @@ exceção da empresa  →  preset da empresa  →  padrão (ligada)
 É a **mesma resposta** para o site e para as regras do banco. Sem isso, os dois divergem e
 ninguém descobre até um cliente ver o que não devia.
 
-> A função morta `has_funcionalidade` ou vira esta, ou é apagada na mesma migration.
-> Não podem coexistir duas funções com o mesmo propósito e uma delas mentindo.
+> ⚠️ **Correção de 21/08/2026, depois de ler a função de verdade.** Uma versão anterior
+> deste documento dizia que `has_funcionalidade` "ou vira esta função, ou é apagada".
+> **As duas opções estavam erradas.** A assinatura real é
+> `has_funcionalidade(_usuario_id uuid, _modulo text, _funcionalidade text)` e o corpo lê
+> `permissoes_usuario.funcionalidades`: é permissão **por usuário**, de sub-recurso dentro
+> de um módulo. Outro eixo. Ela fica onde está, intocada — e a função nova recebe nome
+> próprio, `empresa_tem_secao(text)`.
+
+**Nomes, escolhidos para não colidir com o que já existe.** O projeto já tem
+`permissao_presets` (32 linhas) e `permissoes_usuario` (128 linhas), ambas do eixo POR
+USUÁRIO. Para ninguém confundir os dois eixos ao ler o banco, as tabelas novas levam o
+prefixo `secao_`:
+
+| Nova | Guarda | Não confundir com |
+|---|---|---|
+| `secao_presets` | os presets de seção | `permissao_presets` (permissão por usuário) |
+| `secao_preset_itens` | quais seções cada preset liga | — |
+| `secao_excecoes` | exceção por empresa | `permissoes_usuario` (por usuário) |
+| `empresas.secao_preset_id` | qual preset a empresa segue | — |
+| `empresa_tem_secao(text)` | a pergunta única | `has_funcionalidade(...)` (por usuário) |
 
 ### 4.4 As três camadas de recusa
 
@@ -202,7 +234,17 @@ ninguém pode perder acesso ao que já usava, e por isso as 7 demais entram liga
 padrão. O Portal é o único que nasce desligado, porque é justamente o caso que motivou este
 trabalho — e a MD recebe a exceção que o mantém.
 
-**Funcionalidade nova nasce desligada**, e é liberada quando houver decisão de vendê-la.
+**Funcionalidade nova nasce desligada — por disciplina, não por automatismo.**
+
+Vale ser exato, porque as duas coisas não cabem no mesmo comportamento automático. A
+função resolve "não achei regra" como **ligada**, e é isso que impede as 11 seções atuais
+de sumirem no dia da publicação. Se ela resolvesse como desligada, publicar tiraria tudo
+de todo mundo até alguém preencher a tabela.
+
+Então a regra para seção nova é de processo: **a mesma migration que acrescenta a seção
+acrescenta a linha dela em todos os presets**, com `habilitada = false`. A verificação
+final tem uma consulta que acusa seção sem linha em algum preset — é ela que transforma a
+disciplina em algo conferível.
 
 ---
 

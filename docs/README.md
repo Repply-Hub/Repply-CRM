@@ -57,6 +57,7 @@ repositório**, não aqui:
 | [`operacao/plano-blindagem-whatsapp.md`](operacao/plano-blindagem-whatsapp.md) | **Fase 0 executada, fases 1–4 propostas.** As duas falhas de segurança do WhatsApp: senha exposta e webhook sem autenticação — **o quê e o porquê** |
 | [`operacao/plano-blindagem-whatsapp-execucao.md`](operacao/plano-blindagem-whatsapp-execucao.md) | O **passo a passo** das fases 1 a 4 do documento acima: 10 tarefas, com código, comandos e critério de aprovação de cada uma |
 | [`operacao/plano-controle-de-acesso.md`](operacao/plano-controle-de-acesso.md) | **Desenho aprovado, nada implementado.** Ligar e desligar seções por empresa: presets, exceções, e as três camadas de recusa. Fecha o Portal, hoje aberto para todas as empresas |
+| [`operacao/plano-controle-de-acesso-execucao.md`](operacao/plano-controle-de-acesso-execucao.md) | O **passo a passo**: 13 tarefas com o código de cada uma, o ponto de parada antes da trava do Portal, e o critério de aprovação de cada fase |
 
 ## Dívida
 
