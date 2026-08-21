@@ -204,7 +204,7 @@ import {
   endOfDay,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn, autoResizeTextarea } from "@/lib/utils";
+import { cn, autoResizeTextarea, slugify } from "@/lib/utils";
 import { downloadFile } from "@/lib/download-file";
 import { linkifyText } from "@/lib/linkify";
 import {
@@ -2745,7 +2745,10 @@ function LeadSheet({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clientes")
-        .select("id, empresa, slug, email, telefone")
+        // `clientes` não tem coluna `slug` — pedi-la fazia o PostgREST recusar a
+        // consulta INTEIRA, e o painel "Dados do lead" nunca aparecia. O slug da
+        // URL é montado no cliente (ver navigate abaixo), não vem do banco.
+        .select("id, empresa, email, telefone")
         .eq("id", conversa.cliente_id!)
         .maybeSingle();
       if (error) throw error;
@@ -2759,7 +2762,10 @@ function LeadSheet({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contatos")
-        .select("id, nome, email, telefone, slug")
+        // `contatos` não tem `nome` nem `slug`: o nome da pessoa está em
+        // `nome_contato`. Pedir colunas inexistentes fazia a consulta ser
+        // recusada inteira e o painel "Dados do lead" ficava sempre vazio.
+        .select("id, nome_contato, email, telefone")
         .eq("id", conversa.contato_id!)
         .maybeSingle();
       if (error) throw error;
@@ -2913,7 +2919,7 @@ function LeadSheet({
                     <button
                       className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
                       onClick={() => {
-                        navigate(`/clientes/${cliente.slug ?? cliente.id}`);
+                        navigate(`/clientes/${slugify(cliente.empresa || "cliente")}-${cliente.id}`);
                         onOpenChange(false);
                       }}
                     >
@@ -2930,11 +2936,11 @@ function LeadSheet({
                     <button
                       className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
                       onClick={() => {
-                        navigate(`/contatos/${contato.slug ?? contato.id}`);
+                        navigate(`/contatos/${slugify(contato.nome_contato || "contato")}-${contato.id}`);
                         onOpenChange(false);
                       }}
                     >
-                      {contato.nome}
+                      {contato.nome_contato}
                       <ExternalLink className="h-3 w-3 opacity-50" />
                     </button>
                   </div>
