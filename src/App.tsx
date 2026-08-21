@@ -3,14 +3,17 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Suspense, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { PresenceProvider } from "@/hooks/use-presence";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { TelaBloqueio } from "@/components/shared/TelaBloqueio";
+import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PAYWALL_ATIVO, planoBloqueado } from "@/lib/plano-gate";
+import { secaoDaRota } from "@/lib/secoes";
+import { useSecaoLigada } from "@/hooks/use-secoes";
 // Todas as páginas entram por aqui, e não pelo `lazy` do React: o wrapper
 // traduz "o arquivo desta página sumiu do servidor depois de um deploy" num
 // erro reconhecível, em vez de deixar virar o "Algo deu errado" genérico.
@@ -295,7 +298,9 @@ function ProtectedRoute({
       key={ebKey}
       fallback={(error, _reset, codigo) => <TelaDeErro error={error} codigo={codigo} />}
     >
-      {children}
+      {/* Dentro do ErrorBoundary de propósito: a guarda herda a key por rota (ebKey) e um
+          erro dentro dela não escapa para o boundary da raiz. */}
+      <SecaoRoute>{children}</SecaoRoute>
     </ErrorBoundary>
   );
 }
@@ -356,6 +361,66 @@ function GestorRoute({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
   const isGestor = profile?.role === "admin" || profile?.role === "gestor" || profile?.role === "empresa";
   if (profile && !isGestor) return <Navigate to="/app" replace />;
+  return <>{children}</>;
+}
+
+/**
+ * Guarda de SEÇÃO: a empresa deste usuário tem a seção a que esta rota pertence?
+ *
+ * AdminRoute e GestorRoute olham o PAPEL da pessoa. Esta olha o que a EMPRESA contratou.
+ * As duas coisas se somam: a empresa define o que EXISTE, o papel define quem VÊ.
+ *
+ * Não recebe prop: descobre a seção pela rota. Rota que não pertence a seção nenhuma
+ * (/assinar, /admin/...) devolve null em secaoDaRota e passa direto — é isso que impede a
+ * tela de admin de seções de se auto-bloquear.
+ *
+ * Esconder o item do menu NÃO substitui isto. Qualquer usuário cria um atalho digitando o
+ * endereço à mão (SidebarAddItemDialog.tsx), e o padrão da empresa nunca remove item já
+ * salvo no menu pessoal. Sem esta guarda, desligar uma seção é decoração.
+ *
+ * NA DÚVIDA, ESPERA — não nega nem libera. AdminRoute nega com perfil nulo, GestorRoute
+ * libera; aqui não é preciso escolher, porque existe um terceiro estado honesto. Negar
+ * piscaria "sem acesso" na cara de quem tem acesso; liberar piscaria conteúdo que vai
+ * sumir. O "Carregando..." é o mesmo que o ProtectedRoute já mostra enquanto o perfil vem.
+ */
+function SecaoRoute({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const secao = secaoDaRota(location.pathname);
+  // O hook não pode ser condicional. 'configuracoes' não é desligável, então responde
+  // true na hora e não custa consulta — serve de valor neutro quando não há seção.
+  const { ligada, carregando } = useSecaoLigada(secao?.id ?? "configuracoes");
+
+  if (!secao) return <>{children}</>;
+
+  if (carregando || ligada === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
+        Carregando...
+      </div>
+    );
+  }
+
+  if (!ligada) {
+    return (
+      <TelaBloqueio
+        titulo="Seção não disponível"
+        descricao={
+          <>
+            A seção <strong className="text-foreground">{secao.label}</strong> não faz parte
+            do que está contratado para a sua empresa. Fale com o responsável pela conta se
+            precisar dela.
+          </>
+        }
+        icone={Lock}
+        tom="neutro"
+      >
+        <Button asChild className="w-full">
+          <Link to="/app">Voltar para Negócios</Link>
+        </Button>
+      </TelaBloqueio>
+    );
+  }
+
   return <>{children}</>;
 }
 

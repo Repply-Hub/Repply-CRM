@@ -10,6 +10,8 @@ import { useSidebarPreferences, SidebarItem, ROTA_APP } from '@/hooks/use-sideba
 import { useSaveSidebarEmpresaPadrao } from '@/hooks/use-sidebar-empresa-padrao';
 import { usePermissoes } from '@/hooks/use-permissoes';
 import { getIconComponent } from '@/lib/sidebar-icons';
+import { useSecoesDaEmpresa } from '@/hooks/use-secoes';
+import { SECOES } from '@/lib/secoes';
 import { SidebarAddItemDialog } from '@/components/layout/SidebarAddItemDialog';
 import { SidebarFavicon } from '@/components/layout/SidebarFavicon';
 import { useUnreadEmails, useUnreadChatMessages, useUnreadWaMessages } from '@/hooks/use-notificacoes';
@@ -125,6 +127,7 @@ export function AppSidebar() {
   // customizados criados em Configurações) passa pelo crivo de permissoes_usuario.
   const { data: permissoes } = usePermissoes(!isGestor ? vendedor?.id : undefined);
   const saveEmpresaPadrao = useSaveSidebarEmpresaPadrao();
+  const { mapa: secoesDaEmpresa } = useSecoesDaEmpresa();
 
   // Filter visible items, and for non-gestores also check permissoes_usuario
   const visibleItems = items.filter(i => {
@@ -137,6 +140,22 @@ export function AppSidebar() {
 
     // Itens exclusivos do admin master nunca aparecem para outros perfis
     if (ADMIN_ONLY_IDS.has(i.id)) return false;
+
+    // A empresa contratou esta seção?
+    //
+    // Vem ANTES do atalho de gestor de propósito: aquele `return true` libera tudo, e
+    // gestor/dono de uma empresa sem a seção continuariam vendo o item no menu.
+    //
+    // Enquanto o mapa não chegou, NÃO filtra: o menu aparece inteiro por um instante e
+    // depois encolhe. O contrário — esconder até saber — faria o menu piscar vazio a cada
+    // carregamento, que é pior de usar e assusta mais.
+    //
+    // Isto é conveniência de navegação. Quem recusa de verdade é o SecaoRoute (App.tsx) e,
+    // no Portal, a política do banco.
+    if (secoesDaEmpresa) {
+      const secao = SECOES.find(s => s.id === i.id);
+      if (secao?.desligavel && secoesDaEmpresa.get(secao.id) === false) return false;
+    }
 
     if (isGestor) return true; // gestores/empresa see all visible items
     // For vendedores e cargos customizados: check if they have pode_ver permission for this module
