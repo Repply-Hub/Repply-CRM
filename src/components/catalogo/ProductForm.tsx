@@ -244,7 +244,10 @@ export function ProductForm({ open, onOpenChange, fabricanteId: initialFabId, ed
                 máscara brasileira e entrega número puro já convertido. */}
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Preço de Varejo</Label><CampoMoeda value={preco} onChange={setPreco} required /></div>
-              <div><Label>Estoque Disponível</Label><CampoMoeda comPrefixo={false} value={estoque} onChange={setEstoque} /></div>
+              {/* `casasDecimais={3}`: estoque é QUANTIDADE, não dinheiro. Sem isto ele herda
+                  as 2 casas do padrão e passa a completar zero — um estoque de 10,5 abriria
+                  como "10,50", sugerindo centavo onde a unidade é peça, metro ou saco. */}
+              <div><Label>Estoque Disponível</Label><CampoMoeda comPrefixo={false} casasDecimais={3} value={estoque} onChange={setEstoque} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

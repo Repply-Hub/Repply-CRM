@@ -877,22 +877,30 @@ function NovoNegocioFormContent({
                               </Select>
                             </TableCell>
                             <TableCell>
-                              {/* Quantidade NÃO é dinheiro, então continua campo numérico do
-                                  navegador. Só o step mudou: a coluna do banco é
-                                  numeric(10,3) e as unidades incluem metro quadrado e
-                                  quilograma, mas o step="1" antigo dava a entender que
-                                  quantidade quebrada não podia. O onWheel que tira o foco
-                                  existe porque em type="number" a roda do mouse altera o
-                                  valor sozinha — aqui não dá para trocar por texto, então a
-                                  defesa é soltar o campo antes de a roda mexer nele. */}
-                              <Input
+                              {/* Quantidade não é dinheiro, mas também não é campo do
+                                  navegador: o step="0.001" PROMETIA quantidade quebrada que o
+                                  type="number" não deixava digitar. Ao teclar a vírgula o
+                                  navegador considera o valor inválido e devolve string VAZIA;
+                                  o parseFloat('') || 0 gravava zero e o campo controlado
+                                  reescrevia "0" por cima de quem estava escrevendo. Vender
+                                  1,5 m² ou 0,75 tonelada ficava impossível pelo caminho que o
+                                  brasileiro usa.
+                                  casasDecimais={3} porque itens_pedido.quantidade é
+                                  numeric(10,3) — é o TETO do que dá para digitar, não ordem de
+                                  exibir três casas: 1,5 continua "1,5", porque "1,500" se lê
+                                  como mil e quinhentos.
+                                  Sem type="number", o onWheel e o min="0" saem juntos: roda de
+                                  mouse não mexe em campo de texto, e o CampoMoeda já recusa
+                                  negativo por padrão. O placeholder é "0" na mão porque o
+                                  padrão do componente é "0,00", que é cara de dinheiro em
+                                  coluna de quantidade. */}
+                              <CampoMoeda
+                                comPrefixo={false}
+                                casasDecimais={3}
+                                placeholder="0"
                                 className="h-8 text-xs"
-                                type="number"
-                                min="0"
-                                step="0.001"
                                 value={item.quantidade}
-                                onWheel={(e) => e.currentTarget.blur()}
-                                onChange={e => updateItem(item.id, 'quantidade', parseFloat(e.target.value) || 0)}
+                                onChange={(v) => updateItem(item.id, 'quantidade', v ?? 0)}
                               />
                             </TableCell>
                             <TableCell>

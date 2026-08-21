@@ -3,7 +3,7 @@
 O que está quebrado, mal resolvido ou pendente neste sistema, com **o custo real** e **a
 ordem de conserto**. Escrito para que ninguém precise redescobrir cada item.
 
-Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 27
+Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 28
 acrescentados em 21/08/2026.
 
 > **Este documento não é lista de desejos.** Cada item aqui já tem consequência medida ou
@@ -42,6 +42,7 @@ acrescentados em 21/08/2026.
 | 25 | [522 tamanhos de fonte travados em pixel](#25-522-tamanhos-de-fonte-travados-em-pixel) | Média | Não |
 | 26 | [Cabeçalho de página sem slot de ação](#26-o-cabeçalho-de-página-não-tem-slot-de-ação-e-7-páginas-o-remontam-à-mão) | Baixa | Não |
 | 27 | [`src/data/mockData.ts` órfão](#27-srcdatamockdatats-é-arquivo-órfão) | Baixa | Não |
+| 28 | [Busca de negócio filtra por lista de ids na URL](#28-a-busca-de-negócio-filtra-por-lista-de-ids-na-url-e-por-isso-tem-teto) | Média | Não — mas a busca fica incompleta com termo curto |
 
 ---
 
@@ -661,6 +662,32 @@ batida ou comissão com os números atuais precisa ser avisado **antes**.
 Negócio novo não consegue mais entrar em etapa final sem data: o gatilho
 `fn_set_pedido_fechado_em` passou a garantir isso (ver Resolvidos, 21/08/2026).
 
+### O diagnóstico dos 2 negócios sem data — a versão que funciona
+
+> ⚠️ **O bloco comentado da migration convida a rodar uma consulta que não roda.** Na linha
+> 171 de `20260821120100_data_fechamento_em_todos_os_caminhos.sql`, sob o título
+> "Diagnóstico:", a consulta pede `p.nome_negocio` — **coluna que não existe**. A coluna
+> certa é `p.nome` (confira em `src/integrations/supabase/types.ts`). Quem copiar o bloco
+> como está recebe `ERROR: 42703: column p.nome_negocio does not exist` no meio de uma
+> investigação, e o mais provável é concluir que a migration está errada em vez de
+> desconfiar do nome do campo.
+>
+> **A migration não pode ser corrigida** — ela já rodou em produção e o arquivo é o
+> registro do que rodou (`CLAUDE.md` §6.3). Por isso a versão boa mora aqui.
+
+```sql
+-- Os negócios em etapa final que ficaram sem data de fechamento.
+-- Confirmado em 21/08/2026 na produção: continuam sendo 2.
+SELECT p.id, p.nome, p.status, p.data_pedido, p.prazo_resposta, p.fechado_em
+FROM public.pedidos p
+WHERE p.status IN ('fechamento', 'perdido') AND p.prazo_resposta IS NULL;
+```
+
+O **reparo** proposto (o `UPDATE` que puxa a data do histórico de status e cai na data de
+criação quando não há registro) está logo abaixo do diagnóstico na mesma migration e
+**não tem esse erro** — ele só cita `id`, `status` e as colunas de data. Pode ser copiado
+como está, depois de autorizado.
+
 ---
 
 ## 20. Empresa "MD" duplicada com 6.374 negócios órfãos
@@ -966,17 +993,80 @@ referencia.
 
 ---
 
+## 28. A busca de negócio filtra por lista de ids na URL, e por isso tem teto
+
+**Gravidade: média. Sintoma agudo tapado em 21/08/2026 (`0935a27c`); a causa continua.**
+
+Buscar um negócio por nome de cliente ou de fabricante exige casar contra **outra tabela**.
+O PostgREST não filtra `pedidos` por uma coluna de `clientes` embutida no `select()`, então
+o código faz em dois passos: primeiro descobre **os ids** de cliente e de fabricante que
+batem com o termo, depois filtra `pedidos` por esses ids num `.or()`.
+
+**O problema é que esse `.or()` viaja na URL.** Cada id ocupa cerca de 37 bytes ali dentro.
+Medido nesta base em 21/08/2026 (2.109 clientes no total):
+
+| Termo digitado | Clientes que casam | O que isso gera |
+|---|---|---|
+| `co` — começo de **Co**nstrutora, **Co**mércio, **Co**ndomínio | **1.066** | URL de **~39 KB**. O servidor recusa antes de a consulta chegar ao banco |
+| `ar` | **783** | ~29 KB |
+| `cons` | **603** | ~22 KB |
+| `co`, casando só por **prefixo** (`ilike 'co%'`) | **244** | ~9 KB — melhora muito, e ainda assim não cabe num teto de 60 |
+
+As **contagens** acima foram medidas no banco; os tamanhos de URL saem da mesma conta de
+~37 bytes por id. Ou seja: a busca falhava **justamente nos termos mais usados do ramo**, e
+falhava com cara de erro genérico.
+
+### O que foi feito (e o que ficou faltando)
+
+`0935a27c` pôs um teto: `PEDIDOS_OPTIONS_TETO_IDS = 60`
+(`src/hooks/use-pedidos.ts:373`), com `order` antes do `limit` para que a mesma busca não
+devolva 60 clientes diferentes a cada digitada. A busca **sempre responde** agora — em
+troca, **fica incompleta quando o termo é curto e comum**: com "co", 60 clientes de 1.066
+entram no filtro, e os negócios dos outros 1.006 só aparecem se o **nome do próprio
+negócio** casar com o termo. `TarefaFormDialog` avisa na tela que a lista pode estar
+cortada, o que é honesto, mas não é a mesma coisa que achar o negócio.
+
+**O conserto definitivo é uma RPC `SECURITY DEFINER`** que faça o casamento do texto
+**dentro do banco**, sem trafegar id nenhum pela URL. É exatamente o padrão que o
+`CLAUDE.md` §7.4 já manda usar para busca textual, e que `wa_buscar_mensagens` já usa
+(12.013 ms → 22 ms). Some o teto, some a URL gigante e some o problema de índice sob RLS de
+uma vez só.
+
+### 🔴 São DOIS lugares, e o outro é anterior e pior
+
+`resolveSearchMatches` (`src/hooks/use-pedidos.ts:140`) — que alimenta a **busca da tela de
+Negócios**, não a do formulário de tarefas — tem o **mesmo defeito** e **nenhum teto
+escrito no código**:
+
+```ts
+supabase.from('clientes').select('id').ilike('empresa', `%${trimmedSearch}%`)
+```
+
+Sem `order`, sem `limit`. O que segura o tamanho hoje é o teto padrão de linhas do próprio
+PostgREST, que ninguém escolheu para este caso. O resultado vai inteiro para
+`buildSearchOrClause` e daí para a URL. É código mais antigo que o do formulário de
+tarefas, e está na tela que a MD usa o dia todo.
+
+> **Quando a RPC for feita, as duas migram juntas.** Migrar só uma deixa o sistema com duas
+> buscas que respondem coisas diferentes para o mesmo termo digitado — e a que continuar
+> por id vai seguir quebrando em silêncio nos termos comuns, agora sem ninguém procurando
+> por isso.
+
+---
+
 ## Resolvidos
 
 ### 21/08/2026 — leva de dashboard, data de fechamento, dinheiro e responsividade
 
-> ⚠️ **Código escrito, ainda não commitado; as duas migrations ainda NÃO foram aplicadas
-> no banco.** Escrever migration não é aplicá-la. Enquanto elas não subirem, o Dashboard
-> em produção continua contando dinheiro por data de criação. Confira antes de tratar
-> qualquer linha desta seção como fato na tela do cliente.
+> ✅ **Commitado e no ar; as duas migrations foram aplicadas.** Conferido no banco em
+> 21/08/2026: existem `dashboard_stats`, `plano_vendas_progresso(p_date_from, p_date_to)` e
+> o gatilho `trg_pedidos_set_fechado_em`. Cada linha desta seção já é fato na tela do
+> cliente.
 >
 > As migrations são `20260821120000_dashboard_datas_por_fechamento.sql` e
-> `20260821120100_data_fechamento_em_todos_os_caminhos.sql`.
+> `20260821120100_data_fechamento_em_todos_os_caminhos.sql`. **Nenhuma das duas pode ser
+> editada** — o arquivo é o registro do que rodou (`CLAUDE.md` §6.3). Correção do
+> diagnóstico comentado que ficou com erro de digitação: [item 19](#19-11903-negócios-com-data-trocada-em-produção).
 
 | O que estava errado | Como foi resolvido |
 |---|---|
@@ -994,6 +1084,7 @@ referencia.
 | **A tira de abas era cortada em tela estreita.** Em Configurações, as últimas abas (Campos e Empresa) simplesmente sumiam no celular, sem barra de rolagem em lugar nenhum — funcionalidade inteira inacessível, sem nada indicando que existia | `src/lib/toggle-group-styles.ts` ganhou `max-w-full overflow-x-auto`, `[&>*]:shrink-0` e `justify-start` |
 | **Em Fabricantes o botão "Novo" era literalmente recortado**, e `xl:col-span-3` fazia a coluna **encolher ~100px** ao cruzar 1280px — era por isso que reduzir o zoom um passo piorava antes de melhorar, e o cliente precisava reduzir várias vezes | `flex-wrap` no cabeçalho do card, `min-w-0` no título, `shrink-0` nos botões; `2xl:col-span-3` no lugar de `xl:`; altura `h-full` no lugar de `h-[795px]` fixos |
 | **Faltava busca em 10 pontos** onde a lista já não cabe no olho: contatos, negócio na tarefa, linhas ignoradas, filtros de fabricante e marcador em Negócios, marcador nos formulários, fabricante padrão do catálogo, marcadores de e-mail e referência do produto | Barras de busca acrescentadas. A de negócio na tarefa vai ao **servidor** a partir de 2 letras (com 300ms de represa) — dropdown com teto de 50 resultados, não relatório |
+| **A busca de negócio recém-criada montava uma URL de 39 KB e o servidor recusava.** O termo "co" — começo de Construtora, Comércio e Condomínio — casa com **1.066** clientes, e cada id ocupa ~37 bytes no filtro que viaja na URL. Falhava justamente nos termos mais usados do ramo | `0935a27c` — teto de 60 ids (`PEDIDOS_OPTIONS_TETO_IDS`), com `order` antes do `limit` para o resultado não mudar sozinho entre uma digitada e outra, e aviso na tela quando a lista sai cortada. **É contenção, não cura:** a causa e o conserto definitivo (RPC `SECURITY DEFINER`) estão no [item 28](#28-a-busca-de-negócio-filtra-por-lista-de-ids-na-url-e-por-isso-tem-teto) |
 
 **A causa estrutural da responsividade continua de pé e precisa estar registrada:** o app
 tira a rolagem do documento (`src/index.css:165` — `html, body, #root { overflow: hidden }`)

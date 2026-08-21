@@ -301,6 +301,27 @@ O estrago real: três negócios gravados mil vezes maiores que o certo, o pior d
 `parseMoedaBRL` / `formatarMoedaBRL` (`src/lib/moeda.ts`) para ler e mostrar valor. Nunca
 `parseFloat` em dinheiro, nunca `type="number"` em campo com máscara.
 
+**Quantidade também não é `type="number"`.** `itens_pedido.quantidade` é `numeric(10,3)`, e
+metro quadrado e quilo pedem casa quebrada — mas a mesma vírgula que o campo de número
+recusa é a que o usuário brasileiro digita. Use `<CampoMoeda comPrefixo={false}
+casasDecimais={3}>`: é a máscara, sem o "R$".
+
+**Completar as casas decimais é comportamento de DINHEIRO. Para quantidade é o contrário:**
+
+- Dinheiro sempre tem duas casas. `"1.234,5"` é um valor meio escrito, e completar para
+  `"1.234,50"` ao sair do campo só mostra o que já estava guardado.
+- Quantidade não. Completar `1,5` para `"1,500"` cria um número que **se lê como mil e
+  quinhentos** — o formato americano de milhar, na tela de quem escreve `1.500`. Uma
+  unidade e meia vira mil e quinhentas sem nada mudar no banco.
+
+`casasDecimais={3}` é o **teto** do que se pode digitar, nunca uma ordem de exibir três
+casas. Complete casas só onde a unidade é dinheiro.
+
+**Campo apagado não é zero.** Enquanto a pessoa digita, campo vazio tem que ficar vazio: se
+o pai converte `null` em `0` e devolve, o campo salta para `"0"` com o cursor no fim, no
+meio da troca do número — e redigitar é onde o erro nasce. Vazio e zero valem o mesmo
+número; brigar com quem está digitando é pior que a diferença.
+
 ### 7.11 Modal sem teto de altura prende o usuário na tela
 
 O `DialogContent` do shadcn **não tem teto de altura nem rolagem**, e é centralizado por

@@ -62,7 +62,7 @@ export function formatarMoedaBRL(valor: number | null | undefined): string {
  * Devolve texto no padrão brasileiro cru — só dígitos e, no máximo, uma vírgula.
  * Não use na digitação: veja o cabeçalho do arquivo.
  */
-export function normalizarSeparadoresMoeda(bruto: string): string {
+export function normalizarSeparadoresMoeda(bruto: string, casas = 2): string {
   const limpo = (bruto ?? '').replace(/[^\d.,]/g, '');
   const temPonto = limpo.includes('.');
   const temVirgula = limpo.includes(',');
@@ -77,7 +77,18 @@ export function normalizarSeparadoresMoeda(bruto: string): string {
     const depoisDoPonto = limpo.slice(limpo.lastIndexOf('.') + 1);
     const umPontoSo = limpo.split('.').length === 2;
     // "1234.56" tem cara de centavo; "1.234" e "1.234.567" têm cara de milhar.
-    return umPontoSo && depoisDoPonto.length > 0 && depoisDoPonto.length <= 2
+    //
+    // O teto é `casas`, não 2 fixo, e isso não é detalhe: num campo de QUANTIDADE
+    // (3 casas) a planilha americana escreve "0.750", e a regra de 2 dígitos lia
+    // isso como milhar — 0,75 virava 750, mil vezes maior. Como `preco_total` é
+    // coluna gerada (quantidade x preço) e `pedidos.valor_total` é a soma dela, o
+    // negócio inteiro ficava mil vezes maior. É a mesma família do 106.387.320,00
+    // que motivou este arquivo, só que entrando pela colagem.
+    //
+    // O que continua ambíguo, e não tem como resolver sem adivinhar: colar
+    // "1.500" num campo de 3 casas é lido como 1,5. Quem quiser mil e quinhentos
+    // digita, ou cola sem o ponto. Formato não carrega essa informação.
+    return umPontoSo && depoisDoPonto.length > 0 && depoisDoPonto.length <= casas
       ? limpo.replace('.', ',')
       : limpo.replace(/\./g, '');
   }
@@ -122,6 +133,13 @@ export function formatarDigitacaoMoeda(bruto: string, casas = 2, permitirNegativ
  */
 export function parseMoedaBRL(bruto: string, casas = 2, permitirNegativo = false): number | null {
   const { negativo, corpo } = separarSinal(bruto ?? '', permitirNegativo);
+  // `casas` NÃO é repassado aqui, de propósito. Esta função lê o texto que JÁ
+  // está no campo, e esse texto foi escrito pela nossa própria máscara — nele o
+  // ponto é sempre separador de milhar. Repassar `casas` faria "1.500" num campo
+  // de 3 casas (mil e quinhentas unidades, agrupadas por nós) ser lido como 1,5.
+  // A adivinhação ponto x vírgula só vale para texto vindo de FORA, e o único
+  // caminho que traz texto de fora é a colagem — que chama a normalização direto,
+  // com `casas`.
   const limpo = normalizarSeparadoresMoeda(corpo);
   if (!/\d/.test(limpo)) return null;
 
@@ -137,20 +155,60 @@ export function parseMoedaBRL(bruto: string, casas = 2, permitirNegativo = false
 /**
  * Número vindo do banco → texto formatado do campo.
  *
- * Não completa casas decimais à toa (1234 vira "1.234", não "1.234,00"), que é
- * o comportamento que o campo de meta já tem em produção.
+ * Valor REDONDO não ganha casa decimal à toa: 1234 vira "1.234", não
+ * "1.234,00". É o comportamento que o campo de meta já tem em produção.
+ *
+ * Valor QUEBRADO em dinheiro mostra as duas casas: 1234.5 vira "1.234,50".
+ * Antes virava "1.234,5", porque a função cortava todo zero à direita — e um
+ * negócio de R$ 1.234,50 aberto como "1.234,5" faz quem confere contra o pedido
+ * ou a nota ler uma casa faltando e entender 1.234,05. Esconder centavo é
+ * exatamente a confusão que este campo nasceu para eliminar.
+ *
+ * @param completarDecimais completar as casas é comportamento de DINHEIRO, não
+ *              de quantidade — por isso o padrão sai de `casas === 2`. Com
+ *              `casas = 3` (metro quadrado, quilo) o corte tem que continuar:
+ *              uma quantidade de 1,5 escrita como "1,500" é PIOR que o defeito
+ *              original, porque brasileiro lê "1,500" e pensa em mil e
+ *              quinhentos. Quem chama para dinheiro ganha o comportamento novo
+ *              sem mudar nada; quem chama para quantidade continua cortando.
  *
  * Valor negativo é mostrado com o sinal mesmo quando o campo não deixa digitar
  * negativo: se um dia existir um no banco, esconder seria pior que mostrar.
  */
-export function numeroParaCampoMoeda(n: number | null | undefined, casas = 2): string {
+export function numeroParaCampoMoeda(
+  n: number | null | undefined,
+  casas = 2,
+  completarDecimais = casas === 2,
+): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return '';
 
   const negativo = n < 0;
-  const [inteiro, decimal = ''] = Math.abs(n).toFixed(casas).split('.');
-  const decimalSemZeroAtoa = decimal.replace(/0+$/, '');
-  const texto = decimalSemZeroAtoa
-    ? `${agruparMilhar(inteiro)},${decimalSemZeroAtoa}`
+  // `toLocaleString` e não `toFixed`: os dois arredondam diferente em valor que
+  // cai no meio do centavo, porque `toFixed` olha o binário exato e o `Intl` olha
+  // a representação decimal curta. Meio centavo deixou de ser hipótese quando a
+  // quantidade passou a aceitar casa quebrada: 0,5 x R$ 629,13 = 314,565, e o
+  // campo mostrava 314,56 enquanto "Preço Total" e "Total dos Itens", na MESMA
+  // tela, mostravam R$ 314,57 — que é também o que o banco guarda. Usando o mesmo
+  // formatador de `formatarMoedaBRL`, os três passam a concordar sempre.
+  const [inteiro, decimal = ''] = Math.abs(n)
+    .toLocaleString('pt-BR', {
+      minimumFractionDigits: casas,
+      maximumFractionDigits: casas,
+      useGrouping: false,
+    })
+    .split(',');
+
+  // Decimal inteiramente zero some inteiro, nos dois modos: é o valor redondo
+  // ficando limpo. Só quando existe algum dígito significativo é que a decisão
+  // acima entra em cena.
+  const temDecimalSignificativo = /[1-9]/.test(decimal);
+  let decimalExibido = '';
+  if (temDecimalSignificativo) {
+    decimalExibido = completarDecimais ? decimal : decimal.replace(/0+$/, '');
+  }
+
+  const texto = decimalExibido
+    ? `${agruparMilhar(inteiro)},${decimalExibido}`
     : agruparMilhar(inteiro);
 
   return negativo ? `-${texto}` : texto;

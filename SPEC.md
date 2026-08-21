@@ -357,6 +357,9 @@ tabela `pedidos` já tem milhares de linhas.
 > [`docs/modulos/dashboard.md`](docs/modulos/dashboard.md) — métrica a métrica, com o
 > porquê de cada escolha.
 
+> 🔴 **A meta do Plano de Vendas é sempre a do mês inteiro, mesmo em período curto** —
+> comportamento aceito, não defeito. Antes de "arrumar" a conta, leia §10.12.
+
 ### 5.7 Calendário, Tarefas e Chat
 
 **Calendário** — eventos com participantes, criação em lote, visão por mês/semana/dia.
@@ -835,6 +838,44 @@ desenho e ganhando um seletor Maior/Menor.
 Dois cartões para o mesmo número fazem a tela parecer maior do que a informação que ela
 tem, e obrigam quem olha a conferir se são a mesma coisa. Ficou a rosca, que já agrupa as
 fábricas pequenas em "Outros" com o detalhe ao passar o mouse.
+
+### 10.12 A meta do Plano de Vendas não é rateada pelos dias do período
+
+*Decisão de 21/08/2026.* **Comportamento aceito, não defeito pendente.**
+
+O Plano de Vendas soma as metas de **todos os meses que o período toca**, inteiras, e
+compara com o vendido **daquele período**. A meta não encolhe quando o recorte é menor que
+um mês. Medido na produção em 21/08/2026, chamando a própria função:
+
+| Período escolhido na tela | Meta somada | Vendido | Progresso |
+|---|---|---|---|
+| Agosto inteiro — 01 a 31/08 | R$ 4.500.000 | R$ 1.009.359 | **22,4%** |
+| Só 15 a 20/08 | R$ 4.500.000 | R$ 277.297 | **6,2%** |
+| Só o dia 20/08 | R$ 4.500.000 | R$ 0 | **0,0%** |
+
+Ou seja: escolher "últimos 7 dias" faz a barra indicar fracasso num mês que está indo
+normalmente. **O Lucas foi informado com exatamente estes números e decidiu manter assim.**
+
+**Por quê.** Meta, no ramo da representação, é compromisso do **mês** — é assim que a
+fábrica cobra e é assim que a comissão é conferida. Ratear por dia não teria significado:
+venda de representação não chega diluída em trinta parcelas iguais, um pedido grande
+resolve a semana e uma semana sem fechar nada é rotina, não fracasso. "Meta proporcional a
+6 dias" seria número inventado pelo sistema — e este CRM registra, não interpreta (§3.5).
+
+**A alternativa foi considerada e recusada.** Ratear a meta pelos dias do recorte deixaria
+a barra "bonita" em qualquer período e, em troca, criaria um segundo número de meta
+convivendo com o do mês. Duas metas para o mesmo mês é como a bagunça das datas começou
+(§10.8).
+
+**Como a seção deve ser lida:** ela responde *"quanto da meta do(s) mês(es) que este
+período toca já foi vendido dentro deste período"*. Para conferir se o mês está batendo,
+escolha o mês inteiro. Recorte curto serve para ver **o vendido**, não para julgar a meta.
+
+> 🔴 **Não "conserte" isto por conta própria.** Parece bug numa revisão de código — já foi
+> apontado como bug uma vez. Mexer aqui muda o número que o cliente usa para cobrar equipe
+> e conferir comissão: é mudança do que ele vê e do que ele paga, e exige falar com o Lucas
+> antes (`CLAUDE.md` §11). Detalhe técnico em
+> [`docs/modulos/dashboard.md`](docs/modulos/dashboard.md) §7.
 
 ### 10.7 A soma é feita no banco, não no navegador
 

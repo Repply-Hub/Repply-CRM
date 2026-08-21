@@ -109,6 +109,21 @@ export const CampoMoeda = React.forwardRef<HTMLInputElement, CampoMoedaProps>(fu
   // impede o campo de brigar com quem está digitando: "1.234," e "1.234" valem
   // o mesmo número, e o campo precisa deixar a vírgula em paz.
   React.useEffect(() => {
+    // CAMPO VAZIO + valor 0 vindo de fora NÃO é divergência.
+    // Campo vazio entrega `null` ao pai, mas há tela que converte esse `null`
+    // em zero antes de guardar (o preço unitário do item do pedido faz isso).
+    // O zero volta, bate contra `parseMoedaBRL('') === null`, e sem esta linha o
+    // efeito reescreveria o campo como "0" e jogaria o cursor para o fim — no
+    // meio da digitação de quem só queria trocar o número. Vazio e zero são a
+    // mesma intenção do usuário neste instante; brigar com quem está digitando
+    // é pior que a diferença.
+    //
+    // A troca consciente: se o pai definir 0 vindo de OUTRO lugar (limpar
+    // formulário, resposta do servidor) enquanto o campo estiver vazio, o "0"
+    // não aparece sozinho — o campo fica vazio, que vale o mesmo número.
+    const campoVazio = texto === '';
+    if (campoVazio && value === 0) return;
+
     if (parseMoedaBRL(texto, casasDecimais, permitirNegativo) !== value) {
       setTexto(numeroParaCampoMoeda(value, casasDecimais));
     }
@@ -184,7 +199,7 @@ export const CampoMoeda = React.forwardRef<HTMLInputElement, CampoMoedaProps>(fu
     // Texto colado vem de fora (planilha, e-mail, WhatsApp) e pode estar em
     // qualquer padrão: "R$ 1.234,56", "1234.56" ou "1,234.56". Aqui — e só aqui —
     // o ponto pode significar centavo, então a decisão é de outra função.
-    const pedaco = normalizarSeparadoresMoeda(colado);
+    const pedaco = normalizarSeparadoresMoeda(colado, casasDecimais);
     aplicar(`${campo.value.slice(0, ini)}${pedaco}${campo.value.slice(fim)}`, ini + pedaco.length);
     onPaste?.(e);
   }

@@ -8,9 +8,10 @@ Estado: descrito a partir do código de **21/08/2026**, migrations
 `20260821120000_dashboard_datas_por_fechamento.sql` e
 `20260821120100_data_fechamento_em_todos_os_caminhos.sql`.
 
-> ⚠️ **As duas migrations acima estavam escritas e ainda não aplicadas** quando este
-> documento foi escrito. Escrever migration não é aplicá-la — confira antes de confiar nos
-> números da tela (`CLAUDE.md` §9).
+> ✅ **As duas migrations acima já foram aplicadas em produção.** Conferido no banco em
+> 21/08/2026: existem `dashboard_stats`, `plano_vendas_progresso(p_date_from, p_date_to)` e
+> o gatilho `trg_pedidos_set_fechado_em`. O que este documento descreve é o que a tela do
+> cliente mostra hoje — não é plano.
 
 ---
 
@@ -186,7 +187,8 @@ Agora a função recebe o intervalo e:
 - soma o vendido do intervalo inteiro, por `prazo_resposta`.
 
 **Meta é valor mensal.** Um período que pega meia agosto soma a meta **cheia** de agosto —
-ratear meio mês seria inventar número.
+ratear meio mês seria inventar número. Isso tem consequência visível na tela e é decisão
+registrada do Lucas: leia o quadro no fim desta seção antes de tratar como bug.
 
 **A soma é feita mês a mês antes de virar total.** A regra "usa a meta de equipe; se não
 houver, usa a soma das individuais" vale **por mês**. Somar tudo primeiro e aplicar a regra
@@ -201,6 +203,40 @@ nova — assim o banco pode subir antes da tela sem quebrar nada.
 > parte das metas individuais. Se só uma trocar de coluna de data ou de janela, o total da
 > seção e a quebra "Por vendedor" passam a discordar na tela — e ninguém consegue dizer
 > qual das duas está certa.
+
+### 🔴 Período menor que um mês mostra a meta do mês inteiro — e isso é decisão, não defeito
+
+**Não "conserte" isto sem falar com o Lucas antes.** Parece bug quando você olha a tela, e
+já foi apontado como bug numa revisão de código. Não é: é a escolha do dono do produto,
+tomada em 21/08/2026 com estes números na frente.
+
+O que a própria função devolve, medido na produção em 21/08/2026:
+
+| Período escolhido na tela | Meta somada | Vendido | Progresso na barra |
+|---|---|---|---|
+| Agosto inteiro — 01 a 31/08 | R$ 4.500.000 | R$ 1.009.359 | **22,4%** |
+| Só 15 a 20/08 | R$ 4.500.000 | R$ 277.297 | **6,2%** |
+| Só o dia 20/08 | R$ 4.500.000 | R$ 0 | **0,0%** |
+
+A meta **não muda** com o tamanho do recorte. Ela é sempre a soma das metas dos meses que o
+período toca — meio agosto soma a meta cheia de agosto, e o dia 20 sozinho também. Só o
+vendido encolhe. Consequência prática: escolher "últimos 7 dias" faz a barra de progresso
+indicar fracasso num mês que está indo normalmente.
+
+**Por que fica assim.** Meta, no ramo da representação, é compromisso do **mês**. Ratear
+por dia não teria significado: venda de representação não chega diluída em trinta parcelas
+iguais — um pedido grande resolve a semana, e uma semana inteira sem fechar nada é rotina,
+não fracasso. Uma "meta proporcional a 6 dias" seria número inventado pelo sistema, e o
+`SPEC.md` §3.5 já diz que este CRM registra, não interpreta.
+
+**Como ler a seção sem se enganar:** o Plano de Vendas responde "quanto da meta do(s)
+mês(es) que este período toca já foi vendido **dentro deste período**". Para conferir se o
+mês está batendo, escolha o mês inteiro. Recorte curto serve para ver **o vendido**, não
+para julgar a meta.
+
+> **Antes de mexer:** ratear a meta por dia muda o número que o cliente usa para cobrar
+> equipe e conferir comissão. É mudança do que ele vê e do que ele paga — cai direto na
+> lista do `CLAUDE.md` §11. Decisão registrada em `SPEC.md` §10.12.
 
 ---
 
@@ -281,6 +317,11 @@ venda sumir do Faturamento Total e do Plano de Vendas**, sem avisar ninguém.
 Medido em 21/08/2026, na produção. **Diagnóstico e comandos de reparo estão prontos e
 comentados no fim da migration `20260821120100` — nada foi executado, depende de
 autorização do Lucas.**
+
+> ⚠️ **O diagnóstico comentado dentro daquela migration tem um erro de digitação e não
+> roda como está** (cita `p.nome_negocio`, coluna que não existe). A migration não pode ser
+> editada — ela já rodou, e o arquivo é o registro do que rodou. **A consulta corrigida,
+> pronta para copiar, está no [item 19 da dívida técnica](../divida-tecnica.md#19-11903-negócios-com-data-trocada-em-produção).**
 
 | Achado | Tamanho | Consequência na tela |
 |---|---|---|
