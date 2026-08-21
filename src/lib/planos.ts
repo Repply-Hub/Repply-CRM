@@ -36,9 +36,13 @@ export const PLANOS: Plano[] = [
     destaque: true,
     selo: 'Condição de lançamento',
     // Curtos de propósito: são exibidos numa linha só, lado a lado.
+    // "Todos os módulos" saiu em 21/08/2026. Com o controle de acesso por empresa, o
+    // assinante NÃO recebe todos: o Portal de Consultas é exclusivo da MD Representações
+    // (SPEC.md §11). Prometer "todos" e entregar menos é o tipo de coisa que o cliente
+    // descobre sozinho, no pior momento. A lista agora nomeia o que ele de fato recebe.
     beneficios: [
       'Usuários ilimitados',
-      'Todos os módulos',
+      'Funil, clientes, obras e catálogo',
       'WhatsApp e e-mail',
       'Importação da sua base',
       'Suporte direto com o time',

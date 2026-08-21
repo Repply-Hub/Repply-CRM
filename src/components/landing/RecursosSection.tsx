@@ -3,7 +3,6 @@ import {
   ClipboardList,
   Factory,
   FileSpreadsheet,
-  Globe,
   HardHat,
   History,
   Kanban,
@@ -16,8 +15,13 @@ import {
 } from 'lucide-react';
 import { HeaderSecao, LPSection } from './LPSection';
 
-// Os dois primeiros ganham card duplo porque são o que o concorrente genérico
-// não tem: o WhatsApp de verdade dentro do CRM e a prospecção por licença de obra.
+// Os dois ganham card duplo porque são o que o concorrente genérico não tem: o WhatsApp
+// de verdade dentro do CRM e a obra como objeto de primeira classe.
+//
+// O segundo card era o Portal de Consultas. Saiu em 21/08/2026: o Portal é exclusivo da MD
+// Representações (SPEC.md §11), então anunciá-lo aqui prometia ao assinante algo que ele
+// não recebe. Obras ocupou o lugar por ser o diferencial que TODO assinante recebe — o
+// SPEC.md §5 a chama de "o diferencial que motivou o produto a existir".
 const DESTAQUES = [
   {
     icone: MessageCircle,
@@ -26,17 +30,16 @@ const DESTAQUES = [
       'Todas as conversas do time num painel só, com áudio, imagem, documento, resposta citada e reação. Cada conversa se liga ao cliente e ao negócio, então quem assume no lugar do colega entra sabendo o que já foi combinado.',
   },
   {
-    icone: Globe,
-    titulo: 'Ache a obra antes do concorrente',
+    icone: HardHat,
+    titulo: 'A obra no centro, não o contato',
     texto:
-      'O Portal consulta licenças ambientais e publicações oficiais e traz obra nova com responsável e endereço. Em vez de esperar o cliente ligar, você chega quando o projeto ainda está saindo do papel.',
+      'Cada obra com endereço no mapa, CNPJ da SPE, responsáveis e todos os negócios ligados a ela. Você vê o que já vendeu para aquele canteiro e o que ainda dá para vender — em vez de descobrir pelo vendedor que passou lá na semana passada.',
   },
 ];
 
 const RECURSOS = [
   { icone: Kanban, titulo: 'Funil configurável', texto: 'Etapas e funis do jeito da sua operação, com arrastar e soltar.' },
   { icone: Users, titulo: 'Clientes e contatos', texto: 'Carteira com histórico de cada visita, ligação e proposta.' },
-  { icone: HardHat, titulo: 'Obras no mapa', texto: 'Cada obra com endereço, responsáveis e os negócios ligados a ela.' },
   { icone: Factory, titulo: 'Fabricantes e tabelas', texto: 'Catálogo com tabela de preço por fabricante, sempre à mão.' },
   { icone: Mail, titulo: 'E-mail integrado', texto: 'Gmail conectado: envie a proposta sem sair do negócio.' },
   { icone: LayoutDashboard, titulo: 'Dashboard', texto: 'Faturamento, conversão e o que ainda dá para fechar no mês.' },
