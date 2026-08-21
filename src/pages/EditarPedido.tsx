@@ -595,13 +595,26 @@ const EditarPedido = () => {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
+                        {/* defaultMonth: sem ele o react-day-picker abre sempre no mês de hoje —
+                            corrigir a data de um negócio importado de 2022 exigia clicar na seta
+                            dezenas de vezes. Como o PopoverContent do Radix desmonta o conteúdo
+                            ao fechar, o calendário monta de novo a cada abertura e recalcula o
+                            mês: o defaultMonth (não controlado) basta, sem month/onMonthChange.
+                            Passamos exatamente o mesmo valor de `selected`, pra abrir sempre no
+                            mês do dia que está marcado. */}
                         <Calendar
                           mode="single"
                           selected={dataPedido}
+                          defaultMonth={dataPedido}
                           onSelect={(d) => {
                             if (d) {
-                              const localDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60 * 1000));
-                              setDataPedido(localDate);
+                              // Sem conversão de fuso: o calendário já entrega meia-noite
+                              // LOCAL, e é o fuso local que `format(d,'yyyy-MM-dd')` lê na
+                              // hora de gravar. A conta antiga subtraía o deslocamento do
+                              // fuso (+180 min no Brasil) e recuava a data um dia inteiro:
+                              // clicar no 15/03 gravava 14/03, e clicar no 1º/03 gravava
+                              // 29/02. Medido, não suposto.
+                              setDataPedido(d);
                             }
                           }}
                           locale={ptBR}
@@ -624,13 +637,20 @@ const EditarPedido = () => {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
+                        {/* Fechamento vazio abre no mês da Data de Criação, não no mês de hoje:
+                            negócio criado em 2022 fecha por volta de 2022. Isso é só o mês em que
+                            o calendário ABRE — continua livre escolher qualquer dia, inclusive
+                            ANTERIOR à criação (fecha-mês: a venda é do mês passado e o cadastro
+                            atrasou). Nada de fromDate/disabled aqui — ver SPEC.md §10. */}
                         <Calendar
                           mode="single"
                           selected={prazoResposta}
+                          defaultMonth={prazoResposta ?? dataPedido}
                           onSelect={(d) => {
                             if (d) {
-                              const localDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60 * 1000));
-                              setPrazoResposta(localDate);
+                              // Ver o comentário do campo de Data de Criação: a conversão de
+                              // fuso que existia aqui recuava a data escolhida em um dia.
+                              setPrazoResposta(d);
                             } else {
                               setPrazoResposta(undefined);
                             }

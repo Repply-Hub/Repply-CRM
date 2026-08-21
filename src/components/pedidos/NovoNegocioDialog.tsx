@@ -664,13 +664,21 @@ function NovoNegocioFormContent({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
+                      {/* defaultMonth: sem ele o react-day-picker abre sempre no mês de hoje,
+                          ignorando a data já escolhida — quem recuava pra 2024, fechava o
+                          calendário e reabria pra ajustar o dia voltava pro mês atual. O
+                          PopoverContent do Radix desmonta ao fechar, então o calendário monta de
+                          novo a cada abertura e recalcula o mês: defaultMonth (não controlado)
+                          resolve, sem precisar de month/onMonthChange. */}
                       <Calendar
                         mode="single"
                         selected={dataPedido}
+                        defaultMonth={dataPedido}
                         onSelect={(d) => {
                           if (d) {
-                            const localDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60 * 1000));
-                            setDataPedido(localDate);
+                            // O calendário entrega meia-noite local e `format` grava em fuso
+                            // local: converter aqui recuava a data um dia (15/03 virava 14/03).
+                            setDataPedido(d);
                           }
                         }}
                         locale={ptBR}
@@ -696,13 +704,19 @@ function NovoNegocioFormContent({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
+                      {/* Fechamento vazio abre no mês da Data de Criação, não no de hoje —
+                          cadastrando um negócio antigo, o fechamento também é antigo. É só o mês
+                          de ABERTURA do calendário: escolher data anterior à criação continua
+                          permitido (fecha-mês), então nada de fromDate/disabled — SPEC.md §10. */}
                       <Calendar
                         mode="single"
                         selected={prazoResposta}
+                        defaultMonth={prazoResposta ?? dataPedido}
                         onSelect={(d) => {
                           if (d) {
-                            const localDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60 * 1000));
-                            setPrazoResposta(localDate);
+                            // O calendário entrega meia-noite local e `format` grava em fuso
+                            // local: converter aqui recuava a data um dia (15/03 virava 14/03).
+                            setPrazoResposta(d);
                           } else {
                             setPrazoResposta(undefined);
                           }
@@ -809,7 +823,10 @@ function NovoNegocioFormContent({
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar mode="single" selected={proximoContato} onSelect={setProximoContato} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                            {/* Reabre no mês da data já agendada (undefined = mês atual, que é o
+                                padrão do react-day-picker), pra quem agenda contato pra dois ou
+                                três meses à frente não precisar navegar tudo de novo. */}
+                            <Calendar mode="single" selected={proximoContato} defaultMonth={proximoContato} onSelect={setProximoContato} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
                           </PopoverContent>
                         </Popover>
                         {proximoContato && (
@@ -983,7 +1000,8 @@ function NovoNegocioFormContent({
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={proximoContato} onSelect={setProximoContato} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
+                        {/* Mesmo do campo compacto acima: reabre no mês já agendado. */}
+                        <Calendar mode="single" selected={proximoContato} defaultMonth={proximoContato} onSelect={setProximoContato} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
                       </PopoverContent>
                     </Popover>
                   </div>
