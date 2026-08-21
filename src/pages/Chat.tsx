@@ -1065,10 +1065,13 @@ const Chat = () => {
           { type: file.type },
         ),
     );
-    const validFiles = named.filter(file =>
-      validateFile(file, { allowedExtensions: CHAT_ALLOWED_EXT, allowedMimePrefixes: CHAT_ALLOWED_MIME })
-    );
-    setSelectedFiles(prev => [...prev, ...validFiles]);
+    // Passa por `addFiles` de propósito, em vez de gravar direto em
+    // `selectedFiles`: ele é quem valida E embrulha o arquivo no formato
+    // { file, previewUrl } que a lista de anexos espera. Gravar direto aqui
+    // colocava um File cru no meio de objetos embrulhados, e a tela quebrava ao
+    // desenhar o preview ("Cannot read properties of undefined (reading 'name')").
+    // Uma porta só de entrada — é como o WhatsAppInbox já faz.
+    addFiles(named);
   };
 
   async function startRecording() {
