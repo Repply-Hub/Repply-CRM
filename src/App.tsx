@@ -39,6 +39,7 @@ const AdminWhatsAppInstancias = lazyComRetry(
 );
 const HistoricoAlteracoes = lazyComRetry(() => import("./pages/HistoricoAlteracoes"));
 const AdminEmpresas = lazyComRetry(() => import("./pages/AdminEmpresas"));
+const AdminSecoes = lazyComRetry(() => import("./pages/AdminSecoes"));
 
 const Landing = lazyComRetry(() => import("./pages/Landing"));
 const Cadastro = lazyComRetry(() => import("./pages/Cadastro"));
@@ -567,6 +568,19 @@ const AppRoutes = () => (
         <ProtectedRoute>
           <AdminRoute>
             <AdminEmpresas />
+          </AdminRoute>
+        </ProtectedRoute>
+      }
+    />
+    {/* /admin já está em ROTAS_DO_ADMIN_GERAL por PREFIXO, então esta rota nova já é
+        alcançável pelo admin sem tocar naquela lista. E secaoDaRota('/admin/secoes')
+        devolve null, então a guarda de seção não se auto-bloqueia. */}
+    <Route
+      path="/admin/secoes"
+      element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <AdminSecoes />
           </AdminRoute>
         </ProtectedRoute>
       }

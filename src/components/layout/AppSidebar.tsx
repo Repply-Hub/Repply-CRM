@@ -38,7 +38,7 @@ import {
 // Itens que só existem para o admin master. Conjunto nomeado em vez de uma
 // cadeia de comparações: o filtro cresceu para três ids e a próxima tela de
 // admin não pode depender de alguém lembrar de editar um `||` no meio do JSX.
-const ADMIN_ONLY_IDS = new Set(['admin_wa_instancias', 'usuarios_admin', 'admin_empresas']);
+const ADMIN_ONLY_IDS = new Set(['admin_wa_instancias', 'usuarios_admin', 'admin_empresas', 'admin_secoes']);
 
 /**
  * O que o administrador global vê — e SÓ isso.
@@ -58,7 +58,7 @@ const ADMIN_ONLY_IDS = new Set(['admin_wa_instancias', 'usuarios_admin', 'admin_
  * policies de RLS, que desde a migration 20260804195019 não deixam mais o admin
  * ler conteúdo de empresa nenhuma.
  */
-const ITENS_DO_ADMIN_GERAL = ['admin_empresas', 'admin_wa_instancias'];
+const ITENS_DO_ADMIN_GERAL = ['admin_empresas', 'admin_secoes', 'admin_wa_instancias'];
 
 export function AppSidebar() {
   const { state, setOpen, isMobile } = useSidebar();

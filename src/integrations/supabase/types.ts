@@ -3958,6 +3958,27 @@ export type Database = {
       }
     }
     Functions: {
+      admin_definir_excecao_secao: {
+        Args: { p_empresa_id: string; p_habilitada: boolean | null; p_secao: string }
+        Returns: undefined
+      }
+      admin_definir_preset_da_empresa: {
+        Args: { p_empresa_id: string; p_preset_id: string }
+        Returns: undefined
+      }
+      admin_secoes_por_empresa: {
+        Args: never
+        Returns: {
+          empresa_id: string
+          empresa_nome: string
+          habilitada: boolean
+          origem: string
+          preset_id: string
+          preset_nome: string
+          secao: string
+          usuarios: number
+        }[]
+      }
       can_access_wa_conversa: {
         Args: { _conversa_id: string }
         Returns: boolean
