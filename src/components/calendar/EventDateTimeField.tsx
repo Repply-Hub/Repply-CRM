@@ -163,9 +163,17 @@ export function EventDateTimeField({
                 />
               </div>
             )}
+            {/* O calendário abre no mês da data que já está no campo, não no mês de hoje.
+                O react-day-picker decide o mês de abertura por `defaultMonth`/`month` — a
+                data selecionada NÃO entra nessa conta. Sem isto, abrir um evento ou uma
+                tarefa de 2024 mostrava agosto de 2026 e obrigava a voltar mês a mês.
+                Basta a forma não controlada (`defaultMonth`) porque este Popover desmonta o
+                conteúdo ao fechar: a cada reabertura o mês é recalculado do zero. Com o
+                campo vazio fica `undefined`, que é o comportamento de antes (mês atual). */}
             <Calendar
               mode="single"
               selected={date ?? undefined}
+              defaultMonth={date ?? undefined}
               onSelect={handleDateSelect}
               locale={ptBR}
               initialFocus

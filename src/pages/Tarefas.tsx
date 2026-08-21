@@ -411,9 +411,15 @@ export default function Tarefas() {
                 <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                   Personalizado
                 </p>
+                {/* Abre no mês do prazo já escolhido, não no mês de hoje. O react-day-picker
+                    ignora a data selecionada na hora de decidir o mês de abertura, então um
+                    filtro de março/2024 reabria em agosto/2026 — dezenas de cliques na seta
+                    a cada consulta. `defaultMonth` (não controlado) basta porque o painel de
+                    filtros desmonta ao fechar, recalculando o mês toda vez que ele abre. */}
                 <CalendarRangePicker
                   mode="range"
                   selected={{ from: prazoCustom.from, to: prazoCustom.to }}
+                  defaultMonth={prazoCustom.from ?? prazoCustom.to}
                   onSelect={(range) => {
                     setPrazoCustom({ from: range?.from, to: range?.to });
                     setPrazoFiltro('personalizado');

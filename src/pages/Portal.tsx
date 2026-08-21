@@ -717,7 +717,7 @@ export default function Portal() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear() + 1} />
+                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} defaultMonth={dateFrom ?? dateTo} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear() + 1} />
               </PopoverContent>
             </Popover>
             <span className="text-xs text-muted-foreground">até</span>
@@ -729,7 +729,7 @@ export default function Portal() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear() + 1} />
+                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} defaultMonth={dateTo ?? dateFrom} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear() + 1} />
               </PopoverContent>
             </Popover>
           </div>

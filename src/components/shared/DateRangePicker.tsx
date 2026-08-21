@@ -22,6 +22,7 @@ import {
   TOGGLE_LIST_CLASS,
   TOGGLE_ITEM_CLASS,
 } from "@/lib/toggle-group-styles";
+import { mesDoCalendario, useMesVisivel } from "@/components/shared/mes-calendario";
 
 export interface DateRange {
   from: Date;
@@ -80,6 +81,22 @@ interface Props {
 export function DateRangePicker({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [campo, setCampo] = useState<"de" | "ate">("de");
+
+  // Abrir no mês da data que já está no campo em edição, em vez do mês atual.
+  // Filtrando março/2024, fechar e reabrir a aba jogava a pessoa em agosto/2026
+  // — 29 cliques na setinha pra voltar. Ver `mes-calendario.ts` pro porquê.
+  //
+  // Aqui `defaultMonth` sozinho NÃO resolveria: o <Calendar> abaixo é o mesmo
+  // elemento nas duas abas, então trocar de "De" pra "Até" não remonta nada e o
+  // mês inicial nunca seria recalculado. Por isso a forma controlada, com o
+  // `campo` e o `open` na chave: cada troca de aba e cada reabertura do popover
+  // volta pro mês certo, e no meio disso a navegação continua livre.
+  const mesVisivel = useMesVisivel(
+    campo === "de"
+      ? mesDoCalendario(value.from, value.to)
+      : mesDoCalendario(value.to, value.from),
+    `${campo}|${open}`,
+  );
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
@@ -153,6 +170,8 @@ export function DateRangePicker({ value, onChange }: Props) {
             <Calendar
               mode="single"
               selected={campo === "de" ? value.from : value.to}
+              month={mesVisivel.month}
+              onMonthChange={mesVisivel.onMonthChange}
               onSelect={handleSelect}
               disabled={
                 campo === "de" ? { after: value.to } : { before: value.from }

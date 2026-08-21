@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -310,7 +311,7 @@ function AuditLog() {
                 {dateFrom ? format(dateFrom, 'dd/MM/yy') : 'De'}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end"><Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} className="p-3 pointer-events-auto" /></PopoverContent>
+            <PopoverContent className="w-auto p-0" align="end"><Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} defaultMonth={dateFrom ?? dateTo} locale={ptBR} captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear() + 1} className="p-3 pointer-events-auto" /></PopoverContent>
           </Popover>
           <span className="text-xs text-muted-foreground">—</span>
           <Popover>
@@ -320,7 +321,7 @@ function AuditLog() {
                 {dateTo ? format(dateTo, 'dd/MM/yy') : 'Até'}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end"><Calendar mode="single" selected={dateTo} onSelect={setDateTo} className="p-3 pointer-events-auto" /></PopoverContent>
+            <PopoverContent className="w-auto p-0" align="end"><Calendar mode="single" selected={dateTo} onSelect={setDateTo} defaultMonth={dateTo ?? dateFrom} locale={ptBR} captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear() + 1} className="p-3 pointer-events-auto" /></PopoverContent>
           </Popover>
           {(dateFrom || dateTo) && (
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setDateFrom(undefined); setDateTo(undefined); }}><X className="h-3.5 w-3.5" /></Button>

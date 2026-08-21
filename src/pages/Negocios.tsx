@@ -1530,9 +1530,18 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
+                  {/* defaultMonth: sem ele o react-day-picker abre SEMPRE no mês de hoje, mesmo
+                      com uma data antiga já selecionada — quem filtrou março/2024, fechou e
+                      reabriu o filtro caía em agosto/2026 e tinha que clicar na seta dezenas de
+                      vezes pra voltar. Com 4 anos de histórico importado do Bitrix isso é
+                      inviável. Aqui o defaultMonth (não controlado) resolve sozinho porque o
+                      PopoverContent do Radix desmonta o conteúdo ao fechar: a cada abertura o
+                      calendário monta de novo e o mês é recalculado. Se um dia esse popover
+                      passar a usar forceMount, aí sim vira month + onMonthChange. */}
                   <Calendar
                     mode="single"
                     selected={dateFrom}
+                    defaultMonth={dateFrom}
                     onSelect={handleDateFromSelect}
                     locale={ptBR}
                     captionLayout="dropdown-buttons"
@@ -1562,9 +1571,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
+                  {/* Abre no mês da própria Data Fim; se ela ainda estiver vazia, abre no mês da
+                      Data Início — é onde o intervalo começa, e é de lá que a pessoa está
+                      escolhendo o fim. Sem nenhuma das duas, cai no mês atual (comportamento
+                      padrão do react-day-picker quando defaultMonth é undefined). */}
                   <Calendar
                     mode="single"
                     selected={dateTo}
+                    defaultMonth={dateTo ?? dateFrom}
                     onSelect={handleDateToSelect}
                     initialFocus
                     locale={ptBR}
@@ -2416,9 +2430,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
+                              {/* Mesma correção do filtro do pipeline: abre no mês da data já
+                                  escolhida em vez de no mês atual. Ver o comentário longo no
+                                  filtro "Período" acima. */}
                               <Calendar
                                 mode="single"
                                 selected={bulkPickerDateFrom}
+                                defaultMonth={bulkPickerDateFrom}
                                 onSelect={handleBulkPickerDateFromSelect}
                                 locale={ptBR}
                                 captionLayout="dropdown-buttons"
@@ -2448,9 +2466,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
+                              {/* Cai no mês da Data Início enquanto a Data Fim estiver vazia. */}
                               <Calendar
                                 mode="single"
                                 selected={bulkPickerDateTo}
+                                defaultMonth={bulkPickerDateTo ?? bulkPickerDateFrom}
                                 onSelect={handleBulkPickerDateToSelect}
                                 initialFocus
                                 locale={ptBR}
