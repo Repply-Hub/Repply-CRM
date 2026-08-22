@@ -143,10 +143,24 @@ Situação em 19/08/2026:
 |---|---|
 | Domínio, Stripe, Nylas, arquivo de ambiente | ✅ Resolvidos |
 | **Supabase** | ⚠️ Conta acessível, projeto ainda em organização de terceiro |
-| **GitHub** | ⚠️ Temos envio, repositório em conta pessoal do desenvolvedor anterior |
+| **GitHub** | ✅ **Resolvido em 22/08/2026** — o repositório saiu da conta pessoal do desenvolvedor anterior e passou a ser `Repply-Hub/Repply-CRM`. Confirmado pelo endereço de envio do `origin` |
 | Vercel, uazapi, Google Cloud | ❌ Pendentes |
 | Gemini / Lovable AI / Resend | ❔ Titular a confirmar |
 | Lovable | ✅ Dispensado (último commit do robô em 19/06/2026) |
+
+> **A pasta `.lovable/` foi removida do repositório em 22/08/2026**, no commit `c6ad4ea4`.
+> Eram dois arquivos de memória do robô (`plan.md` e uma nota de banco de dados), sem uso
+> desde que ele foi dispensado.
+>
+> Registrado aqui porque a remoção **pegou carona num commit de conserto de link** e a
+> mensagem daquele commit não a menciona: os arquivos já estavam na fila de commit,
+> preparados por outra sessão de trabalho, e foram junto. Quem for ler o histórico não teria
+> como entender por que um conserto de navegação apagou arquivos do Lovable.
+>
+> Isto **não** afeta a integração `Lovable AI` que lê PDF de licença
+> (`extract-natal-pdf`, ver [integrações externas](arquitetura/integracoes-externas.md) §5)
+> — são coisas diferentes com o mesmo nome: uma é o robô que escrevia código, a outra é um
+> serviço de leitura de PDF que continua em uso.
 
 ### Por que é o item mais grave da lista
 
