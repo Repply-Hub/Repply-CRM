@@ -1775,7 +1775,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </p>
                 {selectedViewOrder.obra ? (
                   <button 
-                    onClick={() => navigate(`/obras/${selectedViewOrder.obra?.id}`)}
+                    // `/obras/{id}` NÃO existe como rota (App.tsx só tem `/obras`), então
+                    // este clique caía no curinga e abria "página não encontrada". O
+                    // caminho certo já existia em ClienteDetalhe.tsx:720: navega para
+                    // `/obras` levando o id no estado, e a tela de Obras o lê e abre a
+                    // obra (Obras.tsx:138).
+                    onClick={() =>
+                      navigate('/obras', {
+                        state: { selectedObraId: selectedViewOrder.obra?.id },
+                      })
+                    }
                     className="text-sm font-medium hover:text-primary transition-colors text-left flex items-center gap-1 group"
                   >
                     {selectedViewOrder.obra.nome_obra}

@@ -7,7 +7,6 @@ import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useVendedores, useClientes } from '@/hooks/use-clientes';
 import { usePedidosOptions } from '@/hooks/use-pedidos';
 import { getNomeNegocio } from '@/lib/nome-negocio';
-import { useObras } from '@/hooks/use-obras';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -72,7 +71,6 @@ export default function Tarefas() {
   const { data: tarefas = [], isLoading } = useTarefas();
   const { data: kanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
   const { data: vendedores = [] } = useVendedores();
-  const { data: obras = [] } = useObras();
   const { data: clientes = [] } = useClientes();
   const { data: pedidosOptions = [] } = usePedidosOptions(empresaId);
   const queryClient = useQueryClient();
