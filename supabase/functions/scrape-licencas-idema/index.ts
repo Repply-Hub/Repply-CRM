@@ -109,6 +109,38 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Esta função grava em `licencas_idema` com service_role, que IGNORA a RLS por
+    // definição. Ou seja, a política criada em 20260822221102_portal_exige_secao.sql não
+    // alcança este caminho: sem a checagem abaixo, qualquer pessoa logada de qualquer
+    // empresa dispararia uma importação nas licenças da MD.
+    //
+    // A checagem usa o cliente do USUÁRIO, criado com o Authorization que veio na
+    // requisição. Com o de serviço, `auth.uid()` é nulo e `empresa_tem_secao` não teria
+    // como saber de quem se trata — responderia o padrão e liberaria todo mundo.
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Sessão não identificada. Entre novamente no sistema.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } },
+    );
+
+    const { data: temPortal, error: erroSecao } = await userClient.rpc('empresa_tem_secao', {
+      p_secao: 'portal',
+    });
+    if (erroSecao || temPortal !== true) {
+      return new Response(
+        JSON.stringify({ error: 'Sua empresa não tem acesso ao Portal de Consultas' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
