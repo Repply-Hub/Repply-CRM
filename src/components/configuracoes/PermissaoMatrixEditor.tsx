@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { MODULOS, type Funcionalidade } from '@/hooks/use-permissoes';
+import { SECOES } from '@/lib/secoes';
+import { useSecoesDaEmpresa } from '@/hooks/use-secoes';
 import {
   Plus, Eye, PenLine, Trash, ChevronDown, Search, Building2, Import, FileDown,
   Filter, ArrowRightLeft, MessageCircle, FileText, ToggleLeft, UserCheck, UsersRound,
@@ -52,6 +54,7 @@ export function PermissaoMatrixEditor({
 }) {
   const [expandedModulo, setExpandedModulo] = useState<string | null>(null);
   const [searchModulo, setSearchModulo] = useState('');
+  const { mapa: secoesDaEmpresa } = useSecoesDaEmpresa();
 
   const getPermCount = (modKey: string) => {
     const mod = MODULOS.find(m => m.key === modKey);
@@ -62,9 +65,30 @@ export function PermissaoMatrixEditor({
     return { active: crudActive + funcActive, total };
   };
 
-  const filteredModulos = MODULOS.filter(m =>
-    !searchModulo || m.label.toLowerCase().includes(searchModulo.toLowerCase())
-  );
+  // Módulo de seção que a empresa NÃO contratou some da matriz.
+  //
+  // São dois eixos e eles se somam: a EMPRESA define o que EXISTE, esta matriz define quem
+  // VÊ, dentro do que existe. Sem este filtro, o gestor de uma empresa sem o Portal ficava
+  // configurando "quem pode ver o Portal" — uma tela que ninguém daquela empresa alcança,
+  // porque a rota recusa (SecaoRoute) e o banco recusa (política de licencas_*).
+  //
+  // MODULOS tem 14 chaves e SECOES tem 12: `contatos` e `pedidos` não são seções próprias
+  // (pertencem a Clientes e Negócios, ambas do núcleo). Módulo sem seção correspondente,
+  // ou de seção não desligável, passa direto e nunca some.
+  //
+  // Enquanto o mapa não chegou, NÃO filtra: a matriz aparece inteira e depois encolhe. O
+  // contrário faria a tela piscar vazia a cada carregamento.
+  //
+  // As linhas já GRAVADAS em permissoes_usuario ficam onde estão, de propósito. Some da
+  // tela, fica no banco — religar a seção devolve a configuração que o gestor já tinha
+  // feito, em vez de obrigá-lo a refazer tudo.
+  const filteredModulos = MODULOS.filter(m => {
+    if (searchModulo && !m.label.toLowerCase().includes(searchModulo.toLowerCase())) return false;
+    if (!secoesDaEmpresa) return true;
+    const secao = SECOES.find(s => s.modulosPermissao.includes(m.key));
+    if (!secao?.desligavel) return true;
+    return secoesDaEmpresa.get(secao.id) !== false;
+  });
 
   return (
     <div className="space-y-4">
