@@ -591,7 +591,7 @@ Isso é fase própria no roadmap — ver §9.
 | Serviço | Para quê | Escopo |
 |---|---|---|
 | **Supabase** | Banco, login, arquivos, funções de borda | Um projeto por ambiente |
-| **Vercel** | Hospedagem do site | Publica sozinha a cada envio para `main` |
+| **Vercel** | Hospedagem do site | **Publicação MANUAL** desde 22/08/2026 — `npx vercel --prod`. Ver `docs/operacao/publicar-na-vercel.md` |
 | **Stripe** | Cobrança da assinatura | Por ambiente |
 | **Nylas** | E-mail (conectar, sincronizar, enviar) | Credencial por ambiente; caixa por usuário |
 | **uazapi** | WhatsApp | Servidor por ambiente; instância por empresa |
@@ -958,8 +958,14 @@ não passa** —
 498 problemas herdados no `main` (medido em 19/08/2026), o que faz a ferramenta deixar de
 servir como sinal: ninguém percebe quando 458 erros viram 459.
 
-Somado ao fato de que **a Vercel publica sozinha a cada envio para `main`**, qualquer erro
-chega ao cliente pagante em minutos.
+Somado ao fato de que **publicar está a um comando de distância** (`npx vercel --prod`),
+qualquer erro chega ao cliente pagante em minutos.
+
+> Até 22/08/2026 a Vercel publicava sozinha a cada envio para o `main`. Deixou de publicar
+> quando o repositório passou para a organização da Repply — o plano gratuito não conecta
+> repositório de organização. Isso acrescentou uma etapa humana entre o commit e o cliente,
+> mas **por acidente, não por decisão**: quem esquecer de publicar deixa o conserto fora do
+> ar sem perceber. Ver `docs/operacao/publicar-na-vercel.md`.
 
 É por isso que este projeto tem regra fixa: **toda alteração vai por branch e Pull
 Request, nunca direto no `main`.** Ver `CLAUDE.md`.

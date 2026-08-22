@@ -41,7 +41,8 @@ empresas de fora usando — **este sistema está em produção com cliente pagan
 - **Gráficos:** Recharts · **Mapas:** Google Maps + Leaflet
 - **Backend:** Supabase (Postgres + Auth + Storage + Edge Functions em Deno)
 - **Testes:** Vitest + Testing Library, ambiente jsdom
-- **Deploy:** Vercel — **publica sozinha a cada envio para `main`**
+- **Deploy:** Vercel — 🔴 **NÃO publica sozinha.** Desde 22/08/2026 a publicação é manual,
+  por `npx vercel --prod`. Ver §16
 
 **TypeScript está frouxo de propósito** (`strictNullChecks: false`, `noImplicitAny: false`).
 Não conte com garantia de tipo ao ler nem ao escrever: o compilador não vai te avisar.
@@ -525,7 +526,8 @@ O trabalho vai **direto no `main`**, como o time já faz. A barreira não é o P
 > 🔴 **Nunca commite nem envie nada sem avisar e receber o "pode".**
 > A autorização é **por commit**. Ter recebido antes não vale para o próximo.
 >
-> Isso existe porque o `main` não tem proteção, a Vercel publica em produção a cada envio,
+> Isso existe porque o `main` não tem proteção, a publicação em produção está a um comando
+> de distância (§16),
 > e a rede de proteção automática é fraca (10 arquivos de teste para 78 mil linhas, lint com
 > 498 problemas herdados, TypeScript frouxo). Sem etapa humana, o erro chega ao cliente
 > pagante em minutos.
@@ -549,14 +551,23 @@ produção por conta própria.
 
 **4. Commitar e enviar.**
 
+> ⚠️ **Nunca `git add -A`.** Pode haver outra sessão de trabalho na mesma pasta. Liste os
+> arquivos um a um, e confira a fila (`git status --short`) num comando SEPARADO do commit
+> — arquivo que a outra sessão já deixou estagiado entra no seu commit mesmo sem você ter
+> adicionado. Já aconteceu duas vezes.
+
 ```sh
-git add -A
+git status --short                      # a fila INTEIRA. Algo que não é seu? Pare.
+git add caminho/um.ts caminho/dois.tsx  # um a um, nunca -A
+git diff --cached --name-only           # confira de novo antes de commitar
 git commit -m "tipo(escopo): descrição em português"
 git push origin main
 ```
 
 Mensagem no padrão convencional, em português. Prefixos: `feat`, `fix`, `refactor`,
 `docs`, `chore`, `style`.
+
+**5. Publicar.** Enviar para o `main` **não** coloca nada no ar. Ver §16.
 
 > **Histórico da regra:** o projeto experimentou branch + Pull Request em 19/08/2026
 > (PR #1, o único do repositório). A decisão foi revertida no mesmo dia, para não conviver
@@ -602,6 +613,41 @@ engordar mais o arquivo.
    decisões estranhas. Leia antes de "corrigir"
 4. Migration recente costuma explicar comportamento novo melhor que o código
 5. Se ainda assim não fechar, **pergunte ao Lucas** em vez de adivinhar
+
+---
+
+## 16. 🔴 Publicar é um passo MANUAL
+
+**Enviar para o `main` não coloca nada no ar.** Isto mudou em 22/08/2026 e contraria o que
+todo mundo assumia até então.
+
+O repositório saiu da conta pessoal do desenvolvedor anterior e virou `Repply-Hub/Repply-CRM`.
+A ligação da Vercel apontava para o endereço antigo e se perdeu — e o plano gratuito da
+Vercel **não conecta repositório de organização**, só de conta pessoal. Enquanto não houver
+plano pago, a publicação é por linha de comando.
+
+```sh
+npx vercel --prod
+```
+
+**Deixe a Vercel construir.** Existe o caminho de construir aqui e mandar pronto
+(`vercel build` + `vercel deploy --prebuilt`): **não use.** O `.env` das máquinas de
+desenvolvimento não tem `VITE_GOOGLE_MAPS_API_KEY`, então isso publicaria o site sem o mapa
+e sem o posicionamento das obras, **sem nenhum erro aparecer**.
+
+Primeira vez numa máquina: `npx vercel login` e `npx vercel link` — escolhendo o projeto
+que já existe, **nunca criando um novo** (criar outro perde domínio, variáveis e histórico).
+
+**Função de servidor é outro caminho.** `npx vercel --prod` publica o site. As funções em
+`supabase/functions/` são publicadas no Supabase, à parte. Mexeu numa delas e só publicou o
+site? A versão antiga continua rodando.
+
+Guia completo, com o que conferir depois e os erros comuns:
+[`docs/operacao/publicar-na-vercel.md`](docs/operacao/publicar-na-vercel.md).
+
+> **Ressalva de negócio, registrada para não virar surpresa:** o plano gratuito da Vercel
+> veda uso comercial, e o Repply CRM tem cliente pagante. A comparação com as alternativas
+> está em [`docs/operacao/migrar-hospedagem.md`](docs/operacao/migrar-hospedagem.md).
 
 ---
 

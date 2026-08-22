@@ -32,8 +32,9 @@ Produto da **Repply** (Grupo MD · Natal/RN). Cliente-âncora: **MD Representaç
 
 Três fatos que mudam como se trabalha neste repositório:
 
-1. **A Vercel publica sozinha a cada envio para `main`.** Não existe etapa de aprovação
-   automática entre o commit e o cliente.
+1. **Enviar para o `main` NÃO publica.** Desde 22/08/2026 a publicação é manual, por
+   `npx vercel --prod` — se você commitou e não rodou o comando, seu trabalho não está no
+   ar. Ver [`docs/operacao/publicar-na-vercel.md`](docs/operacao/publicar-na-vercel.md).
 2. **Quase não existe rede de proteção automática.** São 10 arquivos de teste para 78 mil
    linhas; o TypeScript está configurado de forma frouxa de propósito; e o `npm run lint`
    **não passa** — são 498 problemas herdados no `main`. O critério prático é *o número

@@ -295,8 +295,8 @@ src/test/example.test.ts                                     1
 
 Agrava dois outros fatos:
 
-- **A Vercel publica sozinha a cada envio para `main`** — não há etapa manual entre o
-  commit e o cliente
+- **Publicar está a um comando de distância** (`npx vercel --prod`) — e quem publica é
+  quem acabou de escrever o código, sem ninguém entre ele e o cliente
 - **O TypeScript está frouxo** (item 12) — o compilador também não segura o erro
 
 É por isso que este projeto exige **autorização do Lucas antes de cada commit**

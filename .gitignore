@@ -30,3 +30,6 @@ supabase/.temp/
 .env
 .env.*
 !.env.example
+
+# Vinculo local com o projeto da Vercel (por maquina, nao versionado)
+.vercel

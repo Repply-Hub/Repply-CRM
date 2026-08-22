@@ -51,6 +51,7 @@ repositório**, não aqui:
 | Documento | O que contém |
 |---|---|
 | [`operacao/colocar-no-ar.md`](operacao/colocar-no-ar.md) | Passo a passo para publicar mudanças que dependem de configuração fora do código |
+| [`operacao/publicar-na-vercel.md`](operacao/publicar-na-vercel.md) | 🔴 **Enviar para o `main` não publica mais.** Como colocar no ar pela linha de comando, e o que conferir depois |
 | [`operacao/cobranca-stripe.md`](operacao/cobranca-stripe.md) | O que falta fazer fora do repositório para a cobrança funcionar |
 | [`operacao/guia-de-paginas.md`](operacao/guia-de-paginas.md) | Para que serve cada tela, em linguagem de negócio. Serve de material de uso |
 | [`operacao/plano-reparo-datas.md`](operacao/plano-reparo-datas.md) | **Proposto, não executado.** Como reparar as datas trocadas dos 11.903 negócios já importados |
