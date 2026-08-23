@@ -107,3 +107,179 @@ export function useDefinirPresetDaEmpresa() {
     },
   });
 }
+
+// ---------------------------------------------------------------- presets
+
+export interface PresetResumo {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  is_padrao: boolean;
+  /** Quantas empresas mudam de comportamento se este preset mudar. */
+  empresas_seguindo: number;
+  secoes_ligadas: number;
+}
+
+/**
+ * Os presets, com quantas empresas seguem cada um.
+ *
+ * O número não é enfeite: é o que a tela mostra ANTES de confirmar uma alteração. Mexer num
+ * preset muda todas as empresas que o seguem de uma vez — a única tela do sistema onde um
+ * clique atinge mais de um assinante.
+ */
+export function usePresets() {
+  return useQuery({
+    queryKey: ['admin_presets'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_listar_presets');
+      if (error) throw error;
+      return (data ?? []) as PresetResumo[];
+    },
+  });
+}
+
+/**
+ * As seções de cada preset, todas de uma vez.
+ *
+ * Leitura direta da tabela, sem RPC: a política já libera SELECT para qualquer autenticado
+ * (estas linhas dizem quais TELAS existem, não conteúdo de ninguém), e são poucas dezenas
+ * de linhas no total. Uma consulta só evita uma por preset aberto.
+ */
+export function useItensDosPresets() {
+  return useQuery({
+    queryKey: ['admin_preset_itens'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('secao_preset_itens')
+        .select('preset_id, secao, habilitada');
+      if (error) throw error;
+
+      const mapa = new Map<string, Map<string, boolean>>();
+      for (const linha of data ?? []) {
+        const doPreset = mapa.get(linha.preset_id) ?? new Map<string, boolean>();
+        doPreset.set(linha.secao, linha.habilitada);
+        mapa.set(linha.preset_id, doPreset);
+      }
+      return mapa;
+    },
+  });
+}
+
+/**
+ * Invalidação compartilhada pelas quatro mutações de preset.
+ *
+ * `secoes_da_empresa` entra em todas porque é a chave que o app inteiro usa para saber o que
+ * mostrar. Sem ela, o admin altera o preset e continua vendo o sistema antigo até o cache
+ * vencer — foi exatamente o sintoma que o Lucas relatou em 22/08/2026 com o Portal.
+ */
+function invalidarTudo(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['admin_presets'] });
+  qc.invalidateQueries({ queryKey: ['admin_preset_itens'] });
+  qc.invalidateQueries({ queryKey: ['admin_secoes'] });
+  qc.invalidateQueries({ queryKey: ['secoes_da_empresa'] });
+}
+
+/**
+ * Cria um preset COPIANDO o padrão.
+ *
+ * A cópia é feita no banco, não aqui, e não é conveniência: `empresa_tem_secao` trata
+ * "não achei regra" como LIGADA, então preset sem linhas liberaria tudo — o oposto do que
+ * se espera ao criar um preset para restringir.
+ */
+export function useCriarPreset() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (p: { nome: string; descricao?: string }) => {
+      const { data, error } = await supabase.rpc('admin_criar_preset', {
+        p_nome: p.nome,
+        p_descricao: p.descricao ?? null,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => {
+      invalidarTudo(qc);
+      toast.success('Preset criado com uma cópia do padrão — ajuste as seções abaixo');
+    },
+    onError: (e: unknown) => {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível criar o preset');
+    },
+  });
+}
+
+export function useRenomearPreset() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (p: { presetId: string; nome: string; descricao?: string }) => {
+      const { error } = await supabase.rpc('admin_renomear_preset', {
+        p_preset_id: p.presetId,
+        p_nome: p.nome,
+        p_descricao: p.descricao ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin_presets'] });
+      qc.invalidateQueries({ queryKey: ['admin_secoes'] });
+      toast.success('Preset renomeado');
+    },
+    onError: (e: unknown) => {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível renomear o preset');
+    },
+  });
+}
+
+/**
+ * Liga ou desliga uma seção DENTRO do preset — atinge todas as empresas que o seguem.
+ *
+ * A empresa que tiver exceção para essa seção não muda: exceção ganha do preset. Por isso a
+ * mensagem fala em "empresas que seguem", e não em "todas".
+ */
+export function useDefinirItemPreset() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (p: { presetId: string; secao: string; habilitada: boolean }) => {
+      const { error } = await supabase.rpc('admin_definir_item_preset', {
+        p_preset_id: p.presetId,
+        p_secao: p.secao,
+        p_habilitada: p.habilitada,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_dados, p) => {
+      invalidarTudo(qc);
+      toast.success(p.habilitada ? 'Seção liberada no preset' : 'Seção bloqueada no preset');
+    },
+    onError: (e: unknown) => {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível alterar o preset');
+    },
+  });
+}
+
+/**
+ * Exclui um preset.
+ *
+ * O banco recusa em dois casos — o padrão, e preset em uso — com mensagem que diz o que
+ * fazer. A tela repassa a mensagem em vez de inventar a sua: quem sabe se está em uso é o
+ * banco, e no instante da tentativa.
+ */
+export function useExcluirPreset() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (presetId: string) => {
+      const { error } = await supabase.rpc('admin_excluir_preset', { p_preset_id: presetId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidarTudo(qc);
+      toast.success('Preset excluído');
+    },
+    onError: (e: unknown) => {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível excluir o preset');
+    },
+  });
+}

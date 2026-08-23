@@ -1618,6 +1618,7 @@ export type Database = {
           nome: string | null
           nome_fantasia: string | null
           owner_id: string
+          secao_preset_id: string | null
           subtitulo_header: string | null
           whatsapp_assinar_remetente: boolean
         }
@@ -1632,6 +1633,7 @@ export type Database = {
           nome?: string | null
           nome_fantasia?: string | null
           owner_id: string
+          secao_preset_id?: string | null
           subtitulo_header?: string | null
           whatsapp_assinar_remetente?: boolean
         }
@@ -1646,6 +1648,7 @@ export type Database = {
           nome?: string | null
           nome_fantasia?: string | null
           owner_id?: string
+          secao_preset_id?: string | null
           subtitulo_header?: string | null
           whatsapp_assinar_remetente?: boolean
         }
@@ -3061,6 +3064,91 @@ export type Database = {
           },
         ]
       }
+      secao_excecoes: {
+        Row: {
+          criada_em: string
+          criada_por: string | null
+          empresa_id: string
+          habilitada: boolean
+          secao: string
+        }
+        Insert: {
+          criada_em?: string
+          criada_por?: string | null
+          empresa_id: string
+          habilitada: boolean
+          secao: string
+        }
+        Update: {
+          criada_em?: string
+          criada_por?: string | null
+          empresa_id?: string
+          habilitada?: boolean
+          secao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "secao_excecoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      secao_preset_itens: {
+        Row: {
+          habilitada: boolean
+          preset_id: string
+          secao: string
+        }
+        Insert: {
+          habilitada?: boolean
+          preset_id: string
+          secao: string
+        }
+        Update: {
+          habilitada?: boolean
+          preset_id?: string
+          secao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "secao_preset_itens_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "secao_presets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      secao_presets: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          is_padrao: boolean
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          is_padrao?: boolean
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          is_padrao?: boolean
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sidebar_empresa_padrao: {
         Row: {
           created_at: string
@@ -3958,12 +4046,39 @@ export type Database = {
       }
     }
     Functions: {
+      admin_criar_preset: {
+        Args: { p_descricao?: string; p_nome: string }
+        Returns: string
+      }
       admin_definir_excecao_secao: {
         Args: { p_empresa_id: string; p_habilitada: boolean | null; p_secao: string }
         Returns: undefined
       }
+      admin_definir_item_preset: {
+        Args: { p_habilitada: boolean; p_preset_id: string; p_secao: string }
+        Returns: undefined
+      }
       admin_definir_preset_da_empresa: {
         Args: { p_empresa_id: string; p_preset_id: string }
+        Returns: undefined
+      }
+      admin_excluir_preset: {
+        Args: { p_preset_id: string }
+        Returns: undefined
+      }
+      admin_listar_presets: {
+        Args: never
+        Returns: {
+          descricao: string
+          empresas_seguindo: number
+          id: string
+          is_padrao: boolean
+          nome: string
+          secoes_ligadas: number
+        }[]
+      }
+      admin_renomear_preset: {
+        Args: { p_descricao?: string; p_nome: string; p_preset_id: string }
         Returns: undefined
       }
       admin_secoes_por_empresa: {

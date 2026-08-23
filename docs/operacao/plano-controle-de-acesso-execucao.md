@@ -1299,6 +1299,51 @@ git commit -m "feat(admin): criar e editar presets de seção"
 
 ---
 
+### Executada em 23/08/2026 — três coisas saíram diferentes do previsto
+
+**1. Faltavam duas funções que o plano não tinha pedido.** `admin_excluir_preset` e
+`admin_listar_presets`. Sem a primeira, um preset criado por engano fica para sempre. Sem a
+segunda, não há de onde tirar a contagem de empresas afetadas — que era justamente a regra
+que o plano mandava deixar visível.
+
+A exclusão recusa em dois casos, com mensagem que diz o que fazer: o preset **padrão** (sem
+ele, empresa sem preset apontado fica sem regra nenhuma) e preset **em uso** (a chave
+estrangeira já barraria, mas com erro que ninguém entende).
+
+**2. Trocar o preset da empresa não existia na tela.** O hook `useDefinirPresetDaEmpresa`
+foi escrito na tarefa 6 e nunca chamado por ninguém — código morto. Criar um segundo preset
+sem isso seria inútil: não haveria como colocar empresa nenhuma nele. O seletor entrou no
+cartão de cada empresa.
+
+**3. `types.ts` nunca recebeu as tabelas da tarefa 2.** `secao_presets`,
+`secao_preset_itens`, `secao_excecoes` e a coluna `empresas.secao_preset_id` estavam
+ausentes desde 21/08. Não doeu antes porque tudo passava por RPC; a primeira leitura direta
+de tabela quebrou na verificação de tipo. Corrigido à mão, como manda o CLAUDE.md §6.8.
+
+**Preset novo nasce COPIANDO o padrão**, e isso é correção, não conveniência:
+`empresa_tem_secao` trata "não achei regra" como LIGADA — é o que impede uma publicação de
+tirar todas as seções de todo mundo. O efeito colateral é que preset **sem linhas liberaria
+tudo**, o oposto do que se espera ao criar um preset para restringir.
+
+**Cuidado ao rodar o `tsc` neste projeto:** `tsconfig.json` da raiz tem `"files": []` e
+**não checa nada** — `npx tsc --noEmit` devolve zero erros sempre. O comando que checa de
+verdade é `npx tsc --noEmit -p tsconfig.app.json` (35 erros herdados na linha de base).
+
+**Verificação feita** (ensaio no banco de produção, dentro de transação revertida):
+
+| Ensaio | Resultado |
+|---|---|
+| Gestor da MD (não-admin) nas 4 funções | recusado nas 4, com a mensagem certa |
+| Criar preset | 12 linhas copiadas, 11 ligadas |
+| Nome em branco | recusado |
+| Excluir o padrão | recusado |
+| Excluir preset em uso por 1 empresa | recusado, dizendo quantas |
+| Excluir preset livre | sumiu, 0 itens órfãos |
+
+A tela em si **não foi aberta por mim** — é de admin e exige senha. Falta o Lucas conferir.
+
+---
+
 ## Tarefa 8: ⏸ PONTO DE PARADA — o Lucas liga o Portal para a MD
 
 **Não é tarefa de código.** É o passo que a decisão 7 criou.

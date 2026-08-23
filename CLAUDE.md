@@ -442,6 +442,8 @@ Nunca afirme que algo funciona sem ter rodado. Evidência antes de afirmação.
 npm run test      # 152 testes em 10 arquivos. Tem que passar limpo
 npm run build     # tem que compilar
 npm run lint      # ver a ressalva abaixo
+
+npx tsc --noEmit -p tsconfig.app.json   # 🔴 com o -p. Ver a armadilha abaixo
 ```
 
 > ⚠️ **`npm run lint` NÃO passa limpo neste projeto.** Medido em 19/08/2026 no `main`:
@@ -452,6 +454,19 @@ npm run lint      # ver a ressalva abaixo
 > tem erro novo — conserte.
 >
 > Ver [`docs/divida-tecnica.md` §18](docs/divida-tecnica.md).
+
+> 🔴 **`npx tsc --noEmit` sem o `-p` não confere NADA — e devolve sucesso.** O
+> `tsconfig.json` da raiz tem `"files": []` e só aponta para os outros dois; sem arquivo na
+> lista, o compilador não olha nada e sai com zero erros. É o comando que todo mundo digita
+> por reflexo, e ele dá um "está tudo certo" falso.
+>
+> O que confere de verdade é **`npx tsc --noEmit -p tsconfig.app.json`**. Linha de base em
+> 23/08/2026: **35 erros herdados** — mesmo critério do lint, o número não pode subir.
+>
+> Isso importa mais aqui do que na maioria dos projetos, porque **`npm run build` é
+> `vite build` puro, sem checagem de tipo**: erro de tipo não impede publicar. Em 23/08/2026
+> esse comando pegou duas coisas que o build aceitou numa boa — uma função de banco esquecida
+> nos tipos e três tabelas que nunca tinham sido declaradas desde 21/08.
 
 Além disso, conforme o que mudou:
 
@@ -468,6 +483,7 @@ Além disso, conforme o que mudou:
 
 - ❌ Criar tabela pelo painel do Supabase
 - ❌ Editar migration já existente
+- ❌ Conferir tipo com `npx tsc --noEmit` sem o `-p tsconfig.app.json` (§9) — a raiz não olha arquivo nenhum e devolve sucesso sempre
 - ❌ Puxar coleção inteira para o navegador só para contar ou somar
 - ❌ Confiar em verificação de permissão feita só no frontend
 - ❌ `React.lazy` direto em página (use `lazyComRetry`)
