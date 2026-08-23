@@ -46,6 +46,7 @@ import { useVendedores, useClientes } from "@/hooks/use-clientes";
 import { usePedidosOptions } from "@/hooks/use-pedidos";
 import { getNomeNegocio } from "@/lib/nome-negocio";
 import { useCreateTarefa, useTarefasPorConversa } from "@/hooks/use-tarefas";
+import { useSecaoLigada } from "@/hooks/use-secoes";
 import { useTarefasKanbanColunas } from "@/hooks/use-tarefas-kanban-colunas";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { ChatMessageSearch } from "@/components/chat/ChatMessageSearch";
@@ -2449,6 +2450,7 @@ function LeadSheet({
     }
   }
   const { data: tarefasConversa = [] } = useTarefasPorConversa(conversa.id);
+  const { ligada: temTarefas } = useSecaoLigada('tarefas');
   // Notas internas (mensagens is_nota_interna) criadas a partir desta conversa,
   // mais recente primeiro — tarefasConversa já vem ordenada desc pelo hook.
   const notasConversa = useMemo(
@@ -3157,10 +3159,15 @@ function LeadSheet({
               mesmo padrão de abas usado em "Mídia, links e documentos" abaixo. */}
           <div className="space-y-3">
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <StickyNote className="h-3 w-3" /> Notas e tarefas
+              {/* Deixar "Notas e tarefas" escrito numa empresa sem a seção é o vazamento
+                  mais óbvio desta tela. */}
+              <StickyNote className="h-3 w-3" /> {temTarefas === true ? 'Notas e tarefas' : 'Notas'}
             </p>
             <Tabs defaultValue="notas" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-9 items-center rounded-lg border border-muted-foreground/25 overflow-hidden">
+              {/* As duas classes escritas por extenso, de propósito: o Tailwind não gera
+                  classe montada em texto (`grid-cols-${n}` nunca existiria no CSS final).
+                  Sem isto, a aba Notas ocupa metade e a outra metade vira um buraco. */}
+              <TabsList className={cn('grid w-full h-9 items-center rounded-lg border border-muted-foreground/25 overflow-hidden', temTarefas === true ? 'grid-cols-2' : 'grid-cols-1')}>
                 <TabsTrigger
                   value="notas"
                   className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
@@ -3168,6 +3175,7 @@ function LeadSheet({
                   Notas
                   {notasConversa.length > 0 && ` (${notasConversa.length})`}
                 </TabsTrigger>
+                {temTarefas === true && (
                 <TabsTrigger
                   value="tarefas"
                   className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
@@ -3175,6 +3183,7 @@ function LeadSheet({
                   Tarefas
                   {tarefasConversa.length > 0 && ` (${tarefasConversa.length})`}
                 </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="notas" className="mt-3">
@@ -3201,6 +3210,7 @@ function LeadSheet({
                 )}
               </TabsContent>
 
+              {temTarefas === true && (
               <TabsContent value="tarefas" className="mt-3">
                 {tarefasConversa.length === 0 ? (
                   <p className="text-xs text-muted-foreground px-1 py-6 text-center">
@@ -3224,6 +3234,7 @@ function LeadSheet({
                   </>
                 )}
               </TabsContent>
+              )}
             </Tabs>
           </div>
 
@@ -3612,6 +3623,8 @@ export default function WhatsAppInbox() {
   }, [conversas, searchParams, setSearchParams]);
 
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
+  // Nome diferente do usado no LeadSheet (temTarefas) para não confundir os dois escopos.
+  const { ligada: temTarefasSecao } = useSecaoLigada('tarefas');
 
   /**
    * Mesmo padrão de formulário/campos do modal de criação em src/pages/Tarefas.tsx.
@@ -7612,10 +7625,15 @@ export default function WhatsAppInbox() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
+                        {/* Só este item sai. O menu continua existindo para "Adicionar
+                            nota", que é do WhatsApp e não tem relação com Tarefas — menu
+                            com um item só funciona normalmente. */}
+                        {temTarefasSecao === true && (
                         <DropdownMenuItem onClick={abrirNovaTarefa}>
                           <ListTodo className="h-4 w-4 mr-2" />
                           Nova tarefa
                         </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => setNovaNotaOpen(true)}>
                           <StickyNote className="h-4 w-4 mr-2" />
                           Adicionar nota
@@ -7892,6 +7910,10 @@ export default function WhatsAppInbox() {
         />
       )}
 
+      {/* Envolver aqui tem ganho real, não só higiene: as consultas que alimentam este
+          formulário estão presas ao diálogo (useClientes e usePedidosOptions, que puxam
+          1.305 clientes e até 500 negócios). Com ele fora da árvore, nada disso dispara. */}
+      {temTarefasSecao === true && (
       <Dialog open={novaTarefaOpen} onOpenChange={setNovaTarefaOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -8061,6 +8083,7 @@ export default function WhatsAppInbox() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
 
       <Dialog open={novaNotaOpen} onOpenChange={setNovaNotaOpen}>
         <DialogContent className="max-w-sm">

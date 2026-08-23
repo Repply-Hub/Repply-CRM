@@ -23,6 +23,7 @@ import { useHistoricoContatos } from '@/hooks/use-pedidos';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/hooks/use-auth';
 import { useTarefas } from '@/hooks/use-tarefas';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { ListPagination } from '@/components/shared/ListPagination';
@@ -71,6 +72,7 @@ const ContatoDetalhe = () => {
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
+  const { ligada: temTarefas } = useSecaoLigada('tarefas');
   const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
   const tarefaKanbanStages = useMemo(
     () => tarefasKanbanColunas.map(c => ({ key: c.slug, label: c.nome })),
@@ -378,6 +380,10 @@ const ContatoDetalhe = () => {
           </Card>
         </div>
 
+        {/* A grade inteira sai quando a empresa não contratou Tarefas: ela só contém este
+            card, então não sobra div vazia nem espaçamento fantasma. O TarefaFormDialog
+            também está dentro e some junto, que é o desejado. */}
+        {temTarefas === true && (
         <div className="grid gap-6 md:grid-cols-3">
           {/* Card: Tarefas Vinculadas */}
           <Card className="md:col-span-3">
@@ -462,6 +468,7 @@ const ContatoDetalhe = () => {
             )}
           </Card>
         </div>
+        )}
 
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <ConteudoDialogo>

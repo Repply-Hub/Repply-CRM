@@ -6,6 +6,7 @@ import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { usePedidosPorCliente } from '@/hooks/use-pedidos';
 import { getNomeNegocio } from '@/lib/nome-negocio';
 import { useTarefas } from '@/hooks/use-tarefas';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
@@ -108,6 +109,7 @@ const ClienteDetalhe = () => {
   const { data: clientes, isLoading: loadingClientes } = useClientes();
   const { data: pedidos = [], isLoading: loadingPedidos } = usePedidosPorCliente(id);
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
+  const { ligada: temTarefas } = useSecaoLigada('tarefas');
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
@@ -1306,7 +1308,10 @@ const ClienteDetalhe = () => {
           </CardContent>
         </Card>
 
-        {/* Tarefas */}
+        {/* Tarefas — some inteiro quando a empresa não contratou a seção.
+            `=== true` e não `!== false`: enquanto a resposta não chegou, esconde. Bloco que
+            aparece e some é pior de usar que bloco que demora a aparecer. */}
+        {temTarefas === true && (
         <Card className="border-border/40">
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base flex items-center gap-2">
@@ -1381,14 +1386,20 @@ const ClienteDetalhe = () => {
             kanbanStages={tarefaKanbanStages}
             extraFields={{ cliente_id: id! }}
           />
-
-          <NovoNegocioDialog
-            open={novoNegocioOpen}
-            onOpenChange={setNovoNegocioOpen}
-            clienteId={cliente.id}
-            onCreated={() => setNovoNegocioOpen(false)}
-          />
         </Card>
+        )}
+
+        {/* Novo negócio — FORA do card de Tarefas de propósito.
+            Ele morava lá dentro, e esconder o card o levaria junto: o botão "Novo Negócio"
+            do card de Negócios (bem acima) chama `setNovoNegocioOpen(true)`, e o diálogo
+            simplesmente não abriria numa empresa sem a seção Tarefas — sem erro nenhum,
+            só um botão que não faz nada. Negócio não tem relação com Tarefas. */}
+        <NovoNegocioDialog
+          open={novoNegocioOpen}
+          onOpenChange={setNovoNegocioOpen}
+          clienteId={cliente.id}
+          onCreated={() => setNovoNegocioOpen(false)}
+        />
 
         {/* Excluir cliente */}
         <div className="flex justify-end">

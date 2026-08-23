@@ -17,6 +17,7 @@ import { useFunis } from '@/hooks/use-funis';
 import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
 import { usePedidos, usePedidosStats, useSearchMatches, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
@@ -638,6 +639,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const { data: contatos } = useHistoricoContatos(selectedOrder || viewOrderId);
   const { data: tarefasNegocio } = useTarefasPorPedido(viewOrderId);
+  const { ligada: temTarefas } = useSecaoLigada('tarefas');
   const { data: historicoStatusNegocio } = usePedidoHistoricoStatus(viewOrderId);
   const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
   const tarefaKanbanStages = useMemo(
@@ -2188,7 +2190,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
             )}
 
-            {/* Tarefas / Observações do negócio */}
+            {/* Tarefas / Observações do negócio — some quando a empresa não contratou a
+                seção. Os irmãos acima e abaixo são blocos independentes no mesmo
+                empilhamento, então o espaçamento se fecha sozinho. */}
+            {temTarefas === true && (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tarefas</p>
@@ -2235,6 +2240,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </Table>
               </div>
             </div>
+            )}
 
             {/* Histórico de Movimentação no Kanban */}
             <div className="space-y-4">
@@ -3246,8 +3252,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </AlertDialog>
 
       {viewOrderSheet}
-      {addTarefaDialog}
-      {editTarefaDialog}
+      {/* Cinto e suspensório: os dois únicos gatilhos que abrem estes diálogos já estão
+          dentro do bloco escondido acima, então eles nasceriam com `open={false}` de
+          qualquer jeito. Vale mesmo assim — impede que um gatilho novo, colado ali no
+          futuro, ressuscite a tela de tarefas numa empresa que não contratou. */}
+      {temTarefas === true && (<>{addTarefaDialog}{editTarefaDialog}</>)}
       <FilePreviewDialog file={pdfPreview} onClose={() => setPdfPreview(null)} />
     </AppLayout>
   );
