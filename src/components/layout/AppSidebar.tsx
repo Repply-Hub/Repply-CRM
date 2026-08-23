@@ -10,7 +10,7 @@ import { useSidebarPreferences, SidebarItem, ROTA_APP } from '@/hooks/use-sideba
 import { useSaveSidebarEmpresaPadrao } from '@/hooks/use-sidebar-empresa-padrao';
 import { usePermissoes } from '@/hooks/use-permissoes';
 import { getIconComponent } from '@/lib/sidebar-icons';
-import { useSecoesDaEmpresa } from '@/hooks/use-secoes';
+import { useSecoesDaEmpresa, useSecaoLigada } from '@/hooks/use-secoes';
 import { SECOES } from '@/lib/secoes';
 import { SidebarAddItemDialog } from '@/components/layout/SidebarAddItemDialog';
 import { SidebarFavicon } from '@/components/layout/SidebarFavicon';
@@ -128,8 +128,25 @@ export function AppSidebar() {
   const { data: permissoes } = usePermissoes(!isGestor ? vendedor?.id : undefined);
   const saveEmpresaPadrao = useSaveSidebarEmpresaPadrao();
   const { mapa: secoesDaEmpresa } = useSecoesDaEmpresa();
+  const { ligada: temDashboard } = useSecaoLigada('dashboard');
 
   // Filter visible items, and for non-gestores also check permissoes_usuario
+  /**
+   * A empresa NÃO contratou a seção deste item?
+   *
+   * Extraído do filtro abaixo porque o modo de edição do menu precisa da MESMA regra: ele
+   * monta a lista arrastável a partir de `items` cru, e sem isto a seção desligada
+   * reaparecia ali — bastava clicar em "editar menu" para o Portal voltar à lista.
+   *
+   * Enquanto o mapa não chegou, responde `false` (não esconde nada): o menu aparece
+   * inteiro por um instante e depois encolhe, em vez de piscar vazio a cada carregamento.
+   */
+  const semSecaoContratada = useCallback((i: SidebarItem) => {
+    if (!secoesDaEmpresa) return false;
+    const secao = SECOES.find(s => s.id === i.id);
+    return !!secao?.desligavel && secoesDaEmpresa.get(secao.id) === false;
+  }, [secoesDaEmpresa]);
+
   const visibleItems = items.filter(i => {
     // O admin global tem uma lista PRÓPRIA e fechada, avaliada antes de
     // qualquer outra regra — inclusive antes de `i.visible`, para uma
@@ -152,10 +169,7 @@ export function AppSidebar() {
     //
     // Isto é conveniência de navegação. Quem recusa de verdade é o SecaoRoute (App.tsx) e,
     // no Portal, a política do banco.
-    if (secoesDaEmpresa) {
-      const secao = SECOES.find(s => s.id === i.id);
-      if (secao?.desligavel && secoesDaEmpresa.get(secao.id) === false) return false;
-    }
+    if (semSecaoContratada(i)) return false;
 
     if (isGestor) return true; // gestores/empresa see all visible items
     // For vendedores e cargos customizados: check if they have pode_ver permission for this module
@@ -210,13 +224,18 @@ export function AppSidebar() {
   }, [collapsed, setOpen]);
 
   const enterEditMode = useCallback(() => {
-    setEditItems(JSON.parse(JSON.stringify(items)));
+    // Filtra a seção não contratada ANTES de montar a lista arrastável. Sem isto, clicar em
+    // "editar menu" trazia de volta o item que a empresa não tem — e, pior, salvar dali
+    // gravava esse item na preferência do usuário. O que NÃO se filtra aqui é o item que a
+    // própria pessoa escondeu (`visible: false`): o modo de edição é justamente onde ela o
+    // traz de volta.
+    setEditItems(JSON.parse(JSON.stringify(items.filter(i => !semSecaoContratada(i)))));
     setEditMode(true);
     if (collapsed) {
       hoverOpened.current = false;
       setOpen(true);
     }
-  }, [items, collapsed, setOpen]);
+  }, [items, collapsed, setOpen, semSecaoContratada]);
 
   // Listen for external trigger (from profile page)
   useEffect(() => {
@@ -302,7 +321,14 @@ export function AppSidebar() {
       >
         <SidebarHeader className="px-2 border-b border-primary/20 min-h-[5.5rem] flex flex-col justify-center">
           <Link
-            to="/dashboard"
+            // O logo é o clique mais natural da tela, e apontava sempre para /dashboard.
+            // Numa empresa sem essa seção isso vira beco sem saída: o SecaoRoute recusa.
+            // Cai para a home autenticada, que é seção não desligável e nunca recusa.
+            //
+            // Aqui NÃO se esconde enquanto carrega — o logo tem que aparecer sempre. Então
+            // o `=== true` se traduz em "na dúvida, manda para /app": ir para /app tendo
+            // Dashboard é um clique a mais; ir para /dashboard sem tê-lo é uma parede.
+            to={temDashboard === true ? '/dashboard' : ROTA_APP}
             className={`flex items-center overflow-visible hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : 'gap-3'}`}
           >
             <img src={logoSidebar} alt="Repply" className="shrink-0 object-contain" style={{ width: 40, height: 40, minWidth: 40, minHeight: 40 }} />

@@ -33,3 +33,12 @@ supabase/.temp/
 
 # Vinculo local com o projeto da Vercel (por maquina, nao versionado)
 .vercel
+
+# O `vercel link` acrescenta `.vercel` e `.env*` aqui sozinho, ao final do arquivo.
+# As duas linhas foram removidas em 23/08/2026: `.vercel` já estava logo acima, e `.env*`
+# no fim do arquivo ANULAVA o `!.env.example` de cima — regra de liberação só vale depois
+# do padrão que ela libera. O `.env.example` já está versionado, então nada quebrou; mas o
+# dia em que alguém precisasse recriá-lo, ele não entraria e ninguém entenderia por quê.
+#
+# Se o `vercel link` for rodado de novo noutra máquina, ele vai reacrescentar as duas.
+# Apague-as; as regras corretas já estão neste arquivo.

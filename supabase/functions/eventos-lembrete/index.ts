@@ -62,9 +62,14 @@ Deno.serve(async (req) => {
     }
 
     const authUserIds = [...new Set(devidos.map((e) => e.user_id))];
+    // `empresa_id` entra no select por causa da seção Calendário: esta rotina roda com
+    // service_role e enxerga os eventos de TODAS as empresas, então sem checar cada uma
+    // delas uma empresa com o Calendário desligado continuaria recebendo "🔔 Lembrete" de
+    // evento que ninguém consegue abrir — a rota recusa e o item sumiu do menu, mas o
+    // sininho toca.
     const { data: usuarios, error: errUsuarios } = await supabase
       .from("usuarios")
-      .select("id, user_id")
+      .select("id, user_id, empresa_id")
       .in("user_id", authUserIds);
 
     if (errUsuarios) {
@@ -78,10 +83,37 @@ Deno.serve(async (req) => {
     const usuarioIdByAuthId = new Map(
       (usuarios ?? []).map((u) => [u.user_id as string, u.id as string]),
     );
+    const empresaIdByAuthId = new Map(
+      (usuarios ?? []).map((u) => [u.user_id as string, u.empresa_id as string | null]),
+    );
+
+    // Pergunta UMA vez por empresa, não uma por evento: são poucas empresas e podem ser
+    // muitos eventos.
+    //
+    // `empresa_tem_secao_de` e não `empresa_tem_secao`: aqui não há sessão, e a irmã
+    // resolveria a empresa por `get_my_empresa_id()` — que devolve nulo com service_role e
+    // faria a função liberar todo mundo, dando a impressão de que a checagem existe.
+    const temCalendarioPorEmpresa = new Map<string, boolean>();
+    for (const empresaId of new Set([...empresaIdByAuthId.values()].filter(Boolean))) {
+      const { data, error } = await supabase.rpc("empresa_tem_secao_de", {
+        p_empresa_id: empresaId,
+        p_secao: "calendario",
+      });
+      // Na dúvida, ENVIA. Erro de rede não pode calar o lembrete de quem tem a seção — o
+      // custo de um lembrete a mais é menor que o de uma reunião perdida.
+      temCalendarioPorEmpresa.set(empresaId as string, error ? true : data === true);
+    }
 
     for (const evento of devidos) {
       const usuarioId = usuarioIdByAuthId.get(evento.user_id);
       if (!usuarioId) continue; // sem usuário interno correspondente (ex.: conta órfã)
+
+      // Empresa sem a seção Calendário: pula SEM marcar `lembrete_enviado`.
+      //
+      // Não marcar é o ponto todo: se marcasse, religar a seção deixaria o lembrete
+      // perdido para sempre, porque a consulta lá em cima só pega `lembrete_enviado = false`.
+      const empresaDoEvento = empresaIdByAuthId.get(evento.user_id);
+      if (empresaDoEvento && temCalendarioPorEmpresa.get(empresaDoEvento) === false) continue;
 
       const horario = new Date(evento.inicio).toLocaleString("pt-BR", {
         timeZone: "America/Sao_Paulo",

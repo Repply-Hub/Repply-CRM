@@ -3,6 +3,7 @@ import { useEffect, createElement } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 
 const MENSAGEM_TOAST_MAX_CHARS = 100;
 
@@ -110,6 +111,13 @@ export function useUnreadChatMessages() {
   const meId = profile?.id;
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
 
+  // A trava da seção mora AQUI DENTRO, e não no ponto de chamada (AppSidebar), por dois
+  // motivos. Primeiro, hook do React não pode ser chamado dentro de `if`. Segundo, e mais
+  // importante: travar lá zeraria o contador mas NÃO calaria o aviso em tempo real abaixo,
+  // que é o que de fato aparece para quem não deveria — ele salta por cima de qualquer
+  // tela, sem passar pelo menu nem pela rota.
+  const { ligada: temChat } = useSecaoLigada('chat');
+
   const query = useQuery({
     queryKey: ['unread_chat_count', user?.id, meId],
     queryFn: async () => {
@@ -125,13 +133,15 @@ export function useUnreadChatMessages() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: !!user && !!meId,
+    // `temChat === true` e não `!== false`: com a resposta ainda não conhecida a consulta
+    // não dispara. É a regra da cascata — melhor demorar a aparecer do que aparecer e sumir.
+    enabled: !!user && !!meId && temChat === true,
   });
 
   // Assinatura global (sempre montada via AppSidebar) para garantir que o toast
   // dispare mesmo se o usuário não estiver com a tela de chat aberta no momento.
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || temChat !== true) return;
     const channel = supabase
       .channel(`chat-unread-rt-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_mensagens' }, async (payload) => {
@@ -166,7 +176,11 @@ export function useUnreadChatMessages() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [qc, user?.id, meId]);
+    // `temChat` na lista não é detalhe: sem ele, quem estivesse com o app aberto na hora em
+    // que o admin desligasse o Chat continuaria recebendo aviso até recarregar a página.
+    // Com ele, o mapa de seções recarrega ao voltar para a aba (30s + refetchOnWindowFocus),
+    // este efeito roda de novo e o canal é fechado.
+  }, [qc, user?.id, meId, temChat]);
 
   return query;
 }
