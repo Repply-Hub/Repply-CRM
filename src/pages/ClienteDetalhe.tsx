@@ -12,6 +12,12 @@ import { useAuth } from '@/hooks/use-auth';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { NovoNegocioDialog } from '@/components/pedidos/NovoNegocioDialog';
 import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
+import { useMarcadoresObras } from '@/hooks/use-marcadores-obras';
+
+// O <Select> do Radix não aceita item com valor vazio, então "sem marcador" precisa de um
+// valor de mentirinha só na tela. Ele nunca chega ao banco — vira nulo ao salvar. Mesma
+// convenção da tela de Obras.
+const SEM_MARCADOR_CLIENTE = '__sem_marcador__';
 import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -314,7 +320,8 @@ const ClienteDetalhe = () => {
   const [selectedContatoId, setSelectedContatoId] = useState('');
   const updateContato = useUpdateContato();
   const createObra = useCreateObra();
-  const [novaObra, setNovaObra] = useState({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
+  const { data: marcadoresObras } = useMarcadoresObras();
+  const [novaObra, setNovaObra] = useState({ nome_obra: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' });
   const [pedidosPage, setPedidosPage] = useState(1);
   const [pedidosPageSize, setPedidosPageSize] = useState(5);
   const [pedidosBusca, setPedidosBusca] = useState('');
@@ -1129,7 +1136,14 @@ const ClienteDetalhe = () => {
                       <MapPin className="h-3 w-3" /> {obra.endereco_entrega}
                     </p>
                   )}
-                  <Badge variant="outline" className="mt-2 text-[10px]">{obra.status}</Badge>
+                  {/* Some quando a obra não tem marcador — que é o estado padrão. Antes,
+                      mostrava `obra.status`: o apelido cru do banco ("em_andamento"), sem
+                      tradução, para um campo que nunca teve lista de opções que funcionasse. */}
+                  {obra.marcador && (
+                    <Badge className={`mt-2 text-[10px] bg-${obra.marcador.cor} text-white`}>
+                      {obra.marcador.nome}
+                    </Badge>
+                  )}
                 </div>
               ))}
               
@@ -1164,16 +1178,19 @@ const ClienteDetalhe = () => {
                         if (existingObra) {
                           toast.info('Esta obra já existe para este cliente.');
                           setAddObraOpen(false);
-                          setNovaObra({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
+                          setNovaObra({ nome_obra: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' });
                           return;
                         }
 
                         await createObra.mutateAsync({
                           ...novaObra,
+                          // Campo vazio não é identificador: mandar '' faria o banco recusar.
+                          // Obra sem marcador é o estado normal e se escreve como nulo.
+                          marcador_id: novaObra.marcador_id || null,
                           cliente_id: id!
                         });
                         toast.success('Obra cadastrada com sucesso!');
-                        setNovaObra({ nome_obra: '', endereco_entrega: '', status: 'ativa', spe_cnpj: '' });
+                        setNovaObra({ nome_obra: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' });
                         setAddObraOpen(false);
                       } catch (err: any) {
                         toast.error('Erro ao cadastrar obra: ' + err.message);
@@ -1198,19 +1215,36 @@ const ClienteDetalhe = () => {
                         placeholder="Rua, número, bairro..."
                       />
                     </div>
+                    {/* Era um Status com quatro opções CRAVADAS NO CÓDIGO, que ignoravam a
+                        lista configurável e gravavam 'ativa' por padrão. Foi este formulário —
+                        e não o da tela de Obras — que criou as 2.312 obras apagadas em
+                        agosto/2026, todas com status 'ativa'. Agora fala a mesma língua da
+                        tela de Obras: marcador, opcional, da lista da empresa. */}
                     <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select value={novaObra.status} onValueChange={v => setNovaObra(o => ({ ...o, status: v }))}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ativa">Ativa</SelectItem>
-                          <SelectItem value="em_andamento">Em andamento</SelectItem>
-                          <SelectItem value="parada">Parada</SelectItem>
-                          <SelectItem value="concluida">Concluída</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label>Marcador</Label>
+                      {(marcadoresObras ?? []).length === 0 ? (
+                        <p className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                          Nenhum marcador cadastrado. Marcador é opcional — dá para criar a obra
+                          sem um, e cadastrar os marcadores depois, na tela de Obras.
+                        </p>
+                      ) : (
+                        <Select
+                          value={novaObra.marcador_id || SEM_MARCADOR_CLIENTE}
+                          onValueChange={v =>
+                            setNovaObra(o => ({ ...o, marcador_id: v === SEM_MARCADOR_CLIENTE ? '' : v }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sem marcador" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={SEM_MARCADOR_CLIENTE}>Sem marcador</SelectItem>
+                            {(marcadoresObras ?? []).map(m => (
+                              <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>CNPJ / SPE</Label>

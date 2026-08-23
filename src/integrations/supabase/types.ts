@@ -2441,6 +2441,50 @@ export type Database = {
           },
         ]
       }
+      marcadores_obras: {
+        Row: {
+          cor: string
+          created_at: string
+          empresa_id: string
+          id: string
+          is_sistema: boolean
+          nome: string
+          ordem: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          cor?: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_sistema?: boolean
+          nome: string
+          ordem?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          cor?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_sistema?: boolean
+          nome?: string
+          ordem?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marcadores_obras_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notificacoes: {
         Row: {
           cliente_id: string | null
@@ -2576,6 +2620,7 @@ export type Database = {
           geocoded_at: string | null
           id: string
           latitude: number | null
+          marcador_id: string | null
           longitude: number | null
           nome_obra: string | null
           spe_cnpj: string | null
@@ -2589,6 +2634,7 @@ export type Database = {
           geocoded_at?: string | null
           id?: string
           latitude?: number | null
+          marcador_id?: string | null
           longitude?: number | null
           nome_obra?: string | null
           spe_cnpj?: string | null
@@ -2602,6 +2648,7 @@ export type Database = {
           geocoded_at?: string | null
           id?: string
           latitude?: number | null
+          marcador_id?: string | null
           longitude?: number | null
           nome_obra?: string | null
           spe_cnpj?: string | null
@@ -2613,6 +2660,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "obras_marcador_id_fkey"
+            columns: ["marcador_id"]
+            isOneToOne: false
+            referencedRelation: "marcadores_obras"
             referencedColumns: ["id"]
           },
         ]

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useObras } from '@/hooks/use-obras';
-import { useStatusObras } from '@/hooks/use-status-obras';
+import { useMarcadoresObras } from '@/hooks/use-marcadores-obras';
 import { useClientes } from '@/hooks/use-clientes';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import {
   Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon,
-  LayoutGrid, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2,
+  Tag, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2,
   FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -41,7 +41,7 @@ import { ColumnSettings, type ColumnDefinition } from '@/components/shared/Colum
 import { ListPagination } from '@/components/shared/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { MapaObras } from '@/components/obras/MapaObras';
-import { StatusObrasDialog } from '@/components/obras/StatusObrasDialog';
+import { MarcadoresObrasDialog } from '@/components/obras/MarcadoresObrasDialog';
 import { cn, hasTextSelection } from '@/lib/utils';
 import { FilterButton } from '@/components/shared/FilterButton';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
@@ -61,15 +61,66 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// 🔴 TRÊS LISTAS PRECISAM CONCORDAR e nada no código força isso: esta definição de colunas, o
+// bloco de render por `colId` na tabela e o `switch` de `getSortValue`. Coluna que exista aqui
+// e falte lá cai no `default` e ordena pela coluna ERRADA, sem erro nenhum. Ao mexer em uma,
+// mexa nas três.
 const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'nome_obra', label: 'Nome da Obra', locked: false },
-  { id: 'status', label: 'Status', locked: false },
+  { id: 'marcador', label: 'Marcador', locked: false },
   { id: 'cliente', label: 'Cliente', locked: false },
   { id: 'endereco', label: 'Endereço', locked: false },
   { id: 'spe_cnpj', label: 'CNPJ/SPE', locked: false },
   { id: 'created_at', label: 'Data de Criação', locked: false },
   { id: 'actions', label: 'Ações', locked: false },
 ];
+
+// O <Select> do Radix não aceita item com valor vazio, então "sem marcador" precisa de um
+// valor de mentirinha na tela. Ele nunca chega ao banco: vira `null` na hora de salvar.
+const SEM_MARCADOR = '__sem_marcador__';
+
+/**
+ * A linha de obra como a lista a manipula.
+ *
+ * `marcador` chega por junção EXTERNA (nunca `!inner`), então é NULO para obra sem marcador
+ * — que é o estado padrão, já que a lista de marcadores nasce vazia. Tipar aqui evita
+ * espalhar `as any` pela busca, pelo filtro, pela ordenação e pelo render, que são os quatro
+ * lugares onde o marcador é lido.
+ *
+ * A assinatura de índice existe porque o resto do arquivo é herdado e mexe em colunas
+ * customizadas por nome montado em tempo de execução.
+ */
+type ObraNaLista = {
+  id: string;
+  nome_obra: string | null;
+  endereco_entrega: string | null;
+  marcador_id: string | null;
+  marcador: { id: string; nome: string; cor: string } | null;
+  campos_extras: Record<string, string> | null;
+  [chave: string]: unknown;
+};
+
+/**
+ * O que aparece no lugar do campo quando a empresa ainda não criou marcador nenhum.
+ *
+ * A lista nasce vazia de propósito (decisão do dono do produto), e por isso a tela é obrigada
+ * a dizer isso em voz alta. O modelo antigo — "Status Inicial" com dropdown em branco e
+ * nenhuma explicação — deixava a pessoa parada num campo que parecia quebrado, sem nenhum
+ * caminho para sair dali. Aqui a frase explica o vazio e o botão resolve na mesma tela.
+ */
+function MarcadorVazio({ onGerenciar }: { onGerenciar: () => void }) {
+  return (
+    <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-3 space-y-2">
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Nenhum marcador cadastrado ainda. Marcador é opcional — a obra pode ser criada sem um.
+      </p>
+      <Button type="button" variant="outline" size="sm" className="h-8 gap-2 text-xs" onClick={onGerenciar}>
+        <Tag className="h-3.5 w-3.5" />
+        Criar o primeiro marcador
+      </Button>
+    </div>
+  );
+}
 
 export default function Obras() {
   const navigate = useNavigate();
@@ -83,7 +134,9 @@ export default function Obras() {
   const deleteObra = useDeleteObra();
   const deleteObrasBulk = useDeleteObrasBulk();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('todos');
+  // 'todos' ou o id de um marcador. Guarda ID, não slug: o nome do marcador pode ser
+  // renomeado a qualquer momento sem o filtro deixar de casar.
+  const [marcadorFilter, setMarcadorFilter] = useState<string>('todos');
   const [sortColumn, setSortColumn] = useState<string>('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [page, setPage] = useState(1);
@@ -92,17 +145,19 @@ export default function Obras() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [marcadoresDialogOpen, setMarcadoresDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmDeleteBulk, setConfirmDeleteBulk] = useState(false);
 
+  // `marcador_id` vazio = obra sem marcador, que é um estado válido e é o PADRÃO. Não há
+  // pré-seleção: a lista de marcadores nasce vazia de propósito e o campo é opcional.
   const [newObra, setNewObra] = useState({
     nome_obra: '',
     cliente_id: '',
     endereco_entrega: '',
-    status: '',
+    marcador_id: '',
     spe_cnpj: '',
   });
   const [camposExtrasObra, setCamposExtrasObra] = useState<Record<string, string>>({});
@@ -117,7 +172,7 @@ export default function Obras() {
     nome_obra: '',
     cliente_id: '',
     endereco_entrega: '',
-    status: '',
+    marcador_id: '',
     spe_cnpj: '',
   });
 
@@ -125,13 +180,7 @@ export default function Obras() {
   const [editObraCnpjError, setEditObraCnpjError] = useState('');
 
 
-  const { data: statusObras } = useStatusObras();
-
-  useEffect(() => {
-    if (statusObras?.length && !newObra.status) {
-      setNewObra(prev => ({ ...prev, status: statusObras[0].slug }));
-    }
-  }, [statusObras, newObra.status]);
+  const { data: marcadores } = useMarcadoresObras();
 
   useEffect(() => {
     const state = location.state as { selectedObraId?: string, activeTab?: string } | null;
@@ -172,20 +221,19 @@ export default function Obras() {
     defaultColumns: OBRA_FIELDS,
   });
 
-  const getStatusInfo = (slug: string) => {
-    const status = statusObras?.find(s => s.slug === slug);
-    if (!status) {
-      const label = slug === 'em_andamento' ? 'Em Andamento' : slug.replace(/_/g, ' ');
-      return { 
-        label: label.charAt(0).toUpperCase() + label.slice(1), 
-        variant: 'outline' as const 
-      };
-    }
-    return {
-      label: status.nome,
-      variant: 'default' as const
-    };
-  };
+  // Limpeza da coluna "Status" que ficou salva na configuração de quem já usava a tela.
+  //
+  // A configuração de colunas é persistida por empresa (localStorage + `configuracoes_tabelas`)
+  // e o merge de `useTableSettings` só ACRESCENTA coluna nova — ele nunca tira a que saiu do
+  // produto. Sem isto, toda empresa que já tinha configuração salva continuaria com uma coluna
+  // "Status" no cabeçalho, com todas as células em branco (nada mais responde por `colId ===
+  // 'status'`) e ainda clicável para ordenar, caindo no `default` do `getSortValue`.
+  // O booleano é a dependência (e não `columns`) porque `useTableSettings` devolve um array
+  // novo a cada render — depender dele faria o efeito rodar sempre, sem nunca mudar nada.
+  const temColunaStatusLegada = columns.some(c => c.id === 'status');
+  useEffect(() => {
+    if (temColunaStatusLegada) handleRemoveColumn('status');
+  }, [temColunaStatusLegada, handleRemoveColumn]);
 
   // Rótulos do menu de ordenação por coluna: numérico/moeda usa "0-9" em vez de "A-Z",
   // já que a coluna não tem alfabeto.
@@ -221,18 +269,22 @@ export default function Obras() {
         (o) =>
           (o.nome_obra || '').toLowerCase().includes(q) ||
           (o.endereco_entrega || '').toLowerCase().includes(q) ||
-          ((o.clientes as any)?.empresa || '').toLowerCase().includes(q)
+          ((o.clientes as any)?.empresa || '').toLowerCase().includes(q) ||
+          ((o as ObraNaLista).marcador?.nome || '').toLowerCase().includes(q)
       );
     }
 
-    if (statusFilter !== 'todos') {
-      list = list.filter((o) => o.status === statusFilter);
+    if (marcadorFilter !== 'todos') {
+      list = list.filter((o) => (o as ObraNaLista).marcador_id === marcadorFilter);
     }
 
     const getSortValue = (o: any) => {
       if (sortColumn?.startsWith('custom_')) return (o.campos_extras || {})[sortColumn];
       switch (sortColumn) {
-        case 'status': return getStatusInfo(o.status).label;
+        // Ordena pelo NOME do marcador (o que está na tela), não pelo id. A junção é externa,
+        // então obra sem marcador continua na lista — cai como texto vazio e vai para uma das
+        // pontas, em vez de sumir.
+        case 'marcador': return o.marcador?.nome ?? '';
         case 'cliente': return (o.clientes as any)?.empresa;
         case 'endereco': return o.endereco_entrega || o.nome_obra;
         case 'spe_cnpj': return o.spe_cnpj;
@@ -263,7 +315,7 @@ export default function Obras() {
     });
 
     return list;
-  }, [obras, search, statusFilter, sortColumn, sortDirection, statusObras, columns]);
+  }, [obras, search, marcadorFilter, sortColumn, sortDirection, columns]);
 
   const obrasParaMapa = useMemo(
     () =>
@@ -271,20 +323,25 @@ export default function Obras() {
         id: o.id,
         nome_obra: o.nome_obra,
         endereco_entrega: o.endereco_entrega,
-        status: o.status,
+        marcador_nome: o.marcador?.nome ?? null,
+        marcador_cor: o.marcador?.cor ?? null,
         spe_cnpj: o.spe_cnpj,
         latitude: o.latitude ?? null,
         longitude: o.longitude ?? null,
         geocoded_at: o.geocoded_at ?? null,
         cliente_empresa: o.clientes?.empresa ?? null,
-        cliente_id: o.clientes?.id ?? null,
+        // `o.cliente_id`, e não `o.clientes?.id`: a junção só traz `empresa` e `tipo`, então
+        // `clientes.id` sempre vinha indefinido e o clique no nome do cliente dentro do balão
+        // do mapa não levava a lugar nenhum. A coluna da própria obra está sempre preenchida.
+        cliente_id: o.cliente_id ?? null,
       })),
     [filtered]
   );
 
   const isDefaultSort = sortColumn === 'created_at' && sortDirection === 'desc';
-  const hasFilters = statusFilter !== 'todos' || !isDefaultSort;
-  const activeFilterCount = (statusFilter !== 'todos' ? 1 : 0) + (!isDefaultSort ? 1 : 0);
+  const hasFilters = marcadorFilter !== 'todos' || !isDefaultSort;
+  // Se este contador esquecer um filtro, o botão "Limpar" mente sobre o que está filtrado.
+  const activeFilterCount = (marcadorFilter !== 'todos' ? 1 : 0) + (!isDefaultSort ? 1 : 0);
 
   const paginatedObras = useMemo(() => {
     const startIndex = (page - 1) * pageSize;
@@ -373,7 +430,7 @@ export default function Obras() {
                 hasFilters={hasFilters}
                 activeFilterCount={activeFilterCount}
                 onClear={() => {
-                  setStatusFilter('todos');
+                  setMarcadorFilter('todos');
                   setSortColumn('created_at');
                   setSortDirection('desc');
                 }}
@@ -381,11 +438,11 @@ export default function Obras() {
                 align="end"
               >
                 <div className="flex flex-col gap-1">
-                  {/* Submenu Status */}
+                  {/* Submenu Marcador */}
                   <StandardPopoverMenu
-                    label="Status"
-                    icon={LayoutGrid}
-                    badge={statusFilter !== 'todos' ? 1 : undefined}
+                    label="Marcador"
+                    icon={Tag}
+                    badge={marcadorFilter !== 'todos' ? 1 : undefined}
                     side="left"
                     align="start"
                     sideOffset={10}
@@ -396,32 +453,42 @@ export default function Obras() {
                         <div
                           className={cn(
                             "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
-                            statusFilter === 'todos' && "bg-accent text-accent-foreground"
+                            marcadorFilter === 'todos' && "bg-accent text-accent-foreground"
                           )}
-                          onClick={() => setStatusFilter('todos')}
+                          onClick={() => setMarcadorFilter('todos')}
                         >
-                          <Checkbox checked={statusFilter === 'todos'} onCheckedChange={() => setStatusFilter('todos')} />
-                          Todos os status
+                          <Checkbox checked={marcadorFilter === 'todos'} onCheckedChange={() => setMarcadorFilter('todos')} />
+                          Todos os marcadores
                         </div>
-                        {statusObras?.map(status => (
+                        {/* Lista vazia é o estado NORMAL de quem ainda não criou marcador — e
+                            precisa dizer isso com todas as letras. Um submenu em branco foi o
+                            que deixou o antigo "Status" intransponível: ninguém sabia se estava
+                            vazio porque não havia nada ou porque a tela tinha quebrado. */}
+                        {marcadores?.length === 0 && (
+                          <p className="px-2 py-2 text-xs text-muted-foreground leading-relaxed">
+                            Nenhum marcador cadastrado ainda. Crie o primeiro em "Gerenciar marcadores".
+                          </p>
+                        )}
+                        {marcadores?.map(marcador => (
                           <div
-                            key={status.slug}
+                            key={marcador.id}
                             className={cn(
                               "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm",
-                              statusFilter === status.slug && "bg-accent text-accent-foreground"
+                              marcadorFilter === marcador.id && "bg-accent text-accent-foreground"
                             )}
-                            onClick={() => setStatusFilter(status.slug)}
+                            onClick={() => setMarcadorFilter(marcador.id)}
                           >
-                            <Checkbox checked={statusFilter === status.slug} onCheckedChange={() => setStatusFilter(status.slug)} />
-                            {status.nome}
+                            <Checkbox checked={marcadorFilter === marcador.id} onCheckedChange={() => setMarcadorFilter(marcador.id)} />
+                            <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', `bg-${marcador.cor}`)} />
+                            <span className="truncate">{marcador.nome}</span>
                           </div>
                         ))}
                       </div>
                       <div className="px-1 py-1 mt-1 border-t border-border/50">
                         <StandardMenuItem
-                          label="Gerenciar Status"
+                          label="Gerenciar marcadores"
                           icon={Settings2}
-                          onClick={() => setStatusDialogOpen(true)}
+                          onClick={() => setMarcadoresDialogOpen(true)}
                         />
                       </div>
                     </div>
@@ -511,7 +578,7 @@ export default function Obras() {
                     </thead>
                     <tbody>
                       {paginatedObras.map(obra => {
-                        const status = getStatusInfo(obra.status);
+                        const marcador = (obra as ObraNaLista).marcador;
                         const cliente = obra.clientes as any;
                         const camposExtras = (obra as any).campos_extras || {};
                         // Se o clique foi o fim de uma seleção de texto (usuário copiando
@@ -541,7 +608,11 @@ export default function Obras() {
                                     {obra.nome_obra}
                                   </span>
                                 )}
-                                {colId === 'status' && <Badge variant={status.variant} className="text-[10px]">{status.label}</Badge>}
+                                {colId === 'marcador' && (
+                                  marcador
+                                    ? <Badge className={cn('text-[10px] text-white border-none', `bg-${marcador.cor}`)}>{marcador.nome}</Badge>
+                                    : <span className="text-muted-foreground">—</span>
+                                )}
                                 {colId === 'cliente' && (
                                   <span className="font-medium">
                                     {cliente?.empresa || '—'}
@@ -603,10 +674,10 @@ export default function Obras() {
           </TabsContent>
         </Tabs>
 
-        {/* Status Settings Dialog */}
-        <StatusObrasDialog 
-          open={statusDialogOpen} 
-          onOpenChange={setStatusDialogOpen} 
+        {/* Diálogo de gerenciar marcadores da obra */}
+        <MarcadoresObrasDialog
+          open={marcadoresDialogOpen}
+          onOpenChange={setMarcadoresDialogOpen}
         />
 
         {/* Obra Details Sheet (Lateral) */}
@@ -666,11 +737,13 @@ export default function Obras() {
                         <p className="text-[10px] text-muted-foreground mt-1 italic">Endereço não informado</p>
                       )}
                     </div>
-                      <div className="mt-3">
-                        <Badge variant={getStatusInfo(selectedObra.status).variant}>
-                          {getStatusInfo(selectedObra.status).label}
-                        </Badge>
-                      </div>
+                      {selectedObra.marcador && (
+                        <div className="mt-3">
+                          <Badge className={cn('text-white border-none', `bg-${selectedObra.marcador.cor}`)}>
+                            {selectedObra.marcador.nome}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -706,7 +779,8 @@ export default function Obras() {
                         nome_obra: selectedObra.nome_obra,
                         cliente_id: selectedObra.cliente_id,
                         endereco_entrega: selectedObra.endereco_entrega || '',
-                        status: selectedObra.status,
+                        // Vazio = sem marcador. O <Select> traduz isso para a opção "Nenhum".
+                        marcador_id: selectedObra.marcador_id || '',
                         // Com máscara, e não cru. O banco guarda só os 14 dígitos, mas a
                         // validação cobra os 18 caracteres do formato — sem `formatCnpj`
                         // aqui, obra COM CNPJ salvo era reprovada por "CNPJ obrigatório".
@@ -741,7 +815,10 @@ export default function Obras() {
               }
               const payload = {
                 ...editObra,
-                spe_cnpj: editObra.spe_cnpj.replace(/\D/g, "")
+                spe_cnpj: editObra.spe_cnpj.replace(/\D/g, ""),
+                // String vazia NÃO serve: a coluna é uuid, e `marcador_id = ''` faz o banco
+                // recusar a gravação inteira. "Sem marcador" é `null`.
+                marcador_id: editObra.marcador_id || null,
               };
               updateObra.mutate(payload, {
                 onSuccess: () => {
@@ -772,20 +849,30 @@ export default function Obras() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select 
-                    value={editObra.status} 
-                    onValueChange={(v) => setEditObra(prev => ({ ...prev, status: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusObras?.map(s => (
-                        <SelectItem key={s.slug} value={s.slug}>{s.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Marcador</Label>
+                  {marcadores?.length === 0 ? (
+                    <MarcadorVazio onGerenciar={() => setMarcadoresDialogOpen(true)} />
+                  ) : (
+                    <Select
+                      value={editObra.marcador_id || SEM_MARCADOR}
+                      onValueChange={(v) => setEditObra(prev => ({ ...prev, marcador_id: v === SEM_MARCADOR ? '' : v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o marcador" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={SEM_MARCADOR}>Nenhum</SelectItem>
+                        {marcadores?.map(m => (
+                          <SelectItem key={m.id} value={m.id}>
+                            <span className="flex items-center gap-2">
+                              <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', `bg-${m.cor}`)} />
+                              {m.nome}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -851,12 +938,14 @@ export default function Obras() {
               const payload = {
                 ...newObra,
                 spe_cnpj: newObra.spe_cnpj.replace(/\D/g, ""),
+                // Ver o mesmo comentário na edição: uuid não aceita string vazia.
+                marcador_id: newObra.marcador_id || null,
                 campos_extras: camposExtrasObra,
               };
               createObra.mutate(payload, {
                 onSuccess: () => {
                   setDialogOpen(false);
-                  setNewObra({ nome_obra: '', cliente_id: '', endereco_entrega: '', status: statusObras?.[0]?.slug || '', spe_cnpj: '' });
+                  setNewObra({ nome_obra: '', cliente_id: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' });
                   setCamposExtrasObra({});
                   setNewObraCnpjError('');
                 }
@@ -882,21 +971,33 @@ export default function Obras() {
                   />
                 </div>
 
+                {/* Marcador é sempre OPCIONAL — não passa por `obraObrigatorio`. Foi campo
+                    obrigatório com lista vazia que travou o cadastro no modelo antigo. */}
                 <div className="space-y-2">
-                  <Label>Status Inicial{obraObrigatorio('status', false) && ' *'}</Label>
-                  <Select
-                    value={newObra.status}
-                    onValueChange={(v) => setNewObra(prev => ({ ...prev, status: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusObras?.map(s => (
-                        <SelectItem key={s.slug} value={s.slug}>{s.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Marcador</Label>
+                  {marcadores?.length === 0 ? (
+                    <MarcadorVazio onGerenciar={() => setMarcadoresDialogOpen(true)} />
+                  ) : (
+                    <Select
+                      value={newObra.marcador_id || SEM_MARCADOR}
+                      onValueChange={(v) => setNewObra(prev => ({ ...prev, marcador_id: v === SEM_MARCADOR ? '' : v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o marcador" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={SEM_MARCADOR}>Nenhum</SelectItem>
+                        {marcadores?.map(m => (
+                          <SelectItem key={m.id} value={m.id}>
+                            <span className="flex items-center gap-2">
+                              <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', `bg-${m.cor}`)} />
+                              {m.nome}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 <div className="space-y-2">

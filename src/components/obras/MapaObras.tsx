@@ -4,6 +4,7 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { Loader2, MapPin, Building2, AlertTriangle, Key } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 import { useGeocodeObras, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
 
 const containerStyle = {
@@ -11,12 +12,11 @@ const containerStyle = {
   height: '100%'
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  em_andamento: 'Em Andamento',
-  ativa: 'Ativa',
-  concluida: 'Concluída',
-  parada: 'Parada',
-};
+// O `STATUS_LABEL` que existia aqui traduzia quatro apelidos fixos (em_andamento, ativa,
+// concluida, parada) que nunca bateram com lista nenhuma: `status_obras` está vazia nas 8
+// empresas, então o balão mostrava o apelido cru do banco. Quem etiqueta a obra agora é o
+// MARCADOR, que vem com nome e cor próprios pela junção — e quando a obra não tem marcador o
+// balão simplesmente não mostra etiqueta, em vez de inventar uma.
 
 interface MapaObrasProps {
   obras: ObraComCoordenada[] | undefined;
@@ -198,11 +198,16 @@ export function MapaObras({ obras, isLoading, searchTerm = '', selectedObraId }:
                   <span className="break-words">{selectedObra.endereco_entrega || selectedObra.nome_obra}</span>
                 </div>
                 
-                <div className="pt-1 flex items-center justify-between">
-                  <Badge className="bg-blue-600 hover:bg-blue-700 text-white border-none text-[11px] px-2 py-0.5">
-                    {STATUS_LABEL[selectedObra.status] ?? selectedObra.status}
-                  </Badge>
-                  <span className="text-[10px] text-slate-400 italic">ID: {selectedObra.id.split('-')[0]}</span>
+                <div className="pt-1 flex items-center justify-between gap-2">
+                  {/* A cor vem do token do marcador (`bg-kanban-new`, `bg-destructive`…), que é
+                      exatamente o conjunto coberto pelo safelist do Tailwind. Obra sem marcador
+                      não mostra etiqueta nenhuma. */}
+                  {selectedObra.marcador_nome && (
+                    <Badge className={cn('text-white border-none text-[11px] px-2 py-0.5', `bg-${selectedObra.marcador_cor}`)}>
+                      {selectedObra.marcador_nome}
+                    </Badge>
+                  )}
+                  <span className="text-[10px] text-slate-400 italic ml-auto">ID: {selectedObra.id.split('-')[0]}</span>
                 </div>
               </div>
             </InfoWindow>

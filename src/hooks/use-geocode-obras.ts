@@ -5,7 +5,11 @@ export interface ObraComCoordenada {
   id: string;
   nome_obra: string;
   endereco_entrega: string | null;
-  status: string;
+  /** Nome e cor do marcador da obra, quando ela tiver um. Marcador é opcional: obra sem
+   *  etiqueta é estado válido, e aí os dois vêm nulos e o balão do mapa não mostra nada.
+   *  Substituíram o antigo `status`, que nunca teve lista cadastrada em empresa nenhuma. */
+  marcador_nome?: string | null;
+  marcador_cor?: string | null;
   spe_cnpj: string | null;
   latitude: number | null;
   longitude: number | null;

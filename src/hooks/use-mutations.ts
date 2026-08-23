@@ -171,6 +171,14 @@ export function useCreateVendedor() {
   });
 }
 
+// ⚠️ TEMPORÁRIO — remover junto com o DROP de `obras.status`.
+//
+// O "Status Inicial" da obra virou MARCADOR (`marcador_id`), mas a coluna `status` ainda
+// existe no banco e ainda é NOT NULL: a migration de 23/08/2026 só ACRESCENTOU o marcador, e
+// o DROP vem em arquivo próprio, depois que o site novo estiver publicado. Enquanto isso, o
+// insert precisa mandar algum valor válido — sem ele o cadastro de obra falha em produção.
+const STATUS_LEGADO_DA_OBRA = 'ativa';
+
 export function useCreateObra() {
   const qc = useQueryClient();
   return useMutation({
@@ -178,11 +186,17 @@ export function useCreateObra() {
       nome_obra: string;
       cliente_id: string;
       endereco_entrega?: string;
-      status?: string;
+      marcador_id?: string | null;
       spe_cnpj?: string;
       campos_extras?: Record<string, string>;
     }) => {
-      const { error } = await supabase.from('obras').insert(data);
+      // Ver STATUS_LEGADO_DA_OBRA: a coluna ainda é obrigatória no banco. O valor vai PRIMEIRO
+      // no objeto de propósito — quem ainda manda `status` explicitamente (o cadastro rápido de
+      // obra dentro da ficha do cliente, que ainda tem os quatro rótulos fixos) continua
+      // gravando a escolha da pessoa; forçar 'ativa' por cima trocaria o valor em silêncio.
+      const { error } = await supabase
+        .from('obras')
+        .insert({ status: STATUS_LEGADO_DA_OBRA, ...data });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -195,18 +209,25 @@ export function useCreateObra() {
 export function useUpdateObra() {
   const qc = useQueryClient();
   return useMutation({
+    // `campos_extras` entra aqui porque o create já aceitava e este não: dava para cadastrar
+    // uma obra com campo personalizado preenchido e depois NÃO conseguir alterar aquele
+    // valor — a edição descartava o campo em silêncio. `status` sai dos dois: quem grava a
+    // etiqueta agora é `marcador_id`, e a edição nunca precisou reescrever a coluna legada.
     mutationFn: async ({ id, ...data }: {
       id: string;
       nome_obra?: string;
       cliente_id?: string;
       endereco_entrega?: string;
-      status?: string;
+      marcador_id?: string | null;
       spe_cnpj?: string;
+      campos_extras?: Record<string, string>;
     }) => {
       const { error } = await supabase.from('obras').update(data).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
+      // As duas chaves continuam obrigatórias: a ficha do cliente mostra as obras embutidas,
+      // então invalidar só ['obras'] deixaria a tela do cliente com o dado velho.
       qc.invalidateQueries({ queryKey: ['obras'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
     },

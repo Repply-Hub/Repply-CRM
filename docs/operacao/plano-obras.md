@@ -6,7 +6,8 @@
 
 ## O ponto de partida que muda tudo
 
-A seção de Obras **nunca foi usada**. Medido no banco de produção em 23/08/2026:
+A seção de Obras está vazia **porque foi zerada**, não porque nunca foi tocada. Medido no
+banco de produção em 23/08/2026:
 
 | Medida | Valor |
 |---|---|
@@ -19,6 +20,36 @@ Isso não é um detalhe de contexto: é o que autoriza este plano a **trocar coi
 de remendar**. Não há dado para migrar, não há usuário para reeducar, não há tela em produção
 que dependa do comportamento atual. Qualquer plano escrito sem essa medição seria três vezes
 maior e cheio de compatibilidade retroativa inútil.
+
+### 🔴 Correção: "nunca foi usada" está errado — ela foi usada, deu errado e foi zerada
+
+A primeira versão deste plano dizia que a seção nunca tinha sido usada. `historico_alteracoes`
+desmente, e a diferença importa para quem for construir. **2.312 obras existiram**:
+
+| | |
+|---|---|
+| Criadas | 1.488 registradas, entre 30/07 e 01/08/2026 |
+| Apagadas por **Lucas Ferreira** | 1.404 |
+| Apagadas por **Arthur** | 908 |
+| Quando | 28/07 a 06/08/2026, em **3 lotes cada** — exclusão em massa, deliberada |
+| Empresas | "MD Representações" e "MD" — duas linhas de assinante distintas |
+
+E o que essas obras eram explica a limpeza: o **nome da obra** vinha preenchido com o
+**endereço**, com sobras de coordenada grudadas no fim —
+`R Almirante Barroso 239, Alto da Conceição, Mossoro-RN (0, 0)`,
+`TRAVESSA MINISTRO MACEDO SOARES 1973 LAGOA NOVA (, )`. Nenhuma tinha CNPJ, e nenhuma tinha
+`endereco_entrega` preenchido: o endereço estava **no lugar do nome**. Importação malfeita,
+limpa em seguida pelos próprios donos do dado.
+
+**Duas consequências práticas:**
+
+1. **Todas as 2.312 tinham `status = 'ativa'`.** Esse valor não existe em `status_obras` nem
+   entre os 7 slugs da semente — é o que está **chumbado no formulário da ficha do cliente**
+   (`ClienteDetalhe.tsx:317`). É prova, com dado, de que o cadastro em uso de verdade era o
+   SEGUNDO. Consertar só o formulário de `Obras.tsx` não teria resolvido nada.
+2. **Derrubar `obras.status` não apaga esse histórico.** `historico_alteracoes` guarda a foto
+   inteira da linha em `dados_antes`, com os valores antigos preservados; a tela de Histórico
+   continua legível depois do DROP.
 
 ---
 
@@ -253,6 +284,23 @@ automático, ou a listinha abre do nada.
 ---
 
 ## Fora do escopo, achado no caminho — registrar e decidir depois
+
+0. 🔴 **Existem DUAS empresas "MD", e uma delas guarda 803 clientes que ninguém enxerga.**
+   Medido em 23/08/2026:
+
+   | Empresa | Usuários | Clientes | Negócios |
+   |---|---|---|---|
+   | MD Representações | 13 | 1.305 | 11.911 |
+   | **MD** | 2 | **803** | 0 |
+
+   As duas nasceram no mesmo dia (25/06/2026). A RLS isola uma da outra, então os 803
+   clientes da segunda são invisíveis para as 13 pessoas da primeira — e vice-versa. Foi por
+   aí que apareceu: as obras apagadas estavam divididas entre as duas, e o Arthur (908
+   exclusões) é usuário da segunda.
+
+   Não é assunto de Obras e **não deve ser mexido junto**: juntar ou apagar inquilino é
+   operação de dado de cliente pagante, com decisão de produto antes. Mas é o achado de maior
+   consequência desta apuração, e fica aqui para não se perder.
 
 1. **A tela de importação mente.** Ela diz que a coluna "Obra" vai para `pedidos.obra_id`; vai
    para `endereco_entrega`. → `src/components/import/MappingStep.tsx:67`
