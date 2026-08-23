@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -31,6 +31,8 @@ import { ContatoSelector } from '@/components/clientes/ContatoSelector';
 import { emptyEndereco, enderecoToString, stringToEndereco, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
+import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
+import { parseMoedaBRL } from '@/lib/moeda';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
 import { CargoSelect } from '@/components/shared/CargoSelect';
@@ -76,6 +78,139 @@ const formatDateBR = (value?: string | null) => {
   return `${dia}/${mes}/${ano}`;
 };
 
+/* -------------------------------------------------------------------------------------------
+ * ORDENAÇÃO DA TABELA DE NEGÓCIOS DA FICHA — no navegador, de propósito.
+ *
+ * A lista de Negócios manda a ordenação para o banco porque ela é paginada NO SERVIDOR:
+ * ordenar ali no navegador reordenaria só as 25 linhas que vieram, e a tela mostraria "os
+ * maiores valores" de uma página qualquer. Aqui o caso é o oposto — `usePedidosPorCliente`
+ * traz TODOS os negócios do cliente de uma vez, e a paginação desta tabela é só um recorte
+ * do array que já está na memória. Ordenar o array inteiro antes de recortar dá a ordem
+ * certa, sem tocar em consulta nenhuma.
+ *
+ * É por isso também que aqui TODA coluna sabe se ordenar, inclusive as que a lista principal
+ * precisou deixar de fora (Negócio, Fabricante, Responsável, Etapa, Marcador, Contato,
+ * Observações e as colunas criadas pela importação). Lá o impedimento era do banco: nome do
+ * negócio nulo em toda a base, junção interna que descarta linha sem par, e a coluna `status`
+ * guardando o apelido da etapa ("enviado") em vez do nome que aparece na tela ("Orçamento
+ * Enviado"). Nada disso existe quando o valor já está na mão: aqui ordenamos exatamente o
+ * mesmo valor que a célula mostra, então o que a pessoa lê é o que ordena.
+ * ---------------------------------------------------------------------------------------- */
+
+type TipoDeOrdenacao = 'texto' | 'numero' | 'data' | 'presenca';
+
+/** O que ficou escolhido no cabeçalho: a coluna da tabela (não a do banco) e a direção. */
+type OrdenacaoNegocios = { colId: string; direction: SortDirection };
+
+const ROTULOS_ORDENACAO_PADRAO: Record<TipoDeOrdenacao, { asc: string; desc: string }> = {
+  texto: { asc: 'Ordenar A-Z', desc: 'Ordenar Z-A' },
+  numero: { asc: 'Ordenar 0-9', desc: 'Ordenar 9-0' },
+  data: { asc: 'Mais antigos primeiro', desc: 'Mais recentes primeiro' },
+  presenca: { asc: 'Preenchidos primeiro', desc: 'Vazios primeiro' },
+};
+
+// Como cada coluna PADRÃO se ordena, e como o menu do cabeçalho descreve cada direção.
+// Os rótulos de Valor, Criação, Fechamento e Anexo são os MESMOS da lista de Negócios — quem
+// aprendeu o menu lá encontra as mesmas palavras aqui.
+const ORDENACAO_NEGOCIOS_CLIENTE: Record<string, { tipo: TipoDeOrdenacao; asc?: string; desc?: string }> = {
+  negocio: { tipo: 'texto' },
+  contato: { tipo: 'texto' },
+  endereco_entrega: { tipo: 'texto' },
+  fabricante: { tipo: 'texto' },
+  valor: { tipo: 'numero', asc: 'Menor valor primeiro', desc: 'Maior valor primeiro' },
+  vendedor: { tipo: 'texto' },
+  // Ordena pelo NOME da etapa que está na tela, não pelo apelido guardado em `pedidos.status`.
+  // Ordem alfabética do que se lê, e não a ordem do funil, porque a ficha lista negócios de
+  // funis diferentes: as etapas são agrupadas por apelido e o número de ordem de um funil não
+  // quer dizer nada no outro — uma "ordem do funil" aqui seria inventada.
+  etapa: { tipo: 'texto' },
+  marcador: { tipo: 'texto' },
+  data_pedido: { tipo: 'data' },
+  prazo_resposta: { tipo: 'data' },
+  // "Observações" NÃO ordena, pelo mesmo motivo da lista principal: 11.898 dos
+  // 11.911 negócios têm o campo vazio. Medido na ficha: em 704 dos 708 clientes
+  // com dois ou mais negócios, as duas direções devolvem a lista IDÊNTICA. Um
+  // cabeçalho que responde a mesma coisa nos dois sentidos é pior que nenhum.
+  // Anexo é coluna de SIM/NÃO, não de texto: o que ela responde é "quais negócios têm PDF".
+  // Por isso não entra na regra do vazio-no-fim — "sem anexo" é uma resposta, não um buraco —
+  // e "Sem anexo primeiro" de fato coloca os sem anexo primeiro. Ordenar pelo endereço do
+  // arquivo em ordem alfabética não diria nada a ninguém.
+  anexo: { tipo: 'presenca', asc: 'Com anexo primeiro', desc: 'Sem anexo primeiro' },
+};
+
+// Coluna criada pelo usuário no painel "Colunas": o tipo escolhido lá é que decide como ela
+// ordena. Sem tipo declarado, texto — é como a célula a mostra.
+const TIPO_DE_ORDENACAO_POR_TIPO_DE_COLUNA: Record<string, TipoDeOrdenacao> = {
+  text: 'texto',
+  boolean: 'texto',
+  number: 'numero',
+  currency: 'numero',
+  date: 'data',
+};
+
+const configDeOrdenacao = (col: ColumnDefinition): { tipo: TipoDeOrdenacao; asc: string; desc: string } => {
+  // Mesma checagem que `renderNegocioCell` faz para decidir de onde tira o valor: coluna
+  // criada pela importação pode nascer com um id parecido com o de uma padrão, e aí ordenar
+  // pela regra da padrão ordenaria por outra coisa que não a que está na célula.
+  const padrao = NEGOCIOS_CLIENTE_COLUMNS.some(c => c.id === col.id)
+    ? ORDENACAO_NEGOCIOS_CLIENTE[col.id]
+    : undefined;
+  const tipo = padrao?.tipo ?? TIPO_DE_ORDENACAO_POR_TIPO_DE_COLUNA[col.type ?? 'text'] ?? 'texto';
+  return {
+    tipo,
+    asc: padrao?.asc ?? ROTULOS_ORDENACAO_PADRAO[tipo].asc,
+    desc: padrao?.desc ?? ROTULOS_ORDENACAO_PADRAO[tipo].desc,
+  };
+};
+
+/**
+ * Data em texto → "aaaa-mm-dd", que ordena certo comparado como texto puro.
+ *
+ * De propósito SEM `new Date(...)`: a data vem do banco como "aaaa-mm-dd" e essa leitura a
+ * interpreta como UTC, o que no Brasil recua um dia (CLAUDE.md §7.12). Aqui isso trocaria a
+ * ordem de dois negócios criados em dias vizinhos. Aceita também o "dd/mm/aaaa" que as
+ * colunas de data criadas pela importação costumam guardar.
+ */
+const chaveDeData = (valor: string): string | null => {
+  const iso = valor.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const br = valor.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+  return null;
+};
+
+const estaVazio = (v: unknown) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
+
+const compararParaOrdenacao = (a: unknown, b: unknown, tipo: TipoDeOrdenacao, dir: 1 | -1): number => {
+  // Presença (Anexo) não tem vazio: os dois lados são 0 ou 1, e a direção manda de verdade.
+  if (tipo === 'presenca') return (Number(a) - Number(b)) * dir;
+
+  // Vazio SEMPRE no fim, nos dois sentidos — mesma decisão da lista de Negócios. Sem isso,
+  // "Ordenar Z-A" numa coluna pouco preenchida abriria com uma tela inteira de traços.
+  if (estaVazio(a) || estaVazio(b)) {
+    if (estaVazio(a) && estaVazio(b)) return 0;
+    return estaVazio(a) ? 1 : -1;
+  }
+
+  if (tipo === 'data') {
+    const ca = chaveDeData(String(a));
+    const cb = chaveDeData(String(b));
+    if (ca && cb) return (ca < cb ? -1 : ca > cb ? 1 : 0) * dir;
+  }
+
+  if (tipo === 'numero') {
+    // `parseMoedaBRL` e nunca `parseFloat`: "1.234,56" lido por parseFloat vira 1.234
+    // (CLAUDE.md §7.10). Valor do negócio já chega número e passa direto.
+    const na = typeof a === 'number' ? a : parseMoedaBRL(String(a));
+    const nb = typeof b === 'number' ? b : parseMoedaBRL(String(b));
+    if (na !== null && nb !== null) return (na - nb) * dir;
+  }
+
+  // Texto em pt-BR: o acento entra na conta ("Álvaro" antes de "Amaro"), maiúscula não
+  // separa, e `numeric` faz "Obra 2" vir antes de "Obra 10".
+  return String(a).localeCompare(String(b), 'pt-BR', { numeric: true, sensitivity: 'base' }) * dir;
+};
+
 
 /**
  * Os embeds do negócio (fabricante, vendedor, obra) vêm de um join que o tipo
@@ -91,6 +226,24 @@ type PedidoComEmbeds = {
   obra?: { id?: string; nome_obra?: string } | null;
 };
 const comEmbeds = (p: unknown) => p as PedidoComEmbeds;
+
+/**
+ * O negócio como a ficha do cliente o lê para ORDENAR. Todo campo aqui é um campo que
+ * `valorParaOrdenar` de fato consulta — declarar a mais só criaria a ilusão de garantia,
+ * porque o tipo gerado pelo Supabase não descreve os embeds do join.
+ */
+type NegocioDaFicha = PedidoComEmbeds & {
+  nome?: string | null;
+  status?: string | null;
+  valor_total?: number | null;
+  data_pedido?: string | null;
+  prazo_resposta?: string | null;
+  endereco_entrega?: string | null;
+  pdf_url?: string | null;
+  cliente?: { empresa?: string | null } | null;
+  marcador?: { nome?: string | null } | null;
+  campos_extras?: Record<string, unknown> | null;
+};
 
 const ClienteDetalhe = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -134,6 +287,13 @@ const ClienteDetalhe = () => {
     });
     return Array.from(porSlug.values());
   }, [kanbanColunasEmpresa]);
+  // Definido AQUI em cima, e não junto de `stageBadgeClass` lá embaixo, porque a ordenação da
+  // tabela de negócios (um useMemo, que precisa rodar antes dos returns de carregamento)
+  // ordena a coluna Etapa pelo nome que aparece na tela — e é esta função que o produz.
+  const stageLabel = useCallback(
+    (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key,
+    [KANBAN_STAGES]
+  );
 
   // Debug log
   console.log('ClienteDetalhe - slug:', slug, 'extracted id:', id);
@@ -160,6 +320,9 @@ const ClienteDetalhe = () => {
   const [pedidosBusca, setPedidosBusca] = useState('');
   const [pedidosFiltroFabricante, setPedidosFiltroFabricante] = useState('todos');
   const [pedidosFiltroEtapa, setPedidosFiltroEtapa] = useState('todas');
+  // `null` = a ordem em que os negócios chegam do banco (os mais recentes primeiro). Quem
+  // nunca clicar num cabeçalho vê a tabela exatamente como via antes.
+  const [ordenacaoNegocios, setOrdenacaoNegocios] = useState<OrdenacaoNegocios | null>(null);
   const [addTarefaOpen, setAddTarefaOpen] = useState(false);
   const [novoNegocioOpen, setNovoNegocioOpen] = useState(false);
 
@@ -242,10 +405,80 @@ const ClienteDetalhe = () => {
     });
   }, [pedidosCliente, pedidosBusca, pedidosFiltroFabricante, pedidosFiltroEtapa]);
   const pedidosFiltrosAtivos = pedidosBusca.trim() !== '' || pedidosFiltroFabricante !== 'todos' || pedidosFiltroEtapa !== 'todas';
+
+  /**
+   * O valor pelo qual cada coluna ordena — o MESMO que `renderNegocioCell` põe na célula.
+   * As duas funções têm a mesma estrutura de propósito (primeiro a coluna criada pelo
+   * usuário, depois o `switch` das padrão): se um dia uma célula mudar de fonte de dado, dá
+   * para ver na hora que a ordenação precisa mudar junto.
+   */
+  const valorParaOrdenar = useCallback((p: NegocioDaFicha, colId: string): unknown => {
+    const camposExtras = (p.campos_extras ?? {}) as Record<string, unknown>;
+    if (!NEGOCIOS_CLIENTE_COLUMNS.some(c => c.id === colId)) {
+      return camposExtras[colId] ?? camposExtras[getNegociosLabel(colId)] ?? null;
+    }
+    switch (colId) {
+      case 'negocio': return getNomeNegocio(p);
+      case 'contato': return camposExtras['Contato'] || camposExtras['contato'] || null;
+      case 'endereco_entrega': return p.endereco_entrega ?? (temObras === true ? comEmbeds(p).obra?.nome_obra : null) ?? null;
+      case 'fabricante': return comEmbeds(p).fabricante?.nome ?? null;
+      // `?? 0` porque a célula mostra R$ 0,00 quando o valor é nulo: negócio sem valor não
+      // aparece em branco na tela, então também não é "vazio" para a ordenação.
+      case 'valor': return p.valor_total ?? 0;
+      case 'vendedor': return comEmbeds(p).vendedor?.nome ?? null;
+      case 'etapa': return stageLabel(p.status);
+      case 'marcador': return p.marcador?.nome ?? null;
+      case 'data_pedido': return p.data_pedido ?? null;
+      case 'prazo_resposta': return p.prazo_resposta ?? null;
+      // 0 = tem anexo. Assim "Ordenar crescente" (o `asc` do menu) é literalmente
+      // "Com anexo primeiro", que é o rótulo que a pessoa lê.
+      case 'anexo': return p.pdf_url ? 0 : 1;
+      default: return null;
+    }
+  }, [getNegociosLabel, stageLabel, temObras]);
+
+  /**
+   * A ordenação que de fato vale. Coluna escondida no painel "Colunas" deixa de ordenar: senão
+   * a tabela continuaria numa ordem que nenhum cabeçalho da tela explica — ninguém entenderia
+   * por que os negócios estão naquela sequência.
+   */
+  const ordenacaoAtiva = useMemo(() => {
+    if (!ordenacaoNegocios) return null;
+    const col = negociosColunasVisiveis.find(c => c.id === ordenacaoNegocios.colId);
+    if (!col) return null;
+    return { colId: col.id, direction: ordenacaoNegocios.direction, ...configDeOrdenacao(col) };
+  }, [ordenacaoNegocios, negociosColunasVisiveis]);
+
+  // Ordena a lista JÁ FILTRADA (busca, fabricante, etapa), nunca a lista crua — senão o
+  // recorte da página traria negócios que os filtros tinham tirado da tela.
+  const pedidosOrdenados = useMemo(() => {
+    if (!ordenacaoAtiva) return pedidosFiltrados;
+    const dir: 1 | -1 = ordenacaoAtiva.direction === 'asc' ? 1 : -1;
+    // Calcula o valor de cada linha UMA vez (e não a cada comparação) e guarda a posição
+    // original: o `|| a.i - b.i` no fim é o desempate que mantém empatados na ordem em que
+    // vieram do banco, sem depender da ordenação do motor do navegador ser estável.
+    return pedidosFiltrados
+      .map((p, i) => ({ p, i, v: valorParaOrdenar(p, ordenacaoAtiva.colId) }))
+      .sort((a, b) => compararParaOrdenacao(a.v, b.v, ordenacaoAtiva.tipo, dir) || a.i - b.i)
+      .map(d => d.p);
+  }, [pedidosFiltrados, ordenacaoAtiva, valorParaOrdenar]);
+
+  const handleNegociosSort = useCallback((colId: string, direction: SortDirection) => {
+    setOrdenacaoNegocios({ colId, direction });
+  }, []);
+
+  // Trocar a ordem volta para a primeira página. "Página 3" passou a apontar para outros
+  // negócios: continuar nela depois de pedir "maior valor primeiro" mostraria do 11º ao 15º
+  // maior, com cara de erro. Vale também quando a ordenação CAI porque a coluna foi escondida
+  // no painel "Colunas" — é a outra porta para o mesmo estado.
+  useEffect(() => {
+    setPedidosPage(1);
+  }, [ordenacaoAtiva?.colId, ordenacaoAtiva?.direction]);
+
   const totalPedidosPages = Math.max(1, Math.ceil(pedidosFiltrados.length / pedidosPageSize));
   const paginatedPedidos = useMemo(() =>
-    pedidosFiltrados.slice((pedidosPage - 1) * pedidosPageSize, pedidosPage * pedidosPageSize),
-    [pedidosFiltrados, pedidosPage, pedidosPageSize]
+    pedidosOrdenados.slice((pedidosPage - 1) * pedidosPageSize, pedidosPage * pedidosPageSize),
+    [pedidosOrdenados, pedidosPage, pedidosPageSize]
   );
   const contatosExtras = (contatos ?? []).filter((c: any) => cliente && c.empresa === cliente.empresa);
   // Candidatos a vincular: todo mundo que ainda não está neste cliente.
@@ -399,7 +632,6 @@ const ClienteDetalhe = () => {
   }
 
   const Icon = tipoIcons[cliente.tipo] ?? Building2;
-  const stageLabel = (key: string) => KANBAN_STAGES.find(s => s.key === key)?.label || key;
   // Mesma construção de classe que Negocios.tsx:97 usa para a etiqueta de etapa.
   const stageBadgeClass = (key: string) =>
     `bg-${KANBAN_STAGES.find(s => s.key === key)?.color || 'muted-foreground'} text-white`;
@@ -1285,14 +1517,30 @@ const ClienteDetalhe = () => {
                   </div>
                 )}
                 {/* Cabeçalho e células saem da MESMA lista de colunas visíveis, na mesma ordem —
-                    é o que faz o arrasta-e-solta do painel de colunas valer para a tabela. */}
+                    é o que faz o arrasta-e-solta do painel de colunas valer para a tabela.
+                    Todo cabeçalho é o `SortableTh` de Clientes, Obras e Negócios: mesma setinha,
+                    mesmo menuzinho de A-Z / Z-A. Aqui, diferente da lista principal, TODAS as
+                    colunas ganham o menu — os negócios do cliente já estão inteiros no
+                    navegador, então nenhuma delas depende do banco para saber se ordenar. */}
                 <div className="rounded-lg border border-border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        {negociosColunasVisiveis.map(col => (
-                          <TableHead key={col.id} className="whitespace-nowrap">{getNegociosLabel(col.id)}</TableHead>
-                        ))}
+                        {negociosColunasVisiveis.map(col => {
+                          const { asc, desc } = configDeOrdenacao(col);
+                          return (
+                            <SortableTh
+                              key={col.id}
+                              label={getNegociosLabel(col.id)}
+                              sortKey={col.id}
+                              currentSortKey={ordenacaoAtiva?.colId ?? null}
+                              currentDirection={ordenacaoAtiva?.direction ?? 'desc'}
+                              onSort={handleNegociosSort}
+                              ascLabel={asc}
+                              descLabel={desc}
+                            />
+                          );
+                        })}
                       </TableRow>
                     </TableHeader>
                     <TableBody>

@@ -81,20 +81,136 @@ export interface PedidosFilters {
  * lista — o topo mostraria "o maior valor entre os 10 que sobraram nesta página", com cara de
  * ordenado e sem ser. Por isso a coluna e a direção viajam até o `.order()` da consulta.
  *
- * SÓ COLUNAS DA PRÓPRIA TABELA `pedidos` entram aqui. Cliente, Fabricante, Responsável e
- * Marcador moram em tabelas ligadas, e no PostgREST ordenar por elas exige transformar o
- * vínculo em junção interna (`!inner`) — o que muda QUAIS linhas voltam, não só a ordem
- * (marcador_id é nulo em 8.526 dos 11.911 negócios: a lista perderia 72% das linhas sem
- * avisar, enquanto o rodapé continuaria contando todas). Ver o relatório da tarefa.
+ * ---------------------------------------------------------------------------------------
+ * A REGRA QUE MANDA AQUI: **ordenação que ESCONDE linha é pior que coluna que não ordena.**
+ * O rodapé da tela conta por outra consulta (a RPC `pedidos_stats`), então uma linha que some
+ * da lista continua sendo contada embaixo — o usuário vê "11.911 negócios" e recebe 3.385.
+ * ---------------------------------------------------------------------------------------
+ *
+ * ORDENAR POR TABELA LIGADA (cliente/fabricante/responsável) exige junção interna (`!inner`):
+ * é o que a documentação do supabase-js diz com todas as letras ("only affects the ordering of
+ * the parent table if you use `!inner`"), e sem ela o `order=` é aceito e simplesmente ignorado.
+ * Junção interna DESCARTA a linha sem par — por isso ela só entra onde a ausência de par é
+ * IMPOSSÍVEL, não onde ela apenas não aconteceu ainda.
+ *
+ * Medido em 23/08/2026, na base inteira (todas as 8 empresas, não só a MD):
+ *
+ * | Vínculo       | Coluna em `pedidos` | Chave estrangeira        | Linhas com junção interna |
+ * |---------------|---------------------|--------------------------|---------------------------|
+ * | cliente       | NOT NULL            | ON DELETE CASCADE        | 11.911 de 11.911          |
+ * | fabricante    | NOT NULL            | sem ação (bloqueia apagar)| 11.911 de 11.911         |
+ * | responsável   | NOT NULL            | sem ação (bloqueia apagar)| 11.911 de 11.911         |
+ * | marcador      | **NULA em 8.526**   | ON DELETE SET NULL       | **3.385 de 11.911**       |
+ *
+ * Os três primeiros são seguros por CONSTRUÇÃO, não por sorte: a coluna não aceita nulo e a
+ * chave estrangeira garante que o par existe (no caso do cliente, apagar o cliente apaga o
+ * negócio junto; nos outros dois o banco recusa apagar enquanto houver negócio apontando).
+ * A contagem acima foi conferida com a RLS ligada, logado como VENDEDOR COMUM — não como
+ * gestor —, porque a junção interna também descarta a linha cujo par a política de segurança
+ * esconde. Nenhuma some: cliente, fabricante e responsável de um negócio são sempre da mesma
+ * empresa de quem enxerga o negócio (0 divergências em 11.911).
+ *
+ * O marcador é o oposto: a junção interna esconderia 72% da lista. Por isso ele ordena pela
+ * PRÓPRIA coluna `marcador_id`, que agrupa os marcados (uuid igual fica junto) sem perder
+ * ninguém — e os rótulos na tela prometem exatamente isso, "com/sem marcador", nunca A-Z.
+ *
+ * CUSTO: nenhum. A consulta da lista já varre a tabela inteira hoje (a política de `pedidos`
+ * chama `usuario_in_my_empresa` por linha e derruba o Index Scan — CLAUDE.md §7.9). Medido com
+ * EXPLAIN ANALYZE sob RLS: ordem atual por `created_at` = 1.100 ms; ordem por `cliente(empresa)`
+ * com junção interna = 1.006 ms. A junção resolve por Memoize + Index Scan na chave primária
+ * (1.205 buscas para 11.911 linhas) e não muda a forma do plano.
+ *
+ * ETAPA continua de fora, e não por escolha: `pedidos.status` guarda o apelido da etapa em
+ * texto e NÃO tem chave estrangeira para `kanban_colunas`. O PostgREST recusa o pedido antes
+ * de tocar no banco — `PGRST200: Could not find a relationship between 'pedidos' and
+ * 'kanban_colunas'`. Sem mudança no banco, não existe ordem de funil. Ver o relatório.
  */
 export type PedidosSortColumn =
+  // Colunas da própria tabela `pedidos`
   | 'created_at'
   | 'valor_total'
   | 'data_pedido'
   | 'prazo_resposta'
   | 'endereco_entrega'
-  | 'observacoes'
-  | 'pdf_url';
+  | 'pdf_url'
+  | 'marcador_id'
+  // Dentro de `campos_extras` (JSON)
+  | 'contato'
+  // Tabelas ligadas — exigem junção interna, e só estas três podem tê-la
+  | 'cliente'
+  | 'fabricante'
+  | 'vendedor'
+  | 'negocio';
+
+/**
+ * Vínculos que PODEM virar junção interna.
+ *
+ * `marcador` e `obra` não estão aqui de propósito, e não é descuido de digitação: as duas
+ * colunas aceitam nulo (`marcador_id` é nulo em 8.526 negócios, `obra_id` nos 11.911), então
+ * junção interna nelas apaga a maior parte da lista. Se alguém for acrescentar um vínculo
+ * novo a este tipo, a pergunta a responder antes é uma só: **a coluna é NOT NULL e tem chave
+ * estrangeira?** Se a resposta não for "sim" para as duas, não entra.
+ */
+type RelacaoInterna = 'cliente' | 'fabricante' | 'vendedor';
+
+interface DefinicaoDeOrdem {
+  /** O que vai para o `.order()`, em ordem de prioridade. Mais de uma quando o que a célula
+   *  mostra é a junção de dois campos (é o caso de Negócio: "cliente | fabricante"). */
+  chaves: string[];
+  /** Vínculos que precisam de `!inner` para o `.order()` alcançar a tabela de cima. */
+  relacoesInternas?: RelacaoInterna[];
+  /**
+   * Se `true`, os vazios acompanham a direção: sobem para o topo em ordem decrescente.
+   *
+   * Serve às colunas cujo rótulo promete "com X primeiro / sem X primeiro" — nelas o vazio é a
+   * informação, não um estorvo. Nas outras o vazio fica sempre no fim, nas duas direções: sem
+   * isso "Ordenar Z-A" em Obra/Endereço abriria com uma página inteira de traços (a coluna é
+   * nula em 9.512 dos 11.911), porque em ordem decrescente o padrão do Postgres é NULLS FIRST.
+   */
+  vaziosSeguemADirecao?: boolean;
+}
+
+/**
+ * O que cada ordenação manda ao servidor. É a ÚNICA fonte da verdade: a lista de colunas
+ * aceitas é derivada daqui embaixo, então não existe como uma coluna entrar no tipo e ficar
+ * fora da validação (ou o contrário).
+ */
+const ORDENS: Record<PedidosSortColumn, DefinicaoDeOrdem> = {
+  created_at: { chaves: ['created_at'] },
+  valor_total: { chaves: ['valor_total'] },
+  data_pedido: { chaves: ['data_pedido'] },
+  prazo_resposta: { chaves: ['prazo_resposta'] },
+  // Ordena SÓ por `endereco_entrega`, mas a célula mostra `endereco_entrega ??
+  // obra.nome_obra`. Hoje é inócuo — `obra_id` está nulo nos 11.911 negócios e a
+  // seção Obras não tem uma linha sequer. No dia em que Obras for usada, o negócio
+  // que exibe o nome da obra vai para o fim da lista como se estivesse vazio.
+  // Resolver de verdade exige COALESCE sobre a junção, que o PostgREST não faz no
+  // `order` — precisaria de uma view. Registrado na dívida técnica.
+  endereco_entrega: { chaves: ['endereco_entrega'] },
+  // Anexo e Marcador respondem "quem tem / quem não tem", então o vazio precisa poder ir ao topo.
+  pdf_url: { chaves: ['pdf_url'], vaziosSeguemADirecao: true },
+  marcador_id: { chaves: ['marcador_id'], vaziosSeguemADirecao: true },
+  // Contato mora dentro do JSON de `campos_extras`, na chave com C maiúsculo — a MESMA que a
+  // célula lê em PedidoRow (`camposExtras['Contato']`). O PostgREST aceita caminho de JSON no
+  // `order=` (conferido contra o servidor deste projeto: `campos_extras->>Contato.asc` = HTTP
+  // 200; uma coluna inventada no mesmo teste devolve 400). Está preenchido em 10.802 dos
+  // 11.911; os 1.109 restantes são NULO de verdade (nenhum é texto vazio), então caem no fim.
+  contato: { chaves: ['campos_extras->>Contato'] },
+  cliente: { chaves: ['cliente(empresa)'], relacoesInternas: ['cliente'] },
+  fabricante: { chaves: ['fabricante(nome)'], relacoesInternas: ['fabricante'] },
+  vendedor: { chaves: ['vendedor(nome)'], relacoesInternas: ['vendedor'] },
+  // Negócio NÃO ordena por `pedidos.nome`: essa coluna está nula nos 11.911 negócios e ordenar
+  // por ela empataria tudo — a lista não sairia do lugar. O que a célula MOSTRA vem de
+  // `getNomeNegocio()`, que sem `nome` monta "cliente | fabricante"; ordenar por esses dois
+  // campos, nessa ordem, é ordenar exatamente o texto que está na tela.
+  //
+  // A ressalva, escrita aqui porque um dia vai importar: o formulário permite desligar o "nome
+  // automático" e digitar um nome próprio (NovoNegocioDialog/EditarPedido gravam `nome`). Um
+  // negócio assim aparece na posição do CLIENTE dele, não na do nome digitado. Hoje isso são 0
+  // de 11.911 negócios, e por isso os rótulos do menu dizem "pelo cliente" em vez de um "A-Z"
+  // seco — o cabeçalho não promete mais do que entrega.
+  negocio: { chaves: ['cliente(empresa)', 'fabricante(nome)'], relacoesInternas: ['cliente', 'fabricante'] },
+};
 
 export interface PedidosSort {
   column: PedidosSortColumn;
@@ -104,16 +220,14 @@ export interface PedidosSort {
 /** A ordem histórica da tela: os negócios mais recentes primeiro. */
 export const PEDIDOS_SORT_PADRAO: PedidosSort = { column: 'created_at', ascending: false };
 
-// Lista fechada, conferida em tempo de execução e não só pelo TypeScript: a escolha do usuário
-// é guardada no navegador (localStorage), e um valor antigo/estragado ali viraria um `order=` que
-// o servidor recusa — a tela inteira de Negócios quebraria por causa de uma preferência salva.
-// Diante de qualquer coisa fora da lista, cai no padrão em vez de derrubar a consulta.
-const PEDIDOS_COLUNAS_ORDENAVEIS = new Set<string>([
-  'created_at', 'valor_total', 'data_pedido', 'prazo_resposta', 'endereco_entrega', 'observacoes', 'pdf_url',
-]);
-
+// Conferido em tempo de execução, e não só pelo TypeScript: a escolha do usuário é guardada no
+// navegador (localStorage), e um valor antigo/estragado ali viraria um `order=` que o servidor
+// recusa — a tela inteira de Negócios quebraria por causa de uma preferência salva. Diante de
+// qualquer coisa fora da lista, cai no padrão em vez de derrubar a consulta.
+// `hasOwnProperty` e não `in`: `in` daria verdadeiro para 'toString' e afins herdados do
+// protótipo, e aí `ORDENS[...]` viria indefinido e o `.order()` sairia sem chave nenhuma.
 function resolverOrdenacao(sort?: PedidosSort | null): PedidosSort {
-  if (!sort || !PEDIDOS_COLUNAS_ORDENAVEIS.has(sort.column)) return PEDIDOS_SORT_PADRAO;
+  if (!sort || !Object.prototype.hasOwnProperty.call(ORDENS, sort.column)) return PEDIDOS_SORT_PADRAO;
   return sort;
 }
 
@@ -251,15 +365,24 @@ const buildSearchOrClause = (matches: SearchMatches): string => {
 // os três precisam do MESMO formato de linha: a exportação monta a planilha a partir do mesmo
 // objeto que a tabela desenha, então um campo que só um dos lados busca é um campo que sai
 // vazio no arquivo sem ninguém entender por quê.
-const PEDIDOS_SELECT = `
+//
+// O `!inner` de cliente/fabricante/responsável entra aqui, e só quando a ordenação pedida
+// precisa dele — nunca "por garantia". A forma da LINHA não muda com isso (`!inner` mexe em
+// quais linhas voltam, não em quais campos), então lista, Kanban e planilha continuam
+// recebendo o mesmo objeto. `obra` e `marcador` NUNCA levam `!inner`: as duas colunas aceitam
+// nulo, e junção interna nelas apagaria a maior parte da lista (ver ORDENS, acima).
+function montarSelectDeNegocios(relacoesInternas: RelacaoInterna[] = []): string {
+  const j = (rel: RelacaoInterna) => (relacoesInternas.includes(rel) ? '!inner' : '');
+  return `
   id, status, nome, valor_total, data_pedido, created_at, observacoes,
   cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
-  cliente:clientes(id, empresa),
-  fabricante:fabricantes(id, nome),
-  vendedor:usuarios(id, nome, empresa_id),
+  cliente:clientes${j('cliente')}(id, empresa),
+  fabricante:fabricantes${j('fabricante')}(id, nome),
+  vendedor:usuarios${j('vendedor')}(id, nome, empresa_id),
   obra:obras(id, nome_obra),
   marcador:marcadores(id, nome, cor)
 `;
+}
 
 // O recorte de negócios que a tela mostra, montado num lugar só. Antes cada consumidor
 // repetia a mesma sequência de filtros, e o preço disso já está registrado neste arquivo: a
@@ -274,6 +397,10 @@ const PEDIDOS_SELECT = `
 // em ordem diferente a cada requisição — e aí a página 2 repete negócio que já apareceu na 1 e
 // esconde outro que nunca vai aparecer. Isso vale em dobro para a exportação, que percorre a
 // base inteira lote a lote.
+//
+// O desempate por `id` ficou mais importante ainda com a ordenação por tabela ligada: um mesmo
+// cliente responde por centenas de negócios, então "Cliente A-Z" empata em bloco. Sem o `id` no
+// fim, folhear as páginas mostraria e esconderia negócios ao acaso dentro de cada cliente.
 function montarQueryDeNegocios(opts: {
   usuarioIds: string[] | null;
   stages?: string[];
@@ -285,17 +412,28 @@ function montarQueryDeNegocios(opts: {
   const { usuarioIds, stages, filters, searchMatches, ordenacao, withCount } = opts;
   const { fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId } = filters ?? {};
 
+  const ordem = ORDENS[ordenacao.column];
+
+  // ONDE FICAM OS VAZIOS. O padrão é o fim da lista, nas DUAS direções — colunas muito vazias
+  // (endereco_entrega é nulo em 9.512 dos 11.911) abririam "Ordenar Z-A" com uma página inteira
+  // de traços, porque em ordem decrescente o padrão do Postgres é NULLS FIRST.
+  //
+  // A exceção é a coluna cujo rótulo promete "com X primeiro / sem X primeiro": ali o vazio É a
+  // resposta, e precisa poder subir. Isso conserta um erro do que foi entregue em 22/08: o
+  // `nullsFirst: false` valia para todo mundo, então "Sem anexo primeiro" mandava NULLS LAST e
+  // os 6.732 negócios sem anexo continuavam no FIM — o cabeçalho prometia o contrário do que
+  // fazia. Conferido no banco: com NULLS LAST as 10 primeiras linhas têm todas anexo; com
+  // NULLS FIRST, nenhuma tem.
+  const vaziosNoTopo = ordem.vaziosSeguemADirecao ? !ordenacao.ascending : false;
+
   let query = supabase
     .from('pedidos')
-    .select(PEDIDOS_SELECT, withCount ? { count: 'exact' } : undefined)
-    // `nullsFirst: false` nos dois sentidos: em ordem decrescente o padrão do
-    // Postgres é NULLS FIRST, e colunas muito vazias (endereco_entrega é nulo em
-    // 9.512 dos 11.911) abririam a lista com uma página inteira de traços. A
-    // exceção proposital é o Anexo, cujos rótulos descrevem justamente o
-    // "com/sem" — mas lá o efeito continua o mesmo, porque quem tem anexo tem
-    // texto e quem não tem é nulo.
-    .order(ordenacao.column, { ascending: ordenacao.ascending, nullsFirst: false })
-    .order('id', { ascending: false });
+    .select(montarSelectDeNegocios(ordem.relacoesInternas), withCount ? { count: 'exact' } : undefined);
+
+  for (const chave of ordem.chaves) {
+    query = query.order(chave, { ascending: ordenacao.ascending, nullsFirst: vaziosNoTopo });
+  }
+  query = query.order('id', { ascending: false });
 
   if (usuarioIds) {
     query = query.in('usuario_id', usuarioIds);
@@ -392,7 +530,11 @@ export function usePedidos(
 
       const { data, error, count } = await query;
       if (error) throw error;
-      return { data: (data ?? []) as PedidoWithRelations[], count: count ?? 0 };
+      // `as unknown as`: o texto do `select` agora é montado em tempo de execução (o `!inner`
+      // entra ou não conforme a ordenação), então o supabase-js não consegue mais deduzir o
+      // formato da linha a partir dele como fazia quando era um literal fixo. O formato de
+      // verdade continua sendo o mesmo e está declarado em `PedidoWithRelations`.
+      return { data: (data ?? []) as unknown as PedidoWithRelations[], count: count ?? 0 };
     },
     enabled: !!empresaId && enabled,
     staleTime: 1000 * 60 * 5,
@@ -473,7 +615,9 @@ export async function buscarNegociosDoRecorte(params: {
       .range(inicio, inicio + PEDIDOS_LOTE_EXPORTACAO - 1);
     if (error) throw error;
 
-    const lote = (data ?? []) as PedidoWithRelations[];
+    // `as unknown as` pelo mesmo motivo do fetch da lista: o `select` é montado em tempo de
+    // execução, então a dedução automática de tipo do supabase-js não alcança mais.
+    const lote = (data ?? []) as unknown as PedidoWithRelations[];
     todos.push(...lote);
     onProgresso?.(todos.length);
 

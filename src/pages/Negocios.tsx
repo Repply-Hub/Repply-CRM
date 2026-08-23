@@ -100,43 +100,56 @@ const PAGE_SIZE = 10;
 /**
  * Quais colunas da Lista sabem se ordenar, e como o menu do cabeçalho descreve cada direção.
  *
- * A regra que decidiu esta lista: **só entra a coluna cuja célula mostra, sem intermediário, o
- * valor de uma coluna da tabela `pedidos`.** Cabeçalho que promete ordenar e não ordena é pior
- * que cabeçalho que não promete nada, então o resto simplesmente não ganha o menuzinho.
+ * A REGRA QUE DECIDE QUEM ENTRA — e que continua valendo mesmo depois do pedido de padronizar
+ * o ordenador em todas as colunas: **cabeçalho que promete ordenar e não ordena é pior que
+ * cabeçalho que não promete nada, e ordenação que ESCONDE linha é o pior de todos**, porque o
+ * rodapé conta por outra consulta e continua somando quem sumiu da lista.
  *
- * Quem ficou de fora e por quê (medido na base da MD em 22/08/2026):
+ * Por isso os rótulos aqui descrevem o EFEITO do clique, não o mecanismo: "Maior valor
+ * primeiro" em vez de "valor_total desc", "Com anexo primeiro" em vez de "A-Z".
  *
- * - **Negócio** — a célula mostra `getNomeNegocio()`, que só usa `pedidos.nome` quando ele está
- *   preenchido e senão monta "cliente | fabricante". `nome` está NULO nos 11.911 negócios: pedir
- *   ao banco para ordenar por ele empataria tudo e a lista não mudaria de lugar nenhum.
- * - **Cliente, Fabricante, Responsável, Marcador** — moram em tabelas ligadas. O PostgREST só
- *   ordena o pai por uma coluna da tabela ligada se o vínculo virar junção interna (`!inner`), e
- *   junção interna DESCARTA a linha que não tem par: `marcador_id` é nulo em 8.526 dos 11.911
- *   negócios, então ordenar por Marcador esconderia 72% da lista enquanto o rodapé continuaria
- *   contando todo mundo. Some linha, não muda ordem.
- * - **Etapa** — a célula mostra o NOME da etapa ("Orçamento Enviado"), mas a coluna guarda o
- *   apelido ("enviado"). Ordenar A-Z pelo apelido colocaria "Orçamento Enviado" em 2º e
- *   "Elaboração de Orçamento" em 1º — uma ordem que não bate com nenhum dos dois critérios que
- *   o usuário esperaria (nem alfabética pelo que ele lê, nem a ordem do funil).
- * - **Contato** e as colunas criadas pela importação — vivem dentro de `campos_extras` (um campo
- *   de JSON), não em coluna própria.
- * - **Ações** — não é dado, é botão.
+ * Onze das treze colunas de dado ordenam. As duas que faltam, e o motivo exato (medido em
+ * 23/08/2026, na base inteira — todas as 8 empresas, não só a MD):
+ *
+ * - **Etapa** — não é escolha, é impedimento. `pedidos.status` guarda o apelido da etapa em
+ *   texto ("enviado") e NÃO tem chave estrangeira para `kanban_colunas`, que é onde vivem o
+ *   nome ("Orçamento Enviado") e a ordem do funil. O PostgREST recusa o pedido antes de tocar
+ *   no banco: `PGRST200 — Could not find a relationship between 'pedidos' and 'kanban_colunas'`.
+ *   Ordenar pelo apelido em texto daria "elaboracao, enviado, fechamento, negociacao,
+ *   novo_lead, perdido", que não é nem o que se lê na tela nem a ordem do funil (que é
+ *   novo_lead → elaboracao → enviado → negociacao → fechamento → perdido). Enquanto isso, quem
+ *   quer ver o funil em ordem tem o Kanban, e quem quer uma etapa só tem o filtro de Etapa.
+ * - **Observações** — 11.898 dos 11.911 negócios têm o campo VAZIO e só 4 têm texto. E o truque
+ *   do Anexo ("com/sem primeiro") não funciona aqui: o vazio de Observações é texto em branco,
+ *   não nulo (11.898 em branco contra 9 nulos), e texto em branco não é separável por
+ *   NULLS FIRST/LAST. Qualquer direção entrega páginas de linha vazia.
+ *
+ * - **Ações** não entra porque não é dado, é botão.
  */
 const ORDENACAO_DA_LISTA: Record<string, { coluna: PedidosSortColumn; asc: string; desc: string }> = {
+  // "cliente | fabricante" é literalmente o que a célula desenha (getNomeNegocio monta assim
+  // quando `pedidos.nome` está vazio, que é o caso dos 11.911). O rótulo diz "pelo cliente"
+  // porque é a verdade: um negócio com nome digitado à mão aparece na posição do cliente dele.
+  negocio: { coluna: 'negocio', asc: 'Ordenar A-Z (pelo cliente)', desc: 'Ordenar Z-A (pelo cliente)' },
+  cliente: { coluna: 'cliente', asc: 'Ordenar A-Z', desc: 'Ordenar Z-A' },
+  contato: { coluna: 'contato', asc: 'Ordenar A-Z', desc: 'Ordenar Z-A' },
+  fabricante: { coluna: 'fabricante', asc: 'Ordenar A-Z', desc: 'Ordenar Z-A' },
+  vendedor: { coluna: 'vendedor', asc: 'Ordenar A-Z', desc: 'Ordenar Z-A' },
   valor: { coluna: 'valor_total', asc: 'Menor valor primeiro', desc: 'Maior valor primeiro' },
   data_pedido: { coluna: 'data_pedido', asc: 'Mais antigos primeiro', desc: 'Mais recentes primeiro' },
   prazo_resposta: { coluna: 'prazo_resposta', asc: 'Mais antigos primeiro', desc: 'Mais recentes primeiro' },
-  // Vazios sempre por último, nos dois sentidos (ver o `nullsFirst: false` em
-  // use-pedidos.ts). Sem isso, "Ordenar Z-A" abriria com 9.512 traços, porque o
-  // padrão do Postgres em ordem decrescente é jogar os nulos para o começo.
+  // Vazios sempre por último, nos dois sentidos (ver `vaziosSeguemADirecao` em use-pedidos.ts).
+  // Sem isso, "Ordenar Z-A" abriria com 9.512 traços, porque o padrão do Postgres em ordem
+  // decrescente é jogar os nulos para o começo.
   endereco_entrega: { coluna: 'endereco_entrega', asc: 'Ordenar A-Z', desc: 'Ordenar Z-A' },
-  // "Observações" NÃO entra: medido na base da MD, 11.898 dos 11.911 negócios têm
-  // o campo vazio e só 4 têm texto. Ordenar por ele embaralha a lista e continua
-  // mostrando linha em branco — um cabeçalho que promete e não entrega é pior que
-  // um cabeçalho que não promete nada.
+  // MARCADOR: ordena pelo próprio `marcador_id`, não pelo nome do marcador — e o rótulo não
+  // promete A-Z justamente por isso. Alfabético exigiria junção interna com `marcadores`, e
+  // `marcador_id` é nulo em 8.526 dos 11.911: a lista perderia 72% das linhas em silêncio,
+  // enquanto o rodapé continuaria dizendo 11.911. Pelo id, ninguém some e os negócios do mesmo
+  // marcador ficam juntos (id igual fica lado a lado), que é o que a coluna serve para ver.
+  marcador: { coluna: 'marcador_id', asc: 'Com marcador primeiro', desc: 'Sem marcador primeiro' },
   // Anexo guarda um endereço de arquivo: ordenar por ele alfabeticamente não diz nada a ninguém.
-  // O que a coluna responde de útil é "quais negócios têm anexo" — e o Postgres joga os vazios
-  // para o fim quando a ordem é crescente, então os rótulos descrevem o efeito real do clique.
+  // O que a coluna responde de útil é "quais negócios têm anexo", e é o que os rótulos dizem.
   anexo: { coluna: 'pdf_url', asc: 'Com anexo primeiro', desc: 'Sem anexo primeiro' },
   // Id legado da mesma coluna, criado por importações antigas (ver o tratamento em PedidoRow).
   pdf_url: { coluna: 'pdf_url', asc: 'Com anexo primeiro', desc: 'Sem anexo primeiro' },
