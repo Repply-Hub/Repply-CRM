@@ -251,6 +251,12 @@ export function useUnreadCount() {
   return unreadNotifs + unreadEmails;
 }
 
+// Reexport, não definição: `useUnreadWaMessages` é escrito em use-whatsapp-inbox.ts, e é lá
+// que a trava da seção 'whatsapp' tem que ficar — pelo mesmo motivo explicado em
+// `useUnreadChatMessages` acima. Travar deste lado (ou no AppSidebar, que é quem chama)
+// zeraria o contador e não calaria a assinatura em tempo real que vive dentro do hook
+// original: o aviso "fulano enviou uma mensagem", com o botão que leva para /whatsapp,
+// continuaria saltando por cima de qualquer tela de quem não tem a seção.
 export { useUnreadWaMessages } from '@/hooks/use-whatsapp-inbox';
 
 export function useMarkAsRead() {

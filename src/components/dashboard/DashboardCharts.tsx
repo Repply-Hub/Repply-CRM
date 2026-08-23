@@ -124,6 +124,9 @@ interface DashboardChartsProps {
   rendimentoVendedor: { vendedor: string; valor: number }[];
   // null = não-gestor: seção de atendimento WhatsApp inteira fica oculta (métrica
   // pensada pra gestor/admin acompanhar a equipe, não o desempenho individual).
+  // Também vem null quando a empresa não contratou a seção WhatsApp. Essa decisão mora
+  // inteira em Dashboard.tsx, e de propósito: duplicar a checagem aqui criaria duas fontes
+  // de verdade para a mesma pergunta, e um dia elas discordariam.
   whatsappConversas: { abertas: number; fechadas: number } | null;
   whatsappTempoResposta: { atendente: string; minutos: number }[];
   // true quando a busca dessas métricas falhou (pro gestor/admin) — mostra um aviso
@@ -388,7 +391,9 @@ export function DashboardCharts({
         </Card>
       </div>
 
-      {/* Atendimento WhatsApp — só renderizado pra gestor/admin (whatsappConversas null pro resto) */}
+      {/* Atendimento WhatsApp — só renderizado pra gestor/admin de empresa que tem a seção
+          contratada; nos demais casos Dashboard.tsx manda whatsappConversas null e a faixa
+          inteira (inclusive o aviso de erro) não aparece. */}
       {whatsappError ? (
         <Alert variant="destructive" className="mt-5">
           <AlertTitle>Não foi possível carregar as métricas de atendimento no WhatsApp</AlertTitle>

@@ -73,6 +73,7 @@ const ContatoDetalhe = () => {
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
   const { ligada: temTarefas } = useSecaoLigada('tarefas');
+  const { ligada: temEmails } = useSecaoLigada('emails');
   const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
   const tarefaKanbanStages = useMemo(
     () => tarefasKanbanColunas.map(c => ({ key: c.slug, label: c.nome })),
@@ -289,7 +290,9 @@ const ContatoDetalhe = () => {
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-tight">E-mail Corporativo</p>
                     <p className="text-sm font-semibold text-foreground truncate">{contato.email || 'Não informado'}</p>
-                    {contato.email && (
+                    {/* Some só o atalho de envio, que levaria a uma tela que a rota recusa.
+                        O endereço logo acima é dado cadastral do contato e fica. */}
+                    {temEmails === true && contato.email && (
                       <Button
                         variant="link"
                         className="p-0 h-auto text-[11px] mt-1"

@@ -12,6 +12,7 @@ import {
   resolveFieldLabel,
 } from '@/hooks/use-configuracoes-campos';
 import { useKanbanColunasEmpresa, type KanbanColunaComFunil } from '@/hooks/use-kanban-colunas';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -127,6 +128,11 @@ function EntidadeCamposPanel({ entidade, empresaId, meuUsuarioId }: { entidade: 
   const createCampo = useCreateCampoCustomizado();
   const deleteCampo = useDeleteCampoCustomizado();
 
+  // Cascata da seção Obras: sem a seção, "Obra vinculada" sai desta lista. É aqui que o
+  // gestor marca o campo como obrigatório, e um campo obrigatório que o formulário de
+  // negócio nem mostra mais trava o cadastro em algo que ninguém consegue preencher.
+  const { ligada: temObras } = useSecaoLigada('obras');
+
   // Obrigatoriedade por etapa só existe para Negócios — é a única entidade com conceito
   // de funil/etapa kanban (clientes/contatos/obras não têm pipeline).
   const { data: kanbanColunasEmpresa } = useKanbanColunasEmpresa(entidade === 'pedidos' ? empresaId : undefined);
@@ -147,7 +153,11 @@ function EntidadeCamposPanel({ entidade, empresaId, meuUsuarioId }: { entidade: 
     return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   }
 
-  const padrao = (campos ?? []).filter(c => c.origem === 'padrao');
+  // Só ESCONDE. A linha continua em `configuracoes_campos`, e é isso que devolve a escolha
+  // do gestor intacta se a empresa religar a seção Obras depois.
+  const padrao = (campos ?? []).filter(
+    c => c.origem === 'padrao' && (temObras === true || c.campo_key !== 'obra_id'),
+  );
   const customizados = (campos ?? []).filter(c => c.origem === 'customizado');
 
   // Agrupa os campos padrão por etapa do wizard (Negócios e Empresas têm múltiplos
@@ -296,6 +306,18 @@ export function CamposTab() {
   const empresaId = profile?.empresa_id;
   const meuUsuarioId = profile?.id;
   const [entidade, setEntidade] = useState<EntidadeCampos>('pedidos');
+  const { ligada: temObras } = useSecaoLigada('obras');
+
+  // A aba fica de fora enquanto a resposta não chega (`=== true`): aba que aparece e some
+  // no meio do clique é pior de usar que aba que demora a aparecer. A aba inicial é
+  // 'pedidos', então a tela nunca abre numa aba que sumiu.
+  //
+  // A MESMA lista alimenta os gatilhos e os conteúdos abaixo; se as duas divergirem, sobra
+  // um conteúdo órfão sem aba para alcançá-lo.
+  const opcoes = useMemo(
+    () => ENTIDADE_OPCOES.filter(opt => opt.value !== 'obras' || temObras === true),
+    [temObras],
+  );
 
   if (!empresaId) {
     return <p className="text-sm text-muted-foreground py-8 text-center">Nenhuma empresa vinculada ao seu perfil.</p>;
@@ -312,13 +334,13 @@ export function CamposTab() {
       <CardContent className="space-y-4">
         <Tabs value={entidade} onValueChange={v => setEntidade(v as EntidadeCampos)}>
           <TabsList className={TOGGLE_LIST_CLASS}>
-            {ENTIDADE_OPCOES.map(opt => (
+            {opcoes.map(opt => (
               <TabsTrigger key={opt.value} value={opt.value} className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}>
                 <opt.icon className="h-4 w-4" /> {opt.label}
               </TabsTrigger>
             ))}
           </TabsList>
-          {ENTIDADE_OPCOES.map(opt => (
+          {opcoes.map(opt => (
             <TabsContent key={opt.value} value={opt.value} className="mt-4">
               <EntidadeCamposPanel entidade={opt.value} empresaId={empresaId} meuUsuarioId={meuUsuarioId} />
             </TabsContent>

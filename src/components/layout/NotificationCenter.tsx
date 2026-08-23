@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNotificacoes, useUnreadCount, useMarkAsRead, useMarkAllAsRead, useUnreadEmails, type Notificacao } from '@/hooks/use-notificacoes';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -61,7 +62,15 @@ function formatTime(dateStr: string): string {
 
 export function NotificationCenter() {
   const { data: notificacoes } = useNotificacoes();
-  const { data: unreadEmails = 0 } = useUnreadEmails();
+  const { ligada: temEmails } = useSecaoLigada('emails');
+  const { data: unreadEmailsBruto = 0 } = useUnreadEmails();
+  // Empresa sem a seção de E-mails não tem para onde ir: tanto o aviso quanto o
+  // cartão levam para /emails, que a guarda de rota recusa — avisar de algo que
+  // não se pode abrir é pior que não avisar. Zerar aqui, num lugar só, resolve
+  // os TRÊS pontos que dependem deste número (o aviso, o cartão do topo e a
+  // condição do "Nenhuma notificação"); gatear bloco a bloco esqueceria o
+  // último e o popover nunca mais mostraria o estado vazio.
+  const unreadEmails = temEmails === true ? unreadEmailsBruto : 0;
   const unreadCount = useUnreadCount();
   const markRead = useMarkAsRead();
   const markAllRead = useMarkAllAsRead();

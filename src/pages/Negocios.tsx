@@ -251,26 +251,31 @@ interface NegociosProps {
   defaultView?: LegacyView;
 }
 
-const PedidoRow = memo(({ 
-  pedido, 
-  selected, 
-  onToggle, 
-  onClick, 
-  visibleColumns, 
+const PedidoRow = memo(({
+  pedido,
+  selected,
+  onToggle,
+  onClick,
+  visibleColumns,
   columns,
-  KANBAN_STAGES, 
-  getLabel, 
-  stageLabel 
-}: { 
-  pedido: any, 
-  selected: boolean, 
-  onToggle: () => void, 
-  onClick: () => void, 
+  KANBAN_STAGES,
+  getLabel,
+  stageLabel,
+  temObras
+}: {
+  pedido: any,
+  selected: boolean,
+  onToggle: () => void,
+  onClick: () => void,
   visibleColumns: string[],
   columns: any[],
   KANBAN_STAGES: any[],
   getLabel: (id: string) => string,
-  stageLabel: (status: string) => string
+  stageLabel: (status: string) => string,
+  // Vem por propriedade, e não de `useSecaoLigada` aqui dentro: esta linha é montada uma vez
+  // por negócio da tabela, e a resposta é a mesma para todas — perguntar uma vez lá em cima
+  // custa menos que espalhar o hook por dezenas de cópias do mesmo componente.
+  temObras: boolean | undefined
 }) => {
   const camposExtras = pedido.campos_extras || {};
   const daysInStage = Math.floor((Date.now() - new Date(pedido.created_at).getTime()) / 86400000);
@@ -365,7 +370,11 @@ const PedidoRow = memo(({
               </TableCell>
             );
           case 'endereco_entrega':
-            return <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">{pedido.endereco_entrega ?? pedido.obra?.nome_obra ?? '-'}</TableCell>;
+            // Esta coluna é meio endereço, meio obra: o endereço de entrega é texto livre do
+            // próprio negócio (vem inclusive da importação de planilha) e não pertence à seção
+            // Obras. Some só o "ou o nome da obra" — esconder a coluna inteira apagaria o
+            // endereço de entrega junto, que é dado que a empresa tem com ou sem a seção.
+            return <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">{pedido.endereco_entrega ?? (temObras === true ? pedido.obra?.nome_obra : null) ?? '-'}</TableCell>;
           case 'fabricante':
             return <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">{pedido.fabricante?.nome ?? '-'}</TableCell>;
           case 'valor':
@@ -640,6 +649,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const { data: contatos } = useHistoricoContatos(selectedOrder || viewOrderId);
   const { data: tarefasNegocio } = useTarefasPorPedido(viewOrderId);
   const { ligada: temTarefas } = useSecaoLigada('tarefas');
+  // `=== true` em todo uso abaixo, nunca `!== false`: enquanto a resposta não chega, a cascata
+  // esconde. Bloco que aparece e some meio segundo depois é pior de usar que bloco que demora.
+  const { ligada: temObras } = useSecaoLigada('obras');
+  // Só o texto de dica das caixas de busca. A busca em si continua igual, inclusive casando
+  // negócio pelo nome da obra — isso é invisível para quem usa (o resultado é sempre um
+  // negócio, nunca uma obra), e estreitar a consulta era mexer onde já houve problema de
+  // desempenho (CLAUDE.md §7.4). O que muda é só parar de oferecer uma palavra que, sem a
+  // seção, não quer dizer nada para a empresa.
+  const placeholderBuscaNegocios = temObras === true
+    ? 'Buscar por cliente, obra ou fabricante...'
+    : 'Buscar por cliente ou fabricante...';
   const { data: historicoStatusNegocio } = usePedidoHistoricoStatus(viewOrderId);
   const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
   const tarefaKanbanStages = useMemo(
@@ -1142,6 +1162,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         // origem_lead/itens/proximo_contato vivem fora de PedidoWithRelations, e "status" é
         // o próprio campo sendo alterado — nenhum dos quatro é checável aqui.
         .filter(campo => campo.origem !== 'padrao' || campo.campo_key in valoresPadrao)
+        // Sem a seção Obras, o campo "Obra vinculada" não aparece em formulário nenhum. Se ele
+        // continuasse contando como obrigatório, o cartão travaria nesta etapa com um aviso
+        // impossível de resolver: "falta preencher Obra vinculada" num campo que ninguém
+        // consegue abrir. A configuração do gestor continua gravada no banco — só para de ser
+        // cobrada enquanto a seção estiver desligada.
+        .filter(campo => temObras === true || campo.campo_key !== 'obra_id')
         .filter(campo => {
           const valor = campo.origem === 'padrao' ? valoresPadrao[campo.campo_key] : pedido.campos_extras?.[campo.campo_key];
           return valor === null || valor === undefined || (typeof valor === 'string' && !valor.trim());
@@ -1160,7 +1186,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao mover o negócio');
     }
-  }, [updateStatus, KANBAN_STAGES, kanbanColunas, kanbanPedidosFlat, camposConfigPedidos]);
+  }, [updateStatus, KANBAN_STAGES, kanbanColunas, kanbanPedidosFlat, camposConfigPedidos, temObras]);
 
   const currentPageIds = paginated.map(p => p.id);
   // No modo "todos os filtrados", uma linha está selecionada por padrão, a menos que tenha
@@ -1399,6 +1425,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
+  // O campo `obra` continua sendo preenchido aqui de propósito, mesmo com a seção desligada:
+  // quem decide se a COLUNA "Obra" entra no arquivo é o gerador do PDF, avisado por
+  // `comObra` em handleExportPdf. Esvaziar o valor aqui só trocaria a coluna cheia de nomes
+  // por uma coluna cheia de traços — que é justamente o que a cascata quer evitar.
   const buildExportRows = (specificPedidoId?: string): { rows: PedidoRow[]; titulo: string } => {
     if (specificPedidoId) {
       const p = (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === specificPedidoId);
@@ -1450,7 +1480,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     const { rows, titulo } = buildExportRows(specificPedidoId);
     if (rows.length === 0) return;
     const { generatePedidosPdf } = await import('@/lib/generate-pdf');
-    await generatePedidosPdf(rows, titulo);
+    // A coluna "Obra" do relatório sai do arquivo inteira quando a empresa não tem a seção.
+    // O gerador é função pura (roda fora do React), então não tem como perguntar sozinho —
+    // recebe a resposta por parâmetro de quem chama.
+    await generatePedidosPdf(rows, titulo, { comObra: temObras === true });
   };
 
   // Negócios cobertos pela exportação em Excel.
@@ -1555,7 +1588,13 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           const extras = (p.campos_extras ?? {}) as Record<string, unknown>;
           return String(extras['Contato'] ?? extras['contato'] ?? '');
         },
-        obra: p => p.endereco_entrega ?? p.obra?.nome_obra ?? '',
+        // Mesmo corte da coluna "Obra/Endereço" da lista: o valor principal é o endereço de
+        // entrega, texto livre do negócio que existe com ou sem a seção Obras — só o
+        // "ou o nome da obra" some. A COLUNA continua na planilha mesmo com a seção
+        // desligada, e isso é de propósito: os cabeçalhos daqui são os mesmos que o
+        // assistente de importação reconhece, e é isso que deixa exportar, ajustar no Excel e
+        // reimportar sem remapear nada. Tirar a coluna quebraria essa ida e volta.
+        obra: p => p.endereco_entrega ?? (temObras === true ? p.obra?.nome_obra : null) ?? '',
         fabricante: p => p.fabricante?.nome ?? '',
         valor: p => p.valor_total ?? 0,
         vendedor: p => p.vendedor?.nome ?? '',
@@ -1995,8 +2034,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <SheetTitle className="text-foreground font-bold text-lg">
                 {selectedViewOrder ? getNomeNegocio(selectedViewOrder) : 'Detalhes do Negócio'}
               </SheetTitle>
+              {/* O <SheetDescription> continua montado mesmo sem a seção, e só o texto some:
+                  é ele que o painel usa como descrição acessível (aria-describedby), e tirar o
+                  elemento deixaria o leitor de tela sem referência. Sem Obras, a frase "Sem obra
+                  vinculada" seria pior que o silêncio — fala de algo que a empresa não tem. */}
               <SheetDescription>
-                {selectedViewOrder?.obra?.nome_obra ?? 'Sem obra vinculada'}
+                {temObras === true && (selectedViewOrder?.obra?.nome_obra ?? 'Sem obra vinculada')}
               </SheetDescription>
             </div>
             {selectedViewOrder && (
@@ -2027,31 +2070,37 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   <p className="text-sm font-medium">-</p>
                 )}
               </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Building2 className="h-3 w-3" /> Obra
-                </p>
-                {selectedViewOrder.obra ? (
-                  <button 
-                    // `/obras/{id}` NÃO existe como rota (App.tsx só tem `/obras`), então
-                    // este clique caía no curinga e abria "página não encontrada". O
-                    // caminho certo já existia em ClienteDetalhe.tsx:720: navega para
-                    // `/obras` levando o id no estado, e a tela de Obras o lê e abre a
-                    // obra (Obras.tsx:138).
-                    onClick={() =>
-                      navigate('/obras', {
-                        state: { selectedObraId: selectedViewOrder.obra?.id },
-                      })
-                    }
-                    className="text-sm font-medium hover:text-primary transition-colors text-left flex items-center gap-1 group"
-                  >
-                    {selectedViewOrder.obra.nome_obra}
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                ) : (
-                  <p className="text-sm font-medium">{selectedViewOrder.obra?.nome_obra ?? '-'}</p>
-                )}
-              </div>
+              {/* Sem a seção, o quadro de Obra some inteiro — rótulo e valor. O botão levaria
+                  para /obras, que a guarda de rota já barra: mostrar um caminho fechado é pior
+                  que não mostrar caminho nenhum. A grade é de duas colunas fixas, então os
+                  outros quadros só se reacomodam. */}
+              {temObras === true && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Building2 className="h-3 w-3" /> Obra
+                  </p>
+                  {selectedViewOrder.obra ? (
+                    <button
+                      // `/obras/{id}` NÃO existe como rota (App.tsx só tem `/obras`), então
+                      // este clique caía no curinga e abria "página não encontrada". O
+                      // caminho certo já existia em ClienteDetalhe.tsx:720: navega para
+                      // `/obras` levando o id no estado, e a tela de Obras o lê e abre a
+                      // obra (Obras.tsx:138).
+                      onClick={() =>
+                        navigate('/obras', {
+                          state: { selectedObraId: selectedViewOrder.obra?.id },
+                        })
+                      }
+                      className="text-sm font-medium hover:text-primary transition-colors text-left flex items-center gap-1 group"
+                    >
+                      {selectedViewOrder.obra.nome_obra}
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ) : (
+                    <p className="text-sm font-medium">{selectedViewOrder.obra?.nome_obra ?? '-'}</p>
+                  )}
+                </div>
+              )}
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Factory className="h-3 w-3" /> Fabricante
@@ -2369,7 +2418,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             )}
 
             <SearchWithRecent
-              placeholder="Buscar por cliente, obra ou fabricante..."
+              placeholder={placeholderBuscaNegocios}
               value={search}
               onValueChange={handleSearchChange}
               storageKey="negocios_recent_searches"
@@ -2553,6 +2602,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           KANBAN_STAGES={KANBAN_STAGES}
                           getLabel={getLabel}
                           stageLabel={stageLabel}
+                          temObras={temObras}
                         />
                       ))
 
@@ -2749,7 +2799,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   <Input
                     value={bulkPickerSearch}
                     onChange={(e) => { setBulkPickerSearch(e.target.value); setBulkPickerPage(1); }}
-                    placeholder="Buscar por cliente, obra ou fabricante..."
+                    placeholder={placeholderBuscaNegocios}
                     className="h-9 pl-8"
                   />
                 </div>
@@ -2999,6 +3049,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                               KANBAN_STAGES={KANBAN_STAGES}
                               getLabel={getLabel}
                               stageLabel={stageLabel}
+                              temObras={temObras}
                             />
                           ))}
                         </TableBody>

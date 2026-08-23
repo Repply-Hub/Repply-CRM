@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
 import { DominioTab } from '@/components/configuracoes/DominioTab';
 import { WhatsAppInstanciasTab } from '@/components/configuracoes/WhatsAppInstanciasTab';
@@ -124,6 +125,9 @@ function CustomizeTab() {
 
 function ProfileTab() {
   const { user, signOut } = useAuth();
+  // A assinatura (e a logo do rodapé) só existem para serem anexadas ao e-mail
+  // que o módulo de E-mail envia. Sem o módulo, é configuração sem efeito.
+  const { ligada: temEmails } = useSecaoLigada('emails');
   const qc = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
@@ -263,11 +267,21 @@ function ProfileTab() {
     updatePerfil.mutate({
       nome: form.get('nome') as string,
       telefone: form.get('telefone') as string,
-      // Sanitiza antes de gravar, não só antes de enviar: mantém o que fica
-      // salvo em `usuarios.assinatura_email` já limpo, em vez de confiar que
-      // todo consumidor futuro desse campo (só o envio de e-mail sanitiza de
-      // novo hoje) vá lembrar de tratar como HTML não confiável.
-      assinatura_email: sanitizarAssinaturaEmail(form.get('assinatura_email') as string),
+      // Com a seção de E-mails desligada o editor sai do DOM, e aí
+      // `form.get('assinatura_email')` devolve null — que `sanitizarAssinaturaEmail`
+      // transforma em string vazia. Mandar o campo assim APAGARIA a assinatura já
+      // gravada a cada clique em "Salvar alterações", por uma mudança que era só
+      // de tela, e ela não voltaria quando a seção fosse religada. Por isso o
+      // campo é OMITIDO em vez de enviado vazio: some da tela, fica no banco.
+      ...(temEmails === true
+        ? {
+            // Sanitiza antes de gravar, não só antes de enviar: mantém o que fica
+            // salvo em `usuarios.assinatura_email` já limpo, em vez de confiar que
+            // todo consumidor futuro desse campo (só o envio de e-mail sanitiza de
+            // novo hoje) vá lembrar de tratar como HTML não confiável.
+            assinatura_email: sanitizarAssinaturaEmail(form.get('assinatura_email') as string),
+          }
+        : {}),
     });
   };
 
@@ -375,7 +389,14 @@ function ProfileTab() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2"><UserCircle className="h-4 w-4 text-primary" /> Informações Pessoais</CardTitle>
-            <CardDescription>Atualize seu nome, telefone e assinatura de e-mail</CardDescription>
+            {/* A descrição acompanha o que o card de fato mostra: prometer
+                "assinatura de e-mail" para quem não tem a seção manda a pessoa
+                procurar um campo que não existe. */}
+            <CardDescription>
+              {temEmails === true
+                ? 'Atualize seu nome, telefone e assinatura de e-mail'
+                : 'Atualize seu nome e telefone'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4 mb-5">
@@ -451,52 +472,59 @@ function ProfileTab() {
             <form onSubmit={handleSalvarPerfil} className="space-y-3">
               <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" defaultValue={perfil.nome} placeholder="Seu nome completo" className="h-10" /></div>
               <div className="space-y-1.5"><Label>Telefone</Label><Input name="telefone" defaultValue={perfil.telefone ?? ''} placeholder="(00) 00000-0000" className="h-10" /></div>
-              <div className="space-y-1.5">
-                <Label>Assinatura de E-mail</Label>
-                <AssinaturaEmailEditor
-                  name="assinatura_email"
-                  value={assinaturaHtml}
-                  onChange={setAssinaturaHtml}
-                  userId={user!.id}
-                  onModoChange={setAssinaturaModo}
-                />
-              </div>
-              {(assinaturaHtml || perfil.nome) && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-normal text-muted-foreground">
-                    Como fica no rodapé do e-mail
-                  </Label>
-                  {/* Moldura própria (header + borda) em vez do branco solto de
-                      antes: o CORPO precisa continuar branco fixo — é
-                      exatamente o fundo sobre o qual o rodapé é composto no
-                      envio real — mas sem um header em volta, esse branco
-                      cru destoava muito do resto da tela no tema escuro,
-                      como se tivesse quebrado. O header (no tom do próprio
-                      tema, claro ou escuro) deixa claro que é uma
-                      pré-visualização emoldurada, não um componente solto. */}
-                  <div className="overflow-hidden rounded-md border">
-                    <div className="flex items-center gap-1.5 border-b bg-muted/40 px-3 py-1.5">
-                      <Mail className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                        Pré-visualização do e-mail
-                      </span>
-                    </div>
-                    <div
-                      className="bg-white p-3"
-                      style={{ colorScheme: 'light' }}
-                      dangerouslySetInnerHTML={{
-                        __html: montarRodapeEmailHtml({
-                          nome: perfil.nome ?? '',
-                          assinaturaHtml,
-                          logoUrl: `${LOGO_EMAIL_URL}?v=${logoVersion}`,
-                          mostrarLogo: assinaturaModo === 'texto',
-                          logoCarregou: logoExiste,
-                          isolado: true,
-                        }),
-                      }}
+              {/* `=== true` (e não `!== false`) porque enquanto a resposta não
+                  chega o certo é esconder: um editor que aparece e some no meio
+                  do formulário é pior de usar que um que demora a aparecer. */}
+              {temEmails === true && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label>Assinatura de E-mail</Label>
+                    <AssinaturaEmailEditor
+                      name="assinatura_email"
+                      value={assinaturaHtml}
+                      onChange={setAssinaturaHtml}
+                      userId={user!.id}
+                      onModoChange={setAssinaturaModo}
                     />
                   </div>
-                </div>
+                  {(assinaturaHtml || perfil.nome) && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-normal text-muted-foreground">
+                        Como fica no rodapé do e-mail
+                      </Label>
+                      {/* Moldura própria (header + borda) em vez do branco solto de
+                          antes: o CORPO precisa continuar branco fixo — é
+                          exatamente o fundo sobre o qual o rodapé é composto no
+                          envio real — mas sem um header em volta, esse branco
+                          cru destoava muito do resto da tela no tema escuro,
+                          como se tivesse quebrado. O header (no tom do próprio
+                          tema, claro ou escuro) deixa claro que é uma
+                          pré-visualização emoldurada, não um componente solto. */}
+                      <div className="overflow-hidden rounded-md border">
+                        <div className="flex items-center gap-1.5 border-b bg-muted/40 px-3 py-1.5">
+                          <Mail className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                            Pré-visualização do e-mail
+                          </span>
+                        </div>
+                        <div
+                          className="bg-white p-3"
+                          style={{ colorScheme: 'light' }}
+                          dangerouslySetInnerHTML={{
+                            __html: montarRodapeEmailHtml({
+                              nome: perfil.nome ?? '',
+                              assinaturaHtml,
+                              logoUrl: `${LOGO_EMAIL_URL}?v=${logoVersion}`,
+                              mostrarLogo: assinaturaModo === 'texto',
+                              logoCarregou: logoExiste,
+                              isolado: true,
+                            }),
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
               {/* Logotipo da empresa: dentro do mesmo form, mas discreto de
                   propósito — é uma configuração da empresa (exclusiva de
@@ -512,8 +540,12 @@ function ProfileTab() {
                   nenhum. Usa `assinaturaModo` (a aba selecionada no editor),
                   não o formato do `assinaturaHtml`: o valor só vira `<img>`
                   depois que uma imagem é de fato enviada, e antes disso os
-                  dois modos ficam com o mesmo valor `''`. */}
-              {(perfil.role === 'admin' || perfil.role === 'gestor' || perfil.role === 'empresa') && assinaturaModo === 'texto' && (
+                  dois modos ficam com o mesmo valor `''`.
+                  Some junto com a assinatura quando a empresa não tem a seção de
+                  E-mails: o único lugar onde esta logo aparece é o rodapé do
+                  e-mail enviado (`montarRodapeEmailHtml`), então sem o módulo é
+                  um upload que não vai a lugar nenhum. */}
+              {temEmails === true && (perfil.role === 'admin' || perfil.role === 'gestor' || perfil.role === 'empresa') && assinaturaModo === 'texto' && (
                 <div
                   tabIndex={0}
                   className={cn(
@@ -710,7 +742,17 @@ const Configuracoes = () => {
   // uma entrada por clique de aba.
   const [searchParams, setSearchParams] = useSearchParams();
   const abaDaUrl = searchParams.get('tab') === 'usuarios' ? 'vendedores' : (searchParams.get('tab') || 'perfil');
-  const activeTab = abaDaUrl;
+  // A aba WhatsApp some quando a empresa não tem a seção, e quem tiver
+  // `?tab=whatsapp` nos favoritos cairia numa tela com a tira de abas e NADA
+  // embaixo — sem erro, sem explicação. Cai no Perfil nesse caso.
+  //
+  // Aqui é `=== false` e não `!== true`, ao contrário do resto da cascata, e de
+  // propósito: enquanto a resposta não chega, trocar a aba faria a tela de
+  // Perfil aparecer inteira e sumir logo depois para quem TEM a seção — toda
+  // vez que abrisse o favorito. Esconder o conteúdo enquanto carrega já é o que
+  // as guardas abaixo fazem; trocar de aba é decisão que só se toma sabendo.
+  const { ligada: temWhatsapp } = useSecaoLigada('whatsapp');
+  const activeTab = abaDaUrl === 'whatsapp' && temWhatsapp === false ? 'perfil' : abaDaUrl;
   const setActiveTab = (aba: string) => setSearchParams({ tab: aba }, { replace: true });
   // A aba de Usuários usa layout de altura fixa (scroll interno nos cards); as demais rolam a página normalmente.
   const noPageScroll = activeTab === 'vendedores';
@@ -749,7 +791,7 @@ const Configuracoes = () => {
             {isGestor && (
               <TabsTrigger value="vendedores" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Users className="h-4 w-4" /> Usuários</TabsTrigger>
             )}
-            {isGestor && (
+            {isGestor && temWhatsapp === true && (
               <TabsTrigger value="whatsapp" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Smartphone className="h-4 w-4" /> WhatsApp</TabsTrigger>
             )}
             {isGestor && (
@@ -771,7 +813,10 @@ const Configuracoes = () => {
             </TabsContent>
           )}
 
-          {isGestor && (
+          {/* O conteúdo some junto com o gatilho: sem isto, a URL direta ainda
+              renderizaria o provisionamento de instâncias de uma seção que a
+              empresa não contratou. */}
+          {isGestor && temWhatsapp === true && (
             <TabsContent value="whatsapp" className="mt-4">
               <WhatsAppInstanciasTab />
             </TabsContent>

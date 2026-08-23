@@ -22,6 +22,7 @@ import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-ped
 import { usePedidoHistoricoStatus } from '@/hooks/use-pedidos';
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesCampos, resolveFieldLabel, isCampoObrigatorioNaEtapa } from '@/hooks/use-configuracoes-campos';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
@@ -83,6 +84,10 @@ const EditarPedido = () => {
   const { data: historicoStatus } = usePedidoHistoricoStatus(id ?? null);
   const updatePedido = useUpdatePedidoCompleto();
   const createObraMutation = useCreateObra();
+  // Cascata da secao Obras. `=== true` e deliberado: enquanto a resposta nao chega, o
+  // campo fica escondido — campo que aparece e some no meio da edicao e pior de usar que
+  // campo que demora a aparecer.
+  const { ligada: temObras } = useSecaoLigada('obras');
 
   const [initialized, setInitialized] = useState(false);
   const [step, setStep] = useState(1);
@@ -277,6 +282,11 @@ const EditarPedido = () => {
       valor_manual: valorFinal > 0 ? 'ok' : undefined,
     };
     for (const campo of camposConfig ?? []) {
+      // Com a seção Obras desligada o campo Obra não é desenhado nesta tela. Cobrá-lo
+      // aqui impediria salvar qualquer negócio sem obra vinculada, num campo que ninguém
+      // consegue preencher. A configuração continua gravada e volta a valer se a seção
+      // for religada.
+      if (campo.campo_key === 'obra_id' && temObras !== true) continue;
       if (!isCampoObrigatorioNaEtapa(campo, currentKanbanColunaId)) continue;
       const valor = campo.origem === 'padrao' ? valoresPadrao[campo.campo_key] : camposExtras[campo.campo_key];
       if (!valor || !valor.trim()) {
@@ -526,20 +536,28 @@ const EditarPedido = () => {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Obra</Label>
-                    <SearchableSelect
-                      options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
-                      value={obraId}
-                      onValueChange={handleObraChange}
-                      placeholder="Selecionar obra"
-                      onActionClick={() => setObraDialogOpen(true)}
-                      actionLabel="Nova Obra"
-                    />
-                    {selectedObra?.spe_cnpj && (
-                      <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
-                    )}
-                  </div>
+                  {/* Obra — some junto com a seção. Anda de par com a exceção de
+                      `obra_id` na varredura de obrigatórios (validateStep2): esconder aqui
+                      sem tirar de lá impediria salvar negócio sem obra. O `obraId` já
+                      gravado continua sendo enviado no salvamento de propósito — apagar
+                      vínculo existente só porque a tela não mostra mais o campo destruiria
+                      dado de quem religasse a seção depois. */}
+                  {temObras === true && (
+                    <div className="space-y-2">
+                      <Label>Obra</Label>
+                      <SearchableSelect
+                        options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
+                        value={obraId}
+                        onValueChange={handleObraChange}
+                        placeholder="Selecionar obra"
+                        onActionClick={() => setObraDialogOpen(true)}
+                        actionLabel="Nova Obra"
+                      />
+                      {selectedObra?.spe_cnpj && (
+                        <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

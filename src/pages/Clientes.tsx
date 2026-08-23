@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useClientes, useContatos } from '@/hooks/use-clientes';
 import { useCreateCliente, useCreateContato, useUpdateContato, useDeleteCliente, useDeleteContato } from '@/hooks/use-mutations';
 import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -342,6 +343,11 @@ const Clientes = () => {
   const [panelEmpresa, setPanelEmpresa] = useState<any | null>(null);
   const [panelContato, setPanelContato] = useState<any | null>(null);
   const [emailParaConfirmar, setEmailParaConfirmar] = useState<string | null>(null);
+
+  // Cascata das seções: um hook só serve os dois painéis laterais e a tabela, porque tudo
+  // isto vive dentro do mesmo componente.
+  const { ligada: temEmails } = useSecaoLigada('emails');
+  const { ligada: temObras } = useSecaoLigada('obras');
 
   const [tipo, setTipo] = useState('construtora');
   const [cnpj, setCnpj] = useState('');
@@ -1650,7 +1656,11 @@ const Clientes = () => {
                             );
                           }
 
-                          if (colId === 'obras_count') {
+                          // Coluna legada (o id não está em CLIENTE_FIELDS): só aparece para
+                          // quem tem esse id preso na configuração de tabela salva no
+                          // navegador. Sem a seção Obras ela cai no tratamento genérico e
+                          // mostra "—", em vez de uma contagem que não leva a lugar nenhum.
+                          if (colId === 'obras_count' && temObras === true) {
                             return (
                               <td key={colId} className="py-1.5 px-2.5 text-xs">
                                 <span onClick={onTextClick}>
@@ -1900,13 +1910,20 @@ const Clientes = () => {
                       <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                         <Mail className="h-3 w-3" /> E-mail
                       </Label>
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-left hover:underline hover:text-primary"
-                        onClick={() => setEmailParaConfirmar(panelEmpresa.email)}
-                      >
-                        {panelEmpresa.email}
-                      </button>
+                      {/* O endereço é dado cadastral do cliente e continua na tela; o que
+                          sai sem o módulo de E-mail é o atalho de envio, que levaria a uma
+                          tela que a rota recusa. Vira texto simples, sem cara de link. */}
+                      {temEmails === true ? (
+                        <button
+                          type="button"
+                          className="text-sm font-medium text-left hover:underline hover:text-primary"
+                          onClick={() => setEmailParaConfirmar(panelEmpresa.email)}
+                        >
+                          {panelEmpresa.email}
+                        </button>
+                      ) : (
+                        <p className="text-sm font-medium">{panelEmpresa.email}</p>
+                      )}
                     </div>
                   )}
                   {panelEmpresa.telefone && (
@@ -1925,12 +1942,15 @@ const Clientes = () => {
                       <p className="text-sm font-medium">{panelEmpresa.endereco}</p>
                     </div>
                   )}
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Users className="h-3 w-3" /> Obras vinculadas
-                    </Label>
-                    <p className="text-sm font-medium">{panelEmpresa.obras?.length ?? 0}</p>
-                  </div>
+                  {/* Contagem de obras: sem a seção, é um "0" que nunca sai do lugar. */}
+                  {temObras === true && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Users className="h-3 w-3" /> Obras vinculadas
+                      </Label>
+                      <p className="text-sm font-medium">{panelEmpresa.obras?.length ?? 0}</p>
+                    </div>
+                  )}
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <Calendar className="h-3 w-3" /> Data de cadastro
@@ -2002,13 +2022,19 @@ const Clientes = () => {
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <Mail className="h-3 w-3" /> E-mail
                     </Label>
-                    <button
-                      type="button"
-                      className="text-sm font-medium text-left hover:underline hover:text-primary"
-                      onClick={() => setEmailParaConfirmar(panelContato.email)}
-                    >
-                      {panelContato.email}
-                    </button>
+                    {/* Mesmo critério do painel da empresa: o endereço fica, o atalho de
+                        envio sai junto com o módulo de E-mail. */}
+                    {temEmails === true ? (
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-left hover:underline hover:text-primary"
+                        onClick={() => setEmailParaConfirmar(panelContato.email)}
+                      >
+                        {panelContato.email}
+                      </button>
+                    ) : (
+                      <p className="text-sm font-medium">{panelContato.email}</p>
+                    )}
                   </div>
                 )}
                 {panelContato.telefone && (

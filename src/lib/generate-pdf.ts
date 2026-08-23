@@ -4,7 +4,10 @@ import logoUrl from '@/assets/logo-md.webp';
 
 export interface PedidoRow {
   cliente: string;
-  obra: string;
+  // Opcional porque, com a seção Obras desligada, quem monta as linhas não tem obra nenhuma
+  // para informar — e obrigar um traço só para satisfazer o tipo escreveria no arquivo uma
+  // coluna que não deveria existir.
+  obra?: string;
   fabricante: string;
   vendedor: string;
   valor: number;
@@ -25,7 +28,22 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-export async function generatePedidosPdf(pedidos: PedidoRow[], titulo: string = 'Relatório de Orçamentos') {
+/**
+ * `opcoes.comObra` desliga a coluna "Obra" do relatório.
+ *
+ * Vem por PARÂMETRO, e não de hook, porque isto é função pura: roda fora do React e é
+ * carregada sob demanda por `import()`. Quem chama (a tela de Negócios) é que sabe se a
+ * empresa contratou a seção Obras.
+ *
+ * O padrão é "com obra": chamador que ainda não foi atualizado continua gerando o mesmo
+ * arquivo de sempre, em vez de perder uma coluna sem ninguém pedir.
+ */
+export async function generatePedidosPdf(
+  pedidos: PedidoRow[],
+  titulo: string = 'Relatório de Orçamentos',
+  opcoes: { comObra?: boolean } = {},
+) {
+  const comObra = opcoes.comObra !== false;
   const doc = new jsPDF('landscape', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -65,10 +83,12 @@ export async function generatePedidosPdf(pedidos: PedidoRow[], titulo: string = 
 
   autoTable(doc, {
     startY: 32,
-    head: [['Cliente', 'Obra', 'Fabricante', 'Vendedor', 'Valor', 'Etapa', 'Data']],
+    // Cabeçalho e corpo têm que cortar a coluna JUNTOS: tirar só um dos dois desloca todos
+    // os valores uma casa para o lado e a tabela inteira sai trocada.
+    head: [['Cliente', ...(comObra ? ['Obra'] : []), 'Fabricante', 'Vendedor', 'Valor', 'Etapa', 'Data']],
     body: pedidos.map(p => [
       p.cliente,
-      p.obra,
+      ...(comObra ? [p.obra ?? '-'] : []),
       p.fabricante,
       p.vendedor,
       p.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),

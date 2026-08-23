@@ -110,6 +110,8 @@ const ClienteDetalhe = () => {
   const { data: pedidos = [], isLoading: loadingPedidos } = usePedidosPorCliente(id);
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
   const { ligada: temTarefas } = useSecaoLigada('tarefas');
+  const { ligada: temEmails } = useSecaoLigada('emails');
+  const { ligada: temObras } = useSecaoLigada('obras');
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
@@ -204,6 +206,13 @@ const ClienteDetalhe = () => {
   };
 
   const cliente = clientes?.find(c => c.id === id);
+
+  // O cartão de e-mail continua na tela sem o módulo de E-mail: o endereço é dado
+  // cadastral do cliente. O que sai é só o CLIQUE, que levaria a uma tela que a rota
+  // recusa — o cartão vira informativo, exatamente como já é hoje para quem não tem
+  // e-mail cadastrado.
+  const emailClicavel = temEmails === true && !!cliente?.email;
+
   const selectedViewOrder = useMemo(() =>
     (pedidos ?? []).find(p => p.id === viewOrderId),
   [pedidos, viewOrderId]);
@@ -415,7 +424,10 @@ const ClienteDetalhe = () => {
         // O contato veio da importação como campo extra, não como relação própria de `pedidos`.
         return <TableCell key={colId}>{camposExtras['Contato'] || camposExtras['contato'] || '—'}</TableCell>;
       case 'endereco_entrega':
-        return <TableCell key={colId}>{p.endereco_entrega ?? p.obra?.nome_obra ?? '—'}</TableCell>;
+        // A coluna é meio-obra, meio-endereço: o endereço de entrega é texto livre do
+        // próprio negócio e continua valendo sem a seção Obras. Some só a reserva pelo
+        // nome da obra — esconder a coluna inteira apagaria o endereço junto.
+        return <TableCell key={colId}>{p.endereco_entrega ?? (temObras === true ? p.obra?.nome_obra : null) ?? '—'}</TableCell>;
       case 'fabricante':
         return <TableCell key={colId} className="font-medium">{p.fabricante?.nome ?? '—'}</TableCell>;
       case 'valor':
@@ -477,9 +489,13 @@ const ClienteDetalhe = () => {
               <DialogTitle className="text-foreground font-bold text-lg">
                 {selectedViewOrder ? getNomeNegocio(selectedViewOrder) : 'Detalhes do Negócio'}
               </DialogTitle>
-              <p className="text-sm text-muted-foreground">
-                {selectedViewOrder?.obra?.nome_obra ?? 'Sem obra vinculada'}
-              </p>
+              {/* Sem a seção Obras a frase de reserva ("Sem obra vinculada") ficaria
+                  falando de algo que a empresa não tem — some o subtítulo inteiro. */}
+              {temObras === true && (
+                <p className="text-sm text-muted-foreground">
+                  {selectedViewOrder?.obra?.nome_obra ?? 'Sem obra vinculada'}
+                </p>
+              )}
             </div>
           </div>
         </DialogHeader>
@@ -694,14 +710,14 @@ const ClienteDetalhe = () => {
             </Card>
           )}
           <Card
-            role={cliente.email ? 'button' : undefined}
-            tabIndex={cliente.email ? 0 : undefined}
-            className={`border-border/40 ${cliente.email ? 'cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : ''}`}
+            role={emailClicavel ? 'button' : undefined}
+            tabIndex={emailClicavel ? 0 : undefined}
+            className={`border-border/40 ${emailClicavel ? 'cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : ''}`}
             onClick={() => {
-              if (cliente.email) setEmailParaConfirmar(cliente.email);
+              if (emailClicavel) setEmailParaConfirmar(cliente.email);
             }}
             onKeyDown={e => {
-              if (cliente.email && (e.key === 'Enter' || e.key === ' ')) {
+              if (emailClicavel && (e.key === 'Enter' || e.key === ' ')) {
                 e.preventDefault();
                 setEmailParaConfirmar(cliente.email);
               }
@@ -849,6 +865,10 @@ const ClienteDetalhe = () => {
         </div>
 
         {/* Obras */}
+        {/* O painel inteiro (lista, contagem, os dois atalhos de "Nova Obra" e o modal de
+            cadastro) só faz sentido para quem contratou a seção. O modal fica dentro do
+            bloco de propósito: os únicos jeitos de abri-lo estão aqui dentro. */}
+        {temObras === true && (
         <Card className="border-border/40">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base flex items-center gap-2">
@@ -981,6 +1001,7 @@ const ClienteDetalhe = () => {
               </Dialog>
             </CardContent>
           </Card>
+        )}
         {/* Removed extra closing brace */}
 
         {/* Contatos extras (apenas para empresas, não pessoa física) */}
@@ -1209,8 +1230,11 @@ const ClienteDetalhe = () => {
                   <div className="flex flex-col sm:flex-row gap-2 mb-4">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      {/* A busca em si não muda (continua casando pelo nome da obra); o que
+                          muda é a dica, para não oferecer uma palavra que a empresa sem a
+                          seção Obras não reconhece. */}
                       <Input
-                        placeholder="Buscar por fabricante, vendedor ou obra..."
+                        placeholder={temObras === true ? 'Buscar por fabricante, vendedor ou obra...' : 'Buscar por fabricante ou vendedor...'}
                         value={pedidosBusca}
                         onChange={(e) => { setPedidosBusca(e.target.value); setPedidosPage(1); }}
                         className="pl-9"

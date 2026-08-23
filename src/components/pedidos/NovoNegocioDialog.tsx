@@ -17,6 +17,7 @@ import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCr
 import { useCreateObra } from '@/hooks/use-mutations';
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesCampos, resolveFieldLabel, isCampoObrigatorioNaEtapa } from '@/hooks/use-configuracoes-campos';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
@@ -98,6 +99,10 @@ function NovoNegocioFormContent({
   const { data: kanbanColunas } = useKanbanColunas(undefined, resolvedFunilId);
   const createPedido = useCreatePedidoCompleto();
   const createObraMutation = useCreateObra();
+  // Cascata da secao Obras: a empresa que nao contrata Obras nao pode ver campo de obra
+  // aqui. `=== true` e deliberado — enquanto a resposta nao chega, o campo fica escondido:
+  // campo que aparece e some no meio do preenchimento e pior de usar que campo que demora.
+  const { ligada: temObras } = useSecaoLigada('obras');
 
   const [clienteOpen, setClienteOpen] = useState(false);
   const [fabricanteOpen, setFabricanteOpen] = useState(false);
@@ -284,6 +289,12 @@ function NovoNegocioFormContent({
       // o botão "Criar Negócio" nunca mais habilitaria. Se o campo um dia voltar,
       // basta apagar esta linha.
       c.campo_key !== 'proximo_contato' &&
+      // Mesmo raciocínio para a Obra, por outro motivo: com a seção Obras desligada o
+      // campo não é desenhado na tela. Cobrá-lo aqui travaria o assistente inteiro —
+      // "Preencha o campo obrigatório: Obra vinculada" num campo que ninguém consegue
+      // preencher, e o botão "Criar Negócio" nunca habilitaria. A linha continua gravada
+      // na configuração de campos e volta a valer se a seção for religada.
+      (temObras === true || c.campo_key !== 'obra_id') &&
       (etapaAlvo === 'step2' ? c.etapa === 'Itens do Negócio' : c.etapa !== 'Itens do Negócio')
     );
     for (const campo of camposDaEtapa) {
@@ -541,21 +552,25 @@ function NovoNegocioFormContent({
                   />
                 </div>
 
-                {/* Obra */}
-                <div className="space-y-2">
-                  <Label>Obra{obrigatorio('obra_id', false) && ' *'}</Label>
-                  <SearchableSelect
-                    options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
-                    value={obraId}
-                    onValueChange={handleObraChange}
-                    placeholder="Selecionar obra"
-                    onActionClick={() => setObraDialogOpen(true)}
-                    actionLabel="Nova Obra"
-                  />
-                  {selectedObra?.spe_cnpj && (
-                    <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
-                  )}
-                </div>
+                {/* Obra — some junto com a seção. Anda de par com a exceção de `obra_id`
+                    na varredura de campos obrigatórios (getMissingField): esconder aqui
+                    sem tirar de lá trava o assistente. */}
+                {temObras === true && (
+                  <div className="space-y-2">
+                    <Label>Obra{obrigatorio('obra_id', false) && ' *'}</Label>
+                    <SearchableSelect
+                      options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
+                      value={obraId}
+                      onValueChange={handleObraChange}
+                      placeholder="Selecionar obra"
+                      onActionClick={() => setObraDialogOpen(true)}
+                      actionLabel="Nova Obra"
+                    />
+                    {selectedObra?.spe_cnpj && (
+                      <p className="text-xs text-muted-foreground">SPE/CNPJ: {selectedObra.spe_cnpj}</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

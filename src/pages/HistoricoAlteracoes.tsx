@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useHistoricoAlteracoes, HistoricoAlteracao } from '@/hooks/use-historico-alteracoes';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -116,6 +117,18 @@ export default function HistoricoAlteracoes() {
   const [tabelaFiltro, setTabelaFiltro] = useState<string | undefined>(undefined);
   const [usuarioFiltro, setUsuarioFiltro] = useState<string | undefined>(undefined);
 
+  const { ligada: temObras } = useSecaoLigada('obras');
+
+  // Cascata da seção Obras: sem a seção, "Obra" sai das opções deste filtro.
+  //
+  // O corte é SÓ aqui, e não em TABELA_LABELS: o mesmo mapa traduz a coluna "Entidade" de
+  // cada linha da tabela. Registros antigos de obra continuam no banco e têm que continuar
+  // legíveis como "Obra" — tirá-los do mapa faria o histórico exibir o nome cru da tabela.
+  const entidadesDoFiltro = useMemo(
+    () => Object.entries(TABELA_LABELS).filter(([chave]) => chave !== 'obras' || temObras === true),
+    [temObras],
+  );
+
   const filtros = useMemo(
     () => ({ tabela: tabelaFiltro, usuarioId: usuarioFiltro }),
     [tabelaFiltro, usuarioFiltro],
@@ -144,7 +157,7 @@ export default function HistoricoAlteracoes() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todas as entidades</SelectItem>
-              {Object.entries(TABELA_LABELS).map(([key, label]) => (
+              {entidadesDoFiltro.map(([key, label]) => (
                 <SelectItem key={key} value={key}>{label}</SelectItem>
               ))}
             </SelectContent>

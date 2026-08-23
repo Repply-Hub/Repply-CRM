@@ -8,6 +8,7 @@ import { useFaturamentoMensal, useIndicadoresVendedor, useDashboardStats, useDas
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePicker';
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
 import { MultiSelectSearch } from '@/components/shared/MultiSelectSearch';
@@ -60,6 +61,11 @@ const Dashboard = () => {
   // dashboard, todas dependentes de empresaId via `enabled`.
   const empresaId = profile?.empresa_id;
 
+  // Empresa que não contratou o WhatsApp não pode ver sobra nenhuma dele aqui. `=== true`
+  // (e não `!== false`) de propósito: enquanto a resposta do banco não chega, esconder é
+  // melhor do que mostrar a faixa e arrancá-la da frente de quem já começou a ler.
+  const { ligada: temWhatsapp } = useSecaoLigada('whatsapp');
+
   const { data: faturamento, isLoading: loadFat } = useFaturamentoMensal(empresaId);
   // Mesmos filtros de Período/Fabricante do topo — antes esse card ignorava
   // completamente esses filtros e reagregava o histórico inteiro de pedidos.
@@ -101,7 +107,9 @@ const Dashboard = () => {
   // resposta por atendente) — só interessam ao gestor/admin acompanhando a equipe;
   // pra não-gestor nem dispara a query (RLS de whatsapp_conversas já restringiria
   // ao próprio usuário, mas o gráfico fica oculto de qualquer forma — ver DashboardCharts).
-  const { data: whatsappStats, isError: whatsappIsError } = useDashboardWhatsappStats(isGestor ? empresaId : undefined, {
+  // Sem a seção contratada a consulta também não sai: cortar aqui, na origem, poupa a
+  // chamada à RPC dashboard_whatsapp_stats de uma empresa que não tem o módulo.
+  const { data: whatsappStats, isError: whatsappIsError } = useDashboardWhatsappStats(isGestor && temWhatsapp === true ? empresaId : undefined, {
     dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
     dateTo: format(dateRange.to, 'yyyy-MM-dd'),
   });
@@ -420,9 +428,11 @@ const Dashboard = () => {
             conversaoVendedor={conversaoVendedor}
             rendimentoFabrica={rendimentoFabrica}
             rendimentoVendedor={rendimentoVendedor}
-            whatsappConversas={isGestor && whatsappStats ? { abertas: whatsappStats.conversas_abertas, fechadas: whatsappStats.conversas_fechadas } : null}
+            // A seção entra nas duas condições além do papel: quem mexer amanhã no `enabled`
+            // da consulta acima não teria como adivinhar que a faixa dependia dele.
+            whatsappConversas={isGestor && temWhatsapp === true && whatsappStats ? { abertas: whatsappStats.conversas_abertas, fechadas: whatsappStats.conversas_fechadas } : null}
             whatsappTempoResposta={whatsappStats?.tempo_resposta_atendente ?? []}
-            whatsappError={isGestor && whatsappIsError}
+            whatsappError={isGestor && temWhatsapp === true && whatsappIsError}
           />
         </Suspense>
         </div>
