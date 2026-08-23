@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { addMonths, endOfMonth, startOfMonth } from 'date-fns';
 import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { CampoMoeda } from '@/components/shared/CampoMoeda';
 import { formatarMoedaBRL } from '@/lib/moeda';
-import { Goal, Pencil, Plus, Trash2, Loader2, Copy, Users, User, GripVertical, Info, Search, Factory } from 'lucide-react';
+import { Goal, Pencil, Plus, Trash2, Loader2, Copy, Users, User, GripVertical, Info, Search, Factory, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   usePlanoVendasProgresso,
@@ -110,6 +111,10 @@ interface PlanoVendasSectionProps {
   // UM vendedor está selecionado (ver `vendedorUnico` no corpo do componente) —
   // com 0 ou 2+, a seção mostra a visão agregada/por vendedor, sem alvo único
   // pra editar.
+  //
+  // Vale IGUAL pra gestor e pra vendedor comum: o Dashboard não trava mais o
+  // vendedor comum nele mesmo (ver Dashboard.tsx, onde esta propriedade é
+  // montada). Sem filtro escolhido, todo mundo abre na visão da EMPRESA.
   vendedorIds: string[];
   // Segue o filtro "Fabricante" do topo da página (array vazio = "Todos").
   fabricanteIds: string[];
@@ -121,6 +126,12 @@ interface PlanoVendasSectionProps {
   // período", sem nenhum aviso de que os outros onze meses tinham ficado de fora.
   dateFrom: string;
   dateTo: string;
+  // Avisa o Dashboard que as setas de mês pediram outro período. Quem é dono do
+  // estado de data é o Dashboard (é ele que alimenta o DateRangePicker e TODAS
+  // as métricas da página), então esta seção não guarda data nenhuma: ela só
+  // pede a troca e recebe o novo período de volta por dateFrom/dateTo. Sem esta
+  // propriedade, as setas simplesmente não aparecem.
+  onPeriodoChange?: (range: { from: Date; to: Date }) => void;
 }
 
 function progressoCor(pct: number) {
@@ -129,7 +140,7 @@ function progressoCor(pct: number) {
   return 'text-muted-foreground';
 }
 
-export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vendedorIds, fabricanteIds, vendedores, fabricantes, dateFrom, dateTo }: PlanoVendasSectionProps) {
+export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vendedorIds, fabricanteIds, vendedores, fabricantes, dateFrom, dateTo, onPeriodoChange }: PlanoVendasSectionProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [mostrarDetalhado, setMostrarDetalhado] = useState(
     () => localStorage.getItem(MOSTRAR_DETALHADO_KEY) === '1',
@@ -173,6 +184,26 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
     return `${MESES[mesInicial - 1].slice(0, 3)}/${anoInicial} a ${MESES[mesFinal - 1].slice(0, 3)}/${anoFinal}`;
   }, [anoInicial, mesInicial, anoFinal, mesFinal]);
 
+  // Setas ao lado do rótulo do mês. Elas NÃO são um filtro próprio desta seção:
+  // mudam o filtro "Período" do topo do Dashboard, então a página inteira (KPIs,
+  // gráficos, tudo) anda junto — é o mesmo mês em todo lugar, sem dois períodos
+  // discordando na mesma tela.
+  //
+  // REGRA quando o período atual NÃO é um mês fechado (alguém escolheu à mão
+  // 10/03 a 25/07, por exemplo): a seta vale sobre o MÊS DA DATA INICIAL e o
+  // resultado é SEMPRE um mês inteiro. De "10/03 a 25/07", a seta da direita
+  // leva a "01/04 a 30/04". É previsível e é o único formato que se compara com
+  // a meta, que é um compromisso mensal — voltar "30 dias" deixaria o período
+  // pisando em dois meses e a meta somaria os dois.
+  const irParaMes = (delta: number) => {
+    if (!onPeriodoChange) return;
+    // Montado a partir de ano/mês em número, não de `new Date(dateFrom)`: uma
+    // string 'yyyy-MM-dd' é lida como UTC pelo construtor e, no fuso do Brasil,
+    // voltaria um dia — cairia no mês anterior quando o dia é 1º (CLAUDE.md §7.12).
+    const alvo = addMonths(new Date(anoInicial, mesInicial - 1, 1), delta);
+    onPeriodoChange({ from: startOfMonth(alvo), to: endOfMonth(alvo) });
+  };
+
   const { data: progresso, isLoading } = usePlanoVendasProgresso(
     dateFrom,
     dateTo,
@@ -190,8 +221,12 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
   const totalVendido = useMemo(() => (progresso ?? []).reduce((acc, p) => acc + p.vendido_valor, 0), [progresso]);
   const totalPct = totalMeta > 0 ? (totalVendido / totalMeta) * 100 : 0;
 
+  // O `!!vendedorUnico` antes da comparação não é decoração: na visão da empresa
+  // (sem filtro) `vendedorUnico` é undefined, e `undefined === currentUsuarioId`
+  // seria verdade se o id do usuário também chegasse vazio — o título diria
+  // "Você" em cima de um número que é da empresa inteira.
   const vendedorNome = vendedores.find(v => v.usuario_id === vendedorUnico)?.usuario_nome
-    ?? (vendedorUnico === currentUsuarioId ? 'Você' : '');
+    ?? (!!vendedorUnico && vendedorUnico === currentUsuarioId ? 'Você' : '');
 
   // Ordem customizada dos fabricantes (definida em "Editar metas") — a RPC
   // principal já ordena por ela, mas o agrupamento "Por vendedor" abaixo é
@@ -263,10 +298,39 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* O período segue o filtro do topo da página — ver
-                PlanoVendasSectionProps.dateFrom/dateTo. */}
-            <span className="h-8 flex items-center px-2.5 rounded-md border border-border/60 bg-muted/40 text-xs font-medium text-muted-foreground">
-              {periodoLabel}
-            </span>
+                PlanoVendasSectionProps.dateFrom/dateTo. As setas mudam AQUELE
+                filtro (ver irParaMes), não um período só desta seção; o rótulo
+                do meio acompanha sozinho, porque ele é calculado a partir do
+                dateFrom/dateTo que o Dashboard devolve. */}
+            <div className="flex items-center gap-0.5">
+              {onPeriodoChange && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                  aria-label="Mês anterior"
+                  onClick={() => irParaMes(-1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              )}
+              <span className="h-8 flex items-center px-2.5 rounded-md border border-border/60 bg-muted/40 text-xs font-medium text-muted-foreground">
+                {periodoLabel}
+              </span>
+              {onPeriodoChange && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                  aria-label="Próximo mês"
+                  onClick={() => irParaMes(1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
             {isGestor && (
               <Button
                 size="sm"

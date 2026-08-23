@@ -15,7 +15,7 @@ import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { useFunis } from '@/hooks/use-funis';
 import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
-import { usePedidos, usePedidosStats, useSearchMatches, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField } from '@/hooks/use-pedidos';
+import { usePedidos, usePedidosStats, useSearchMatches, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
@@ -54,6 +54,7 @@ import { ImportDialog } from '@/components/ImportDialog';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { ResizableTh } from '@/components/shared/ResizableTh';
+import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
 import { KanbanColumn } from '@/components/pedidos/kanban/KanbanColumn';
 import { FilterButton } from '@/components/shared/FilterButton';
 import { toast } from 'sonner';
@@ -94,6 +95,68 @@ const PEDIDOS_DEFAULT_VISIBLE_COLUMNS = ['negocio', 'cliente', 'contato', 'fabri
 
 const PAGE_SIZE = 10;
 // Constante LEGACY_CARD_FIELDS removida pois as colunas agora são independentes.
+
+/**
+ * Quais colunas da Lista sabem se ordenar, e como o menu do cabeçalho descreve cada direção.
+ *
+ * A regra que decidiu esta lista: **só entra a coluna cuja célula mostra, sem intermediário, o
+ * valor de uma coluna da tabela `pedidos`.** Cabeçalho que promete ordenar e não ordena é pior
+ * que cabeçalho que não promete nada, então o resto simplesmente não ganha o menuzinho.
+ *
+ * Quem ficou de fora e por quê (medido na base da MD em 22/08/2026):
+ *
+ * - **Negócio** — a célula mostra `getNomeNegocio()`, que só usa `pedidos.nome` quando ele está
+ *   preenchido e senão monta "cliente | fabricante". `nome` está NULO nos 11.911 negócios: pedir
+ *   ao banco para ordenar por ele empataria tudo e a lista não mudaria de lugar nenhum.
+ * - **Cliente, Fabricante, Responsável, Marcador** — moram em tabelas ligadas. O PostgREST só
+ *   ordena o pai por uma coluna da tabela ligada se o vínculo virar junção interna (`!inner`), e
+ *   junção interna DESCARTA a linha que não tem par: `marcador_id` é nulo em 8.526 dos 11.911
+ *   negócios, então ordenar por Marcador esconderia 72% da lista enquanto o rodapé continuaria
+ *   contando todo mundo. Some linha, não muda ordem.
+ * - **Etapa** — a célula mostra o NOME da etapa ("Orçamento Enviado"), mas a coluna guarda o
+ *   apelido ("enviado"). Ordenar A-Z pelo apelido colocaria "Orçamento Enviado" em 2º e
+ *   "Elaboração de Orçamento" em 1º — uma ordem que não bate com nenhum dos dois critérios que
+ *   o usuário esperaria (nem alfabética pelo que ele lê, nem a ordem do funil).
+ * - **Contato** e as colunas criadas pela importação — vivem dentro de `campos_extras` (um campo
+ *   de JSON), não em coluna própria.
+ * - **Ações** — não é dado, é botão.
+ */
+const ORDENACAO_DA_LISTA: Record<string, { coluna: PedidosSortColumn; asc: string; desc: string }> = {
+  valor: { coluna: 'valor_total', asc: 'Menor valor primeiro', desc: 'Maior valor primeiro' },
+  data_pedido: { coluna: 'data_pedido', asc: 'Mais antigos primeiro', desc: 'Mais recentes primeiro' },
+  prazo_resposta: { coluna: 'prazo_resposta', asc: 'Mais antigos primeiro', desc: 'Mais recentes primeiro' },
+  // Vazios sempre por último, nos dois sentidos (ver o `nullsFirst: false` em
+  // use-pedidos.ts). Sem isso, "Ordenar Z-A" abriria com 9.512 traços, porque o
+  // padrão do Postgres em ordem decrescente é jogar os nulos para o começo.
+  endereco_entrega: { coluna: 'endereco_entrega', asc: 'Ordenar A-Z', desc: 'Ordenar Z-A' },
+  // "Observações" NÃO entra: medido na base da MD, 11.898 dos 11.911 negócios têm
+  // o campo vazio e só 4 têm texto. Ordenar por ele embaralha a lista e continua
+  // mostrando linha em branco — um cabeçalho que promete e não entrega é pior que
+  // um cabeçalho que não promete nada.
+  // Anexo guarda um endereço de arquivo: ordenar por ele alfabeticamente não diz nada a ninguém.
+  // O que a coluna responde de útil é "quais negócios têm anexo" — e o Postgres joga os vazios
+  // para o fim quando a ordem é crescente, então os rótulos descrevem o efeito real do clique.
+  anexo: { coluna: 'pdf_url', asc: 'Com anexo primeiro', desc: 'Sem anexo primeiro' },
+  // Id legado da mesma coluna, criado por importações antigas (ver o tratamento em PedidoRow).
+  pdf_url: { coluna: 'pdf_url', asc: 'Com anexo primeiro', desc: 'Sem anexo primeiro' },
+};
+
+const ORDENACAO_STORAGE_KEY = 'negocios_lista_ordenacao';
+
+/** O que ficou guardado do último uso: a coluna do cabeçalho (não a do banco) e a direção. */
+type OrdenacaoDaLista = { colId: string; direction: SortDirection };
+
+// Descarta preferência salva que não existe mais (coluna removida, arquivo de outra versão).
+// Sem isso, uma escolha antiga viraria um `order=` inválido e derrubaria a lista inteira.
+const lerOrdenacaoSalva = (): OrdenacaoDaLista | null => {
+  try {
+    const salvo = JSON.parse(localStorage.getItem(ORDENACAO_STORAGE_KEY) || 'null');
+    if (!salvo || !ORDENACAO_DA_LISTA[salvo.colId]) return null;
+    return { colId: salvo.colId, direction: salvo.direction === 'asc' ? 'asc' : 'desc' };
+  } catch {
+    return null;
+  }
+};
 
 const getStageBadgeClass = (corToken: string) => `bg-${corToken} text-white`;
 
@@ -534,6 +597,39 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // cada tecla vira uma rodada de requisições.
   const deferredSearch = useDebouncedValue(search, 350);
   const [page, setPage] = useState(1);
+
+  // Ordenação da Lista, lembrada entre visitas (do mesmo jeito que a busca e as larguras das
+  // colunas já são). `null` = a ordem de sempre, os negócios mais recentes primeiro.
+  const [ordenacao, setOrdenacao] = useState<OrdenacaoDaLista | null>(lerOrdenacaoSalva);
+
+  const handleSort = useCallback((colId: string, direction: SortDirection) => {
+    setOrdenacao({ colId, direction });
+    localStorage.setItem(ORDENACAO_STORAGE_KEY, JSON.stringify({ colId, direction }));
+    // Volta para a primeira página: a ordem mudou, então "página 7" passou a apontar para
+    // outros negócios. Ficar na 7 depois de pedir "maior valor primeiro" mostraria o 61º ao 70º
+    // maior valor, com cara de erro.
+    setPage(1);
+  }, []);
+
+  // A ordenação que de fato vai ao servidor. Uma coluna escondida em "Colunas" deixa de valer:
+  // senão a lista continuaria ordenada por algo que não está mais na tela, sem nenhum cabeçalho
+  // marcado explicando o porquê da ordem.
+  const sortDaLista: PedidosSort | undefined = useMemo(() => {
+    if (!ordenacao) return undefined;
+    const alvo = ORDENACAO_DA_LISTA[ordenacao.colId];
+    if (!alvo || !tableVisibleColumns.includes(ordenacao.colId)) return undefined;
+    return { column: alvo.coluna, ascending: ordenacao.direction === 'asc' };
+  }, [ordenacao, tableVisibleColumns]);
+
+  // Esconder em "Colunas" a coluna que está ordenando derruba a ordenação — e a
+  // lista inteira se reorganiza. Sem voltar para a primeira página, quem estava
+  // na página 7 continua na 7 de uma lista que virou outra, olhando negócios sem
+  // relação nenhuma com o que estava na tela. O `handleSort` já reseta quando a
+  // troca é pelo cabeçalho; esta é a outra porta para o mesmo estado.
+  useEffect(() => {
+    setPage(1);
+  }, [sortDaLista?.column, sortDaLista?.ascending]);
+
   const [importOpen, setImportOpen] = useState(false);
   const [importDialogMounted, setImportDialogMounted] = useState(false);
   const [importAiOpen, setImportAiOpen] = useState(false);
@@ -553,6 +649,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [pdfPreview, setPdfPreview] = useState<FilePreviewTarget | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportTargetId, setExportTargetId] = useState<string | undefined>(undefined);
+  // Exportação em andamento: trava um segundo clique enquanto a varredura do funil roda.
+  const [exportando, setExportando] = useState(false);
+  // Confirmação que aparece só quando o recorte é grande — ver PEDIDOS_EXPORTACAO_AVISO.
+  const [confirmExportOpen, setConfirmExportOpen] = useState(false);
 
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>(() => parseListParam(searchParams.get('vendedores')));
   const [selectedFabricantes, setSelectedFabricantes] = useState<string[]>(() => parseListParam(searchParams.get('fabricantes')));
@@ -748,6 +848,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     activeStages,
     pedidosFilters,
     !showKanban,
+    // withCount / resolvedSearchMatches ficam no padrão; só existem aqui porque `sort` vem
+    // depois deles na assinatura. O Kanban NÃO recebe ordenação: cada coluna do board tem a
+    // ordem dela e não tem cabeçalho onde clicar.
+    false,
+    undefined,
+    sortDaLista,
   );
   const { data: pedidosStats, isFetching: isStatsFetching } = usePedidosStats(empresaId, activeStages, pedidosFilters);
 
@@ -1345,11 +1451,154 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     await generatePedidosPdf(rows, titulo);
   };
 
+  // Negócios cobertos pela exportação em Excel.
+  //
+  // MUDOU AQUI: antes a planilha saía com o que já estava carregado na tela — com "Exibir 10",
+  // um funil de 11.906 negócios virava um arquivo de 10 linhas, e nada no arquivo dizia isso.
+  // Agora a busca vai ao servidor com os MESMOS `activeStages`/`pedidosFilters` que a tela usa,
+  // em lotes de PEDIDOS_LOTE_EXPORTACAO (ver buscarNegociosDoRecorte), e o resultado é o recorte
+  // filtrado inteiro — o mesmo número que o cabeçalho já mostra.
+  //
+  // O caso de UM negócio só (o "Exportar" de dentro da linha) continua lendo o que está na tela:
+  // o registro já está carregado, ir ao servidor buscar de novo seria uma volta sem ganho.
+  const obterNegociosParaExportar = async (
+    specificPedidoId: string | undefined,
+    onProgresso: (carregados: number) => void,
+  ): Promise<{ negocios: PedidoWithRelations[]; titulo: string }> => {
+    if (specificPedidoId) {
+      const p = (showKanban ? kanbanPedidosFlat : pedidos).find(item => item.id === specificPedidoId);
+      return p ? { negocios: [p], titulo: `Negócio - ${getNomeNegocio(p)}` } : { negocios: [], titulo: '' };
+    }
+
+    const filtrado = hasPipelineFilters || deferredSearch.trim() !== '';
+    const negocios = await buscarNegociosDoRecorte({
+      empresaId,
+      stages: activeStages,
+      filters: pedidosFilters,
+      // A planilha sai na mesma ordem que a tela está mostrando — quem ordenou por "maior valor
+      // primeiro" e exportou espera abrir o arquivo e ver o maior valor na primeira linha.
+      sort: sortDaLista,
+      onProgresso,
+    });
+    return { negocios, titulo: filtrado ? 'Negócios - Filtrado' : 'Negócios' };
+  };
+
+  // A planilha sai com os MESMOS cabeçalhos que o assistente de importação reconhece, na mesma
+  // ordem — é o que permite exportar, ajustar no Excel e reimportar sem remapear coluna nenhuma.
+  // Os rótulos vêm de `FIELDS` (importPedidosUtils), a MESMA lista que a importação lê: assim os
+  // dois lados não têm como divergir em silêncio quando alguém acrescentar um campo lá.
+  // O import é dinâmico porque esse módulo carrega o xlsx (pesado): fora do clique de exportar
+  // ele não deve entrar no pacote da página, que é justamente por que o diálogo de importação
+  // também é carregado sob demanda.
   const handleExportExcel = async (specificPedidoId?: string) => {
-    const { rows, titulo } = buildExportRows(specificPedidoId);
-    if (rows.length === 0) return;
-    const { generatePedidosExcel } = await import('@/lib/generate-excel');
-    generatePedidosExcel(rows, titulo);
+    // Dois cliques seguidos disparariam duas varreduras completas do funil ao mesmo tempo.
+    if (exportando) return;
+
+    const exportandoTudo = !specificPedidoId;
+    // Um aviso que se atualiza a cada lote. Sem ele, 12 idas ao servidor em sequência parecem
+    // uma tela travada: nada se mexe, nenhum arquivo aparece, e a pessoa clica de novo.
+    const avisoId = exportandoTudo
+      ? toast.loading(`Buscando os ${totalCount.toLocaleString('pt-BR')} negócios do filtro...`)
+      : undefined;
+
+    setExportando(true);
+    try {
+      const { negocios, titulo } = await obterNegociosParaExportar(specificPedidoId, carregados => {
+        if (avisoId !== undefined) {
+          toast.loading(
+            `Buscando negócios... ${carregados.toLocaleString('pt-BR')} de ${totalCount.toLocaleString('pt-BR')}`,
+            { id: avisoId },
+          );
+        }
+      });
+
+      if (negocios.length === 0) {
+        toast.error('Nenhum negócio para exportar.', { id: avisoId });
+        return;
+      }
+
+      // Confere o que veio contra o número que a tela promete. Divergência aqui é notícia, não
+      // detalhe: significa que o arquivo saiu incompleto (alguém mexeu nos negócios durante a
+      // busca, ou o recorte passou do teto do laço de lotes). Melhor a pessoa saber antes de
+      // mandar a planilha para alguém do que descobrir depois que faltava gente.
+      if (exportandoTudo && negocios.length < totalCount) {
+        toast.warning(
+          `O arquivo saiu com ${negocios.length.toLocaleString('pt-BR')} dos ${totalCount.toLocaleString('pt-BR')} negócios do filtro. Vale conferir e exportar de novo.`,
+        );
+      }
+
+      if (avisoId !== undefined) {
+        toast.loading(`Montando a planilha com ${negocios.length.toLocaleString('pt-BR')} negócios...`, { id: avisoId });
+      }
+
+      const [{ FIELDS }, { utils: xlsxUtils, writeFile: xlsxWriteFile }] = await Promise.all([
+        import('@/components/import-pedidos/importPedidosUtils'),
+        import('xlsx'),
+      ]);
+
+      // Cada campo da importação e de onde sai o valor dele aqui. As datas saem EXATAMENTE como
+      // estão no banco (`AAAA-MM-DD`, as duas colunas são do tipo date) e como texto: nada de
+      // `new Date(...)`/`toLocaleDateString`, que é o idioma que fazia a data cair no dia anterior
+      // (CLAUDE.md §7.12) — a exportação antiga escrevia 30/01 para um negócio de 31/01. Do outro
+      // lado, `sanitizeFieldValue` (MappingStep.tsx) tem um ramo próprio para `AAAA-MM-DD` que
+      // devolve a data idêntica sem passar por `Date`, então a ida e a volta fecham no mesmo dia.
+      // Lembrando o que os nomes escondem: `data_pedido` é a CRIAÇÃO e `prazo_resposta` é o
+      // FECHAMENTO — os rótulos da planilha ("Criação"/"Fechamento") são os que a importação usa.
+      const valorDaColuna: Record<string, (p: PedidoWithRelations) => string | number> = {
+        negocio: p => getNomeNegocio(p),
+        cliente: p => p.cliente?.empresa ?? '',
+        // Mesma origem que a coluna "Contato" da lista: o contato veio da importação como campo
+        // extra, não como relação própria de `pedidos`.
+        contato: p => {
+          const extras = (p.campos_extras ?? {}) as Record<string, unknown>;
+          return String(extras['Contato'] ?? extras['contato'] ?? '');
+        },
+        obra: p => p.endereco_entrega ?? p.obra?.nome_obra ?? '',
+        fabricante: p => p.fabricante?.nome ?? '',
+        valor: p => p.valor_total ?? 0,
+        vendedor: p => p.vendedor?.nome ?? '',
+        // O nome da etapa, não o slug: a importação casa o texto contra o nome real das colunas do
+        // funil (matchPedidoStatusToColuna), então o rótulo volta para a mesma etapa de origem.
+        status: p => stageLabel(p.status),
+        marcador: p => p.marcador?.nome ?? '',
+        data_pedido: p => p.data_pedido ?? '',
+        prazo_resposta: p => p.prazo_resposta ?? '',
+        observacoes: p => p.observacoes ?? '',
+        pdf_url: p => p.pdf_url ?? '',
+      };
+
+      const larguraPorCampo: Record<string, number> = {
+        negocio: 38, cliente: 28, contato: 24, obra: 30, fabricante: 22, valor: 16, vendedor: 22,
+        status: 18, marcador: 16, data_pedido: 12, prazo_resposta: 12, observacoes: 40, pdf_url: 40,
+      };
+
+      const cabecalhos = FIELDS.map(f => f.label);
+      const linhas = negocios.map(p =>
+        Object.fromEntries(FIELDS.map(f => [f.label, valorDaColuna[f.key]?.(p) ?? '']))
+      );
+
+      // `header` fixa a ordem das colunas na planilha, que é a ordem de FIELDS.
+      const ws = xlsxUtils.json_to_sheet(linhas, { header: cabecalhos });
+      ws['!cols'] = FIELDS.map(f => ({ wch: larguraPorCampo[f.key] ?? 20 }));
+
+      const wb = xlsxUtils.book_new();
+      xlsxUtils.book_append_sheet(wb, ws, 'Negócios');
+      // `format` do date-fns (fuso local) em vez de `toISOString()` (UTC): depois das 21h no
+      // Brasil o nome do arquivo sairia com a data de amanhã.
+      const nomeArquivo = `${titulo.replace(/[^a-zA-Z0-9À-ÿ -]/g, '').trim() || 'negocios'}-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      xlsxWriteFile(wb, nomeArquivo);
+
+      if (avisoId !== undefined) {
+        toast.success(`${negocios.length.toLocaleString('pt-BR')} negócios exportados.`, { id: avisoId });
+      }
+    } catch (err) {
+      console.error('[export negocios]', err);
+      toast.error((err as Error)?.message || 'Não foi possível exportar os negócios.', { id: avisoId });
+    } finally {
+      // Só aqui, e não logo depois da busca: montar a planilha de 11.906 linhas também leva
+      // tempo, e liberar o botão antes disso deixaria dois arquivos sendo gerados ao mesmo tempo.
+      setExportando(false);
+    }
   };
 
   const openExportDialog = (specificPedidoId?: string) => {
@@ -1361,9 +1610,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     setExportDialogOpen(false);
     if (formatoEscolhido === 'pdf') {
       await handleExportPdf(exportTargetId);
-    } else {
-      await handleExportExcel(exportTargetId);
+      return;
     }
+    // Recorte grande: pergunta antes. São várias idas ao servidor seguidas da montagem da
+    // planilha, e o único jeito honesto de fazer isso é avisar quanto vai custar em vez de
+    // deixar a aba parecendo travada por meio minuto.
+    if (!exportTargetId && totalCount > PEDIDOS_EXPORTACAO_AVISO) {
+      setConfirmExportOpen(true);
+      return;
+    }
+    await handleExportExcel(exportTargetId);
   };
 
   const optionsPopover = useMemo(() => (
@@ -2035,9 +2291,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const isFiltered = hasPipelineFilters || deferredSearch.trim() !== '';
 
+  // O subtítulo agora DESCREVE a seção, em vez de contar negócios — mesmo padrão (e mesmo tom,
+  // sem ponto final) das outras telas: Clientes, Tarefas, Fabricantes.
+  const subtitle = 'Funil de orçamentos, da abertura ao fechamento';
+
+  // A contagem e a soma que ficavam no subtítulo não foram jogadas fora: viraram a linha de
+  // resumo logo abaixo da barra de ferramentas. O total em dinheiro do recorte não aparece em
+  // nenhum outro lugar da tela (o rodapé mostra só a contagem, e o Kanban só o total por etapa).
   // Contagem e soma vêm de usePedidosStats (query dedicada no servidor), refletindo
   // TODOS os registros que atendem ao filtro atual — não apenas o lote carregado localmente.
-  const subtitle = `${totalCount} negócios${isFiltered ? ' (filtrados)' : ''} · Total: ${totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+  const resumoDoRecorte = `${totalCount.toLocaleString('pt-BR')} ${totalCount === 1 ? 'negócio' : 'negócios'}${isFiltered ? ' (filtrados)' : ''} · Total: ${totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
 
   return (
     <AppLayout title="Negócios" subtitle={subtitle} mainClassName="flex-1 overflow-hidden flex flex-col">
@@ -2124,6 +2387,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           </div>
         </div>
 
+        {/* Quantos negócios e quanto dinheiro o recorte atual representa — saiu do subtítulo da
+            página, que agora descreve a seção. */}
+        <p className="mb-3 shrink-0 text-xs text-muted-foreground">{resumoDoRecorte}</p>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -2200,19 +2467,59 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       <TableHead className="w-10 h-14 px-2.5">
                         <Checkbox checked={allPageSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
                       </TableHead>
-                      {visibleColumnDefs.map((col, i) => (
-                        <ResizableTh
-                          key={col.id}
-                          width={resolvedColWidths[i]}
-                          onResize={(w) => setColumnWidth(col.id, w)}
-                          className={cn(
-                            "whitespace-nowrap h-14 px-2.5 text-xs font-semibold",
-                            col.id === 'acoes' && "text-center"
-                          )}
-                        >
-                          {getLabel(col.id)}
-                        </ResizableTh>
-                      ))}
+                      {visibleColumnDefs.map((col, i) => {
+                        // Só coluna do sistema pode ordenar. Coluna criada pela importação vive
+                        // dentro de `campos_extras` e pode até nascer com um id parecido com o de
+                        // uma padrão — ordenar por ela mandaria o banco ordenar por outra coisa.
+                        // ('pdf_url' é o id legado de "Anexo", tratado como padrão aqui pelo
+                        // mesmo motivo que PedidoRow o trata.)
+                        const eColunaDoSistema = col.id === 'pdf_url' || PEDIDOS_COLUMNS.some(c => c.id === col.id);
+                        const ordenavel = eColunaDoSistema ? ORDENACAO_DA_LISTA[col.id] : undefined;
+
+                        // ORDENAR E REDIMENSIONAR NO MESMO CABEÇALHO, sem um atrapalhar o outro.
+                        // O jeito ingênuo — pôr o clique de ordenar no <th> inteiro — quebra na
+                        // hora: arrastar a borda para alargar a coluna termina em clique, e a
+                        // lista reordena sozinha quando ninguém pediu. Aqui os dois gestos têm
+                        // alvos separados: quem ordena é um botão no meio do cabeçalho, e a alça
+                        // de arraste é um elemento IRMÃO dele, colado na borda direita, que
+                        // ainda interrompe a propagação do evento assim que o ponteiro desce
+                        // (SortableTh + use-column-resize). São exatamente os mesmos cabeçalhos
+                        // de Clientes e Obras, onde as duas coisas já convivem há tempo.
+                        //
+                        // A coluna que NÃO sabe se ordenar continua com o cabeçalho de antes,
+                        // sem a setinha — é o que deixa visível, sem ninguém explicar, quais
+                        // colunas respondem ao clique.
+                        if (ordenavel) {
+                          return (
+                            <SortableTh
+                              key={col.id}
+                              label={getLabel(col.id)}
+                              sortKey={col.id}
+                              currentSortKey={ordenacao?.colId ?? null}
+                              currentDirection={ordenacao?.direction ?? 'desc'}
+                              onSort={handleSort}
+                              ascLabel={ordenavel.asc}
+                              descLabel={ordenavel.desc}
+                              width={resolvedColWidths[i]}
+                              onResize={(w) => setColumnWidth(col.id, w)}
+                            />
+                          );
+                        }
+
+                        return (
+                          <ResizableTh
+                            key={col.id}
+                            width={resolvedColWidths[i]}
+                            onResize={(w) => setColumnWidth(col.id, w)}
+                            className={cn(
+                              "whitespace-nowrap h-14 px-2.5 text-xs font-semibold",
+                              col.id === 'acoes' && "text-center"
+                            )}
+                          >
+                            {getLabel(col.id)}
+                          </ResizableTh>
+                        );
+                      })}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -2882,7 +3189,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Exportar negócios</DialogTitle>
-            <DialogDescription>Escolha o formato do arquivo a ser gerado.</DialogDescription>
+            {/* Diz QUANTOS negócios vão sair no arquivo, e o número é diferente por formato —
+                por isso os dois aparecem. O Excel passou a cobrir o recorte filtrado inteiro
+                (busca no servidor, ver handleExportExcel). O PDF continua com o que está na
+                tela de propósito: um PDF do funil da MD teria mais de 250 páginas e o navegador
+                monta esse arquivo inteiro na memória. Prometer "11.906" nos dois e entregar a
+                página num deles seria a mesma armadilha de antes, só que ao contrário. */}
+            <DialogDescription>
+              {exportTargetId
+                ? 'Escolha o formato do arquivo a ser gerado.'
+                : `Excel: os ${totalCount.toLocaleString('pt-BR')} negócios do filtro atual. PDF: os ${(showKanban ? kanbanPedidosFlat.length : pedidos.length).toLocaleString('pt-BR')} que estão carregados na tela agora.`}
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 pt-2">
             <button
@@ -2904,6 +3221,29 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Recorte grande: avisa antes em vez de congelar a aba. O custo é real e dá para
+          descrever com honestidade — são idas ao servidor de 1.000 em 1.000 (teto do servidor,
+          ver PEDIDOS_LOTE_EXPORTACAO) e depois a montagem da planilha aqui no navegador. */}
+      <AlertDialog open={confirmExportOpen} onOpenChange={setConfirmExportOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Exportar {totalCount.toLocaleString('pt-BR')} negócios?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A planilha vai sair com o filtro inteiro, não só com a página que está na tela.
+              São {Math.ceil(totalCount / PEDIDOS_LOTE_EXPORTACAO)} buscas no servidor até juntar
+              tudo, e nesse tempo a tela fica ocupada — normalmente algumas dezenas de segundos.
+              Se você quer só uma amostra, dá para filtrar mais antes de exportar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleExportExcel(exportTargetId)}>
+              Exportar tudo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {viewOrderSheet}
       {addTarefaDialog}

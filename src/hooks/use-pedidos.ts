@@ -73,6 +73,50 @@ export interface PedidosFilters {
   hideImportados?: boolean;
 }
 
+/**
+ * Ordenação da LISTA de Negócios, resolvida NO SERVIDOR.
+ *
+ * POR QUE NO SERVIDOR: a lista é paginada pelo Postgres (10, 25, 50… por página de 11,9 mil
+ * negócios). Ordenar só as linhas que já chegaram no navegador reordenaria a PÁGINA, não a
+ * lista — o topo mostraria "o maior valor entre os 10 que sobraram nesta página", com cara de
+ * ordenado e sem ser. Por isso a coluna e a direção viajam até o `.order()` da consulta.
+ *
+ * SÓ COLUNAS DA PRÓPRIA TABELA `pedidos` entram aqui. Cliente, Fabricante, Responsável e
+ * Marcador moram em tabelas ligadas, e no PostgREST ordenar por elas exige transformar o
+ * vínculo em junção interna (`!inner`) — o que muda QUAIS linhas voltam, não só a ordem
+ * (marcador_id é nulo em 8.526 dos 11.911 negócios: a lista perderia 72% das linhas sem
+ * avisar, enquanto o rodapé continuaria contando todas). Ver o relatório da tarefa.
+ */
+export type PedidosSortColumn =
+  | 'created_at'
+  | 'valor_total'
+  | 'data_pedido'
+  | 'prazo_resposta'
+  | 'endereco_entrega'
+  | 'observacoes'
+  | 'pdf_url';
+
+export interface PedidosSort {
+  column: PedidosSortColumn;
+  ascending: boolean;
+}
+
+/** A ordem histórica da tela: os negócios mais recentes primeiro. */
+export const PEDIDOS_SORT_PADRAO: PedidosSort = { column: 'created_at', ascending: false };
+
+// Lista fechada, conferida em tempo de execução e não só pelo TypeScript: a escolha do usuário
+// é guardada no navegador (localStorage), e um valor antigo/estragado ali viraria um `order=` que
+// o servidor recusa — a tela inteira de Negócios quebraria por causa de uma preferência salva.
+// Diante de qualquer coisa fora da lista, cai no padrão em vez de derrubar a consulta.
+const PEDIDOS_COLUNAS_ORDENAVEIS = new Set<string>([
+  'created_at', 'valor_total', 'data_pedido', 'prazo_resposta', 'endereco_entrega', 'observacoes', 'pdf_url',
+]);
+
+function resolverOrdenacao(sort?: PedidosSort | null): PedidosSort {
+  if (!sort || !PEDIDOS_COLUNAS_ORDENAVEIS.has(sort.column)) return PEDIDOS_SORT_PADRAO;
+  return sort;
+}
+
 async function resolveUsuarioIds(empresaId: string, vendedorIds?: string[]): Promise<string[]> {
   if (vendedorIds && vendedorIds.length > 0) return vendedorIds;
   const { data: companyUsers } = await supabase
@@ -203,6 +247,94 @@ const buildSearchOrClause = (matches: SearchMatches): string => {
   return orParts.join(',');
 };
 
+// Os campos que a lista, o card do Kanban e a planilha de exportação leem. Um só lugar porque
+// os três precisam do MESMO formato de linha: a exportação monta a planilha a partir do mesmo
+// objeto que a tabela desenha, então um campo que só um dos lados busca é um campo que sai
+// vazio no arquivo sem ninguém entender por quê.
+const PEDIDOS_SELECT = `
+  id, status, nome, valor_total, data_pedido, created_at, observacoes,
+  cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
+  cliente:clientes(id, empresa),
+  fabricante:fabricantes(id, nome),
+  vendedor:usuarios(id, nome, empresa_id),
+  obra:obras(id, nome_obra),
+  marcador:marcadores(id, nome, cor)
+`;
+
+// O recorte de negócios que a tela mostra, montado num lugar só. Antes cada consumidor
+// repetia a mesma sequência de filtros, e o preço disso já está registrado neste arquivo: a
+// exclusão em massa "por filtro" precisa espelhar exatamente o mesmo recorte da lista, senão
+// apaga mais do que o número prometido no diálogo. A exportação tem o mesmo dever — o arquivo
+// precisa conter exatamente os negócios que o cabeçalho contou, nem um a mais.
+//
+// A ORDEM vem de fora (`ordenacao`) e sempre termina em `id`: `created_at` tem MUITOS valores
+// duplicados (imports em massa gravam o mesmo instante em centenas de linhas) e as outras
+// colunas ordenáveis empatam ainda mais (`valor_total` repete, `pdf_url` é nulo em 6.732
+// negócios). Sem um desempate único e estável, o Postgres pode devolver as linhas empatadas
+// em ordem diferente a cada requisição — e aí a página 2 repete negócio que já apareceu na 1 e
+// esconde outro que nunca vai aparecer. Isso vale em dobro para a exportação, que percorre a
+// base inteira lote a lote.
+function montarQueryDeNegocios(opts: {
+  usuarioIds: string[] | null;
+  stages?: string[];
+  filters?: PedidosFilters;
+  searchMatches: SearchMatches | null;
+  ordenacao: PedidosSort;
+  withCount?: boolean;
+}) {
+  const { usuarioIds, stages, filters, searchMatches, ordenacao, withCount } = opts;
+  const { fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId } = filters ?? {};
+
+  let query = supabase
+    .from('pedidos')
+    .select(PEDIDOS_SELECT, withCount ? { count: 'exact' } : undefined)
+    // `nullsFirst: false` nos dois sentidos: em ordem decrescente o padrão do
+    // Postgres é NULLS FIRST, e colunas muito vazias (endereco_entrega é nulo em
+    // 9.512 dos 11.911) abririam a lista com uma página inteira de traços. A
+    // exceção proposital é o Anexo, cujos rótulos descrevem justamente o
+    // "com/sem" — mas lá o efeito continua o mesmo, porque quem tem anexo tem
+    // texto e quem não tem é nulo.
+    .order(ordenacao.column, { ascending: ordenacao.ascending, nullsFirst: false })
+    .order('id', { ascending: false });
+
+  if (usuarioIds) {
+    query = query.in('usuario_id', usuarioIds);
+  }
+
+  if (stages && stages.length > 0) {
+    query = query.in('status', stages);
+  }
+
+  if (funilId) {
+    query = query.eq('funil_id', funilId);
+  }
+
+  if (fabricanteIds && fabricanteIds.length > 0) {
+    query = query.in('fabricante_id', fabricanteIds);
+  }
+
+  if (marcadorIds && marcadorIds.length > 0) {
+    query = query.in('marcador_id', marcadorIds);
+  }
+
+  query = applyDateRangeFilter(query, dateFrom, dateTo, dateField);
+
+  if (onlyAttention) {
+    const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
+    query = query.lte('created_at', cutoff).not('status', 'in', ETAPAS_FINAIS_ATENCAO);
+  }
+
+  if (hideImportados) {
+    query = query.is('import_hash', null);
+  }
+
+  if (searchMatches) {
+    query = query.or(buildSearchOrClause(searchMatches));
+  }
+
+  return query;
+}
+
 export function usePedidos(
   empresaId?: string,
   page = 0,
@@ -222,11 +354,23 @@ export function usePedidos(
   // compartilham o mesmo termo e resolveriam os mesmos ids repetidamente. `undefined` mantém o
   // comportamento antigo (resolve sozinho); `null` explícito também cai no fallback.
   resolvedSearchMatches?: SearchMatches | null,
+  // Coluna e direção escolhidas no cabeçalho da Lista. Fica FORA de `PedidosFilters` de
+  // propósito: `filters` é a identidade do RECORTE (é o que a exclusão/edição em massa manda ao
+  // servidor quando o usuário escolhe "todos os filtrados", e é o que `assinaturaDoFiltro` em
+  // Negocios.tsx compara para saber se a seleção ainda vale). Ordenar não muda quais negócios
+  // estão no recorte, só a ordem deles — se a ordenação entrasse em `filters`, trocar de coluna
+  // limparia a seleção de milhares de negócios já feita pelo usuário.
+  sort?: PedidosSort,
 ) {
   const { vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId, search } = filters ?? {};
+  const ordenacao = resolverOrdenacao(sort);
 
   return useQuery({
-    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId, search, withCount],
+    // Coluna e direção PRECISAM entrar na chave de cache, no fim (as posições anteriores são
+    // lidas por índice em useUpdatePedidoStatus: `key[4]` são as etapas). Sem isso o React Query
+    // devolveria a lista já guardada da ordenação anterior, e clicar em "Maior valor primeiro"
+    // não mudaria nada na tela.
+    queryKey: ['pedidos', empresaId, page, pageSize, stages, vendedorIds, fabricanteIds, marcadorIds, dateFrom, dateTo, dateField, onlyAttention, hideImportados, funilId, search, withCount, ordenacao.column, ordenacao.ascending],
     queryFn: async () => {
       let usuarioIds: string[] | null = null;
 
@@ -243,60 +387,8 @@ export function usePedidos(
         return { data: [], count: 0 };
       }
 
-      let query = supabase
-        .from('pedidos')
-        .select(`
-          id, status, nome, valor_total, data_pedido, created_at, observacoes,
-          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
-          cliente:clientes(id, empresa),
-          fabricante:fabricantes(id, nome),
-          vendedor:usuarios(id, nome, empresa_id),
-          obra:obras(id, nome_obra),
-          marcador:marcadores(id, nome, cor)
-        `, withCount ? { count: 'exact' } : undefined)
-        // `created_at` tem MUITOS valores duplicados (imports em massa gravam o mesmo
-        // timestamp em centenas de linhas) — sem um desempate único e estável, o Postgres
-        // pode reordenar as linhas empatadas entre execuções, fazendo o range crescer
-        // "embaralhando" o que já tinha sido buscado em vez de só acrescentar linhas novas.
-        // `id` garante ordenação 100% determinística.
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
+      const query = montarQueryDeNegocios({ usuarioIds, stages, filters, searchMatches, ordenacao, withCount })
         .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      if (usuarioIds) {
-        query = query.in('usuario_id', usuarioIds);
-      }
-
-      if (stages && stages.length > 0) {
-        query = query.in('status', stages);
-      }
-
-      if (funilId) {
-        query = query.eq('funil_id', funilId);
-      }
-
-      if (fabricanteIds && fabricanteIds.length > 0) {
-        query = query.in('fabricante_id', fabricanteIds);
-      }
-
-      if (marcadorIds && marcadorIds.length > 0) {
-        query = query.in('marcador_id', marcadorIds);
-      }
-
-      query = applyDateRangeFilter(query, dateFrom, dateTo, dateField);
-
-      if (onlyAttention) {
-        const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
-        query = query.lte('created_at', cutoff).not('status', 'in', ETAPAS_FINAIS_ATENCAO);
-      }
-
-      if (hideImportados) {
-        query = query.is('import_hash', null);
-      }
-
-      if (searchMatches) {
-        query = query.or(buildSearchOrClause(searchMatches));
-      }
 
       const { data, error, count } = await query;
       if (error) throw error;
@@ -310,6 +402,88 @@ export function usePedidos(
     // o próximo, para o board do Kanban/Lista não sumir/piscar a cada requisição.
     placeholderData: keepPreviousData,
   });
+}
+
+/**
+ * Quantas linhas cabem numa requisição só.
+ *
+ * NÃO é um número escolhido por gosto: o PostgREST corta a resposta em 1.000 linhas. Pedir
+ * `.range(0, 11905)` não devolve 11.906 negócios, devolve os 1.000 primeiros — sem erro,
+ * sem aviso, sem nada na tela indicando que faltou. Uma exportação "do funil inteiro" sairia
+ * com 8% dos negócios e o usuário só descobriria conferindo no Excel.
+ */
+export const PEDIDOS_LOTE_EXPORTACAO = 1000;
+
+/**
+ * A partir de quantos negócios a tela pergunta antes de começar.
+ *
+ * Acima disso a exportação passa de um punhado de segundos (a base da MD tem 11.906 negócios,
+ * o que dá 12 idas ao servidor) e o navegador fica ocupado montando a planilha no fim. Perguntar
+ * é melhor que uma aba parada sem explicação.
+ */
+export const PEDIDOS_EXPORTACAO_AVISO = 5000;
+
+/**
+ * Freio de mão do laço de lotes. Se algum dia um filtro devolver mais que isto, a exportação
+ * para e quem chamou compara o que veio com a contagem do cabeçalho — melhor um arquivo
+ * incompleto DENUNCIADO na tela do que um laço que nunca termina.
+ */
+export const PEDIDOS_EXPORTACAO_TETO = 50000;
+
+/**
+ * Busca no servidor TODOS os negócios do recorte filtrado — não a página que está na tela.
+ *
+ * Usa exatamente os mesmos `stages`/`filters` que a lista e que `usePedidosStats` (a contagem
+ * do cabeçalho), passando pelo mesmo `montarQueryDeNegocios`. É isso que garante que o arquivo
+ * tenha o mesmo número de linhas que a tela promete.
+ *
+ * POR QUE LOTE A LOTE E NÃO UMA LISTA DE IDS: a tentação é selecionar os ids e depois buscar
+ * `id.in.(...)`. Este projeto já tem duas dívidas registradas por causa disso — cada id ocupa
+ * ~37 bytes no endereço da requisição e o servidor recusa a URL por volta de 800 ids. Repetir a
+ * CONSULTA com os filtros, deslocando o `.range()`, não carrega id nenhum no endereço e não tem
+ * teto de tamanho.
+ *
+ * `onProgresso` é chamado a cada lote para a tela poder dizer que está trabalhando: 12 idas ao
+ * servidor sem nenhum sinal parecem travamento.
+ */
+export async function buscarNegociosDoRecorte(params: {
+  empresaId?: string;
+  stages?: string[];
+  filters?: PedidosFilters;
+  sort?: PedidosSort;
+  onProgresso?: (carregados: number) => void;
+}): Promise<PedidoWithRelations[]> {
+  const { empresaId, stages, filters, sort, onProgresso } = params;
+
+  let usuarioIds: string[] | null = null;
+  if (empresaId) {
+    usuarioIds = await resolveUsuarioIds(empresaId, filters?.vendedorIds);
+    if (usuarioIds.length === 0) return [];
+  }
+
+  const trimmedSearch = filters?.search?.trim();
+  const searchMatches = trimmedSearch ? await resolveSearchMatches(trimmedSearch) : null;
+  if (searchMatches && hasNoSearchMatches(searchMatches)) return [];
+
+  const ordenacao = resolverOrdenacao(sort);
+  const todos: PedidoWithRelations[] = [];
+
+  for (let inicio = 0; inicio < PEDIDOS_EXPORTACAO_TETO; inicio += PEDIDOS_LOTE_EXPORTACAO) {
+    const { data, error } = await montarQueryDeNegocios({ usuarioIds, stages, filters, searchMatches, ordenacao })
+      .range(inicio, inicio + PEDIDOS_LOTE_EXPORTACAO - 1);
+    if (error) throw error;
+
+    const lote = (data ?? []) as PedidoWithRelations[];
+    todos.push(...lote);
+    onProgresso?.(todos.length);
+
+    // Lote menor que o pedido = acabou. É o único sinal confiável de fim: não dá para confiar
+    // na contagem do cabeçalho aqui, porque ela vem de outra consulta (a RPC pedidos_stats) e
+    // pode ter sido calculada segundos antes.
+    if (lote.length < PEDIDOS_LOTE_EXPORTACAO) break;
+  }
+
+  return todos;
 }
 
 // Negócios de um cliente específico (página de detalhes do cliente/empresa). Filtra direto no

@@ -29,12 +29,41 @@ import { EnderecoForm } from '@/components/clientes/EnderecoForm';
 import { ContatoSelector } from '@/components/clientes/ContatoSelector';
 import { emptyEndereco, enderecoToString, stringToEndereco, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/shared/ListPagination';
+import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
+import { useTableSettings } from '@/hooks/use-table-settings';
+import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
 import { CargoSelect } from '@/components/shared/CargoSelect';
 import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 import { slugify } from '@/lib/utils';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física', condominio: 'Condomínio', hospital: 'Hospital', distribuidor: 'Distribuidor', hotel: 'Hotel', escola: 'Escola', instalador: 'Instalador' };
+
+// Colunas da tabela de negócios da ficha do cliente. Os ids são os MESMOS de PEDIDOS_COLUMNS
+// (Negocios.tsx), pensando no dia em que essa tabela virar um componente compartilhado.
+// A CONFIGURAÇÃO, porém, é separada (chave `clientes_negocios`): este painel é um resumo dentro
+// da ficha, e compartilhar a chave da tela de Negócios derrubaria as 14 colunas de lá dentro do
+// card do cliente — além de fazer uma reordenação aqui mexer na lista principal, e vice-versa.
+// Não tem coluna "Cliente" (é sempre o dono da ficha) nem "Ações" (a linha inteira já abre o
+// negócio).
+const NEGOCIOS_CLIENTE_COLUMNS: ColumnDefinition[] = [
+  { id: 'negocio', label: 'Negócio' },
+  { id: 'contato', label: 'Contato' },
+  { id: 'endereco_entrega', label: 'Obra/Endereço' },
+  { id: 'fabricante', label: 'Fabricante' },
+  { id: 'valor', label: 'Valor' },
+  { id: 'vendedor', label: 'Responsável/Vendedor' },
+  { id: 'etapa', label: 'Etapa' },
+  { id: 'marcador', label: 'Marcador' },
+  { id: 'data_pedido', label: 'Criação' },
+  { id: 'prazo_resposta', label: 'Fechamento' },
+  { id: 'observacoes', label: 'Observações' },
+  { id: 'anexo', label: 'Anexo' },
+];
+
+// Exatamente as quatro colunas que a ficha já mostrava: quem nunca mexer na configuração
+// continua vendo a mesma tabela de sempre.
+const NEGOCIOS_CLIENTE_DEFAULT_VISIBLE = ['fabricante', 'valor', 'etapa', 'data_pedido'];
 
 // Formata datas ISO ("aaaa-mm-dd" ou timestamp completo) para dd/mm/aaaa sem passar
 // por conversão de timezone do navegador (o valor já representa a data salva pelo backend).
@@ -46,6 +75,21 @@ const formatDateBR = (value?: string | null) => {
   return `${dia}/${mes}/${ano}`;
 };
 
+
+/**
+ * Os embeds do negócio (fabricante, vendedor, obra) vêm de um join que o tipo
+ * gerado pelo Supabase não descreve. Um tipo com nome, em vez de `as any`
+ * espalhado: o compilador ainda ajuda com o que ESTÁ declarado aqui.
+ *
+ * Fora do componente de propósito: dentro dele a função seria recriada a cada
+ * render e cairia como dependência faltante em todo `useMemo` que a usa.
+ */
+type PedidoComEmbeds = {
+  fabricante?: { id?: string; nome?: string } | null;
+  vendedor?: { id?: string; nome?: string } | null;
+  obra?: { id?: string; nome_obra?: string } | null;
+};
+const comEmbeds = (p: unknown) => p as PedidoComEmbeds;
 
 const ClienteDetalhe = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -114,6 +158,36 @@ const ClienteDetalhe = () => {
   const [pedidosFiltroEtapa, setPedidosFiltroEtapa] = useState('todas');
   const [addTarefaOpen, setAddTarefaOpen] = useState(false);
   const [novoNegocioOpen, setNovoNegocioOpen] = useState(false);
+
+  // Mesmo mecanismo de colunas da tela de Clientes e da lista de Negócios (arrastar para
+  // reordenar, ligar/desligar, renomear, salvar modelo): o painel de negócios da ficha usa o
+  // mesmo hook e o mesmo componente, só com a sua própria chave de configuração.
+  const {
+    columns: negociosColumns,
+    visibleColumns: negociosVisibleColumns,
+    setVisibleColumns: setNegociosVisibleColumns,
+    handleRename: handleNegociosRename,
+    handleTypeChange: handleNegociosTypeChange,
+    handleAddColumn: handleNegociosAddColumn,
+    handleRemoveColumn: handleNegociosRemoveColumn,
+    handleReorder: handleNegociosReorder,
+    getLabel: getNegociosLabel,
+    presets: negociosPresets,
+    savePreset: saveNegociosPreset,
+    loadPreset: loadNegociosPreset,
+    deletePreset: deleteNegociosPreset,
+    resetToDefaults: resetNegociosColumns,
+  } = useTableSettings({
+    key: 'clientes_negocios',
+    defaultColumns: NEGOCIOS_CLIENTE_COLUMNS,
+    defaultVisibleColumns: NEGOCIOS_CLIENTE_DEFAULT_VISIBLE,
+  });
+  // A ordem das colunas visíveis é a ordem da lista `columns` — é ela que o arrasta-e-solta
+  // reordena, e é por isso que cabeçalho e células precisam sair sempre desta mesma variável.
+  const negociosColunasVisiveis = useMemo(
+    () => negociosColumns.filter(col => negociosVisibleColumns.includes(col.id)),
+    [negociosColumns, negociosVisibleColumns]
+  );
   const [tarefasPage, setTarefasPage] = useState(1);
   const [tarefasPageSize, setTarefasPageSize] = useState(5);
 
@@ -135,7 +209,7 @@ const ClienteDetalhe = () => {
   const fabricantesDoCliente = useMemo(() => {
     const mapa = new Map<string, string>();
     pedidosCliente.forEach(p => {
-      const fab = (p as { fabricante?: { id?: string; nome?: string } }).fabricante;
+      const fab = comEmbeds(p).fabricante;
       if (fab?.id) mapa.set(fab.id, fab.nome);
     });
     return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
@@ -143,13 +217,13 @@ const ClienteDetalhe = () => {
   const pedidosFiltrados = useMemo(() => {
     const termo = pedidosBusca.trim().toLowerCase();
     return pedidosCliente.filter(p => {
-      if (pedidosFiltroFabricante !== 'todos' && (p as any).fabricante?.id !== pedidosFiltroFabricante) return false;
+      if (pedidosFiltroFabricante !== 'todos' && comEmbeds(p).fabricante?.id !== pedidosFiltroFabricante) return false;
       if (pedidosFiltroEtapa !== 'todas' && p.status !== pedidosFiltroEtapa) return false;
       if (termo) {
         const alvo = [
-          (p as any).fabricante?.nome,
-          (p as any).vendedor?.nome,
-          (p as any).obra?.nome_obra,
+          comEmbeds(p).fabricante?.nome,
+          comEmbeds(p).vendedor?.nome,
+          comEmbeds(p).obra?.nome_obra,
         ].filter(Boolean).join(' ').toLowerCase();
         if (!alvo.includes(termo)) return false;
       }
@@ -319,6 +393,79 @@ const ClienteDetalhe = () => {
   const stageBadgeClass = (key: string) =>
     `bg-${KANBAN_STAGES.find(s => s.key === key)?.color || 'muted-foreground'} text-white`;
 
+  // Uma célula da tabela de negócios da ficha. Lê cada campo do mesmo jeito que a lista de
+  // Negócios lê (Negocios.tsx, componente PedidoRow), para as duas telas nunca mostrarem coisas
+  // diferentes sobre o mesmo negócio.
+  const renderNegocioCell = (p: any, colId: string) => {
+    const camposExtras = (p.campos_extras ?? {}) as Record<string, any>;
+    const isColunaPadrao = NEGOCIOS_CLIENTE_COLUMNS.some(c => c.id === colId);
+
+    if (!isColunaPadrao) {
+      // Coluna criada pelo usuário: o valor mora em campos_extras, pelo id ou pelo rótulo.
+      const valor = camposExtras[colId] ?? camposExtras[getNegociosLabel(colId)];
+      return <TableCell key={colId} className="text-muted-foreground text-sm">{valor || '—'}</TableCell>;
+    }
+
+    switch (colId) {
+      case 'negocio':
+        return <TableCell key={colId} className="font-medium">{getNomeNegocio(p)}</TableCell>;
+      case 'contato':
+        // O contato veio da importação como campo extra, não como relação própria de `pedidos`.
+        return <TableCell key={colId}>{camposExtras['Contato'] || camposExtras['contato'] || '—'}</TableCell>;
+      case 'endereco_entrega':
+        return <TableCell key={colId}>{p.endereco_entrega ?? p.obra?.nome_obra ?? '—'}</TableCell>;
+      case 'fabricante':
+        return <TableCell key={colId} className="font-medium">{p.fabricante?.nome ?? '—'}</TableCell>;
+      case 'valor':
+        return <TableCell key={colId}>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>;
+      case 'vendedor':
+        return <TableCell key={colId}>{p.vendedor?.nome ?? '—'}</TableCell>;
+      case 'etapa':
+        return (
+          <TableCell key={colId}>
+            <Badge className={stageBadgeClass(p.status)}>{stageLabel(p.status)}</Badge>
+          </TableCell>
+        );
+      case 'marcador':
+        return (
+          <TableCell key={colId}>
+            {p.marcador ? <Badge className={`bg-${p.marcador.cor} text-white`}>{p.marcador.nome}</Badge> : '—'}
+          </TableCell>
+        );
+      // As duas datas passam por formatDateBR (recorta o texto "aaaa-mm-dd" que veio do banco).
+      // O `new Date(...).toLocaleDateString('pt-BR')` que estava aqui lia a data como UTC e a
+      // mostrava no fuso local: no Brasil, todo negócio aparecia com o dia ANTERIOR ao gravado
+      // (CLAUDE.md §7.12).
+      case 'data_pedido':
+        return <TableCell key={colId} className="text-muted-foreground">{formatDateBR(p.data_pedido) || '—'}</TableCell>;
+      case 'prazo_resposta':
+        return <TableCell key={colId} className="text-muted-foreground">{formatDateBR(p.prazo_resposta) || '—'}</TableCell>;
+      case 'observacoes':
+        return (
+          <TableCell key={colId} className="max-w-[280px] truncate" title={p.observacoes ?? ''}>
+            {p.observacoes || '—'}
+          </TableCell>
+        );
+      case 'anexo':
+        return (
+          <TableCell key={colId} onClick={e => e.stopPropagation()}>
+            {p.pdf_url ? (
+              <a
+                href={repairCorruptedBitrixUrl(p.pdf_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <FileText className="h-3.5 w-3.5" /> PDF
+              </a>
+            ) : '—'}
+          </TableCell>
+        );
+      default:
+        return <TableCell key={colId}>—</TableCell>;
+    }
+  };
+
   const viewOrderSheet = (
     <Dialog open={!!viewOrderId} onOpenChange={(open) => !open && setViewOrderId(null)}>
       <ConteudoDialogo className="sm:max-w-xl">
@@ -350,8 +497,11 @@ const ClienteDetalhe = () => {
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Data do Negócio</p>
+                {/* formatDateBR, e não `new Date(...).toLocaleDateString`: a data vem do banco como
+                    "aaaa-mm-dd" e essa leitura a interpretava como UTC, mostrando o dia anterior
+                    para quem está no Brasil (CLAUDE.md §7.12). */}
                 <p className="text-sm font-medium">
-                  {new Date(selectedViewOrder.data_pedido).toLocaleDateString('pt-BR')}
+                  {formatDateBR(selectedViewOrder.data_pedido) || '—'}
                 </p>
               </div>
               <div className="space-y-1">
@@ -1022,9 +1172,29 @@ const ClienteDetalhe = () => {
         <Card className="border-border/40">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="text-base">Negócios</CardTitle>
-            <Button size="sm" onClick={() => setNovoNegocioOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Novo Negócio
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Mesmo painel de colunas da tela de Clientes e da lista de Negócios: arrasta pra
+                  reordenar, clica pra mostrar/esconder, renomeia e salva modelo. */}
+              <ColumnSettings
+                columns={negociosColumns}
+                visibleColumns={negociosVisibleColumns}
+                onChange={setNegociosVisibleColumns}
+                onRename={handleNegociosRename}
+                onTypeChange={handleNegociosTypeChange}
+                onAdd={handleNegociosAddColumn}
+                onRemove={handleNegociosRemoveColumn}
+                onReorder={handleNegociosReorder}
+                presets={negociosPresets}
+                onSavePreset={saveNegociosPreset}
+                onLoadPreset={loadNegociosPreset}
+                onDeletePreset={deleteNegociosPreset}
+                onReset={resetNegociosColumns}
+                label="Colunas"
+              />
+              <Button size="sm" onClick={() => setNovoNegocioOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Novo Negócio
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loadingPedidos ? (
@@ -1088,20 +1258,21 @@ const ClienteDetalhe = () => {
                     )}
                   </div>
                 )}
-                <div className="rounded-lg border border-border overflow-hidden">
+                {/* Cabeçalho e células saem da MESMA lista de colunas visíveis, na mesma ordem —
+                    é o que faz o arrasta-e-solta do painel de colunas valer para a tabela. */}
+                <div className="rounded-lg border border-border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead>Fabricante</TableHead>
-                        <TableHead>Valor</TableHead>
-                        <TableHead>Etapa</TableHead>
-                        <TableHead>Data</TableHead>
+                        {negociosColunasVisiveis.map(col => (
+                          <TableHead key={col.id} className="whitespace-nowrap">{getNegociosLabel(col.id)}</TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {pedidosFiltrados.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={Math.max(1, negociosColunasVisiveis.length)} className="text-center py-8 text-muted-foreground">
                             {pedidosCliente.length === 0
                               ? 'Nenhum negócio encontrado para este cliente.'
                               : 'Nenhum negócio encontrado com os filtros aplicados.'}
@@ -1110,12 +1281,7 @@ const ClienteDetalhe = () => {
                       ) : (
                         paginatedPedidos.map(p => (
                           <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setViewOrderId(p.id)}>
-                            <TableCell className="font-medium">{(p as any).fabricante?.nome ?? '-'}</TableCell>
-                            <TableCell>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                            <TableCell>
-                              <Badge className={stageBadgeClass(p.status)}>{stageLabel(p.status)}</Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">{new Date(p.data_pedido).toLocaleDateString('pt-BR')}</TableCell>
+                            {negociosColunasVisiveis.map(col => renderNegocioCell(p, col.id))}
                           </TableRow>
                         ))
                       )}

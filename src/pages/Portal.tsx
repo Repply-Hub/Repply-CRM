@@ -694,7 +694,7 @@ export default function Portal() {
   };
 
   return (
-    <AppLayout title="Portal de Consultas" subtitle="Consulte licenças e publicações oficiais de órgãos públicos." mainClassName="flex-1 overflow-hidden flex flex-col">
+    <AppLayout title="Portal de Consultas" subtitle="Consulte licenças e publicações oficiais de órgãos públicos" mainClassName="flex-1 overflow-hidden flex flex-col">
       <div className="p-3 sm:p-4 md:p-6 flex flex-col flex-1 min-h-0 gap-4 sm:gap-6">
         {/* Search bar */}
         <div className="flex flex-wrap items-center gap-3 shrink-0">

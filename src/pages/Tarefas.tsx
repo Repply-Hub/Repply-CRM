@@ -300,10 +300,12 @@ export default function Tarefas() {
     }
   };
 
+  // Subtítulo descreve a tela, como no resto do sistema. Era a contagem do filtro
+  // atual, que continua visível no rodapé da lista (o total da paginação).
   return (
     <AppLayout
       title="Tarefas"
-      subtitle={`${filtered.length} tarefa(s)`}
+      subtitle="Pendências e compromissos da equipe, ligados a cliente e negócio"
       mainClassName="flex-1 overflow-hidden flex flex-col"
     >
       <div className="flex flex-col flex-1 min-h-0 p-3 sm:p-4 md:p-6">

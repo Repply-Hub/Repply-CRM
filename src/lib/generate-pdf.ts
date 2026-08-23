@@ -73,7 +73,11 @@ export async function generatePedidosPdf(pedidos: PedidoRow[], titulo: string = 
       p.vendedor,
       p.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
       p.etapa,
-      p.data ? new Date(p.data).toLocaleDateString('pt-BR') : '-',
+      // Sem `new Date()`: a data vem como texto AAAA-MM-DD, e o JavaScript lê
+      // isso como meia-noite UTC — no Brasil, 21h do DIA ANTERIOR. Todo negócio
+      // do dia 1º saía no PDF com data do mês passado. Mesma armadilha do
+      // CLAUDE.md §7.12 que já mordeu a exportação em Excel e os campos de data.
+      p.data ? p.data.slice(0, 10).split('-').reverse().join('/') : '-',
     ]),
     styles: { fontSize: 8, cellPadding: 3, textColor: [50, 50, 50] },
     headStyles: { fillColor: BRAND_ORANGE, fontStyle: 'bold', fontSize: 8, textColor: [255, 255, 255] },

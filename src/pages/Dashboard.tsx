@@ -382,9 +382,20 @@ const Dashboard = () => {
             empresaId={empresaId}
             isGestor={isGestor}
             currentUsuarioId={profile?.id}
-            // Não-gestor sempre vê o próprio plano; gestor segue o filtro
-            // "Responsável" do topo (array vazio = "Todos").
-            vendedorIds={isGestor ? vendedorIds : profile?.id ? [profile.id] : []}
+            // Gestor e vendedor comum seguem o MESMO filtro "Responsável" do
+            // topo (array vazio = "Todos"). Antes o vendedor comum era travado
+            // nele mesmo aqui, então o Plano de Vendas dele mostrava só o que
+            // ele tinha vendido — e o plano é da empresa: meta de equipe contra
+            // o vendido da empresa. Sem filtro escolhido, ele agora abre no
+            // geral, igual ao gestor.
+            //
+            // Filtrar um vendedor de propósito continua funcionando: escolher
+            // alguém em "Responsável" recorta esta seção como já recortava os
+            // KPIs e os gráficos da página. O que mudou é só o PADRÃO.
+            //
+            // A quebra "Por vendedor" (a lista de baixo) segue gestor-only —
+            // ela é controlada dentro da seção por `isGestor`, não por aqui.
+            vendedorIds={vendedorIds}
             fabricanteIds={fabricanteIds}
             vendedores={(vendedores ?? []).map(v => ({ usuario_id: v.usuario_id ?? '', usuario_nome: v.usuario_nome ?? '' }))}
             fabricantes={fabricantes}
@@ -393,6 +404,11 @@ const Dashboard = () => {
             // 31/dez" mostrava só janeiro no Plano de Vendas — e não avisava.
             dateFrom={format(dateRange.from, 'yyyy-MM-dd')}
             dateTo={format(dateRange.to, 'yyyy-MM-dd')}
+            // As setas de mês da seção comandam o filtro "Período" do topo: elas
+            // não têm data própria, escrevem NESTE estado. Por isso o
+            // DateRangePicker acima e a página inteira (KPIs, gráficos) mudam
+            // junto com a seta — é o mesmo `dateRange` para todo mundo.
+            onPeriodoChange={setDateRange}
           />
         )}
 

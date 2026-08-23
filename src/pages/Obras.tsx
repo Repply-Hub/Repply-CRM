@@ -321,16 +321,14 @@ export default function Obras() {
     );
   };
 
+  // O `headerContent` que existia aqui repetia, letra por letra, o mesmo cabeçalho que o
+  // AppLayout já monta a partir de `title`/`subtitle`. Como `headerContent` tem prioridade
+  // sobre os dois, o `subtitle` desta tela era texto morto: mexer nele não mudava nada na
+  // tela. Removido para o cabeçalho vir de um lugar só, como nas demais seções.
   return (
-    <AppLayout 
-      title="Obras" 
-      subtitle="Gerencie e acompanhe todas as obras cadastradas."
-      headerContent={
-        <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
-          <h1 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">Obras</h1>
-          <p className="text-[10px] sm:text-sm text-muted-foreground truncate">Gerencie e acompanhe todas as obras cadastradas.</p>
-        </div>
-      }
+    <AppLayout
+      title="Obras"
+      subtitle="Gerencie e acompanhe todas as obras cadastradas"
       mainClassName="flex-1 overflow-hidden flex flex-col"
     >
       <div className="p-4 md:p-6 space-y-6 flex-1 flex flex-col min-h-0">

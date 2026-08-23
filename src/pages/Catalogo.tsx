@@ -100,10 +100,13 @@ const Catalogo = () => {
 
   const showFolders = categoria === 'todas' && busca.trim() === '';
 
+  // O subtítulo do cabeçalho diz PARA QUE a tela serve, como no resto do sistema.
+  // Era contagem (categorias ou produtos, conforme o modo), e contagem continua
+  // onde ela ajuda de verdade: cada pasta de categoria mostra o próprio total.
   return (
     <AppLayout
       title="Catálogo de Produtos"
-      subtitle={showFolders ? `${categorias.length} categoria(s)` : `${filtered.length} produto(s)`}
+      subtitle="Produtos das representadas, com referência e preço de tabela"
       mainClassName="flex-1 overflow-hidden flex flex-col"
     >
       <div className="p-4 md:p-6 w-full flex flex-col flex-1 min-h-0 gap-6">

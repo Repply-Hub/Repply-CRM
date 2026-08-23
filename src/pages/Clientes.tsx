@@ -471,7 +471,6 @@ const Clientes = () => {
   const empresas = clients ?? [];
   const contatos = contatosList ?? [];
   const isLoading = activeTab === 'empresas' ? loadingClientes : loadingContatos;
-  const totalCount = (clients?.length ?? 0) + (contatosList?.length ?? 0);
 
   // Larguras resolvidas na mesma ordem das colunas visíveis, usadas no <colgroup> e nos
   // cabeçalhos — a tabela precisa de largura própria explícita (não w-full/auto) + colgroup,
@@ -961,8 +960,10 @@ const Clientes = () => {
   };
 
 
+  // Subtítulo descreve a tela, como no resto do sistema. Era a soma de empresas +
+  // contatos; essa contagem não se perdeu, continua no selo de cada aba logo abaixo.
   return (
-    <AppLayout title="Clientes" subtitle={`${totalCount} cadastrados`} mainClassName="flex-1 overflow-hidden flex flex-col">
+    <AppLayout title="Clientes" subtitle="Carteira de clientes e os contatos de cada empresa" mainClassName="flex-1 overflow-hidden flex flex-col">
       <div className="p-3 sm:p-4 md:p-6 w-full flex-1 flex flex-col min-h-0">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
         <div className="flex flex-wrap items-center gap-3 mb-4">

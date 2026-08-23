@@ -566,10 +566,12 @@ const Fabricantes = () => {
   // Mobile: show detail view when a fabricante is selected
   const showingDetail = !!selectedFab;
 
+  // Subtítulo descreve a tela, como no resto do sistema. Era a contagem de
+  // representadas — número que a própria lista da esquerda já mostra.
   return (
     <AppLayout
       title="Fabricantes & Tabelas de Preço"
-      subtitle={`${fabricantes?.length ?? 0} fabricantes cadastrados`}
+      subtitle="Representadas, seus contatos e a tabela de preços de cada uma"
       mainClassName="flex-1 overflow-hidden flex flex-col"
     >
       <div className="p-4 md:p-6 w-full flex-1 flex flex-col min-h-0 h-full">

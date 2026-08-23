@@ -172,8 +172,6 @@ function NovoNegocioFormContent({
   const { data: camposConfig } = useConfiguracoesCampos('pedidos', profile?.empresa_id);
   const { data: marcadores } = useMarcadores(profile?.empresa_id);
   const [camposExtras, setCamposExtras] = useState<Record<string, string>>({});
-  const [proximoContato, setProximoContato] = useState<Date | undefined>();
-  const [proximoContatoHora, setProximoContatoHora] = useState('09:00');
   const [valorManual, setValorManual] = useState<number | null>(null);
   const [isManualMode, setIsManualMode] = useState(false);
 
@@ -277,10 +275,16 @@ function NovoNegocioFormContent({
       // Valor manual só é exigível quando o modo manual está ativo — fora dele,
       // o valor vem do somatório dos itens.
       valor_manual: (!isManualMode || valorManual != null) ? 'ok' : undefined,
-      proximo_contato: proximoContato ? 'ok' : undefined,
     };
     const camposDaEtapa = (camposConfig ?? []).filter(c =>
-      etapaAlvo === 'step2' ? c.etapa === 'Itens do Negócio' : c.etapa !== 'Itens do Negócio'
+      // "Próximo Contato Agendado" saiu da tela, mas a linha dele continua na
+      // configuração de campos por empresa e ainda pode estar (ou vir a ser)
+      // marcada como obrigatória lá. Sem esta exceção, a empresa que marcasse
+      // ficaria sem nenhum lugar onde preencher: a validação reprovaria sempre e
+      // o botão "Criar Negócio" nunca mais habilitaria. Se o campo um dia voltar,
+      // basta apagar esta linha.
+      c.campo_key !== 'proximo_contato' &&
+      (etapaAlvo === 'step2' ? c.etapa === 'Itens do Negócio' : c.etapa !== 'Itens do Negócio')
     );
     for (const campo of camposDaEtapa) {
       if (!isCampoObrigatorioNaEtapa(campo, currentKanbanColunaId)) continue;
@@ -344,14 +348,6 @@ function NovoNegocioFormContent({
       }
 
       // 2. Create Pedido
-      let proximoContatoISO: string | undefined;
-      if (proximoContato) {
-        const dt = new Date(proximoContato);
-        const [h, m] = proximoContatoHora.split(':').map(Number);
-        dt.setHours(h, m, 0, 0);
-        proximoContatoISO = dt.toISOString();
-      }
-
       const created = await createPedido.mutateAsync({
         cliente_id: clienteId,
         fabricante_id: fabricanteId,
@@ -375,7 +371,9 @@ function NovoNegocioFormContent({
           unidade: i.unidade || undefined,
           preco_unitario: i.preco_unitario,
         })),
-        proximo_contato: proximoContatoISO,
+        // `proximo_contato` saiu do payload junto com o campo da tela. Omitir é seguro:
+        // o hook só criava a linha em historico_contatos QUANDO o valor vinha preenchido
+        // (use-novo-pedido.ts), então não mandar nada não apaga nem sobrescreve nada.
         valor_total: valorFinal,
       });
       toast.success('Negócio criado com sucesso!');
@@ -788,53 +786,32 @@ function NovoNegocioFormContent({
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2 p-4 border rounded-xl bg-muted/10">
-                        <Label className="text-sm font-semibold">Valor de Negociação</Label>
-                        {/* CampoMoeda no lugar do <input type="number"> antigo. Dois defeitos
-                            morreram aqui de uma vez:
-                            1. o campo era do padrão dos EUA e a leitura usava parseFloat —
-                               parseFloat("99.888,47") devolve 99.888, MIL VEZES MENOS, sem
-                               erro nenhum. Foi o que gravou 106.387.320,00 no lugar de
-                               106.387,32 em produção;
-                            2. em type="number" a roda do mouse altera o valor sozinha quando
-                               o cursor está por cima do campo — a pessoa rola a página para
-                               ver o resto do formulário e o valor muda sem ela ver.
-                            O CampoMoeda entrega número puro no onChange, então nada de
-                            parseFloat volta aqui. */}
-                        <CampoMoeda
-                          className="h-10 text-base font-bold"
-                          value={valorManual}
-                          onChange={(v) => {
-                            setValorManual(v);
-                            setIsManualMode(true);
-                          }}
-                        />
-                        <p className="text-[10px] text-muted-foreground">Defina o valor manualmente caso não queira listar itens individuais.</p>
-                      </div>
-
-                      <div className="space-y-2 p-4 border rounded-xl bg-muted/10">
-                        <Label className="text-sm font-semibold">Próximo Contato Agendado</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className={cn("w-full h-10 justify-start text-left font-normal bg-background", !proximoContato && "text-muted-foreground")}>
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {proximoContato ? format(proximoContato, "dd/MM/yyyy") : "Selecionar data"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            {/* Reabre no mês da data já agendada (undefined = mês atual, que é o
-                                padrão do react-day-picker), pra quem agenda contato pra dois ou
-                                três meses à frente não precisar navegar tudo de novo. */}
-                            <Calendar mode="single" selected={proximoContato} defaultMonth={proximoContato} onSelect={setProximoContato} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
-                          </PopoverContent>
-                        </Popover>
-                        {proximoContato && (
-                          <div className="mt-2">
-                            <Input type="time" className="h-8 text-xs" value={proximoContatoHora} onChange={e => setProximoContatoHora(e.target.value)} />
-                          </div>
-                        )}
-                      </div>
+                    {/* Aqui existia uma grade de duas colunas: "Valor de Negociação" e "Próximo
+                        Contato Agendado". Com o agendamento fora, sobrou um cartão só — a grade
+                        saiu e o cartão ganhou `max-w-sm`, o mesmo formato da tela de edição
+                        (EditarPedido.tsx), pra não virar um campo esticado na linha inteira. */}
+                    <div className="space-y-2 p-4 border rounded-xl bg-muted/10 max-w-sm">
+                      <Label className="text-sm font-semibold">Valor de Negociação</Label>
+                      {/* CampoMoeda no lugar do <input type="number"> antigo. Dois defeitos
+                          morreram aqui de uma vez:
+                          1. o campo era do padrão dos EUA e a leitura usava parseFloat —
+                             parseFloat("99.888,47") devolve 99.888, MIL VEZES MENOS, sem
+                             erro nenhum. Foi o que gravou 106.387.320,00 no lugar de
+                             106.387,32 em produção;
+                          2. em type="number" a roda do mouse altera o valor sozinha quando
+                             o cursor está por cima do campo — a pessoa rola a página para
+                             ver o resto do formulário e o valor muda sem ela ver.
+                          O CampoMoeda entrega número puro no onChange, então nada de
+                          parseFloat volta aqui. */}
+                      <CampoMoeda
+                        className="h-10 text-base font-bold"
+                        value={valorManual}
+                        onChange={(v) => {
+                          setValorManual(v);
+                          setIsManualMode(true);
+                        }}
+                      />
+                      <p className="text-[10px] text-muted-foreground">Defina o valor manualmente caso não queira listar itens individuais.</p>
                     </div>
                   </div>
                 ) : (
@@ -986,33 +963,6 @@ function NovoNegocioFormContent({
                   </div>
                 )}
               </div>
-
-              {/* Próximo contato - Somente se houver itens, caso contrário já aparece acima */}
-              {itens.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Próximo Contato Agendado</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !proximoContato && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {proximoContato ? format(proximoContato, "dd/MM/yyyy") : "Selecionar data"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        {/* Mesmo do campo compacto acima: reabre no mês já agendado. */}
-                        <Calendar mode="single" selected={proximoContato} defaultMonth={proximoContato} onSelect={setProximoContato} locale={ptBR} className={cn("p-3 pointer-events-auto")} />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  {proximoContato && (
-                    <div className="space-y-2">
-                      <Label>Horário</Label>
-                      <Input type="time" value={proximoContatoHora} onChange={e => setProximoContatoHora(e.target.value)} />
-                    </div>
-                  )}
-                </div>
-              )}
 
             </div>
           )}
