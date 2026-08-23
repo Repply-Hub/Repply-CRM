@@ -35,8 +35,8 @@ import { useCreateObra, useUpdateObra, useDeleteObra, useDeleteObrasBulk } from 
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
 import { toast } from 'sonner';
-import { z } from 'zod';
-import { formatCnpj, isValidCnpj } from '@/utils/cnpj';
+import { formatCnpj } from '@/utils/cnpj';
+import { validarCnpjDaObra } from '@/lib/obra-cnpj';
 import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
@@ -124,7 +124,6 @@ export default function Obras() {
   const [newObraCnpjError, setNewObraCnpjError] = useState('');
   const [editObraCnpjError, setEditObraCnpjError] = useState('');
 
-  const cnpjSchema = z.string().min(18, "CNPJ obrigatório").refine(isValidCnpj, { message: "CNPJ inválido" });
 
   const { data: statusObras } = useStatusObras();
 
@@ -708,7 +707,10 @@ export default function Obras() {
                         cliente_id: selectedObra.cliente_id,
                         endereco_entrega: selectedObra.endereco_entrega || '',
                         status: selectedObra.status,
-                        spe_cnpj: selectedObra.spe_cnpj || '',
+                        // Com máscara, e não cru. O banco guarda só os 14 dígitos, mas a
+                        // validação cobra os 18 caracteres do formato — sem `formatCnpj`
+                        // aqui, obra COM CNPJ salvo era reprovada por "CNPJ obrigatório".
+                        spe_cnpj: formatCnpj(selectedObra.spe_cnpj || ''),
                       });
                       setEditDialogOpen(true);
                       setSelectedObra(null);
@@ -732,9 +734,9 @@ export default function Obras() {
             </CabecalhoDialogo>
             <form onSubmit={(e) => {
               e.preventDefault();
-              const result = cnpjSchema.safeParse(editObra.spe_cnpj);
-              if (!result.success) {
-                setEditObraCnpjError(result.error.errors[0].message);
+              const erroCnpjEdit = validarCnpjDaObra(editObra.spe_cnpj, obraObrigatorio('spe_cnpj', false));
+              if (erroCnpjEdit) {
+                setEditObraCnpjError(erroCnpjEdit);
                 return;
               }
               const payload = {
@@ -835,13 +837,10 @@ export default function Obras() {
                 toast.error("Preencha ao menos o nome e o cliente.");
                 return;
               }
-              const speCnpjObrigatorio = obraObrigatorio('spe_cnpj', false);
-              if (speCnpjObrigatorio || newObra.spe_cnpj.trim()) {
-                const result = cnpjSchema.safeParse(newObra.spe_cnpj);
-                if (!result.success) {
-                  setNewObraCnpjError(result.error.errors[0].message);
-                  return;
-                }
+              const erroCnpjNovo = validarCnpjDaObra(newObra.spe_cnpj, obraObrigatorio('spe_cnpj', false));
+              if (erroCnpjNovo) {
+                setNewObraCnpjError(erroCnpjNovo);
+                return;
               }
               for (const c of (camposConfigObras ?? []).filter(c => c.origem === 'customizado' && c.obrigatorio)) {
                 if (!camposExtrasObra[c.campo_key]?.trim()) {
