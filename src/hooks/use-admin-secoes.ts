@@ -117,6 +117,15 @@ export interface PresetResumo {
   is_padrao: boolean;
   /** Quantas empresas mudam de comportamento se este preset mudar. */
   empresas_seguindo: number;
+  /**
+   * Quantas seguem este preset por OMISSÃO — sem apontar preset nenhum.
+   *
+   * Só é diferente de zero no preset padrão, e é o número que importa ao TROCAR o padrão:
+   * `empresas_seguindo` responde "quem segue este preset", este responde "quem muda se eu
+   * trocar qual é o padrão". Medido em 23/08/2026: 0, porque as 8 empresas apontam
+   * explicitamente. Trocar o padrão hoje decide só o que o PRÓXIMO assinante recebe.
+   */
+  empresas_por_omissao: number;
   secoes_ligadas: number;
 }
 
@@ -280,6 +289,36 @@ export function useExcluirPreset() {
     },
     onError: (e: unknown) => {
       toast.error(e instanceof Error ? e.message : 'Não foi possível excluir o preset');
+    },
+  });
+}
+
+/**
+ * Escolhe QUAL preset é o padrão.
+ *
+ * Padrão aqui significa uma coisa só, e é bom não confundir: é o preset que vale para
+ * empresa que não aponta nenhum. Como `empresas.secao_preset_id` nasce nulo e não há gatilho
+ * que o preencha, na prática o padrão é **o que um assinante novo recebe no primeiro dia**.
+ *
+ * Não confundir com o preset de PERMISSÕES (`permissao_presets`), que é o outro eixo: aquele
+ * diz o que cada cargo VÊ dentro do que existe; este diz o que EXISTE para o assinante.
+ */
+export function useDefinirPresetPadrao() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (presetId: string) => {
+      const { error } = await supabase.rpc('admin_definir_preset_padrao', {
+        p_preset_id: presetId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidarTudo(qc);
+      toast.success('Preset padrão alterado — é o que empresa nova passa a receber');
+    },
+    onError: (e: unknown) => {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível alterar o preset padrão');
     },
   });
 }

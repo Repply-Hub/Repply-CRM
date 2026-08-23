@@ -4062,6 +4062,10 @@ export type Database = {
         Args: { p_empresa_id: string; p_preset_id: string }
         Returns: undefined
       }
+      admin_definir_preset_padrao: {
+        Args: { p_preset_id: string }
+        Returns: undefined
+      }
       admin_excluir_preset: {
         Args: { p_preset_id: string }
         Returns: undefined
@@ -4070,6 +4074,7 @@ export type Database = {
         Args: never
         Returns: {
           descricao: string
+          empresas_por_omissao: number
           empresas_seguindo: number
           id: string
           is_padrao: boolean

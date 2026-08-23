@@ -21,13 +21,13 @@ import {
 } from '@/components/shared/DialogoResponsivo';
 import {
   Building2, Users, Loader2, ChevronDown, ChevronRight, Search, RefreshCw, ShieldCheck,
-  Layers, Plus, Pencil, Trash2, AlertTriangle,
+  Layers, Plus, Pencil, Trash2, AlertTriangle, Star,
 } from 'lucide-react';
 import { SECOES } from '@/lib/secoes';
 import {
   useAdminSecoes, useDefinirExcecao, useDefinirPresetDaEmpresa,
   usePresets, useItensDosPresets, useCriarPreset, useRenomearPreset,
-  useDefinirItemPreset, useExcluirPreset,
+  useDefinirItemPreset, useExcluirPreset, useDefinirPresetPadrao,
   type LinhaSecaoEmpresa, type PresetResumo,
 } from '@/hooks/use-admin-secoes';
 
@@ -465,14 +465,23 @@ function SecoesDoPreset({
 function CardPreset({
   preset,
   itens,
+  empresasSemPreset,
 }: {
   preset: PresetResumo;
   itens: Map<string, boolean> | undefined;
+  /**
+   * Quantas empresas não apontam preset nenhum — ou seja, quantas mudam NA HORA se o padrão
+   * for trocado. Vem do preset padrão ATUAL, não deste cartão: este, por não ser o padrão,
+   * tem esse número sempre em zero.
+   */
+  empresasSemPreset: number;
 }) {
   const [aberto, setAberto] = useState(false);
   const [renomeando, setRenomeando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
+  const [tornandoPadrao, setTornandoPadrao] = useState(false);
   const excluir = useExcluirPreset();
+  const definirPadrao = useDefinirPresetPadrao();
 
   return (
     <Card>
@@ -498,7 +507,16 @@ function CardPreset({
             </span>
           </button>
 
-          {preset.is_padrao && <Badge variant="outline">padrão</Badge>}
+          {preset.is_padrao && (
+            <Badge
+              variant="outline"
+              className="gap-1 whitespace-nowrap"
+              title="É o que uma empresa nova recebe ao entrar, enquanto ninguém escolher outro para ela"
+            >
+              <Star className="h-3 w-3 fill-current" />
+              padrão
+            </Badge>
+          )}
 
           <Badge
             variant="secondary"
@@ -508,6 +526,21 @@ function CardPreset({
             <Building2 className="h-3 w-3" />
             {preset.empresas_seguindo}
           </Badge>
+
+          {/* Só aparece em quem NÃO é o padrão: no padrão o botão não teria o que fazer, e
+              botão que não faz nada ensina errado. */}
+          {!preset.is_padrao && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Tornar este o preset padrão"
+              title="Tornar este o preset padrão"
+              disabled={definirPadrao.isPending}
+              onClick={() => setTornandoPadrao(true)}
+            >
+              <Star className="h-4 w-4" />
+            </Button>
+          )}
 
           <Button
             variant="ghost"
@@ -541,6 +574,49 @@ function CardPreset({
         <DialogoPreset preset={preset} aoFechar={() => setRenomeando(false)} />
       )}
 
+      <AlertDialog open={tornandoPadrao} onOpenChange={setTornandoPadrao}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tornar {preset.nome} o preset padrão?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Empresa nova entra no sistema sem preset escolhido e segue o padrão. Daqui
+                  em diante, quem entrar recebe{' '}
+                  <strong className="text-foreground">{preset.nome}</strong>.
+                </p>
+                {/* O número vem do padrão ATUAL, não deste preset: quem muda na hora é quem
+                    não aponta preset nenhum. Hoje esse número é 0 — as empresas todas
+                    apontam explicitamente —, e dizer isso evita tanto o susto quanto a
+                    impressão errada de que a troca não faz nada. */}
+                {empresasSemPreset > 0 ? (
+                  <p>
+                    <strong className="text-foreground">
+                      {empresasSemPreset} empresa{empresasSemPreset > 1 ? 's' : ''} muda
+                      {empresasSemPreset > 1 ? 'm' : ''} agora
+                    </strong>{' '}
+                    — {empresasSemPreset > 1 ? 'são as que não têm' : 'é a que não tem'} preset
+                    escolhido e {empresasSemPreset > 1 ? 'seguem' : 'segue'} o padrão.
+                  </p>
+                ) : (
+                  <p>
+                    <strong className="text-foreground">Nenhuma empresa de hoje muda.</strong>{' '}
+                    Todas têm um preset escolhido, e escolha feita ganha do padrão. Isto vale
+                    só para quem entrar de agora em diante.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => definirPadrao.mutate(preset.id)}>
+              Tornar padrão
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={excluindo} onOpenChange={setExcluindo}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -568,11 +644,18 @@ function AbaPresets() {
   const { data: itens } = useItensDosPresets();
   const [criando, setCriando] = useState(false);
 
+  // Quem segue o padrão por omissão segue o padrão ATUAL — por isso o número sai de lá, e
+  // não do cartão que está sendo promovido.
+  const empresasSemPreset = presets.find((p) => p.is_padrao)?.empresas_por_omissao ?? 0;
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm text-muted-foreground">
-          Mexer num preset muda todas as empresas que o seguem de uma vez.
+          Mexer num preset muda todas as empresas que o seguem de uma vez. O preset marcado
+          com <Star className="inline h-3 w-3 fill-current align-[-1px]" /> é o{' '}
+          <strong className="text-foreground">padrão</strong>: o que uma empresa nova recebe
+          ao entrar, enquanto ninguém escolher outro para ela.
         </p>
         <Button onClick={() => setCriando(true)}>
           <Plus className="h-4 w-4" />
@@ -595,7 +678,12 @@ function AbaPresets() {
 
       <div className="space-y-2">
         {presets.map((p) => (
-          <CardPreset key={p.id} preset={p} itens={itens?.get(p.id)} />
+          <CardPreset
+            key={p.id}
+            preset={p}
+            itens={itens?.get(p.id)}
+            empresasSemPreset={empresasSemPreset}
+          />
         ))}
       </div>
 
