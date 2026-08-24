@@ -1,23 +1,63 @@
-# Publicar o site — pela linha de comando
+# Publicar o site
 
-> 🔴 **Enviar para o `main` NÃO publica mais nada.** Desde 22/08/2026 a publicação é um
-> passo manual, feito por quem enviou o código. Se você commitou e não rodou o comando
-> abaixo, **o que você fez não está no ar.**
+> ✅ **Enviar para o `main` publica.** Desde 24/08/2026, commit no `main` vira site no ar em
+> cerca de 30 segundos, sem ninguém rodar comando nenhum. O ✓ ou ✗ ao lado do commit no
+> GitHub é o resultado da publicação.
 
 ---
 
-## Por que mudou
+## Os dois dias em que não publicou, e o diagnóstico errado
 
-Duas coisas aconteceram no mesmo dia:
+Entre 22 e 24/08/2026 a publicação foi manual. O motivo escrito aqui na época — e repetido
+no `CLAUDE.md`, no `README.md` e em três conversas — era:
 
-1. **O repositório mudou de dono.** Saiu de `viniciusgodoy99/mdrepresentacoes` (conta
-   pessoal do desenvolvedor anterior) e passou a ser `Repply-Hub/Repply-CRM`. A ligação da
-   Vercel apontava para o endereço antigo e se perdeu.
-2. **O plano da Vercel é o gratuito**, e ele não conecta repositório que pertence a uma
-   organização do GitHub — só a repositório de conta pessoal.
+> ~~"O plano gratuito da Vercel não **conecta** repositório que pertence a uma organização
+> do GitHub."~~
 
-Enquanto não houver plano pago, a saída é publicar pela linha de comando: ela não depende
-da ligação com o GitHub.
+**Isso é falso.** A conexão existia o tempo todo e disparava a cada commit. O que ela
+recebia de volta era esta recusa, que estava em `commits/<sha>/status` da API do GitHub —
+o ✗ vermelho ao lado de cada commit, que ninguém tinha aberto:
+
+```
+Cannot deploy from a private GitHub organization repository on the Hobby plan
+```
+
+A palavra que decide é **privado**, não "organização". O plano gratuito conecta repositório
+de organização normalmente; ele se recusa a **publicar** quando esse repositório é privado.
+
+O conserto foi tornar o repositório público, em 24/08/2026. Sem plano pago, sem reconectar
+nada: as duas verificações que devolviam `failure` passaram a devolver
+`success | Deployment has completed`.
+
+### O erro de método, que é o que vale guardar
+
+Três diagnósticos furados saíram do mesmo hábito: **ler ausência de informação como
+informação.** O `vercel project inspect` não mostra bloco de Git, e isso foi lido como "não
+há repositório conectado". O comando que respondeu de primeira foi o mais óbvio — tentar
+conectar e escutar a resposta:
+
+```bash
+npx vercel git connect
+# > Repply-Hub/Repply-CRM is already connected to your project.
+```
+
+Quando um lado diz "está tudo certo" e o resultado não aparece, **procure onde o outro lado
+registra a recusa** — aqui, o status do commit no GitHub.
+
+---
+
+## 🔴 A Vercel do desenvolvedor anterior continua ligada
+
+Cada commit dispara **duas** publicações, em duas contas:
+
+| Verificação no commit | Conta |
+|---|---|
+| `Vercel – repply-crm` | `vercel.com/repply1` — a da Repply, serve `crm.repplyhub.com.br` |
+| `Vercel – repply` | `vercel.com/arthurclimb` — **a do desenvolvedor anterior** |
+
+Enquanto o repositório era privado, as duas falhavam. Agora as duas publicam com sucesso: a
+conta do desenvolvedor anterior mantém uma cópia do CRM no ar, atualizada a cada commit.
+Titularidade pendente — decisão do Lucas, não desconecte por conta própria.
 
 > ⚠️ **O plano gratuito da Vercel veda uso comercial.** O Repply CRM é um SaaS com cliente
 > pagante, então hoje o uso está fora dos termos e a Vercel pode suspender o projeto sem
@@ -28,6 +68,9 @@ da ligação com o GitHub.
 ---
 
 ## Uma vez só, por máquina
+
+> Só faz falta para o caminho manual da seção seguinte. Para o uso normal — commitar e
+> deixar publicar sozinho — não é preciso instalar nem configurar nada.
 
 ```bash
 npx vercel login
@@ -49,7 +92,24 @@ Isso cria uma pasta `.vercel/` local, que **não vai para o repositório** (est�
 
 ---
 
-## A cada publicação
+## Publicar à mão — só para o que NÃO está commitado
+
+Em uso normal isto não é necessário: o `git push` já publica. O comando serve para provar
+alguma coisa antes de commitar, ou se a publicação automática cair.
+
+> ⚠️ **Nunca publique da pasta de trabalho quando houver outra sessão codando nela.** O
+> `vercel --prod` manda o **disco**, não o commitado — sobe junto o que a outra sessão
+> deixou pela metade. Publique de uma cópia limpa:
+>
+> ```bash
+> git clone --local . /tmp/publicar && cd /tmp/publicar && npm ci
+> ```
+>
+> E **apague o `.env` antes de mandar**: o `.env` das máquinas de desenvolvimento não tem
+> `VITE_GOOGLE_MAPS_API_KEY`, e o site iria ao ar sem mapa e sem posicionamento das obras,
+> sem nenhum erro aparecer.
+
+### O comando
 
 ```bash
 npx vercel --prod
