@@ -171,14 +171,6 @@ export function useCreateVendedor() {
   });
 }
 
-// ⚠️ TEMPORÁRIO — remover junto com o DROP de `obras.status`.
-//
-// O "Status Inicial" da obra virou MARCADOR (`marcador_id`), mas a coluna `status` ainda
-// existe no banco e ainda é NOT NULL: a migration de 23/08/2026 só ACRESCENTOU o marcador, e
-// o DROP vem em arquivo próprio, depois que o site novo estiver publicado. Enquanto isso, o
-// insert precisa mandar algum valor válido — sem ele o cadastro de obra falha em produção.
-const STATUS_LEGADO_DA_OBRA = 'ativa';
-
 export function useCreateObra() {
   const qc = useQueryClient();
   return useMutation({
@@ -190,13 +182,15 @@ export function useCreateObra() {
       spe_cnpj?: string;
       campos_extras?: Record<string, string>;
     }) => {
-      // Ver STATUS_LEGADO_DA_OBRA: a coluna ainda é obrigatória no banco. O valor vai PRIMEIRO
-      // no objeto de propósito — quem ainda manda `status` explicitamente (o cadastro rápido de
-      // obra dentro da ficha do cliente, que ainda tem os quatro rótulos fixos) continua
-      // gravando a escolha da pessoa; forçar 'ativa' por cima trocaria o valor em silêncio.
-      const { error } = await supabase
-        .from('obras')
-        .insert({ status: STATUS_LEGADO_DA_OBRA, ...data });
+      // Sem `status`: o "Status Inicial" virou marcador e a coluna vai ser derrubada. Este
+      // insert PRECISA parar de mandá-la ANTES do DROP, e o site novo precisa estar publicado
+      // antes dele — senão existe uma janela em que o cadastro de obra dá erro em produção.
+      //
+      // Enquanto a coluna existir, omiti-la é seguro: ela é NOT NULL mas tem DEFAULT
+      // ('em_andamento'), e o Postgres só aplica o default quando a coluna é OMITIDA do
+      // insert. Mandá-la explicitamente, mesmo vazia, é o que anulava o default — foi assim
+      // que obra entrava no banco com status em branco.
+      const { error } = await supabase.from('obras').insert(data);
       if (error) throw error;
     },
     onSuccess: () => {
