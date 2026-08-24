@@ -41,8 +41,8 @@ empresas de fora usando — **este sistema está em produção com cliente pagan
 - **Gráficos:** Recharts · **Mapas:** Leaflet + OpenStreetMap (sem chave de API)
 - **Backend:** Supabase (Postgres + Auth + Storage + Edge Functions em Deno)
 - **Testes:** Vitest + Testing Library, ambiente jsdom
-- **Deploy:** Vercel — **publica sozinha** desde 24/08/2026: commit no `main` vai ao ar em
-  ~30s. O comando manual (`npx vercel --prod`) só serve para o que não está commitado. Ver §16
+- **Deploy:** Vercel — 🔴 **NÃO publica sozinha.** A publicação é manual, por
+  `npx vercel --prod`, com login na conta da Repply. Ver §16
 
 **TypeScript está frouxo de propósito** (`strictNullChecks: false`, `noImplicitAny: false`).
 Não conte com garantia de tipo ao ler nem ao escrever: o compilador não vai te avisar.
@@ -583,9 +583,8 @@ git push origin main
 Mensagem no padrão convencional, em português. Prefixos: `feat`, `fix`, `refactor`,
 `docs`, `chore`, `style`.
 
-**5. Publicar: nada a fazer.** Desde 24/08/2026 o `git push` já publica — a Vercel
-constrói e coloca no ar sozinha, em ~30s. Confira o resultado pelo ✓/✗ ao lado do commit no
-GitHub. Ver §16.
+**5. Publicar.** Enviar para o `main` **não** coloca nada no ar. Rode `npx vercel --prod`.
+O assistente pode rodá-lo sozinho; o Lucas autorizou em 24/08/2026. Ver §16.
 
 > **Histórico da regra:** o projeto experimentou branch + Pull Request em 19/08/2026
 > (PR #1, o único do repositório). A decisão foi revertida no mesmo dia, para não conviver
@@ -634,31 +633,41 @@ engordar mais o arquivo.
 
 ---
 
-## 16. Publicar: enviar para o `main` publica sozinho
+## 16. 🔴 Publicar é um passo MANUAL
 
-**Desde 24/08/2026 a Vercel voltou a publicar automaticamente.** Commit no `main` vira site
-no ar em cerca de 30 segundos, sem ninguém rodar comando nenhum.
+**Enviar para o `main` não coloca nada no ar.**
 
-### O que realmente estava quebrado — e por quê a explicação anterior era falsa
+```sh
+npx vercel --prod
+```
+
+### A explicação correta — e por que ela mudou duas vezes em dois dias
 
 Entre 22 e 24/08/2026 este arquivo dizia que "o plano gratuito não **conecta** repositório de
-organização". **Isso está errado**, e o erro custou dois dias de publicação manual e três
-diagnósticos furados. A conexão sempre existiu e sempre disparou; o que ela recebia de volta,
-a cada commit, era esta recusa — lida direto da API do GitHub:
+organização". **Isso é falso**, e o erro custou dois dias de diagnóstico furado. A conexão
+sempre existiu e sempre disparou; o que ela recebia de volta a cada commit era esta recusa,
+lida direto da API do GitHub:
 
 > `Cannot deploy from a private GitHub organization repository on the Hobby plan`
 
-A palavra que decide é **privado**, não "organização". O plano gratuito conecta repositório de
-organização sem problema; ele se recusa a publicar quando esse repositório é **privado**.
+A palavra que decide é **privado**, não "organização". O plano gratuito publica repositório de
+organização sem problema — recusa quando esse repositório é **privado**.
 
-O conserto foi tornar o repositório público, em 24/08/2026. Nada de plano pago, nada de
-reconectar: as mesmas duas verificações que devolviam `failure` passaram a devolver
-`success | Deployment has completed`, e o arquivo servido em produção trocou sozinho.
+Em 24/08/2026 o repositório foi tornado **público** para a publicação automática voltar, e ela
+voltou. **No mesmo dia foi tornado privado de novo**, por decisão do dono do produto, depois de
+uma apuração de segurança. Ficou privado.
 
-**A lição de método, que vale além da Vercel:** o `vercel project inspect` não mostra bloco de
-Git, e essa ausência foi lida como "não há repositório conectado". Ausência de informação não
-é informação. O estado real estava o tempo todo em `commits/<sha>/status` do GitHub — o ✗
-vermelho ao lado de cada commit — e ninguém tinha aberto.
+**Logo: a publicação automática NÃO funciona, e não vai funcionar enquanto o plano for gratuito
+e o repositório for privado.**
+
+> 🔴 Não "conserte" isso tornando o repositório público de novo sem falar com o Lucas. Fechá-lo
+> foi decisão tomada com o levantamento na mão, não descuido.
+
+### Como cada dev publica
+
+Login na **conta da Vercel da Repply** — não na conta pessoal —, e `npx vercel --prod` da pasta
+do projeto. É assim que dev de fora publica também: o acesso vem da conta compartilhada, não do
+repositório.
 
 ### Quando ainda é preciso publicar à mão
 
@@ -675,18 +684,14 @@ npx vercel --prod
 > e apague o `.env` antes de mandar; sem isso o site vai ao ar sem a chave do Google Maps e
 > sem mapa, sem erro nenhum aparecer).
 
-### 🔴 A Vercel do desenvolvedor anterior continua ligada neste repositório
+### A Vercel do desenvolvedor anterior — desconectada em 24/08/2026
 
-Cada commit dispara **duas** publicações, em duas contas diferentes:
+Até 24/08/2026 cada commit disparava **duas** publicações: a da Repply (`vercel.com/repply1`,
+que serve `crm.repplyhub.com.br`) e uma da conta do desenvolvedor anterior
+(`vercel.com/arthurclimb`), que mantinha uma cópia do CRM no ar.
 
-| Verificação no commit | Conta |
-|---|---|
-| `Vercel – repply-crm` | `vercel.com/repply1` — a da Repply, a que serve `crm.repplyhub.com.br` |
-| `Vercel – repply` | `vercel.com/arthurclimb` — **a do desenvolvedor anterior** |
-
-Enquanto era privado, as duas falhavam. Agora as duas **publicam com sucesso** — ou seja, a
-conta do desenvolvedor anterior mantém uma cópia do CRM no ar, atualizada a cada commit.
-Titularidade pendente, decisão do Lucas. Não desconecte por conta própria.
+Conferido em 24/08/2026: o commit mais recente traz **uma só** verificação. A segunda conta
+saiu. Se ela reaparecer entre as verificações de um commit, a ligação voltou — avise o Lucas.
 
 ### Quem publica
 
